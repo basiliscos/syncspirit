@@ -1,0 +1,130 @@
+#include <boost/beast/http.hpp>
+#include <boost/beast/version.hpp>
+#include <string_view>
+
+#include "error_code.h"
+#include "upnp_support.h"
+
+namespace syncspirit::utils {
+
+const char *upnp_fields::st = "ST";
+const char *upnp_fields::man = "MAN";
+const char *upnp_fields::mx = "MX";
+const char *upnp_fields::usn = "USN";
+
+const char *upnp_addr = "239.255.255.250";
+
+static const char *igd_v1_st_v = "urn:schemas-upnp-org:device:InternetGatewayDevice:1";
+static const char *igd_man_v = "\"ssdp:discover\"";
+
+constexpr unsigned http_version = 11;
+
+namespace http = boost::beast::http;
+namespace asio = boost::asio;
+namespace sys = boost::system;
+
+outcome::result<void> make_discovery_request(fmt::memory_buffer &buff, std::uint32_t max_wait) noexcept {
+    std::string upnp_host = fmt::format("{}:{}", upnp_addr, upnp_port);
+    std::string upnp_max_wait = fmt::format("{}", max_wait);
+
+    auto req = http::request<http::empty_body>();
+    req.version(http_version);
+    req.method(http::verb::msearch);
+    req.target("*");
+    req.set(http::field::host, upnp_host.data());
+    req.set(upnp_fields::st, igd_v1_st_v);
+    req.set(upnp_fields::man, igd_man_v);
+    req.set(upnp_fields::mx, upnp_max_wait.data());
+    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+    auto serializer = http::serializer<true, http::empty_body>(req);
+    serializer.split(false);
+
+    sys::error_code ec;
+    serializer.next(ec, [&](auto ec, const auto &buff_seq) {
+        if (!ec) {
+            auto sz = buffer_size(buff_seq);
+            buff.resize(sz);
+            buffer_copy(asio::mutable_buffer(buff.data(), sz), buff_seq);
+        }
+    });
+    if (ec) {
+        return ec;
+    };
+    return outcome::success();
+}
+
+outcome::result<discovery_result> parse(const std::uint8_t *data, std::size_t bytes) noexcept {
+    http::parser<false, http::empty_body> parser;
+    auto buff = asio::const_buffers_1(data, bytes);
+    sys::error_code ec;
+    parser.put(buff, ec);
+    if (ec) {
+        return ec;
+    }
+
+    parser.put_eof(ec);
+    if (ec) {
+        return ec;
+    }
+
+    if (!parser.is_done()) {
+        return error_code::incomplete_discovery_reply;
+    }
+
+    auto &message = parser.get();
+    auto it_location = message.find(http::field::location);
+    if (it_location == message.end()) {
+        return error_code::no_location;
+    }
+    // std::string_view location_str = it_location->value();
+    auto location_option = parse(it_location->value());
+
+    auto it_st = message.find(upnp_fields::st);
+    if (it_st == message.end()) {
+        return error_code::no_st;
+    }
+
+    auto it_usn = message.find(upnp_fields::usn);
+    if (it_usn == message.end()) {
+        return error_code::no_usn;
+    }
+
+    auto st = it_st->value();
+    if (st != igd_v1_st_v) {
+        return error_code::igd_mismatch;
+    }
+
+    auto usn = it_usn->value();
+    return discovery_result{
+        *location_option,
+        std::string(st.begin(), st.end()),
+        std::string(usn.begin(), usn.end()),
+    };
+}
+
+outcome::result<void> make_description_request(fmt::memory_buffer &buff, const discovery_result &dr) noexcept {
+    auto &location = dr.location;
+    http::request<http::empty_body> req;
+    req.method(http::verb::get);
+    req.version(http_version);
+    req.target(location.path);
+    req.set(http::field::host, location.host);
+    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+    sys::error_code ec;
+    auto serializer = http::serializer<true, http::empty_body>(req);
+    serializer.next(ec, [&](auto ec, const auto &buff_seq) {
+        if (!ec) {
+            auto sz = buffer_size(buff_seq);
+            buff.resize(sz);
+            buffer_copy(asio::mutable_buffer(buff.data(), sz), buff_seq);
+        }
+    });
+    if (ec) {
+        return ec;
+    };
+    return outcome::success();
+}
+
+} // namespace syncspirit::utils

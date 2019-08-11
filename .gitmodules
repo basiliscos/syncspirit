@@ -1,0 +1,12 @@
+[submodule "lib/rotor"]
+	path = lib/rotor
+	url = git@github.com:basiliscos/cpp-rotor.git
+[submodule "lib/spdlog"]
+	path = lib/spdlog
+	url = git@github.com:gabime/spdlog.git
+[submodule "lib/fmt"]
+	path = lib/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "lib/json"]
+	path = lib/json
+	url = https://github.com/nlohmann/json.git
