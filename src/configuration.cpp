@@ -75,7 +75,9 @@ boost::optional<configuration_t> get_config(std::ifstream &config) {
             ("global_discovery.cert_file", po::value<std::string>()->default_value("~/.config/syncthing/cert.pem"), "certificate file path")
             ("global_discovery.key_file", po::value<std::string>()->default_value("~/.config/syncthing/key.pem"), "key file path")
             ("global_discovery.timeout", po::value<std::uint32_t>()->default_value(1), "discovery timeout (seconds)")
-            ("upnp.timeout", po::value<std::uint32_t>()->default_value(5), "max wait discovery timeout")
+            ("upnp.rx_buff_size", po::value<std::uint32_t>()->default_value(16384), "receive bufffer size in bytes (default: 16384)")
+            ("upnp.max_wait", po::value<std::uint32_t>()->default_value(5), "max wait discovery timeout")
+            ("upnp.timeout", po::value<std::uint32_t>()->default_value(5), "total upnp timeout")
             ;
     // clang-format on
 
@@ -100,6 +102,7 @@ boost::optional<configuration_t> get_config(std::ifstream &config) {
     cfg.global_announce_config.key_file = vm["global_discovery.key_file"].as<std::string>();
     cfg.global_announce_config.timeout = vm["global_discovery.timeout"].as<std::uint32_t>();
 
+    cfg.upnp_config.max_wait = vm["upnp.max_wait"].as<std::uint32_t>();
     cfg.upnp_config.timeout = vm["upnp.timeout"].as<std::uint32_t>();
 
     // checks

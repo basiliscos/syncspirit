@@ -18,6 +18,10 @@ std::string error_code_category::message(int c) const {
         return "no usn";
     case error_code::igd_mismatch:
         return "IGD (InternetGatewayDevice) mismatch";
+    case error_code::xml_parse_error:
+        return "Error parsing xml";
+    case error_code::wan_notfound:
+        return "WAN device description was not found in the XML";
     default:
         return "unknown";
     }

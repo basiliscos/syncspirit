@@ -11,6 +11,8 @@ enum class error_code {
     no_st,
     no_usn,
     igd_mismatch,
+    xml_parse_error,
+    wan_notfound,
 };
 
 namespace detail {

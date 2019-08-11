@@ -1,7 +1,8 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
 #include <string_view>
-
+#include <sstream>
+#include <pugixml.hpp>
 #include "error_code.h"
 #include "upnp_support.h"
 
@@ -16,6 +17,10 @@ const char *upnp_addr = "239.255.255.250";
 
 static const char *igd_v1_st_v = "urn:schemas-upnp-org:device:InternetGatewayDevice:1";
 static const char *igd_man_v = "\"ssdp:discover\"";
+static const char *igd_wan_xpath = "//service[../../deviceType = 'urn:schemas-upnp-org:device:WANConnectionDevice:1' "
+                                   "and serviceType = 'urn:schemas-upnp-org:service:WANIPConnection:1']";
+static const char *igd_wan_service = "urn:schemas-upnp-org:service:WANIPConnection:1";
+static const char *soap_GetExternalIPAddress = "GetExternalIPAddress";
 
 constexpr unsigned http_version = 11;
 
@@ -124,6 +129,61 @@ outcome::result<void> make_description_request(fmt::memory_buffer &buff, const d
     if (ec) {
         return ec;
     };
+    return outcome::success();
+}
+
+outcome::result<igd_result> parse_igd(const std::uint8_t *data, std::size_t bytes) noexcept {
+    pugi::xml_document doc;
+    auto result = doc.load_buffer(data, bytes);
+    if (!result) {
+        return error_code::xml_parse_error;
+    }
+    auto node = doc.select_node(igd_wan_xpath);
+    if (!node) {
+        return error_code::wan_notfound;
+    }
+
+    auto control_url = node.node().child_value("controlURL");
+    auto description_url = node.node().child_value("SCPDURL");
+    if (control_url && description_url) {
+        return igd_result{control_url, description_url};
+    }
+    return error_code::wan_notfound;
+}
+
+outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const URI &uri) noexcept {
+    http::request<http::string_body> req;
+    std::string soap_action = fmt::format("{0}#{1}", igd_wan_service, soap_GetExternalIPAddress);
+    req.method(http::verb::post);
+    req.version(http_version);
+    req.target(uri.path);
+    req.set(http::field::host, uri.host);
+    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+    req.set(http::field::soapaction, soap_action);
+    req.set(http::field::pragma, "no-cache");
+    req.set(http::field::cache_control, "no-cache");
+    req.set(http::field::content_type, "text/xml");
+
+    std::string body = fmt::format("<?xml version='1.0'?>"
+                                   "<s:Envelope xmlns:s='http://schemas.xmlsoap.org/soap/envelope/' "
+                                   "s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'>"
+                                   "<s:Body><u:{0} xmlns:u='{1}'></u:{0}></s:Body></s:Envelope>",
+                                   soap_GetExternalIPAddress, igd_wan_service);
+    req.body() = body;
+    req.prepare_payload();
+
+    sys::error_code ec;
+    auto serializer = http::serializer<true, http::string_body>(req);
+    serializer.next(ec, [&](auto ec, const auto &buff_seq) {
+        if (!ec) {
+            auto sz = buffer_size(buff_seq);
+            buff.resize(sz);
+            buffer_copy(asio::mutable_buffer(buff.data(), sz), buff_seq);
+        }
+    });
+    if (ec) {
+        return ec;
+    }
     return outcome::success();
 }
 

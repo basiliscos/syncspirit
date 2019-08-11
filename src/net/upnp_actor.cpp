@@ -8,12 +8,15 @@ using udp = boost::asio::ip::udp;
 using tcp = boost::asio::ip::tcp;
 using v4 = asio::ip::address_v4;
 
-constexpr std::size_t rx_buff_sz = 1500;
-
 upnp_actor_t::upnp_actor_t(ra::supervisor_asio_t &sup, const config::upnp_config_t &cfg_)
     : r::actor_base_t{sup}, cfg{cfg_}, strand{static_cast<ra::supervisor_asio_t &>(supervisor).get_strand()},
       io_context{strand.get_io_context()}, resolver{io_context}, udp_socket{io_context, udp::endpoint(udp::v4(), 0)},
       tcp_socket{io_context}, timer{io_context}, activities_flag{0} {}
+
+void upnp_actor_t::on_initialize(r::message_t<r::payload::initialize_actor_t> &msg) noexcept {
+    r::actor_base_t::on_initialize(msg);
+    subscribe(&upnp_actor_t::on_description);
+}
 
 void upnp_actor_t::trigger_shutdown() noexcept {
     if (!(activities_flag & SHUTDOWN_ACTIVE)) {
@@ -84,7 +87,7 @@ void upnp_actor_t::on_start(r::message_t<r::payload::start_actor_t> &msg) noexce
     activities_flag |= TIMER_ACTIVE;
 
     auto destination = udp::endpoint(v4::from_string(upnp_addr), upnp_port);
-    auto request_result = make_discovery_request(tx_buff, cfg.timeout);
+    auto request_result = make_discovery_request(tx_buff, cfg.max_wait);
     if (!request_result) {
         spdlog::error("upnp_actor:: can't serialize upnp discovery request: {}", request_result.error().message());
         return trigger_shutdown();
@@ -117,15 +120,24 @@ void upnp_actor_t::on_discovery_sent(std::size_t bytes) noexcept {
 
     spdlog::trace("upnp_actor::will wait discovery reply");
     auto fwd = ra::forwarder_t(*this, &upnp_actor_t::on_discovery_received, &upnp_actor_t::on_udp_error);
-    auto buff = rx_buff.prepare(rx_buff_sz);
+    auto buff = rx_buff.prepare(cfg.rx_buff_size);
     udp_socket.async_receive(buff, std::move(fwd));
     activities_flag |= UDP_ACTIVE;
 }
 
 void upnp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     spdlog::trace("upnp_actor_t::on_discovery_received ({} bytes)", bytes);
-    activities_flag &= ~UDP_ACTIVE;
+    if (!bytes) {
+        spdlog::trace("upnp_actor::will wait discovery reply");
+        rx_buff.consume(cfg.rx_buff_size);
+        auto fwd = ra::forwarder_t(*this, &upnp_actor_t::on_discovery_received, &upnp_actor_t::on_udp_error);
+        auto buff = rx_buff.prepare(cfg.rx_buff_size);
+        udp_socket.async_receive(buff, std::move(fwd));
+        activities_flag |= UDP_ACTIVE;
+        return;
+    }
 
+    activities_flag &= ~UDP_ACTIVE;
     const std::uint8_t *buff = reinterpret_cast<const std::uint8_t *>(rx_buff.data().data());
     auto discovery_result = parse(buff, bytes);
     if (!discovery_result) {
@@ -184,19 +196,49 @@ void upnp_actor_t::on_connect(resolve_it_t it) noexcept {
     }
     spdlog::trace("upnp_actor:: making description request ({} bytes) to {} ", tx_buff.size(),
                   discovery_option->location.path);
-    auto fwd = ra::forwarder_t(*this, &upnp_actor_t::on_description_requested, &upnp_actor_t::on_tcp_error);
+    auto fwd = ra::forwarder_t(*this, &upnp_actor_t::on_request_sent, &upnp_actor_t::on_tcp_error);
     auto buff = asio::buffer(tx_buff.data(), tx_buff.size());
     asio::async_write(tcp_socket, buff, std::move(fwd));
 }
 
-void upnp_actor_t::on_description_requested(std::size_t) noexcept {
-    spdlog::trace("upnp_actor_t::on_description_requested");
+void upnp_actor_t::on_request_sent(std::size_t) noexcept {
+    spdlog::trace("upnp_actor_t::on_on_request_sent");
 
-    auto fwd = ra::forwarder_t(*this, &upnp_actor_t::on_description_received, &upnp_actor_t::on_tcp_error);
+    auto fwd = ra::forwarder_t(*this, &upnp_actor_t::on_response_received, &upnp_actor_t::on_tcp_error);
+    rx_buff.prepare(cfg.rx_buff_size);
     http::async_read(tcp_socket, rx_buff, responce, std::move(fwd));
 }
 
-void upnp_actor_t::on_description_received(std::size_t bytes) noexcept {
-    spdlog::trace("upnp_actor_t::on_description_received ({} bytes)", bytes);
-    trigger_shutdown();
+void upnp_actor_t::on_response_received(std::size_t bytes) noexcept {
+    spdlog::trace("upnp_actor_t::on_response_received ({}  bytes)", bytes);
+    activities_flag &= ~TCP_ACTIVE;
+    send<resp_description_t>(address, bytes);
+}
+
+void upnp_actor_t::on_description(r::message_t<resp_description_t> &msg) noexcept {
+    const std::uint8_t *buff = reinterpret_cast<const std::uint8_t *>(rx_buff.data().data());
+    auto bytes = msg.payload.bytes;
+    auto igd_result = parse_igd(buff, bytes);
+    if (!igd_result) {
+        spdlog::warn("upnp_actor:: can't get IGD result: {}", igd_result.error().message());
+        std::string xml(static_cast<const char *>(rx_buff.data().data()), bytes);
+        spdlog::debug("xml:\n{0}\n", xml);
+        return trigger_shutdown();
+    }
+
+    rx_buff.consume(bytes);
+    auto &igd = igd_result.value();
+    auto &location = discovery_option->location;
+    std::string igd_control_url = fmt::format("http://{0}:{1}{2}", location.host, location.port, igd.control_path);
+    std::string igd_descr_url = fmt::format("http://{0}:{1}{2}", location.host, location.port, igd.description_path);
+    spdlog::debug("IGD control url: {0}, description url: {1}", igd_control_url, igd_descr_url);
+
+    auto url_option = utils::parse(igd_control_url.c_str());
+    if (!url_option) {
+        spdlog::error("upnp_actor:: can't parse IGD url {}", igd_control_url);
+        return trigger_shutdown();
+    }
+    igd_url = *url_option;
+
+    return trigger_shutdown();
 }

@@ -25,10 +25,19 @@ struct discovery_result {
     std::string usn;
 };
 
+struct igd_result {
+    std::string control_path;
+    std::string description_path;
+};
+
 outcome::result<discovery_result> parse(const std::uint8_t *data, std::size_t bytes) noexcept;
 
 outcome::result<void> make_discovery_request(fmt::memory_buffer &buff, std::uint32_t max_wait) noexcept;
 
 outcome::result<void> make_description_request(fmt::memory_buffer &buff, const discovery_result &dr) noexcept;
+
+outcome::result<igd_result> parse_igd(const std::uint8_t *data, std::size_t bytes) noexcept;
+
+outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const URI &uri) noexcept;
 
 } // namespace syncspirit::utils

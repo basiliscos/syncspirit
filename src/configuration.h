@@ -38,6 +38,8 @@ struct global_announce_config_t {
 };
 
 struct upnp_config_t {
+    std::uint32_t rx_buff_size;
+    std::uint32_t max_wait;
     std::uint32_t timeout;
 };
 
