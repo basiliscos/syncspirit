@@ -123,7 +123,7 @@ void upnp_actor_t::on_discovery_sent(std::size_t bytes) noexcept {
         return trigger_shutdown();
     }
 
-    spdlog::trace("upnp_actor::will wait discovery reply");
+    spdlog::trace("upnp_actor::will wait discovery reply via {}");
     auto fwd = ra::forwarder_t(*this, &upnp_actor_t::on_discovery_received, &upnp_actor_t::on_udp_error);
     auto buff = rx_buff.prepare(cfg.rx_buff_size);
     udp_socket.async_receive(buff, std::move(fwd));
@@ -181,9 +181,15 @@ void upnp_actor_t::on_tcp_error(const sys::error_code &ec) noexcept {
 }
 
 void upnp_actor_t::on_connect(resolve_it_t it) noexcept {
-    std::stringstream str_buff;
-    str_buff << it->endpoint();
-    spdlog::trace("upnp_actor_t::on_connect ({})", str_buff.str());
+    sys::error_code ec;
+    auto local_endpoint = tcp_socket->local_endpoint(ec);
+    if (ec) {
+        spdlog::warn("upnp_actor_t::on_discovery_sent :: cannot get local endpoint: {}", ec.message());
+        return trigger_shutdown();
+    }
+    auto remote_endpoint = it->endpoint();
+    spdlog::trace("upnp_actor_t::on_connect {0}:{1} => {2}:{3}", local_endpoint.address().to_string(),
+                  local_endpoint.port(), remote_endpoint.address().to_string(), remote_endpoint.port());
 
     spdlog::trace("upnp_actor:: making request ({} bytes) to {} ", tx_buff.size(), request_url.full);
     auto fwd = ra::forwarder_t(*this, &upnp_actor_t::on_request_sent, &upnp_actor_t::on_tcp_error);
@@ -207,17 +213,16 @@ void upnp_actor_t::on_response_received(std::size_t bytes) noexcept {
 }
 
 void upnp_actor_t::on_description(r::message_t<resp_description_t> &msg) noexcept {
-    auto bytes = msg.payload.bytes;
-    auto body = response_option->body();
+    auto &body = response_option->body();
     auto igd_result = parse_igd(body.data(), body.size());
     if (!igd_result) {
         spdlog::warn("upnp_actor:: can't get IGD result: {}", igd_result.error().message());
-        std::string xml(static_cast<const char *>(rx_buff.data().data()), bytes);
+        std::string xml(body);
         spdlog::debug("xml:\n{0}\n", xml);
         return trigger_shutdown();
     }
 
-    rx_buff.consume(bytes);
+    rx_buff.consume(msg.payload.bytes);
     auto &igd = igd_result.value();
     auto &location = discovery_option->location;
     std::string igd_control_url = fmt::format("http://{0}:{1}{2}", location.host, location.port, igd.control_path);
@@ -236,9 +241,15 @@ void upnp_actor_t::on_description(r::message_t<resp_description_t> &msg) noexcep
 }
 
 void upnp_actor_t::on_external_ip(r::message_t<resp_external_ip_t> &msg) noexcept {
-    auto bytes = msg.payload.bytes;
-    std::string xml(response_option->body());
-    spdlog::debug("on_external_ip xml:\n{0}\n", xml);
-    rx_buff.consume(bytes);
+    auto &body = response_option->body();
+    auto ip_addr_result = parse_external_ip(body.data(), body.size());
+    if (!ip_addr_result) {
+        spdlog::warn("upnp_actor:: can't get external IP address: {}", ip_addr_result.error().message());
+        std::string xml(body);
+        spdlog::debug("xml:\n{0}\n", xml);
+        return trigger_shutdown();
+    }
+    spdlog::debug("external IP addr: {}", ip_addr_result.value());
+    rx_buff.consume(msg.payload.bytes);
     return trigger_shutdown();
 }

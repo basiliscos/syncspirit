@@ -28,3 +28,10 @@ TEST_CASE("parse IGD description", "[support]") {
     REQUIRE(wan_service.value().control_path == "/upnp/control/WANIPConn1");
     REQUIRE(wan_service.value().description_path == "/gateconnSCPD.xml");
 }
+
+TEST_CASE("parse external IP", "[support]") {
+    auto xml = read_to_file("/tests/data/external-ip.xml");
+    auto ip = parse_external_ip(xml.c_str(), xml.size());
+    REQUIRE(ip);
+    REQUIRE(ip.value() == "81.31.113.9");
+}

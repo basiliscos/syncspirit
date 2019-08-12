@@ -21,6 +21,7 @@ static const char *igd_wan_xpath = "//service[../../deviceType = 'urn:schemas-up
                                    "and serviceType = 'urn:schemas-upnp-org:service:WANIPConnection:1']";
 static const char *igd_wan_service = "urn:schemas-upnp-org:service:WANIPConnection:1";
 static const char *soap_GetExternalIPAddress = "GetExternalIPAddress";
+static const char *external_ip_xpath = "//NewExternalIPAddress";
 
 constexpr unsigned http_version = 11;
 
@@ -185,6 +186,20 @@ outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const U
         return ec;
     }
     return outcome::success();
+}
+
+outcome::result<std::string> parse_external_ip(const char *data, std::size_t bytes) noexcept {
+    pugi::xml_document doc;
+    auto result = doc.load_buffer(data, bytes);
+    if (!result) {
+        return error_code::xml_parse_error;
+    }
+    auto node = doc.select_node(external_ip_xpath);
+    if (!node) {
+        return error_code::xml_parse_error;
+    }
+
+    return node.node().child_value();
 }
 
 } // namespace syncspirit::utils
