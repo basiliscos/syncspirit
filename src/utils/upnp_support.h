@@ -40,4 +40,6 @@ outcome::result<igd_result> parse_igd(const std::uint8_t *data, std::size_t byte
 
 outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const URI &uri) noexcept;
 
+outcome::result<std::string> parse_external_ip(const std::uint8_t *data, std::size_t bytes) noexcept;
+
 } // namespace syncspirit::utils
