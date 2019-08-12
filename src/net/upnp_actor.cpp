@@ -137,7 +137,7 @@ void upnp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
         return trigger_discovery();
     }
 
-    const std::uint8_t *buff = reinterpret_cast<const std::uint8_t *>(rx_buff.data().data());
+    const char *buff = static_cast<const char *>(rx_buff.data().data());
     auto discovery_result = parse(buff, bytes);
     if (!discovery_result) {
         spdlog::warn("upnp_actor:: can't get discovery result: {}", discovery_result.error().message());
@@ -209,7 +209,7 @@ void upnp_actor_t::on_response_received(std::size_t bytes) noexcept {
 void upnp_actor_t::on_description(r::message_t<resp_description_t> &msg) noexcept {
     auto bytes = msg.payload.bytes;
     auto body = response_option->body();
-    auto igd_result = parse_igd(reinterpret_cast<const std::uint8_t *>(body.data()), body.size());
+    auto igd_result = parse_igd(body.data(), body.size());
     if (!igd_result) {
         spdlog::warn("upnp_actor:: can't get IGD result: {}", igd_result.error().message());
         std::string xml(static_cast<const char *>(rx_buff.data().data()), bytes);

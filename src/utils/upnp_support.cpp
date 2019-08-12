@@ -59,7 +59,7 @@ outcome::result<void> make_discovery_request(fmt::memory_buffer &buff, std::uint
     return outcome::success();
 }
 
-outcome::result<discovery_result> parse(const std::uint8_t *data, std::size_t bytes) noexcept {
+outcome::result<discovery_result> parse(const char *data, std::size_t bytes) noexcept {
     http::parser<false, http::empty_body> parser;
     auto buff = asio::const_buffers_1(data, bytes);
     sys::error_code ec;
@@ -132,7 +132,7 @@ outcome::result<void> make_description_request(fmt::memory_buffer &buff, const d
     return outcome::success();
 }
 
-outcome::result<igd_result> parse_igd(const std::uint8_t *data, std::size_t bytes) noexcept {
+outcome::result<igd_result> parse_igd(const char *data, std::size_t bytes) noexcept {
     pugi::xml_document doc;
     auto result = doc.load_buffer(data, bytes);
     if (!result) {
