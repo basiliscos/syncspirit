@@ -64,7 +64,8 @@ int main(int argc, char **argv) {
         /* pre-init actors */
         asio::io_context io_context;
         ra::system_context_ptr_t sys_context{new ra::system_context_asio_t{io_context}};
-        ra::supervisor_config_t sup_conf{pt::milliseconds{500}};
+        auto stand = std::make_shared<asio::io_context::strand>(io_context);
+        ra::supervisor_config_t sup_conf{std::move(stand), pt::milliseconds{500}};
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>(sup_conf, *cfg_option);
         sup_net->start();
 
