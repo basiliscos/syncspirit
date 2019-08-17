@@ -22,16 +22,14 @@ void ssdp_actor_t::cancel_pending() noexcept {
         if (ec) {
             spdlog::error("ssdp_actor_t:: timer cancellation : {}", ec.message());
         }
-        activities_flag &= ~TIMER_ACTIVE;
     }
 
-    if (activities_flag & UDP_ACTIVE) {
+    if (activities_flag & (UDP_SEND | UDP_RECV)) {
         sys::error_code ec;
         sock.cancel(ec);
         if (ec) {
             spdlog::error("ssdp_actor_t:: udp socket cancellation : {}", ec.message());
         }
-        activities_flag &= ~UDP_ACTIVE;
     }
 }
 
@@ -69,9 +67,13 @@ void ssdp_actor_t::on_timeout_error(const sys::error_code &ec) noexcept {
 }
 
 void ssdp_actor_t::on_udp_error(const sys::error_code &ec) noexcept {
-    activities_flag &= ~UDP_ACTIVE;
+    activities_flag &= ~(UDP_RECV | UDP_SEND);
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("ssdp_actor_t::on_udp_error :: {}", ec.message());
+
+        sys::error_code ec;
+        sock.cancel(ec);
+
         trigger_shutdown();
     }
 }
@@ -93,6 +95,14 @@ void ssdp_actor_t::on_try_again(r::message_t<try_again_request_t> &) noexcept {
 }
 
 void ssdp_actor_t::initate_discovery() noexcept {
+    if (activities_flag) {
+        /* some operations might be pending (i.e. timer cancellation) */
+        if (activities_flag) {
+            auto fwd_postpone = ra::forwarder_t(*this, &ssdp_actor_t::initate_discovery);
+            return asio::post(io_context, fwd_postpone);
+        }
+    }
+
     /* broadcast discorvery */
     auto destination = udp::endpoint(v4::from_string(upnp_addr), upnp_port);
     auto request_result = make_discovery_request(tx_buff, max_wait);
@@ -105,9 +115,14 @@ void ssdp_actor_t::initate_discovery() noexcept {
     spdlog::trace("ssdp_actor_t:: sending multicast request to {}:{} ({} bytes)", upnp_addr, upnp_port, tx_buff.size());
 
     auto fwd_discovery = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_sent, &ssdp_actor_t::on_udp_error);
-    auto buff = asio::buffer(tx_buff.data(), tx_buff.size());
-    sock.async_send_to(buff, destination, std::move(fwd_discovery));
-    activities_flag |= UDP_ACTIVE;
+    auto buff_tx = asio::buffer(tx_buff.data(), tx_buff.size());
+    sock.async_send_to(buff_tx, destination, std::move(fwd_discovery));
+    activities_flag |= UDP_SEND;
+
+    auto fwd_recieve = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_received, &ssdp_actor_t::on_udp_error);
+    auto buff_rx = asio::buffer(rx_buff.data(), RX_BUFF_SIZE);
+    sock.async_receive(buff_rx, std::move(fwd_recieve));
+    activities_flag |= UDP_RECV;
 
     /* start timer */
     timer.expires_from_now(pt::seconds{max_wait});
@@ -118,7 +133,7 @@ void ssdp_actor_t::initate_discovery() noexcept {
 
 void ssdp_actor_t::on_discovery_sent(std::size_t bytes) noexcept {
     spdlog::trace("ssdp_actor_t::on_discovery_sent ({} bytes)", bytes);
-    activities_flag &= ~UDP_ACTIVE;
+    activities_flag &= ~UDP_SEND;
     if (bytes != tx_buff.size()) {
         spdlog::warn("ssdp_actor_t::on_discovery_sent :: tx buff size mismatch {} vs {}", bytes, tx_buff.size());
         return trigger_shutdown();
@@ -127,15 +142,11 @@ void ssdp_actor_t::on_discovery_sent(std::size_t bytes) noexcept {
     auto endpoint = sock.local_endpoint();
     spdlog::trace("ssdp_actor_t::will wait discovery reply via {0}:{1}", endpoint.address().to_string(),
                   endpoint.port());
-    auto fwd = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_received, &ssdp_actor_t::on_udp_error);
-    auto buff = asio::buffer(rx_buff.data(), RX_BUFF_SIZE);
-    sock.async_receive(buff, std::move(fwd));
-    activities_flag |= UDP_ACTIVE;
 }
 
 void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     spdlog::trace("ssdp_actor_t::on_discovery_received ({} bytes)", bytes);
-    activities_flag &= ~UDP_ACTIVE;
+    activities_flag &= ~UDP_RECV;
 
     sys::error_code ec;
     timer.cancel(ec);
@@ -143,7 +154,6 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
         spdlog::error("ssdp_actor_t:: timer cancellation : {}", ec.message());
         return;
     }
-    activities_flag &= ~TIMER_ACTIVE;
 
     if (!bytes) {
         auto ec = sys::errc::make_error_code(sys::errc::bad_message);
