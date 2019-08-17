@@ -7,7 +7,7 @@ using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(ra::supervisor_asio_t *sup, ra::system_context_ptr_t ctx,
                                    const ra::supervisor_config_t &sup_cfg, const config::configuration_t &cfg)
-    : ra::supervisor_asio_t(sup, ctx, sup_cfg), cfg{cfg} {}
+    : ra::supervisor_asio_t(sup, ctx, sup_cfg), cfg{cfg}, guard(asio::make_work_guard(sup_cfg.strand->context())) {}
 
 void net_supervisor_t::on_start(r::message_t<r::payload::start_actor_t> &msg) noexcept {
     spdlog::trace("net_supervisor_t::on_start");
@@ -23,4 +23,10 @@ void net_supervisor_t::launch_upnp() noexcept {
     spdlog::trace("net_supervisor_t:: launching upnp supervisor");
     ra::system_context_ptr_t ctx(&get_asio_context());
     create_actor<upnp_supervisor_t>(ctx, ra::supervisor_asio_t::config, cfg.upnp_config);
+}
+
+void net_supervisor_t::confirm_shutdown() noexcept {
+    spdlog::trace("net_supervisor_t::confirm_shutdown");
+    ra::supervisor_asio_t::confirm_shutdown();
+    guard.reset();
 }

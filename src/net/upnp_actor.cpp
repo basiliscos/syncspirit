@@ -10,7 +10,7 @@ using v4 = asio::ip::address_v4;
 
 upnp_actor_t::upnp_actor_t(ra::supervisor_asio_t &sup, const config::upnp_config_t &cfg_)
     : r::actor_base_t{sup}, cfg{cfg_}, strand{static_cast<ra::supervisor_asio_t &>(supervisor).get_strand()},
-      io_context{strand.get_io_context()}, resolver{io_context},
+      io_context{strand.context()}, resolver{io_context},
       udp_socket{io_context, udp::endpoint(udp::v4(), 0)}, timer{io_context}, activities_flag{0} {}
 
 void upnp_actor_t::on_initialize(r::message_t<r::payload::initialize_actor_t> &msg) noexcept {

@@ -21,7 +21,6 @@ using namespace syncspirit;
 static std::atomic<bool> signal_shutdown_flag{false};
 
 int main(int argc, char **argv) {
-    using guard_t = asio::executor_work_guard<asio::io_context::executor_type>;
     try {
         // clang-format off
         /* parse command-line & config options */
@@ -67,10 +66,9 @@ int main(int argc, char **argv) {
         auto stand = std::make_shared<asio::io_context::strand>(io_context);
         ra::supervisor_config_t sup_conf{std::move(stand), pt::milliseconds{500}};
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>(sup_conf, *cfg_option);
-        sup_net->start();
+        sup_net->start(); /* !!! no need of that */
 
         /* launch actors */
-        guard_t net_guard{asio::make_work_guard(io_context)};
         auto net_thread = std::thread([&io_context]() {
             io_context.run();
             spdlog::trace("net thread has been terminated");
@@ -81,6 +79,7 @@ int main(int argc, char **argv) {
         act.sa_handler = [](int) { signal_shutdown_flag = true; };
         if (sigaction(SIGINT, &act, nullptr) != 0) {
             spdlog::critical("cannot set signal handler");
+            return 1;
         }
         auto console_thread = std::thread([] {
             while (!signal_shutdown_flag) {
@@ -91,10 +90,9 @@ int main(int argc, char **argv) {
 
         spdlog::trace("waiting actors terminations");
         console_thread.join();
-        net_guard.reset();
 
+        sup_net->shutdown();
         net_thread.join();
-
         spdlog::trace("everything has been terminated");
     } catch (const std::exception &ex) {
         spdlog::critical("Starting failure : {}", ex.what());

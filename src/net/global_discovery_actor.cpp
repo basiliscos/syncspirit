@@ -8,7 +8,7 @@ namespace pt = boost::posix_time;
 global_discovery_actor_t::global_discovery_actor_t(ra::supervisor_asio_t &sup,
                                                    const config::global_announce_config_t &cfg_)
     : r::actor_base_t{sup}, cfg{cfg_}, strand{static_cast<ra::supervisor_asio_t &>(supervisor).get_strand()},
-      io_context{strand.get_io_context()}, ssl_context{ssl::context::tls}, resolver{io_context},
+      io_context{strand.context()}, ssl_context{ssl::context::tls}, resolver{io_context},
       stream{io_context, ssl_context}, timer{io_context}, activities_flag{0} {}
 
 void global_discovery_actor_t::on_initialize(r::message_t<r::payload::initialize_actor_t> &msg) noexcept {

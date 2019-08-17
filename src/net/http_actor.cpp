@@ -6,7 +6,7 @@ using namespace syncspirit::net;
 
 http_actor_t::http_actor_t(ra::supervisor_asio_t &sup)
     : r::actor_base_t::actor_base_t(sup), strand{static_cast<ra::supervisor_asio_t &>(supervisor).get_strand()},
-      io_context{strand.get_io_context()}, resolver{io_context}, timer{io_context}, activities_flag{0} {}
+      io_context{strand.context()}, resolver{io_context}, timer{io_context}, activities_flag{0} {}
 
 void http_actor_t::on_initialize(r::message_t<r::payload::initialize_actor_t> &msg) noexcept {
     r::actor_base_t::on_initialize(msg);

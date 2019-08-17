@@ -8,6 +8,7 @@
 
 #include <fmt/format.h>
 #include "../utils/uri.h"
+#include "../utils/upnp_support.h"
 
 namespace syncspirit {
 namespace net {
@@ -44,6 +45,8 @@ struct request_failed_t {
 struct ssdp_failed_t {
     sys::error_code ec;
 };
+
+using ssdp_result_t = utils::discovery_result;
 
 } // namespace net
 } // namespace syncspirit

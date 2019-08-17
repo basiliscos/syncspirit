@@ -10,8 +10,8 @@ static const constexpr std::size_t RX_BUFF_SIZE = 1500;
 
 ssdp_actor_t::ssdp_actor_t(ra::supervisor_asio_t &sup, std::uint32_t max_wait_)
     : r::actor_base_t::actor_base_t(sup), strand{static_cast<ra::supervisor_asio_t &>(supervisor).get_strand()},
-      io_context{strand.get_io_context()}, timer{io_context}, sock{io_context}, max_wait{max_wait_}, activities_flag{
-                                                                                                         0} {
+      io_context{strand.context()}, timer{io_context}, sock{io_context, udp::endpoint(udp::v4(), 0)},
+      max_wait{max_wait_}, activities_flag{0} {
     rx_buff.resize(RX_BUFF_SIZE);
 }
 
@@ -77,13 +77,14 @@ void ssdp_actor_t::reply_error(const sys::error_code &ec) noexcept {
 }
 
 void ssdp_actor_t::on_start(r::message_t<r::payload::start_actor_t> &msg) noexcept {
-    spdlog::trace("ssdp_actor_t::ssdp_actor_t");
+    spdlog::trace("ssdp_actor_t::on_start");
 
     /* broadcast discorvery */
     auto destination = udp::endpoint(v4::from_string(upnp_addr), upnp_port);
     auto request_result = make_discovery_request(tx_buff, max_wait);
     if (!request_result) {
-        spdlog::error("ssdp_actor_t:: can't serialize upnp discovery request: {}", request_result.error().message());
+        spdlog::error("ssdp_actor_t:: cannot serialize discovery request: {}", request_result.error().message());
+        reply_error(request_result.error());
         return trigger_shutdown();
     }
 
@@ -111,7 +112,9 @@ void ssdp_actor_t::on_discovery_sent(std::size_t bytes) noexcept {
         return trigger_shutdown();
     }
 
-    spdlog::trace("ssdp_actor_t::will wait discovery reply via {}");
+    auto endpoint = sock.local_endpoint();
+    spdlog::trace("ssdp_actor_t::will wait discovery reply via {0}:{1}", endpoint.address().to_string(),
+                  endpoint.port());
     auto fwd = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_received, &ssdp_actor_t::on_udp_error);
     auto buff = asio::buffer(rx_buff.data(), RX_BUFF_SIZE);
     sock.async_receive(buff, std::move(fwd));
@@ -121,6 +124,14 @@ void ssdp_actor_t::on_discovery_sent(std::size_t bytes) noexcept {
 void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     spdlog::trace("ssdp_actor_t::on_discovery_received ({} bytes)", bytes);
     activities_flag &= ~UDP_ACTIVE;
+
+    sys::error_code ec;
+    timer.cancel(ec);
+    if (ec) {
+        spdlog::error("ssdp_actor_t:: timer cancellation : {}", ec.message());
+    }
+    activities_flag &= ~TIMER_ACTIVE;
+
     if (!bytes) {
         auto ec = sys::errc::make_error_code(sys::errc::bad_message);
         return reply_error(ec);
@@ -129,9 +140,9 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     const char *buff = static_cast<const char *>(rx_buff.data());
     auto discovery_result = parse(buff, bytes);
     if (!discovery_result) {
-        //spdlog::warn("upnp_actor:: can't get discovery result: {}", discovery_result.error().message());
-        //auto ec = sys::errc::make_error_code(sys::errc::bad_message);
-        //return reply_error(ec);
-        //reply_error(discovery_result.error());
+        spdlog::warn("upnp_actor:: can't get discovery result: {}", discovery_result.error().message());
+        return reply_error(discovery_result.error());
     }
+
+    send<ssdp_result_t>(supervisor.get_address(), discovery_result.value());
 }

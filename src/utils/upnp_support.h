@@ -1,13 +1,13 @@
 #pragma once
 #include "uri.h"
 #include <fmt/format.h>
-#include <outcome.hpp>
 #include <string>
 #include <vector>
+#include <boost/outcome.hpp>
 
 namespace syncspirit::utils {
 
-namespace outcome = OUTCOME_V2_NAMESPACE;
+namespace outcome = boost::outcome_v2;
 
 struct upnp_fields {
     static const char *st;

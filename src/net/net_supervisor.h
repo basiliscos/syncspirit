@@ -16,12 +16,16 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
                      const config::configuration_t &cfg);
 
     virtual void on_start(r::message_t<r::payload::start_actor_t> &) noexcept override;
+    virtual void confirm_shutdown() noexcept override;
 
   private:
+    using guard_t = asio::executor_work_guard<asio::io_context::executor_type>;
+
     void launch_discovery() noexcept;
     void launch_upnp() noexcept;
 
     config::configuration_t cfg;
+    guard_t guard;
 };
 
 } // namespace net
