@@ -42,9 +42,11 @@ struct request_failed_t {
     utils::URI url;
 };
 
-struct ssdp_failed_t {
+struct ssdp_failure_t {
     sys::error_code ec;
 };
+
+struct try_again_request_t {};
 
 using ssdp_result_t = utils::discovery_result;
 

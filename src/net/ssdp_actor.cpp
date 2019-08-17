@@ -41,6 +41,11 @@ void ssdp_actor_t::on_shutdown(r::message_t<r::payload::shutdown_request_t> &msg
     r::actor_base_t::on_shutdown(msg);
 }
 
+void ssdp_actor_t::on_initialize(r::message_t<r::payload::initialize_actor_t> &msg) noexcept {
+    subscribe(&ssdp_actor_t::on_try_again);
+    r::actor_base_t::on_initialize(msg);
+}
+
 void ssdp_actor_t::trigger_shutdown() noexcept {
     if (!(activities_flag & SHUTDOWN_ACTIVE)) {
         activities_flag |= SHUTDOWN_ACTIVE;
@@ -49,7 +54,7 @@ void ssdp_actor_t::trigger_shutdown() noexcept {
 }
 
 void ssdp_actor_t::on_timeout_trigger() noexcept {
-    spdlog::error("ssdp_actor_t:: timeout");
+    spdlog::warn("ssdp_actor_t:: timeout");
     activities_flag &= ~TIMER_ACTIVE;
     auto ec = sys::errc::make_error_code(sys::errc::timed_out);
     reply_error(ec);
@@ -72,13 +77,22 @@ void ssdp_actor_t::on_udp_error(const sys::error_code &ec) noexcept {
 }
 
 void ssdp_actor_t::reply_error(const sys::error_code &ec) noexcept {
-    send<ssdp_failed_t>(supervisor.get_address(), ec);
+    send<ssdp_failure_t>(supervisor.get_address(), ec);
     cancel_pending();
 }
 
 void ssdp_actor_t::on_start(r::message_t<r::payload::start_actor_t> &msg) noexcept {
     spdlog::trace("ssdp_actor_t::on_start");
+    initate_discovery();
+    r::actor_base_t::on_start(msg);
+}
 
+void ssdp_actor_t::on_try_again(r::message_t<try_again_request_t> &) noexcept {
+    spdlog::trace("ssdp_actor_t::on_start");
+    initate_discovery();
+}
+
+void ssdp_actor_t::initate_discovery() noexcept {
     /* broadcast discorvery */
     auto destination = udp::endpoint(v4::from_string(upnp_addr), upnp_port);
     auto request_result = make_discovery_request(tx_buff, max_wait);
@@ -100,8 +114,6 @@ void ssdp_actor_t::on_start(r::message_t<r::payload::start_actor_t> &msg) noexce
     auto fwd_timeout = ra::forwarder_t(*this, &ssdp_actor_t::on_timeout_trigger, &ssdp_actor_t::on_timeout_error);
     timer.async_wait(std::move(fwd_timeout));
     activities_flag |= TIMER_ACTIVE;
-
-    r::actor_base_t::on_start(msg);
 }
 
 void ssdp_actor_t::on_discovery_sent(std::size_t bytes) noexcept {
@@ -129,6 +141,7 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     timer.cancel(ec);
     if (ec) {
         spdlog::error("ssdp_actor_t:: timer cancellation : {}", ec.message());
+        return;
     }
     activities_flag &= ~TIMER_ACTIVE;
 
