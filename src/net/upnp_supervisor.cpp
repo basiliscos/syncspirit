@@ -1,5 +1,6 @@
 #include "upnp_supervisor.h"
 #include "http_actor.h"
+#include "ssdp_actor.h"
 
 using namespace syncspirit::net;
 

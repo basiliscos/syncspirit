@@ -41,5 +41,9 @@ struct request_failed_t {
     utils::URI url;
 };
 
+struct ssdp_failed_t {
+    sys::error_code ec;
+};
+
 } // namespace net
 } // namespace syncspirit
