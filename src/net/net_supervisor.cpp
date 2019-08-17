@@ -1,6 +1,6 @@
 #include "net_supervisor.h"
 #include "global_discovery_actor.h"
-#include "upnp_actor.h"
+#include "upnp_supervisor.h"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::net;
@@ -19,4 +19,8 @@ void net_supervisor_t::launch_discovery() noexcept {
     create_actor<global_discovery_actor_t>(cfg.global_announce_config);
 }
 
-void net_supervisor_t::launch_upnp() noexcept { create_actor<upnp_actor_t>(cfg.upnp_config); }
+void net_supervisor_t::launch_upnp() noexcept {
+    spdlog::trace("net_supervisor_t:: launching upnp supervisor");
+    ra::system_context_ptr_t ctx(&get_asio_context());
+    create_actor<upnp_supervisor_t>(ctx, ra::supervisor_asio_t::config, cfg.upnp_config);
+}
