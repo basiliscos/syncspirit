@@ -11,6 +11,7 @@ upnp_supervisor_t::upnp_supervisor_t(ra::supervisor_asio_t *sup, ra::system_cont
     : ra::supervisor_asio_t(sup, ctx, sup_cfg), cfg{cfg_}, ssdp_errors{0} {
     addr_description = make_address();
     addr_external_ip = make_address();
+    rx_buff = std::make_shared<request_t::rx_buff_t>();
 }
 
 void upnp_supervisor_t::on_shutdown(r::message_t<r::payload::shutdown_request_t> &msg) noexcept {
@@ -87,7 +88,7 @@ void upnp_supervisor_t::on_ssdp(r::message_t<ssdp_result_t> &msg) noexcept {
         return do_shutdown();
     }
     send<request_t>(http_addr, *igd_url, std::move(tx_buff), pt::milliseconds{cfg.timeout * 1000}, addr_description,
-                    cfg.rx_buff_size);
+                    rx_buff, cfg.rx_buff_size);
 }
 
 void upnp_supervisor_t::on_ssdp_failure(r::message_t<ssdp_failure_t> &) noexcept {
@@ -112,7 +113,7 @@ void upnp_supervisor_t::on_igd_description(r::message_t<response_t> &msg) noexce
         return do_shutdown();
     }
 
-    msg.payload.data.consume(msg.payload.bytes);
+    msg.payload.rx_buff->consume(msg.payload.bytes);
     auto &igd = igd_result.value();
     auto &location = *igd_url;
     std::string control_url = fmt::format("http://{0}:{1}{2}", location.host, location.port, igd.control_path);
@@ -133,7 +134,7 @@ void upnp_supervisor_t::on_igd_description(r::message_t<response_t> &msg) noexce
         return do_shutdown();
     }
     send<request_t>(http_addr, *igd_control_url, std::move(tx_buff), pt::milliseconds{cfg.timeout * 1000},
-                    addr_external_ip, cfg.rx_buff_size);
+                    addr_external_ip, rx_buff, cfg.rx_buff_size);
 }
 
 void upnp_supervisor_t::on_external_ip(r::message_t<response_t> &msg) noexcept {
@@ -147,5 +148,5 @@ void upnp_supervisor_t::on_external_ip(r::message_t<response_t> &msg) noexcept {
         return do_shutdown();
     }
     spdlog::debug("external IP addr: {}", ip_addr_result.value());
-    msg.payload.data.consume(msg.payload.bytes);
+    msg.payload.rx_buff->consume(msg.payload.bytes);
 }

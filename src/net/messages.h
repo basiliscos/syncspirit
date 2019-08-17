@@ -5,6 +5,7 @@
 #include <rotor/asio.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include <memory>
 
 #include <fmt/format.h>
 #include "../utils/uri.h"
@@ -21,18 +22,21 @@ namespace sys = boost::system;
 using tcp = asio::ip::tcp;
 
 struct request_t {
+    using rx_buff_t = boost::beast::flat_buffer;
+    using rx_buff_ptr_t = std::shared_ptr<rx_buff_t>;
     utils::URI url;
     fmt::memory_buffer data;
     pt::milliseconds timeout;
     r::address_ptr_t reply_to;
+    rx_buff_ptr_t rx_buff;
     std::size_t rx_buff_size;
 };
 
 struct response_t {
     using http_response_t = http::response<http::string_body>;
+    request_t::rx_buff_ptr_t rx_buff;
     tcp::endpoint local_endpoint;
     utils::URI url;
-    boost::beast::flat_buffer data;
     http_response_t response;
     std::size_t bytes;
 };

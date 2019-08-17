@@ -57,7 +57,6 @@ void http_actor_t::on_request(request_message_t &msg) noexcept {
     }
 
     request = request_ptr_t{&msg};
-    response = response_ptr_t(new response_message_t{msg.payload.reply_to});
 
     trigger_request();
 }
@@ -124,14 +123,16 @@ void http_actor_t::on_resolve(resolve_results_t results) noexcept {
 void http_actor_t::on_connect(resolve_it_t) noexcept {
     spdlog::trace("http_actor_t::on_connect");
     sys::error_code ec;
-    response->payload.local_endpoint = sock->local_endpoint(ec);
+    auto endpoint = sock->local_endpoint(ec);
     if (ec) {
         spdlog::warn("http_actor_t::on_discovery_sent :: cannot get local endpoint: {0}", ec.message());
         return reply_error(ec);
     }
-    auto &endpoint = response->payload.local_endpoint;
     spdlog::trace("http_actor_t::on_connect, local endpoint = {0}:{1}", endpoint.address().to_string(),
                   endpoint.port());
+    auto &req_payload = request->payload;
+    response = response_ptr_t(
+        new response_message_t{req_payload.reply_to, req_payload.rx_buff, std::move(endpoint), req_payload.url});
 
     auto &data = request->payload.data;
     auto &url = request->payload.url;
@@ -152,9 +153,9 @@ void http_actor_t::on_tcp_error(const sys::error_code &ec) noexcept {
 void http_actor_t::on_request_sent(std::size_t bytes) noexcept {
     spdlog::trace("http_actor_t::on_on_request_sent ({} bytes)", bytes);
     auto fwd = ra::forwarder_t(*this, &http_actor_t::on_response_received, &http_actor_t::on_tcp_error);
-    auto &rx_buff = response->payload.data;
-    rx_buff.prepare(request->payload.rx_buff_size);
-    http::async_read(*sock, rx_buff, response->payload.response, std::move(fwd));
+    auto &rx_buff = response->payload.rx_buff;
+    rx_buff->prepare(request->payload.rx_buff_size);
+    http::async_read(*sock, *rx_buff, response->payload.response, std::move(fwd));
 }
 
 void http_actor_t::on_response_received(std::size_t bytes) noexcept {

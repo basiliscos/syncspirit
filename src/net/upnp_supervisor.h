@@ -42,6 +42,7 @@ class upnp_supervisor_t : public ra::supervisor_asio_t {
     std::uint32_t ssdp_failures;
     url_option_t igd_url;
     url_option_t igd_control_url;
+    request_t::rx_buff_ptr_t rx_buff;
 };
 
 } // namespace net
