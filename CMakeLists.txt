@@ -20,7 +20,6 @@ add_library(syncspirit_lib
     src/net/http_actor.cpp
     src/net/net_supervisor.cpp
     src/net/ssdp_actor.cpp
-    src/net/upnp_actor.cpp
     src/net/upnp_supervisor.cpp
     src/utils/error_code.cpp
     src/utils/uri.cpp
