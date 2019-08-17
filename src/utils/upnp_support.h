@@ -34,7 +34,7 @@ outcome::result<discovery_result> parse(const char *data, std::size_t bytes) noe
 
 outcome::result<void> make_discovery_request(fmt::memory_buffer &buff, std::uint32_t max_wait) noexcept;
 
-outcome::result<void> make_description_request(fmt::memory_buffer &buff, const discovery_result &dr) noexcept;
+outcome::result<void> make_description_request(fmt::memory_buffer &buff, const URI &uri) noexcept;
 
 outcome::result<igd_result> parse_igd(const char *data, std::size_t bytes) noexcept;
 

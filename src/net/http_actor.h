@@ -33,6 +33,7 @@ struct http_actor_t : public r::actor_base_t {
     virtual void on_start(r::message_t<r::payload::start_actor_t> &) noexcept override;
     virtual void on_request(request_message_t &) noexcept;
 
+    void trigger_request() noexcept;
     void on_timeout_trigger() noexcept;
     void on_timeout_error(const sys::error_code &ec) noexcept;
     void on_resolve_error(const sys::error_code &ec) noexcept;
@@ -43,10 +44,10 @@ struct http_actor_t : public r::actor_base_t {
     void on_response_received(std::size_t bytes) noexcept;
 
   private:
-    const static constexpr std::uint32_t SHUTDOWN_ACTIVE = 1 << 1;
-    const static constexpr std::uint32_t TIMER_ACTIVE = 1 << 2;
-    const static constexpr std::uint32_t TCP_ACTIVE = 1 << 3;
-    const static constexpr std::uint32_t RESOLVER_ACTIVE = 1 << 4;
+    const static constexpr std::uint32_t SHUTDOWN_ACTIVE = 1 << 0;
+    const static constexpr std::uint32_t TIMER_ACTIVE = 1 << 1;
+    const static constexpr std::uint32_t TCP_ACTIVE = 1 << 2;
+    const static constexpr std::uint32_t RESOLVER_ACTIVE = 1 << 3;
 
     void clean_state() noexcept;
     void reply_error(const sys::error_code &ec) noexcept;

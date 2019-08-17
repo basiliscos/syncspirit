@@ -109,13 +109,12 @@ outcome::result<discovery_result> parse(const char *data, std::size_t bytes) noe
     };
 }
 
-outcome::result<void> make_description_request(fmt::memory_buffer &buff, const discovery_result &dr) noexcept {
-    auto &location = dr.location;
+outcome::result<void> make_description_request(fmt::memory_buffer &buff, const URI &uri) noexcept {
     http::request<http::empty_body> req;
     req.method(http::verb::get);
     req.version(http_version);
-    req.target(location.path);
-    req.set(http::field::host, location.host);
+    req.target(uri.path);
+    req.set(http::field::host, uri.host);
     req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 
     sys::error_code ec;

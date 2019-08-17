@@ -36,7 +36,7 @@ void ssdp_actor_t::cancel_pending() noexcept {
 }
 
 void ssdp_actor_t::on_shutdown(r::message_t<r::payload::shutdown_request_t> &msg) noexcept {
-    spdlog::trace("ssdp_actor_tt::on_shutdown");
+    spdlog::trace("ssdp_actor_t::on_shutdown");
     cancel_pending();
     r::actor_base_t::on_shutdown(msg);
 }

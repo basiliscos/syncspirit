@@ -146,11 +146,14 @@ void upnp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     rx_buff.consume(bytes);
     discovery_option = discovery_result.value();
 
+    /*
     trigger_request(
         [&]() {
             return std::make_tuple(make_description_request(tx_buff, *discovery_option), discovery_option->location);
         },
         [this](std::size_t bytes) { return send<resp_description_t>(address, bytes); });
+
+    */
 }
 
 void upnp_actor_t::on_resolve_error(const sys::error_code &ec) noexcept {
