@@ -1,2 +1,3 @@
 1. http_manager/supervisor to transparently handle http/https requests
-2.
+2. delete portmapping on shuttdown
+
