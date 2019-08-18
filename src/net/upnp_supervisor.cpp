@@ -7,8 +7,10 @@ using namespace syncspirit::net;
 using namespace syncspirit::utils;
 
 upnp_supervisor_t::upnp_supervisor_t(ra::supervisor_asio_t *sup, ra::system_context_ptr_t ctx,
-                                     const ra::supervisor_config_t &sup_cfg, const config::upnp_config_t &cfg_)
-    : ra::supervisor_asio_t(sup, ctx, sup_cfg), cfg{cfg_}, ssdp_errors{0} {
+                                     const ra::supervisor_config_t &sup_cfg, const config::upnp_config_t &cfg_,
+                                     const runtime_config_t &runtime_cfg)
+    : ra::supervisor_asio_t(sup, ctx, sup_cfg), acceptor_addr{runtime_cfg.acceptor_addr},
+      peers_addr{runtime_cfg.peers_addr}, cfg{cfg_}, ssdp_errors{0} {
     addr_description = make_address();
     addr_external_ip = make_address();
     rx_buff = std::make_shared<request_t::rx_buff_t>();
@@ -36,6 +38,8 @@ void upnp_supervisor_t::on_initialize(r::message_t<r::payload::initialize_actor_
         subscribe(&upnp_supervisor_t::on_ssdp_failure);
         subscribe(&upnp_supervisor_t::on_igd_description, addr_description);
         subscribe(&upnp_supervisor_t::on_external_ip, addr_external_ip);
+        subscribe(&upnp_supervisor_t::on_listen_failure);
+        subscribe(&upnp_supervisor_t::on_listen_success);
     }
     ra::supervisor_asio_t::on_initialize(msg);
 }
@@ -147,6 +151,30 @@ void upnp_supervisor_t::on_external_ip(r::message_t<response_t> &msg) noexcept {
         spdlog::debug("xml:\n{0}\n", xml);
         return do_shutdown();
     }
-    spdlog::debug("external IP addr: {}", ip_addr_result.value());
+    auto &ip_addr = ip_addr_result.value();
+    spdlog::debug("external IP addr: {}", ip_addr);
     msg.payload.rx_buff->consume(msg.payload.bytes);
+
+    sys::error_code ec;
+    external_addr = asio::ip::address::from_string(ip_addr, ec);
+    if (ec) {
+        spdlog::warn("upnp_actor:: can't external IP address '{0}' is incorrect: {}", ip_addr, ec.message());
+        return do_shutdown();
+    }
+
+    auto listen_addr = msg.payload.local_endpoint.address();
+    std::uint16_t port = 0; /* any port */
+    send<listen_request_t>(acceptor_addr, address, peers_addr, std::move(listen_addr), port);
+}
+
+void upnp_supervisor_t::on_listen_failure(r::message_t<listen_failure_t> &msg) noexcept {
+    spdlog::error("upnp_supervisor_t::on_listen_failure :: ", msg.payload.ec.message());
+    return do_shutdown();
+}
+
+void upnp_supervisor_t::on_listen_success(r::message_t<listen_response_t> &msg) noexcept {
+    spdlog::trace("upnp_supervisor_t::on_listen_success");
+    auto &local_ep = msg.payload.listening_endpoint;
+    spdlog::debug("going to map {0}:{1} => {2}:{3}", external_addr.to_string(), local_ep.port(),
+                  local_ep.address().to_string(), local_ep.port());
 }

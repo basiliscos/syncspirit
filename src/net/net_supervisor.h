@@ -13,6 +13,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
                      const config::configuration_t &cfg);
 
     virtual void on_start(r::message_t<r::payload::start_actor_t> &) noexcept override;
+    virtual void on_shutdown(r::message_t<r::payload::shutdown_request_t> &) noexcept override;
     virtual void confirm_shutdown() noexcept override;
 
   private:
@@ -20,9 +21,11 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
 
     void launch_discovery() noexcept;
     void launch_upnp() noexcept;
+    void launch_acceptor() noexcept;
 
     config::configuration_t cfg;
     guard_t guard;
+    r::address_ptr_t acceptor_addr;
 };
 
 } // namespace net

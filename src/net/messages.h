@@ -20,9 +20,13 @@ namespace asio = boost::asio;
 namespace pt = boost::posix_time;
 namespace http = boost::beast::http;
 namespace sys = boost::system;
+
 using tcp = asio::ip::tcp;
 using udp = asio::ip::udp;
 using v4 = asio::ip::address_v4;
+using udp_socket_t = udp::socket;
+using tcp_socket_t = tcp::socket;
+using timer_t = asio::deadline_timer;
 
 struct request_t {
     using rx_buff_t = boost::beast::flat_buffer;
@@ -54,6 +58,25 @@ struct ssdp_failure_t {
 };
 
 struct try_again_request_t {};
+
+struct listen_request_t {
+    r::address_ptr_t reply_to;
+    r::address_ptr_t redirect_to; /* address where redirect accepted peers (clients) */
+    asio::ip::address address;
+    std::uint16_t port;
+};
+
+struct listen_failure_t {
+    sys::error_code ec;
+};
+
+struct listen_response_t {
+    tcp::endpoint listening_endpoint;
+};
+
+struct new_peer_t {
+    tcp::socket sock;
+};
 
 using ssdp_result_t = utils::discovery_result;
 

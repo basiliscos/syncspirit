@@ -28,9 +28,6 @@ struct ssdp_actor_t : public r::actor_base_t {
     void on_discovery_received(std::size_t bytes) noexcept;
 
   private:
-    using udp_socket_t = udp::socket;
-    using timer_t = asio::deadline_timer;
-
     const static constexpr std::uint32_t SHUTDOWN_ACTIVE = 1 << 0;
     const static constexpr std::uint32_t TIMER_ACTIVE = 1 << 1;
     const static constexpr std::uint32_t UDP_SEND = 1 << 2;

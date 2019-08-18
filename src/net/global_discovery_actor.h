@@ -32,10 +32,8 @@ struct global_discovery_actor_t : public r::actor_base_t {
     void on_handshake() noexcept;
 
   private:
-    using socket_t = tcp::socket;
     using endpoint_t = tcp::endpoint;
-    using stream_t = ssl::stream<socket_t>;
-    using timer_t = asio::deadline_timer;
+    using stream_t = ssl::stream<tcp_socket_t>;
 
     const static constexpr std::uint32_t SHUTDOWN_ACTIVE = 0b0000'0001;
     const static constexpr std::uint32_t TIMER_ACTIVE = 0b0000'0010;

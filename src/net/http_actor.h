@@ -14,9 +14,7 @@ using request_ptr_t = r::intrusive_ptr_t<request_message_t>;
 using response_ptr_t = r::intrusive_ptr_t<response_message_t>;
 
 struct http_actor_t : public r::actor_base_t {
-    using tcp_socket_t = tcp::socket;
     using tcp_socket_ptr_t = std::unique_ptr<tcp_socket_t>;
-    using timer_t = asio::deadline_timer;
     using resolve_results_t = tcp::resolver::results_type;
     using resolve_it_t = resolve_results_t::iterator;
 
