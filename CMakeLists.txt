@@ -35,6 +35,8 @@ add_subdirectory("lib/rotor")
 add_subdirectory("lib/fmt")
 add_subdirectory("lib/pugixml")
 
+target_compile_definitions(pugixml PUBLIC "PUGIXML_NO_EXCEPTIONS")
+
 target_include_directories(syncspirit_lib PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/rotor/include
     ${syncspirit_SOURCE_DIR}/lib/spdlog/include
