@@ -4,8 +4,6 @@
 using namespace syncspirit::net;
 using namespace syncspirit::utils;
 
-using v4 = asio::ip::address_v4;
-
 static const constexpr std::size_t RX_BUFF_SIZE = 1500;
 
 ssdp_actor_t::ssdp_actor_t(ra::supervisor_asio_t &sup, std::uint32_t max_wait_)

@@ -14,12 +14,15 @@
 namespace syncspirit {
 namespace net {
 
+namespace r = rotor;
+namespace ra = rotor::asio;
 namespace asio = boost::asio;
 namespace pt = boost::posix_time;
-namespace r = rotor;
 namespace http = boost::beast::http;
 namespace sys = boost::system;
 using tcp = asio::ip::tcp;
+using udp = asio::ip::udp;
+using v4 = asio::ip::address_v4;
 
 struct request_t {
     using rx_buff_t = boost::beast::flat_buffer;

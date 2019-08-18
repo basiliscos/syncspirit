@@ -2,8 +2,6 @@
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::net;
-namespace ssl = boost::asio::ssl;
-namespace pt = boost::posix_time;
 
 global_discovery_actor_t::global_discovery_actor_t(ra::supervisor_asio_t &sup,
                                                    const config::global_announce_config_t &cfg_)

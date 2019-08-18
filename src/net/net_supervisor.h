@@ -1,15 +1,12 @@
 #pragma once
 
 #include "../configuration.h"
+#include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>
 
 namespace syncspirit {
 namespace net {
-
-namespace r = rotor;
-namespace ra = rotor::asio;
-namespace asio = boost::asio;
 
 struct net_supervisor_t : public ra::supervisor_asio_t {
     net_supervisor_t(ra::supervisor_asio_t *sup, ra::system_context_ptr_t ctx, const ra::supervisor_config_t &sup_cfg,

@@ -9,13 +9,6 @@
 namespace syncspirit {
 namespace net {
 
-namespace r = rotor;
-namespace ra = rotor::asio;
-namespace asio = boost::asio;
-namespace sys = boost::system;
-namespace pt = boost::posix_time;
-using udp = asio::ip::udp;
-
 struct ssdp_actor_t : public r::actor_base_t {
 
     ssdp_actor_t(ra::supervisor_asio_t &sup, std::uint32_t max_wait);

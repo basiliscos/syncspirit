@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../configuration.h"
+#include "messages.h"
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 #include <rotor/asio/supervisor_asio.h>
@@ -8,10 +9,7 @@
 namespace syncspirit {
 namespace net {
 
-namespace r = rotor;
-namespace ra = rotor::asio;
-namespace asio = boost::asio;
-namespace sys = boost::system;
+namespace ssl = boost::asio::ssl;
 
 struct global_discovery_actor_t : public r::actor_base_t {
     using resolve_results_t = asio::ip::tcp::resolver::results_type;
@@ -34,9 +32,9 @@ struct global_discovery_actor_t : public r::actor_base_t {
     void on_handshake() noexcept;
 
   private:
-    using socket_t = asio::ip::tcp::socket;
-    using endpoint_t = asio::ip::tcp::endpoint;
-    using stream_t = asio::ssl::stream<socket_t>;
+    using socket_t = tcp::socket;
+    using endpoint_t = tcp::endpoint;
+    using stream_t = ssl::stream<socket_t>;
     using timer_t = asio::deadline_timer;
 
     const static constexpr std::uint32_t SHUTDOWN_ACTIVE = 0b0000'0001;
@@ -47,8 +45,8 @@ struct global_discovery_actor_t : public r::actor_base_t {
     config::global_announce_config_t cfg;
     asio::io_context::strand &strand;
     asio::io_context &io_context;
-    asio::ssl::context ssl_context;
-    asio::ip::tcp::resolver resolver;
+    ssl::context ssl_context;
+    tcp::resolver resolver;
     stream_t stream;
     timer_t timer;
     std::uint32_t activities_flag;

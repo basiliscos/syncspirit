@@ -8,12 +8,6 @@
 namespace syncspirit {
 namespace net {
 
-namespace r = rotor;
-namespace ra = rotor::asio;
-namespace asio = boost::asio;
-namespace sys = boost::system;
-using tcp = boost::asio::ip::tcp;
-
 using request_message_t = r::message_t<request_t>;
 using response_message_t = r::message_t<response_t>;
 using request_ptr_t = r::intrusive_ptr_t<request_message_t>;

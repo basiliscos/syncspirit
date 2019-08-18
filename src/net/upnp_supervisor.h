@@ -8,9 +8,6 @@
 namespace syncspirit {
 namespace net {
 
-namespace ra = rotor::asio;
-namespace r = rotor;
-
 class upnp_supervisor_t : public ra::supervisor_asio_t {
   public:
     upnp_supervisor_t(ra::supervisor_asio_t *sup, ra::system_context_ptr_t ctx, const ra::supervisor_config_t &sup_cfg,
