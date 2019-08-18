@@ -41,6 +41,7 @@ struct upnp_config_t {
     std::uint32_t rx_buff_size;
     std::uint32_t max_wait;
     std::uint32_t timeout;
+    std::uint16_t external_port;
 };
 
 struct configuration_t {

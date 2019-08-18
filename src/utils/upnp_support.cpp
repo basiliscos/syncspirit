@@ -21,7 +21,9 @@ static const char *igd_wan_xpath = "//service[../../deviceType = 'urn:schemas-up
                                    "and serviceType = 'urn:schemas-upnp-org:service:WANIPConnection:1']";
 static const char *igd_wan_service = "urn:schemas-upnp-org:service:WANIPConnection:1";
 static const char *soap_GetExternalIPAddress = "GetExternalIPAddress";
+static const char *soap_AddPortMapping = "AddPortMapping";
 static const char *external_ip_xpath = "//NewExternalIPAddress";
+static const char *port_mapping_succes_xpath = "//*[local-name() = 'AddPortMappingResponse']";
 
 constexpr unsigned http_version = 11;
 
@@ -199,6 +201,62 @@ outcome::result<std::string> parse_external_ip(const char *data, std::size_t byt
     }
 
     return node.node().child_value();
+}
+
+outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &uri, std::uint16_t external_port,
+                                           const std::string &internal_ip, std::uint16_t internal_port) noexcept {
+    http::request<http::string_body> req;
+    std::string soap_action = fmt::format("{0}#{1}", igd_wan_service, soap_AddPortMapping);
+    req.method(http::verb::post);
+    req.version(http_version);
+    req.target(uri.path);
+    req.set(http::field::host, uri.host);
+    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+    req.set(http::field::soapaction, soap_action);
+    req.set(http::field::pragma, "no-cache");
+    req.set(http::field::cache_control, "no-cache");
+    req.set(http::field::content_type, "text/xml");
+
+    std::string body = fmt::format("<?xml version='1.0'?>"
+                                   "<s:Envelope xmlns:s='http://schemas.xmlsoap.org/soap/envelope/' "
+                                   "s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'>"
+                                   "<s:Body><u:{0} xmlns:u='{1}'>"
+                                   "<NewRemoteHost/>"
+                                   "<NewExternalPort>{2}</NewExternalPort>"
+                                   "<NewProtocol>TCP</NewProtocol>"
+                                   "<NewInternalPort>{3}</NewInternalPort>"
+                                   "<NewInternalClient>{4}</NewInternalClient>"
+                                   "<NewEnabled>1</NewEnabled>"
+                                   "<NewPortMappingDescription>syncspirit at {2}</NewPortMappingDescription>"
+                                   "<NewLeaseDuration>0</NewLeaseDuration>"
+                                   "</u:{0}></s:Body></s:Envelope>",
+                                   soap_AddPortMapping, igd_wan_service, external_port, internal_port, internal_ip);
+    req.body() = body;
+    req.prepare_payload();
+
+    sys::error_code ec;
+    auto serializer = http::serializer<true, http::string_body>(req);
+    serializer.next(ec, [&](auto ec, const auto &buff_seq) {
+        if (!ec) {
+            auto sz = buffer_size(buff_seq);
+            buff.resize(sz);
+            buffer_copy(asio::mutable_buffer(buff.data(), sz), buff_seq);
+        }
+    });
+    if (ec) {
+        return ec;
+    }
+    return outcome::success();
+}
+
+outcome::result<bool> parse_mapping(const char *data, std::size_t bytes) noexcept {
+    pugi::xml_document doc;
+    auto result = doc.load_buffer(data, bytes);
+    if (!result) {
+        return error_code::xml_parse_error;
+    }
+    auto node = doc.select_node(port_mapping_succes_xpath);
+    return static_cast<bool>(node);
 }
 
 } // namespace syncspirit::utils

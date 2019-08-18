@@ -1,0 +1,5 @@
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>
+<u:GetExternalIPAddressResponse xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:1">
+<NewExternalIPAddress>81.31.113.9</NewExternalIPAddress>
+</u:GetExternalIPAddressResponse>
+</s:Body> </s:Envelope>

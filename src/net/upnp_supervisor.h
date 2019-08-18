@@ -25,6 +25,7 @@ class upnp_supervisor_t : public ra::supervisor_asio_t {
     virtual void on_shutdown_confirm(r::message_t<r::payload::shutdown_confirmation_t> &) noexcept override;
     virtual void on_igd_description(r::message_t<response_t> &) noexcept;
     virtual void on_external_ip(r::message_t<response_t> &) noexcept;
+    virtual void on_mapping_ip(r::message_t<response_t> &) noexcept;
     virtual void on_listen_failure(r::message_t<listen_failure_t> &) noexcept;
     virtual void on_listen_success(r::message_t<listen_response_t> &) noexcept;
 
@@ -44,6 +45,7 @@ class upnp_supervisor_t : public ra::supervisor_asio_t {
     r::address_ptr_t peers_addr;
     r::address_ptr_t addr_description; /* for routing */
     r::address_ptr_t addr_external_ip; /* for routing */
+    r::address_ptr_t addr_mapping;     /* for routing */
     config::upnp_config_t cfg;
     std::uint32_t ssdp_errors;
     std::uint32_t ssdp_failures;

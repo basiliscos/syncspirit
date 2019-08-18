@@ -13,6 +13,7 @@ upnp_supervisor_t::upnp_supervisor_t(ra::supervisor_asio_t *sup, ra::system_cont
       peers_addr{runtime_cfg.peers_addr}, cfg{cfg_}, ssdp_errors{0} {
     addr_description = make_address();
     addr_external_ip = make_address();
+    addr_mapping = make_address();
     rx_buff = std::make_shared<request_t::rx_buff_t>();
 }
 
@@ -36,10 +37,11 @@ void upnp_supervisor_t::on_initialize(r::message_t<r::payload::initialize_actor_
     if (msg.payload.actor_address == address) {
         subscribe(&upnp_supervisor_t::on_ssdp);
         subscribe(&upnp_supervisor_t::on_ssdp_failure);
-        subscribe(&upnp_supervisor_t::on_igd_description, addr_description);
-        subscribe(&upnp_supervisor_t::on_external_ip, addr_external_ip);
         subscribe(&upnp_supervisor_t::on_listen_failure);
         subscribe(&upnp_supervisor_t::on_listen_success);
+        subscribe(&upnp_supervisor_t::on_igd_description, addr_description);
+        subscribe(&upnp_supervisor_t::on_external_ip, addr_external_ip);
+        subscribe(&upnp_supervisor_t::on_mapping_ip, addr_mapping);
     }
     ra::supervisor_asio_t::on_initialize(msg);
 }
@@ -175,6 +177,34 @@ void upnp_supervisor_t::on_listen_failure(r::message_t<listen_failure_t> &msg) n
 void upnp_supervisor_t::on_listen_success(r::message_t<listen_response_t> &msg) noexcept {
     spdlog::trace("upnp_supervisor_t::on_listen_success");
     auto &local_ep = msg.payload.listening_endpoint;
-    spdlog::debug("going to map {0}:{1} => {2}:{3}", external_addr.to_string(), local_ep.port(),
+    spdlog::debug("going to map {0}:{1} => {2}:{3}", external_addr.to_string(), cfg.external_port,
                   local_ep.address().to_string(), local_ep.port());
+
+    fmt::memory_buffer tx_buff;
+    auto result = make_mapping_request(tx_buff, *igd_control_url, cfg.external_port, local_ep.address().to_string(),
+                                       local_ep.port());
+    if (!result) {
+        spdlog::error("upnp_supervisor_t:: cannot serialize IP-mapping request: {0}", result.error().message());
+        return do_shutdown();
+    }
+    send<request_t>(http_addr, *igd_control_url, std::move(tx_buff), pt::milliseconds{cfg.timeout * 1000}, addr_mapping,
+                    rx_buff, cfg.rx_buff_size);
+}
+
+void upnp_supervisor_t::on_mapping_ip(r::message_t<response_t> &msg) noexcept {
+    spdlog::trace("upnp_supervisor_t::on_mapping_ip");
+    auto &body = msg.payload.response.body();
+    auto result = parse_mapping(body.data(), body.size());
+    if (!result) {
+        spdlog::warn("upnp_actor:: can't parse port mapping reply : {}", result.error().message());
+        std::string xml(body);
+        spdlog::debug("xml:\n{0}\n", xml);
+        return do_shutdown();
+    }
+    msg.payload.rx_buff->consume(msg.payload.bytes);
+    if (!result.value()) {
+        spdlog::warn("upnp_actor:: unsuccessfull port mapping");
+        return do_shutdown();
+    }
+    spdlog::trace("upnp_supervisor_t:: port mapping succeeded");
 }

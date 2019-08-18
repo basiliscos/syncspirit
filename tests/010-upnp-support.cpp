@@ -35,3 +35,17 @@ TEST_CASE("parse external IP", "[support]") {
     REQUIRE(ip);
     REQUIRE(ip.value() == "81.31.113.9");
 }
+
+TEST_CASE("parse successful port mapping", "[support]") {
+    auto xml = read_to_file("/tests/data/port-mapping-success.xml");
+    auto r = parse_mapping(xml.c_str(), xml.size());
+    REQUIRE(r);
+    REQUIRE(r.value() == true);
+}
+
+TEST_CASE("parse failede port mapping", "[support]") {
+    auto xml = read_to_file("/tests/data/soap-failure.xml");
+    auto r = parse_mapping(xml.c_str(), xml.size());
+    REQUIRE(r);
+    REQUIRE(r.value() == false);
+}

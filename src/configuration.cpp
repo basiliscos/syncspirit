@@ -78,6 +78,7 @@ boost::optional<configuration_t> get_config(std::ifstream &config) {
             ("upnp.rx_buff_size", po::value<std::uint32_t>()->default_value(16384), "receive bufffer size in bytes (default: 16384)")
             ("upnp.max_wait", po::value<std::uint32_t>()->default_value(5), "max wait discovery timeout")
             ("upnp.timeout", po::value<std::uint32_t>()->default_value(5), "total upnp timeout")
+            ("upnp.external_port", po::value<std::uint16_t>()->default_value(21028), "external port to accept connections (default: 21028)")
             ;
     // clang-format on
 
@@ -104,6 +105,7 @@ boost::optional<configuration_t> get_config(std::ifstream &config) {
 
     cfg.upnp_config.max_wait = vm["upnp.max_wait"].as<std::uint32_t>();
     cfg.upnp_config.timeout = vm["upnp.timeout"].as<std::uint32_t>();
+    cfg.upnp_config.external_port = vm["upnp.external_port"].as<std::uint16_t>();
 
     // checks
     if (cfg.logging_config.sinks.empty()) {
