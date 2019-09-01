@@ -64,12 +64,13 @@ int main(int argc, char **argv) {
         asio::io_context io_context;
         ra::system_context_ptr_t sys_context{new ra::system_context_asio_t{io_context}};
         auto stand = std::make_shared<asio::io_context::strand>(io_context);
-        ra::supervisor_config_t sup_conf{std::move(stand), pt::milliseconds{500}};
+        auto timeout = pt::milliseconds{1000};
+        ra::supervisor_config_asio_t sup_conf{timeout, std::move(stand)};
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>(sup_conf, *cfg_option);
         sup_net->start();
 
         /* launch actors */
-        auto net_thread = std::thread([&io_context]() {
+        auto net_thread = std::thread([&io_context, &sup_net]() {
             io_context.run();
             spdlog::trace("net thread has been terminated");
             signal_shutdown_flag = true;

@@ -15,14 +15,14 @@ class upnp_supervisor_t : public ra::supervisor_asio_t {
         r::address_ptr_t peers_addr;
     };
 
-    upnp_supervisor_t(ra::supervisor_asio_t *sup, ra::system_context_ptr_t ctx, const ra::supervisor_config_t &sup_cfg,
+    upnp_supervisor_t(ra::supervisor_asio_t *sup, const ra::supervisor_config_asio_t &sup_cfg,
                       const config::upnp_config_t &cfg, const runtime_config_t &runtime_cfg);
     virtual ~upnp_supervisor_t();
 
-    virtual void on_initialize(r::message_t<r::payload::initialize_actor_t> &msg) noexcept override;
-    virtual void on_start(r::message_t<r::payload::start_actor_t> &) noexcept override;
-    virtual void on_shutdown(r::message_t<r::payload::shutdown_request_t> &) noexcept override;
-    virtual void on_shutdown_confirm(r::message_t<r::payload::shutdown_confirmation_t> &) noexcept override;
+    virtual void on_initialize(r::message::init_request_t &msg) noexcept override;
+    virtual void on_start(r::message::start_trigger_t &) noexcept override;
+    virtual void shutdown_finish() noexcept override;
+    virtual void on_shutdown_confirm(r::message::shutdown_responce_t &) noexcept override;
     virtual void on_igd_description(r::message_t<response_t> &) noexcept;
     virtual void on_external_ip(r::message_t<response_t> &) noexcept;
     virtual void on_mapping_ip(r::message_t<response_t> &) noexcept;

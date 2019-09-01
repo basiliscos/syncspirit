@@ -12,9 +12,9 @@ namespace net {
 struct ssdp_actor_t : public r::actor_base_t {
 
     ssdp_actor_t(ra::supervisor_asio_t &sup, std::uint32_t max_wait);
-    virtual void on_initialize(r::message_t<r::payload::initialize_actor_t> &) noexcept override;
+    virtual void on_initialize(r::message::init_request_t &) noexcept override;
     virtual void on_start(r::message_t<r::payload::start_actor_t> &) noexcept override;
-    virtual void on_shutdown(r::message_t<r::payload::shutdown_request_t> &) noexcept override;
+    virtual void shutdown_start() noexcept override;
     virtual void on_try_again(r::message_t<try_again_request_t> &) noexcept;
 
     void trigger_shutdown() noexcept;

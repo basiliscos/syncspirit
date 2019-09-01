@@ -9,12 +9,12 @@ acceptor_actor_t::acceptor_actor_t(ra::supervisor_asio_t &sup)
     accepting = false;
 }
 
-void acceptor_actor_t::on_initialize(r::message_t<r::payload::initialize_actor_t> &msg) noexcept {
-    r::actor_base_t::on_initialize(msg);
+void acceptor_actor_t::on_initialize(r::message::init_request_t &msg) noexcept {
     subscribe(&acceptor_actor_t::on_listen_request);
+    r::actor_base_t::on_initialize(msg);
 }
 
-void acceptor_actor_t::on_shutdown(r::message_t<r::payload::shutdown_request_t> &msg) noexcept {
+void acceptor_actor_t::on_shutdown(r::message::shutdown_request_t &msg) noexcept {
     spdlog::trace("acceptor_actor_t::on_shutdown");
     if (accepting) {
         sys::error_code ec;

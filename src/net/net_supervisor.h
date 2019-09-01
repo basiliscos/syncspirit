@@ -9,12 +9,12 @@ namespace syncspirit {
 namespace net {
 
 struct net_supervisor_t : public ra::supervisor_asio_t {
-    net_supervisor_t(ra::supervisor_asio_t *sup, ra::system_context_ptr_t ctx, const ra::supervisor_config_t &sup_cfg,
+    net_supervisor_t(ra::supervisor_asio_t *sup, const ra::supervisor_config_asio_t &sup_cfg,
                      const config::configuration_t &cfg);
 
     virtual void on_start(r::message_t<r::payload::start_actor_t> &) noexcept override;
-    virtual void on_shutdown(r::message_t<r::payload::shutdown_request_t> &) noexcept override;
-    virtual void confirm_shutdown() noexcept override;
+    virtual void on_shutdown(r::message::shutdown_request_t &) noexcept override;
+    virtual void shutdown_finish() noexcept override;
 
   private:
     using guard_t = asio::executor_work_guard<asio::io_context::executor_type>;

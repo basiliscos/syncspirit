@@ -6,10 +6,9 @@
 using namespace syncspirit::net;
 using namespace syncspirit::utils;
 
-upnp_supervisor_t::upnp_supervisor_t(ra::supervisor_asio_t *sup, ra::system_context_ptr_t ctx,
-                                     const ra::supervisor_config_t &sup_cfg, const config::upnp_config_t &cfg_,
-                                     const runtime_config_t &runtime_cfg)
-    : ra::supervisor_asio_t(sup, ctx, sup_cfg), acceptor_addr{runtime_cfg.acceptor_addr},
+upnp_supervisor_t::upnp_supervisor_t(ra::supervisor_asio_t *sup, const ra::supervisor_config_asio_t &sup_cfg,
+                                     const config::upnp_config_t &cfg_, const runtime_config_t &runtime_cfg)
+    : ra::supervisor_asio_t(sup, sup_cfg), acceptor_addr{runtime_cfg.acceptor_addr},
       peers_addr{runtime_cfg.peers_addr}, cfg{cfg_}, ssdp_errors{0} {
     addr_description = make_address();
     addr_external_ip = make_address();
@@ -17,45 +16,42 @@ upnp_supervisor_t::upnp_supervisor_t(ra::supervisor_asio_t *sup, ra::system_cont
     rx_buff = std::make_shared<request_t::rx_buff_t>();
 }
 
-void upnp_supervisor_t::on_shutdown(r::message_t<r::payload::shutdown_request_t> &msg) noexcept {
-    if (msg.payload.actor_address == address) {
-        http_addr.reset();
-        ssdp_addr.reset();
-    }
-    ra::supervisor_asio_t::on_shutdown(msg);
+void upnp_supervisor_t::shutdown_finish() noexcept {
+    http_addr.reset();
+    ssdp_addr.reset();
 }
 
 upnp_supervisor_t::~upnp_supervisor_t() { spdlog::trace("upnp_supervisor_t:~upnp_supervisor_t"); }
 
 void upnp_supervisor_t::launch_ssdp() noexcept {
     spdlog::trace("upnp_supervisor_t::launch_ssdp");
-    ssdp_addr = create_actor<ssdp_actor_t>(cfg.max_wait)->get_address();
+    rotor::pt::seconds timeout{cfg.max_wait};
+    ssdp_addr = create_actor<ssdp_actor_t>(timeout, cfg.max_wait)->get_address();
     ssdp_failures = 0;
 }
 
-void upnp_supervisor_t::on_initialize(r::message_t<r::payload::initialize_actor_t> &msg) noexcept {
-    if (msg.payload.actor_address == address) {
-        subscribe(&upnp_supervisor_t::on_ssdp);
-        subscribe(&upnp_supervisor_t::on_ssdp_failure);
-        subscribe(&upnp_supervisor_t::on_listen_failure);
-        subscribe(&upnp_supervisor_t::on_listen_success);
-        subscribe(&upnp_supervisor_t::on_igd_description, addr_description);
-        subscribe(&upnp_supervisor_t::on_external_ip, addr_external_ip);
-        subscribe(&upnp_supervisor_t::on_mapping_ip, addr_mapping);
-    }
+void upnp_supervisor_t::on_initialize(r::message::init_request_t &msg) noexcept {
+    subscribe(&upnp_supervisor_t::on_ssdp);
+    subscribe(&upnp_supervisor_t::on_ssdp_failure);
+    subscribe(&upnp_supervisor_t::on_listen_failure);
+    subscribe(&upnp_supervisor_t::on_listen_success);
+    subscribe(&upnp_supervisor_t::on_igd_description, addr_description);
+    subscribe(&upnp_supervisor_t::on_external_ip, addr_external_ip);
+    subscribe(&upnp_supervisor_t::on_mapping_ip, addr_mapping);
     ra::supervisor_asio_t::on_initialize(msg);
 }
 
-void upnp_supervisor_t::on_start(r::message_t<r::payload::start_actor_t> &msg) noexcept {
+void upnp_supervisor_t::on_start(r::message::start_trigger_t &msg) noexcept {
     spdlog::trace("upnp_supervisor_t::on_start");
     launch_ssdp();
-    http_addr = create_actor<http_actor_t>()->get_address();
+    rotor::pt::seconds timeout{cfg.max_wait};
+    http_addr = create_actor<http_actor_t>(timeout)->get_address();
     ra::supervisor_asio_t::on_start(msg);
 }
 
-void upnp_supervisor_t::on_shutdown_confirm(r::message_t<r::payload::shutdown_confirmation_t> &msg) noexcept {
+void upnp_supervisor_t::on_shutdown_confirm(r::message::shutdown_responce_t &msg) noexcept {
     ra::supervisor_asio_t::on_shutdown_confirm(msg);
-    auto &target = msg.payload.actor_address;
+    auto &target = msg.payload.req->payload.request_payload.actor_address;
     bool self_shutdown = false;
 
     if (target.get() == ssdp_addr.get() && !igd_url && (ssdp_failures == 0)) {

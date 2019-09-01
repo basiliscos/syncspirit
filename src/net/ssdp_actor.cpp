@@ -31,13 +31,13 @@ void ssdp_actor_t::cancel_pending() noexcept {
     }
 }
 
-void ssdp_actor_t::on_shutdown(r::message_t<r::payload::shutdown_request_t> &msg) noexcept {
-    spdlog::trace("ssdp_actor_t::on_shutdown");
+void ssdp_actor_t::shutdown_start() noexcept {
+    spdlog::trace("ssdp_actor_t::shutdown_start");
     cancel_pending();
-    r::actor_base_t::on_shutdown(msg);
+    r::actor_base_t::shutdown_start();
 }
 
-void ssdp_actor_t::on_initialize(r::message_t<r::payload::initialize_actor_t> &msg) noexcept {
+void ssdp_actor_t::on_initialize(r::message::init_request_t &msg) noexcept {
     subscribe(&ssdp_actor_t::on_try_again);
     r::actor_base_t::on_initialize(msg);
 }

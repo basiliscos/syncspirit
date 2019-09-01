@@ -44,6 +44,7 @@ target_include_directories(syncspirit_lib PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/json/include
     ${syncspirit_SOURCE_DIR}/lib/pugixml/src
     ${Boost_INCLUDE_DIRS}
+    ${OPENSSL_INCLUDE_DIR}
 )
 
 target_link_libraries(syncspirit

@@ -9,7 +9,7 @@ global_discovery_actor_t::global_discovery_actor_t(ra::supervisor_asio_t &sup,
       io_context{strand.context()}, ssl_context{ssl::context::tls}, resolver{io_context},
       stream{io_context, ssl_context}, timer{io_context}, activities_flag{0} {}
 
-void global_discovery_actor_t::on_initialize(r::message_t<r::payload::initialize_actor_t> &msg) noexcept {
+void global_discovery_actor_t::on_initialize(r::message::init_request_t &msg) noexcept {
     spdlog::trace("global_discovery_actor_t::on_initialize");
 
     ssl_context.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2);
@@ -34,7 +34,7 @@ void global_discovery_actor_t::trigger_shutdown() noexcept {
     }
 }
 
-void global_discovery_actor_t::on_shutdown(r::message_t<r::payload::shutdown_request_t> &msg) noexcept {
+void global_discovery_actor_t::on_shutdown(r::message::shutdown_request_t &msg) noexcept {
     spdlog::trace("global_discovery_actor::on_shutdown");
 
     if (activities_flag & TIMER_ACTIVE) {

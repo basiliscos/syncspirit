@@ -13,8 +13,8 @@ namespace net {
 struct acceptor_actor_t : public r::actor_base_t {
   public:
     acceptor_actor_t(ra::supervisor_asio_t &sup);
-    virtual void on_initialize(r::message_t<r::payload::initialize_actor_t> &) noexcept override;
-    virtual void on_shutdown(r::message_t<r::payload::shutdown_request_t> &) noexcept override;
+    virtual void on_initialize(r::message::init_request_t &) noexcept override;
+    virtual void on_shutdown(r::message::shutdown_request_t &) noexcept override;
     virtual void on_listen_request(r::message_t<listen_request_t> &) noexcept;
 
   private:

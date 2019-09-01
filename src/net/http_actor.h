@@ -20,8 +20,8 @@ struct http_actor_t : public r::actor_base_t {
 
     http_actor_t(ra::supervisor_asio_t &sup);
 
-    virtual void on_initialize(r::message_t<r::payload::initialize_actor_t> &) noexcept override;
-    virtual void on_shutdown(r::message_t<r::payload::shutdown_request_t> &) noexcept override;
+    virtual void on_initialize(r::message::init_request_t &) noexcept override;
+    virtual void on_shutdown(r::message::shutdown_request_t &) noexcept override;
     virtual void on_start(r::message_t<r::payload::start_actor_t> &) noexcept override;
     virtual void on_request(request_message_t &) noexcept;
 

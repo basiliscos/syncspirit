@@ -17,9 +17,9 @@ struct global_discovery_actor_t : public r::actor_base_t {
 
     global_discovery_actor_t(ra::supervisor_asio_t &sup, const config::global_announce_config_t &cfg);
 
-    virtual void on_initialize(r::message_t<r::payload::initialize_actor_t> &) noexcept override;
+    virtual void on_initialize(r::message::init_request_t &) noexcept override;
     virtual void on_start(r::message_t<r::payload::start_actor_t> &) noexcept override;
-    virtual void on_shutdown(r::message_t<r::payload::shutdown_request_t> &) noexcept override;
+    virtual void on_shutdown(r::message::shutdown_request_t &) noexcept override;
 
     void trigger_shutdown() noexcept;
     void on_timeout_trigger() noexcept;

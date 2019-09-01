@@ -7,7 +7,7 @@ http_actor_t::http_actor_t(ra::supervisor_asio_t &sup)
     : r::actor_base_t::actor_base_t(sup), strand{static_cast<ra::supervisor_asio_t &>(supervisor).get_strand()},
       io_context{strand.context()}, resolver{io_context}, timer{io_context}, activities_flag{0} {}
 
-void http_actor_t::on_initialize(r::message_t<r::payload::initialize_actor_t> &msg) noexcept {
+void http_actor_t::on_initialize(r::message::init_request_t &msg) noexcept {
     r::actor_base_t::on_initialize(msg);
     subscribe(&http_actor_t::on_request);
 }
@@ -37,7 +37,7 @@ void http_actor_t::clean_state() noexcept {
     sock.reset();
 }
 
-void http_actor_t::on_shutdown(r::message_t<r::payload::shutdown_request_t> &msg) noexcept {
+void http_actor_t::on_shutdown(r::message::shutdown_request_t &msg) noexcept {
     spdlog::trace("http_actor_t::on_shutdown");
     clean_state();
     r::actor_base_t::on_shutdown(msg);

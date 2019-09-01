@@ -1,13 +1,18 @@
 // dot -Tpng -o /tmp/h.png < docs/hierarchy.dot
 digraph D {
     "net::sup" -> "http::sup";
+    "net::sup" -> "registry";
     "http::sup" -> "http::actor";
     "http::sup" -> "https::actor";
+    "http::sup" -> "registry" [style = "dotted"];
     "net::sup" -> "local_announcer::actor";
     "net::sup" -> "global_announcer::sup";
     "net::sup" -> "acceptor::actor";
+    "acceptor::actor" -> "registry" [style = "dotted"];
     "global_announcer::sup" -> "ssdp::actor";
+    "global_announcer::sup" -> "registry" [style = "dotted"];
     "global_announcer::sup" -> "http::sup" [style = "dotted"];
     "global_announcer::sup" -> "acceptor::actor" [style = "dotted"];
+    "local_announcer::actor" -> "registry" [style = "dotted"];
     "local_announcer::actor" -> "acceptor::actor" [style = "dotted"];
 }
