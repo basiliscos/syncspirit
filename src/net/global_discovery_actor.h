@@ -10,6 +10,7 @@ namespace syncspirit {
 namespace net {
 
 namespace ssl = boost::asio::ssl;
+using timer_t = asio::deadline_timer;
 
 struct global_discovery_actor_t : public r::actor_base_t {
     using resolve_results_t = asio::ip::tcp::resolver::results_type;

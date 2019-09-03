@@ -13,7 +13,7 @@ upnp_supervisor_t::upnp_supervisor_t(ra::supervisor_asio_t *sup, const ra::super
     addr_description = make_address();
     addr_external_ip = make_address();
     addr_mapping = make_address();
-    rx_buff = std::make_shared<request_t::rx_buff_t>();
+    rx_buff = std::make_shared<payload::http_request_t::rx_buff_t>();
 }
 
 void upnp_supervisor_t::shutdown_finish() noexcept {
@@ -31,8 +31,7 @@ void upnp_supervisor_t::launch_ssdp() noexcept {
 }
 
 void upnp_supervisor_t::on_initialize(r::message::init_request_t &msg) noexcept {
-    subscribe(&upnp_supervisor_t::on_ssdp);
-    subscribe(&upnp_supervisor_t::on_ssdp_failure);
+    subscribe(&upnp_supervisor_t::on_ssdp_reply);
     subscribe(&upnp_supervisor_t::on_listen_failure);
     subscribe(&upnp_supervisor_t::on_listen_success);
     subscribe(&upnp_supervisor_t::on_igd_description, addr_description);
@@ -49,6 +48,14 @@ void upnp_supervisor_t::on_start(r::message::start_trigger_t &msg) noexcept {
     ra::supervisor_asio_t::on_start(msg);
 }
 
+void upnp_supervisor_t::on_initialize_confirm(r::message::init_response_t &msg) noexcept {
+    ra::supervisor_asio_t::on_initialize_confirm(msg);
+    if (msg.payload.req->payload.request_payload.actor_address == ssdp_addr) {
+        rotor::pt::seconds timeout{cfg.max_wait};
+        request<payload::ssdp_request_t>(ssdp_addr).timeout(timeout);
+    }
+}
+
 void upnp_supervisor_t::on_shutdown_confirm(r::message::shutdown_responce_t &msg) noexcept {
     ra::supervisor_asio_t::on_shutdown_confirm(msg);
     auto &target = msg.payload.req->payload.request_payload.actor_address;
@@ -58,7 +65,7 @@ void upnp_supervisor_t::on_shutdown_confirm(r::message::shutdown_responce_t &msg
         ssdp_addr.reset();
         ++ssdp_errors;
         if (ssdp_errors < MAX_SSDP_ERRORS - 1) {
-            launch_ssdp();
+            std::abort();
         } else {
             self_shutdown = true;
         }
@@ -71,42 +78,41 @@ void upnp_supervisor_t::on_shutdown_confirm(r::message::shutdown_responce_t &msg
     }
 }
 
-void upnp_supervisor_t::on_ssdp(r::message_t<ssdp_result_t> &msg) noexcept {
-    auto &url = msg.payload.location;
+void upnp_supervisor_t::on_ssdp_reply(message::ssdp_responce_t &msg) noexcept {
+    spdlog::trace("upnp_supervisor_t::on_ssdp_reply", ssdp_failures);
+    if (msg.payload.ec) {
+        if (ssdp_failures < MAX_SSDP_FAILURES - 1) {
+            ++ssdp_failures;
+            rotor::pt::seconds timeout{cfg.max_wait};
+            request<payload::ssdp_request_t>(ssdp_addr).timeout(timeout);
+        } else {
+            do_shutdown();
+        }
+        return;
+    }
+    auto &url = msg.payload.res->igd.location;
     spdlog::debug("IGD location = {}", url.full);
     igd_url = url;
     // no longer need of ssdp
-    send<r::payload::shutdown_request_t>(address, ssdp_addr);
+    send<r::payload::shutdown_trigger_t>(ssdp_addr);
 
     if (!http_addr) {
         spdlog::error("upnp_supervisor_t:: no active http actor");
         return do_shutdown();
     }
 
-    fmt::memory_buffer tx_buff;
-    auto result = make_description_request(tx_buff, *igd_url);
-    if (!result) {
-        spdlog::error("upnp_supervisor_t:: cannot serialize IP-address request: {0}", result.error().message());
+    make_request(addr_description, *igd_url,
+                 [&](auto &tx_buff) { return make_description_request(tx_buff, *igd_url); });
+}
+
+void upnp_supervisor_t::on_igd_description(message::http_responce_t &msg) noexcept {
+    spdlog::trace("upnp_supervisor_t::on_igd_description");
+    if (msg.payload.ec) {
+        spdlog::warn("upnp_actor:: get IGD description: {}", msg.payload.ec.message());
         return do_shutdown();
     }
-    send<request_t>(http_addr, *igd_url, std::move(tx_buff), pt::milliseconds{cfg.timeout * 1000}, addr_description,
-                    rx_buff, cfg.rx_buff_size);
-}
 
-void upnp_supervisor_t::on_ssdp_failure(r::message_t<ssdp_failure_t> &) noexcept {
-    spdlog::trace("upnp_supervisor_t::on_ssdp_failure ({0})", ssdp_failures);
-    if (ssdp_failures < MAX_SSDP_FAILURES - 1) {
-        ++ssdp_failures;
-        send<try_again_request_t>(ssdp_addr);
-    } else {
-        send<r::payload::shutdown_request_t>(address, ssdp_addr);
-    }
-}
-
-void upnp_supervisor_t::on_igd_description(r::message_t<response_t> &msg) noexcept {
-    spdlog::trace("upnp_supervisor_t::on_igd_description");
-
-    auto &body = msg.payload.response.body();
+    auto &body = msg.payload.res->response.body();
     auto igd_result = parse_igd(body.data(), body.size());
     if (!igd_result) {
         spdlog::warn("upnp_actor:: can't get IGD result: {}", igd_result.error().message());
@@ -115,7 +121,7 @@ void upnp_supervisor_t::on_igd_description(r::message_t<response_t> &msg) noexce
         return do_shutdown();
     }
 
-    msg.payload.rx_buff->consume(msg.payload.bytes);
+    rx_buff->consume(msg.payload.res->bytes);
     auto &igd = igd_result.value();
     auto &location = *igd_url;
     std::string control_url = fmt::format("http://{0}:{1}{2}", location.host, location.port, igd.control_path);
@@ -129,19 +135,17 @@ void upnp_supervisor_t::on_igd_description(r::message_t<response_t> &msg) noexce
     }
     igd_control_url = url_option.value();
 
-    fmt::memory_buffer tx_buff;
-    auto result = make_external_ip_request(tx_buff, *igd_control_url);
-    if (!result) {
-        spdlog::error("upnp_supervisor_t:: cannot serialize IP-address request: {0}", result.error().message());
-        return do_shutdown();
-    }
-    send<request_t>(http_addr, *igd_control_url, std::move(tx_buff), pt::milliseconds{cfg.timeout * 1000},
-                    addr_external_ip, rx_buff, cfg.rx_buff_size);
+    make_request(addr_external_ip, *igd_control_url,
+                 [&](auto &tx_buff) { return make_external_ip_request(tx_buff, *igd_control_url); });
 }
 
-void upnp_supervisor_t::on_external_ip(r::message_t<response_t> &msg) noexcept {
+void upnp_supervisor_t::on_external_ip(message::http_responce_t &msg) noexcept {
     spdlog::trace("upnp_supervisor_t::on_external_ip");
-    auto &body = msg.payload.response.body();
+    if (msg.payload.ec) {
+        spdlog::warn("upnp_actor:: get external IP address: {}", msg.payload.ec.message());
+        return do_shutdown();
+    }
+    auto &body = msg.payload.res->response.body();
     auto ip_addr_result = parse_external_ip(body.data(), body.size());
     if (!ip_addr_result) {
         spdlog::warn("upnp_actor:: can't get external IP address: {}", ip_addr_result.error().message());
@@ -151,7 +155,8 @@ void upnp_supervisor_t::on_external_ip(r::message_t<response_t> &msg) noexcept {
     }
     auto &ip_addr = ip_addr_result.value();
     spdlog::debug("external IP addr: {}", ip_addr);
-    msg.payload.rx_buff->consume(msg.payload.bytes);
+    auto &rx_buff = msg.payload.req->payload.request_payload.rx_buff;
+    rx_buff->consume(msg.payload.res->bytes);
 
     sys::error_code ec;
     external_addr = asio::ip::address::from_string(ip_addr, ec);
@@ -160,7 +165,7 @@ void upnp_supervisor_t::on_external_ip(r::message_t<response_t> &msg) noexcept {
         return do_shutdown();
     }
 
-    auto listen_addr = msg.payload.local_endpoint.address();
+    auto listen_addr = msg.payload.res->local_endpoint.address();
     std::uint16_t port = 0; /* any port */
     send<listen_request_t>(acceptor_addr, address, peers_addr, std::move(listen_addr), port);
 }
@@ -176,20 +181,19 @@ void upnp_supervisor_t::on_listen_success(r::message_t<listen_response_t> &msg) 
     spdlog::debug("going to map {0}:{1} => {2}:{3}", external_addr.to_string(), cfg.external_port,
                   local_ep.address().to_string(), local_ep.port());
 
-    fmt::memory_buffer tx_buff;
-    auto result = make_mapping_request(tx_buff, *igd_control_url, cfg.external_port, local_ep.address().to_string(),
-                                       local_ep.port());
-    if (!result) {
-        spdlog::error("upnp_supervisor_t:: cannot serialize IP-mapping request: {0}", result.error().message());
-        return do_shutdown();
-    }
-    send<request_t>(http_addr, *igd_control_url, std::move(tx_buff), pt::milliseconds{cfg.timeout * 1000}, addr_mapping,
-                    rx_buff, cfg.rx_buff_size);
+    make_request(addr_mapping, *igd_control_url, [&](auto &tx_buff) {
+        return make_mapping_request(tx_buff, *igd_control_url, cfg.external_port, local_ep.address().to_string(),
+                                    local_ep.port());
+    });
 }
 
-void upnp_supervisor_t::on_mapping_ip(r::message_t<response_t> &msg) noexcept {
+void upnp_supervisor_t::on_mapping_ip(message::http_responce_t &msg) noexcept {
     spdlog::trace("upnp_supervisor_t::on_mapping_ip");
-    auto &body = msg.payload.response.body();
+    if (msg.payload.ec) {
+        spdlog::warn("upnp_actor:: unsuccessfull port mapping: {}", msg.payload.ec.message());
+        return do_shutdown();
+    }
+    auto &body = msg.payload.res->response.body();
     auto result = parse_mapping(body.data(), body.size());
     if (!result) {
         spdlog::warn("upnp_actor:: can't parse port mapping reply : {}", result.error().message());
@@ -197,7 +201,7 @@ void upnp_supervisor_t::on_mapping_ip(r::message_t<response_t> &msg) noexcept {
         spdlog::debug("xml:\n{0}\n", xml);
         return do_shutdown();
     }
-    msg.payload.rx_buff->consume(msg.payload.bytes);
+    rx_buff->consume(msg.payload.res->bytes);
     if (!result.value()) {
         spdlog::warn("upnp_actor:: unsuccessfull port mapping");
         return do_shutdown();

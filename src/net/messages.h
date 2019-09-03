@@ -26,38 +26,16 @@ using udp = asio::ip::udp;
 using v4 = asio::ip::address_v4;
 using udp_socket_t = udp::socket;
 using tcp_socket_t = tcp::socket;
-using timer_t = asio::deadline_timer;
 
-struct request_t {
-    using rx_buff_t = boost::beast::flat_buffer;
-    using rx_buff_ptr_t = std::shared_ptr<rx_buff_t>;
-    utils::URI url;
-    fmt::memory_buffer data;
-    pt::milliseconds timeout;
-    r::address_ptr_t reply_to;
-    rx_buff_ptr_t rx_buff;
-    std::size_t rx_buff_size;
-};
+/* outdated start */
 
-struct response_t {
-    using http_response_t = http::response<http::string_body>;
-    request_t::rx_buff_ptr_t rx_buff;
-    tcp::endpoint local_endpoint;
-    utils::URI url;
-    http_response_t response;
-    std::size_t bytes;
-};
-
-struct request_failed_t {
-    sys::error_code ec;
-    utils::URI url;
-};
-
+/*
 struct ssdp_failure_t {
     sys::error_code ec;
 };
 
 struct try_again_request_t {};
+*/
 
 struct listen_request_t {
     r::address_ptr_t reply_to;
@@ -78,7 +56,54 @@ struct new_peer_t {
     tcp::socket sock;
 };
 
-using ssdp_result_t = utils::discovery_result;
+// using ssdp_result_t = utils::discovery_result;
+
+/* outdated end */
+
+namespace payload {
+
+struct http_responce_t : public r::arc_base_t<http_responce_t> {
+    using http_response_t = http::response<http::string_body>;
+    tcp::endpoint local_endpoint;
+    http_response_t response;
+    std::size_t bytes;
+
+    http_responce_t(const tcp::endpoint &endpoint_, http_response_t &&response_, std::size_t bytes_)
+        : local_endpoint(endpoint_), response(std::move(response_)), bytes{bytes_} {}
+};
+
+struct http_request_t {
+    using rx_buff_t = boost::beast::flat_buffer;
+    using rx_buff_ptr_t = std::shared_ptr<rx_buff_t>;
+    using duration_t = r::pt::time_duration;
+    using responce_t = r::intrusive_ptr_t<http_responce_t>;
+
+    utils::URI url;
+    fmt::memory_buffer data;
+    rx_buff_ptr_t rx_buff;
+    std::size_t rx_buff_size;
+};
+
+struct ssdp_responce_t : r::arc_base_t<ssdp_responce_t> {
+    utils::discovery_result igd;
+    ssdp_responce_t(utils::discovery_result igd_) : igd{std::move(igd_)} {}
+};
+
+struct ssdp_request_t {
+    using responce_t = r::intrusive_ptr_t<ssdp_responce_t>;
+};
+
+} // end of namespace payload
+
+namespace message {
+
+using http_request_t = r::request_traits_t<payload::http_request_t>::request::message_t;
+using http_responce_t = r::request_traits_t<payload::http_request_t>::responce::message_t;
+
+using ssdp_request_t = r::request_traits_t<payload::ssdp_request_t>::request::message_t;
+using ssdp_responce_t = r::request_traits_t<payload::ssdp_request_t>::responce::message_t;
+
+} // end of namespace message
 
 } // namespace net
 } // namespace syncspirit

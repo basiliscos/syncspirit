@@ -23,21 +23,34 @@ class upnp_supervisor_t : public ra::supervisor_asio_t {
     virtual void on_start(r::message::start_trigger_t &) noexcept override;
     virtual void shutdown_finish() noexcept override;
     virtual void on_shutdown_confirm(r::message::shutdown_responce_t &) noexcept override;
-    virtual void on_igd_description(r::message_t<response_t> &) noexcept;
-    virtual void on_external_ip(r::message_t<response_t> &) noexcept;
-    virtual void on_mapping_ip(r::message_t<response_t> &) noexcept;
+    virtual void on_initialize_confirm(r::message::init_response_t &msg) noexcept;
+
+    virtual void on_igd_description(message::http_responce_t &) noexcept;
+    virtual void on_external_ip(message::http_responce_t &) noexcept;
+    virtual void on_mapping_ip(message::http_responce_t &) noexcept;
     virtual void on_listen_failure(r::message_t<listen_failure_t> &) noexcept;
     virtual void on_listen_success(r::message_t<listen_response_t> &) noexcept;
 
-    void on_ssdp(r::message_t<ssdp_result_t> &) noexcept;
-    void on_ssdp_failure(r::message_t<ssdp_failure_t> &) noexcept;
+    void on_ssdp_reply(message::ssdp_responce_t &) noexcept;
 
   private:
     using url_option_t = boost::optional<utils::URI>;
+    using duration_t = pt::time_duration;
     const static constexpr std::uint32_t MAX_SSDP_ERRORS = 3;
     const static constexpr std::uint32_t MAX_SSDP_FAILURES = 5;
 
     void launch_ssdp() noexcept;
+
+    template <typename F> void make_request(const r::address_ptr_t via, const utils::URI &url, F &&fn) {
+        fmt::memory_buffer tx_buff;
+        auto result = fn(tx_buff);
+        if (!result) {
+            spdlog::error("upnp_supervisor_t:: cannot make http request: {0}", result.error().message());
+            return do_shutdown();
+        }
+        request_via<payload::http_request_t>(http_addr, via, url, std::move(tx_buff), rx_buff, cfg.rx_buff_size)
+            .timeout(pt::seconds{cfg.timeout});
+    }
 
     r::address_ptr_t http_addr;
     r::address_ptr_t ssdp_addr;
@@ -51,7 +64,7 @@ class upnp_supervisor_t : public ra::supervisor_asio_t {
     std::uint32_t ssdp_failures;
     url_option_t igd_url;
     url_option_t igd_control_url;
-    request_t::rx_buff_ptr_t rx_buff;
+    payload::http_request_t::rx_buff_ptr_t rx_buff;
     asio::ip::address external_addr;
 };
 
