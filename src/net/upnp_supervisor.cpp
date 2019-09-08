@@ -52,7 +52,7 @@ void upnp_supervisor_t::on_initialize_confirm(r::message::init_response_t &msg) 
     ra::supervisor_asio_t::on_initialize_confirm(msg);
     if (msg.payload.req->payload.request_payload.actor_address == ssdp_addr) {
         rotor::pt::seconds timeout{cfg.max_wait};
-        request<payload::ssdp_request_t>(ssdp_addr).timeout(timeout);
+        request<payload::ssdp_request_t>(ssdp_addr).send(timeout);
     }
 }
 
@@ -84,7 +84,7 @@ void upnp_supervisor_t::on_ssdp_reply(message::ssdp_responce_t &msg) noexcept {
         if (ssdp_failures < MAX_SSDP_FAILURES - 1) {
             ++ssdp_failures;
             rotor::pt::seconds timeout{cfg.max_wait};
-            request<payload::ssdp_request_t>(ssdp_addr).timeout(timeout);
+            request<payload::ssdp_request_t>(ssdp_addr).send(timeout);
         } else {
             do_shutdown();
         }

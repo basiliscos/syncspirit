@@ -49,7 +49,7 @@ class upnp_supervisor_t : public ra::supervisor_asio_t {
             return do_shutdown();
         }
         request_via<payload::http_request_t>(http_addr, via, url, std::move(tx_buff), rx_buff, cfg.rx_buff_size)
-            .timeout(pt::seconds{cfg.timeout});
+            .send(pt::seconds{cfg.timeout});
     }
 
     r::address_ptr_t http_addr;
