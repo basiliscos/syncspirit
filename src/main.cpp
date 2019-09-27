@@ -5,12 +5,16 @@
 #include <thread>
 #include <vector>
 
+#include <boost/filesystem.hpp>
+
 #include "configuration.h"
+#include "utils/location.h"
 #include "net/net_supervisor.h"
 #include <boost/program_options.hpp>
 #include <rotor/asio.hpp>
 #include <spdlog/spdlog.h>
 
+namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 namespace ra = rotor::asio;
@@ -28,7 +32,7 @@ int main(int argc, char **argv) {
         cmdline_descr.add_options()
                 ("help", "show this help message")
                 ("log_level", po::value<std::string>()->default_value("info"), "initial log level")
-                ( "config_file", po::value<std::string>()->default_value("syncspirit.conf"), "configuration file path");
+                ( "config_dir", po::value<std::string>(), "configuration directory path");
         // clang-format on
 
         po::variables_map vm;
@@ -45,16 +49,30 @@ int main(int argc, char **argv) {
         auto log_level = config::get_log_level(log_level_str);
         spdlog::set_level(log_level);
 
-        std::string config_file_path = vm["config_file"].as<std::string>();
-        std::ifstream config_file(config_file_path.c_str());
+        fs::path config_file_path;
+        if (vm.count("config_dir")) {
+            auto path = vm["config_dir"].as<std::string>();
+            config_file_path = fs::path{path.c_str()};
+        } else {
+            auto config_default = utils::get_default_config_dir();
+            if (config_default) {
+                config_file_path = config_default.value();
+            } else {
+                spdlog::error("cannot determine default config dir: {}", config_default.error().message());
+                return 1;
+            }
+        }
+        config_file_path.append("syncspirit.conf");
+        auto config_file_path_c = config_file_path.c_str();
+        std::ifstream config_file(config_file_path_c);
         if (!config_file) {
-            spdlog::error("Cannot open config file {}", config_file_path);
+            spdlog::error("Cannot open config file {}", config_file_path_c);
             return 1;
         }
 
         auto cfg_option = config::get_config(config_file);
         if (!cfg_option) {
-            spdlog::error("Config file {} is incorrect", config_file_path);
+            spdlog::error("Config file {} is incorrect", config_file_path_c);
             return 1;
         }
         spdlog::trace("configuration seems OK");
