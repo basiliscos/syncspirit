@@ -23,6 +23,7 @@ add_library(syncspirit_lib
     src/net/ssdp_actor.cpp
     src/net/upnp_supervisor.cpp
     src/utils/error_code.cpp
+    src/utils/tls.cpp
     src/utils/uri.cpp
     src/utils/upnp_support.cpp
 )

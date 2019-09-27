@@ -56,7 +56,7 @@ void upnp_supervisor_t::on_initialize_confirm(r::message::init_response_t &msg) 
     }
 }
 
-void upnp_supervisor_t::on_shutdown_confirm(r::message::shutdown_responce_t &msg) noexcept {
+void upnp_supervisor_t::on_shutdown_confirm(r::message::shutdown_response_t &msg) noexcept {
     ra::supervisor_asio_t::on_shutdown_confirm(msg);
     auto &target = msg.payload.req->payload.request_payload.actor_address;
     bool self_shutdown = false;
@@ -78,7 +78,7 @@ void upnp_supervisor_t::on_shutdown_confirm(r::message::shutdown_responce_t &msg
     }
 }
 
-void upnp_supervisor_t::on_ssdp_reply(message::ssdp_responce_t &msg) noexcept {
+void upnp_supervisor_t::on_ssdp_reply(message::ssdp_response_t &msg) noexcept {
     spdlog::trace("upnp_supervisor_t::on_ssdp_reply", ssdp_failures);
     if (msg.payload.ec) {
         if (ssdp_failures < MAX_SSDP_FAILURES - 1) {
@@ -105,7 +105,7 @@ void upnp_supervisor_t::on_ssdp_reply(message::ssdp_responce_t &msg) noexcept {
                  [&](auto &tx_buff) { return make_description_request(tx_buff, *igd_url); });
 }
 
-void upnp_supervisor_t::on_igd_description(message::http_responce_t &msg) noexcept {
+void upnp_supervisor_t::on_igd_description(message::http_response_t &msg) noexcept {
     spdlog::trace("upnp_supervisor_t::on_igd_description");
     if (msg.payload.ec) {
         spdlog::warn("upnp_actor:: get IGD description: {}", msg.payload.ec.message());
@@ -139,7 +139,7 @@ void upnp_supervisor_t::on_igd_description(message::http_responce_t &msg) noexce
                  [&](auto &tx_buff) { return make_external_ip_request(tx_buff, *igd_control_url); });
 }
 
-void upnp_supervisor_t::on_external_ip(message::http_responce_t &msg) noexcept {
+void upnp_supervisor_t::on_external_ip(message::http_response_t &msg) noexcept {
     spdlog::trace("upnp_supervisor_t::on_external_ip");
     if (msg.payload.ec) {
         spdlog::warn("upnp_actor:: get external IP address: {}", msg.payload.ec.message());
@@ -187,7 +187,7 @@ void upnp_supervisor_t::on_listen_success(r::message_t<listen_response_t> &msg) 
     });
 }
 
-void upnp_supervisor_t::on_mapping_ip(message::http_responce_t &msg) noexcept {
+void upnp_supervisor_t::on_mapping_ip(message::http_response_t &msg) noexcept {
     spdlog::trace("upnp_supervisor_t::on_mapping_ip");
     if (msg.payload.ec) {
         spdlog::warn("upnp_actor:: unsuccessfull port mapping: {}", msg.payload.ec.message());

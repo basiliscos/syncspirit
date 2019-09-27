@@ -15,6 +15,16 @@ enum class error_code {
     xml_parse_error,
     wan_notfound,
     timed_out,
+    tls_context_init_failure,
+    tls_param_init_failure,
+    tls_param_gen_failure,
+    tls_key_gen_init_failure,
+    tls_key_gen_failure,
+    tls_ec_curve_failure,
+    tls_ec_group_failure,
+    tls_cert_set_failure,
+    tls_cert_ext_failure,
+    tls_cert_sign_failure,
 };
 
 namespace detail {

@@ -1,11 +1,4 @@
 1. http_manager/supervisor to transparently handle http/https requests
 2. delete portmapping on shuttdown
 3. openssl
-view: openssl x509 -in ~/.config/syncthing/cert.pem -inform pem -noout -text
 
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365
-
-secp384r1
-
-openssl ecparam -name secp384r1 -genkey -param_enc explicit -out private-key.pem
-openssl req -new -x509 -key private-key.pem -out server.pem -days 730

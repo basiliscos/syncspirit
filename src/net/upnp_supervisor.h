@@ -22,16 +22,16 @@ class upnp_supervisor_t : public ra::supervisor_asio_t {
     virtual void on_initialize(r::message::init_request_t &msg) noexcept override;
     virtual void on_start(r::message::start_trigger_t &) noexcept override;
     virtual void shutdown_finish() noexcept override;
-    virtual void on_shutdown_confirm(r::message::shutdown_responce_t &) noexcept override;
+    virtual void on_shutdown_confirm(r::message::shutdown_response_t &) noexcept override;
     virtual void on_initialize_confirm(r::message::init_response_t &msg) noexcept;
 
-    virtual void on_igd_description(message::http_responce_t &) noexcept;
-    virtual void on_external_ip(message::http_responce_t &) noexcept;
-    virtual void on_mapping_ip(message::http_responce_t &) noexcept;
+    virtual void on_igd_description(message::http_response_t &) noexcept;
+    virtual void on_external_ip(message::http_response_t &) noexcept;
+    virtual void on_mapping_ip(message::http_response_t &) noexcept;
     virtual void on_listen_failure(r::message_t<listen_failure_t> &) noexcept;
     virtual void on_listen_success(r::message_t<listen_response_t> &) noexcept;
 
-    void on_ssdp_reply(message::ssdp_responce_t &) noexcept;
+    void on_ssdp_reply(message::ssdp_response_t &) noexcept;
 
   private:
     using url_option_t = boost::optional<utils::URI>;

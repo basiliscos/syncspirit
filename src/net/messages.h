@@ -29,14 +29,6 @@ using tcp_socket_t = tcp::socket;
 
 /* outdated start */
 
-/*
-struct ssdp_failure_t {
-    sys::error_code ec;
-};
-
-struct try_again_request_t {};
-*/
-
 struct listen_request_t {
     r::address_ptr_t reply_to;
     r::address_ptr_t redirect_to; /* address where redirect accepted peers (clients) */
@@ -56,19 +48,17 @@ struct new_peer_t {
     tcp::socket sock;
 };
 
-// using ssdp_result_t = utils::discovery_result;
-
 /* outdated end */
 
 namespace payload {
 
-struct http_responce_t : public r::arc_base_t<http_responce_t> {
-    using http_response_t = http::response<http::string_body>;
+struct http_response_t : public r::arc_base_t<http_response_t> {
+    using raw_http_response_t = http::response<http::string_body>;
     tcp::endpoint local_endpoint;
-    http_response_t response;
+    raw_http_response_t response;
     std::size_t bytes;
 
-    http_responce_t(const tcp::endpoint &endpoint_, http_response_t &&response_, std::size_t bytes_)
+    http_response_t(const tcp::endpoint &endpoint_, raw_http_response_t &&response_, std::size_t bytes_)
         : local_endpoint(endpoint_), response(std::move(response_)), bytes{bytes_} {}
 };
 
@@ -76,7 +66,7 @@ struct http_request_t {
     using rx_buff_t = boost::beast::flat_buffer;
     using rx_buff_ptr_t = std::shared_ptr<rx_buff_t>;
     using duration_t = r::pt::time_duration;
-    using responce_t = r::intrusive_ptr_t<http_responce_t>;
+    using response_t = r::intrusive_ptr_t<http_response_t>;
 
     utils::URI url;
     fmt::memory_buffer data;
@@ -84,13 +74,13 @@ struct http_request_t {
     std::size_t rx_buff_size;
 };
 
-struct ssdp_responce_t : r::arc_base_t<ssdp_responce_t> {
+struct ssdp_response_t : r::arc_base_t<ssdp_response_t> {
     utils::discovery_result igd;
-    ssdp_responce_t(utils::discovery_result igd_) : igd{std::move(igd_)} {}
+    ssdp_response_t(utils::discovery_result igd_) : igd{std::move(igd_)} {}
 };
 
 struct ssdp_request_t {
-    using responce_t = r::intrusive_ptr_t<ssdp_responce_t>;
+    using response_t = r::intrusive_ptr_t<ssdp_response_t>;
 };
 
 } // end of namespace payload
@@ -98,10 +88,10 @@ struct ssdp_request_t {
 namespace message {
 
 using http_request_t = r::request_traits_t<payload::http_request_t>::request::message_t;
-using http_responce_t = r::request_traits_t<payload::http_request_t>::responce::message_t;
+using http_response_t = r::request_traits_t<payload::http_request_t>::response::message_t;
 
 using ssdp_request_t = r::request_traits_t<payload::ssdp_request_t>::request::message_t;
-using ssdp_responce_t = r::request_traits_t<payload::ssdp_request_t>::responce::message_t;
+using ssdp_response_t = r::request_traits_t<payload::ssdp_request_t>::response::message_t;
 
 } // end of namespace message
 
