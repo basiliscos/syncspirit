@@ -1,6 +1,8 @@
 #pragma once
-#include <boost/outcome.hpp>
+#include <string>
 #include <memory>
+#include <vector>
+#include <boost/outcome.hpp>
 #include <openssl/x509v3.h>
 #include <openssl/evp.h>
 
@@ -17,9 +19,16 @@ struct key_pair_t {
 
     X509_sp cert;
     EVP_PKEY_sp private_key;
+    std::string cert_data;
+
+    outcome::result<void> save(const char *cert, const char *priv_key) const noexcept;
 };
 
 outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept;
+
+outcome::result<key_pair_t> load_pair(const char *cert, const char *priv_key) noexcept;
+
+outcome::result<std::string> sha256_digest(const std::string &data) noexcept;
 
 } // namespace utils
 } // namespace syncspirit

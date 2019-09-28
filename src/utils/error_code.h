@@ -26,6 +26,12 @@ enum class error_code {
     tls_cert_set_failure,
     tls_cert_ext_failure,
     tls_cert_sign_failure,
+    tls_cert_save_failure,
+    tls_cert_load_failure,
+    tls_key_save_failure,
+    tls_key_load_failure,
+    tls_sha256_init_failure,
+    tls_sha256_failure,
 };
 
 namespace detail {

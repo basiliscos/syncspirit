@@ -58,7 +58,7 @@ outcome::result<void> make_discovery_request(fmt::memory_buffer &buff, std::uint
     });
     if (ec) {
         return ec;
-    };
+    }
     return outcome::success();
 }
 
