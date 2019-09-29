@@ -32,6 +32,7 @@ enum class error_code {
     tls_key_load_failure,
     tls_sha256_init_failure,
     tls_sha256_failure,
+    base32_decoding_failure,
 };
 
 namespace detail {

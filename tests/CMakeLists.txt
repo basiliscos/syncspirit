@@ -37,3 +37,7 @@ add_executable(011-tls-util 011-tls-util.cpp)
 target_link_libraries(011-tls-util syncspirit_test_lib)
 add_test(011-tls-util "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/011-tls-util")
 
+add_executable(012-base32 012-base32.cpp)
+target_link_libraries(012-base32 syncspirit_test_lib)
+add_test(012-base32 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/012-base32")
+

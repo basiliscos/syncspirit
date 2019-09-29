@@ -11,14 +11,6 @@ using namespace syncspirit::test;
 
 namespace fs = boost::filesystem;
 
-struct path_guard_t {
-    fs::path& path;
-    path_guard_t(fs::path& path_): path{path_}{}
-    ~path_guard_t() {
-        fs::remove(path);
-    }
-};
-
 TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     auto pair = generate_pair("sample");
     REQUIRE((bool) pair);
@@ -48,7 +40,7 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
 }
 
 TEST_CASE("sha256 for certificate", "[support][tls]") {
-    auto cert = read_file("/tests/data/sample-cert.pem");
+    auto cert = read_file("/data/sample-cert.pem");
     auto sha_result = sha256_digest(cert);
     REQUIRE((bool)sha_result);
     auto& sha = sha_result.value();
