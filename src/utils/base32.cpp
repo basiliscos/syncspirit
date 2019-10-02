@@ -4,8 +4,8 @@
 
 using namespace syncspirit::utils;
 
-static const char in_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-static const std::int32_t out_table[255] = {
+const char base32::in_alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+const std::int32_t base32::out_alphabet[] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, /* 0 */
     -1,                                                                                 /* 1 */
@@ -81,7 +81,7 @@ std::string base32::encode(const std::string &input) noexcept {
     while (in_bytes || in_bits > 0) {
         constexpr auto shift = 16 - 5;
         auto index = (in & (in_mask << (shift))) >> shift;
-        encoded[out_index++] = in_table[index];
+        encoded[out_index++] = in_alphabet[index];
         in_bits -= 5;
         sign_bits -= 5;
         in = (in << 5) & (std::numeric_limits<std::uint16_t>::max() - 1);
@@ -118,7 +118,7 @@ outcome::result<std::string> base32::decode(const std::string &input) noexcept {
         out = (out << 5);
         auto in_byte = *ptr++;
         std::uint32_t in_value = static_cast<std::uint32_t>(in_byte);
-        auto quartet = out_table[in_value];
+        auto quartet = out_alphabet[in_value];
         if (quartet == -1) {
             return error_code::base32_decoding_failure;
         }
