@@ -68,7 +68,7 @@ std::string base32::encode(const std::string &input) noexcept {
     /* setup and pre-allign first 2 bytes */
     auto pull_in = [&]() {
         if (in_bytes) {
-            std::uint32_t in_byte = static_cast<std::uint32_t>(*ptr++);
+            std::uint32_t in_byte = static_cast<unsigned char>(*ptr++);
             in_bits += 8;
             in = in | (in_byte << (16 - in_bits));
             --in_bytes;

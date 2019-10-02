@@ -8,6 +8,7 @@ namespace fs = boost::filesystem;
 using b32 = syncspirit::utils::base32;
 
 TEST_CASE("base32 encode/decode", "[support]") {
+
     SECTION("encode") {
         REQUIRE(b32::encode("f") == "MY" );
         REQUIRE(b32::encode("fo") == "MZXQ" );
@@ -26,5 +27,14 @@ TEST_CASE("base32 encode/decode", "[support]") {
         REQUIRE(b32::decode("MZXW6LLC").value() == "foo-b" );
         REQUIRE(b32::decode("MZXW6LLCMFZA").value() == "foo-bar" );
         REQUIRE(b32::decode("NRXXEZLNEBUXA43VNUQGI33MN5ZCA43JOQQGC3LFOQ").value() == "lorem ipsum dolor sit amet" );
+    }
+
+    SECTION("binary string") {
+        unsigned char in[] = {0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6};
+        std::string orig(reinterpret_cast<char*>(in));
+        auto e = b32::encode(orig);
+        auto d = b32::decode(e);
+        REQUIRE((bool)d);
+        REQUIRE(d.value() == orig);
     }
 }

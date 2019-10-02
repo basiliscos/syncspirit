@@ -19,7 +19,7 @@ struct key_pair_t {
 
     X509_sp cert;
     EVP_PKEY_sp private_key;
-    std::string cert_data;
+    std::string cert_data; /* in DER-format */
 
     outcome::result<void> save(const char *cert, const char *priv_key) const noexcept;
 };

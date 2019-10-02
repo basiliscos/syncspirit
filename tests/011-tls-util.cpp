@@ -1,4 +1,5 @@
 #include "catch.hpp"
+#include "utils/base32.h"
 #include "utils/tls.h"
 #include "test-utils.h"
 #include <openssl/pem.h>
@@ -36,16 +37,18 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     auto load_result = load_pair(cert_file.c_str(), key_file.c_str());
     REQUIRE((bool) load_result);
     REQUIRE(load_result.value().cert_data.size() == pair.value().cert_data.size());
-    REQUIRE(load_result.value().cert_data== pair.value().cert_data);
+
+    bool bytes_equal = load_result.value().cert_data == pair.value().cert_data;
+    REQUIRE(bytes_equal);
 }
 
 TEST_CASE("sha256 for certificate", "[support][tls]") {
-    auto cert = read_file("/data/sample-cert.pem");
+    auto cert = read_file("/data/cert.der");
     auto sha_result = sha256_digest(cert);
     REQUIRE((bool)sha_result);
     auto& sha = sha_result.value();
     REQUIRE(1 == 1);
-    std::string expected = "f2f117136b1442bf69d1c3dad4e6d836d5bdf69295c1af406a69795b429f27ed";
+    std::string expected = "b1b48b580b78b47c975a138b4aaa2988fc621795c95a2868e24d93b327e8858c";
     char got[expected.size() + 1];
     std::memset(got, 0, sizeof (got));
 
@@ -54,4 +57,7 @@ TEST_CASE("sha256 for certificate", "[support][tls]") {
     }
     std::string got_str(got, expected.size());
     REQUIRE(got_str == expected);
+
+    auto enc = base32::encode(sha);
+    REQUIRE(enc == "WG2IWWALPC2HZF22COFUVKRJRD6GEF4VZFNCQ2HCJWJ3GJ7IQWGA");
 }

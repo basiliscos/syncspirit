@@ -26,6 +26,22 @@ static bool add_extension(X509V3_CTX &ctx, X509 *cert, int NID_EXT, const char *
     return true;
 }
 
+static outcome::result<std::string> as_der(X509 *cert) noexcept {
+    BIO *bio = BIO_new(BIO_s_mem());
+    auto bio_guard = make_guard(bio, [](auto *ptr) { BIO_free(ptr); });
+    if (i2d_X509_bio(bio, cert) < 0) {
+        return error_code::tls_cert_save_failure;
+    }
+    char *cert_buff;
+    auto cert_sz = BIO_get_mem_data(bio, &cert_buff);
+    if (cert_sz < 0) {
+        return error_code::tls_cert_save_failure;
+    }
+    std::string cert_container(static_cast<std::size_t>(cert_sz), 0);
+    std::memcpy(cert_container.data(), cert_buff, cert_container.size());
+    return cert_container;
+}
+
 outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     auto ev_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);
     if (ev_ctx == nullptr) {
@@ -129,20 +145,12 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
         return error_code::tls_cert_sign_failure;
     }
 
-    BIO *bio = BIO_new(BIO_s_mem());
-    auto bio_guard = make_guard(bio, [](auto *ptr) { BIO_free(ptr); });
-    if (1 != PEM_write_bio_X509(bio, cert)) {
-        return error_code::tls_cert_save_failure;
+    auto cert_container = as_der(cert);
+    if (!cert_container) {
+        return cert_container.error();
     }
-    char *cert_buff;
-    auto cert_sz = BIO_get_mem_data(bio, &cert_buff);
-    if (cert_sz < 0) {
-        return error_code::tls_cert_save_failure;
-    }
-    std::string cert_container(static_cast<std::size_t>(cert_sz), 0);
-    std::memcpy(cert_container.data(), cert_buff, cert_container.size());
 
-    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), std::move(cert_container)};
+    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), std::move(cert_container.value())};
 }
 
 outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_key_path) const noexcept {
@@ -189,17 +197,9 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
     }
     rewind(cert_file);
 
-    std::string cert_container(static_cast<std::size_t>(cert_sz), 0);
-    if (1 != fread(cert_container.data(), cert_container.size(), 1, cert_file)) {
-        return sys::error_code{errno, sys::generic_category()};
-    }
-
-    BIO *bio = BIO_new_mem_buf(cert_container.data(), static_cast<int>(cert_sz));
-    auto bio_guard = make_guard(bio, [](auto *ptr) { BIO_free(ptr); });
-
     X509 *cert = X509_new();
     auto cert_guard = make_guard(cert, [](auto *ptr) { X509_free(ptr); });
-    if (!PEM_read_bio_X509(bio, &cert, nullptr, nullptr)) {
+    if (!PEM_read_X509(cert_file, &cert, nullptr, nullptr)) {
         return error_code::tls_cert_load_failure;
     }
 
@@ -215,7 +215,12 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
         return error_code::tls_cert_load_failure;
     }
 
-    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), std::move(cert_container)};
+    auto cert_container = as_der(cert);
+    if (!cert_container) {
+        return cert_container.error();
+    }
+
+    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), std::move(cert_container.value())};
 }
 
 outcome::result<std::string> sha256_digest(const std::string &data) noexcept {
