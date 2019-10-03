@@ -1,11 +1,14 @@
 #include "luhn32.h"
 #include "../utils/base32.h"
 #include <cassert>
+#include <string_view>
+#include <boost/outcome.hpp>
 
 using namespace syncspirit::proto;
 using namespace syncspirit::utils;
+namespace outcome = boost::outcome_v2;
 
-char luhn32::calculate(const std::string &in) noexcept {
+static outcome::result<char> calc(const std::string_view &in) {
     int factor = 1;
     int sum = 0;
     constexpr const int n = 32;
@@ -26,4 +29,24 @@ char luhn32::calculate(const std::string &in) noexcept {
     int check_char_index = (n - remainder) % n;
 
     return base32::in_alphabet[check_char_index];
+}
+
+char luhn32::calculate(const std::string &in) noexcept {
+    auto result = calc(std::string_view(in));
+    assert(result && "wrong codepoint (bad input string)");
+    return result.value();
+}
+
+bool luhn32::validate(const std::string &in) noexcept {
+    auto length = in.length();
+    if (!length) {
+        return false; // not sure
+    }
+
+    auto view = std::string_view(in.data(), length - 1);
+    auto result = calc(view);
+    if (!result) {
+        return false;
+    }
+    return in[length - 1] == result.value();
 }
