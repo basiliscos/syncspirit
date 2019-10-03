@@ -16,14 +16,20 @@ int main(int argc, char *argv[]) {
 
 namespace syncspirit::test {
 
-std::string read_file(const char* test_file) {
+std::string file_path(const char* test_file) {
     auto self_file = __FILE__;
     fs::path self(self_file);
     self.remove_filename();
-    fs::path file_path(self.string() + test_file);
+    auto str_path = self.string() + test_file;
+    return str_path;
+}
+
+
+std::string read_file(const char* test_file) {
+    auto fp = file_path(test_file);
     sys::error_code ec;
-    auto filesize = fs::file_size(file_path, ec);
-    auto file_path_c = file_path.c_str();
+    auto filesize = fs::file_size(fs::path(fp), ec);
+    auto file_path_c = fp.c_str();
     auto in = fopen(file_path_c, "rb");
     if (!in) {
         auto ec = sys::error_code{errno, sys::generic_category()};

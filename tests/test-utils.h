@@ -15,6 +15,7 @@ struct path_guard_t {
     }
 };
 
+std::string file_path(const char* test_file);
 std::string read_file(const char* test_file);
 
 }

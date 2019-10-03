@@ -31,13 +31,13 @@ static outcome::result<char> calc(const std::string_view &in) {
     return base32::in_alphabet[check_char_index];
 }
 
-char luhn32::calculate(const std::string &in) noexcept {
-    auto result = calc(std::string_view(in));
+char luhn32::calculate(std::string_view in) noexcept {
+    auto result = calc(in);
     assert(result && "wrong codepoint (bad input string)");
     return result.value();
 }
 
-bool luhn32::validate(const std::string &in) noexcept {
+bool luhn32::validate(std::string_view in) noexcept {
     auto length = in.length();
     if (!length) {
         return false; // not sure
