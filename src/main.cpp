@@ -5,6 +5,7 @@
 #include <thread>
 #include <vector>
 
+#include <google/protobuf/stubs/common.h>
 #include <boost/filesystem.hpp>
 
 #include "configuration.h"
@@ -25,6 +26,8 @@ using namespace syncspirit;
 static std::atomic<bool> signal_shutdown_flag{false};
 
 int main(int argc, char **argv) {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
+
     try {
         // clang-format off
         /* parse command-line & config options */
@@ -118,6 +121,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    google::protobuf::ShutdownProtobufLibrary();
     /* exit */
     spdlog::info("normal exit");
     return 0;

@@ -13,6 +13,9 @@ find_package(
     REQUIRED
 )
 find_package(OpenSSL REQUIRED)
+find_package(Protobuf REQUIRED)
+
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS src/proto/announce.proto)
 
 add_library(syncspirit_lib
     src/configuration.cpp
@@ -30,6 +33,7 @@ add_library(syncspirit_lib
     src/utils/tls.cpp
     src/utils/uri.cpp
     src/utils/upnp_support.cpp
+    ${PROTO_SRCS}
 )
 
 add_executable(syncspirit
@@ -50,6 +54,7 @@ target_include_directories(syncspirit_lib PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/pugixml/src
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
+    ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 target_link_libraries(syncspirit
@@ -59,6 +64,7 @@ target_link_libraries(syncspirit
     fmt::fmt
     ${Boost_LIBRARIES}
     OpenSSL::SSL
+    protobuf::libprotobuf-lite
 )
 
 enable_testing()
