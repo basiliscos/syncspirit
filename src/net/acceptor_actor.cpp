@@ -1,17 +1,30 @@
 #include "acceptor_actor.h"
+#include "names.h"
 #include "../utils/error_code.h"
 
 using namespace syncspirit::net;
 
-acceptor_actor_t::acceptor_actor_t(ra::supervisor_asio_t &sup)
+acceptor_actor_t::acceptor_actor_t(ra::supervisor_asio_t &sup, r::address_ptr_t registry_)
     : r::actor_base_t::actor_base_t(sup), strand{static_cast<ra::supervisor_asio_t &>(supervisor).get_strand()},
-      io_context{strand.context()}, acceptor{io_context}, peer(io_context) {
+      io_context{strand.context()}, acceptor{io_context}, peer(io_context), registry_addr{registry_} {
     accepting = false;
 }
 
-void acceptor_actor_t::on_initialize(r::message::init_request_t &msg) noexcept {
+void acceptor_actor_t::on_registration(r::message::registration_response_t &msg) noexcept {
+    auto &ec = msg.payload.ec;
+    if (ec) {
+        spdlog::warn("acceptor_actor_t::on_registration failure :: {}", ec.message());
+        return;
+    }
+
+    unsubscribe(&acceptor_actor_t::on_registration);
+    r::actor_base_t::init_start();
+}
+
+void acceptor_actor_t::init_start() noexcept {
     subscribe(&acceptor_actor_t::on_listen_request);
-    r::actor_base_t::on_initialize(msg);
+    subscribe(&acceptor_actor_t::on_registration);
+    request<r::payload::registration_request_t>(registry_addr, names::acceptor, address).send(default_timeout);
 }
 
 void acceptor_actor_t::on_shutdown(r::message::shutdown_request_t &msg) noexcept {
@@ -24,19 +37,25 @@ void acceptor_actor_t::on_shutdown(r::message::shutdown_request_t &msg) noexcept
         }
     }
     redirect_to.reset();
+    send<r::payload::deregistration_notify_t>(registry_addr, address);
+    registry_addr.reset();
     r::actor_base_t::on_shutdown(msg);
 }
 
-void acceptor_actor_t::on_listen_request(r::message_t<listen_request_t> &msg) noexcept {
+void acceptor_actor_t::on_listen_request(message::listen_request_t &msg) noexcept {
     spdlog::trace("acceptor_actor_t::on_listen_request");
-    tcp::endpoint endpoint(msg.payload.address, msg.payload.port);
+    auto &payload = msg.payload.request_payload;
+    auto &addr = payload.address;
+    auto &port = payload.port;
+
+    tcp::endpoint endpoint(addr, port);
     sys::error_code ec;
 
     acceptor.open(endpoint.protocol(), ec);
     if (ec) {
         spdlog::error("cannot open endpoint ({0}:{1}) : {2}", endpoint.address().to_string(), endpoint.port(),
                       ec.message());
-        send<listen_failure_t>(msg.payload.reply_to, ec);
+        reply_with_error(msg, ec);
         return do_shutdown();
     }
 
@@ -44,20 +63,19 @@ void acceptor_actor_t::on_listen_request(r::message_t<listen_request_t> &msg) no
     if (ec) {
         spdlog::error("cannot bind endpoint ({0}:{1}) : {2}", endpoint.address().to_string(), endpoint.port(),
                       ec.message());
-        send<listen_failure_t>(msg.payload.reply_to, ec);
+        reply_with_error(msg, ec);
         return do_shutdown();
     }
 
     acceptor.listen(asio::socket_base::max_listen_connections, ec);
     if (ec) {
         spdlog::error("cannot listen ({0}:{1}) : {2}", endpoint.address().to_string(), endpoint.port(), ec.message());
-        send<listen_failure_t>(msg.payload.reply_to, ec);
+        reply_with_error(msg, ec);
         return do_shutdown();
     }
 
-    redirect_to = msg.payload.redirect_to;
     accept_next();
-    send<listen_response_t>(msg.payload.reply_to, acceptor.local_endpoint());
+    reply_to(msg, acceptor.local_endpoint());
 }
 
 void acceptor_actor_t::accept_next() noexcept {
@@ -78,8 +96,11 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
     }
 
     if (redirect_to) {
+        /*
         send<new_peer_t>(redirect_to, std::move(peer));
         peer = tcp_socket_t(io_context);
         accept_next();
+        */
+        assert(0 && "TODO");
     }
 }

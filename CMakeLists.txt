@@ -23,6 +23,8 @@ add_library(syncspirit_lib
     src/net/global_discovery_actor.cpp
     src/net/http_actor.cpp
     src/net/net_supervisor.cpp
+    src/net/messages.cpp
+    src/net/names.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_supervisor.cpp
     src/proto/device_id.cpp

@@ -27,30 +27,20 @@ using v4 = asio::ip::address_v4;
 using udp_socket_t = udp::socket;
 using tcp_socket_t = tcp::socket;
 
-/* outdated start */
+extern r::pt::time_duration default_timeout;
 
-struct listen_request_t {
-    r::address_ptr_t reply_to;
-    r::address_ptr_t redirect_to; /* address where redirect accepted peers (clients) */
-    asio::ip::address address;
-    std::uint16_t port;
-};
-
-struct listen_failure_t {
-    sys::error_code ec;
-};
+namespace payload {
 
 struct listen_response_t {
     tcp::endpoint listening_endpoint;
 };
 
-struct new_peer_t {
-    tcp::socket sock;
+struct listen_request_t {
+    using response_t = listen_response_t;
+
+    asio::ip::address address;
+    std::uint16_t port;
 };
-
-/* outdated end */
-
-namespace payload {
 
 struct http_response_t : public r::arc_base_t<http_response_t> {
     using raw_http_response_t = http::response<http::string_body>;
@@ -92,6 +82,9 @@ using http_response_t = r::request_traits_t<payload::http_request_t>::response::
 
 using ssdp_request_t = r::request_traits_t<payload::ssdp_request_t>::request::message_t;
 using ssdp_response_t = r::request_traits_t<payload::ssdp_request_t>::response::message_t;
+
+using listen_request_t = r::request_traits_t<payload::listen_request_t>::request::message_t;
+using listen_response_t = r::request_traits_t<payload::listen_request_t>::response::message_t;
 
 } // end of namespace message
 
