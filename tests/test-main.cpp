@@ -38,7 +38,8 @@ std::string read_file(const char* test_file) {
     }
     assert(in);
     std::vector<char> buffer(filesize, 0);
-    assert(fread(buffer.data(), filesize, 1, in) == 1);
+    auto r = fread(buffer.data(), filesize, 1, in);
+    assert(r == 1);
     fclose(in);
     return std::string(buffer.data(), filesize);
 }
