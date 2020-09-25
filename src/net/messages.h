@@ -29,30 +29,42 @@ using tcp_socket_t = tcp::socket;
 
 extern r::pt::time_duration default_timeout;
 
+
 namespace payload {
 
-struct listen_response_t {
-    tcp::endpoint listening_endpoint;
+
+struct address_response_t : public r::arc_base_t<address_response_t> {
+    using resolve_results_t = tcp::resolver::results_type;
+
+    explicit address_response_t(resolve_results_t results_) : results{results_} {};
+    resolve_results_t results;
 };
 
-struct listen_request_t {
-    using response_t = listen_response_t;
+struct address_request_t : public r::arc_base_t<address_request_t> {
+    using response_t = r::intrusive_ptr_t<address_response_t>;
+    std::string host;
+    std::string port;
+    address_request_t(const std::string& host_, std::string& port_): host{host_}, port{port_}{}
+};
 
-    asio::ip::address address;
-    std::uint16_t port;
+struct endpoint_response_t {
+    tcp::endpoint local_endpoint;
+};
+
+struct endpoint_request_t {
+    using response_t = endpoint_response_t;
 };
 
 struct http_response_t : public r::arc_base_t<http_response_t> {
     using raw_http_response_t = http::response<http::string_body>;
-    tcp::endpoint local_endpoint;
     raw_http_response_t response;
     std::size_t bytes;
 
-    http_response_t(const tcp::endpoint &endpoint_, raw_http_response_t &&response_, std::size_t bytes_)
-        : local_endpoint(endpoint_), response(std::move(response_)), bytes{bytes_} {}
+    http_response_t(raw_http_response_t &&response_, std::size_t bytes_)
+        : response(std::move(response_)), bytes{bytes_} {}
 };
 
-struct http_request_t {
+struct http_request_t  : public r::arc_base_t<http_request_t> {
     using rx_buff_t = boost::beast::flat_buffer;
     using rx_buff_ptr_t = std::shared_ptr<rx_buff_t>;
     using duration_t = r::pt::time_duration;
@@ -62,29 +74,36 @@ struct http_request_t {
     fmt::memory_buffer data;
     rx_buff_ptr_t rx_buff;
     std::size_t rx_buff_size;
+    http_request_t(utils::URI& url_, fmt::memory_buffer&& data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_):
+        url{url_}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_}{}
 };
 
-struct ssdp_response_t : r::arc_base_t<ssdp_response_t> {
+struct ssdp_notification_t : r::arc_base_t<ssdp_notification_t> {
     utils::discovery_result igd;
-    ssdp_response_t(utils::discovery_result igd_) : igd{std::move(igd_)} {}
+    asio::ip::address local_address;
+    ssdp_notification_t(utils::discovery_result&& igd_, const asio::ip::address& local_address_):
+        igd{std::move(igd_)}, local_address{local_address_} {}
 };
 
-struct ssdp_request_t {
-    using response_t = r::intrusive_ptr_t<ssdp_response_t>;
+struct port_mapping_notification_t {
+    bool success;
 };
 
 } // end of namespace payload
 
 namespace message {
 
+using ssdp_notification_t = r::message_t<payload::ssdp_notification_t>;
+using port_mapping_notification_t = r::message_t<payload::port_mapping_notification_t>;
+
+using resolve_request_t = r::request_traits_t<payload::address_request_t>::request::message_t;
+using resolve_response_t = r::request_traits_t<payload::address_request_t>::response::message_t;
+
 using http_request_t = r::request_traits_t<payload::http_request_t>::request::message_t;
 using http_response_t = r::request_traits_t<payload::http_request_t>::response::message_t;
 
-using ssdp_request_t = r::request_traits_t<payload::ssdp_request_t>::request::message_t;
-using ssdp_response_t = r::request_traits_t<payload::ssdp_request_t>::response::message_t;
-
-using listen_request_t = r::request_traits_t<payload::listen_request_t>::request::message_t;
-using listen_response_t = r::request_traits_t<payload::listen_request_t>::response::message_t;
+using endpoint_request_t = r::request_traits_t<payload::endpoint_request_t>::request::message_t;
+using endpoint_response_t = r::request_traits_t<payload::endpoint_request_t>::response::message_t;
 
 } // end of namespace message
 

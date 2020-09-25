@@ -20,13 +20,14 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS src/proto/announce.proto)
 add_library(syncspirit_lib
     src/configuration.cpp
     src/net/acceptor_actor.cpp
-    src/net/global_discovery_actor.cpp
+    #src/net/global_discovery_actor.cpp
     src/net/http_actor.cpp
     src/net/net_supervisor.cpp
+    src/net/resolver_actor.cpp
     src/net/messages.cpp
     src/net/names.cpp
     src/net/ssdp_actor.cpp
-    src/net/upnp_supervisor.cpp
+    src/net/upnp_actor.cpp
     src/proto/device_id.cpp
     src/proto/luhn32.cpp
     src/utils/base32.cpp

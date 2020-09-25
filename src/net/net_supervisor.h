@@ -3,35 +3,44 @@
 #include "../configuration.h"
 #include "messages.h"
 #include <boost/asio.hpp>
-#include <rotor/asio/supervisor_asio.h>
+#include <rotor/asio.hpp>
 
 namespace syncspirit {
 namespace net {
 
+struct net_supervisor_config_t : ra::supervisor_config_asio_t {
+    config::configuration_t app_config;
+};
+
+template <typename Supervisor>
+struct net_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<Supervisor> {
+    using builder_t = typename Supervisor::template config_builder_t<Supervisor>;
+    using parent_t = ra::supervisor_config_asio_builder_t<Supervisor>;
+    using parent_t::parent_t;
+
+    builder_t &&app_config(const config::configuration_t& value) &&noexcept {
+        parent_t::config.app_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+};
+
 struct net_supervisor_t : public ra::supervisor_asio_t {
-    net_supervisor_t(ra::supervisor_asio_t *sup, const ra::supervisor_config_asio_t &sup_cfg,
-                     const config::configuration_t &cfg);
+    using parent_t = ra::supervisor_asio_t;
+    using config_t = net_supervisor_config_t;
+    template <typename Actor> using config_builder_t = net_supervisor_config_builder_t<Actor>;
 
-    /*
-    virtual void on_initialize(r::message::init_request_t &) noexcept override;
-    virtual void on_initialize_confirm(r::message::init_response_t &msg) noexcept override;
-    */
-    virtual void init_start() noexcept override;
-    virtual void on_registration(r::message::registration_response_t &) noexcept;
-    virtual void on_start(r::message_t<r::payload::start_actor_t> &) noexcept override;
-    virtual void on_shutdown(r::message::shutdown_request_t &) noexcept override;
-    virtual void shutdown_finish() noexcept override;
+    explicit net_supervisor_t(config_t &config);
+    void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept override;
 
-  private:
-    using guard_t = asio::executor_work_guard<asio::io_context::executor_type>;
+private:
+    void on_ssdp(message::ssdp_notification_t& message) noexcept;
+    void on_port_mapping(message::port_mapping_notification_t& message) noexcept;
+    bool launch_ssdp() noexcept;
 
-    void launch_discovery() noexcept;
-    void launch_upnp() noexcept;
-    void launch_acceptor() noexcept;
-
-    config::configuration_t cfg;
-    guard_t guard;
-    r::address_ptr_t registry_addr;
+    config::configuration_t app_cfg;
+    r::address_ptr_t ssdp_addr;
+    std::uint32_t ssdp_attempts = 0;
 };
 
 } // namespace net

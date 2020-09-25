@@ -23,6 +23,26 @@ namespace asio = boost::asio;
 
 using namespace syncspirit;
 
+spdlog::level::level_enum get_log_level(const std::string &log_level) {
+    using namespace spdlog::level;
+    level_enum value = info;
+    if (log_level == "trace")
+        value = trace;
+    if (log_level == "debug")
+        value = debug;
+    if (log_level == "info")
+        value = info;
+    if (log_level == "warn")
+        value = warn;
+    if (log_level == "error")
+        value = err;
+    if (log_level == "crit")
+        value = critical;
+    if (log_level == "off")
+        value = off;
+    return value;
+}
+
 static std::atomic<bool> signal_shutdown_flag{false};
 
 int main(int argc, char **argv) {
@@ -49,7 +69,7 @@ int main(int argc, char **argv) {
         }
 
         auto log_level_str = vm["log_level"].as<std::string>();
-        auto log_level = config::get_log_level(log_level_str);
+        auto log_level = get_log_level(log_level_str);
         spdlog::set_level(log_level);
 
         fs::path config_file_path;
@@ -85,9 +105,15 @@ int main(int argc, char **argv) {
         asio::io_context io_context;
         ra::system_context_ptr_t sys_context{new ra::system_context_asio_t{io_context}};
         auto stand = std::make_shared<asio::io_context::strand>(io_context);
-        auto timeout = pt::milliseconds{1000};
-        ra::supervisor_config_asio_t sup_conf{timeout, std::move(stand)};
-        auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>(sup_conf, *cfg_option);
+        auto timeout = pt::milliseconds{cfg_option->timeout};
+        //ra::supervisor_config_asio_t sup_conf{timeout, std::move(stand)};
+        //auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>(sup_conf, *cfg_option);
+        auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
+                .app_config(*cfg_option)
+                .strand(stand)
+                .timeout(timeout)
+                .create_registry()
+                .finish();
         sup_net->start();
 
         /* launch actors */
