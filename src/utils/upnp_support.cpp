@@ -155,7 +155,7 @@ outcome::result<igd_result> parse_igd(const char *data, std::size_t bytes) noexc
 
 outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const URI &uri) noexcept {
     http::request<http::string_body> req;
-    std::string soap_action = fmt::format("{0}#{1}", igd_wan_service, soap_GetExternalIPAddress);
+    std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_GetExternalIPAddress);
     req.method(http::verb::post);
     req.version(http_version);
     req.target(uri.path);
@@ -206,7 +206,7 @@ outcome::result<std::string> parse_external_ip(const char *data, std::size_t byt
 outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &uri, std::uint16_t external_port,
                                            const std::string &internal_ip, std::uint16_t internal_port) noexcept {
     http::request<http::string_body> req;
-    std::string soap_action = fmt::format("{0}#{1}", igd_wan_service, soap_AddPortMapping);
+    std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_AddPortMapping);
     req.method(http::verb::post);
     req.version(http_version);
     req.target(uri.path);
