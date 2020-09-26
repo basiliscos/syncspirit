@@ -43,15 +43,15 @@ void ssdp_actor_t::on_start() noexcept {
 
     spdlog::trace("ssdp_actor_t:: sending multicast request to {}:{} ({} bytes)", upnp_addr, upnp_port, tx_buff.size());
 
-    auto fwd_discovery = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_sent, &ssdp_actor_t::on_udp_send_error);
-    auto buff_tx = asio::buffer(tx_buff.data(), tx_buff.size());
-    sock->async_send_to(buff_tx, destination, std::move(fwd_discovery));
-    resources->acquire(resource::send);
-
     auto fwd_recieve = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_received, &ssdp_actor_t::on_udp_recv_error);
     auto buff_rx = asio::buffer(rx_buff.data(), RX_BUFF_SIZE);
     sock->async_receive(buff_rx, std::move(fwd_recieve));
     resources->acquire(resource::recv);
+
+    auto fwd_discovery = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_sent, &ssdp_actor_t::on_udp_send_error);
+    auto buff_tx = asio::buffer(tx_buff.data(), tx_buff.size());
+    sock->async_send_to(buff_tx, destination, std::move(fwd_discovery));
+    resources->acquire(resource::send);
 }
 
 void ssdp_actor_t::shutdown_start() noexcept {

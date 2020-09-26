@@ -3,8 +3,10 @@
 #include <boost/asio.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <rotor/asio.hpp>
+#include <boost/asio/ssl.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+
 #include <memory>
 
 #include <fmt/format.h>
@@ -20,6 +22,7 @@ namespace asio = boost::asio;
 namespace pt = boost::posix_time;
 namespace http = boost::beast::http;
 namespace sys = boost::system;
+namespace ssl = asio::ssl;
 
 using tcp = asio::ip::tcp;
 using udp = asio::ip::udp;
@@ -28,6 +31,8 @@ using udp_socket_t = udp::socket;
 using tcp_socket_t = tcp::socket;
 
 extern r::pt::time_duration default_timeout;
+
+using ssl_context_ptr_t = std::unique_ptr<ssl::context>;
 
 
 namespace payload {
@@ -64,7 +69,7 @@ struct http_response_t : public r::arc_base_t<http_response_t> {
         : response(std::move(response_)), bytes{bytes_} {}
 };
 
-struct http_request_t  : public r::arc_base_t<http_request_t> {
+struct http_request_t : r::arc_base_t<http_request_t> {
     using rx_buff_t = boost::beast::flat_buffer;
     using rx_buff_ptr_t = std::shared_ptr<rx_buff_t>;
     using duration_t = r::pt::time_duration;
@@ -74,8 +79,10 @@ struct http_request_t  : public r::arc_base_t<http_request_t> {
     fmt::memory_buffer data;
     rx_buff_ptr_t rx_buff;
     std::size_t rx_buff_size;
-    http_request_t(utils::URI& url_, fmt::memory_buffer&& data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_):
-        url{url_}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_}{}
+    ssl_context_ptr_t ssl_context;
+
+    http_request_t(utils::URI& url_, fmt::memory_buffer&& data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_, ssl_context_ptr_t ssl_context_ = {}):
+        url{url_}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_}, ssl_context{std::move(ssl_context_)} {}
 };
 
 struct ssdp_notification_t : r::arc_base_t<ssdp_notification_t> {

@@ -4,6 +4,7 @@
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor.hpp>
+#include <variant>
 
 namespace syncspirit {
 namespace net {
@@ -33,7 +34,9 @@ template <typename Actor> struct http_actor_config_builder_t : r::actor_config_b
 
 struct http_actor_t : public r::actor_base_t {
     using request_ptr_t = r::intrusive_ptr_t<message::http_request_t>;
-    using tcp_socket_ptr_t = std::unique_ptr<tcp::socket>;
+    using socket_ptr_t = std::unique_ptr<tcp::socket>;
+    using secure_socket_t = std::unique_ptr<ssl::stream<tcp_socket_t>>;
+
     using resolve_it_t = payload::address_response_t::resolve_results_t::iterator;
 
     using config_t = http_actor_config_t;
@@ -54,8 +57,11 @@ private:
     void on_tcp_error(const sys::error_code &ec) noexcept;
     void on_timer_error(const sys::error_code &ec) noexcept;
     void on_timer_trigger() noexcept;
+    void on_handshake() noexcept;
+    void on_handshake_error(const sys::error_code &ec) noexcept;
     bool cancel_sock() noexcept;
     bool cancel_timer() noexcept;
+    void write_request() noexcept;
 
     pt::time_duration resolve_timeout;
     pt::time_duration request_timeout;
@@ -64,7 +70,8 @@ private:
     r::address_ptr_t resolver;
     request_ptr_t orig_req;
     bool need_response = false;
-    tcp_socket_ptr_t sock;
+    socket_ptr_t sock;
+    secure_socket_t sock_s;
     http::request<http::empty_body> http_request;
     http::response<http::string_body> http_response;
     size_t response_size = 0;

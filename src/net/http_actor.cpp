@@ -30,7 +30,8 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 bool http_actor_t::maybe_shutdown() noexcept {
     if (state == r::state_t::SHUTTING_DOWN) {
         if (resources->has(resource::io)) {
-            sock->cancel();
+            if (sock) sock->cancel();
+            else sock_s->next_layer().cancel();
         }
         if (resources->has(resource::timer)) {
             timer.cancel();
@@ -41,7 +42,6 @@ bool http_actor_t::maybe_shutdown() noexcept {
 }
 
 void http_actor_t::on_request(message::http_request_t &req) noexcept {
-    assert(!sock);
     orig_req.reset(&req);
     http_response.clear();
     need_response = true;
@@ -52,6 +52,7 @@ void http_actor_t::on_request(message::http_request_t &req) noexcept {
 }
 
 void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
+    using address_t = payload::address_response_t::resolve_results_t;
     auto &ec = res.payload.ec;
     if (ec) {
         reply_with_error(*orig_req, ec);
@@ -59,19 +60,19 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
         return;
     }
 
-    sys::error_code ec_sock;
-    sock = std::make_unique<tcp::socket>(strand.context());
-    sock->open(tcp::v4(), ec_sock);
-    if (ec_sock) {
-        reply_with_error(*orig_req, ec_sock);
-        orig_req.reset();
-        need_response = false;
-        return;
+    tcp::socket* layer;
+    auto& ssl_ctx = orig_req->payload.request_payload->ssl_context;
+    if (ssl_ctx) {
+        sock_s = std::make_unique<secure_socket_t::element_type>(strand, *ssl_ctx);
+        layer = &sock_s->next_layer();
+    } else {
+        sock = std::make_unique<tcp::socket>(strand.context());
+        layer = sock.get();
     }
 
     auto &addresses = res.payload.res->results;
     auto fwd_connect = ra::forwarder_t(*this, &http_actor_t::on_connect, &http_actor_t::on_tcp_error);
-    asio::async_connect(*sock, addresses.begin(), addresses.end(), std::move(fwd_connect));
+    asio::async_connect(*layer, addresses.begin(), addresses.end(), std::move(fwd_connect));
     resources->acquire(resource::io);
 
     timer.expires_from_now(request_timeout);
@@ -89,6 +90,15 @@ void http_actor_t::on_connect(resolve_it_t) noexcept {
         return;
     }
 
+    if (sock) {
+        write_request();
+    } else {
+        auto fwd = ra::forwarder_t(*this, &http_actor_t::on_handshake, &http_actor_t::on_handshake_error);
+        sock_s->async_handshake(ssl::stream_base::client, std::move(fwd));
+    }
+}
+
+void http_actor_t::write_request() noexcept {
     auto& payload = *orig_req->payload.request_payload;
     auto &url =  payload.url;
     auto &data = payload.data;
@@ -106,24 +116,34 @@ void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
     if (maybe_shutdown())
         return;
 
-    auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_read, &http_actor_t::on_tcp_error);
 
     auto &rx_buff = orig_req->payload.request_payload->rx_buff;
     rx_buff->prepare(orig_req->payload.request_payload->rx_buff_size);
-    http::async_read(*sock, *rx_buff, http_response, std::move(fwd));
+    if (sock) {
+        auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_read, &http_actor_t::on_tcp_error);
+        http::async_read(*sock, *rx_buff, http_response, std::move(fwd));
+    } else {
+        auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_read, &http_actor_t::on_tcp_error);
+        http::async_read(*sock_s, *rx_buff, http_response, std::move(fwd));
+    }
 }
 
 void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     response_size = bytes;
 
     sys::error_code ec;
-    /* sock->cancel(); */
-    sock->close(ec);
+    if (sock) {
+        sock->close(ec);
+    }else {
+        sock_s->next_layer().close(ec);
+    }
     if (ec) {
         // we are going to destroy socket anyway
-        std::cout << "socket closing error: " << ec.message() << "\n";
+        spdlog::trace("http_actor_t:: closing socket error: {} ", ec.message());
     }
     sock.reset();
+    sock_s.reset();
+
     resources->release(resource::io);
     cancel_timer();
     maybe_shutdown();
@@ -160,6 +180,21 @@ void http_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
     maybe_shutdown();
 }
 
+void http_actor_t::on_handshake() noexcept {
+    if (maybe_shutdown()) {
+        return;
+    }
+    write_request();
+}
+
+void http_actor_t::on_handshake_error(const sys::error_code &ec) noexcept {
+    reply_with_error(*orig_req, ec);
+    need_response = false;
+    cancel_sock();
+    cancel_timer();
+    maybe_shutdown();
+}
+
 
 void http_actor_t::on_timer_trigger() noexcept {
     resources->release(resource::timer);
@@ -176,10 +211,12 @@ bool http_actor_t::cancel_sock() noexcept {
     sys::error_code ec;
     if (sock) {
         sock->cancel(ec);
-        if (ec) {
-            spdlog::error("http_actor_t::cancel_sock() :: {}", ec.message());
-            get_supervisor().do_shutdown();
-        }
+    } else if (sock_s) {
+        sock_s->next_layer().cancel(ec);
+    }
+    if (ec) {
+        spdlog::error("http_actor_t::cancel_sock() :: {}", ec.message());
+        get_supervisor().do_shutdown();
     }
     return (bool)ec;
 }
