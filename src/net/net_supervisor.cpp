@@ -84,5 +84,6 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
         .key_file(cfg.key_file)
         .announce_url(cfg.announce_url)
         .rx_buff_size(cfg.rx_buff_size)
+        .io_timeout(cfg.timeout)
         .finish();
 }
