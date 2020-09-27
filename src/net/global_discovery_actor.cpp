@@ -48,7 +48,6 @@ void global_discovery_actor_t::on_start() noexcept {
     fmt::memory_buffer tx_buff;
     auto res = utils::serialize(req, tx_buff);
     assert(res);
-    spdlog::debug("data = {}", std::string(tx_buff.begin(), tx_buff.end()));
     auto timeout = r::pt::millisec{io_timeout};
     request<payload::http_request_t>(http_client, announce_url, std::move(tx_buff), rx_buff, rx_buff_size, ssl_context)
         .send(timeout);

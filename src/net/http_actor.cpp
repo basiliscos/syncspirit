@@ -31,10 +31,11 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 bool http_actor_t::maybe_shutdown() noexcept {
     if (state == r::state_t::SHUTTING_DOWN) {
         if (resources->has(resource::io)) {
-            if (sock)
+            if (sock) {
                 sock->cancel();
-            else
+            } else {
                 sock_s->next_layer().cancel();
+            }
         }
         if (resources->has(resource::timer)) {
             timer.cancel();
@@ -164,13 +165,16 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
 
 void http_actor_t::on_tcp_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
+    if (ec != asio::error::operation_aborted) {
+        spdlog::warn("http_actor_t::on_tcp_error :: {}", ec.message());
+    }
+    cancel_timer();
     if (!need_response) {
         return;
     }
 
     reply_with_error(*orig_req, ec);
     need_response = false;
-    cancel_timer();
 }
 
 void http_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
@@ -195,15 +199,21 @@ void http_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
 
 void http_actor_t::on_handshake() noexcept {
     if (maybe_shutdown()) {
+        resources->release(resource::io);
         return;
     }
     write_request();
 }
 
 void http_actor_t::on_handshake_error(const sys::error_code &ec) noexcept {
-    reply_with_error(*orig_req, ec);
+    resources->release(resource::io);
+    if (ec != asio::error::operation_aborted) {
+        spdlog::warn("http_actor_t::on_handshake_error :: {}", ec.message());
+    }
+    if (need_response) {
+        reply_with_error(*orig_req, ec);
+    }
     need_response = false;
-    cancel_sock();
     cancel_timer();
     maybe_shutdown();
 }

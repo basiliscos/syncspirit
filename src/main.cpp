@@ -43,7 +43,8 @@ spdlog::level::level_enum get_log_level(const std::string &log_level) {
     return value;
 }
 
-static std::atomic<bool> signal_shutdown_flag{false};
+std::atomic_bool console_flag = false;
+std::atomic_bool net_flag = false;
 
 int main(int argc, char **argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -117,33 +118,41 @@ int main(int argc, char **argv) {
         sup_net->start();
 
         /* launch actors */
-        auto net_thread = std::thread([&io_context, &sup_net]() {
+        auto sleep_quant = std::chrono::milliseconds(100);
+        auto net_thread = std::thread([&]() {
             io_context.run();
+            console_flag = true;
+            while (!net_flag || !console_flag) {
+                std::this_thread::sleep_for(sleep_quant);
+            }
             spdlog::trace("net thread has been terminated");
-            signal_shutdown_flag = true;
         });
 
         struct sigaction act;
-        act.sa_handler = [](int) { signal_shutdown_flag = true; };
+        act.sa_handler = [](int) { console_flag = true; };
         if (sigaction(SIGINT, &act, nullptr) != 0) {
             spdlog::critical("cannot set signal handler");
             return 1;
         }
-        auto console_thread = std::thread([] {
-            while (!signal_shutdown_flag) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        auto console_thread = std::thread([&] {
+            while (!console_flag) {
+                std::this_thread::sleep_for(sleep_quant);
             }
+            sup_net->shutdown();
+            console_flag = true;
             spdlog::trace("console thread has been terminated");
         });
 
-        spdlog::trace("waiting actors terminations");
+        spdlog::trace("waiting console thread termination");
         console_thread.join();
-
-        sup_net->shutdown();
+        net_flag = true;
+        spdlog::trace("waiting net thread termination");
         net_thread.join();
+
         spdlog::trace("everything has been terminated");
-    } catch (const std::exception &ex) {
-        spdlog::critical("Starting failure : {}", ex.what());
+    } catch (...) {
+        spdlog::critical("unknown exception");
+        // spdlog::critical("Starting failure : {}", ex.what());
         return 1;
     }
 
