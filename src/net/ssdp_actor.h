@@ -28,18 +28,17 @@ struct ssdp_actor_t : public r::actor_base_t {
     using config_t = ssdp_actor_config_t;
     template <typename Actor> using config_builder_t = ssdp_actor_config_builder_t<Actor>;
 
-    explicit ssdp_actor_t(ssdp_actor_config_t& cfg);
+    explicit ssdp_actor_t(ssdp_actor_config_t &cfg);
 
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
-private:
+  private:
     void on_discovery_sent(std::size_t bytes) noexcept;
     void on_udp_send_error(const sys::error_code &ec) noexcept;
     void on_udp_recv_error(const sys::error_code &ec) noexcept;
     void on_discovery_received(std::size_t bytes) noexcept;
-
 
     asio::io_context::strand &strand;
     std::uint32_t max_wait;

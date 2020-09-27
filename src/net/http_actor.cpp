@@ -7,13 +7,14 @@ using namespace syncspirit::net;
 
 namespace {
 namespace resource {
-    r::plugin::resource_id_t io = 0;
-    r::plugin::resource_id_t timer = 1;
-}
-}
+r::plugin::resource_id_t io = 0;
+r::plugin::resource_id_t timer = 1;
+} // namespace resource
+} // namespace
 
-http_actor_t::http_actor_t(config_t &config): r::actor_base_t{config}, resolve_timeout(config.resolve_timeout), request_timeout(config.request_timeout),
-    strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, timer{strand.context()} {}
+http_actor_t::http_actor_t(config_t &config)
+    : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout), request_timeout(config.request_timeout),
+      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, timer{strand.context()} {}
 
 void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -30,8 +31,10 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 bool http_actor_t::maybe_shutdown() noexcept {
     if (state == r::state_t::SHUTTING_DOWN) {
         if (resources->has(resource::io)) {
-            if (sock) sock->cancel();
-            else sock_s->next_layer().cancel();
+            if (sock)
+                sock->cancel();
+            else
+                sock_s->next_layer().cancel();
         }
         if (resources->has(resource::timer)) {
             timer.cancel();
@@ -59,12 +62,12 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
         return;
     }
 
-    tcp::socket* layer;
-    auto& payload = orig_req->payload.request_payload;
-    auto& ssl_ctx = payload->ssl_context;
+    tcp::socket *layer;
+    auto &payload = orig_req->payload.request_payload;
+    auto &ssl_ctx = payload->ssl_context;
     if (ssl_ctx) {
         sock_s = std::make_unique<secure_socket_t::element_type>(strand, *ssl_ctx);
-        auto& host = payload->url.host;
+        auto &host = payload->url.host;
         if (!SSL_set_tlsext_host_name(sock_s->native_handle(), host.c_str())) {
             sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
             spdlog::error("http_actor_t:: Set SNI Hostname : {}", ec.message());
@@ -107,8 +110,8 @@ void http_actor_t::on_connect(resolve_it_t) noexcept {
 }
 
 void http_actor_t::write_request() noexcept {
-    auto& payload = *orig_req->payload.request_payload;
-    auto &url =  payload.url;
+    auto &payload = *orig_req->payload.request_payload;
+    auto &url = payload.url;
     auto &data = payload.data;
     spdlog::trace("http_actor_t:: sending {0} bytes to {1} ", data.size(), url.full);
     auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_sent, &http_actor_t::on_tcp_error);
@@ -128,7 +131,6 @@ void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
     if (maybe_shutdown())
         return;
 
-
     auto &rx_buff = orig_req->payload.request_payload->rx_buff;
     rx_buff->prepare(orig_req->payload.request_payload->rx_buff_size);
     auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_read, &http_actor_t::on_tcp_error);
@@ -145,7 +147,7 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     sys::error_code ec;
     if (sock) {
         sock->close(ec);
-    }else {
+    } else {
         sock_s->next_layer().close(ec);
     }
     if (ec) {
@@ -206,7 +208,6 @@ void http_actor_t::on_handshake_error(const sys::error_code &ec) noexcept {
     maybe_shutdown();
 }
 
-
 void http_actor_t::on_timer_trigger() noexcept {
     resources->release(resource::timer);
     if (need_response) {
@@ -246,7 +247,6 @@ void http_actor_t::on_start() noexcept {
     spdlog::trace("http_actor_t::on_start");
     r::actor_base_t::on_start();
 }
-
 
 // cancel any pending async ops
 void http_actor_t::shutdown_start() noexcept {

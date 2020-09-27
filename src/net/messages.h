@@ -34,9 +34,7 @@ extern r::pt::time_duration default_timeout;
 
 using ssl_context_ptr_t = std::shared_ptr<ssl::context>;
 
-
 namespace payload {
-
 
 struct address_response_t : public r::arc_base_t<address_response_t> {
     using resolve_results_t = tcp::resolver::results_type;
@@ -49,7 +47,7 @@ struct address_request_t : public r::arc_base_t<address_request_t> {
     using response_t = r::intrusive_ptr_t<address_response_t>;
     std::string host;
     std::string port;
-    address_request_t(const std::string& host_, std::string& port_): host{host_}, port{port_}{}
+    address_request_t(const std::string &host_, std::string &port_) : host{host_}, port{port_} {}
 };
 
 struct endpoint_response_t {
@@ -81,15 +79,17 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     std::size_t rx_buff_size;
     ssl_context_ptr_t ssl_context;
 
-    http_request_t(utils::URI& url_, fmt::memory_buffer&& data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_, ssl_context_ptr_t ssl_context_ = {}):
-        url{url_}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_}, ssl_context{std::move(ssl_context_)} {}
+    http_request_t(utils::URI &url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
+                   ssl_context_ptr_t ssl_context_ = {})
+        : url{url_}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_}, ssl_context{std::move(
+                                                                                                 ssl_context_)} {}
 };
 
 struct ssdp_notification_t : r::arc_base_t<ssdp_notification_t> {
     utils::discovery_result igd;
     asio::ip::address local_address;
-    ssdp_notification_t(utils::discovery_result&& igd_, const asio::ip::address& local_address_):
-        igd{std::move(igd_)}, local_address{local_address_} {}
+    ssdp_notification_t(utils::discovery_result &&igd_, const asio::ip::address &local_address_)
+        : igd{std::move(igd_)}, local_address{local_address_} {}
 };
 
 struct port_mapping_notification_t {

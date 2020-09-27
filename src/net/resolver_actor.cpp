@@ -2,16 +2,15 @@
 #include "spdlog/spdlog.h"
 #include "names.h"
 
-
 using namespace syncspirit::net;
 using namespace syncspirit::utils;
 
 namespace {
 namespace resource {
-    r::plugin::resource_id_t io = 0;
-    r::plugin::resource_id_t timer = 1;
-}
-}
+r::plugin::resource_id_t io = 0;
+r::plugin::resource_id_t timer = 1;
+} // namespace resource
+} // namespace
 
 resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
     : r::actor_base_t{config}, io_timeout{config.resolve_timeout},
@@ -20,10 +19,8 @@ resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
 
 void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) { p.subscribe_actor(&resolver_actor_t::on_request); });
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.register_name(names::resolver, get_address()); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&resolver_actor_t::on_request); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::resolver, get_address()); });
 }
 
 bool resolver_actor_t::maybe_shutdown() noexcept {
@@ -80,7 +77,7 @@ void resolver_actor_t::process() noexcept {
     if (queue.empty())
         return;
     auto queue_it = queue.begin();
-    auto& payload = (*queue_it)->payload.request_payload;
+    auto &payload = (*queue_it)->payload.request_payload;
     auto endpoint = endpoint_t{payload->host, payload->port};
     auto cache_it = cache.find(endpoint);
     if (cache_it != cache.end()) {
@@ -100,14 +97,12 @@ void resolver_actor_t::resolve_start(request_ptr_t &req) noexcept {
         return;
 
     auto &payload = req->payload.request_payload;
-    auto fwd_resolver =
-        ra::forwarder_t(*this, &resolver_actor_t::on_resolve, &resolver_actor_t::on_resolve_error);
+    auto fwd_resolver = ra::forwarder_t(*this, &resolver_actor_t::on_resolve, &resolver_actor_t::on_resolve_error);
     backend.async_resolve(payload->host, payload->port, std::move(fwd_resolver));
     resources->acquire(resource::io);
 
     timer.expires_from_now(io_timeout);
-    auto fwd_timer =
-        ra::forwarder_t(*this, &resolver_actor_t::on_timer_trigger, &resolver_actor_t::on_timer_error);
+    auto fwd_timer = ra::forwarder_t(*this, &resolver_actor_t::on_timer_trigger, &resolver_actor_t::on_timer_error);
     timer.async_wait(std::move(fwd_timer));
     resources->acquire(resource::timer);
 }
@@ -115,7 +110,8 @@ void resolver_actor_t::resolve_start(request_ptr_t &req) noexcept {
 void resolver_actor_t::on_resolve(resolve_results_t results) noexcept {
     resources->release(resource::io);
     if (!queue.empty()) {
-        auto &payload = queue.front()->payload.request_payload;;
+        auto &payload = queue.front()->payload.request_payload;
+        ;
         auto endpoint = endpoint_t{payload->host, payload->port};
         auto pair = cache.emplace(endpoint, results);
         auto &it = pair.first;
@@ -157,7 +153,7 @@ void resolver_actor_t::on_timer_trigger() noexcept {
 }
 
 // cancel any pending async ops
-void resolver_actor_t::shutdown_start() noexcept  {
+void resolver_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
     maybe_shutdown();
 }

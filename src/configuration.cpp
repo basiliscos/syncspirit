@@ -52,7 +52,6 @@ boost::optional<configuration_t> get_config(std::ifstream &config) {
     cfg.upnp_config.timeout = vm["upnp.timeout"].as<std::uint32_t>();
     cfg.upnp_config.external_port = vm["upnp.external_port"].as<std::uint16_t>();
 
-
     // all OK
     result = std::move(cfg);
 

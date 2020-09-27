@@ -31,7 +31,6 @@ template <typename Actor> struct http_actor_config_builder_t : r::actor_config_b
     }
 };
 
-
 struct http_actor_t : public r::actor_base_t {
     using request_ptr_t = r::intrusive_ptr_t<message::http_request_t>;
     using socket_ptr_t = std::unique_ptr<tcp::socket>;
@@ -47,7 +46,8 @@ struct http_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
-private:
+
+  private:
     bool maybe_shutdown() noexcept;
     void on_request(message::http_request_t &req) noexcept;
     void on_resolve(message::resolve_response_t &res) noexcept;

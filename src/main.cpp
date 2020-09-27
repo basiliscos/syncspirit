@@ -106,14 +106,14 @@ int main(int argc, char **argv) {
         ra::system_context_ptr_t sys_context{new ra::system_context_asio_t{io_context}};
         auto stand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg_option->timeout};
-        //ra::supervisor_config_asio_t sup_conf{timeout, std::move(stand)};
-        //auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>(sup_conf, *cfg_option);
+        // ra::supervisor_config_asio_t sup_conf{timeout, std::move(stand)};
+        // auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>(sup_conf, *cfg_option);
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
-                .app_config(*cfg_option)
-                .strand(stand)
-                .timeout(timeout)
-                .create_registry()
-                .finish();
+                           .app_config(*cfg_option)
+                           .strand(stand)
+                           .timeout(timeout)
+                           .create_registry()
+                           .finish();
         sup_net->start();
 
         /* launch actors */

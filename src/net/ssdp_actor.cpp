@@ -3,7 +3,6 @@
 #include "spdlog/spdlog.h"
 #include "names.h"
 
-
 using namespace syncspirit::net;
 using namespace syncspirit::utils;
 
@@ -11,22 +10,21 @@ static const constexpr std::size_t RX_BUFF_SIZE = 1500;
 
 namespace {
 namespace resource {
-    r::plugin::resource_id_t send;
-    r::plugin::resource_id_t recv;
-}
-}
+r::plugin::resource_id_t send;
+r::plugin::resource_id_t recv;
+} // namespace resource
+} // namespace
 
 ssdp_actor_t::ssdp_actor_t(ssdp_actor_config_t &cfg)
     : r::actor_base_t::actor_base_t(cfg), strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()},
-       max_wait{cfg.max_wait} {
+      max_wait{cfg.max_wait} {
     rx_buff.resize(RX_BUFF_SIZE);
 }
 
 void ssdp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(names::coordinator, coordinator_addr, true).link(false);
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>(
+        [&](auto &p) { p.discover_name(names::coordinator, coordinator_addr, true).link(false); });
 }
 
 void ssdp_actor_t::on_start() noexcept {
@@ -96,7 +94,7 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     send<payload::ssdp_notification_t>(coordinator_addr, std::move(value), my_ip);
 }
 
-void ssdp_actor_t::on_udp_send_error(const sys::error_code& ec) noexcept {
+void ssdp_actor_t::on_udp_send_error(const sys::error_code &ec) noexcept {
     resources->release(resource::send);
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("ssdp_actor_t::on_udp_send_error :: {}", ec.message());
@@ -104,7 +102,7 @@ void ssdp_actor_t::on_udp_send_error(const sys::error_code& ec) noexcept {
     }
 }
 
-void ssdp_actor_t::on_udp_recv_error(const sys::error_code& ec) noexcept {
+void ssdp_actor_t::on_udp_recv_error(const sys::error_code &ec) noexcept {
     resources->release(resource::recv);
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("ssdp_actor_t::on_udp_recv_error :: {}", ec.message());

@@ -9,8 +9,8 @@ using json = nlohmann::json;
 
 using namespace syncspirit::net;
 
-global_discovery_actor_t::global_discovery_actor_t(config_t& cfg):r::actor_base_t{cfg},
-    endpoint{cfg.endpoint}, announce_url{cfg.announce_url}, rx_buff_size{cfg.rx_buff_size} {
+global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
+    : r::actor_base_t{cfg}, endpoint{cfg.endpoint}, announce_url{cfg.announce_url}, rx_buff_size{cfg.rx_buff_size} {
 
     rx_buff = std::make_shared<rx_buff_t::element_type>(rx_buff_size);
 
@@ -22,18 +22,16 @@ global_discovery_actor_t::global_discovery_actor_t(config_t& cfg):r::actor_base_
 
 void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(names::http10, http_client, true).link(true);
-    });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&global_discovery_actor_t::on_announce);
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>(
+        [&](auto &p) { p.discover_name(names::http10, http_client, true).link(true); });
+    plugin.with_casted<r::plugin::starter_plugin_t>(
+        [&](auto &p) { p.subscribe_actor(&global_discovery_actor_t::on_announce); });
 }
 
 void global_discovery_actor_t::on_start() noexcept {
     spdlog::trace("global_discovery_actor_t::on_start");
     json payload = json::object();
-    payload["addresses"] = { fmt::format("tcp://{0}:{1}", endpoint.address().to_string(), endpoint.port()) };
+    payload["addresses"] = {fmt::format("tcp://{0}:{1}", endpoint.address().to_string(), endpoint.port())};
 
     http::request<http::string_body> req;
     req.method(http::verb::post);
@@ -50,12 +48,13 @@ void global_discovery_actor_t::on_start() noexcept {
     assert(res);
     spdlog::debug("data = {}", std::string(tx_buff.begin(), tx_buff.end()));
     auto timeout = shutdown_timeout / 2;
-    request<payload::http_request_t>(http_client, announce_url, std::move(tx_buff), rx_buff, rx_buff_size, ssl_context).send(timeout);
+    request<payload::http_request_t>(http_client, announce_url, std::move(tx_buff), rx_buff, rx_buff_size, ssl_context)
+        .send(timeout);
 }
 
-void global_discovery_actor_t::on_announce(message::http_response_t& message) noexcept{
+void global_discovery_actor_t::on_announce(message::http_response_t &message) noexcept {
     spdlog::trace("global_discovery_actor_t::on_announce");
-    auto& ec = message.payload.ec;
+    auto &ec = message.payload.ec;
     if (ec) {
         spdlog::error("global_discovery_actor_t, announcing error = {}", ec.message());
         return do_shutdown();

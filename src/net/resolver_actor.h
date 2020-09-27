@@ -11,15 +11,14 @@ namespace net {
 struct endpoint_t {
     std::string host;
     std::string port;
-    bool operator== (const endpoint_t& other) const noexcept { return host == other.host && port == other.port; }
+    bool operator==(const endpoint_t &other) const noexcept { return host == other.host && port == other.port; }
 };
 
-}
-}
+} // namespace net
+} // namespace syncspirit
 
 namespace std {
 using endpoint_t = syncspirit::net::endpoint_t;
-
 
 template <> struct hash<endpoint_t> {
     inline size_t operator()(const endpoint_t &endpoint) const noexcept {
@@ -29,7 +28,7 @@ template <> struct hash<endpoint_t> {
     }
 };
 
-}
+} // namespace std
 
 namespace syncspirit {
 namespace net {
@@ -59,8 +58,7 @@ struct resolver_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void shutdown_start() noexcept override;
 
-private:
-
+  private:
     using request_ptr_t = r::intrusive_ptr_t<message::resolve_request_t>;
     using resolve_results_t = payload::address_response_t::resolve_results_t;
     using Queue = std::list<request_ptr_t>;
@@ -78,12 +76,11 @@ private:
     void on_timer_error(const sys::error_code &ec) noexcept;
     void on_timer_trigger() noexcept;
 
-
     template <typename ReplyFn> void reply(const endpoint_t &endpoint, ReplyFn &&fn) noexcept {
         auto it = queue.begin();
         while (it != queue.end()) {
             auto &message_ptr = *it;
-            auto& payload = *message_ptr->payload.request_payload;
+            auto &payload = *message_ptr->payload.request_payload;
             if (payload.host == endpoint.host && payload.port == endpoint.port) {
                 fn(*message_ptr);
                 it = queue.erase(it);
@@ -101,6 +98,5 @@ private:
     Cache cache;
 };
 
-
-}}
-
+} // namespace net
+} // namespace syncspirit

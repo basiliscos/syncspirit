@@ -25,18 +25,17 @@ template <typename Actor> struct acceptor_actor_config_builder_t : r::actor_conf
     }
 };
 
-
 struct acceptor_actor_t : public r::actor_base_t {
     using config_t = acceptor_actor_config_t;
     template <typename Actor> using config_builder_t = acceptor_actor_config_builder_t<Actor>;
 
-    acceptor_actor_t(config_t& config);
+    acceptor_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void shutdown_start() noexcept override;
     void on_start() noexcept override;
 
-private:
-    void on_endpoint_request(message::endpoint_request_t&) noexcept;
+  private:
+    void on_endpoint_request(message::endpoint_request_t &) noexcept;
     using tcp_socket_option_t = boost::optional<tcp_socket_t>;
 
     void accept_next() noexcept;
@@ -47,7 +46,7 @@ private:
     tcp::endpoint endpoint;
     tcp::acceptor acceptor;
     tcp_socket_t peer;
-    //r::address_ptr_t redirect_to;
+    // r::address_ptr_t redirect_to;
 };
 
 } // namespace net
