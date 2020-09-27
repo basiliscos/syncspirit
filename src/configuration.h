@@ -15,10 +15,10 @@ struct local_announce_config_t {
 };
 
 struct global_announce_config_t {
-    syncspirit::utils::URI server_url;
+    syncspirit::utils::URI announce_url;
     std::string cert_file;
     std::string key_file;
-    std::uint32_t timeout;
+    std::uint32_t rx_buff_size;
 };
 
 struct upnp_config_t {

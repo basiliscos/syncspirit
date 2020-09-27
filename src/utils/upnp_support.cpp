@@ -1,10 +1,10 @@
 #include <boost/beast/http.hpp>
-#include <boost/beast/version.hpp>
 #include <string_view>
 #include <sstream>
 #include <pugixml.hpp>
 #include "error_code.h"
 #include "upnp_support.h"
+#include "beast_support.h"
 
 namespace syncspirit::utils {
 
@@ -43,23 +43,8 @@ outcome::result<void> make_discovery_request(fmt::memory_buffer &buff, std::uint
     req.set(upnp_fields::st, igd_v1_st_v);
     req.set(upnp_fields::man, igd_man_v);
     req.set(upnp_fields::mx, upnp_max_wait.data());
-    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 
-    auto serializer = http::serializer<true, http::empty_body>(req);
-    serializer.split(false);
-
-    sys::error_code ec;
-    serializer.next(ec, [&](auto ec, const auto &buff_seq) {
-        if (!ec) {
-            auto sz = buffer_size(buff_seq);
-            buff.resize(sz);
-            buffer_copy(asio::mutable_buffer(buff.data(), sz), buff_seq);
-        }
-    });
-    if (ec) {
-        return ec;
-    }
-    return outcome::success();
+    return serialize(req, buff);
 }
 
 outcome::result<discovery_result> parse(const char *data, std::size_t bytes) noexcept {
@@ -117,21 +102,8 @@ outcome::result<void> make_description_request(fmt::memory_buffer &buff, const U
     req.version(http_version);
     req.target(uri.path);
     req.set(http::field::host, uri.host);
-    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 
-    sys::error_code ec;
-    auto serializer = http::serializer<true, http::empty_body>(req);
-    serializer.next(ec, [&](auto ec, const auto &buff_seq) {
-        if (!ec) {
-            auto sz = buffer_size(buff_seq);
-            buff.resize(sz);
-            buffer_copy(asio::mutable_buffer(buff.data(), sz), buff_seq);
-        }
-    });
-    if (ec) {
-        return ec;
-    };
-    return outcome::success();
+    return serialize(req, buff);
 }
 
 outcome::result<igd_result> parse_igd(const char *data, std::size_t bytes) noexcept {
@@ -160,7 +132,6 @@ outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const U
     req.version(http_version);
     req.target(uri.path);
     req.set(http::field::host, uri.host);
-    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
     req.set(http::field::soapaction, soap_action);
     req.set(http::field::pragma, "no-cache");
     req.set(http::field::cache_control, "no-cache");
@@ -173,20 +144,7 @@ outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const U
                                    soap_GetExternalIPAddress, igd_wan_service);
     req.body() = body;
     req.prepare_payload();
-
-    sys::error_code ec;
-    auto serializer = http::serializer<true, http::string_body>(req);
-    serializer.next(ec, [&](auto ec, const auto &buff_seq) {
-        if (!ec) {
-            auto sz = buffer_size(buff_seq);
-            buff.resize(sz);
-            buffer_copy(asio::mutable_buffer(buff.data(), sz), buff_seq);
-        }
-    });
-    if (ec) {
-        return ec;
-    }
-    return outcome::success();
+    return serialize(req, buff);
 }
 
 outcome::result<std::string> parse_external_ip(const char *data, std::size_t bytes) noexcept {
@@ -211,7 +169,6 @@ outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &
     req.version(http_version);
     req.target(uri.path);
     req.set(http::field::host, uri.host);
-    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
     req.set(http::field::soapaction, soap_action);
     req.set(http::field::pragma, "no-cache");
     req.set(http::field::cache_control, "no-cache");
@@ -234,19 +191,7 @@ outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &
     req.body() = body;
     req.prepare_payload();
 
-    sys::error_code ec;
-    auto serializer = http::serializer<true, http::string_body>(req);
-    serializer.next(ec, [&](auto ec, const auto &buff_seq) {
-        if (!ec) {
-            auto sz = buffer_size(buff_seq);
-            buff.resize(sz);
-            buffer_copy(asio::mutable_buffer(buff.data(), sz), buff_seq);
-        }
-    });
-    if (ec) {
-        return ec;
-    }
-    return outcome::success();
+    return serialize(req, buff);
 }
 
 outcome::result<bool> parse_mapping(const char *data, std::size_t bytes) noexcept {

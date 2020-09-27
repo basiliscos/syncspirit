@@ -32,7 +32,7 @@ using tcp_socket_t = tcp::socket;
 
 extern r::pt::time_duration default_timeout;
 
-using ssl_context_ptr_t = std::unique_ptr<ssl::context>;
+using ssl_context_ptr_t = std::shared_ptr<ssl::context>;
 
 
 namespace payload {
@@ -93,6 +93,7 @@ struct ssdp_notification_t : r::arc_base_t<ssdp_notification_t> {
 };
 
 struct port_mapping_notification_t {
+    asio::ip::address external_ip;
     bool success;
 };
 

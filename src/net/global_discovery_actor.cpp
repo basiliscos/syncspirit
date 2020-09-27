@@ -1,8 +1,75 @@
 #include "global_discovery_actor.h"
+#include "names.h"
 #include <spdlog/spdlog.h>
+#include <nlohmann/json.hpp>
+#include "../utils/beast_support.h"
+
+// for convenience
+using json = nlohmann::json;
 
 using namespace syncspirit::net;
 
+global_discovery_actor_t::global_discovery_actor_t(config_t& cfg):r::actor_base_t{cfg},
+    endpoint{cfg.endpoint}, announce_url{cfg.announce_url}, rx_buff_size{cfg.rx_buff_size} {
+
+    rx_buff = std::make_shared<rx_buff_t::element_type>(rx_buff_size);
+
+    ssl_context = std::make_shared<ssl::context>(ssl::context::tls);
+    ssl_context->set_options(ssl::context::default_workarounds | ssl::context::no_sslv2);
+    ssl_context->use_certificate_chain_file(cfg.cert_file);
+    ssl_context->use_private_key_file(cfg.key_file, ssl::context::pem);
+}
+
+void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
+    r::actor_base_t::configure(plugin);
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.discover_name(names::http10, http_client, true).link(true);
+    });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&global_discovery_actor_t::on_announce);
+    });
+}
+
+void global_discovery_actor_t::on_start() noexcept {
+    spdlog::trace("global_discovery_actor_t::on_start");
+    json payload = json::object();
+    payload["addresses"] = { fmt::format("tcp://{0}:{1}", endpoint.address().to_string(), endpoint.port()) };
+
+    http::request<http::string_body> req;
+    req.method(http::verb::post);
+    req.version(11);
+    req.target(announce_url.path);
+    req.set(http::field::host, announce_url.host);
+    req.set(http::field::content_type, "application/json");
+
+    req.body() = payload.dump();
+    req.prepare_payload();
+
+    fmt::memory_buffer tx_buff;
+    auto res = utils::serialize(req, tx_buff);
+    assert(res);
+    spdlog::debug("data = {}", std::string(tx_buff.begin(), tx_buff.end()));
+    auto timeout = shutdown_timeout / 2;
+    request<payload::http_request_t>(http_client, announce_url, std::move(tx_buff), rx_buff, rx_buff_size, ssl_context).send(timeout);
+}
+
+void global_discovery_actor_t::on_announce(message::http_response_t& message) noexcept{
+    spdlog::trace("global_discovery_actor_t::on_announce");
+    auto& ec = message.payload.ec;
+    if (ec) {
+        spdlog::error("global_discovery_actor_t, announcing error = {}", ec.message());
+        return do_shutdown();
+    }
+    auto &res = message.payload.res->response;
+    auto code = res.result_int();
+    spdlog::debug("global_discovery_actor_t::on_announce code = {} ", code);
+    if (code != 204) {
+        spdlog::warn("global_discovery_actor_t, unexpected resonse code = {}", code);
+        do_shutdown();
+    }
+}
+
+#if 0
 global_discovery_actor_t::global_discovery_actor_t(ra::supervisor_asio_t &sup,
                                                    const config::global_announce_config_t &cfg_)
     : r::actor_base_t{sup}, cfg{cfg_}, strand{static_cast<ra::supervisor_asio_t &>(supervisor).get_strand()},
@@ -144,3 +211,4 @@ void global_discovery_actor_t::on_handshake() noexcept {
     spdlog::trace("global_discovery_actor::on_handshake success");
     trigger_shutdown();
 }
+#endif

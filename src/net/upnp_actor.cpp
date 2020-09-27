@@ -168,7 +168,7 @@ void upnp_actor_t::on_mapping_ip(message::http_response_t& msg) noexcept {
             }
         }
     }
-    send<payload::port_mapping_notification_t>(coordinator, ok);
+    send<payload::port_mapping_notification_t>(coordinator,  external_addr, ok);
 }
 
 void upnp_actor_t::shutdown_start() noexcept {

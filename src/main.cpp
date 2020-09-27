@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         spdlog::trace("configuration seems OK");
-        spdlog::info("starting");
+        spdlog::info("starting, protobuf v{}", google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION));
 
         /* pre-init actors */
         asio::io_context io_context;

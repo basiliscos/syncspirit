@@ -52,7 +52,6 @@ void http_actor_t::on_request(message::http_request_t &req) noexcept {
 }
 
 void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
-    using address_t = payload::address_response_t::resolve_results_t;
     auto &ec = res.payload.ec;
     if (ec) {
         reply_with_error(*orig_req, ec);
@@ -61,9 +60,18 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     }
 
     tcp::socket* layer;
-    auto& ssl_ctx = orig_req->payload.request_payload->ssl_context;
+    auto& payload = orig_req->payload.request_payload;
+    auto& ssl_ctx = payload->ssl_context;
     if (ssl_ctx) {
         sock_s = std::make_unique<secure_socket_t::element_type>(strand, *ssl_ctx);
+        auto& host = payload->url.host;
+        if (!SSL_set_tlsext_host_name(sock_s->native_handle(), host.c_str())) {
+            sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
+            spdlog::error("http_actor_t:: Set SNI Hostname : {}", ec.message());
+            reply_with_error(*orig_req, ec);
+            need_response = false;
+            return;
+        }
         layer = &sock_s->next_layer();
     } else {
         sock = std::make_unique<tcp::socket>(strand.context());
@@ -105,7 +113,11 @@ void http_actor_t::write_request() noexcept {
     spdlog::trace("http_actor_t:: sending {0} bytes to {1} ", data.size(), url.full);
     auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_sent, &http_actor_t::on_tcp_error);
     auto buff = asio::buffer(data.data(), data.size());
-    asio::async_write(*sock, buff, std::move(fwd));
+    if (sock) {
+        asio::async_write(*sock, buff, std::move(fwd));
+    } else {
+        asio::async_write(*sock_s, buff, std::move(fwd));
+    }
 }
 
 void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
@@ -119,11 +131,10 @@ void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
 
     auto &rx_buff = orig_req->payload.request_payload->rx_buff;
     rx_buff->prepare(orig_req->payload.request_payload->rx_buff_size);
+    auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_read, &http_actor_t::on_tcp_error);
     if (sock) {
-        auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_read, &http_actor_t::on_tcp_error);
         http::async_read(*sock, *rx_buff, http_response, std::move(fwd));
     } else {
-        auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_read, &http_actor_t::on_tcp_error);
         http::async_read(*sock_s, *rx_buff, http_response, std::move(fwd));
     }
 }
