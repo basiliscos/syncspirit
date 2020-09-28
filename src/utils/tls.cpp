@@ -26,6 +26,31 @@ static bool add_extension(X509V3_CTX &ctx, X509 *cert, int NID_EXT, const char *
     return true;
 }
 
+template <typename Key, typename Fn> static outcome::result<std::string> as_der_impl(Key *cert, Fn &&fn) noexcept {
+    BIO *bio = BIO_new(BIO_s_mem());
+    auto bio_guard = make_guard(bio, [](auto *ptr) { BIO_free(ptr); });
+    if (fn(bio, cert) < 0) {
+        return error_code::tls_cert_save_failure;
+    }
+    char *cert_buff;
+    auto cert_sz = BIO_get_mem_data(bio, &cert_buff);
+    if (cert_sz < 0) {
+        return error_code::tls_cert_save_failure;
+    }
+    std::string cert_container(static_cast<std::size_t>(cert_sz), 0);
+    std::memcpy(cert_container.data(), cert_buff, cert_container.size());
+    return cert_container;
+}
+
+static outcome::result<std::string> as_der(X509 *cert) noexcept {
+    return as_der_impl(cert, [](BIO *bio, auto *cert) { return i2d_X509_bio(bio, cert); });
+}
+
+static outcome::result<std::string> as_der(EVP_PKEY *key) noexcept {
+    return as_der_impl(key, [](BIO *bio, auto *key) { return i2d_PUBKEY_bio(bio, key); });
+}
+
+#if 0
 static outcome::result<std::string> as_der(X509 *cert) noexcept {
     BIO *bio = BIO_new(BIO_s_mem());
     auto bio_guard = make_guard(bio, [](auto *ptr) { BIO_free(ptr); });
@@ -41,6 +66,23 @@ static outcome::result<std::string> as_der(X509 *cert) noexcept {
     std::memcpy(cert_container.data(), cert_buff, cert_container.size());
     return cert_container;
 }
+
+static outcome::result<std::string> as_der(EVP_PKEY *key) noexcept {
+    BIO *bio = BIO_new(BIO_s_mem());
+    auto bio_guard = make_guard(bio, [](auto *ptr) { BIO_free(ptr); });
+    if (i2d_PUBKEY_bio(bio, key) < 0) {
+        return error_code::tls_cert_save_failure;
+    }
+    char *cert_buff;
+    auto cert_sz = BIO_get_mem_data(bio, &cert_buff);
+    if (cert_sz < 0) {
+        return error_code::tls_cert_save_failure;
+    }
+    std::string cert_container(static_cast<std::size_t>(cert_sz), 0);
+    std::memcpy(cert_container.data(), cert_buff, cert_container.size());
+    return cert_container;
+}
+#endif
 
 outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     auto ev_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);
@@ -150,7 +192,13 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
         return cert_container.error();
     }
 
-    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), std::move(cert_container.value())};
+    auto key_container = as_der(pkey);
+    if (!key_container) {
+        return key_container.error();
+    }
+
+    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), std::move(cert_container.value()),
+                      std::move(key_container.value())};
 }
 
 outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_key_path) const noexcept {
@@ -220,7 +268,13 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
         return cert_container.error();
     }
 
-    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), std::move(cert_container.value())};
+    auto key_container = as_der(pkey);
+    if (!key_container) {
+        return key_container.error();
+    }
+
+    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), std::move(cert_container.value()),
+                      std::move(key_container.value())};
 }
 
 outcome::result<std::string> sha256_digest(const std::string &data) noexcept {

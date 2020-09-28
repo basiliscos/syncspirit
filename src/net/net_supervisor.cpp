@@ -10,7 +10,14 @@
 
 using namespace syncspirit::net;
 
-net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{cfg}, app_cfg{cfg.app_config} {}
+net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{cfg}, app_cfg{cfg.app_config} {
+    auto &files_cfg = app_cfg.global_announce_config;
+    auto result = ssl.load(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
+    if (!result) {
+        spdlog::critical("cannot load certificate/key pair :: {}", result.error().message());
+        throw result.error();
+    }
+}
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);

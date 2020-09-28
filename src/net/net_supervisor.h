@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../configuration.h"
+#include "ssl.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
@@ -41,6 +42,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     config::configuration_t app_cfg;
     r::address_ptr_t ssdp_addr;
     std::uint32_t ssdp_attempts = 0;
+    ssl_t ssl;
 };
 
 } // namespace net
