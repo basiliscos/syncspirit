@@ -47,42 +47,10 @@ static outcome::result<std::string> as_der(X509 *cert) noexcept {
 }
 
 static outcome::result<std::string> as_der(EVP_PKEY *key) noexcept {
-    return as_der_impl(key, [](BIO *bio, auto *key) { return i2d_PUBKEY_bio(bio, key); });
+    auto pkc8 = EVP_PKEY2PKCS8(key);
+    auto pkc8_guard = make_guard(pkc8, [](auto *ptr) { PKCS8_PRIV_KEY_INFO_free(ptr); });
+    return as_der_impl(pkc8, [](BIO *bio, auto *key) { return i2d_PKCS8_PRIV_KEY_INFO_bio(bio, key); });
 }
-
-#if 0
-static outcome::result<std::string> as_der(X509 *cert) noexcept {
-    BIO *bio = BIO_new(BIO_s_mem());
-    auto bio_guard = make_guard(bio, [](auto *ptr) { BIO_free(ptr); });
-    if (i2d_X509_bio(bio, cert) < 0) {
-        return error_code::tls_cert_save_failure;
-    }
-    char *cert_buff;
-    auto cert_sz = BIO_get_mem_data(bio, &cert_buff);
-    if (cert_sz < 0) {
-        return error_code::tls_cert_save_failure;
-    }
-    std::string cert_container(static_cast<std::size_t>(cert_sz), 0);
-    std::memcpy(cert_container.data(), cert_buff, cert_container.size());
-    return cert_container;
-}
-
-static outcome::result<std::string> as_der(EVP_PKEY *key) noexcept {
-    BIO *bio = BIO_new(BIO_s_mem());
-    auto bio_guard = make_guard(bio, [](auto *ptr) { BIO_free(ptr); });
-    if (i2d_PUBKEY_bio(bio, key) < 0) {
-        return error_code::tls_cert_save_failure;
-    }
-    char *cert_buff;
-    auto cert_sz = BIO_get_mem_data(bio, &cert_buff);
-    if (cert_sz < 0) {
-        return error_code::tls_cert_save_failure;
-    }
-    std::string cert_container(static_cast<std::size_t>(cert_sz), 0);
-    std::memcpy(cert_container.data(), cert_buff, cert_container.size());
-    return cert_container;
-}
-#endif
 
 outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     auto ev_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);

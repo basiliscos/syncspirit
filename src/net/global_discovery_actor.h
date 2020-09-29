@@ -2,6 +2,7 @@
 
 #include "../configuration.h"
 #include "messages.h"
+#include "ssl.h"
 #include <boost/asio.hpp>
 
 namespace syncspirit {
@@ -10,8 +11,7 @@ namespace net {
 struct global_discovery_actor_config_t : r::actor_config_t {
     tcp::endpoint endpoint;
     utils::URI announce_url;
-    std::string cert_file;
-    std::string key_file;
+    const ssl_t *ssl;
     std::uint32_t rx_buff_size;
     std::uint32_t io_timeout;
     std::uint32_t reannounce_after;
@@ -32,13 +32,8 @@ template <typename Actor> struct global_discovery_actor_config_builder_t : r::ac
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cert_file(const std::string &value) &&noexcept {
-        parent_t::config.cert_file = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&key_file(const std::string &value) &&noexcept {
-        parent_t::config.key_file = value;
+    builder_t &&ssl(const ssl_t *value) &&noexcept {
+        parent_t::config.ssl = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -75,7 +70,7 @@ struct global_discovery_actor_t : public r::actor_base_t {
     r::address_ptr_t http_client;
     tcp::endpoint endpoint;
     utils::URI announce_url;
-    ssl_context_ptr_t ssl_context;
+    const ssl_t &ssl;
     rx_buff_t rx_buff;
     std::uint32_t rx_buff_size;
     std::uint32_t io_timeout;

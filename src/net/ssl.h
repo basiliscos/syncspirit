@@ -15,7 +15,7 @@ namespace outcome = boost::outcome_v2;
 struct ssl_t {
     outcome::result<void> load(const char *cert, const char *priv_key) noexcept;
 
-    ssl::context get_context() noexcept;
+    ssl::context get_context() const noexcept;
 
   private:
     proto::device_id_t device_id;

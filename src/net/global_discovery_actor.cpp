@@ -11,15 +11,11 @@ using json = nlohmann::json;
 using namespace syncspirit::net;
 
 global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, endpoint{cfg.endpoint}, announce_url{cfg.announce_url}, rx_buff_size{cfg.rx_buff_size},
-      io_timeout(cfg.io_timeout), reannounce_after(cfg.reannounce_after) {
+    : r::actor_base_t{cfg}, endpoint{cfg.endpoint}, announce_url{cfg.announce_url},
+      ssl(*cfg.ssl), rx_buff_size{cfg.rx_buff_size}, io_timeout(cfg.io_timeout),
+      reannounce_after(cfg.reannounce_after) {
 
     rx_buff = std::make_shared<rx_buff_t::element_type>(rx_buff_size);
-
-    ssl_context = std::make_shared<ssl::context>(ssl::context::tls);
-    ssl_context->set_options(ssl::context::default_workarounds | ssl::context::no_sslv2);
-    ssl_context->use_certificate_chain_file(cfg.cert_file);
-    ssl_context->use_private_key_file(cfg.key_file, ssl::context::pem);
 }
 
 void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -49,7 +45,8 @@ void global_discovery_actor_t::on_start() noexcept {
     auto res = utils::serialize(req, tx_buff);
     assert(res);
     auto timeout = r::pt::millisec{io_timeout};
-    request<payload::http_request_t>(http_client, announce_url, std::move(tx_buff), rx_buff, rx_buff_size, ssl_context)
+    request<payload::http_request_t>(http_client, announce_url, std::move(tx_buff), rx_buff, rx_buff_size,
+                                     ssl.get_context())
         .send(timeout);
 }
 

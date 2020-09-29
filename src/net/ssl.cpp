@@ -16,7 +16,7 @@ outcome::result<void> ssl_t::load(const char *cert, const char *priv_key) noexce
     return outcome::success();
 }
 
-ssl::context ssl_t::get_context() noexcept {
+ssl::context ssl_t::get_context() const noexcept {
     ssl::context ctx(ssl::context::tls);
     ctx.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2);
 
