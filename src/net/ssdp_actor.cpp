@@ -28,7 +28,7 @@ void ssdp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void ssdp_actor_t::on_start() noexcept {
-    spdlog::trace("ssdp_actor_t::on_start");
+    spdlog::trace("ssdp_actor_t::on_start ({})", (void *)address.get());
     sock = std::make_unique<udp_socket_t>(strand.context(), udp::endpoint(udp::v4(), 0));
 
     /* broadcast discorvery */

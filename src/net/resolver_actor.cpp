@@ -24,13 +24,7 @@ void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 bool resolver_actor_t::maybe_shutdown() noexcept {
-    if (state == r::state_t::SHUTTING_DOWN) {
-        auto ec = r::make_error_code(r::error_code_t::actor_not_linkable);
-        for (auto &req : queue) {
-            reply_with_error(*req, ec);
-        }
-        queue.clear();
-
+    if (state == r::state_t::SHUTTING_DOWN && queue.empty()) {
         if (resources->has(resource::io)) {
             backend.cancel();
         }
@@ -54,12 +48,6 @@ bool resolver_actor_t::cancel_timer() noexcept {
 }
 
 void resolver_actor_t::on_request(message::resolve_request_t &req) noexcept {
-    if (state == r::state_t::SHUTTING_DOWN) {
-        auto ec = r::make_error_code(r::error_code_t::actor_not_linkable);
-        reply_with_error(req, ec);
-        return;
-    }
-
     queue.emplace_back(&req);
     if (!resources->has(resource::io))
         process();
@@ -74,6 +62,8 @@ void resolver_actor_t::mass_reply(const endpoint_t &endpoint, const std::error_c
 }
 
 void resolver_actor_t::process() noexcept {
+    if (maybe_shutdown())
+        return;
     if (queue.empty())
         return;
     auto queue_it = queue.begin();
@@ -111,7 +101,6 @@ void resolver_actor_t::on_resolve(resolve_results_t results) noexcept {
     resources->release(resource::io);
     if (!queue.empty()) {
         auto &payload = queue.front()->payload.request_payload;
-        ;
         auto endpoint = endpoint_t{payload->host, payload->port};
         auto pair = cache.emplace(endpoint, results);
         auto &it = pair.first;

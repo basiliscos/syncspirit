@@ -48,11 +48,13 @@ struct upnp_actor_t : public r::actor_base_t {
 
   private:
     using rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
+    using unlink_request_t = r::intrusive_ptr_t<r::message::unlink_request_t>;
 
     void on_endpoint(message::endpoint_response_t &res) noexcept;
     void on_igd_description(message::http_response_t &res) noexcept;
     void on_external_ip(message::http_response_t &res) noexcept;
-    void on_mapping_ip(message::http_response_t &res) noexcept;
+    void on_mapping_port(message::http_response_t &res) noexcept;
+    void on_unmapping_port(message::http_response_t &res) noexcept;
 
     utils::URI main_url;
     utils::URI igd_control_url;
@@ -62,11 +64,13 @@ struct upnp_actor_t : public r::actor_base_t {
     r::address_ptr_t addr_description; /* for routing */
     r::address_ptr_t addr_external_ip; /* for routing */
     r::address_ptr_t addr_mapping;     /* for routing */
+    r::address_ptr_t addr_unmapping;   /* for routing */
     rx_buff_t rx_buff;
     std::uint32_t rx_buff_size;
     std::uint16_t external_port;
     tcp::endpoint accepting_endpoint;
     asio::ip::address external_addr;
+    unlink_request_t unlink_request;
 };
 
 } // namespace net

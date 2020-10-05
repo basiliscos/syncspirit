@@ -9,7 +9,8 @@ using namespace syncspirit::utils;
 namespace {
 namespace resource {
 r::plugin::resource_id_t req_acceptor = 0;
-}
+r::plugin::resource_id_t external_port = 1;
+} // namespace resource
 } // namespace
 
 upnp_actor_t::upnp_actor_t(config_t &cfg)
@@ -21,12 +22,14 @@ void upnp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         addr_description = p.create_address();
         addr_external_ip = p.create_address();
         addr_mapping = p.create_address();
+        addr_unmapping = p.create_address();
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&upnp_actor_t::on_endpoint);
         p.subscribe_actor(&upnp_actor_t::on_igd_description, addr_description);
         p.subscribe_actor(&upnp_actor_t::on_external_ip, addr_external_ip);
-        p.subscribe_actor(&upnp_actor_t::on_mapping_ip, addr_mapping);
+        p.subscribe_actor(&upnp_actor_t::on_mapping_port, addr_mapping);
+        p.subscribe_actor(&upnp_actor_t::on_unmapping_port, addr_unmapping);
 
         auto timeout = shutdown_timeout / 2;
         request<payload::endpoint_request_t>(acceptor).send(timeout);
@@ -37,10 +40,20 @@ void upnp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.discover_name(names::coordinator, coordinator).link();
         p.discover_name(names::acceptor, acceptor, true).link(true);
     });
+    plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) {
+        p.on_unlink([&](auto &req) {
+            if (resources->has(resource::external_port)) {
+                unlink_request = &req;
+                return true;
+            } else {
+                return false;
+            }
+        });
+    });
 }
 
 void upnp_actor_t::on_start() noexcept {
-    spdlog::trace("upnp_actor_t::on_start");
+    spdlog::trace("upnp_actor_t::on_start(), addr = {}", (void *)address.get());
     rx_buff = std::make_shared<payload::http_request_t::rx_buff_t>();
 
     fmt::memory_buffer tx_buff;
@@ -110,7 +123,7 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
 }
 
 void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
-    spdlog::trace("upnp_supervisor_t::on_external_ip");
+    spdlog::trace("upnp_actor_t::on_external_ip");
     if (msg.payload.ec) {
         spdlog::warn("upnp_actor:: get external IP address: {}", msg.payload.ec.message());
         return do_shutdown();
@@ -151,8 +164,8 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
         .send(timeout);
 }
 
-void upnp_actor_t::on_mapping_ip(message::http_response_t &msg) noexcept {
-    spdlog::trace("upnp_supervisor_t::on_mapping_ip");
+void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
+    spdlog::trace("upnp_actor_t::on_mapping_port");
     bool ok = false;
     if (msg.payload.ec) {
         spdlog::warn("upnp_actor:: unsuccessfull port mapping: {}", msg.payload.ec.message());
@@ -168,19 +181,49 @@ void upnp_actor_t::on_mapping_ip(message::http_response_t &msg) noexcept {
             if (!result.value()) {
                 spdlog::warn("upnp_actor:: unsuccessfull port mapping");
             } else {
-                spdlog::trace("upnp_supervisor_t:: port mapping succeeded");
+                spdlog::debug("upnp_actor_t:: port mapping succeeded");
                 ok = true;
+                resources->acquire(resource::external_port);
             }
         }
     }
     send<payload::port_mapping_notification_t>(coordinator, external_addr, ok);
 }
 
+void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
+    resources->release(resource::external_port);
+    spdlog::trace("upnp_actor_t::unmapping_port");
+    if (msg.payload.ec) {
+        spdlog::warn("upnp_actor:: unsuccessfull port mapping: {}", msg.payload.ec.message());
+        return;
+    }
+    if (unlink_request) {
+        auto p = get_plugin(r::plugin::link_client_plugin_t::class_identity);
+        auto plugin = static_cast<r::plugin::link_client_plugin_t *>(p);
+        plugin->forget_link(*unlink_request);
+        unlink_request.reset();
+    }
+}
+
 void upnp_actor_t::shutdown_start() noexcept {
-    spdlog::trace("upnp_supervisor_t::shutdown_start");
+    spdlog::trace("upnp_actor_t::shutdown_start");
     r::actor_base_t::shutdown_start();
     if (resources->has(resource::req_acceptor)) {
         resources->release(resource::req_acceptor);
         assert(!resources->has_any());
+    }
+    if (resources->has(resource::external_port)) {
+        spdlog::trace("upnp_actor_t, going to unmap extenal port {}", external_port);
+        fmt::memory_buffer tx_buff;
+        auto res = make_unmapping_request(tx_buff, igd_control_url, external_port);
+        if (!res) {
+            spdlog::warn("upnp_actor_t::error making port mapping request :: {}", res.error().message());
+            resources->release(resource::external_port);
+            return;
+        }
+        auto timeout = shutdown_timeout / 2;
+        request_via<payload::http_request_t>(http_client, addr_unmapping, igd_control_url, std::move(tx_buff), rx_buff,
+                                             rx_buff_size)
+            .send(timeout);
     }
 }

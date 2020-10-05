@@ -45,6 +45,9 @@ outcome::result<std::string> parse_external_ip(const char *data, std::size_t byt
 outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &uri, std::uint16_t external_port,
                                            const std::string &internal_ip, std::uint16_t internal_port) noexcept;
 
+outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const URI &uri,
+                                             std::uint16_t external_port) noexcept;
+
 outcome::result<bool> parse_mapping(const char *data, std::size_t bytes) noexcept;
 
 } // namespace syncspirit::utils

@@ -32,7 +32,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept {
     parent_t::on_child_shutdown(actor, ec);
-    spdlog::trace("net_supervisor_t::on_child_shutdown()");
+    spdlog::trace("net_supervisor_t::on_child_shutdown(), addr = {}", (void *)actor->get_address().get());
     if (!ec && ssdp_addr && actor->get_address() == ssdp_addr) {
         return;
     }

@@ -15,6 +15,7 @@ enum class error_code {
     xml_parse_error,
     wan_notfound,
     timed_out,
+    service_not_available,
     cant_determine_config_dir,
     tls_context_init_failure,
     tls_param_init_failure,

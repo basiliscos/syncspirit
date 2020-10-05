@@ -22,6 +22,7 @@ static const char *igd_wan_xpath = "//service[../../deviceType = 'urn:schemas-up
 static const char *igd_wan_service = "urn:schemas-upnp-org:service:WANIPConnection:1";
 static const char *soap_GetExternalIPAddress = "GetExternalIPAddress";
 static const char *soap_AddPortMapping = "AddPortMapping";
+static const char *soap_DeletePortMapping = "DeletePortMapping";
 static const char *external_ip_xpath = "//NewExternalIPAddress";
 static const char *port_mapping_succes_xpath = "//*[local-name() = 'AddPortMappingResponse']";
 
@@ -188,6 +189,34 @@ outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &
                                    "<NewLeaseDuration>0</NewLeaseDuration>"
                                    "</u:{0}></s:Body></s:Envelope>",
                                    soap_AddPortMapping, igd_wan_service, external_port, internal_port, internal_ip);
+    req.body() = body;
+    req.prepare_payload();
+
+    return serialize(req, buff);
+}
+
+outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const URI &uri,
+                                             std::uint16_t external_port) noexcept {
+    http::request<http::string_body> req;
+    std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_DeletePortMapping);
+    req.method(http::verb::post);
+    req.version(http_version);
+    req.target(uri.path);
+    req.set(http::field::host, uri.host);
+    req.set(http::field::soapaction, soap_action);
+    req.set(http::field::pragma, "no-cache");
+    req.set(http::field::cache_control, "no-cache");
+    req.set(http::field::content_type, "text/xml");
+
+    std::string body = fmt::format("<?xml version='1.0'?>"
+                                   "<s:Envelope xmlns:s='http://schemas.xmlsoap.org/soap/envelope/' "
+                                   "s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'>"
+                                   "<s:Body><u:{0} xmlns:u='{1}'>"
+                                   "<NewRemoteHost/>"
+                                   "<NewExternalPort>{2}</NewExternalPort>"
+                                   "<NewProtocol>TCP</NewProtocol>"
+                                   "</u:{0}></s:Body></s:Envelope>",
+                                   soap_DeletePortMapping, igd_wan_service, external_port);
     req.body() = body;
     req.prepare_payload();
 

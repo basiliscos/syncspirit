@@ -24,6 +24,8 @@ std::string error_code_category::message(int c) const {
         return "WAN device description was not found in the XML";
     case error_code::timed_out:
         return "timeout occured";
+    case error_code::service_not_available:
+        return "service not available";
     default:
         return "unknown";
     }

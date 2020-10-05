@@ -48,7 +48,10 @@ struct http_actor_t : public r::actor_base_t {
     void shutdown_start() noexcept override;
 
   private:
-    bool maybe_shutdown() noexcept;
+    using queue_t = std::list<request_ptr_t>;
+
+    // bool maybe_shutdown() noexcept;
+    void process() noexcept;
     void on_request(message::http_request_t &req) noexcept;
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_connect(resolve_it_t) noexcept;
@@ -57,19 +60,25 @@ struct http_actor_t : public r::actor_base_t {
     void on_tcp_error(const sys::error_code &ec) noexcept;
     void on_timer_error(const sys::error_code &ec) noexcept;
     void on_timer_trigger() noexcept;
+    void on_shutdown_timer_error(const sys::error_code &ec) noexcept;
+    void on_shutdown_timer_trigger() noexcept;
     void on_handshake() noexcept;
     void on_handshake_error(const sys::error_code &ec) noexcept;
     bool cancel_sock() noexcept;
     bool cancel_timer() noexcept;
+    void cancel_io() noexcept;
     void write_request() noexcept;
+    void start_shutdown_timer() noexcept;
 
     pt::time_duration resolve_timeout;
     pt::time_duration request_timeout;
     asio::io_context::strand &strand;
-    asio::deadline_timer timer;
+    asio::deadline_timer request_timer;
+    asio::deadline_timer shutdown_timer;
     r::address_ptr_t resolver;
-    request_ptr_t orig_req;
+    queue_t queue;
     bool need_response = false;
+    bool stop_io = false;
     socket_ptr_t sock;
     secure_socket_t sock_s;
     http::request<http::empty_body> http_request;
