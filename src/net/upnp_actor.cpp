@@ -191,11 +191,20 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
 }
 
 void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
+    spdlog::trace("actor_t::on_unmapping_port");
     resources->release(resource::external_port);
-    spdlog::trace("upnp_actor_t::unmapping_port");
     if (msg.payload.ec) {
         spdlog::warn("upnp_actor:: unsuccessfull port mapping: {}", msg.payload.ec.message());
         return;
+    }
+    auto &body = msg.payload.res->response.body();
+    auto result = parse_unmapping(body.data(), body.size());
+    if (!result) {
+        spdlog::warn("upnp_actor:: can't parse port unmapping reply : {}", result.error().message());
+        std::string xml(body);
+        spdlog::debug("xml:\n{0}\n", xml);
+    } else {
+        spdlog::debug("upnp_actor_t, succesfully unmapped external port {}", external_port);
     }
     if (unlink_request) {
         auto p = get_plugin(r::plugin::link_client_plugin_t::class_identity);

@@ -25,6 +25,7 @@ static const char *soap_AddPortMapping = "AddPortMapping";
 static const char *soap_DeletePortMapping = "DeletePortMapping";
 static const char *external_ip_xpath = "//NewExternalIPAddress";
 static const char *port_mapping_succes_xpath = "//*[local-name() = 'AddPortMappingResponse']";
+static const char *port_unmapping_succes_xpath = "//*[local-name() = 'DeletePortMappingResponse']";
 
 constexpr unsigned http_version = 11;
 
@@ -230,6 +231,16 @@ outcome::result<bool> parse_mapping(const char *data, std::size_t bytes) noexcep
         return error_code::xml_parse_error;
     }
     auto node = doc.select_node(port_mapping_succes_xpath);
+    return static_cast<bool>(node);
+}
+
+outcome::result<bool> parse_unmapping(const char *data, std::size_t bytes) noexcept {
+    pugi::xml_document doc;
+    auto result = doc.load_buffer(data, bytes);
+    if (!result) {
+        return error_code::xml_parse_error;
+    }
+    auto node = doc.select_node(port_unmapping_succes_xpath);
     return static_cast<bool>(node);
 }
 

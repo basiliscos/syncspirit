@@ -50,4 +50,6 @@ outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const URI
 
 outcome::result<bool> parse_mapping(const char *data, std::size_t bytes) noexcept;
 
+outcome::result<bool> parse_unmapping(const char *data, std::size_t bytes) noexcept;
+
 } // namespace syncspirit::utils
