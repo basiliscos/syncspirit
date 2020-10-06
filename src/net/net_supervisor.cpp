@@ -89,6 +89,7 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
         .endpoint(external_ep)
         .ssl(&ssl)
         .announce_url(cfg.announce_url)
+        .device_id(proto::device_id_t(cfg.device_id))
         .rx_buff_size(cfg.rx_buff_size)
         .io_timeout(cfg.timeout)
         .finish();

@@ -28,7 +28,7 @@ TEST_CASE("device_id", "[protocol]") {
     auto load_result = load_pair(cert_path.c_str(), key_path.c_str());
     REQUIRE(load_result);
     auto& pair = load_result.value();
-    auto device_id = device_id_t(pair);
+    auto device_id = device_id_t(pair.cert_data);
     auto expected = std::string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
     REQUIRE(device_id.value.size() == expected.size());
     REQUIRE(device_id.value == expected);

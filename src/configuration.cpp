@@ -17,7 +17,8 @@ boost::optional<configuration_t> get_config(std::ifstream &config) {
             ("global.timeout", po::value<std::uint32_t>()->default_value(200), "root timeout in milliseconds (default: 200)")
             ("local_announce.enabled", po::value<bool>()->default_value(true), "enable LAN-announcements")
             ("local_announce.port", po::value<std::uint16_t>()->default_value(21027), "LAN-announcement port")
-            ("global_discovery.announce_url", po::value<std::string>()->default_value("https://discovery.syncthing.net/v2/?noannounce&id=LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW"), "Global announce server")
+            ("global_discovery.announce_url", po::value<std::string>()->default_value("https://discovery.syncthing.net/v2"), "Global announce server")
+            ("global_discovery.device_id", po::value<std::string>()->default_value("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW"), "discovery server certificate device id")
             ("global_discovery.cert_file", po::value<std::string>()->default_value("~/.config/syncthing/cert.pem"), "certificate file path")
             ("global_discovery.key_file", po::value<std::string>()->default_value("~/.config/syncthing/key.pem"), "key file path")
             ("global_discovery.rx_buff_size", po::value<std::uint32_t>()->default_value(2048), "rx buff size in bytes (default: 2048)")
@@ -46,6 +47,7 @@ boost::optional<configuration_t> get_config(std::ifstream &config) {
         return result;
     }
     cfg.global_announce_config.announce_url = *announce_url;
+    cfg.global_announce_config.device_id = vm["global_discovery.device_id"].as<std::string>();
     cfg.global_announce_config.cert_file = vm["global_discovery.cert_file"].as<std::string>();
     cfg.global_announce_config.key_file = vm["global_discovery.key_file"].as<std::string>();
     cfg.global_announce_config.rx_buff_size = vm["global_discovery.rx_buff_size"].as<std::uint32_t>();

@@ -13,6 +13,7 @@
 #include <fmt/format.h>
 #include "../utils/uri.h"
 #include "../utils/upnp_support.h"
+#include "ssl.h"
 
 namespace syncspirit {
 namespace net {
@@ -71,7 +72,7 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     using rx_buff_ptr_t = std::shared_ptr<rx_buff_t>;
     using duration_t = r::pt::time_duration;
     using response_t = r::intrusive_ptr_t<http_response_t>;
-    using ssl_option_t = std::optional<ssl::context>;
+    using ssl_option_t = std::optional<ssl_context_t>;
 
     utils::URI url;
     fmt::memory_buffer data;
@@ -83,7 +84,7 @@ struct http_request_t : r::arc_base_t<http_request_t> {
         : url{url_}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_} {}
 
     http_request_t(utils::URI &url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
-                   ssl::context &&ssl_context_)
+                   ssl_context_t &&ssl_context_)
         : http_request_t(url_, std::move(data_), rx_buff_, rx_buff_size_) {
         ssl_context = std::move(ssl_context_);
     }

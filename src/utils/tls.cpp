@@ -52,6 +52,8 @@ static outcome::result<std::string> as_der(EVP_PKEY *key) noexcept {
     return as_der_impl(pkc8, [](BIO *bio, auto *key) { return i2d_PKCS8_PRIV_KEY_INFO_bio(bio, key); });
 }
 
+outcome::result<std::string> as_serialized_der(X509 *cert) noexcept { return as_der(cert); }
+
 outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     auto ev_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);
     if (ev_ctx == nullptr) {
@@ -165,8 +167,8 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
         return key_container.error();
     }
 
-    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), std::move(cert_container.value()),
-                      std::move(key_container.value())};
+    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), cert_data_t{std::move(cert_container.value())},
+                      cert_data_t{std::move(key_container.value())}};
 }
 
 outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_key_path) const noexcept {
@@ -241,8 +243,8 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
         return key_container.error();
     }
 
-    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), std::move(cert_container.value()),
-                      std::move(key_container.value())};
+    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), cert_data_t{std::move(cert_container.value())},
+                      cert_data_t{std::move(key_container.value())}};
 }
 
 outcome::result<std::string> sha256_digest(const std::string &data) noexcept {

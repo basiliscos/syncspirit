@@ -12,8 +12,8 @@ using namespace syncspirit::net;
 
 global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, endpoint{cfg.endpoint}, announce_url{cfg.announce_url},
-      ssl(*cfg.ssl), rx_buff_size{cfg.rx_buff_size}, io_timeout(cfg.io_timeout),
-      reannounce_after(cfg.reannounce_after) {
+      dicovery_device_id{std::move(cfg.device_id)}, ssl{*cfg.ssl}, rx_buff_size{cfg.rx_buff_size},
+      io_timeout(cfg.io_timeout), reannounce_after(cfg.reannounce_after) {
 
     rx_buff = std::make_shared<rx_buff_t::element_type>(rx_buff_size);
 }
@@ -46,7 +46,7 @@ void global_discovery_actor_t::on_start() noexcept {
     assert(res);
     auto timeout = r::pt::millisec{io_timeout};
     request<payload::http_request_t>(http_client, announce_url, std::move(tx_buff), rx_buff, rx_buff_size,
-                                     ssl.get_context())
+                                     make_context(ssl, dicovery_device_id))
         .send(timeout);
 }
 

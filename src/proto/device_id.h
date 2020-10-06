@@ -15,9 +15,12 @@ struct device_id_t {
     static const constexpr std::size_t DASHED_SIZE = LUHNIZED_SIZE + DASH_ITERATIONS - 1;
 
     device_id_t() noexcept {};
-    device_id_t(const utils::key_pair_t &) noexcept;
-    std::string_view value;
-    char dashed_[DASHED_SIZE];
+    device_id_t(const std::string &value_) noexcept : value(value_){};
+    device_id_t(const utils::cert_data_t &) noexcept;
+
+    bool operator==(const device_id_t &other) const noexcept { return other.value == value; }
+    bool operator!=(const device_id_t &other) const noexcept { return !(other.value == value); }
+    std::string value;
 };
 
 } // namespace syncspirit::proto

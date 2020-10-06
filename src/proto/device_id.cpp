@@ -6,9 +6,9 @@
 using namespace syncspirit::proto;
 using namespace syncspirit::utils;
 
-device_id_t::device_id_t(const utils::key_pair_t &pair) noexcept {
-    auto sha_result = sha256_digest(pair.cert_data);
-    assert(sha_result && "cannot calc sha265 from certificate");
+device_id_t::device_id_t(const cert_data_t &data) noexcept {
+    auto sha_result = sha256_digest(data.bytes);
+    assert(sha_result && "cannot calc sha256 from certificate");
     auto sha = base32::encode(sha_result.value());
     assert(sha.size() == SHA256_B32_SIZE);
 
@@ -24,6 +24,7 @@ device_id_t::device_id_t(const utils::key_pair_t &pair) noexcept {
         sha_ptr += CHECK_DIGIT_INT;
     }
 
+    char dashed_[DASHED_SIZE];
     luhn_ptr = luhnized;
     char *dashed_ptr = dashed_;
     for (std::size_t i = 0; i < DASH_ITERATIONS; ++i) {

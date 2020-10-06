@@ -17,7 +17,7 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     REQUIRE((bool) pair);
     REQUIRE((bool) pair.value().cert);
     REQUIRE((bool) pair.value().private_key);
-    REQUIRE(pair.value().cert_data.size() > 0);
+    REQUIRE(pair.value().cert_data.bytes.size() > 0);
 
     auto& value = pair.value();
 
@@ -36,9 +36,9 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
 
     auto load_result = load_pair(cert_file.c_str(), key_file.c_str());
     REQUIRE((bool) load_result);
-    REQUIRE(load_result.value().cert_data.size() == pair.value().cert_data.size());
+    REQUIRE(load_result.value().cert_data.bytes.size() == pair.value().cert_data.bytes.size());
 
-    bool bytes_equal = load_result.value().cert_data == pair.value().cert_data;
+    bool bytes_equal = load_result.value().cert_data.bytes == pair.value().cert_data.bytes;
     REQUIRE(bytes_equal);
 }
 

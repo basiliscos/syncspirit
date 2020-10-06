@@ -74,7 +74,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto &payload = queue.front()->payload.request_payload;
     auto &ssl_ctx = payload->ssl_context;
     if (ssl_ctx) {
-        sock_s = std::make_unique<secure_socket_t::element_type>(strand, *ssl_ctx);
+        sock_s = std::make_unique<secure_socket_t::element_type>(strand, ssl_ctx->ctx);
         auto &host = payload->url.host;
         if (!SSL_set_tlsext_host_name(sock_s->native_handle(), host.c_str())) {
             sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
@@ -84,6 +84,9 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
             need_response = false;
             return process();
         }
+        sock_s->set_verify_depth(ssl_ctx->verify_depth);
+        sock_s->set_verify_mode(ssl_ctx->verify_mode);
+        sock_s->set_verify_callback(ssl_ctx->verify_callback);
         layer = &sock_s->next_layer();
     } else {
         sock = std::make_unique<tcp::socket>(strand.context());
