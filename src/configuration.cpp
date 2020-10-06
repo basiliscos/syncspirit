@@ -1,15 +1,27 @@
 #include "configuration.h"
 #include <boost/program_options.hpp>
 #include <boost/tokenizer.hpp>
+#include <cstdlib>
 
 namespace po = boost::program_options;
 
 namespace syncspirit::config {
 
+std::string expand_home(const std::string &path, const char *home) {
+    if (home && path.size() && path[0] == '~') {
+        std::string new_path(home);
+        new_path += path.c_str() + 1;
+        return new_path;
+    }
+    return home;
+}
+
 boost::optional<configuration_t> get_config(std::ifstream &config) {
     using result_t = boost::optional<configuration_t>;
     result_t result{};
     configuration_t cfg;
+
+    auto home = std::getenv("HOME");
 
     // clang-format off
     po::options_description descr("Allowed options");
@@ -48,8 +60,8 @@ boost::optional<configuration_t> get_config(std::ifstream &config) {
     }
     cfg.global_announce_config.announce_url = *announce_url;
     cfg.global_announce_config.device_id = vm["global_discovery.device_id"].as<std::string>();
-    cfg.global_announce_config.cert_file = vm["global_discovery.cert_file"].as<std::string>();
-    cfg.global_announce_config.key_file = vm["global_discovery.key_file"].as<std::string>();
+    cfg.global_announce_config.cert_file = expand_home(vm["global_discovery.cert_file"].as<std::string>(), home);
+    cfg.global_announce_config.key_file = expand_home(vm["global_discovery.key_file"].as<std::string>(), home);
     cfg.global_announce_config.rx_buff_size = vm["global_discovery.rx_buff_size"].as<std::uint32_t>();
     cfg.global_announce_config.timeout = vm["global_discovery.timeout"].as<std::uint32_t>();
     cfg.global_announce_config.reannounce_after = vm["global_discovery.reannounce_after"].as<std::uint32_t>();
