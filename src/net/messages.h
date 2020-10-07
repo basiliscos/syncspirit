@@ -71,8 +71,8 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     using rx_buff_t = boost::beast::flat_buffer;
     using rx_buff_ptr_t = std::shared_ptr<rx_buff_t>;
     using duration_t = r::pt::time_duration;
-    using response_t = r::intrusive_ptr_t<http_response_t>;
     using ssl_option_t = std::optional<ssl_context_t>;
+    using response_t = r::intrusive_ptr_t<http_response_t>;
 
     utils::URI url;
     fmt::memory_buffer data;
@@ -102,11 +102,23 @@ struct port_mapping_notification_t {
     bool success;
 };
 
+struct announce_notification_t {};
+
+struct discovery_response_t : r::arc_base_t<discovery_response_t> {
+    std::vector<utils::URI> uris;
+};
+
+struct discovery_request_t : r::arc_base_t<discovery_request_t> {
+    proto::device_id_t peer;
+    using response_t = r::intrusive_ptr_t<discovery_response_t>;
+};
+
 } // end of namespace payload
 
 namespace message {
 
 using ssdp_notification_t = r::message_t<payload::ssdp_notification_t>;
+using announce_notification_t = r::message_t<payload::announce_notification_t>;
 using port_mapping_notification_t = r::message_t<payload::port_mapping_notification_t>;
 
 using resolve_request_t = r::request_traits_t<payload::address_request_t>::request::message_t;
@@ -117,6 +129,9 @@ using http_response_t = r::request_traits_t<payload::http_request_t>::response::
 
 using endpoint_request_t = r::request_traits_t<payload::endpoint_request_t>::request::message_t;
 using endpoint_response_t = r::request_traits_t<payload::endpoint_request_t>::response::message_t;
+
+using discovery_request_t = r::request_traits_t<payload::discovery_request_t>::request::message_t;
+using discovery_response_t = r::request_traits_t<payload::discovery_request_t>::response::message_t;
 
 } // end of namespace message
 

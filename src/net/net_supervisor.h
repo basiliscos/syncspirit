@@ -36,6 +36,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
 
   private:
     void on_ssdp(message::ssdp_notification_t &message) noexcept;
+    void on_announce(message::announce_notification_t &message) noexcept;
     void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
     bool launch_ssdp() noexcept;
 

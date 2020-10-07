@@ -20,8 +20,10 @@ global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
 
 void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.discover_name(names::http10, http_client, true).link(true); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.discover_name(names::http10, http_client, true).link(true);
+        p.discover_name(names::coordinator, coordinator, false).link();
+    });
     plugin.with_casted<r::plugin::starter_plugin_t>(
         [&](auto &p) { p.subscribe_actor(&global_discovery_actor_t::on_announce); });
 }
@@ -83,4 +85,6 @@ void global_discovery_actor_t::on_announce(message::http_response_t &message) no
     if (reannounce < 1)
         reannounce = this->reannounce_after / 1000;
     spdlog::debug("global_discovery_actor_t:: will reannounce after {} seconds", reannounce);
+
+    send<payload::announce_notification_t>(coordinator);
 }

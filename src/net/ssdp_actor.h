@@ -39,8 +39,11 @@ struct ssdp_actor_t : public r::actor_base_t {
     void on_udp_send_error(const sys::error_code &ec) noexcept;
     void on_udp_recv_error(const sys::error_code &ec) noexcept;
     void on_discovery_received(std::size_t bytes) noexcept;
-
+    void on_timer_error(const sys::error_code &ec) noexcept;
+    void on_timer_trigger() noexcept;
+    void timer_cancel() noexcept;
     asio::io_context::strand &strand;
+    asio::deadline_timer timer;
     std::uint32_t max_wait;
     std::unique_ptr<udp_socket_t> sock;
     r::address_ptr_t coordinator_addr;

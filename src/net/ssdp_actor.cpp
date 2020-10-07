@@ -12,12 +12,13 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t send;
 r::plugin::resource_id_t recv;
+r::plugin::resource_id_t timer;
 } // namespace resource
 } // namespace
 
 ssdp_actor_t::ssdp_actor_t(ssdp_actor_config_t &cfg)
     : r::actor_base_t::actor_base_t(cfg), strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()},
-      max_wait{cfg.max_wait} {
+      timer{strand}, max_wait{cfg.max_wait} {
     rx_buff.resize(RX_BUFF_SIZE);
 }
 
@@ -50,17 +51,24 @@ void ssdp_actor_t::on_start() noexcept {
     auto buff_tx = asio::buffer(tx_buff.data(), tx_buff.size());
     sock->async_send_to(buff_tx, destination, std::move(fwd_discovery));
     resources->acquire(resource::send);
+
+    auto timeout = pt::seconds(max_wait);
+    timer.expires_from_now(timeout);
+    auto fwd_timer = ra::forwarder_t(*this, &ssdp_actor_t::on_timer_trigger, &ssdp_actor_t::on_timer_error);
+    timer.async_wait(std::move(fwd_timer));
+    resources->acquire(resource::timer);
 }
 
 void ssdp_actor_t::shutdown_start() noexcept {
     spdlog::trace("ssdp_actor_t::shutdown_start");
-    if (resources->has_any()) {
-        sys::error_code ec;
+    sys::error_code ec;
+    if (resources->has(resource::send) || resources->has(resource::recv)) {
         sock->cancel(ec);
         if (ec) {
             spdlog::error("ssdp_actor_t:: udp socket cancellation : {}", ec.message());
         }
     }
+    timer_cancel();
     r::actor_base_t::shutdown_start();
 }
 
@@ -77,7 +85,7 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     spdlog::trace("ssdp_actor_t::on_discovery_received ({} bytes)", bytes);
     resources->release(resource::recv);
 
-    if (!bytes) {
+    if (!bytes || !resources->has(resource::timer)) {
         return do_shutdown();
     }
 
@@ -92,6 +100,7 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     auto my_ip = sock->local_endpoint().address();
 
     send<payload::ssdp_notification_t>(coordinator_addr, std::move(value), my_ip);
+    timer_cancel();
 }
 
 void ssdp_actor_t::on_udp_send_error(const sys::error_code &ec) noexcept {
@@ -100,6 +109,7 @@ void ssdp_actor_t::on_udp_send_error(const sys::error_code &ec) noexcept {
         spdlog::warn("ssdp_actor_t::on_udp_send_error :: {}", ec.message());
         do_shutdown();
     }
+    timer_cancel();
 }
 
 void ssdp_actor_t::on_udp_recv_error(const sys::error_code &ec) noexcept {
@@ -107,5 +117,30 @@ void ssdp_actor_t::on_udp_recv_error(const sys::error_code &ec) noexcept {
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("ssdp_actor_t::on_udp_recv_error :: {}", ec.message());
         do_shutdown();
+    }
+    timer_cancel();
+}
+
+void ssdp_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
+    resources->release(resource::timer);
+    if (ec != asio::error::operation_aborted) {
+        spdlog::warn("ssdp_actor_t::on_timer_error :: {}", ec.message());
+        do_shutdown();
+    }
+}
+
+void ssdp_actor_t::on_timer_trigger() noexcept {
+    resources->release(resource::timer);
+    spdlog::warn("ssdp_actor_t::on_timer_trigger");
+    do_shutdown();
+}
+
+void ssdp_actor_t::timer_cancel() noexcept {
+    if (resources->has(resource::timer)) {
+        sys::error_code ec;
+        timer.cancel(ec);
+        if (ec) {
+            spdlog::error("ssdp_actor_t:: timer cancellation : {}", ec.message());
+        }
     }
 }

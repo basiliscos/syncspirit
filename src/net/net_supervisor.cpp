@@ -5,6 +5,7 @@
 #include "ssdp_actor.h"
 #include "http_actor.h"
 #include "resolver_actor.h"
+#include "peer_supervisor.h"
 #include "names.h"
 #include <spdlog/spdlog.h>
 
@@ -26,6 +27,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&net_supervisor_t::on_ssdp);
         p.subscribe_actor(&net_supervisor_t::on_port_mapping);
+        p.subscribe_actor(&net_supervisor_t::on_announce);
         launch_ssdp();
     });
 }
@@ -93,4 +95,16 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
         .rx_buff_size(cfg.rx_buff_size)
         .io_timeout(cfg.timeout)
         .finish();
+}
+
+void net_supervisor_t::on_announce(message::announce_notification_t &) noexcept {
+#if 0
+    auto timeout = shutdown_timeout / 2;
+    peer_list_t peers;
+    peers.push_back(proto::device_id_t("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
+    create_actor<peer_supervisor_t>()
+        .timeout(timeout)
+        .peer_list(peers)
+        .finish();
+#endif
 }

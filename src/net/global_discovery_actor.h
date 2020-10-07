@@ -74,6 +74,7 @@ struct global_discovery_actor_t : public r::actor_base_t {
     void on_announce(message::http_response_t &message) noexcept;
 
     r::address_ptr_t http_client;
+    r::address_ptr_t coordinator;
     tcp::endpoint endpoint;
     utils::URI announce_url;
     proto::device_id_t dicovery_device_id;
