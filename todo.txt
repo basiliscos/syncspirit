@@ -1,5 +1,4 @@
-- ssdp actror should use timer
-- make https actor "persistent"
+- invent discovery logic
 - discover peers via discovery server
 
 openssl x509 -inform PEM -outform DER -in ~/.config/syncthing/cert.pem -out /tmp/cert.der

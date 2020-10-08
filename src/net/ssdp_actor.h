@@ -42,6 +42,7 @@ struct ssdp_actor_t : public r::actor_base_t {
     void on_timer_error(const sys::error_code &ec) noexcept;
     void on_timer_trigger() noexcept;
     void timer_cancel() noexcept;
+
     asio::io_context::strand &strand;
     asio::deadline_timer timer;
     std::uint32_t max_wait;

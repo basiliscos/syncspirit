@@ -10,9 +10,11 @@ namespace syncspirit {
 namespace net {
 
 struct http_actor_config_t : public r::actor_config_t {
+    using r::actor_config_t::actor_config_t;
     r::pt::time_duration resolve_timeout;
     r::pt::time_duration request_timeout;
-    using r::actor_config_t::actor_config_t;
+    std::string registry_name;
+    bool keep_alive;
 };
 
 template <typename Actor> struct http_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -27,6 +29,16 @@ template <typename Actor> struct http_actor_config_builder_t : r::actor_config_b
 
     builder_t &&request_timeout(const pt::time_duration &value) &&noexcept {
         parent_t::config.request_timeout = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&registry_name(const std::string &value) &&noexcept {
+        parent_t::config.registry_name = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&keep_alive(bool value = true) &&noexcept {
+        parent_t::config.keep_alive = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -50,8 +62,8 @@ struct http_actor_t : public r::actor_base_t {
   private:
     using queue_t = std::list<request_ptr_t>;
 
-    // bool maybe_shutdown() noexcept;
     void process() noexcept;
+    void spawn_timer() noexcept;
     void on_request(message::http_request_t &req) noexcept;
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_connect(resolve_it_t) noexcept;
@@ -64,14 +76,16 @@ struct http_actor_t : public r::actor_base_t {
     void on_shutdown_timer_trigger() noexcept;
     void on_handshake() noexcept;
     void on_handshake_error(const sys::error_code &ec) noexcept;
-    bool cancel_sock() noexcept;
-    bool cancel_timer() noexcept;
+    void cancel_sock() noexcept;
+    void cancel_timer() noexcept;
     void cancel_io() noexcept;
     void write_request() noexcept;
     void start_shutdown_timer() noexcept;
 
     pt::time_duration resolve_timeout;
     pt::time_duration request_timeout;
+    std::string registry_name;
+    bool keep_alive;
     asio::io_context::strand &strand;
     asio::deadline_timer request_timer;
     asio::deadline_timer shutdown_timer;
@@ -84,6 +98,7 @@ struct http_actor_t : public r::actor_base_t {
     http::request<http::empty_body> http_request;
     http::response<http::string_body> http_response;
     size_t response_size = 0;
+    utils::URI resolved_url;
 };
 
 } // namespace net

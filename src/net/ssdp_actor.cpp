@@ -10,9 +10,9 @@ static const constexpr std::size_t RX_BUFF_SIZE = 1500;
 
 namespace {
 namespace resource {
-r::plugin::resource_id_t send;
-r::plugin::resource_id_t recv;
-r::plugin::resource_id_t timer;
+r::plugin::resource_id_t send = 0;
+r::plugin::resource_id_t recv = 1;
+r::plugin::resource_id_t timer = 2;
 } // namespace resource
 } // namespace
 

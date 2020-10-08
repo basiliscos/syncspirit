@@ -9,14 +9,16 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t io = 0;
 r::plugin::resource_id_t request_timer = 1;
-r::plugin::resource_id_t shutdown_timer = 1;
+r::plugin::resource_id_t shutdown_timer = 2;
+r::plugin::resource_id_t connection = 3;
 } // namespace resource
 } // namespace
 
 http_actor_t::http_actor_t(config_t &config)
-    : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout), request_timeout(config.request_timeout),
-      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, request_timer{strand.context()},
-      shutdown_timer{strand.context()} {}
+    : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout),
+      request_timeout(config.request_timeout), registry_name{config.registry_name},
+      keep_alive{config.keep_alive}, strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()},
+      request_timer{strand.context()}, shutdown_timer{strand.context()} {}
 
 void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -25,7 +27,7 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&http_actor_t::on_resolve);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(names::http10, get_address());
+        p.register_name(registry_name, get_address());
         p.discover_name(names::resolver, resolver).link(false);
     });
 }
@@ -53,8 +55,31 @@ void http_actor_t::process() noexcept {
     need_response = true;
     response_size = 0;
     auto &url = queue.front()->payload.request_payload->url;
-    auto port = std::to_string(url.port);
-    request<payload::address_request_t>(resolver, url.host, port).send(resolve_timeout);
+
+    if (keep_alive && resources->has(resource::connection)) {
+        resources->release(resource::connection);
+        if (url.host == resolved_url.host && url.port == resolved_url.port) {
+            spdlog::trace("http_actor_t ({}) reusing connection", registry_name);
+            spawn_timer();
+            write_request();
+        } else {
+            spdlog::warn("http_actor_t ({}) :: different endpoint is used: {}:{} vs {}:{}", registry_name,
+                         resolved_url.host, resolved_url.port, url.host, url.port);
+            cancel_sock();
+        }
+    } else {
+        auto port = std::to_string(url.port);
+        request<payload::address_request_t>(resolver, url.host, port).send(resolve_timeout);
+    }
+}
+
+void http_actor_t::spawn_timer() noexcept {
+    resources->acquire(resource::io);
+
+    request_timer.expires_from_now(request_timeout);
+    auto fwd_timer = ra::forwarder_t(*this, &http_actor_t::on_timer_trigger, &http_actor_t::on_timer_error);
+    request_timer.async_wait(std::move(fwd_timer));
+    resources->acquire(resource::request_timer);
 }
 
 void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
@@ -96,12 +121,9 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto &addresses = res.payload.res->results;
     auto fwd_connect = ra::forwarder_t(*this, &http_actor_t::on_connect, &http_actor_t::on_tcp_error);
     asio::async_connect(*layer, addresses.begin(), addresses.end(), std::move(fwd_connect));
-    resources->acquire(resource::io);
 
-    request_timer.expires_from_now(request_timeout);
-    auto fwd_timer = ra::forwarder_t(*this, &http_actor_t::on_timer_trigger, &http_actor_t::on_timer_error);
-    request_timer.async_wait(std::move(fwd_timer));
-    resources->acquire(resource::request_timer);
+    spawn_timer();
+    resolved_url = payload->url;
 }
 
 void http_actor_t::on_connect(resolve_it_t) noexcept {
@@ -122,7 +144,7 @@ void http_actor_t::write_request() noexcept {
     auto &payload = *queue.front()->payload.request_payload;
     auto &url = payload.url;
     auto &data = payload.data;
-    spdlog::trace("http_actor_t:: sending {0} bytes to {1} ", data.size(), url.full);
+    spdlog::trace("http_actor_t ({}) :: sending {} bytes to {} ", registry_name, data.size(), url.full);
     auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_sent, &http_actor_t::on_tcp_error);
     auto buff = asio::buffer(data.data(), data.size());
     if (sock) {
@@ -152,18 +174,28 @@ void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
 void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     response_size = bytes;
 
-    sys::error_code ec;
-    if (sock) {
-        sock->close(ec);
+    /*
+    auto &rx_buff = *queue.front()->payload.request_payload->rx_buff;
+    std::string data{(const char*)rx_buff.data().data(), bytes};
+    spdlog::debug("http_actor_t::on_request_read ({}): \n{}", registry_name, data);
+    */
+
+    if (keep_alive && http_response.keep_alive()) {
+        resources->acquire(resource::connection);
     } else {
-        sock_s->next_layer().close(ec);
+        sys::error_code ec;
+        if (sock) {
+            sock->close(ec);
+        } else {
+            sock_s->next_layer().close(ec);
+        }
+        if (ec) {
+            // we are going to destroy socket anyway
+            spdlog::trace("http_actor_t:: closing socket error: {} ", ec.message());
+        }
+        sock.reset();
+        sock_s.reset();
     }
-    if (ec) {
-        // we are going to destroy socket anyway
-        spdlog::trace("http_actor_t:: closing socket error: {} ", ec.message());
-    }
-    sock.reset();
-    sock_s.reset();
 
     resources->release(resource::io);
     cancel_timer();
@@ -172,6 +204,9 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
 
 void http_actor_t::on_tcp_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
+    if (resources->has(resource::connection)) {
+        resources->release(resource::connection);
+    }
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("http_actor_t::on_tcp_error :: {}", ec.message());
     }
@@ -202,7 +237,9 @@ void http_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
         queue.pop_front();
         need_response = false;
     }
-    cancel_sock();
+    if (!resources->has(resource::connection)) {
+        cancel_sock();
+    }
     process();
 }
 
@@ -243,8 +280,11 @@ void http_actor_t::on_timer_trigger() noexcept {
     process();
 }
 
-bool http_actor_t::cancel_sock() noexcept {
+void http_actor_t::cancel_sock() noexcept {
     sys::error_code ec;
+    if (resources->has(resource::connection)) {
+        resources->release(resource::connection);
+    }
     if (sock) {
         sock->cancel(ec);
     } else if (sock_s) {
@@ -254,27 +294,28 @@ bool http_actor_t::cancel_sock() noexcept {
         spdlog::error("http_actor_t::cancel_sock() :: {}", ec.message());
         get_supervisor().do_shutdown();
     }
-    return (bool)ec;
 }
 
-bool http_actor_t::cancel_timer() noexcept {
+void http_actor_t::cancel_timer() noexcept {
     sys::error_code ec;
     request_timer.cancel(ec);
     if (ec) {
         spdlog::error("http_actor_t::cancel_timer() :: {}", ec.message());
         get_supervisor().do_shutdown();
     }
-    return (bool)ec;
 }
 
 void http_actor_t::on_start() noexcept {
-    spdlog::trace("http_actor_t::on_start (addr = {})", (void *)address.get());
+    spdlog::trace("http_actor_t::on_start({}) (addr = {})", registry_name, (void *)address.get());
     r::actor_base_t::on_start();
 }
 
 void http_actor_t::shutdown_start() noexcept {
-    if (resources->has_any())
+    if (resources->has(resource::io) || resources->has(resource::request_timer)) {
         start_shutdown_timer();
+    } else if (resources->has(resource::connection)) {
+        resources->release(resource::connection);
+    }
     r::actor_base_t::shutdown_start();
 }
 

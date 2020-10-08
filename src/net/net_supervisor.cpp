@@ -52,7 +52,13 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
     auto io_timeout = shutdown_timeout / 3;
     create_actor<acceptor_actor_t>().timeout(timeout).local_address(message.payload.local_address).finish();
     create_actor<resolver_actor_t>().timeout(timeout).resolve_timeout(io_timeout).finish();
-    create_actor<http_actor_t>().timeout(timeout).request_timeout(io_timeout).resolve_timeout(io_timeout).finish();
+    create_actor<http_actor_t>()
+        .timeout(timeout)
+        .request_timeout(io_timeout)
+        .resolve_timeout(io_timeout)
+        .registry_name(names::http10)
+        .keep_alive(false)
+        .finish();
     create_actor<upnp_actor_t>()
         .timeout(timeout)
         .descr_url(igd_url)

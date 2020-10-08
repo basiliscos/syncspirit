@@ -66,13 +66,20 @@ struct global_discovery_actor_t : public r::actor_base_t {
     explicit global_discovery_actor_t(config_t &cfg);
 
     void on_start() noexcept override;
+    void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:
     using rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
 
+    void announce() noexcept;
     void on_announce(message::http_response_t &message) noexcept;
+    void on_timer_error(const sys::error_code &ec) noexcept;
+    void on_timer_trigger() noexcept;
+    void timer_cancel() noexcept;
 
+    asio::io_context::strand &strand;
+    asio::deadline_timer timer;
     r::address_ptr_t http_client;
     r::address_ptr_t coordinator;
     tcp::endpoint endpoint;
