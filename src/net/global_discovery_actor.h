@@ -74,6 +74,7 @@ struct global_discovery_actor_t : public r::actor_base_t {
 
     void announce() noexcept;
     void on_announce(message::http_response_t &message) noexcept;
+    void on_discovery(message::discovery_request_t &req) noexcept;
     void on_timer_error(const sys::error_code &ec) noexcept;
     void on_timer_trigger() noexcept;
     void timer_cancel() noexcept;
@@ -90,6 +91,7 @@ struct global_discovery_actor_t : public r::actor_base_t {
     std::uint32_t rx_buff_size;
     std::uint32_t io_timeout;
     std::uint32_t reannounce_after;
+    bool announced = false;
 };
 
 } // namespace net

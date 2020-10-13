@@ -80,12 +80,14 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     std::size_t rx_buff_size;
     ssl_option_t ssl_context;
 
-    http_request_t(utils::URI &url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_)
-        : url{url_}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_} {}
+    template <typename URI>
+    http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_)
+        : url{std::forward<URI>(url_)}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_} {}
 
-    http_request_t(utils::URI &url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
+    template <typename URI>
+    http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
                    ssl_context_t &&ssl_context_)
-        : http_request_t(url_, std::move(data_), rx_buff_, rx_buff_size_) {
+        : http_request_t(std::forward<URI>(url_), std::move(data_), rx_buff_, rx_buff_size_) {
         ssl_context = std::move(ssl_context_);
     }
 };
@@ -102,15 +104,20 @@ struct port_mapping_notification_t {
     bool success;
 };
 
-struct announce_notification_t {};
+struct announce_notification_t {
+    r::address_ptr_t source;
+};
 
 struct discovery_response_t : r::arc_base_t<discovery_response_t> {
+    discovery_response_t(std::vector<utils::URI> &&uris_) noexcept : uris{std::move(uris_)} {}
     std::vector<utils::URI> uris;
 };
 
 struct discovery_request_t : r::arc_base_t<discovery_request_t> {
-    proto::device_id_t peer;
     using response_t = r::intrusive_ptr_t<discovery_response_t>;
+
+    discovery_request_t(const proto::device_id_t &peer_) noexcept : peer{peer_} {}
+    proto::device_id_t peer;
 };
 
 } // end of namespace payload

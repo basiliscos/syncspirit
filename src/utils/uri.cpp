@@ -35,4 +35,28 @@ boost::optional<URI> parse(const boost::string_view &uri) {
     return result_t{};
 }
 
+void URI::reconstruct() noexcept { full = proto + "://" + host + ":" + std::to_string(port) + path + query; }
+
+void URI::set_path(const std::string &value) noexcept {
+    path = "";
+    if (value.size() && value[0] != '/') {
+        path += "/";
+    }
+    path += value;
+
+    reconstruct();
+}
+
+void URI::set_query(const std::string &value) noexcept {
+    query = "";
+    if (value.size() && value[0] != '?') {
+        query += "?";
+    }
+    query += value;
+
+    reconstruct();
+}
+
+std::string URI::relative() const noexcept { return path + query; }
+
 }; // namespace syncspirit::utils

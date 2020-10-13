@@ -176,7 +176,7 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
 
     /*
     auto &rx_buff = *queue.front()->payload.request_payload->rx_buff;
-    std::string data{(const char*)rx_buff.data().data(), bytes};
+    std::string data{(const char *)rx_buff.data().data(), bytes};
     spdlog::debug("http_actor_t::on_request_read ({}): \n{}", registry_name, data);
     */
 

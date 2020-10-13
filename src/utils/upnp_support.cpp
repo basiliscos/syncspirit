@@ -102,7 +102,7 @@ outcome::result<void> make_description_request(fmt::memory_buffer &buff, const U
     http::request<http::empty_body> req;
     req.method(http::verb::get);
     req.version(http_version);
-    req.target(uri.path);
+    req.target(uri.relative());
     req.set(http::field::host, uri.host);
 
     return serialize(req, buff);
@@ -132,7 +132,7 @@ outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const U
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_GetExternalIPAddress);
     req.method(http::verb::post);
     req.version(http_version);
-    req.target(uri.path);
+    req.target(uri.relative());
     req.set(http::field::host, uri.host);
     req.set(http::field::soapaction, soap_action);
     req.set(http::field::pragma, "no-cache");
@@ -169,7 +169,7 @@ outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_AddPortMapping);
     req.method(http::verb::post);
     req.version(http_version);
-    req.target(uri.path);
+    req.target(uri.relative());
     req.set(http::field::host, uri.host);
     req.set(http::field::soapaction, soap_action);
     req.set(http::field::pragma, "no-cache");
@@ -202,7 +202,7 @@ outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const URI
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_DeletePortMapping);
     req.method(http::verb::post);
     req.version(http_version);
-    req.target(uri.path);
+    req.target(uri.relative());
     req.set(http::field::host, uri.host);
     req.set(http::field::soapaction, soap_action);
     req.set(http::field::pragma, "no-cache");

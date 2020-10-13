@@ -34,9 +34,10 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
 
     explicit peer_supervisor_t(peer_supervisor_config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
-    void on_start() noexcept override;
 
   private:
+    void on_announce(message::announce_notification_t &msg) noexcept;
+    void on_discovery(message::discovery_response_t &res) noexcept;
     void discover_next_peer() noexcept;
 
     r::address_ptr_t coordinator;

@@ -5,6 +5,7 @@
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
+#include <unordered_map>
 
 namespace syncspirit {
 namespace net {
@@ -35,15 +36,23 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept override;
 
   private:
+    using discovery_map_t =
+        std::unordered_map<rotor::request_id_t, rotor::intrusive_ptr_t<message::discovery_request_t>>;
+
     void on_ssdp(message::ssdp_notification_t &message) noexcept;
     void on_announce(message::announce_notification_t &message) noexcept;
     void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
+    void on_discovery_req(message::discovery_request_t &req) noexcept;
+    void on_discovery_res(message::discovery_response_t &req) noexcept;
     bool launch_ssdp() noexcept;
 
     config::configuration_t app_cfg;
     r::address_ptr_t ssdp_addr;
+    r::address_ptr_t peers_addr;
+    r::address_ptr_t global_discovery_addr;
     std::uint32_t ssdp_attempts = 0;
     ssl_t ssl;
+    discovery_map_t discovery_map;
 };
 
 } // namespace net

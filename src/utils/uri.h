@@ -14,6 +14,13 @@ struct URI {
     std::string path;
     std::string query;
     std::string fragment;
+
+    void set_path(const std::string &value) noexcept;
+    void set_query(const std::string &value) noexcept;
+    std::string relative() const noexcept;
+
+  private:
+    void reconstruct() noexcept;
 };
 
 boost::optional<URI> parse(const char *uri);
