@@ -11,8 +11,7 @@
 #include <optional>
 
 #include <fmt/format.h>
-#include "../utils/uri.h"
-#include "../utils/upnp_support.h"
+#include "../model/upnp.h"
 #include "ssl.h"
 
 namespace syncspirit {
@@ -93,9 +92,9 @@ struct http_request_t : r::arc_base_t<http_request_t> {
 };
 
 struct ssdp_notification_t : r::arc_base_t<ssdp_notification_t> {
-    utils::discovery_result igd;
+    model::discovery_result igd;
     asio::ip::address local_address;
-    ssdp_notification_t(utils::discovery_result &&igd_, const asio::ip::address &local_address_)
+    ssdp_notification_t(model::discovery_result &&igd_, const asio::ip::address &local_address_)
         : igd{std::move(igd_)}, local_address{local_address_} {}
 };
 
@@ -116,8 +115,8 @@ struct discovery_response_t : r::arc_base_t<discovery_response_t> {
 struct discovery_request_t : r::arc_base_t<discovery_request_t> {
     using response_t = r::intrusive_ptr_t<discovery_response_t>;
 
-    discovery_request_t(const proto::device_id_t &peer_) noexcept : peer{peer_} {}
-    proto::device_id_t peer;
+    discovery_request_t(const model::device_id_t &peer_) noexcept : peer{peer_} {}
+    model::device_id_t peer;
 };
 
 } // end of namespace payload

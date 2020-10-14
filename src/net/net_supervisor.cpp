@@ -70,7 +70,7 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
 
     // temporally hard-code
     peer_list_t peers;
-    peers.push_back(proto::device_id_t("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
+    peers.push_back(model::device_id_t("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
     peers_addr =
         create_actor<peer_supervisor_t>().peer_list(peers).strand(strand).timeout(timeout).finish()->get_address();
 
@@ -106,7 +106,7 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
                                 .endpoint(external_ep)
                                 .ssl(&ssl)
                                 .announce_url(cfg.announce_url)
-                                .device_id(proto::device_id_t(cfg.device_id))
+                                .device_id(model::device_id_t(cfg.device_id))
                                 .rx_buff_size(cfg.rx_buff_size)
                                 .io_timeout(cfg.timeout)
                                 .finish()

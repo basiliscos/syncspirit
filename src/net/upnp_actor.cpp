@@ -1,10 +1,11 @@
 #include "upnp_actor.h"
-#include "../utils/upnp_support.h"
+#include "../proto/upnp_support.h"
 #include "spdlog/spdlog.h"
 #include "names.h"
 
 using namespace syncspirit::net;
 using namespace syncspirit::utils;
+using namespace syncspirit::proto;
 
 namespace {
 namespace resource {

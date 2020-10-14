@@ -2,11 +2,14 @@
 #include <string_view>
 #include <sstream>
 #include <pugixml.hpp>
-#include "error_code.h"
 #include "upnp_support.h"
-#include "beast_support.h"
+#include "../utils/error_code.h"
+#include "../utils/beast_support.h"
 
-namespace syncspirit::utils {
+using namespace syncspirit::utils;
+using namespace syncspirit::model;
+
+namespace syncspirit::proto {
 
 const char *upnp_fields::st = "ST";
 const char *upnp_fields::man = "MAN";
@@ -72,8 +75,7 @@ outcome::result<discovery_result> parse(const char *data, std::size_t bytes) noe
     if (it_location == message.end()) {
         return error_code::no_location;
     }
-    // std::string_view location_str = it_location->value();
-    auto location_option = parse(it_location->value());
+    auto location_option = utils::parse(it_location->value());
 
     auto it_st = message.find(upnp_fields::st);
     if (it_st == message.end()) {
@@ -244,4 +246,4 @@ outcome::result<bool> parse_unmapping(const char *data, std::size_t bytes) noexc
     return static_cast<bool>(node);
 }
 
-} // namespace syncspirit::utils
+} // namespace syncspirit::proto

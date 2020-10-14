@@ -1,10 +1,11 @@
 #include "ssdp_actor.h"
-#include "../utils/upnp_support.h"
+#include "../proto/upnp_support.h"
 #include "spdlog/spdlog.h"
 #include "names.h"
 
 using namespace syncspirit::net;
 using namespace syncspirit::utils;
+using namespace syncspirit::proto;
 
 static const constexpr std::size_t RX_BUFF_SIZE = 1500;
 

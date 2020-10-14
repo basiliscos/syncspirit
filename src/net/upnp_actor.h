@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../configuration.h"
-#include "../utils/upnp_support.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>

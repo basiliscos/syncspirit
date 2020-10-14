@@ -3,7 +3,7 @@
 #include <string>
 #include "../utils/tls.h"
 
-namespace syncspirit::proto {
+namespace syncspirit::model {
 
 struct device_id_t {
     static const constexpr std::size_t SHA256_B32_SIZE = 52;
@@ -23,4 +23,4 @@ struct device_id_t {
     std::string value;
 };
 
-} // namespace syncspirit::proto
+} // namespace syncspirit::model

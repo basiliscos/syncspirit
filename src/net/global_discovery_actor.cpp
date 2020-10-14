@@ -2,7 +2,7 @@
 #include "names.h"
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
-#include "../utils/discovery_support.h"
+#include "../proto/discovery_support.h"
 #include "http_actor.h"
 
 using namespace syncspirit::net;

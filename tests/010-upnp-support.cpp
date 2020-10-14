@@ -1,13 +1,13 @@
 #include "catch.hpp"
 #include "test-utils.h"
-#include "utils/upnp_support.h"
+#include "proto/upnp_support.h"
 #include <boost/filesystem.hpp>
 #include <iostream>
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
 
-using namespace syncspirit::utils;
+using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
 TEST_CASE("parse IGD description", "[support]") {

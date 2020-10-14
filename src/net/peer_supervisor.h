@@ -9,7 +9,7 @@
 namespace syncspirit {
 namespace net {
 
-using peer_list_t = std::list<proto::device_id_t>;
+using peer_list_t = std::list<model::device_id_t>;
 
 struct peer_supervisor_config_t : ra::supervisor_config_asio_t {
     peer_list_t peer_list;

@@ -11,7 +11,7 @@ outcome::result<void> ssl_t::load(const char *cert, const char *priv_key) noexce
         return key_pair.error();
     }
 
-    proto::device_id_t device(key_pair.value().cert_data);
+    model::device_id_t device(key_pair.value().cert_data);
     device_id = std::move(device);
     pair = std::move(key_pair.value());
     return outcome::success();
@@ -29,7 +29,7 @@ ssl::context ssl_t::get_context() const noexcept {
     return ctx;
 }
 
-ssl_context_t make_context(const ssl_t &ssl, const proto::device_id_t &device_id) noexcept {
+ssl_context_t make_context(const ssl_t &ssl, const model::device_id_t &device_id) noexcept {
     auto ctx = ssl.get_context();
     int depth = 1;
     auto mode = ssl::verify_peer | ssl::verify_fail_if_no_peer_cert | ssl::verify_client_once;
@@ -47,7 +47,7 @@ ssl_context_t make_context(const ssl_t &ssl, const proto::device_id_t &device_id
         }
 
         utils::cert_data_t cert_data{std::move(der_option.value())};
-        auto peer_device_id = proto::device_id_t(cert_data);
+        auto peer_device_id = model::device_id_t(cert_data);
         spdlog::trace("peer device_id = {}", peer_device_id.value);
 
         if (peer_device_id != device_id) {

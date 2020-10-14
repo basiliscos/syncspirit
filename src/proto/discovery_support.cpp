@@ -1,6 +1,6 @@
 #include "discovery_support.h"
-#include "beast_support.h"
-#include "error_code.h"
+#include "../utils/beast_support.h"
+#include "../utils/error_code.h"
 #include <boost/beast/http.hpp>
 #include <nlohmann/json.hpp>
 #include <charconv>
@@ -35,7 +35,7 @@ outcome::result<URI> make_announce_request(fmt::memory_buffer &buff, const URI &
 }
 
 outcome::result<URI> make_discovery_request(fmt::memory_buffer &buff, const URI &announce_uri,
-                                            const proto::device_id_t device_id) noexcept {
+                                            const model::device_id_t device_id) noexcept {
     auto target = fmt::format("?device={}", device_id.value);
     utils::URI uri = announce_uri;
     uri.set_query(target);

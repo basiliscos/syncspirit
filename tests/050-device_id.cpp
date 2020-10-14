@@ -1,11 +1,12 @@
 #include "catch.hpp"
 #include "test-utils.h"
-#include "proto/device_id.h"
+#include "model/device_id.h"
 #include "proto/luhn32.h"
 #include "utils/tls.h"
 
 using namespace syncspirit::test;
 using namespace syncspirit::utils;
+using namespace syncspirit::model;
 using namespace syncspirit::proto;
 
 namespace fs = boost::filesystem;

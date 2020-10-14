@@ -1,9 +1,10 @@
 #include "device_id.h"
 #include <cassert>
 #include "../utils/base32.h"
-#include "luhn32.h"
+#include "../proto/luhn32.h"
 
 using namespace syncspirit::proto;
+using namespace syncspirit::model;
 using namespace syncspirit::utils;
 
 device_id_t::device_id_t(const cert_data_t &data) noexcept {

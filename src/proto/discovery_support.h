@@ -1,6 +1,6 @@
 #pragma once
-#include "uri.h"
-#include "../proto/device_id.h"
+#include "../utils/uri.h"
+#include "../model/device_id.h"
 #include <fmt/format.h>
 #include <string>
 #include <vector>
@@ -18,7 +18,7 @@ using tcp = asio::ip::tcp;
 outcome::result<URI> make_announce_request(fmt::memory_buffer &buff, const URI &announce_uri,
                                            const tcp::endpoint &endpoint) noexcept;
 outcome::result<URI> make_discovery_request(fmt::memory_buffer &buff, const URI &announce_uri,
-                                            const proto::device_id_t device_id) noexcept;
+                                            const model::device_id_t device_id) noexcept;
 
 outcome::result<std::uint32_t> parse_announce(http::response<http::string_body> &res) noexcept;
 
