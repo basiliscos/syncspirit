@@ -5,7 +5,9 @@
 #include <nlohmann/json.hpp>
 #include <charconv>
 
-namespace syncspirit::utils {
+using namespace syncspirit::utils;
+
+namespace syncspirit::proto {
 
 namespace http = boost::beast::http;
 using json = nlohmann::json;
@@ -84,4 +86,4 @@ outcome::result<std::uint32_t> parse_announce(http::response<http::string_body> 
     return static_cast<std::uint32_t>(reannounce);
 }
 
-} // namespace syncspirit::utils
+} // namespace syncspirit::proto

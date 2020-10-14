@@ -63,7 +63,7 @@ void global_discovery_actor_t::announce() noexcept {
     spdlog::trace("global_discovery_actor_t::announce");
 
     fmt::memory_buffer tx_buff;
-    auto res = utils::make_announce_request(tx_buff, announce_url, endpoint);
+    auto res = proto::make_announce_request(tx_buff, announce_url, endpoint);
     if (!res) {
         spdlog::trace("global_discovery_actor_t::error making announce request :: {}", res.error().message());
         return do_shutdown();
@@ -82,7 +82,7 @@ void global_discovery_actor_t::on_announce_response(message::http_response_t &me
         return do_shutdown();
     }
 
-    auto res = utils::parse_announce(message.payload.res->response);
+    auto res = proto::parse_announce(message.payload.res->response);
     if (!res) {
         spdlog::warn("global_discovery_actor_t, parsing announce error = {}", res.error().message());
         return do_shutdown();
@@ -113,7 +113,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
         return reply_with_error(*orig_req, ec);
     }
 
-    auto res = utils::parse_announce(message.payload.res->response);
+    auto res = proto::parse_announce(message.payload.res->response);
     if (!res) {
         spdlog::warn("global_discovery_actor_t, parsing discovery error = {}", res.error().message());
         return reply_with_error(*orig_req, res.error());
@@ -127,7 +127,7 @@ void global_discovery_actor_t::on_discovery(message::discovery_request_t &req) n
     spdlog::trace("global_discovery_actor_t::on_on_discovery");
 
     fmt::memory_buffer tx_buff;
-    auto res = utils::make_discovery_request(tx_buff, announce_url, req.payload.request_payload->peer);
+    auto res = proto::make_discovery_request(tx_buff, announce_url, req.payload.request_payload->peer);
     if (!res) {
         spdlog::trace("global_discovery_actor_t::error making discovery request :: {}", res.error().message());
         return do_shutdown();
