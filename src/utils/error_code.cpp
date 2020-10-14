@@ -43,6 +43,18 @@ std::string error_code_category::message(int c) const {
     case error_code::negative_reannounce_interval:
         r = "negative reannounce interval";
         break;
+    case error_code::malformed_json:
+        r = "malformed json";
+        break;
+    case error_code::incorrect_json:
+        r = "incorrect json";
+        break;
+    case error_code::malformed_url:
+        r = "malformed url";
+        break;
+    case error_code::malformed_date:
+        r = "malformed date";
+        break;
     default:
         r = "unknown";
     }

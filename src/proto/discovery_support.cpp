@@ -2,8 +2,11 @@
 #include "../utils/beast_support.h"
 #include "../utils/error_code.h"
 #include <boost/beast/http.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <nlohmann/json.hpp>
 #include <charconv>
+#include <sstream>
+#include <iomanip>
 
 using namespace syncspirit::utils;
 
@@ -84,6 +87,63 @@ outcome::result<std::uint32_t> parse_announce(http::response<http::string_body> 
         return ec;
     }
     return static_cast<std::uint32_t>(reannounce);
+}
+
+outcome::result<model::peer_contact_option_t> parse_contact(http::response<http::string_body> &res) noexcept {
+    auto code = res.result_int();
+    if (code == 404) {
+        return model::peer_contact_option_t{};
+    };
+    if (code != 200) {
+        return make_error_code(error_code::unexpected_response_code);
+    };
+
+    auto &body = res.body();
+    auto ptr = body.data();
+    auto data = json::parse(ptr, ptr + body.size(), nullptr, false);
+    if (data.is_discarded()) {
+        return make_error_code(error_code::malformed_json);
+    }
+    if (!data.is_object()) {
+        return make_error_code(error_code::incorrect_json);
+    }
+
+    auto &addresses = data["addresses"];
+    if (!addresses.is_array()) {
+        return make_error_code(error_code::incorrect_json);
+    }
+
+    model::peer_contact_t::uri_container_t urls;
+    for (auto &it : addresses) {
+        if (!it.is_string()) {
+            return make_error_code(error_code::incorrect_json);
+        }
+        auto uri_str = it.get<std::string>();
+        auto uri_option = utils::parse(uri_str.c_str());
+        if (!uri_option) {
+            return make_error_code(error_code::malformed_url);
+        }
+        urls.emplace_back(std::move(uri_option.value()));
+    }
+
+    auto &seen = data["seen"];
+    if (!seen.is_string()) {
+        return make_error_code(error_code::incorrect_json);
+    }
+    auto date = boost::posix_time::from_iso_string(seen.get<std::string>());
+#if 0
+    std::tm t = {};
+    std::stringstream ss(seen.get<std::string>());
+    ss >> std::get_time(&t, "%Y-%m-%dT%H:%M:%S");
+    if (ss.fail()) {
+        return make_error_code(error_code::malformed_date);
+    }
+
+    std::time_t l = std::mktime(&t);
+    from_time_t
+#endif
+
+    return model::peer_contact_t{std::move(date), std::move(urls)};
 }
 
 } // namespace syncspirit::proto

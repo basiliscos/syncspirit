@@ -1,6 +1,7 @@
 #pragma once
 #include "../utils/uri.h"
 #include "../model/device_id.h"
+#include "../model/peer_contact.h"
 #include <fmt/format.h>
 #include <string>
 #include <vector>
@@ -21,5 +22,7 @@ outcome::result<utils::URI> make_discovery_request(fmt::memory_buffer &buff, con
                                                    const model::device_id_t device_id) noexcept;
 
 outcome::result<std::uint32_t> parse_announce(http::response<http::string_body> &res) noexcept;
+
+outcome::result<model::peer_contact_option_t> parse_contact(http::response<http::string_body> &res) noexcept;
 
 } // namespace syncspirit::proto

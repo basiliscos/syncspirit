@@ -36,6 +36,10 @@ enum class error_code {
     base32_decoding_failure,
     unexpected_response_code,
     negative_reannounce_interval,
+    malformed_json,
+    incorrect_json,
+    malformed_url,
+    malformed_date,
 };
 
 namespace detail {
