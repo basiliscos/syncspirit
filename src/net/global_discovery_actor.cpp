@@ -2,12 +2,8 @@
 #include "names.h"
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
-#include "../utils/beast_support.h"
+#include "../utils/discovery_support.h"
 #include "http_actor.h"
-#include <charconv>
-
-// for convenience
-using json = nlohmann::json;
 
 using namespace syncspirit::net;
 
@@ -25,7 +21,7 @@ global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, timer{strand},
       endpoint{cfg.endpoint}, announce_url{cfg.announce_url},
       dicovery_device_id{std::move(cfg.device_id)}, ssl{*cfg.ssl}, rx_buff_size{cfg.rx_buff_size},
-      io_timeout(cfg.io_timeout), reannounce_after(cfg.reannounce_after) {
+      io_timeout(cfg.io_timeout) {
 
     rx_buff = std::make_shared<rx_buff_t::element_type>(rx_buff_size);
 }
@@ -60,27 +56,15 @@ void global_discovery_actor_t::on_start() noexcept {
 
 void global_discovery_actor_t::announce() noexcept {
     spdlog::trace("global_discovery_actor_t::announce");
-    json payload = json::object();
-    payload["addresses"] = {fmt::format("tcp://{0}:{1}", endpoint.address().to_string(), endpoint.port())};
-
-    utils::URI uri(announce_url);
-    uri.set_path("/v2");
-    http::request<http::string_body> req;
-    req.method(http::verb::post);
-    req.version(11);
-    req.keep_alive(true);
-    req.target(uri.relative());
-    req.set(http::field::host, uri.host);
-    req.set(http::field::content_type, "application/json");
-
-    req.body() = payload.dump();
-    req.prepare_payload();
 
     fmt::memory_buffer tx_buff;
-    auto res = utils::serialize(req, tx_buff);
-    assert(res);
+    auto res = utils::make_announce_request(tx_buff, announce_url, endpoint);
+    if (!res) {
+        spdlog::trace("global_discovery_actor_t::error making announce request :: {}", res.error().message());
+        return do_shutdown();
+    }
     auto timeout = r::pt::millisec{io_timeout};
-    request<payload::http_request_t>(http_client, std::move(uri), std::move(tx_buff), rx_buff, rx_buff_size,
+    request<payload::http_request_t>(http_client, std::move(res.value()), std::move(tx_buff), rx_buff, rx_buff_size,
                                      make_context(ssl, dicovery_device_id))
         .send(timeout);
 }
@@ -92,33 +76,14 @@ void global_discovery_actor_t::on_announce(message::http_response_t &message) no
         spdlog::error("global_discovery_actor_t, announcing error = {}", ec.message());
         return do_shutdown();
     }
-    auto &res = message.payload.res->response;
-    auto code = res.result_int();
-    spdlog::debug("global_discovery_actor_t::on_announce code = {} ", code);
-    if (code != 204 && code != 429) {
-        spdlog::warn("global_discovery_actor_t, unexpected resonse code = {}", code);
+
+    auto res = utils::parse_announce(message.payload.res->response);
+    if (!res) {
+        spdlog::warn("global_discovery_actor_t, parsing announce error = {}", res.error().message());
         return do_shutdown();
     }
 
-    auto convert = [&](const auto &it) -> int {
-        if (it != res.end()) {
-            auto str = it->value();
-            int value;
-            auto result = std::from_chars(str.begin(), str.end(), value);
-            if (result.ec == std::errc()) {
-                return value;
-            }
-        }
-        return 0;
-    };
-
-    auto reannounce = convert(res.find("Reannounce-After"));
-    if (reannounce < 1) {
-        reannounce = convert(res.find("Retry-After"));
-    }
-    if (reannounce < 1) {
-        reannounce = this->reannounce_after / 1000;
-    }
+    auto reannounce = res.value();
     spdlog::debug("global_discovery_actor_t:: will reannounce after {} seconds", reannounce);
 
     auto timeout = pt::seconds(reannounce);
@@ -137,22 +102,15 @@ void global_discovery_actor_t::on_announce(message::http_response_t &message) no
 void global_discovery_actor_t::on_discovery(message::discovery_request_t &req) noexcept {
     spdlog::trace("global_discovery_actor_t::on_on_discovery");
 
-    auto target = fmt::format("?device={}", req.payload.request_payload->peer.value);
-    utils::URI uri = announce_url;
-    uri.set_query(target);
-
-    http::request<http::empty_body> query;
-    query.method(http::verb::get);
-    query.version(11);
-    query.keep_alive(true);
-    query.target(uri.relative());
-    query.set(http::field::host, uri.host);
-
     fmt::memory_buffer tx_buff;
-    auto res = utils::serialize(query, tx_buff);
-    assert(res);
+    auto res = utils::make_discovery_request(tx_buff, announce_url, req.payload.request_payload->peer);
+    if (!res) {
+        spdlog::trace("global_discovery_actor_t::error making discovery request :: {}", res.error().message());
+        return do_shutdown();
+    }
+
     auto timeout = r::pt::millisec{io_timeout};
-    request<payload::http_request_t>(http_client, std::move(uri), std::move(tx_buff), rx_buff, rx_buff_size,
+    request<payload::http_request_t>(http_client, std::move(res.value()), std::move(tx_buff), rx_buff, rx_buff_size,
                                      make_context(ssl, dicovery_device_id))
         .send(timeout);
 }

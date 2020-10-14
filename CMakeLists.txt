@@ -34,6 +34,7 @@ add_library(syncspirit_lib
     src/proto/luhn32.cpp
     src/utils/base32.cpp
     src/utils/beast_support.cpp
+    src/utils/discovery_support.cpp
     src/utils/error_code.cpp
     src/utils/location.cpp
     src/utils/tls.cpp

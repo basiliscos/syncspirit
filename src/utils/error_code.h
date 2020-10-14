@@ -34,6 +34,8 @@ enum class error_code {
     tls_sha256_init_failure,
     tls_sha256_failure,
     base32_decoding_failure,
+    unexpected_response_code,
+    negative_reannounce_interval,
 };
 
 namespace detail {

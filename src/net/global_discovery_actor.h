@@ -15,7 +15,6 @@ struct global_discovery_actor_config_t : r::actor_config_t {
     const ssl_t *ssl;
     std::uint32_t rx_buff_size;
     std::uint32_t io_timeout;
-    std::uint32_t reannounce_after;
 };
 
 template <typename Actor> struct global_discovery_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -52,11 +51,6 @@ template <typename Actor> struct global_discovery_actor_config_builder_t : r::ac
         parent_t::config.io_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
-    builder_t &&reannounce_after(const std::uint32_t value) &&noexcept {
-        parent_t::config.io_reannounce_after = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
 };
 
 struct global_discovery_actor_t : public r::actor_base_t {
@@ -90,7 +84,6 @@ struct global_discovery_actor_t : public r::actor_base_t {
     rx_buff_t rx_buff;
     std::uint32_t rx_buff_size;
     std::uint32_t io_timeout;
-    std::uint32_t reannounce_after;
     bool announced = false;
 };
 
