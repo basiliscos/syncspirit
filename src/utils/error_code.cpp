@@ -5,30 +5,50 @@ namespace syncspirit::utils::detail {
 const char *error_code_category::name() const noexcept { return "syncspirit_error"; }
 
 std::string error_code_category::message(int c) const {
+    std::string r;
     switch (static_cast<error_code>(c)) {
     case error_code::success:
-        return "success";
+        r = "success";
+        break;
     case error_code::no_location:
-        return "no location";
+        r = "no location";
+        break;
     case error_code::incomplete_discovery_reply:
-        return "incomplete discovery reply";
+        r = "incomplete discovery reply";
+        break;
     case error_code::no_st:
-        return "no st (search target)";
+        r = "no st (search target)";
+        break;
     case error_code::no_usn:
-        return "no usn";
+        r = "no usn";
+        break;
     case error_code::igd_mismatch:
-        return "IGD (InternetGatewayDevice) mismatch";
+        r = "IGD (InternetGatewayDevice) mismatch";
+        break;
     case error_code::xml_parse_error:
-        return "Error parsing xml";
+        r = "Error parsing xml";
+        break;
     case error_code::wan_notfound:
-        return "WAN device description was not found in the XML";
+        r = "WAN device description was not found in the XML";
+        break;
     case error_code::timed_out:
-        return "timeout occured";
+        r = "timeout occured";
+        break;
     case error_code::service_not_available:
-        return "service not available";
+        r = "service not available";
+        break;
+    case error_code::unexpected_response_code:
+        r = "unexpected response code";
+        break;
+    case error_code::negative_reannounce_interval:
+        r = "negative reannounce interval";
+        break;
     default:
-        return "unknown";
+        r = "unknown";
     }
+    r += " (";
+    r += std::to_string(c) + ")";
+    return r;
 }
 
 } // namespace syncspirit::utils::detail

@@ -65,9 +65,12 @@ struct global_discovery_actor_t : public r::actor_base_t {
 
   private:
     using rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
+    using discovery_request_t = r::intrusive_ptr_t<message::discovery_request_t>;
+    using discovery_queue_t = std::list<discovery_request_t>;
 
     void announce() noexcept;
-    void on_announce(message::http_response_t &message) noexcept;
+    void on_announce_response(message::http_response_t &message) noexcept;
+    void on_discovery_response(message::http_response_t &message) noexcept;
     void on_discovery(message::discovery_request_t &req) noexcept;
     void on_timer_error(const sys::error_code &ec) noexcept;
     void on_timer_trigger() noexcept;
@@ -85,6 +88,9 @@ struct global_discovery_actor_t : public r::actor_base_t {
     std::uint32_t rx_buff_size;
     std::uint32_t io_timeout;
     bool announced = false;
+    r::address_ptr_t addr_announce;  /* for routing */
+    r::address_ptr_t addr_discovery; /* for routing */
+    discovery_queue_t discovery_queue;
 };
 
 } // namespace net
