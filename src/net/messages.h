@@ -12,6 +12,7 @@
 
 #include <fmt/format.h>
 #include "../model/upnp.h"
+#include "../model/peer_contact.h"
 #include "ssl.h"
 
 namespace syncspirit {
@@ -108,15 +109,16 @@ struct announce_notification_t {
 };
 
 struct discovery_response_t : r::arc_base_t<discovery_response_t> {
-    discovery_response_t(std::vector<utils::URI> &&uris_) noexcept : uris{std::move(uris_)} {}
-    std::vector<utils::URI> uris;
+    discovery_response_t(model::peer_contact_option_t &&peer_) noexcept : peer{std::move(peer_)} {}
+
+    model::peer_contact_option_t peer;
 };
 
 struct discovery_request_t : r::arc_base_t<discovery_request_t> {
     using response_t = r::intrusive_ptr_t<discovery_response_t>;
 
-    discovery_request_t(const model::device_id_t &peer_) noexcept : peer{peer_} {}
-    model::device_id_t peer;
+    discovery_request_t(const model::device_id_t &peer_) noexcept : device_id{peer_} {}
+    model::device_id_t device_id;
 };
 
 } // end of namespace payload

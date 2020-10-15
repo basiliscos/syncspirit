@@ -38,8 +38,17 @@ void peer_supervisor_t::on_announce(message::announce_notification_t &) noexcept
 
 void peer_supervisor_t::on_discovery(message::discovery_response_t &res) noexcept {
     auto &ec = res.payload.ec;
+    auto &device_id = res.payload.req->payload.request_payload->device_id.value;
     if (ec) {
-        auto &peer = res.payload.req->payload.request_payload->peer;
-        spdlog::trace("peer_supervisor_t, peer {} wasn't discovered : {}", peer.value, ec.message());
+        spdlog::warn("peer_supervisor_t, peer {} wasn't discovered : {}", device_id, ec.message());
+        return discover_next_peer();
     }
+
+    auto &peer_option = res.payload.res->peer;
+    if (!peer_option) {
+        spdlog::debug("peer_supervisor_t, peer {} not found", device_id);
+        return discover_next_peer();
+    }
+
+    spdlog::trace("peer_supervisor_t, peer {} found, initiating connection", device_id);
 }

@@ -121,19 +121,22 @@ void net_supervisor_t::on_announce(message::announce_notification_t &) noexcept 
 void net_supervisor_t::on_discovery_req(message::discovery_request_t &req) noexcept {
     assert(global_discovery_addr);
     auto timeout = shutdown_timeout / 2;
-    auto &peer = req.payload.request_payload->peer;
-    auto req_id = request<payload::discovery_request_t>(global_discovery_addr, peer).send(timeout);
+    auto &device_id = req.payload.request_payload->device_id;
+    auto req_id = request<payload::discovery_request_t>(global_discovery_addr, device_id).send(timeout);
     discovery_map.emplace(req_id, &req);
 }
 
 void net_supervisor_t::on_discovery_res(message::discovery_response_t &res) noexcept {
     auto &ec = res.payload.ec;
     auto &req_id = res.payload.req->payload.id;
-    auto &orig = discovery_map.at(req_id);
+    auto it = discovery_map.find(req_id);
+    assert(it != discovery_map.end());
+    auto &orig = it->second;
     if (ec) {
         reply_with_error(*orig, ec);
     } else {
-        auto &urls = res.payload.res->uris;
-        reply_to(*orig, std::move(urls));
+        auto &peer = res.payload.res->peer;
+        reply_to(*orig, std::move(peer));
     }
+    discovery_map.erase(it);
 }

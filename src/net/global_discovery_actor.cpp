@@ -113,29 +113,28 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
         return reply_with_error(*orig_req, ec);
     }
 
-    auto res = proto::parse_announce(message.payload.res->response);
+    auto res = proto::parse_contact(message.payload.res->response);
     if (!res) {
         spdlog::warn("global_discovery_actor_t, parsing discovery error = {}", res.error().message());
         return reply_with_error(*orig_req, res.error());
     }
 
-    auto reannounce = res.value();
-    spdlog::debug("global_discovery_actor_t:: will reannounce after {} seconds", reannounce);
+    reply_to(*orig_req, std::move(res.value()));
 }
 
 void global_discovery_actor_t::on_discovery(message::discovery_request_t &req) noexcept {
     spdlog::trace("global_discovery_actor_t::on_on_discovery");
 
     fmt::memory_buffer tx_buff;
-    auto res = proto::make_discovery_request(tx_buff, announce_url, req.payload.request_payload->peer);
-    if (!res) {
-        spdlog::trace("global_discovery_actor_t::error making discovery request :: {}", res.error().message());
+    auto r = proto::make_discovery_request(tx_buff, announce_url, req.payload.request_payload->device_id);
+    if (!r) {
+        spdlog::trace("global_discovery_actor_t::error making discovery request :: {}", r.error().message());
         return do_shutdown();
     }
 
     auto timeout = r::pt::millisec{io_timeout};
-    request_via<payload::http_request_t>(http_client, addr_discovery, std::move(res.value()), std::move(tx_buff),
-                                         rx_buff, rx_buff_size, make_context(ssl, dicovery_device_id))
+    request_via<payload::http_request_t>(http_client, addr_discovery, std::move(r.value()), std::move(tx_buff), rx_buff,
+                                         rx_buff_size, make_context(ssl, dicovery_device_id))
         .send(timeout);
     discovery_queue.emplace_back(&req);
 }
