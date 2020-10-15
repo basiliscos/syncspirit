@@ -47,9 +47,18 @@ add_executable(syncspirit
     src/main.cpp
 )
 
+set(BUILD_BOOST_ASIO true CACHE BOOL "BUILD_BOOST_ASIO")
+set(URIPARSER_BUILD_WCHAR_T false CACHE BOOL "URIPARSER_BUILD_WCHAR_T")
+set(URIPARSER_BUILD_TOOLS false CACHE BOOL "URIPARSER_BUILD_TOOLS")
+set(URIPARSER_BUILD_DOCS false CACHE BOOL "DURIPARSER_BUILD_DOCS")
+set(URIPARSER_BUILD_TESTS false CACHE BOOL "URIPARSER_BUILD_TESTS")
+set(URIPARSER_ENABLE_INSTALL false CACHE BOOL "URIPARSER_ENABLE_INSTALL")
+set(BUILD_SHARED_LIBS false CACHE BOOL "BUILD_SHARED_LIBS")
+
 add_subdirectory("lib/rotor")
 add_subdirectory("lib/fmt")
 add_subdirectory("lib/pugixml")
+add_subdirectory("lib/uriparser")
 
 target_compile_definitions(pugixml PUBLIC "PUGIXML_NO_EXCEPTIONS")
 
@@ -59,6 +68,7 @@ target_include_directories(syncspirit_lib PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/fmt/include
     ${syncspirit_SOURCE_DIR}/lib/json/include
     ${syncspirit_SOURCE_DIR}/lib/pugixml/src
+    ${syncspirit_SOURCE_DIR}/lib/uriparser/include
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}
@@ -72,6 +82,7 @@ target_link_libraries(syncspirit
     ${Boost_LIBRARIES}
     OpenSSL::SSL
     protobuf::libprotobuf-lite
+    uriparser
 )
 
 enable_testing()

@@ -1,6 +1,7 @@
 #include "uri.h"
 #include <charconv>
 #include <regex>
+#include <uriparser/Uri.h>
 
 namespace syncspirit::utils {
 
@@ -8,31 +9,45 @@ boost::optional<URI> parse(const char *uri) { return parse(boost::string_view(ur
 
 boost::optional<URI> parse(const boost::string_view &uri) {
     using result_t = boost::optional<URI>;
-    std::regex re("(\\w+)://([^/ :]+):?([^/ ]*)(/?[^ #?]*)\\x3f?([^ #]*)#?([^ ]*)");
-    std::cmatch what;
-    if (regex_match(uri.begin(), uri.end(), what, re)) {
-        auto proto = std::string(what[1].first, what[1].length());
-        int port = 0;
-        std::from_chars(what[3].first, what[3].second, port);
-        if (!port) {
-            if (proto == "http") {
-                port = 80;
-            } else if (proto == "https") {
-                port = 443;
-            }
-        }
+    using guard_t = std::unique_ptr<UriUriA, std::function<void(UriUriA *)>>;
 
-        return result_t{URI{
-            std::string(uri.begin(), uri.end()), std::string(what[2].first, what[2].length()), // host
-            static_cast<std::uint16_t>(port),                                                  // port
-            proto,                                                                             // proto
-            std::string(what[3].first, what[3].length()),                                      // service
-            std::string(what[4].first, what[4].length()),                                      // path
-            std::string(what[5].first, what[5].length()),                                      // query
-            std::string(what[6].first, what[6].length()),                                      // fragment
-        }};
+    UriUriA obj;
+    const char *errorPos;
+
+    if (uriParseSingleUriExA(&obj, uri.begin(), uri.end(), &errorPos) != URI_SUCCESS) {
+        return result_t{};
     }
-    return result_t{};
+    guard_t guard(&obj, [](auto ptr) { uriFreeUriMembersA(ptr); });
+
+    std::string proto(obj.scheme.first, obj.scheme.afterLast);
+    std::string port_str = std::string(obj.portText.first, obj.portText.afterLast);
+    std::uint16_t port = 0;
+    if (port_str.size() > 0) {
+        std::from_chars(obj.portText.first, obj.portText.afterLast, port);
+    }
+    if (port == 0) {
+        if (proto == "http") {
+            port = 80;
+        } else if (proto == "https") {
+            port = 443;
+        }
+    }
+    std::string path;
+    for (auto p = obj.pathHead; p; p = p->next) {
+        path += std::string("/") + std::string(p->text.first, p->text.afterLast);
+    }
+    auto p = obj.pathHead;
+
+    return result_t{URI{
+        std::string(uri),                                        // full
+        std::string(obj.hostText.first, obj.hostText.afterLast), // host
+        port,                                                    // port
+        proto,                                                   // proto
+        port_str,                                                // service
+        path,                                                    // path
+        std::string(obj.query.first, obj.query.afterLast),       // query
+        std::string(obj.fragment.first, obj.fragment.afterLast), // fragment
+    }};
 }
 
 void URI::reconstruct() noexcept { full = proto + "://" + host + ":" + std::to_string(port) + path + query; }

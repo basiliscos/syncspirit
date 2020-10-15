@@ -130,20 +130,12 @@ outcome::result<model::peer_contact_option_t> parse_contact(http::response<http:
     if (!seen.is_string()) {
         return make_error_code(error_code::incorrect_json);
     }
-    auto date = boost::posix_time::from_iso_string(seen.get<std::string>());
-#if 0
-    std::tm t = {};
-    std::stringstream ss(seen.get<std::string>());
-    ss >> std::get_time(&t, "%Y-%m-%dT%H:%M:%S");
-    if (ss.fail()) {
+    try {
+        auto date = boost::posix_time::from_iso_extended_string(seen.get<std::string>());
+        return model::peer_contact_t{std::move(date), std::move(urls)};
+    } catch (...) {
         return make_error_code(error_code::malformed_date);
     }
-
-    std::time_t l = std::mktime(&t);
-    from_time_t
-#endif
-
-    return model::peer_contact_t{std::move(date), std::move(urls)};
 }
 
 } // namespace syncspirit::proto

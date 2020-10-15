@@ -13,3 +13,6 @@
 [submodule "lib/pugixml"]
 	path = lib/pugixml
 	url = https://github.com/zeux/pugixml.git
+[submodule "lib/uriparser"]
+	path = lib/uriparser
+	url = https://github.com/uriparser/uriparser.git

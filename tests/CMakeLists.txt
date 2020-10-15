@@ -20,6 +20,7 @@ target_link_libraries(syncspirit_test_lib
     fmt::fmt
     ${Boost_LIBRARIES}
     OpenSSL::SSL
+    uriparser
 )
 target_include_directories(syncspirit_test_lib PUBLIC
     "${syncspirit_SOURCE_DIR}/src"
