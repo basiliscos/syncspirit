@@ -2,7 +2,6 @@
 
 #include "../configuration.h"
 #include "messages.h"
-#include "ssl.h"
 #include <boost/asio.hpp>
 
 namespace syncspirit {
@@ -12,7 +11,7 @@ struct global_discovery_actor_config_t : r::actor_config_t {
     tcp::endpoint endpoint;
     utils::URI announce_url;
     model::device_id_t device_id;
-    const ssl_t *ssl;
+    const utils::key_pair_t *ssl_pair;
     std::uint32_t rx_buff_size;
     std::uint32_t io_timeout;
 };
@@ -32,8 +31,8 @@ template <typename Actor> struct global_discovery_actor_config_builder_t : r::ac
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&ssl(const ssl_t *value) &&noexcept {
-        parent_t::config.ssl = value;
+    builder_t &&ssl_pair(const utils::key_pair_t *value) &&noexcept {
+        parent_t::config.ssl_pair = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -83,7 +82,7 @@ struct global_discovery_actor_t : public r::actor_base_t {
     tcp::endpoint endpoint;
     utils::URI announce_url;
     model::device_id_t dicovery_device_id;
-    const ssl_t &ssl;
+    const utils::key_pair_t &ssl_pair;
     rx_buff_t rx_buff;
     std::uint32_t rx_buff_size;
     std::uint32_t io_timeout;

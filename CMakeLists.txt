@@ -29,7 +29,6 @@ add_library(syncspirit_lib
     src/net/messages.cpp
     src/net/names.cpp
     src/net/ssdp_actor.cpp
-    src/net/ssl.cpp
     src/net/upnp_actor.cpp
     src/proto/discovery_support.cpp
     src/proto/luhn32.cpp

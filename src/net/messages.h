@@ -13,7 +13,7 @@
 #include <fmt/format.h>
 #include "../model/upnp.h"
 #include "../model/peer_contact.h"
-#include "ssl.h"
+#include "../transport/base.h"
 
 namespace syncspirit {
 namespace net {
@@ -71,7 +71,7 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     using rx_buff_t = boost::beast::flat_buffer;
     using rx_buff_ptr_t = std::shared_ptr<rx_buff_t>;
     using duration_t = r::pt::time_duration;
-    using ssl_option_t = std::optional<ssl_context_t>;
+    using ssl_option_t = transport::ssl_option_t;
     using response_t = r::intrusive_ptr_t<http_response_t>;
 
     utils::URI url;
@@ -86,9 +86,9 @@ struct http_request_t : r::arc_base_t<http_request_t> {
 
     template <typename URI>
     http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
-                   ssl_context_t &&ssl_context_)
+                   transport::ssl_junction_t &&ssl_)
         : http_request_t(std::forward<URI>(url_), std::move(data_), rx_buff_, rx_buff_size_) {
-        ssl_context = std::move(ssl_context_);
+        ssl_context = ssl_option_t(std::move(ssl_));
     }
 };
 

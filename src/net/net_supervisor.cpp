@@ -13,11 +13,13 @@ using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{cfg}, app_cfg{cfg.app_config} {
     auto &files_cfg = app_cfg.global_announce_config;
-    auto result = ssl.load(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
+    auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
     if (!result) {
         spdlog::critical("cannot load certificate/key pair :: {}", result.error().message());
         throw result.error();
     }
+    ssl_pair = std::move(result.value());
+    device_id = model::device_id_t(ssl_pair.cert_data);
 }
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -104,7 +106,7 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
     global_discovery_addr = create_actor<global_discovery_actor_t>()
                                 .timeout(timeout)
                                 .endpoint(external_ep)
-                                .ssl(&ssl)
+                                .ssl_pair(&ssl_pair)
                                 .announce_url(cfg.announce_url)
                                 .device_id(model::device_id_t(cfg.device_id))
                                 .rx_buff_size(cfg.rx_buff_size)

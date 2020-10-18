@@ -55,6 +55,9 @@ std::string error_code_category::message(int c) const {
     case error_code::malformed_date:
         r = "malformed date";
         break;
+    case error_code::transport_not_available:
+        r = "transport is not available";
+        break;
     default:
         r = "unknown";
     }

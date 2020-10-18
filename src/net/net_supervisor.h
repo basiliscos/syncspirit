@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../configuration.h"
-#include "ssl.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
@@ -51,7 +50,8 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     r::address_ptr_t peers_addr;
     r::address_ptr_t global_discovery_addr;
     std::uint32_t ssdp_attempts = 0;
-    ssl_t ssl;
+    model::device_id_t device_id;
+    utils::key_pair_t ssl_pair;
     discovery_map_t discovery_map;
 };
 

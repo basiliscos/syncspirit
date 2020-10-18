@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../configuration.h"
+#include "../transport/base.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor.hpp>
@@ -74,8 +75,8 @@ struct http_actor_t : public r::actor_base_t {
     void on_timer_trigger() noexcept;
     void on_shutdown_timer_error(const sys::error_code &ec) noexcept;
     void on_shutdown_timer_trigger() noexcept;
-    void on_handshake() noexcept;
-    void on_handshake_error(const sys::error_code &ec) noexcept;
+    void on_handshake(bool valid_peer) noexcept;
+    void on_handshake_error(sys::error_code ec) noexcept;
     void cancel_sock() noexcept;
     void cancel_timer() noexcept;
     void cancel_io() noexcept;
@@ -93,8 +94,8 @@ struct http_actor_t : public r::actor_base_t {
     queue_t queue;
     bool need_response = false;
     bool stop_io = false;
-    socket_ptr_t sock;
-    secure_socket_t sock_s;
+    transport::transport_sp_t transport;
+    transport::http_base_t *http_adapter = nullptr;
     http::request<http::empty_body> http_request;
     http::response<http::string_body> http_response;
     size_t response_size = 0;

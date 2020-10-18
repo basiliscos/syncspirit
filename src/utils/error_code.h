@@ -40,6 +40,7 @@ enum class error_code {
     incorrect_json,
     malformed_url,
     malformed_date,
+    transport_not_available,
 };
 
 namespace detail {

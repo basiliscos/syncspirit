@@ -20,7 +20,7 @@ r::plugin::resource_id_t timer = 0;
 global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, timer{strand},
       endpoint{cfg.endpoint}, announce_url{cfg.announce_url},
-      dicovery_device_id{std::move(cfg.device_id)}, ssl{*cfg.ssl}, rx_buff_size{cfg.rx_buff_size},
+      dicovery_device_id{std::move(cfg.device_id)}, ssl_pair{*cfg.ssl_pair}, rx_buff_size{cfg.rx_buff_size},
       io_timeout(cfg.io_timeout) {
 
     rx_buff = std::make_shared<rx_buff_t::element_type>(rx_buff_size);
@@ -69,8 +69,9 @@ void global_discovery_actor_t::announce() noexcept {
         return do_shutdown();
     }
     auto timeout = r::pt::millisec{io_timeout};
+    transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true};
     request_via<payload::http_request_t>(http_client, addr_announce, std::move(res.value()), std::move(tx_buff),
-                                         rx_buff, rx_buff_size, make_context(ssl, dicovery_device_id))
+                                         rx_buff, rx_buff_size, std::move(ssl))
         .send(timeout);
 }
 
@@ -133,9 +134,11 @@ void global_discovery_actor_t::on_discovery(message::discovery_request_t &req) n
     }
 
     auto timeout = r::pt::millisec{io_timeout};
+    transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true};
     request_via<payload::http_request_t>(http_client, addr_discovery, std::move(r.value()), std::move(tx_buff), rx_buff,
-                                         rx_buff_size, make_context(ssl, dicovery_device_id))
+                                         rx_buff_size, std::move(ssl))
         .send(timeout);
+
     discovery_queue.emplace_back(&req);
 }
 

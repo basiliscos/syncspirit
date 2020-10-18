@@ -95,33 +95,24 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     if (stop_io)
         return process();
 
-    tcp::socket *layer;
     auto &payload = queue.front()->payload.request_payload;
     auto &ssl_ctx = payload->ssl_context;
-    if (ssl_ctx) {
-        sock_s = std::make_unique<secure_socket_t::element_type>(strand, ssl_ctx->ctx);
-        auto &host = payload->url.host;
-        if (!SSL_set_tlsext_host_name(sock_s->native_handle(), host.c_str())) {
-            sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
-            spdlog::error("http_actor_t:: Set SNI Hostname : {}", ec.message());
-            reply_with_error(*queue.front(), ec);
-            queue.pop_front();
-            need_response = false;
-            return process();
-        }
-        sock_s->set_verify_depth(ssl_ctx->verify_depth);
-        sock_s->set_verify_mode(ssl_ctx->verify_mode);
-        sock_s->set_verify_callback(ssl_ctx->verify_callback);
-        layer = &sock_s->next_layer();
-    } else {
-        sock = std::make_unique<tcp::socket>(strand.context());
-        layer = sock.get();
+    transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, strand};
+    transport = transport::initiate(cfg);
+    if (!transport) {
+        auto ec = utils::make_error_code(utils::error_code::transport_not_available);
+        reply_with_error(*queue.front(), ec);
+        queue.pop_front();
+        need_response = false;
+        return process();
     }
+    http_adapter = dynamic_cast<transport::http_base_t *>(transport.get());
+    assert(http_adapter);
 
     auto &addresses = res.payload.res->results;
-    auto fwd_connect = ra::forwarder_t(*this, &http_actor_t::on_connect, &http_actor_t::on_tcp_error);
-    asio::async_connect(*layer, addresses.begin(), addresses.end(), std::move(fwd_connect));
-
+    transport::connect_fn_t on_connect = [&](auto arg) { this->on_connect(arg); };
+    transport::error_fn_t on_error = [&](auto arg) { this->on_tcp_error(arg); };
+    transport->async_connect(addresses, on_connect, on_error);
     spawn_timer();
     resolved_url = payload->url;
 }
@@ -132,12 +123,9 @@ void http_actor_t::on_connect(resolve_it_t) noexcept {
         return process();
     }
 
-    if (sock) {
-        write_request();
-    } else {
-        auto fwd = ra::forwarder_t(*this, &http_actor_t::on_handshake, &http_actor_t::on_handshake_error);
-        sock_s->async_handshake(ssl::stream_base::client, std::move(fwd));
-    }
+    transport::handshake_fn_t handshake_fn([&](auto arg) { on_handshake(arg); });
+    transport::error_fn_t error_fn([&](auto arg) { on_handshake_error(arg); });
+    transport->async_handshake(handshake_fn, error_fn);
 }
 
 void http_actor_t::write_request() noexcept {
@@ -145,13 +133,10 @@ void http_actor_t::write_request() noexcept {
     auto &url = payload.url;
     auto &data = payload.data;
     spdlog::trace("http_actor_t ({}) :: sending {} bytes to {} ", registry_name, data.size(), url.full);
-    auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_sent, &http_actor_t::on_tcp_error);
     auto buff = asio::buffer(data.data(), data.size());
-    if (sock) {
-        asio::async_write(*sock, buff, std::move(fwd));
-    } else {
-        asio::async_write(*sock_s, buff, std::move(fwd));
-    }
+    transport::io_fn_t on_write = [&](auto arg) { this->on_request_sent(arg); };
+    transport::error_fn_t on_error = [&](auto arg) { this->on_tcp_error(arg); };
+    transport->async_write(buff, on_write, on_error);
 }
 
 void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
@@ -163,12 +148,9 @@ void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
     auto &payload = *queue.front()->payload.request_payload;
     auto &rx_buff = payload.rx_buff;
     rx_buff->prepare(payload.rx_buff_size);
-    auto fwd = ra::forwarder_t(*this, &http_actor_t::on_request_read, &http_actor_t::on_tcp_error);
-    if (sock) {
-        http::async_read(*sock, *rx_buff, http_response, std::move(fwd));
-    } else {
-        http::async_read(*sock_s, *rx_buff, http_response, std::move(fwd));
-    }
+    transport::io_fn_t on_read = [&](auto arg) { this->on_request_read(arg); };
+    transport::error_fn_t on_error = [&](auto arg) { this->on_tcp_error(arg); };
+    http_adapter->async_read(*rx_buff, http_response, on_read, on_error);
 }
 
 void http_actor_t::on_request_read(std::size_t bytes) noexcept {
@@ -183,18 +165,8 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     if (keep_alive && http_response.keep_alive()) {
         resources->acquire(resource::connection);
     } else {
-        sys::error_code ec;
-        if (sock) {
-            sock->close(ec);
-        } else {
-            sock_s->next_layer().close(ec);
-        }
-        if (ec) {
-            // we are going to destroy socket anyway
-            spdlog::trace("http_actor_t:: closing socket error: {} ", ec.message());
-        }
-        sock.reset();
-        sock_s.reset();
+        transport.reset();
+        http_adapter = nullptr;
     }
 
     resources->release(resource::io);
@@ -238,12 +210,12 @@ void http_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
         need_response = false;
     }
     if (!resources->has(resource::connection)) {
-        cancel_sock();
+        cancel_io();
     }
     process();
 }
 
-void http_actor_t::on_handshake() noexcept {
+void http_actor_t::on_handshake(bool valid_peer) noexcept {
     if (!need_response || stop_io) {
         resources->release(resource::io);
         return process();
@@ -251,7 +223,7 @@ void http_actor_t::on_handshake() noexcept {
     write_request();
 }
 
-void http_actor_t::on_handshake_error(const sys::error_code &ec) noexcept {
+void http_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("http_actor_t::on_handshake_error :: {}", ec.message());
@@ -281,19 +253,11 @@ void http_actor_t::on_timer_trigger() noexcept {
 }
 
 void http_actor_t::cancel_sock() noexcept {
-    sys::error_code ec;
     if (resources->has(resource::connection)) {
         resources->release(resource::connection);
     }
-    if (sock) {
-        sock->cancel(ec);
-    } else if (sock_s) {
-        sock_s->next_layer().cancel(ec);
-    }
-    if (ec) {
-        spdlog::error("http_actor_t::cancel_sock() :: {}", ec.message());
-        get_supervisor().do_shutdown();
-    }
+    transport.release();
+    http_adapter = nullptr;
 }
 
 void http_actor_t::cancel_timer() noexcept {
@@ -350,11 +314,7 @@ void http_actor_t::on_shutdown_timer_trigger() noexcept {
 
 void http_actor_t::cancel_io() noexcept {
     if (resources->has(resource::io)) {
-        if (sock) {
-            sock->cancel();
-        } else {
-            sock_s->next_layer().cancel();
-        }
+        transport->cancel();
     }
     if (resources->has(resource::request_timer)) {
         request_timer.cancel();
