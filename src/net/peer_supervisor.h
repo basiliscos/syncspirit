@@ -13,6 +13,7 @@ using peer_list_t = std::list<model::device_id_t>;
 
 struct peer_supervisor_config_t : ra::supervisor_config_asio_t {
     peer_list_t peer_list;
+    const utils::key_pair_t *ssl_pair;
 };
 
 template <typename Supervisor>
@@ -23,6 +24,11 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
 
     builder_t &&peer_list(const peer_list_t &value) &&noexcept {
         parent_t::config.peer_list = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&ssl_pair(const utils::key_pair_t *value) &&noexcept {
+        parent_t::config.ssl_pair = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -42,6 +48,7 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
 
     r::address_ptr_t coordinator;
     peer_list_t peer_list;
+    const utils::key_pair_t &ssl_pair;
     peer_list_t discover_queue;
 };
 

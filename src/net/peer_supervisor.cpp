@@ -4,7 +4,8 @@
 
 using namespace syncspirit::net;
 
-peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg) : parent_t{cfg}, peer_list{cfg.peer_list} {
+peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
+    : parent_t{cfg}, peer_list{cfg.peer_list}, ssl_pair{*cfg.ssl_pair} {
     discover_queue = peer_list;
 }
 

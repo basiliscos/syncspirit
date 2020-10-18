@@ -52,7 +52,7 @@ struct base_t {
     virtual void async_write(asio::const_buffer buff, const io_fn_t &on_write, error_fn_t &on_error) noexcept = 0;
     virtual void cancel() noexcept = 0;
 
-    const model::device_id_t peer_identity() noexcept { return actual_peer; }
+    const model::device_id_t &peer_identity() noexcept { return actual_peer; }
 
   protected:
     base_t(strand_t &strand_) noexcept;
@@ -108,7 +108,6 @@ struct http_base_t {
     void async_read_impl(Socket &sock, strand_t &strand, rx_buff_t &rx_buff, response_t &response,
                          const io_fn_t &on_read, error_fn_t &on_error) noexcept {
         http::async_read(sock, rx_buff, response, [&, on_read, on_error](auto ec, auto bytes) {
-            spdlog::debug("http::async_read, bytes = {}, ec = {}", bytes, ec.message());
             if (ec) {
                 strand.post([ec = ec, on_error]() { on_error(ec); });
                 return;

@@ -73,8 +73,13 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
     // temporally hard-code
     peer_list_t peers;
     peers.push_back(model::device_id_t("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
-    peers_addr =
-        create_actor<peer_supervisor_t>().peer_list(peers).strand(strand).timeout(timeout).finish()->get_address();
+    peers_addr = create_actor<peer_supervisor_t>()
+                     .ssl_pair(&ssl_pair)
+                     .peer_list(peers)
+                     .strand(strand)
+                     .timeout(timeout)
+                     .finish()
+                     ->get_address();
 
     return;
 }
