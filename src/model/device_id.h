@@ -2,6 +2,7 @@
 
 #include <string>
 #include "../utils/tls.h"
+#include <spdlog/fmt/ostr.h>
 
 namespace syncspirit::model {
 
@@ -21,6 +22,10 @@ struct device_id_t {
     bool operator==(const device_id_t &other) const noexcept { return other.value == value; }
     bool operator!=(const device_id_t &other) const noexcept { return !(other.value == value); }
     std::string value;
+
+    template <typename OStream> friend OStream &operator<<(OStream &os, const device_id_t &device_id) {
+        return os << device_id.value;
+    }
 };
 
 } // namespace syncspirit::model

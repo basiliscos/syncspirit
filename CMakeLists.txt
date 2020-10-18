@@ -24,6 +24,7 @@ add_library(syncspirit_lib
     src/net/global_discovery_actor.cpp
     src/net/http_actor.cpp
     src/net/net_supervisor.cpp
+    src/net/peer_actor.cpp
     src/net/peer_supervisor.cpp
     src/net/resolver_actor.cpp
     src/net/messages.cpp

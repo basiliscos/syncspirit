@@ -111,7 +111,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 
     auto &addresses = res.payload.res->results;
     transport::connect_fn_t on_connect = [&](auto arg) { this->on_connect(arg); };
-    transport::error_fn_t on_error = [&](auto arg) { this->on_tcp_error(arg); };
+    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     transport->async_connect(addresses, on_connect, on_error);
     spawn_timer();
     resolved_url = payload->url;
@@ -135,7 +135,7 @@ void http_actor_t::write_request() noexcept {
     spdlog::trace("http_actor_t ({}) :: sending {} bytes to {} ", registry_name, data.size(), url.full);
     auto buff = asio::buffer(data.data(), data.size());
     transport::io_fn_t on_write = [&](auto arg) { this->on_request_sent(arg); };
-    transport::error_fn_t on_error = [&](auto arg) { this->on_tcp_error(arg); };
+    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     transport->async_write(buff, on_write, on_error);
 }
 
@@ -149,7 +149,7 @@ void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
     auto &rx_buff = payload.rx_buff;
     rx_buff->prepare(payload.rx_buff_size);
     transport::io_fn_t on_read = [&](auto arg) { this->on_request_read(arg); };
-    transport::error_fn_t on_error = [&](auto arg) { this->on_tcp_error(arg); };
+    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     http_adapter->async_read(*rx_buff, http_response, on_read, on_error);
 }
 
@@ -174,13 +174,13 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     process();
 }
 
-void http_actor_t::on_tcp_error(const sys::error_code &ec) noexcept {
+void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     if (resources->has(resource::connection)) {
         resources->release(resource::connection);
     }
     if (ec != asio::error::operation_aborted) {
-        spdlog::warn("http_actor_t::on_tcp_error :: {}", ec.message());
+        spdlog::warn("http_actor_t::on_io_error :: {}", ec.message());
     }
     cancel_timer();
     if (!need_response || stop_io) {
@@ -201,7 +201,7 @@ void http_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
             need_response = false;
         }
         spdlog::error("http_actor_t::on_timer_error() :: {}", ec.message());
-        return get_supervisor().do_shutdown();
+        return do_shutdown();
     }
 
     if (need_response) {
@@ -265,7 +265,7 @@ void http_actor_t::cancel_timer() noexcept {
     request_timer.cancel(ec);
     if (ec) {
         spdlog::error("http_actor_t::cancel_timer() :: {}", ec.message());
-        get_supervisor().do_shutdown();
+        do_shutdown();
     }
 }
 
@@ -293,7 +293,7 @@ void http_actor_t::start_shutdown_timer() noexcept {
 void http_actor_t::on_shutdown_timer_error(const sys::error_code &ec) noexcept {
     resources->release(resource::shutdown_timer);
     if (ec != asio::error::operation_aborted) {
-        spdlog::error("http_actor_t::on_timer_error() :: {}", ec.message());
+        spdlog::error("http_actor_t::on_timer_error, {} :: {}", registry_name, ec.message());
     }
 
     cancel_io();
@@ -304,7 +304,7 @@ void http_actor_t::on_shutdown_timer_error(const sys::error_code &ec) noexcept {
 
 void http_actor_t::on_shutdown_timer_trigger() noexcept {
     resources->release(resource::shutdown_timer);
-    spdlog::warn("http_actor_t::on_shutdown_timer_trigger", (void *)address.get());
+    spdlog::warn("http_actor_t::on_shutdown_timer_trigger, {}", registry_name);
 
     cancel_io();
     stop_io = true;

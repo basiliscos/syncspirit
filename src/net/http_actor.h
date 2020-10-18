@@ -70,7 +70,7 @@ struct http_actor_t : public r::actor_base_t {
     void on_connect(resolve_it_t) noexcept;
     void on_request_sent(std::size_t /* bytes */) noexcept;
     void on_request_read(std::size_t bytes) noexcept;
-    void on_tcp_error(const sys::error_code &ec) noexcept;
+    void on_io_error(const sys::error_code &ec) noexcept;
     void on_timer_error(const sys::error_code &ec) noexcept;
     void on_timer_trigger() noexcept;
     void on_shutdown_timer_error(const sys::error_code &ec) noexcept;

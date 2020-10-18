@@ -20,6 +20,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
     }
     ssl_pair = std::move(result.value());
     device_id = model::device_id_t(ssl_pair.cert_data);
+    spdlog::info("net_supervisor_t, my id = {}", device_id);
 }
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
