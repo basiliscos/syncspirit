@@ -60,7 +60,7 @@ void tls_t::async_connect(const resolved_hosts_t &hosts, connect_fn_t &on_connec
 void tls_t::async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) noexcept {
     sock.async_handshake(ssl::stream_base::client, [&, on_handshake, on_error](auto ec) {
         if (ec) {
-            strand.post([ec = ec, &on_error]() { on_error(ec); });
+            strand.post([ec = ec, on_error]() { on_error(ec); });
             return;
         }
         strand.post([this, on_handshake]() { on_handshake(validation_passed); });

@@ -248,7 +248,7 @@ void http_actor_t::on_timer_trigger() noexcept {
     reply_with_error(*queue.front(), ec);
     queue.pop_front();
     need_response = false;
-    cancel_sock();
+    cancel_io();
     process();
 }
 
@@ -256,7 +256,7 @@ void http_actor_t::cancel_sock() noexcept {
     if (resources->has(resource::connection)) {
         resources->release(resource::connection);
     }
-    transport.release();
+    transport.reset();
     http_adapter = nullptr;
 }
 
