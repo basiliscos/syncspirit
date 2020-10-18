@@ -52,9 +52,12 @@ struct base_t {
     virtual void async_write(asio::const_buffer buff, const io_fn_t &on_write, error_fn_t &on_error) noexcept = 0;
     virtual void cancel() noexcept = 0;
 
+    const model::device_id_t peer_identity() noexcept { return actual_peer; }
+
   protected:
     base_t(strand_t &strand_) noexcept;
     strand_t &strand;
+    model::device_id_t actual_peer;
 
     template <typename Socket>
     void async_connect_impl(Socket &sock, const resolved_hosts_t &hosts, connect_fn_t &on_connect,

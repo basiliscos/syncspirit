@@ -4,7 +4,7 @@
 using namespace syncspirit::transport;
 
 tls_t::tls_t(const transport_config_t &config) noexcept
-    : base_t(config.strand), peer(config.ssl_junction->peer), me(*config.ssl_junction->me),
+    : base_t(config.strand), expected_peer(config.ssl_junction->peer), me(*config.ssl_junction->me),
       ctx(get_context(*this)), sock{strand, ctx} {
     if (config.ssl_junction->sni_extension) {
         auto &host = config.uri.host;
@@ -30,11 +30,11 @@ tls_t::tls_t(const transport_config_t &config) noexcept
         }
 
         utils::cert_data_t cert_data{std::move(der_option.value())};
-        auto peer_device_id = model::device_id_t(cert_data);
-        spdlog::trace("peer device_id = {}", peer_device_id.value);
+        actual_peer = model::device_id_t(cert_data);
+        spdlog::trace("peer device_id = {}", actual_peer.value);
 
-        if (peer_device_id != peer) {
-            spdlog::warn("unexcpected peer device_id. Got: {}, expected: {}", peer_device_id.value, peer.value);
+        if (actual_peer != expected_peer) {
+            spdlog::warn("unexcpected peer device_id. Got: {}, expected: {}", actual_peer.value, expected_peer.value);
             return false;
         }
         validation_passed = true;

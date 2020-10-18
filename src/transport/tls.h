@@ -18,7 +18,7 @@ struct tls_t : base_t {
   protected:
     using socket_t = ssl::stream<tcp::socket>;
 
-    model::device_id_t peer;
+    model::device_id_t expected_peer;
     const utils::key_pair_t &me;
     ssl::context ctx;
     socket_t sock;
