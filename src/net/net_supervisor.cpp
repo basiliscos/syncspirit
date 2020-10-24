@@ -106,6 +106,7 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
         return do_shutdown();
     }
 
+#if 0
     auto timeout = shutdown_timeout * 9 / 10;
     tcp::endpoint external_ep(message.payload.external_ip, app_cfg.upnp_config.external_port);
     auto &cfg = app_cfg.global_announce_config;
@@ -119,6 +120,7 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
                                 .io_timeout(cfg.timeout)
                                 .finish()
                                 ->get_address();
+#endif
 }
 
 void net_supervisor_t::on_announce(message::announce_notification_t &) noexcept {

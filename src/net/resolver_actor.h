@@ -56,7 +56,6 @@ struct resolver_actor_t : public r::actor_base_t {
 
     explicit resolver_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
-    void shutdown_start() noexcept override;
 
   private:
     using request_ptr_t = r::intrusive_ptr_t<message::resolve_request_t>;
@@ -64,9 +63,9 @@ struct resolver_actor_t : public r::actor_base_t {
     using Queue = std::list<request_ptr_t>;
     using Cache = std::unordered_map<endpoint_t, resolve_results_t>;
 
-    bool maybe_shutdown() noexcept;
     bool cancel_timer() noexcept;
     void on_request(message::resolve_request_t &req) noexcept;
+    void on_cancel(message::resolve_cancel_t &message) noexcept;
     void mass_reply(const endpoint_t &endpoint, const resolve_results_t &results) noexcept;
     void mass_reply(const endpoint_t &endpoint, const std::error_code &ec) noexcept;
     void process() noexcept;

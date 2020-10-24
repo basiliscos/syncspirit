@@ -19,21 +19,11 @@ resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
 
 void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&resolver_actor_t::on_request); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&resolver_actor_t::on_request);
+        p.subscribe_actor(&resolver_actor_t::on_cancel);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::resolver, get_address()); });
-}
-
-bool resolver_actor_t::maybe_shutdown() noexcept {
-    if (state == r::state_t::SHUTTING_DOWN && queue.empty()) {
-        if (resources->has(resource::io)) {
-            backend.cancel();
-        }
-        if (resources->has(resource::timer)) {
-            backend.cancel();
-        }
-        return true;
-    }
-    return false;
 }
 
 bool resolver_actor_t::cancel_timer() noexcept {
@@ -53,6 +43,34 @@ void resolver_actor_t::on_request(message::resolve_request_t &req) noexcept {
         process();
 }
 
+void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
+    if (queue.empty())
+        return;
+    auto &request_id = message.payload.id;
+    auto &source = message.payload.source;
+    auto matches = [&](auto &it) {
+        auto &payload = it->payload;
+        return payload.id == request_id && payload.origin == source;
+    };
+    if (matches(queue.front())) {
+        assert(resources->has(resource::io));
+        backend.cancel();
+        cancel_timer();
+        return;
+    } else if (queue.size() > 1) {
+        auto it = queue.begin();
+        std::advance(it, 1);
+        for (; it != queue.end(); ++it) {
+            if (matches(*it)) {
+                auto ec = r::make_error_code(r::error_code_t::cancelled);
+                reply_with_error(**it, ec);
+                queue.erase(it);
+                return;
+            }
+        }
+    }
+}
+
 void resolver_actor_t::mass_reply(const endpoint_t &endpoint, const resolve_results_t &results) noexcept {
     reply(endpoint, [&](auto &message) { reply_to(message, results); });
 }
@@ -62,8 +80,6 @@ void resolver_actor_t::mass_reply(const endpoint_t &endpoint, const std::error_c
 }
 
 void resolver_actor_t::process() noexcept {
-    if (maybe_shutdown())
-        return;
     if (queue.empty())
         return;
     auto queue_it = queue.begin();
@@ -80,8 +96,6 @@ void resolver_actor_t::process() noexcept {
 
 void resolver_actor_t::resolve_start(request_ptr_t &req) noexcept {
     if (resources->has_any())
-        return;
-    if (maybe_shutdown())
         return;
     if (queue.empty())
         return;
@@ -111,20 +125,36 @@ void resolver_actor_t::on_resolve(resolve_results_t results) noexcept {
 
 void resolver_actor_t::on_resolve_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
-    auto &payload = queue.front()->payload.request_payload;
-    auto endpoint = endpoint_t{payload->host, payload->port};
-    mass_reply(endpoint, ec);
     cancel_timer();
+    auto &payload = queue.front()->payload.request_payload;
+    if (ec == asio::error::operation_aborted) {
+        if (resources->has(resource::io)) {
+            auto ec = r::make_error_code(r::error_code_t::cancelled);
+            reply_with_error(*queue.front(), ec);
+            queue.pop_front();
+            return;
+        }
+    } else {
+        auto endpoint = endpoint_t{payload->host, payload->port};
+        mass_reply(endpoint, ec);
+    }
+
+    process();
 }
 
 void resolver_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
     resources->release(resource::timer);
-    if (ec != asio::error::operation_aborted) {
-        return get_supervisor().do_shutdown();
+    if (ec == asio::error::operation_aborted) {
+        if (resources->has(resource::io)) {
+            auto ec = r::make_error_code(r::error_code_t::cancelled);
+            reply_with_error(*queue.front(), ec);
+            queue.pop_front();
+            return;
+        }
+    } else {
+        spdlog::warn("resolver_actor_t::on_timer_error :: {}", ec.message());
     }
-    if (!maybe_shutdown()) {
-        process();
-    }
+    process();
 }
 
 void resolver_actor_t::on_timer_trigger() noexcept {
@@ -136,13 +166,5 @@ void resolver_actor_t::on_timer_trigger() noexcept {
         auto endpoint = endpoint_t{payload->host, payload->port};
         mass_reply(endpoint, ec);
     }
-    if (!maybe_shutdown()) {
-        process();
-    }
-}
-
-// cancel any pending async ops
-void resolver_actor_t::shutdown_start() noexcept {
-    r::actor_base_t::shutdown_start();
-    maybe_shutdown();
+    process();
 }

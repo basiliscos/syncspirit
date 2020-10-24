@@ -5,7 +5,7 @@
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor.hpp>
-#include <variant>
+#include <optional>
 
 namespace syncspirit {
 namespace net {
@@ -62,10 +62,12 @@ struct http_actor_t : public r::actor_base_t {
 
   private:
     using queue_t = std::list<request_ptr_t>;
+    using request_option_t = std::optional<r::request_id_t>;
 
     void process() noexcept;
     void spawn_timer() noexcept;
     void on_request(message::http_request_t &req) noexcept;
+    void on_cancel(message::http_cancel_t &req) noexcept;
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_connect(resolve_it_t) noexcept;
     void on_request_sent(std::size_t /* bytes */) noexcept;
@@ -100,6 +102,7 @@ struct http_actor_t : public r::actor_base_t {
     http::response<http::string_body> http_response;
     size_t response_size = 0;
     utils::URI resolved_url;
+    request_option_t resolve_request;
 };
 
 } // namespace net

@@ -129,17 +129,20 @@ using ssdp_notification_t = r::message_t<payload::ssdp_notification_t>;
 using announce_notification_t = r::message_t<payload::announce_notification_t>;
 using port_mapping_notification_t = r::message_t<payload::port_mapping_notification_t>;
 
-using resolve_request_t = r::request_traits_t<payload::address_request_t>::request::message_t;
-using resolve_response_t = r::request_traits_t<payload::address_request_t>::response::message_t;
-
-using http_request_t = r::request_traits_t<payload::http_request_t>::request::message_t;
-using http_response_t = r::request_traits_t<payload::http_request_t>::response::message_t;
-
 using endpoint_request_t = r::request_traits_t<payload::endpoint_request_t>::request::message_t;
 using endpoint_response_t = r::request_traits_t<payload::endpoint_request_t>::response::message_t;
 
+using resolve_request_t = r::request_traits_t<payload::address_request_t>::request::message_t;
+using resolve_response_t = r::request_traits_t<payload::address_request_t>::response::message_t;
+using resolve_cancel_t = r::request_traits_t<payload::address_request_t>::cancel::message_t;
+
+using http_request_t = r::request_traits_t<payload::http_request_t>::request::message_t;
+using http_response_t = r::request_traits_t<payload::http_request_t>::response::message_t;
+using http_cancel_t = r::request_traits_t<payload::http_request_t>::cancel::message_t;
+
 using discovery_request_t = r::request_traits_t<payload::discovery_request_t>::request::message_t;
 using discovery_response_t = r::request_traits_t<payload::discovery_request_t>::response::message_t;
+using discovery_cancel_t = r::request_traits_t<payload::discovery_request_t>::response::message_t;
 
 } // end of namespace message
 

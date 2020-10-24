@@ -37,6 +37,33 @@ void http_actor_t::on_request(message::http_request_t &req) noexcept {
     process();
 }
 
+void http_actor_t::on_cancel(message::http_cancel_t &req) noexcept {
+    if (queue.empty()) {
+        return;
+    }
+
+    auto &request_id = req.payload.id;
+    if (request_id == queue.front()->payload.id) {
+        if (resolve_request) {
+            send<message::resolve_cancel_t::payload_t>(resolver, request_id, get_address());
+        } else {
+            cancel_io();
+        }
+    } else {
+        auto it = queue.begin();
+        ++it;
+        for (; it != queue.end(); ++it) {
+            auto &http_req = **it;
+            if (http_req.payload.id == request_id) {
+                auto ec = r::make_error_code(r::error_code_t::cancelled);
+                reply_with_error(http_req, ec);
+                queue.erase(it);
+                return;
+            }
+        }
+    }
+}
+
 void http_actor_t::process() noexcept {
     if (stop_io) {
         auto ec = utils::make_error_code(utils::error_code::service_not_available);
@@ -69,7 +96,7 @@ void http_actor_t::process() noexcept {
         }
     } else {
         auto port = std::to_string(url.port);
-        request<payload::address_request_t>(resolver, url.host, port).send(resolve_timeout);
+        resolve_request = request<payload::address_request_t>(resolver, url.host, port).send(resolve_timeout);
     }
 }
 
@@ -83,6 +110,7 @@ void http_actor_t::spawn_timer() noexcept {
 }
 
 void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
+    resolve_request.reset();
     auto &ec = res.payload.ec;
     if (ec) {
         spdlog::warn("http_actor_t::on_resolve error: {} ({})", ec.message(), ec.category().name());
