@@ -25,6 +25,11 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_
     spdlog::trace("peer_supervisor_t::on_child_shutdown(), peer = {} :: ", peer->device_id, ec.message());
 }
 
+void peer_supervisor_t::on_start() noexcept {
+    spdlog::trace("acceptor_actor_t::on_start (addr = {})", (void *)address.get());
+    parent_t::on_start();
+}
+
 void peer_supervisor_t::discover_next_peer() noexcept {
     spdlog::trace("peer_supervisor_t::discover_next_peer");
     if (discover_queue.empty()) {

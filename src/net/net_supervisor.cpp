@@ -74,7 +74,6 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
     // temporally hard-code
     peer_list_t peers;
     peers.push_back(model::device_id_t("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
-#if 0
     peers_addr = create_actor<peer_supervisor_t>()
                      .ssl_pair(&ssl_pair)
                      .peer_list(peers)
@@ -82,7 +81,6 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
                      .timeout(timeout)
                      .finish()
                      ->get_address();
-#endif
 
     return;
 }
@@ -125,7 +123,7 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
 
 void net_supervisor_t::on_announce(message::announce_notification_t &) noexcept {
     // this is needed to have multiple discovery services, i.e. global & local
-    // send<payload::announce_notification_t>(peers_addr, get_address());
+    send<payload::announce_notification_t>(peers_addr, get_address());
 }
 
 void net_supervisor_t::on_discovery_req(message::discovery_request_t &req) noexcept {

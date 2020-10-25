@@ -88,6 +88,9 @@ void global_discovery_actor_t::on_announce_response(message::http_response_t &me
         return do_shutdown();
     }
 
+    if (state >= r::state_t::SHUTTING_DOWN)
+        return;
+
     auto reannounce = res.value();
     spdlog::debug("global_discovery_actor_t:: will reannounce after {} seconds", reannounce);
 
@@ -154,6 +157,7 @@ void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils:
 }
 
 void global_discovery_actor_t::shutdown_start() noexcept {
+    spdlog::trace("global_discovery_actor_t::shutdown_start");
     if (resources->has(resource::http)) {
         send<message::http_cancel_t::payload_t>(http_client, *http_request, get_address());
     }

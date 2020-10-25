@@ -181,7 +181,7 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     bool ok = false;
     if (msg.payload.ec) {
         spdlog::warn("upnp_actor:: unsuccessfull port mapping: {}", msg.payload.ec.message());
-    } else {
+    } else if (state < r::state_t::SHUTTING_DOWN) {
         auto &body = msg.payload.res->response.body();
         auto result = parse_mapping(body.data(), body.size());
         if (!result) {

@@ -41,6 +41,7 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
     explicit peer_supervisor_t(peer_supervisor_config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept override;
+    void on_start() noexcept override;
 
   private:
     void on_announce(message::announce_notification_t &msg) noexcept;

@@ -22,6 +22,7 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&http_actor_t::on_request);
         p.subscribe_actor(&http_actor_t::on_resolve);
+        p.subscribe_actor(&http_actor_t::on_cancel);
         p.subscribe_actor(&http_actor_t::on_close_connection);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
@@ -69,6 +70,9 @@ void http_actor_t::process() noexcept {
             reply_with_error(*req, ec);
         }
         queue.clear();
+        if (resources->has(resource::connection)) {
+            cancel_sock();
+        }
         return;
     }
 
