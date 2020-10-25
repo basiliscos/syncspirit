@@ -22,6 +22,7 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&http_actor_t::on_request);
         p.subscribe_actor(&http_actor_t::on_resolve);
+        p.subscribe_actor(&http_actor_t::on_close_connection);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(registry_name, get_address());
@@ -279,6 +280,15 @@ void http_actor_t::cancel_sock() noexcept {
 void http_actor_t::on_start() noexcept {
     spdlog::trace("http_actor_t::on_start({}) (addr = {})", registry_name, (void *)address.get());
     r::actor_base_t::on_start();
+}
+
+void http_actor_t::on_close_connection(message::http_close_connection_t &) noexcept {
+    if (resources->has(resource::connection)) {
+        stop_io = true;
+        if (queue.empty()) {
+            cancel_sock();
+        }
+    }
 }
 
 void http_actor_t::cancel_io() noexcept {

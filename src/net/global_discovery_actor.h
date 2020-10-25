@@ -3,6 +3,7 @@
 #include "../configuration.h"
 #include "messages.h"
 #include <boost/asio.hpp>
+#include <optional>
 
 namespace syncspirit {
 namespace net {
@@ -71,12 +72,9 @@ struct global_discovery_actor_t : public r::actor_base_t {
     void on_announce_response(message::http_response_t &message) noexcept;
     void on_discovery_response(message::http_response_t &message) noexcept;
     void on_discovery(message::discovery_request_t &req) noexcept;
-    void on_timer_error(const sys::error_code &ec) noexcept;
-    void on_timer_trigger() noexcept;
-    void timer_cancel() noexcept;
+    void on_timer(r::request_id_t, bool cancelled) noexcept;
+    void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff) noexcept;
 
-    asio::io_context::strand &strand;
-    asio::deadline_timer timer;
     r::address_ptr_t http_client;
     r::address_ptr_t coordinator;
     tcp::endpoint endpoint;
@@ -89,6 +87,8 @@ struct global_discovery_actor_t : public r::actor_base_t {
     bool announced = false;
     r::address_ptr_t addr_announce;  /* for routing */
     r::address_ptr_t addr_discovery; /* for routing */
+    std::optional<r::request_id_t> timer_request;
+    std::optional<r::request_id_t> http_request;
     discovery_queue_t discovery_queue;
 };
 

@@ -14,12 +14,12 @@ const char *https = "net::gda::https";
 namespace {
 namespace resource {
 r::plugin::resource_id_t timer = 0;
+r::plugin::resource_id_t http = 1;
 } // namespace resource
 } // namespace
 
 global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, timer{strand},
-      endpoint{cfg.endpoint}, announce_url{cfg.announce_url},
+    : r::actor_base_t{cfg}, endpoint{cfg.endpoint}, announce_url{cfg.announce_url},
       dicovery_device_id{std::move(cfg.device_id)}, ssl_pair{*cfg.ssl_pair}, rx_buff_size{cfg.rx_buff_size},
       io_timeout(cfg.io_timeout) {
 
@@ -55,7 +55,7 @@ void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexc
 }
 
 void global_discovery_actor_t::on_start() noexcept {
-    spdlog::trace("global_discovery_actor_t::on_start");
+    spdlog::trace("global_discovery_actor_t::on_start (addr = {})", (void *)address.get());
     announce();
 }
 
@@ -68,15 +68,14 @@ void global_discovery_actor_t::announce() noexcept {
         spdlog::trace("global_discovery_actor_t::error making announce request :: {}", res.error().message());
         return do_shutdown();
     }
-    auto timeout = r::pt::millisec{io_timeout};
-    transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true};
-    request_via<payload::http_request_t>(http_client, addr_announce, std::move(res.value()), std::move(tx_buff),
-                                         rx_buff, rx_buff_size, std::move(ssl))
-        .send(timeout);
+    make_request(addr_announce, res.value(), std::move(tx_buff));
 }
 
 void global_discovery_actor_t::on_announce_response(message::http_response_t &message) noexcept {
     spdlog::trace("global_discovery_actor_t::on_announce_response");
+    resources->release(resource::http);
+    http_request.reset();
+
     auto &ec = message.payload.ec;
     if (ec) {
         spdlog::error("global_discovery_actor_t, announcing error = {}", ec.message());
@@ -93,10 +92,7 @@ void global_discovery_actor_t::on_announce_response(message::http_response_t &me
     spdlog::debug("global_discovery_actor_t:: will reannounce after {} seconds", reannounce);
 
     auto timeout = pt::seconds(reannounce);
-    timer.expires_from_now(timeout);
-    auto fwd_timer =
-        ra::forwarder_t(*this, &global_discovery_actor_t::on_timer_trigger, &global_discovery_actor_t::on_timer_error);
-    timer.async_wait(std::move(fwd_timer));
+    timer_request = start_timer(timeout, *this, &global_discovery_actor_t::on_timer);
     resources->acquire(resource::timer);
 
     if (!announced) {
@@ -107,6 +103,9 @@ void global_discovery_actor_t::on_announce_response(message::http_response_t &me
 
 void global_discovery_actor_t::on_discovery_response(message::http_response_t &message) noexcept {
     spdlog::trace("global_discovery_actor_t::on_discovery_response");
+    resources->release(resource::http);
+    http_request.reset();
+
     auto &ec = message.payload.ec;
     auto orig_req = discovery_queue.front();
     discovery_queue.pop_front();
@@ -133,39 +132,35 @@ void global_discovery_actor_t::on_discovery(message::discovery_request_t &req) n
         return do_shutdown();
     }
 
-    auto timeout = r::pt::millisec{io_timeout};
-    transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true};
-    request_via<payload::http_request_t>(http_client, addr_discovery, std::move(r.value()), std::move(tx_buff), rx_buff,
-                                         rx_buff_size, std::move(ssl))
-        .send(timeout);
-
+    make_request(addr_discovery, r.value(), std::move(tx_buff));
     discovery_queue.emplace_back(&req);
 }
 
-void global_discovery_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
+void global_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::timer);
-    if (ec != asio::error::operation_aborted) {
-        spdlog::warn("global_discovery_actor_t::on_timer_error :: {}", ec.message());
-        do_shutdown();
+    if (!cancelled) {
+        announce();
     }
 }
 
-void global_discovery_actor_t::on_timer_trigger() noexcept {
-    resources->release(resource::timer);
-    announce();
-}
-
-void global_discovery_actor_t::timer_cancel() noexcept {
-    sys::error_code ec;
-    timer.cancel(ec);
-    if (ec) {
-        spdlog::error("global_discovery_actor_t:: timer cancellation : {}", ec.message());
-    }
+void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri,
+                                            fmt::memory_buffer &&tx_buff) noexcept {
+    auto timeout = r::pt::millisec{io_timeout};
+    transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true};
+    http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
+                                                        rx_buff_size, std::move(ssl))
+                       .send(timeout);
+    resources->acquire(resource::http);
 }
 
 void global_discovery_actor_t::shutdown_start() noexcept {
+    if (resources->has(resource::http)) {
+        send<message::http_cancel_t::payload_t>(http_client, *http_request, get_address());
+    }
+    send<payload::http_close_connection_t>(http_client);
+
     if (resources->has(resource::timer)) {
-        timer_cancel();
+        cancel_timer(*timer_request);
     }
     r::actor_base_t::shutdown_start();
 }

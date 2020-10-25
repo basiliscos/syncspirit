@@ -65,9 +65,12 @@ struct http_actor_t : public r::actor_base_t {
 
     void process() noexcept;
     void spawn_timer() noexcept;
+
     void on_request(message::http_request_t &req) noexcept;
     void on_cancel(message::http_cancel_t &req) noexcept;
     void on_resolve(message::resolve_response_t &res) noexcept;
+    void on_close_connection(message::http_close_connection_t &) noexcept;
+
     void on_connect(resolve_it_t) noexcept;
     void on_request_sent(std::size_t /* bytes */) noexcept;
     void on_request_read(std::size_t bytes) noexcept;

@@ -92,6 +92,8 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     }
 };
 
+struct http_close_connection_t {};
+
 struct ssdp_notification_t : r::arc_base_t<ssdp_notification_t> {
     model::discovery_result igd;
     asio::ip::address local_address;
@@ -139,6 +141,7 @@ using resolve_cancel_t = r::request_traits_t<payload::address_request_t>::cancel
 using http_request_t = r::request_traits_t<payload::http_request_t>::request::message_t;
 using http_response_t = r::request_traits_t<payload::http_request_t>::response::message_t;
 using http_cancel_t = r::request_traits_t<payload::http_request_t>::cancel::message_t;
+using http_close_connection_t = r::message_t<payload::http_close_connection_t>;
 
 using discovery_request_t = r::request_traits_t<payload::discovery_request_t>::request::message_t;
 using discovery_response_t = r::request_traits_t<payload::discovery_request_t>::response::message_t;
