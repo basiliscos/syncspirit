@@ -32,7 +32,8 @@ void peer_actor_t::try_next_uri() noexcept {
     transport::ssl_junction_t ssl{device_id, &ssl_pair, false};
     while (uri_idx < (std::int32_t)contact.uris.size()) {
         auto &uri = contact.uris[++uri_idx];
-        transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, strand};
+        auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
+        transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup};
         auto result = transport::initiate(cfg);
         if (result) {
             return initiate(std::move(result), uri);

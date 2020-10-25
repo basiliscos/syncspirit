@@ -4,9 +4,12 @@
 
 namespace syncspirit::transport {
 
-base_t::base_t(strand_t &strand_) noexcept : strand{strand_} {}
+base_t::base_t(rotor::asio::supervisor_asio_t &supervisor_) noexcept
+    : supervisor{supervisor_}, strand{supervisor.get_strand()} {}
 
 base_t::~base_t() {}
+
+http_base_t::http_base_t(rotor::asio::supervisor_asio_t &supervisor_) noexcept : supervisor{supervisor_} {}
 
 http_base_t::~http_base_t() {}
 

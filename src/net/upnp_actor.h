@@ -4,6 +4,7 @@
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>
+#include <optional>
 
 namespace syncspirit {
 namespace net {
@@ -48,12 +49,15 @@ struct upnp_actor_t : public r::actor_base_t {
   private:
     using rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
     using unlink_request_t = r::intrusive_ptr_t<r::message::unlink_request_t>;
+    using request_option_t = std::optional<r::request_id_t>;
 
     void on_endpoint(message::endpoint_response_t &res) noexcept;
     void on_igd_description(message::http_response_t &res) noexcept;
     void on_external_ip(message::http_response_t &res) noexcept;
     void on_mapping_port(message::http_response_t &res) noexcept;
     void on_unmapping_port(message::http_response_t &res) noexcept;
+    void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff) noexcept;
+    void request_finish() noexcept;
 
     utils::URI main_url;
     utils::URI igd_control_url;
@@ -70,6 +74,7 @@ struct upnp_actor_t : public r::actor_base_t {
     tcp::endpoint accepting_endpoint;
     asio::ip::address external_addr;
     unlink_request_t unlink_request;
+    request_option_t http_request;
 };
 
 } // namespace net

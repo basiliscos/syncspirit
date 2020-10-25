@@ -26,6 +26,11 @@ void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::resolver, get_address()); });
 }
 
+void resolver_actor_t::on_start() noexcept {
+    spdlog::trace("resolver_actor_t::on_start (addr = {})", (void *)address.get());
+    r::actor_base_t::on_start();
+}
+
 bool resolver_actor_t::cancel_timer() noexcept {
     sys::error_code ec;
     if (resources->has(resource::timer)) {

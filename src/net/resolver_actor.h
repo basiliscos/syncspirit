@@ -56,6 +56,7 @@ struct resolver_actor_t : public r::actor_base_t {
 
     explicit resolver_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void on_start() noexcept override;
 
   private:
     using request_ptr_t = r::intrusive_ptr_t<message::resolve_request_t>;

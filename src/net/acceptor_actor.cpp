@@ -24,7 +24,7 @@ void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void acceptor_actor_t::on_start() noexcept {
-    spdlog::trace("acceptor_actor_t::on_start");
+    spdlog::trace("acceptor_actor_t::on_start (addr = {})", (void *)address.get());
     sys::error_code ec;
 
     acceptor.open(endpoint.protocol(), ec);
@@ -54,6 +54,7 @@ void acceptor_actor_t::on_start() noexcept {
     }
 
     accept_next();
+    r::actor_base_t::on_start();
 }
 
 void acceptor_actor_t::accept_next() noexcept {

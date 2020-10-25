@@ -41,7 +41,7 @@ using ssl_option_t = std::optional<ssl_junction_t>;
 struct transport_config_t {
     ssl_option_t ssl_junction;
     utils::URI uri;
-    strand_t &strand;
+    rotor::asio::supervisor_asio_t &supervisor;
 };
 
 struct base_t {
@@ -55,31 +55,44 @@ struct base_t {
     const model::device_id_t &peer_identity() noexcept { return actual_peer; }
 
   protected:
-    base_t(strand_t &strand_) noexcept;
+    base_t(rotor::asio::supervisor_asio_t &supervisor_) noexcept;
+    rotor::asio::supervisor_asio_t &supervisor;
     strand_t &strand;
     model::device_id_t actual_peer;
 
     template <typename Socket>
     void async_connect_impl(Socket &sock, const resolved_hosts_t &hosts, connect_fn_t &on_connect,
                             error_fn_t &on_error) noexcept {
-        asio::async_connect(sock, hosts.begin(), hosts.end(), [&, on_connect, on_error](auto &ec, auto addr) {
+        asio::async_connect(sock, hosts.begin(), hosts.end(), [this, on_connect, on_error](auto &ec, auto addr) {
             if (ec) {
-                strand.post([ec = ec, on_error]() { on_error(ec); });
+                strand.post([ec = ec, on_error, this]() {
+                    on_error(ec);
+                    supervisor.do_process();
+                });
                 return;
             }
-            strand.post([addr = addr, on_connect]() { on_connect(addr); });
+            strand.post([addr = addr, on_connect, this]() {
+                on_connect(addr);
+                supervisor.do_process();
+            });
         });
     }
 
     template <typename Socket>
     void async_write_impl(Socket &sock, asio::const_buffer buff, const io_fn_t &on_write,
                           error_fn_t &on_error) noexcept {
-        asio::async_write(sock, buff, [&, on_write, on_error](auto &ec, auto bytes) {
+        asio::async_write(sock, buff, [&, on_write, on_error, this](auto &ec, auto bytes) {
             if (ec) {
-                strand.post([ec = ec, on_error]() { on_error(ec); });
+                strand.post([ec = ec, on_error, this]() {
+                    on_error(ec);
+                    supervisor.do_process();
+                });
                 return;
             }
-            strand.post([bytes = bytes, on_write]() { on_write(bytes); });
+            strand.post([bytes = bytes, on_write, this]() {
+                on_write(bytes);
+                supervisor.do_process();
+            });
         });
     }
 
@@ -99,20 +112,29 @@ struct http_base_t {
     using rx_buff_t = boost::beast::flat_buffer;
     using response_t = http::response<http::string_body>;
 
+    http_base_t(rotor::asio::supervisor_asio_t &sup) noexcept;
     virtual ~http_base_t();
     virtual void async_read(rx_buff_t &rx_buff, response_t &response, const io_fn_t &on_read,
                             error_fn_t &on_error) noexcept = 0;
 
   protected:
+    rotor::asio::supervisor_asio_t &supervisor;
+
     template <typename Socket>
     void async_read_impl(Socket &sock, strand_t &strand, rx_buff_t &rx_buff, response_t &response,
                          const io_fn_t &on_read, error_fn_t &on_error) noexcept {
-        http::async_read(sock, rx_buff, response, [&, on_read, on_error](auto ec, auto bytes) {
+        http::async_read(sock, rx_buff, response, [&, on_read, on_error, this](auto ec, auto bytes) {
             if (ec) {
-                strand.post([ec = ec, on_error]() { on_error(ec); });
+                strand.post([ec = ec, on_error, this]() {
+                    on_error(ec);
+                    supervisor.do_process();
+                });
                 return;
             }
-            strand.post([bytes = bytes, on_read]() { on_read(bytes); });
+            strand.post([bytes = bytes, on_read, this]() {
+                on_read(bytes);
+                supervisor.do_process();
+            });
         });
     }
 };

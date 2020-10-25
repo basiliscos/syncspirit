@@ -16,7 +16,7 @@ struct tcp_t : base_t {
 };
 
 struct http_t : tcp_t, http_base_t {
-    using tcp_t::tcp_t;
+    http_t(const transport_config_t &config) noexcept;
 
     void async_read(rx_buff_t &rx_buff, response_t &response, const io_fn_t &on_read,
                     error_fn_t &on_error) noexcept override;

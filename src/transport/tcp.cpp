@@ -3,7 +3,9 @@
 
 using namespace syncspirit::transport;
 
-tcp_t::tcp_t(const transport_config_t &config) noexcept : base_t{config.strand}, sock(strand) {
+http_t::http_t(const transport_config_t &config) noexcept : tcp_t{config}, http_base_t(config.supervisor) {}
+
+tcp_t::tcp_t(const transport_config_t &config) noexcept : base_t{config.supervisor}, sock(strand) {
     assert(!config.ssl_junction);
 }
 
@@ -12,7 +14,10 @@ void tcp_t::async_connect(const resolved_hosts_t &hosts, connect_fn_t &on_connec
 }
 
 void tcp_t::async_handshake(handshake_fn_t &on_handshake, error_fn_t &) noexcept {
-    strand.post([on_handshake]() { on_handshake(true); });
+    strand.post([on_handshake, this]() {
+        on_handshake(true);
+        supervisor.do_process();
+    });
 }
 
 void tcp_t::async_write(asio::const_buffer buff, const io_fn_t &on_write, error_fn_t &on_error) noexcept {

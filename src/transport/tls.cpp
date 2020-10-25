@@ -3,8 +3,10 @@
 
 using namespace syncspirit::transport;
 
+https_t::https_t(const transport_config_t &config) noexcept : tls_t{config}, http_base_t(config.supervisor) {}
+
 tls_t::tls_t(const transport_config_t &config) noexcept
-    : base_t(config.strand), expected_peer(config.ssl_junction->peer), me(*config.ssl_junction->me),
+    : base_t(config.supervisor), expected_peer(config.ssl_junction->peer), me(*config.ssl_junction->me),
       ctx(get_context(*this)), sock{strand, ctx} {
     if (config.ssl_junction->sni_extension) {
         auto &host = config.uri.host;
@@ -60,10 +62,16 @@ void tls_t::async_connect(const resolved_hosts_t &hosts, connect_fn_t &on_connec
 void tls_t::async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) noexcept {
     sock.async_handshake(ssl::stream_base::client, [&, on_handshake, on_error](auto ec) {
         if (ec) {
-            strand.post([ec = ec, on_error]() { on_error(ec); });
+            strand.post([ec = ec, on_error, this]() {
+                on_error(ec);
+                supervisor.do_process();
+            });
             return;
         }
-        strand.post([this, on_handshake]() { on_handshake(validation_passed); });
+        strand.post([this, on_handshake]() {
+            on_handshake(validation_passed);
+            supervisor.do_process();
+        });
     });
 }
 

@@ -9,16 +9,13 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t io = 0;
 r::plugin::resource_id_t request_timer = 1;
-r::plugin::resource_id_t shutdown_timer = 2;
-r::plugin::resource_id_t connection = 3;
+r::plugin::resource_id_t connection = 2;
 } // namespace resource
 } // namespace
 
 http_actor_t::http_actor_t(config_t &config)
     : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout),
-      request_timeout(config.request_timeout), registry_name{config.registry_name},
-      keep_alive{config.keep_alive}, strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()},
-      request_timer{strand.context()}, shutdown_timer{strand.context()} {}
+      request_timeout(config.request_timeout), registry_name{config.registry_name}, keep_alive{config.keep_alive} {}
 
 void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -45,7 +42,7 @@ void http_actor_t::on_cancel(message::http_cancel_t &req) noexcept {
     auto &request_id = req.payload.id;
     if (request_id == queue.front()->payload.id) {
         if (resolve_request) {
-            send<message::resolve_cancel_t::payload_t>(resolver, request_id, get_address());
+            send<message::resolve_cancel_t::payload_t>(resolver, *resolve_request, get_address());
         } else {
             cancel_io();
         }
@@ -103,9 +100,7 @@ void http_actor_t::process() noexcept {
 void http_actor_t::spawn_timer() noexcept {
     resources->acquire(resource::io);
 
-    request_timer.expires_from_now(request_timeout);
-    auto fwd_timer = ra::forwarder_t(*this, &http_actor_t::on_timer_trigger, &http_actor_t::on_timer_error);
-    request_timer.async_wait(std::move(fwd_timer));
+    timer_request = start_timer(request_timeout, *this, &http_actor_t::on_timer);
     resources->acquire(resource::request_timer);
 }
 
@@ -125,7 +120,8 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 
     auto &payload = queue.front()->payload.request_payload;
     auto &ssl_ctx = payload->ssl_context;
-    transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, strand};
+    auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
+    transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup};
     transport = transport::initiate(cfg);
     if (!transport) {
         auto ec = utils::make_error_code(utils::error_code::transport_not_available);
@@ -198,7 +194,9 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     }
 
     resources->release(resource::io);
-    cancel_timer();
+    if (resources->has(resource::request_timer)) {
+        cancel_timer(*timer_request);
+    }
     process();
 }
 
@@ -210,7 +208,9 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("http_actor_t::on_io_error :: {}", ec.message());
     }
-    cancel_timer();
+    if (resources->has(resource::request_timer)) {
+        cancel_timer(*timer_request);
+    }
     if (!need_response || stop_io) {
         return process();
     }
@@ -218,29 +218,6 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     reply_with_error(*queue.front(), ec);
     queue.pop_front();
     need_response = false;
-}
-
-void http_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
-    resources->release(resource::request_timer);
-    if (ec != asio::error::operation_aborted) {
-        if (need_response) {
-            reply_with_error(*queue.front(), ec);
-            queue.pop_front();
-            need_response = false;
-        }
-        spdlog::error("http_actor_t::on_timer_error() :: {}", ec.message());
-        return do_shutdown();
-    }
-
-    if (need_response) {
-        reply_to(*queue.front(), std::move(http_response), response_size);
-        queue.pop_front();
-        need_response = false;
-    }
-    if (!resources->has(resource::connection)) {
-        cancel_io();
-    }
-    process();
 }
 
 void http_actor_t::on_handshake(bool valid_peer) noexcept {
@@ -262,21 +239,32 @@ void http_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     reply_with_error(*queue.front(), ec);
     queue.pop_front();
     need_response = false;
-    cancel_timer();
+    if (resources->has(resource::request_timer)) {
+        cancel_timer(*timer_request);
+    }
     process();
 }
 
-void http_actor_t::on_timer_trigger() noexcept {
+void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::request_timer);
+    timer_request.reset();
+
     if (!need_response || stop_io) {
         return process();
     }
 
-    auto ec = r::make_error_code(r::error_code_t::request_timeout);
-    reply_with_error(*queue.front(), ec);
+    if (cancelled) {
+        reply_to(*queue.front(), std::move(http_response), response_size);
+    } else {
+        auto ec = r::make_error_code(r::error_code_t::request_timeout);
+        reply_with_error(*queue.front(), ec);
+    }
     queue.pop_front();
     need_response = false;
-    cancel_io();
+
+    if (!resources->has(resource::connection)) {
+        cancel_io();
+    }
     process();
 }
 
@@ -288,56 +276,9 @@ void http_actor_t::cancel_sock() noexcept {
     http_adapter = nullptr;
 }
 
-void http_actor_t::cancel_timer() noexcept {
-    sys::error_code ec;
-    request_timer.cancel(ec);
-    if (ec) {
-        spdlog::error("http_actor_t::cancel_timer() :: {}", ec.message());
-        do_shutdown();
-    }
-}
-
 void http_actor_t::on_start() noexcept {
     spdlog::trace("http_actor_t::on_start({}) (addr = {})", registry_name, (void *)address.get());
     r::actor_base_t::on_start();
-}
-
-void http_actor_t::shutdown_start() noexcept {
-    if (resources->has(resource::io) || resources->has(resource::request_timer)) {
-        start_shutdown_timer();
-    } else if (resources->has(resource::connection)) {
-        resources->release(resource::connection);
-    }
-    r::actor_base_t::shutdown_start();
-}
-
-void http_actor_t::start_shutdown_timer() noexcept {
-    shutdown_timer.expires_from_now(request_timeout);
-    auto fwd = ra::forwarder_t(*this, &http_actor_t::on_shutdown_timer_trigger, &http_actor_t::on_shutdown_timer_error);
-    shutdown_timer.async_wait(std::move(fwd));
-    resources->acquire(resource::shutdown_timer);
-}
-
-void http_actor_t::on_shutdown_timer_error(const sys::error_code &ec) noexcept {
-    resources->release(resource::shutdown_timer);
-    if (ec != asio::error::operation_aborted) {
-        spdlog::error("http_actor_t::on_timer_error, {} :: {}", registry_name, ec.message());
-    }
-
-    cancel_io();
-    stop_io = true;
-    process();
-    shutdown_continue();
-}
-
-void http_actor_t::on_shutdown_timer_trigger() noexcept {
-    resources->release(resource::shutdown_timer);
-    spdlog::warn("http_actor_t::on_shutdown_timer_trigger, {}", registry_name);
-
-    cancel_io();
-    stop_io = true;
-    process();
-    shutdown_continue();
 }
 
 void http_actor_t::cancel_io() noexcept {
@@ -345,6 +286,6 @@ void http_actor_t::cancel_io() noexcept {
         transport->cancel();
     }
     if (resources->has(resource::request_timer)) {
-        request_timer.cancel();
+        send<message::resolve_cancel_t::payload_t>(resolver, *resolve_request, get_address());
     }
 }

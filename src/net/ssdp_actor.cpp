@@ -19,7 +19,7 @@ r::plugin::resource_id_t timer = 2;
 
 ssdp_actor_t::ssdp_actor_t(ssdp_actor_config_t &cfg)
     : r::actor_base_t::actor_base_t(cfg), strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()},
-      timer{strand}, max_wait{cfg.max_wait} {
+      max_wait{cfg.max_wait} {
     rx_buff.resize(RX_BUFF_SIZE);
 }
 
@@ -54,9 +54,7 @@ void ssdp_actor_t::on_start() noexcept {
     resources->acquire(resource::send);
 
     auto timeout = pt::seconds(max_wait);
-    timer.expires_from_now(timeout);
-    auto fwd_timer = ra::forwarder_t(*this, &ssdp_actor_t::on_timer_trigger, &ssdp_actor_t::on_timer_error);
-    timer.async_wait(std::move(fwd_timer));
+    timer_request = start_timer(timeout, *this, &ssdp_actor_t::on_timer);
     resources->acquire(resource::timer);
 }
 
@@ -122,26 +120,16 @@ void ssdp_actor_t::on_udp_recv_error(const sys::error_code &ec) noexcept {
     timer_cancel();
 }
 
-void ssdp_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
+void ssdp_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::timer);
-    if (ec != asio::error::operation_aborted) {
-        spdlog::warn("ssdp_actor_t::on_timer_error :: {}", ec.message());
+    if (!cancelled) {
+        spdlog::warn("ssdp_actor_t::on_timer_trigger");
         do_shutdown();
     }
 }
 
-void ssdp_actor_t::on_timer_trigger() noexcept {
-    resources->release(resource::timer);
-    spdlog::warn("ssdp_actor_t::on_timer_trigger");
-    do_shutdown();
-}
-
 void ssdp_actor_t::timer_cancel() noexcept {
     if (resources->has(resource::timer)) {
-        sys::error_code ec;
-        timer.cancel(ec);
-        if (ec) {
-            spdlog::error("ssdp_actor_t:: timer cancellation : {}", ec.message());
-        }
+        cancel_timer(*timer_request);
     }
 }
