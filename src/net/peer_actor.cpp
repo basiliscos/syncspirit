@@ -1,5 +1,6 @@
 #include "peer_actor.h"
 #include "names.h"
+#include "announce.pb.h"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::net;
@@ -13,9 +14,7 @@ r::plugin::resource_id_t io = 2;
 } // namespace
 
 peer_actor_t::peer_actor_t(config_t &config)
-    : r::actor_base_t{config}, device_id{config.peer_device_id},
-      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, contact{config.contact},
-      ssl_pair{*config.ssl_pair}, timer{strand} {}
+    : r::actor_base_t{config}, device_id{config.peer_device_id}, contact{config.contact}, ssl_pair{*config.ssl_pair} {}
 
 void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -69,7 +68,8 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     transport::connect_fn_t on_connect = [&](auto arg) { this->on_connect(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     transport->async_connect(addresses, on_connect, on_error);
-    spawn_timer();
+    pt::time_duration timeout = init_timeout * 8 / 10;
+    timer_request = start_timer(timeout, *this, &peer_actor_t::on_timer);
     resources->acquire(resource::io);
 }
 
@@ -86,15 +86,9 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("http_actor_t::on_io_error :: {}", ec.message());
     }
-    cancel_timer();
+    if (timer_request)
+        cancel_timer(*timer_request);
     do_shutdown();
-}
-
-void peer_actor_t::spawn_timer() noexcept {
-    pt::time_duration timeout = init_timeout * 8 / 10;
-    timer.expires_from_now(timeout);
-    auto fwd_timer = ra::forwarder_t(*this, &peer_actor_t::on_timer_trigger, &peer_actor_t::on_timer_error);
-    timer.async_wait(std::move(fwd_timer));
 }
 
 void peer_actor_t::on_handshake(bool valid_peer) noexcept {
@@ -109,23 +103,7 @@ void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     do_shutdown();
 }
 
-void peer_actor_t::cancel_timer() noexcept {
-    sys::error_code ec;
-    timer.cancel(ec);
-    if (ec) {
-        spdlog::error("http_actor_t::cancel_timer, device_id = {} :: {}", device_id, ec.message());
-        do_shutdown();
-    }
-}
-
-void peer_actor_t::on_timer_trigger() noexcept {
+void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     spdlog::trace("peer_actor_t::on_timer_trigger, device_id = {}", device_id);
     do_shutdown();
-}
-
-void peer_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
-    if (ec != asio::error::operation_aborted) {
-        spdlog::error("peer_actor_t::on_timer_error, device_id = {} :: {}", device_id, ec.message());
-        return do_shutdown();
-    }
 }

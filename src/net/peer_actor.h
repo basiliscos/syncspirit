@@ -3,8 +3,8 @@
 #include "../configuration.h"
 #include "messages.h"
 #include <boost/asio.hpp>
-#include <boost/optional.hpp>
 #include <rotor/asio/supervisor_asio.h>
+#include <optional>
 
 namespace syncspirit {
 namespace net {
@@ -49,25 +49,21 @@ struct peer_actor_t : public r::actor_base_t {
   private:
     using resolve_it_t = payload::address_response_t::resolve_results_t::iterator;
 
-    void spawn_timer() noexcept;
-    void cancel_timer() noexcept;
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_connect(resolve_it_t) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;
     void try_next_uri() noexcept;
     void initiate(transport::transport_sp_t tran, const utils::URI &url) noexcept;
-    void on_timer_error(const sys::error_code &ec) noexcept;
-    void on_timer_trigger() noexcept;
     void on_handshake(bool valid_peer) noexcept;
     void on_handshake_error(sys::error_code ec) noexcept;
+    void on_timer(r::request_id_t, bool cancelled) noexcept;
 
-    asio::io_context::strand &strand;
     model::peer_contact_t contact;
     const utils::key_pair_t &ssl_pair;
-    asio::deadline_timer timer;
     r::address_ptr_t resolver;
     transport::transport_sp_t transport;
     std::int32_t uri_idx = -1;
+    std::optional<r::request_id_t> timer_request;
 };
 
 } // namespace net
