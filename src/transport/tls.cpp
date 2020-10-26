@@ -32,8 +32,11 @@ tls_t::tls_t(const transport_config_t &config) noexcept
         }
 
         utils::cert_data_t cert_data{std::move(der_option.value())};
-        actual_peer = model::device_id_t(cert_data);
-        spdlog::trace("tls, peer device_id = {}", actual_peer);
+        auto peer = model::device_id_t(cert_data);
+        if (!actual_peer) {
+            actual_peer = peer;
+            spdlog::trace("tls, peer device_id = {}", actual_peer);
+        }
 
         if (actual_peer != expected_peer) {
             spdlog::warn("unexcpected peer device_id. Got: {}, expected: {}", actual_peer, expected_peer);

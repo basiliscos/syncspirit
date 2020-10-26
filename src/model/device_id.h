@@ -21,6 +21,8 @@ struct device_id_t {
 
     bool operator==(const device_id_t &other) const noexcept { return other.value == value; }
     bool operator!=(const device_id_t &other) const noexcept { return !(other.value == value); }
+    operator bool() const noexcept { return !value.empty(); }
+
     std::string value;
 
     template <typename OStream> friend OStream &operator<<(OStream &os, const device_id_t &device_id) {
