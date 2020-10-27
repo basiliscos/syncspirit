@@ -20,8 +20,12 @@ void tcp_t::async_handshake(handshake_fn_t &on_handshake, error_fn_t &) noexcept
     });
 }
 
-void tcp_t::async_write(asio::const_buffer buff, const io_fn_t &on_write, error_fn_t &on_error) noexcept {
-    async_write_impl(sock, buff, on_write, on_error);
+void tcp_t::async_send(asio::const_buffer buff, const io_fn_t &on_write, error_fn_t &on_error) noexcept {
+    async_send_impl(sock, buff, on_write, on_error);
+}
+
+void tcp_t::async_recv(asio::mutable_buffer buff, const io_fn_t &on_read, error_fn_t &on_error) noexcept {
+    async_recv_impl(sock, buff, on_read, on_error);
 }
 
 void tcp_t::cancel() noexcept { cancel_impl(sock); }

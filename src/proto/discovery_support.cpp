@@ -121,9 +121,12 @@ outcome::result<model::peer_contact_option_t> parse_contact(http::response<http:
         auto uri_str = it.get<std::string>();
         auto uri_option = utils::parse(uri_str.c_str());
         if (!uri_option) {
-            return make_error_code(error_code::malformed_url);
+            continue;
         }
         urls.emplace_back(std::move(uri_option.value()));
+    }
+    if (urls.empty()) {
+        return make_error_code(error_code::malformed_url);
     }
 
     auto &seen = data["seen"];

@@ -55,10 +55,12 @@ struct peer_actor_t : public r::actor_base_t {
   private:
     using resolve_it_t = payload::address_response_t::resolve_results_t::iterator;
 
+    asio::mutable_buffer prepare_rx_buff() noexcept;
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_connect(resolve_it_t) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;
     void on_write(std::size_t bytes) noexcept;
+    void on_read(std::size_t bytes) noexcept;
     void try_next_uri() noexcept;
     void initiate(transport::transport_sp_t tran, const utils::URI &url) noexcept;
     void on_handshake(bool valid_peer) noexcept;
@@ -73,6 +75,7 @@ struct peer_actor_t : public r::actor_base_t {
     std::int32_t uri_idx = -1;
     std::optional<r::request_id_t> timer_request;
     fmt::memory_buffer tx_buff;
+    fmt::memory_buffer rx_buff;
 };
 
 } // namespace net

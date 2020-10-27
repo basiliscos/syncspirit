@@ -1,4 +1,3 @@
-
 4. discovery_support, upnp_support-> proto
 
 openssl x509 -inform PEM -outform DER -in ~/.config/syncthing/cert.pem -out /tmp/cert.der

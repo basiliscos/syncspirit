@@ -4,6 +4,8 @@ namespace syncspirit::utils::detail {
 
 const char *error_code_category::name() const noexcept { return "syncspirit_error"; }
 
+const char *bep_error_code_category::name() const noexcept { return "syncspirit_bep_error"; }
+
 std::string error_code_category::message(int c) const {
     std::string r;
     switch (static_cast<error_code>(c)) {
@@ -66,11 +68,34 @@ std::string error_code_category::message(int c) const {
     return r;
 }
 
+std::string bep_error_code_category::message(int c) const {
+    std::string r;
+    switch (static_cast<bep_error_code>(c)) {
+    case bep_error_code::success:
+        r = "success";
+        break;
+    case bep_error_code::magic_mismatch:
+        r = "magic number mismatch in hello message";
+        break;
+    case bep_error_code::protobuf_err:
+        r = "error parsing protobuf message";
+        break;
+    default:
+        r = "unknown";
+    }
+    r += " (";
+    r += std::to_string(c) + ")";
+    return r;
+}
+
 } // namespace syncspirit::utils::detail
 
 namespace syncspirit::utils {
 
 const static detail::error_code_category category;
+const static detail::bep_error_code_category bep_category;
+
 const detail::error_code_category &error_code_category() { return category; }
+const detail::bep_error_code_category &bep_error_code_category() { return bep_category; }
 
 } // namespace syncspirit::utils

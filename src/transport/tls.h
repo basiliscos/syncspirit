@@ -9,7 +9,8 @@ struct tls_t : base_t {
     tls_t(const transport_config_t &config) noexcept;
     void async_connect(const resolved_hosts_t &hosts, connect_fn_t &on_connect, error_fn_t &on_error) noexcept override;
     void async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) noexcept override;
-    void async_write(asio::const_buffer buff, const io_fn_t &on_write, error_fn_t &on_error) noexcept override;
+    void async_send(asio::const_buffer buff, const io_fn_t &on_write, error_fn_t &on_error) noexcept override;
+    void async_recv(asio::mutable_buffer buff, const io_fn_t &on_read, error_fn_t &on_error) noexcept override;
     void cancel() noexcept override;
 
   private:

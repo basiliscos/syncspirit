@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         spdlog::trace("configuration seems OK");
-        spdlog::info("starting {} v{}, libraries: protobuf v{}", constants::client_name, constants::client_version,
+        spdlog::info("starting {} {}, libraries: protobuf v{}", constants::client_name, constants::client_version,
                      google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION));
 
         /* pre-init actors */

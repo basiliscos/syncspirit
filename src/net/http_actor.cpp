@@ -165,7 +165,7 @@ void http_actor_t::write_request() noexcept {
     auto buff = asio::buffer(data.data(), data.size());
     transport::io_fn_t on_write = [&](auto arg) { this->on_request_sent(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
-    transport->async_write(buff, on_write, on_error);
+    transport->async_send(buff, on_write, on_error);
 }
 
 void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
