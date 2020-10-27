@@ -22,7 +22,7 @@ void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void peer_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept {
     auto *peer = static_cast<peer_actor_t *>(actor);
-    spdlog::trace("peer_supervisor_t::on_child_shutdown, {} peer = {} :: ", peer->device_id, ec.message());
+    spdlog::trace("peer_supervisor_t::on_child_shutdown, peer = {}", peer->device_id);
 }
 
 void peer_supervisor_t::on_start() noexcept {

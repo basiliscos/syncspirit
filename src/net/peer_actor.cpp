@@ -36,12 +36,13 @@ void peer_actor_t::try_next_uri() noexcept {
         transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup};
         auto result = transport::initiate(cfg);
         if (result) {
+            resources->release(resource::uris);
             return initiate(std::move(result), uri);
         }
     }
 
-    resources->release(resource::uris);
     spdlog::trace("peer_actor_t::try_next_uri, no way to conenct with {} found, shut down", device_id);
+    resources->release(resource::uris);
     do_shutdown();
 }
 
@@ -87,9 +88,14 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("http_actor_t::on_io_error, {} :: {}", device_id, ec.message());
     }
-    if (timer_request)
+    if (timer_request) {
         cancel_timer(*timer_request);
-    do_shutdown();
+    }
+    if (resources->has(resource::uris)) {
+        try_next_uri();
+    } else {
+        do_shutdown();
+    }
 }
 
 asio::mutable_buffer peer_actor_t::prepare_rx_buff() noexcept {
