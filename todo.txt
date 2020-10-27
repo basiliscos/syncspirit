@@ -1,22 +1,3 @@
-1. нужно отменять запросы!!!
-
-[2020-10-18 21:36:54.454] [trace] global_discovery_actor_t::on_start
-[2020-10-18 21:36:54.454] [trace] global_discovery_actor_t::announce
-[2020-10-18 21:36:54.599] [trace] tls, peer device_id = LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW
-[2020-10-18 21:36:54.599] [trace] tls, peer device_id = LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW
-[2020-10-18 21:36:54.688] [trace] http_actor_t (net::gda::https) :: sending 174 bytes to https://discovery.syncthing.net:443/v2
-[2020-10-18 21:36:54.747] [trace] global_discovery_actor_t::on_announce_response
-[2020-10-18 21:36:54.747] [error] global_discovery_actor_t, announcing error = request timeout
-[2020-10-18 21:36:54.748] [trace] net_supervisor_t::on_child_shutdown(), addr = 0x7fb0d80142b0
-[2020-10-18 21:36:54.749] [trace] upnp_actor_t::shutdown_start
-[2020-10-18 21:36:54.749] [trace] upnp_actor_t, going to unmap extenal port 22001
-[2020-10-18 21:36:54.749] [trace] ssdp_actor_t::shutdown_start
-[2020-10-18 21:36:54.750] [trace] net_supervisor_t::on_child_shutdown(), addr = 0x7fb0d800e7e0
-[2020-10-18 21:36:54.751] [trace] net_supervisor_t::on_child_shutdown(), addr = 0x7fb0d8003130
-syncspirit: /usr/include/boost/beast/core/impl/read_size.hpp:51: std::size_t boost::beast::detail::read_size(DynamicBuffer&, std::size_t, std::false_type) [with DynamicBuffer = boost::beast::basic_flat_buffer<std::allocator<char> >; std::size_t = long unsigned int; std::false_type = std::integral_constant<bool, false>]: Assertion `size <= buffer.max_size()' failed.
-[2]    26054 abort (core dumped)  ./syncspirit --log_level trace --config_dir=../
-
-
 
 4. discovery_support, upnp_support-> proto
 

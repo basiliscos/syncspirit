@@ -15,10 +15,14 @@ find_package(
 find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS src/proto/announce.proto)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
+    src/proto/announce.proto
+    src/proto/hello.proto
+)
 
 add_library(syncspirit_lib
     src/configuration.cpp
+    src/constants.cpp
     src/model/device_id.cpp
     src/net/acceptor_actor.cpp
     src/net/global_discovery_actor.cpp
@@ -31,6 +35,7 @@ add_library(syncspirit_lib
     src/net/names.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
+    src/proto/bep_support.cpp
     src/proto/discovery_support.cpp
     src/proto/luhn32.cpp
     src/proto/upnp_support.cpp
@@ -84,7 +89,7 @@ target_link_libraries(syncspirit
     fmt::fmt
     ${Boost_LIBRARIES}
     OpenSSL::SSL
-    protobuf::libprotobuf-lite
+    protobuf::libprotobuf
     uriparser
 )
 

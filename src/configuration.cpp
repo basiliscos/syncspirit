@@ -2,6 +2,7 @@
 #include <boost/program_options.hpp>
 #include <boost/tokenizer.hpp>
 #include <cstdlib>
+#include <boost/asio/ip/host_name.hpp>
 
 namespace po = boost::program_options;
 
@@ -27,6 +28,7 @@ boost::optional<configuration_t> get_config(std::ifstream &config) {
     po::options_description descr("Allowed options");
     descr.add_options()
             ("global.timeout", po::value<std::uint32_t>()->default_value(200), "root timeout in milliseconds (default: 200)")
+            ("global.device_name", po::value<std::string>()->default_value(""), "device name")
             ("local_announce.enabled", po::value<bool>()->default_value(true), "enable LAN-announcements")
             ("local_announce.port", po::value<std::uint16_t>()->default_value(21027), "LAN-announcement port")
             ("global_discovery.announce_url", po::value<std::string>()->default_value("https://discovery.syncthing.net/v2"), "Global announce server")
@@ -47,7 +49,16 @@ boost::optional<configuration_t> get_config(std::ifstream &config) {
     po::store(po::parse_config_file(config, descr, false), vm);
     po::notify(vm);
 
+    auto device_name = vm["global.device_name"].as<std::string>();
+    if (device_name.empty()) {
+        boost::system::error_code ec;
+        device_name = boost::asio::ip::host_name(ec);
+        if (ec) {
+            std::cout << "hostname cannot be determined: " << ec.message() << "\n";
+        }
+    }
     cfg.timeout = vm["global.timeout"].as<std::uint32_t>();
+    cfg.device_name = device_name;
     cfg.local_announce_config.enabled = vm["local_announce.enabled"].as<bool>();
     cfg.local_announce_config.port = vm["local_announce.port"].as<std::uint16_t>();
 

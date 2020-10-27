@@ -6,7 +6,7 @@
 using namespace syncspirit::net;
 
 peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
-    : parent_t{cfg}, peer_list{cfg.peer_list}, ssl_pair{*cfg.ssl_pair} {
+    : parent_t{cfg}, peer_list{cfg.peer_list}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair} {
     discover_queue = peer_list;
 }
 
@@ -22,7 +22,7 @@ void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void peer_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept {
     auto *peer = static_cast<peer_actor_t *>(actor);
-    spdlog::trace("peer_supervisor_t::on_child_shutdown(), peer = {} :: ", peer->device_id, ec.message());
+    spdlog::trace("peer_supervisor_t::on_child_shutdown, {} peer = {} :: ", peer->device_id, ec.message());
 }
 
 void peer_supervisor_t::on_start() noexcept {
@@ -66,6 +66,7 @@ void peer_supervisor_t::on_discovery(message::discovery_response_t &res) noexcep
     spdlog::trace("peer_supervisor_t, peer {} found, initiating connection", device_id);
     create_actor<peer_actor_t>()
         .ssl_pair(&ssl_pair)
+        .device_name(device_name)
         .peer_device_id(device_id)
         .contact(peer_option.value())
         .timeout(timeout)

@@ -20,7 +20,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
     }
     ssl_pair = std::move(result.value());
     device_id = model::device_id_t(ssl_pair.cert_data);
-    spdlog::info("net_supervisor_t, my id = {}", device_id);
+    spdlog::info("net_supervisor_t, device name = {},  device id = {}", app_cfg.device_name, device_id);
 }
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -76,6 +76,7 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
     peers.push_back(model::device_id_t("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
     peers_addr = create_actor<peer_supervisor_t>()
                      .ssl_pair(&ssl_pair)
+                     .device_name(app_cfg.device_name)
                      .peer_list(peers)
                      .strand(strand)
                      .timeout(timeout)

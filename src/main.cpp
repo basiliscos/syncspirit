@@ -8,6 +8,7 @@
 #include <google/protobuf/stubs/common.h>
 #include <boost/filesystem.hpp>
 
+#include "constants.h"
 #include "configuration.h"
 #include "utils/location.h"
 #include "net/net_supervisor.h"
@@ -100,7 +101,8 @@ int main(int argc, char **argv) {
             return 1;
         }
         spdlog::trace("configuration seems OK");
-        spdlog::info("starting, protobuf v{}", google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION));
+        spdlog::info("starting {} v{}, libraries: protobuf v{}", constants::client_name, constants::client_version,
+                     google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION));
 
         /* pre-init actors */
         asio::io_context io_context;

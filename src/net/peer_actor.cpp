@@ -1,7 +1,7 @@
 #include "peer_actor.h"
 #include "names.h"
-#include "announce.pb.h"
 #include <spdlog/spdlog.h>
+#include "../proto/bep_support.h"
 
 using namespace syncspirit::net;
 
@@ -14,7 +14,8 @@ r::plugin::resource_id_t io = 2;
 } // namespace
 
 peer_actor_t::peer_actor_t(config_t &config)
-    : r::actor_base_t{config}, device_id{config.peer_device_id}, contact{config.contact}, ssl_pair{*config.ssl_pair} {}
+    : r::actor_base_t{config}, device_id{config.peer_device_id},
+      device_name{config.device_name}, contact{config.contact}, ssl_pair{*config.ssl_pair} {}
 
 void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -60,7 +61,7 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 
     auto &ec = res.payload.ec;
     if (ec) {
-        spdlog::warn("peer_actor_t::on_resolve error: {} ({})", ec.message(), ec.category().name());
+        spdlog::warn("peer_actor_t::on_resolve error, {} : {}", device_id, ec.message());
         return try_next_uri();
     }
 
@@ -84,7 +85,7 @@ void peer_actor_t::on_connect(resolve_it_t) noexcept {
 void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        spdlog::warn("http_actor_t::on_io_error :: {}", ec.message());
+        spdlog::warn("http_actor_t::on_io_error, {} :: {}", device_id, ec.message());
     }
     if (timer_request)
         cancel_timer(*timer_request);
@@ -93,13 +94,22 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
 
 void peer_actor_t::on_handshake(bool valid_peer) noexcept {
     spdlog::trace("peer_actor_t::on_handshake, device_id = {}, valid = {} ", device_id, valid_peer);
-    do_shutdown();
+    proto::make_hello_message(tx_buff, device_name);
+    auto buff = asio::buffer(tx_buff.data(), tx_buff.size());
+
+    transport::io_fn_t on_write = [&](auto arg) { this->on_write(arg); };
+    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
+    transport->async_write(buff, on_write, on_error);
 }
 void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        spdlog::warn("http_actor_t::on_handshake_error :: {}", ec.message());
+        spdlog::warn("http_actor_t::on_handshake_error, {} :: {}", device_id, ec.message());
     }
+}
+
+void peer_actor_t::on_write(std::size_t) noexcept {
+    spdlog::trace("peer_actor_t::on_write, {}", device_id);
     do_shutdown();
 }
 

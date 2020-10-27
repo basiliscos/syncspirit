@@ -36,6 +36,7 @@ struct configuration_t {
     upnp_config_t upnp_config;
     global_announce_config_t global_announce_config;
     std::uint32_t timeout;
+    std::string device_name;
 };
 
 boost::optional<configuration_t> get_config(std::ifstream &config);
