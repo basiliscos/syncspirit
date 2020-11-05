@@ -45,7 +45,6 @@ enum class error_code {
 
 enum class bep_error_code {
     success = 0,
-    magic_mismatch,
     protobuf_err,
 };
 

@@ -14,6 +14,7 @@ struct peer_actor_config_t : public r::actor_config_t {
     model::device_id_t peer_device_id;
     model::peer_contact_t contact;
     const utils::key_pair_t *ssl_pair;
+    config::bep_config_t bep_config;
 };
 
 template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -40,6 +41,11 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         parent_t::config.device_name = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
+        parent_t::config.bep_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct peer_actor_t : public r::actor_base_t {
@@ -54,7 +60,6 @@ struct peer_actor_t : public r::actor_base_t {
   private:
     using resolve_it_t = payload::address_response_t::resolve_results_t::iterator;
 
-    asio::mutable_buffer prepare_rx_buff() noexcept;
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_connect(resolve_it_t) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;
@@ -65,6 +70,7 @@ struct peer_actor_t : public r::actor_base_t {
     void on_handshake(bool valid_peer) noexcept;
     void on_handshake_error(sys::error_code ec) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
+    void read_more();
 
     std::string_view device_name;
     model::peer_contact_t contact;
@@ -75,6 +81,7 @@ struct peer_actor_t : public r::actor_base_t {
     std::optional<r::request_id_t> timer_request;
     fmt::memory_buffer tx_buff;
     fmt::memory_buffer rx_buff;
+    std::size_t rx_idx = 0;
 };
 
 } // namespace net

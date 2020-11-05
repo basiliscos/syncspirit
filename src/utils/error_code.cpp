@@ -74,9 +74,6 @@ std::string bep_error_code_category::message(int c) const {
     case bep_error_code::success:
         r = "success";
         break;
-    case bep_error_code::magic_mismatch:
-        r = "magic number mismatch in hello message";
-        break;
     case bep_error_code::protobuf_err:
         r = "error parsing protobuf message";
         break;

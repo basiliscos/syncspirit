@@ -15,7 +15,9 @@ r::plugin::resource_id_t io = 2;
 
 peer_actor_t::peer_actor_t(config_t &config)
     : r::actor_base_t{config}, device_id{config.peer_device_id},
-      device_name{config.device_name}, contact{config.contact}, ssl_pair{*config.ssl_pair} {}
+      device_name{config.device_name}, contact{config.contact}, ssl_pair{*config.ssl_pair} {
+    rx_buff.resize(config.bep_config.rx_buff_size);
+}
 
 void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -98,50 +100,75 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     }
 }
 
-asio::mutable_buffer peer_actor_t::prepare_rx_buff() noexcept {
-    rx_buff.resize(1500);
-    return asio::buffer(rx_buff.data(), rx_buff.size());
-}
-
 void peer_actor_t::on_handshake(bool valid_peer) noexcept {
+    resources->release(resource::io);
     spdlog::trace("peer_actor_t::on_handshake, device_id = {}, valid = {} ", device_id, valid_peer);
     proto::make_hello_message(tx_buff, device_name);
 
     transport::io_fn_t on_write = [&](auto arg) { this->on_write(arg); };
-    transport::io_fn_t on_read = [&](auto arg) { this->on_read(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
+
+    resources->acquire(resource::io);
     transport->async_send(asio::buffer(tx_buff.data(), tx_buff.size()), on_write, on_error);
-    transport->async_recv(prepare_rx_buff(), on_read, on_error);
+    read_more();
 }
 void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        spdlog::warn("http_actor_t::on_handshake_error, {} :: {}", device_id, ec.message());
+        spdlog::warn("peer_actor_t::on_handshake_error, {} :: {}", device_id, ec.message());
     }
 }
 
+void peer_actor_t::read_more() {
+    if (rx_idx >= rx_buff.size()) {
+        spdlog::warn("peer_actor_t::read_more, {} :: rx buffer limit reached, {}", device_id, rx_buff.size());
+        return do_shutdown();
+    }
+
+    transport::io_fn_t on_read = [&](auto arg) { this->on_read(arg); };
+    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
+    resources->acquire(resource::io);
+    auto buff = asio::buffer(rx_buff.data() + rx_idx, rx_buff.size() - rx_idx);
+    transport->async_recv(buff, on_read, on_error);
+}
+
 void peer_actor_t::on_write(std::size_t) noexcept {
+    resources->release(resource::io);
     spdlog::trace("peer_actor_t::on_write, {}", device_id);
     // do_shutdown();
 }
 
 void peer_actor_t::on_read(std::size_t bytes) noexcept {
+    resources->release(resource::io);
     spdlog::trace("peer_actor_t::on_read, {} :: {} bytes", device_id, bytes);
     auto buff = asio::buffer(rx_buff.data(), bytes);
-    auto result = proto::parse_hello(buff);
+    auto result = proto::parse_bep(buff);
     if (!result) {
         spdlog::warn("peer_actor_t::on_read, {} error parsing message:: {}", device_id, result.error().message());
         do_shutdown();
     }
     auto &value = result.value();
-    if (!value.message) {
+    if (!value.consumed) {
         spdlog::trace("peer_actor_t::on_read, {} :: incomplete message", device_id);
+        return read_more();
+    }
+    bool ok = std::visit(
+        [&](auto &&msg) {
+            using T = std::decay_t<decltype(msg)>;
+            if constexpr (std::is_same_v<T, proto::message::Hello>) {
+                spdlog::info("peer_actor_t::on_read, {} hello from {} ({} {})", device_id, msg->device_name(),
+                             msg->client_name(), msg->client_version());
+                return true;
+            } else {
+                spdlog::warn("peer_actor_t::on_read, {} :: unexpected_message", device_id);
+                do_shutdown();
+                return false;
+            }
+        },
+        value.message);
+    if (ok) {
         std::abort();
     }
-    auto &msg = value.message;
-    spdlog::info("peer_actor_t::on_read, {} hello from {} ({} {})", device_id, msg->device_name(), msg->client_name(),
-                 msg->client_version());
-    std::abort();
 }
 
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {

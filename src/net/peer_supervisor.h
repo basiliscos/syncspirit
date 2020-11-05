@@ -15,6 +15,7 @@ struct peer_supervisor_config_t : ra::supervisor_config_asio_t {
     std::string_view device_name;
     peer_list_t peer_list;
     const utils::key_pair_t *ssl_pair;
+    config::bep_config_t bep_config;
 };
 
 template <typename Supervisor>
@@ -35,6 +36,11 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
 
     builder_t &&ssl_pair(const utils::key_pair_t *value) &&noexcept {
         parent_t::config.ssl_pair = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
+        parent_t::config.bep_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -59,6 +65,7 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
     std::string_view device_name;
     const utils::key_pair_t &ssl_pair;
     peer_list_t discover_queue;
+    config::bep_config_t bep_config;
 };
 
 } // namespace net

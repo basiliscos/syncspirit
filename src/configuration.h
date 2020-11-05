@@ -31,10 +31,15 @@ struct upnp_config_t {
     std::uint16_t external_port;
 };
 
+struct bep_config_t {
+    std::uint64_t rx_buff_size;
+};
+
 struct configuration_t {
     local_announce_config_t local_announce_config;
     upnp_config_t upnp_config;
     global_announce_config_t global_announce_config;
+    bep_config_t bep_config;
     std::uint32_t timeout;
     std::string device_name;
 };

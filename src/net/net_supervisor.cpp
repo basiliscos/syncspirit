@@ -80,6 +80,7 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
                      .peer_list(peers)
                      .strand(strand)
                      .timeout(timeout)
+                     .bep_config(app_cfg.bep_config)
                      .finish()
                      ->get_address();
 

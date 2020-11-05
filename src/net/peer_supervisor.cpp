@@ -6,7 +6,8 @@
 using namespace syncspirit::net;
 
 peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
-    : parent_t{cfg}, peer_list{cfg.peer_list}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair} {
+    : parent_t{cfg}, peer_list{cfg.peer_list}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair},
+      bep_config(cfg.bep_config) {
     discover_queue = peer_list;
 }
 
@@ -69,6 +70,7 @@ void peer_supervisor_t::on_discovery(message::discovery_response_t &res) noexcep
         .device_name(device_name)
         .peer_device_id(device_id)
         .contact(peer_option.value())
+        .bep_config(bep_config)
         .timeout(timeout)
         .finish();
 }
