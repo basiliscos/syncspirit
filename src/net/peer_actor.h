@@ -67,10 +67,11 @@ struct peer_actor_t : public r::actor_base_t {
     void on_read(std::size_t bytes) noexcept;
     void try_next_uri() noexcept;
     void initiate(transport::transport_sp_t tran, const utils::URI &url) noexcept;
-    void on_handshake(bool valid_peer) noexcept;
+    void on_handshake(bool valid_peer, X509 *peer_cert) noexcept;
     void on_handshake_error(sys::error_code ec) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
-    void read_more();
+    void read_more() noexcept;
+    void authorize() noexcept;
 
     std::string_view device_name;
     model::peer_contact_t contact;
@@ -82,6 +83,7 @@ struct peer_actor_t : public r::actor_base_t {
     fmt::memory_buffer tx_buff;
     fmt::memory_buffer rx_buff;
     std::size_t rx_idx = 0;
+    bool valid_peer = false;
 };
 
 } // namespace net

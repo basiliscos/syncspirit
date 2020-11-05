@@ -15,7 +15,7 @@ void tcp_t::async_connect(const resolved_hosts_t &hosts, connect_fn_t &on_connec
 
 void tcp_t::async_handshake(handshake_fn_t &on_handshake, error_fn_t &) noexcept {
     strand.post([on_handshake, this]() {
-        on_handshake(true);
+        on_handshake(true, nullptr);
         supervisor.do_process();
     });
 }

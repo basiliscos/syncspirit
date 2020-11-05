@@ -72,7 +72,8 @@ void tls_t::async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) 
             return;
         }
         strand.post([this, on_handshake]() {
-            on_handshake(validation_passed);
+            auto peer_cert = SSL_get_peer_certificate(sock.native_handle());
+            on_handshake(validation_passed, peer_cert);
             supervisor.do_process();
         });
     });

@@ -152,7 +152,7 @@ void http_actor_t::on_connect(resolve_it_t) noexcept {
         return process();
     }
 
-    transport::handshake_fn_t handshake_fn([&](auto arg) { on_handshake(arg); });
+    transport::handshake_fn_t handshake_fn([&](auto arg, auto peer) { on_handshake(arg, peer); });
     transport::error_fn_t error_fn([&](auto arg) { on_handshake_error(arg); });
     transport->async_handshake(handshake_fn, error_fn);
 }
@@ -225,7 +225,7 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     need_response = false;
 }
 
-void http_actor_t::on_handshake(bool valid_peer) noexcept {
+void http_actor_t::on_handshake(bool valid_peer, X509 *) noexcept {
     if (!need_response || stop_io) {
         resources->release(resource::io);
         return process();

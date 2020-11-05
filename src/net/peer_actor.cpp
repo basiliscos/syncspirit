@@ -80,7 +80,7 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 void peer_actor_t::on_connect(resolve_it_t) noexcept {
     spdlog::trace("peer_actor_t::on_connect(), device_id = {}", device_id);
 
-    transport::handshake_fn_t handshake_fn([&](auto arg) { on_handshake(arg); });
+    transport::handshake_fn_t handshake_fn([&](auto arg, auto peer_cert) { on_handshake(arg, peer_cert); });
     transport::error_fn_t error_fn([&](auto arg) { on_handshake_error(arg); });
     transport->async_handshake(handshake_fn, error_fn);
 }
@@ -100,8 +100,9 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     }
 }
 
-void peer_actor_t::on_handshake(bool valid_peer) noexcept {
+void peer_actor_t::on_handshake(bool valid_peer, X509 *) noexcept {
     resources->release(resource::io);
+    this->valid_peer = valid_peer;
     spdlog::trace("peer_actor_t::on_handshake, device_id = {}, valid = {} ", device_id, valid_peer);
     proto::make_hello_message(tx_buff, device_name);
 
@@ -119,7 +120,7 @@ void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     }
 }
 
-void peer_actor_t::read_more() {
+void peer_actor_t::read_more() noexcept {
     if (rx_idx >= rx_buff.size()) {
         spdlog::warn("peer_actor_t::read_more, {} :: rx buffer limit reached, {}", device_id, rx_buff.size());
         return do_shutdown();
@@ -167,6 +168,16 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         },
         value.message);
     if (ok) {
+        rx_idx -= value.consumed;
+        authorize();
+    }
+}
+
+void peer_actor_t::authorize() noexcept {
+    if (!valid_peer) {
+        spdlog::info("peer_actor_t::authorize, {} :: non-valid peer", device_id);
+        return do_shutdown();
+    } else {
         std::abort();
     }
 }
