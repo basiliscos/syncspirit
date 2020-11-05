@@ -16,8 +16,7 @@ find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
-    src/proto/announce.proto
-    src/proto/hello.proto
+    src/proto/bep.proto
 )
 
 add_library(syncspirit_lib

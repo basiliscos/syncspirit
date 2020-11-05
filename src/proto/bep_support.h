@@ -3,7 +3,7 @@
 #include <boost/outcome.hpp>
 #include <boost/asio/buffer.hpp>
 #include <memory>
-#include "hello.pb.h"
+#include "bep.pb.h"
 
 namespace syncspirit::proto {
 
