@@ -1,0 +1,2 @@
+/bin/ar qc librotor_asio.a CMakeFiles/rotor_asio.dir/src/rotor/asio/supervisor_asio.cpp.o
+/bin/ranlib librotor_asio.a
