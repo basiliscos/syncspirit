@@ -100,19 +100,46 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     }
 }
 
+void peer_actor_t::process_tx_queue() noexcept {
+    assert(!tx_item);
+    if (!tx_queue.empty()) {
+        auto &item = tx_queue.front();
+        tx_item = std::move(item);
+        tx_queue.pop_front();
+        transport::io_fn_t on_write = [&](auto arg) { this->on_write(arg); };
+        transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
+        auto &tx_buff = tx_item->buff;
+
+        if (tx_buff.size()) {
+            resources->acquire(resource::io);
+            transport->async_send(asio::buffer(tx_buff.data(), tx_buff.size()), on_write, on_error);
+        } else {
+            assert(tx_item->final);
+            spdlog::trace("peer_actor_t::process_tx_queue, device_id = {}, final empty message, shutting down ",
+                          device_id);
+            do_shutdown();
+        }
+    }
+}
+
+void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
+    tx_item_t item = new confidential::payload::tx_item_t{std::move(buff), final};
+    tx_queue.emplace_back(std::move(item));
+    process_tx_queue();
+}
+
 void peer_actor_t::on_handshake(bool valid_peer, X509 *) noexcept {
     resources->release(resource::io);
     this->valid_peer = valid_peer;
     spdlog::trace("peer_actor_t::on_handshake, device_id = {}, valid = {} ", device_id, valid_peer);
-    proto::make_hello_message(tx_buff, device_name);
 
-    transport::io_fn_t on_write = [&](auto arg) { this->on_write(arg); };
-    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
+    fmt::memory_buffer buff;
+    proto::make_hello_message(buff, device_name);
+    push_write(std::move(buff), false);
 
-    resources->acquire(resource::io);
-    transport->async_send(asio::buffer(tx_buff.data(), tx_buff.size()), on_write, on_error);
     read_more();
 }
+
 void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
@@ -133,10 +160,18 @@ void peer_actor_t::read_more() noexcept {
     transport->async_recv(buff, on_read, on_error);
 }
 
-void peer_actor_t::on_write(std::size_t) noexcept {
+void peer_actor_t::on_write(std::size_t sz) noexcept {
     resources->release(resource::io);
-    spdlog::trace("peer_actor_t::on_write, {}", device_id);
-    // do_shutdown();
+    spdlog::trace("peer_actor_t::on_write, {} :: {} bytes", device_id, sz);
+    assert(tx_item);
+    if (tx_item->final) {
+        spdlog::trace("peer_actor_t::process_tx_queue, device_id = {}, final message has been sent, shutting down ",
+                      device_id);
+        do_shutdown();
+    } else {
+        tx_item.reset();
+        process_tx_queue();
+    }
 }
 
 void peer_actor_t::on_read(std::size_t bytes) noexcept {
@@ -178,7 +213,9 @@ void peer_actor_t::authorize() noexcept {
         spdlog::info("peer_actor_t::authorize, {} :: non-valid peer", device_id);
         return do_shutdown();
     } else {
-        std::abort();
+        fmt::memory_buffer buff;
+        spdlog::warn("finalizing...");
+        push_write(std::move(buff), true);
     }
 }
 

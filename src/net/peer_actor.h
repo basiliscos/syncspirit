@@ -5,6 +5,7 @@
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>
 #include <optional>
+#include <list>
 
 namespace syncspirit {
 namespace net {
@@ -58,7 +59,26 @@ struct peer_actor_t : public r::actor_base_t {
     model::device_id_t device_id;
 
   private:
+    struct confidential {
+        struct payload {
+            struct tx_item_t : r::arc_base_t<tx_item_t> {
+                fmt::memory_buffer buff;
+                bool final = false;
+
+                tx_item_t(fmt::memory_buffer &&buff_, bool final_) noexcept : buff{std::move(buff_)}, final{final_} {}
+                tx_item_t(tx_item_t &&other) = default;
+            };
+        };
+
+        struct message {
+            using tx_item_t = r::message_t<payload::tx_item_t>;
+        };
+    };
+
     using resolve_it_t = payload::address_response_t::resolve_results_t::iterator;
+    using tx_item_t = r::intrusive_ptr_t<confidential::payload::tx_item_t>;
+    using tx_message_t = confidential::message::tx_item_t;
+    using tx_queue_t = std::list<tx_item_t>;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_connect(resolve_it_t) noexcept;
@@ -72,6 +92,8 @@ struct peer_actor_t : public r::actor_base_t {
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void read_more() noexcept;
     void authorize() noexcept;
+    void push_write(fmt::memory_buffer &&buff, bool final) noexcept;
+    void process_tx_queue() noexcept;
 
     std::string_view device_name;
     model::peer_contact_t contact;
@@ -80,7 +102,8 @@ struct peer_actor_t : public r::actor_base_t {
     transport::transport_sp_t transport;
     std::int32_t uri_idx = -1;
     std::optional<r::request_id_t> timer_request;
-    fmt::memory_buffer tx_buff;
+    tx_queue_t tx_queue;
+    tx_item_t tx_item;
     fmt::memory_buffer rx_buff;
     std::size_t rx_idx = 0;
     bool valid_peer = false;
