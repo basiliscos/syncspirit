@@ -1,9 +1,9 @@
 [submodule "lib/rotor"]
 	path = lib/rotor
-	url = git@github.com:basiliscos/cpp-rotor.git
+	url = https://github.com/basiliscos/cpp-rotor
 [submodule "lib/spdlog"]
 	path = lib/spdlog
-	url = git@github.com:gabime/spdlog.git
+	url = https://github.com/gabime/spdlog
 [submodule "lib/fmt"]
 	path = lib/fmt
 	url = https://github.com/fmtlib/fmt.git
