@@ -10,6 +10,7 @@ namespace resource {
 r::plugin::resource_id_t resolving = 0;
 r::plugin::resource_id_t uris = 1;
 r::plugin::resource_id_t io = 2;
+r::plugin::resource_id_t timer = 2;
 } // namespace resource
 } // namespace
 
@@ -72,9 +73,11 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     transport::connect_fn_t on_connect = [&](auto arg) { this->on_connect(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     transport->async_connect(addresses, on_connect, on_error);
+    resources->acquire(resource::io);
+
     pt::time_duration timeout = init_timeout * 8 / 10;
     timer_request = start_timer(timeout, *this, &peer_actor_t::on_timer);
-    resources->acquire(resource::io);
+    resources->acquire(resource::timer);
 }
 
 void peer_actor_t::on_connect(resolve_it_t) noexcept {
@@ -90,9 +93,7 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("http_actor_t::on_io_error, {} :: {}", device_id, ec.message());
     }
-    if (timer_request) {
-        cancel_timer(*timer_request);
-    }
+    cancel_timer();
     if (resources->has(resource::uris)) {
         try_next_uri();
     } else {
@@ -188,6 +189,8 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         spdlog::trace("peer_actor_t::on_read, {} :: incomplete message", device_id);
         return read_more();
     }
+
+    cancel_timer();
     bool ok = std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
@@ -220,6 +223,21 @@ void peer_actor_t::authorize() noexcept {
 }
 
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
-    spdlog::trace("peer_actor_t::on_timer_trigger, device_id = {}", device_id);
-    do_shutdown();
+    resources->release(resource::timer);
+    spdlog::trace("peer_actor_t::on_timer_trigger, device_id = {}, cancelled = {}", device_id, cancelled);
+    if (!cancelled) {
+        do_shutdown();
+    }
+}
+
+void peer_actor_t::shutdown_start() noexcept {
+    r::actor_base_t::shutdown_start();
+    cancel_timer();
+}
+
+void peer_actor_t::cancel_timer() noexcept {
+    if (resources->has(resource::timer)) {
+        r::actor_base_t::cancel_timer(*timer_request);
+        timer_request.reset();
+    }
 }

@@ -83,8 +83,6 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
                      .bep_config(app_cfg.bep_config)
                      .finish()
                      ->get_address();
-
-    return;
 }
 
 bool net_supervisor_t::launch_ssdp() noexcept {

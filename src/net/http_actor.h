@@ -88,6 +88,7 @@ struct http_actor_t : public r::actor_base_t {
     pt::time_duration request_timeout;
     std::string registry_name;
     bool keep_alive;
+    bool kept_alive = false;
     r::address_ptr_t resolver;
     queue_t queue;
     bool need_response = false;

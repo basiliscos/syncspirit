@@ -27,7 +27,7 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_
 }
 
 void peer_supervisor_t::on_start() noexcept {
-    spdlog::trace("acceptor_actor_t::on_start (addr = {})", (void *)address.get());
+    spdlog::trace("peer_supervisor_t::on_start (addr = {})", (void *)address.get());
     parent_t::on_start();
 }
 

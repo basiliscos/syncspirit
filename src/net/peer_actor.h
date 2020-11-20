@@ -55,6 +55,7 @@ struct peer_actor_t : public r::actor_base_t {
 
     peer_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void shutdown_start() noexcept override;
 
     model::device_id_t device_id;
 
@@ -94,6 +95,7 @@ struct peer_actor_t : public r::actor_base_t {
     void authorize() noexcept;
     void push_write(fmt::memory_buffer &&buff, bool final) noexcept;
     void process_tx_queue() noexcept;
+    void cancel_timer() noexcept;
 
     std::string_view device_name;
     model::peer_contact_t contact;

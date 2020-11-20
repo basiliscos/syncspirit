@@ -9,7 +9,6 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t io = 0;
 r::plugin::resource_id_t request_timer = 1;
-r::plugin::resource_id_t connection = 2;
 } // namespace resource
 } // namespace
 
@@ -38,6 +37,7 @@ void http_actor_t::on_request(message::http_request_t &req) noexcept {
 
 void http_actor_t::on_cancel(message::http_cancel_t &req) noexcept {
     if (queue.empty()) {
+        cancel_sock();
         return;
     }
 
@@ -70,9 +70,7 @@ void http_actor_t::process() noexcept {
             reply_with_error(*req, ec);
         }
         queue.clear();
-        if (resources->has(resource::connection)) {
-            cancel_sock();
-        }
+        cancel_sock();
         return;
     }
 
@@ -85,8 +83,7 @@ void http_actor_t::process() noexcept {
     response_size = 0;
     auto &url = queue.front()->payload.request_payload->url;
 
-    if (keep_alive && resources->has(resource::connection)) {
-        resources->release(resource::connection);
+    if (keep_alive && kept_alive) {
         if (url.host == resolved_url.host && url.port == resolved_url.port) {
             spdlog::trace("http_actor_t ({}) reusing connection", registry_name);
             spawn_timer();
@@ -94,7 +91,9 @@ void http_actor_t::process() noexcept {
         } else {
             spdlog::warn("http_actor_t ({}) :: different endpoint is used: {}:{} vs {}:{}", registry_name,
                          resolved_url.host, resolved_url.port, url.host, url.port);
+            kept_alive = false;
             cancel_sock();
+            process();
         }
     } else {
         auto port = std::to_string(url.port);
@@ -192,8 +191,9 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     */
 
     if (keep_alive && http_response.keep_alive()) {
-        resources->acquire(resource::connection);
+        kept_alive = true;
     } else {
+        kept_alive = false;
         transport.reset();
         http_adapter = nullptr;
     }
@@ -207,9 +207,7 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
 
 void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
-    if (resources->has(resource::connection)) {
-        resources->release(resource::connection);
-    }
+    kept_alive = false;
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("http_actor_t::on_io_error :: {}", ec.message());
     }
@@ -267,16 +265,13 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     queue.pop_front();
     need_response = false;
 
-    if (!resources->has(resource::connection)) {
+    if (!kept_alive) {
         cancel_io();
     }
     process();
 }
 
 void http_actor_t::cancel_sock() noexcept {
-    if (resources->has(resource::connection)) {
-        resources->release(resource::connection);
-    }
     transport.reset();
     http_adapter = nullptr;
 }
@@ -287,7 +282,7 @@ void http_actor_t::on_start() noexcept {
 }
 
 void http_actor_t::on_close_connection(message::http_close_connection_t &) noexcept {
-    if (resources->has(resource::connection)) {
+    if (kept_alive) {
         stop_io = true;
         if (queue.empty()) {
             cancel_sock();
