@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
 
         if (populate) {
             spdlog::info("Generating cryptographical keys...");
-            auto pair = utils::generate_pair(constants::client_name);
+            auto pair = utils::generate_pair(constants::issuer_name);
             if (!pair) {
                 spdlog::error("cannot generate cryptographical keys :: {}", pair.error().message());
                 return -1;
