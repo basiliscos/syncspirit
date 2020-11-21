@@ -3,6 +3,7 @@
 #include "utils/uri.h"
 #include <boost/optional.hpp>
 #include <boost/variant.hpp>
+#include <boost/filesystem.hpp>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -44,6 +45,10 @@ struct configuration_t {
     std::string device_name;
 };
 
-boost::optional<configuration_t> get_config(std::ifstream &config);
+using config_option_t = boost::optional<configuration_t>;
+
+config_option_t get_config(std::ifstream &config);
+
+void populate_config(const boost::filesystem::path &config_path);
 
 } // namespace syncspirit::config

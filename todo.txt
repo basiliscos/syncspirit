@@ -1,32 +1,6 @@
 - generate keys
 
-4. discovery_support, upnp_support-> proto
-
-Continuing with signal SIGINT.
-[2020-11-19 09:20:32.492] [trace] console thread has been terminated
-[2020-11-19 09:20:32.492] [trace] waiting net thread termination
-[Thread 0x7ffff6373700 (LWP 8276) exited]
-[2020-11-19 09:20:32.492] [trace] upnp_actor_t::shutdown_start
-[2020-11-19 09:20:32.493] [trace] upnp_actor_t, going to unmap extenal port 22001
-[2020-11-19 09:20:32.493] [trace] ssdp_actor_t::shutdown_start
-[2020-11-19 09:20:32.493] [trace] global_discovery_actor_t::shutdown_start
-[2020-11-19 09:20:32.495] [trace] net_supervisor_t::on_child_shutdown(), addr = 0x7ffff000e880
-[2020-11-19 09:20:32.495] [trace] net_supervisor_t::on_child_shutdown(), addr = 0x7ffff00030f0
-[2020-11-19 09:20:32.496] [trace] http_actor_t (net::http10) :: sending 621 bytes to http://192.168.100.1:49652/upnp/control/WANIPConn1
-[2020-11-19 09:20:32.569] [trace] actor_t::on_unmapping_port
-[2020-11-19 09:20:32.569] [debug] upnp_actor_t, succesfully unmapped external port 22001
-[2020-11-19 09:20:32.571] [trace] net_supervisor_t::on_child_shutdown(), addr = 0x7ffff000c390
-[2020-11-19 09:20:32.571] [trace] net_supervisor_t::on_child_shutdown(), addr = 0x7ffff0009870
-[2020-11-19 09:20:32.571] [trace] net_supervisor_t::on_child_shutdown(), addr = 0x7ffff00019f0
-[2020-11-19 09:20:32.672] [trace] tls, peer device_id = LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW
-[2020-11-19 09:20:32.860] [trace] http_actor_t (net::gda::https) :: sending 174 bytes to https://discovery.syncthing.net:443/v2
-[2020-11-19 09:20:33.038] [trace] global_discovery_actor_t::on_announce_response
-[2020-11-19 09:20:33.039] [error] global_discovery_actor_t, announcing error = request timeout
-[2020-11-19 09:20:33.039] [trace] net_supervisor_t::on_child_shutdown(), addr = 0x7ffff0014de0
-fatal error: request timeout
-
-http_actor connected resource is held. Cancel should release it
-
+4. discovery_support, upnp_support-> proto ?
 
 openssl x509 -inform PEM -outform DER -in ~/.config/syncthing/cert.pem -out /tmp/cert.der
 

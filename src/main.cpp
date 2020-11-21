@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
         cmdline_descr.add_options()
                 ("help", "show this help message")
                 ("log_level", po::value<std::string>()->default_value("info"), "initial log level")
-                ( "config_dir", po::value<std::string>(), "configuration directory path");
+                ("config_dir", po::value<std::string>(), "configuration directory path");
         // clang-format on
 
         po::variables_map vm;
@@ -87,20 +87,44 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
+
         config_file_path.append("syncspirit.conf");
+        bool populate = !fs::exists(config_file_path);
+        if (populate) {
+            spdlog::info("Config {} seems does not exit, creating default one...", config_file_path.c_str());
+            config::populate_config(config_file_path);
+        }
         auto config_file_path_c = config_file_path.c_str();
         std::ifstream config_file(config_file_path_c);
         if (!config_file) {
             spdlog::error("Cannot open config file {}", config_file_path_c);
             return 1;
         }
-
-        auto cfg_option = config::get_config(config_file);
+        config::config_option_t cfg_option = config::get_config(config_file);
         if (!cfg_option) {
             spdlog::error("Config file {} is incorrect", config_file_path_c);
             return 1;
         }
+        auto &cfg = *cfg_option;
         spdlog::trace("configuration seems OK");
+
+        if (populate) {
+            spdlog::info("Generating cryptographical keys...");
+            auto pair = utils::generate_pair(constants::client_name);
+            if (!pair) {
+                spdlog::error("cannot generate cryptographical keys :: {}", pair.error().message());
+                return -1;
+            }
+            auto &keys = pair.value();
+            auto &cert_path = cfg.global_announce_config.cert_file;
+            auto &key_path = cfg.global_announce_config.key_file;
+            auto save_result = keys.save(cert_path.c_str(), key_path.c_str());
+            if (!save_result) {
+                spdlog::error("cannot store cryptographical keys :: {}", save_result.error().message());
+                return -1;
+            }
+        }
+
         spdlog::info("starting {} {}, libraries: protobuf v{}", constants::client_name, constants::client_version,
                      google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION));
 
@@ -108,11 +132,11 @@ int main(int argc, char **argv) {
         asio::io_context io_context;
         ra::system_context_ptr_t sys_context{new ra::system_context_asio_t{io_context}};
         auto stand = std::make_shared<asio::io_context::strand>(io_context);
-        auto timeout = pt::milliseconds{cfg_option->timeout};
+        auto timeout = pt::milliseconds{cfg.timeout};
         // ra::supervisor_config_asio_t sup_conf{timeout, std::move(stand)};
         // auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>(sup_conf, *cfg_option);
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
-                           .app_config(*cfg_option)
+                           .app_config(cfg)
                            .strand(stand)
                            .timeout(timeout)
                            .create_registry()

@@ -5,6 +5,7 @@
 #include <boost/system/error_code.hpp>
 #include <openssl/pem.h>
 #include <openssl/sha.h>
+#include <openssl/err.h>
 
 namespace sys = boost::system;
 
@@ -190,7 +191,10 @@ outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_k
             return sys::error_code{errno, sys::generic_category()};
         }
         auto pk_file_guard = make_guard(pk_file, [](auto *ptr) { fclose(ptr); });
-        if (1 != PEM_write_PrivateKey(pk_file, private_key.get(), nullptr, nullptr, 0, nullptr, nullptr)) {
+
+        auto ec_key = EVP_PKEY_get1_EC_KEY(private_key.get());
+        auto ec_key_guard = make_guard(ec_key, [](auto *ptr) { EC_KEY_free(ptr); });
+        if (1 != PEM_write_ECPrivateKey(pk_file, ec_key, nullptr, nullptr, 0, nullptr, nullptr)) {
             return error_code::tls_key_save_failure;
         }
     } while (0);
@@ -202,7 +206,7 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
     /* read certificate in memory, then load it va openssl */
     auto cert_file = fopen(cert_path, "r");
     if (!cert_file) {
-        return sys::error_code{errno, sys::generic_category()};
+        return sys::error_code{errno, sys::system_category()};
     }
     auto cert_file_guard = make_guard(cert_file, [](auto *ptr) { fclose(ptr); });
 
