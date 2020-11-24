@@ -1,16 +1,17 @@
 #include "configuration.h"
 #include <boost/asio/ip/host_name.hpp>
-#include <boost/program_options.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <spdlog/spdlog.h>
 #include <cstdlib>
-#include <sstream>
-#include <fstream>
 
-namespace po = boost::program_options;
+#define TOML_EXCEPTIONS 0
+#include <toml++/toml.h>
+
 namespace fs = boost::filesystem;
+
+static const std::string home_path = "~/.config/syncspirit";
 
 namespace syncspirit::config {
 
@@ -23,148 +24,208 @@ static std::string expand_home(const std::string &path, const char *home) {
     return path;
 }
 
-static po::options_description get_default_options() noexcept {
-    // clang-format off
-    po::options_description descr("Allowed options");
-    descr.add_options()
-            ("global.timeout", po::value<std::uint32_t>()->default_value(5000), "root timeout in milliseconds (default: 200)")
-            ("global.device_name", po::value<std::string>()->default_value("%localhost%"), "human-readeable this device identity")
-            ("local_announce.enabled", po::value<bool>()->default_value(false), "enable LAN-announcements")
-            ("local_announce.port", po::value<std::uint16_t>()->default_value(21027), "LAN-announcement port")
-            ("global_discovery.announce_url", po::value<std::string>()->default_value("https://discovery.syncthing.net/v2"), "Global announce server")
-            ("global_discovery.device_id", po::value<std::string>()->default_value("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW"), "discovery server certificate device id")
-            ("global_discovery.cert_file", po::value<std::string>()->default_value("~/.config/syncspirit/cert.pem"), "certificate file path")
-            ("global_discovery.key_file", po::value<std::string>()->default_value("~/.config/syncspirit/key.pem"), "key file path")
-            ("global_discovery.rx_buff_size", po::value<std::uint32_t>()->default_value(16 * 1024 * 1024), "rx buff size in bytes (default: 16 Mb)")
-            ("global_discovery.timeout", po::value<std::uint32_t>()->default_value(3000), "timeout in milliseconds (default: 3000)")
-            ("global_discovery.reannounce_after", po::value<std::uint32_t>()->default_value(600000), "timeout after reannounce in milliseconds (default: 600000)")
-            ("upnp.rx_buff_size", po::value<std::uint32_t>()->default_value(16384), "receive buffer size in bytes (default: 16384)")
-            ("upnp.max_wait", po::value<std::uint32_t>()->default_value(1), "max wait discovery timeout (default: 1 second)")
-            ("upnp.timeout", po::value<std::uint32_t>()->default_value(10), "total upnp timeout (default: 10 seconds)")
-            ("upnp.external_port", po::value<std::uint16_t>()->default_value(22001), "external port to accept connections (default: 22001)")
-            ("bep.rx_buff_size", po::value<std::uint64_t>()->default_value(16 * 1024 * 1024), "receive buffer size in bytes (default: 16 Mb)")
-            ;
-    // clang-format on
-    return descr;
-}
+using device_name_t = outcome::result<std::string>;
 
-static std::string get_device_name() noexcept {
+static device_name_t get_device_name() noexcept {
     boost::system::error_code ec;
     auto device_name = boost::asio::ip::host_name(ec);
     if (ec) {
-        spdlog::warn("hostname cannot be determined: {}", ec.message());
-        device_name = "localhost";
+        return ec;
     }
     return device_name;
 }
 
-config_option_t get_config(std::ifstream &config) {
-    config_option_t result{};
+config_result_t get_config(std::istream &config) {
     configuration_t cfg;
 
     auto home = std::getenv("HOME");
-    auto descr = get_default_options();
-
-    po::variables_map vm;
-    po::store(po::parse_config_file(config, descr, false), vm);
-    po::notify(vm);
-
-    auto device_name = vm["global.device_name"].as<std::string>();
-    if (device_name.empty()) {
-        device_name = get_device_name();
+    auto r = toml::parse(config);
+    if (!r) {
+        return std::string(r.error().description());
     }
-    cfg.timeout = vm["global.timeout"].as<std::uint32_t>();
-    cfg.device_name = device_name;
-    cfg.local_announce_config.enabled = vm["local_announce.enabled"].as<bool>();
-    cfg.local_announce_config.port = vm["local_announce.port"].as<std::uint16_t>();
 
-    auto announce_url_raw = vm["global_discovery.announce_url"].as<std::string>();
-    auto announce_url = utils::parse(announce_url_raw.c_str());
-    if (!announce_url) {
-        std::cout << "wrong announce_url: " << announce_url_raw << "\n";
-        std::cout << descr << "\n";
-        return result;
-    }
-    cfg.global_announce_config.announce_url = *announce_url;
-    cfg.global_announce_config.device_id = vm["global_discovery.device_id"].as<std::string>();
-    cfg.global_announce_config.cert_file = expand_home(vm["global_discovery.cert_file"].as<std::string>(), home);
-    cfg.global_announce_config.key_file = expand_home(vm["global_discovery.key_file"].as<std::string>(), home);
-    cfg.global_announce_config.rx_buff_size = vm["global_discovery.rx_buff_size"].as<std::uint32_t>();
-    cfg.global_announce_config.timeout = vm["global_discovery.timeout"].as<std::uint32_t>();
-    cfg.global_announce_config.reannounce_after = vm["global_discovery.reannounce_after"].as<std::uint32_t>();
+    auto &root_tbl = r.table();
+    // global
+    do {
+        auto t = root_tbl["global"];
+        auto timeout = t["timeout"].value<std::uint32_t>();
+        if (!timeout) {
+            return "global/timeout is incorrect or missing";
+        }
+        cfg.timeout = timeout.value();
 
-    cfg.upnp_config.max_wait = vm["upnp.max_wait"].as<std::uint32_t>();
-    cfg.upnp_config.timeout = vm["upnp.timeout"].as<std::uint32_t>();
-    cfg.upnp_config.external_port = vm["upnp.external_port"].as<std::uint16_t>();
+        auto device_name = t["device_name"].value<std::string>();
+        if (!device_name) {
+            auto option = get_device_name();
+            if (!option)
+                return option.error().message();
+            device_name = option.value();
+        }
+        cfg.device_name = device_name.value();
+    } while (0);
 
-    cfg.bep_config.rx_buff_size = vm["bep.rx_buff_size"].as<std::uint64_t>();
+    // global_discovery
+    do {
+        auto t = root_tbl["global_discovery"];
+        auto &c = cfg.global_announce_config;
+        auto url = t["announce_url"].value<std::string>();
+        if (!url) {
+            return "global_discovery/announce_url is incorrect or missing";
+        }
+        auto announce_url = utils::parse(url.value().c_str());
+        if (!announce_url) {
+            return "global_discovery/announce_url is not url";
+        }
+        c.announce_url = announce_url.value();
 
-    // all OK
-    result = std::move(cfg);
+        auto device_id = t["device_id"].value<std::string>();
+        if (!device_id) {
+            return "global_discovery/device_id is incorrect or missing";
+        }
+        c.device_id = device_id.value();
 
-    return result;
+        auto cert_file = t["cert_file"].value<std::string>();
+        if (!cert_file) {
+            return "global_discovery/cert_file is incorrect or missing";
+        }
+        c.cert_file = expand_home(cert_file.value(), home);
+
+        auto key_file = t["key_file"].value<std::string>();
+        if (!key_file) {
+            return "global_discovery/key_file is incorrect or missing";
+        }
+        c.key_file = expand_home(key_file.value(), home);
+
+        auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
+        if (!rx_buff_size) {
+            return "global_discovery/rx_buff_size is incorrect or missing";
+        }
+        c.rx_buff_size = rx_buff_size.value();
+
+        auto timeout = t["timeout"].value<std::uint32_t>();
+        if (!timeout) {
+            return "global_discovery/timeout is incorrect or missing";
+        }
+        c.timeout = timeout.value();
+    } while (0);
+
+    // upnp
+    do {
+        auto t = root_tbl["upnp"];
+        auto &c = cfg.upnp_config;
+        auto max_wait = t["max_wait"].value<std::uint32_t>();
+        if (!max_wait) {
+            return "global_discovery/max_wait is incorrect or missing";
+        }
+        c.max_wait = max_wait.value();
+
+        auto timeout = t["timeout"].value<std::uint32_t>();
+        if (!timeout) {
+            return "upnp/timeout is incorrect or missing";
+        }
+        c.timeout = timeout.value();
+
+        auto external_port = t["external_port"].value<std::uint32_t>();
+        if (!external_port) {
+            return "upnp/external_port is incorrect or missing";
+        }
+        c.external_port = external_port.value();
+
+        auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
+        if (!rx_buff_size) {
+            return "upng/rx_buff_size is incorrect or missing";
+        }
+        c.rx_buff_size = rx_buff_size.value();
+
+    } while (0);
+
+    // bep
+    do {
+        auto t = root_tbl["bep"];
+        auto &c = cfg.bep_config;
+        auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
+        if (!rx_buff_size) {
+            return "bep/rx_buff_size is incorrect or missing";
+        }
+        c.rx_buff_size = rx_buff_size.value();
+    } while (0);
+    return std::move(cfg);
 }
 
-void populate_config(const fs::path &config_path) {
+outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) noexcept {
+    // clang-format off
+    auto tbl = toml::table{{
+        {"global", toml::table{{
+            {"timeout",  cfg.timeout},
+            {"device_name", cfg.device_name}
+        }}},
+        {"global_discovery", toml::table{{
+            {"announce_url", cfg.global_announce_config.announce_url.full},
+            {"device_id", cfg.global_announce_config.device_id},
+            {"cert_file", cfg.global_announce_config.cert_file},
+            {"key_file", cfg.global_announce_config.key_file},
+            {"rx_buff_size", cfg.global_announce_config.rx_buff_size},
+            {"timeout",  cfg.global_announce_config.timeout},
+        }}},
+        {"upnp", toml::table{{
+            {"max_wait", cfg.upnp_config.max_wait},
+            {"timeout",  cfg.upnp_config.timeout},
+            {"external_port",  cfg.upnp_config.external_port},
+            {"rx_buff_size", cfg.upnp_config.rx_buff_size},
+        }}},
+        {"bep", toml::table{{
+            {"rx_buff_size", cfg.bep_config.rx_buff_size},
+        }}},
+    }};
+    // clang-format on
+    out << tbl;
+    return outcome::success();
+}
+
+configuration_t generate_config(const boost::filesystem::path &config_path) {
     auto dir = config_path.parent_path();
     if (!fs::exists(dir)) {
         spdlog::info("creating directory {}", dir.c_str());
         fs::create_directories(dir);
     }
-    auto descr = get_default_options();
 
-    // used to get the defaults
-    std::stringstream empty_in;
-    po::variables_map vm;
-    po::store(po::parse_config_file(empty_in, descr, false), vm);
-
-    std::stringstream out_str;
-    std::ostream &out = out_str;
-
-    std::string last_section;
-
-    for (auto &opt : descr.options()) {
-        std::string value_str;
-        auto &value_container = vm[opt->long_name()];
-        auto &value = value_container.value();
-        if (value.type() == typeid(std::string)) {
-            value_str = value_container.as<std::string>();
-        } else if (value.type() == typeid(bool)) {
-            value_str = value_container.as<bool>() ? "true" : "false";
-        } else if (value.type() == typeid(std::uint16_t)) {
-            value_str = std::to_string(value_container.as<std::uint16_t>());
-        } else if (value.type() == typeid(std::uint32_t)) {
-            value_str = std::to_string(value_container.as<std::uint32_t>());
-        } else if (value.type() == typeid(std::uint64_t)) {
-            value_str = std::to_string(value_container.as<std::uint64_t>());
-        }
-        auto long_name = opt->long_name();
-        auto dot = long_name.find(".");
-        assert(dot > 0 && dot != std::string::npos);
-
-        std::string section(long_name, 0, dot);
-        std::string name(long_name, dot + 1);
-        if (section != last_section) {
-            out << "\n[" << section << "]\n";
-            last_section = std::move(section);
-        }
-
-        out << "# " << opt->description() << "\n";
-        out << name << " = " << value_str << "\n\n";
-    }
-
-    // special value handling
-    auto result = boost::algorithm::replace_all_copy(out_str.str(), "%localhost%", get_device_name());
-
+    std::string cert_file = home_path + "/cert.pem";
+    std::string key_file = home_path + "/key.pem";
     auto home = std::getenv("HOME");
     auto home_dir = fs::path(home).append(".config").append("syncthing");
     bool is_home = dir == fs::path(home_dir);
     if (!is_home) {
-        result = boost::algorithm::replace_all_copy(result, "~/.config/syncspirit", dir.string());
+        using boost::algorithm::replace_all_copy;
+        cert_file = replace_all_copy(cert_file, home_path, dir.string());
+        key_file = replace_all_copy(key_file, home_path, dir.string());
     }
 
-    std::fstream f_out(config_path.string(), f_out.binary | f_out.trunc | f_out.in | f_out.out);
-    f_out << result;
+    auto device_name = get_device_name();
+    auto device = std::string(device_name ? device_name.value() : "localhost");
+
+    // clang-format off
+    configuration_t cfg;
+    cfg.timeout = 5000;
+    cfg.device_name = device;
+    cfg.global_announce_config = global_announce_config_t{
+        utils::parse("https://discovery.syncthing.net/").value(),
+        "LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW",
+        cert_file,
+        key_file,
+        32 * 1024,
+        3000,
+        10 * 60,
+    };
+    cfg.upnp_config = upnp_config_t {
+        1,          /* max_wait */
+        10,         /* timeout */
+        22001,      /* external port */
+        64 * 1024,  /* rx_buff */
+    };
+    cfg.bep_config = bep_config_t {
+        16 * 1024 * 1024,   /* rx_buff */
+    };
+    return cfg;
 }
 
 } // namespace syncspirit::config

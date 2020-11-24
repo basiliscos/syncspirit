@@ -46,6 +46,10 @@ add_executable(013-global-discovery 013-global-discovery.cpp)
 target_link_libraries(013-global-discovery syncspirit_test_lib)
 add_test(013-global-discovery "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/013-global-discovery")
 
+add_executable(014-configuration 014-configuration.cpp)
+target_link_libraries(014-configuration syncspirit_test_lib)
+add_test(014-configuration "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/014-configuration")
+
 add_executable(050-device_id 050-device_id.cpp)
 target_link_libraries(050-device_id syncspirit_test_lib)
 add_test(050-device_id "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-device_id")

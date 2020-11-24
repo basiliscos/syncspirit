@@ -19,6 +19,8 @@ struct URI {
     void set_query(const std::string &value) noexcept;
     std::string relative() const noexcept;
 
+    inline bool operator==(const URI &other) const noexcept { return full == other.full; }
+
   private:
     void reconstruct() noexcept;
 };

@@ -1,0 +1,25 @@
+[global]
+timeout = 5000
+device_name = "hp-note"
+
+[local_announce]
+enabled = 0
+port = 21027
+
+[global_discovery]
+announce_url = "https://discovery.syncthing.net/"
+device_id = "LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW"
+cert_file = "~/.config/syncthing/cert.pem"
+key_file = "~/.config/syncthing/key.pem"
+rx_buff_size = 32768
+timeout = 3000
+
+[upnp]
+max_wait = 1
+timeout = 10
+external_port = 22001
+rx_buff_size = 65536
+
+[bep]
+# 32 MB
+rx_buff_size = 33554432

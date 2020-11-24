@@ -29,7 +29,7 @@ void make_hello_message(fmt::memory_buffer &buff, const std::string_view &device
 
 // void parse hello
 
-template <typename... Ts> auto wrap(Ts &&... data) noexcept {
+template <typename... Ts> auto wrap(Ts &&...data) noexcept {
     return message::wrapped_message_t{std::forward<Ts>(data)...};
 }
 

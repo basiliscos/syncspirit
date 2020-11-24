@@ -1,4 +1,3 @@
-- generate keys
 
 4. discovery_support, upnp_support-> proto ?
 

@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.2)
 project (syncspirit)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(
@@ -76,6 +76,7 @@ target_include_directories(syncspirit_lib PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/json/include
     ${syncspirit_SOURCE_DIR}/lib/pugixml/src
     ${syncspirit_SOURCE_DIR}/lib/uriparser/include
+    ${syncspirit_SOURCE_DIR}/lib/tomlplusplus/include
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}
