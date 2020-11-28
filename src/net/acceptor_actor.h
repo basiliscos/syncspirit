@@ -45,6 +45,7 @@ struct acceptor_actor_t : public r::actor_base_t {
     tcp::endpoint endpoint;
     tcp::acceptor acceptor;
     tcp_socket_t peer;
+    r::address_ptr_t coordinator;
 };
 
 } // namespace net

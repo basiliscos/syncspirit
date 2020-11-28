@@ -26,6 +26,7 @@ add_library(syncspirit_lib
     src/net/acceptor_actor.cpp
     src/net/global_discovery_actor.cpp
     src/net/http_actor.cpp
+    src/net/local_discovery_actor.cpp
     src/net/net_supervisor.cpp
     src/net/peer_actor.cpp
     src/net/peer_supervisor.cpp

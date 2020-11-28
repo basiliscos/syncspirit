@@ -64,10 +64,41 @@ config_result_t get_config(std::istream &config) {
         cfg.device_name = device_name.value();
     } while (0);
 
+    // local_discovery
+    do {
+        auto t = root_tbl["local_discovery"];
+        auto &c = cfg.local_announce_config;
+
+        auto enabled = t["enabled"].value<bool>();
+        if (!enabled) {
+            return "local_discovery/enabled is incorrect or missing";
+        }
+        c.enabled = enabled.value();
+
+        auto port = t["port"].value<std::uint16_t>();
+        if (!port) {
+            return "local_discovery/port is incorrect or missing";
+        }
+        c.port = port.value();
+
+        auto frequency = t["frequency"].value<std::uint32_t>();
+        if (!frequency) {
+            return "local_discovery/frequency is incorrect or missing";
+        }
+        c.frequency = frequency.value();
+    } while (0);
+
     // global_discovery
     do {
         auto t = root_tbl["global_discovery"];
         auto &c = cfg.global_announce_config;
+
+        auto enabled = t["enabled"].value<bool>();
+        if (!enabled) {
+            return "global_discovery/enabled is incorrect or missing";
+        }
+        c.enabled = enabled.value();
+
         auto url = t["announce_url"].value<std::string>();
         if (!url) {
             return "global_discovery/announce_url is incorrect or missing";
@@ -159,7 +190,13 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
             {"timeout",  cfg.timeout},
             {"device_name", cfg.device_name}
         }}},
+        {"local_discovery", toml::table{{
+            {"enabled",  cfg.local_announce_config.enabled},
+            {"port",  cfg.local_announce_config.port},
+            {"frequency",  cfg.local_announce_config.frequency},
+        }}},
         {"global_discovery", toml::table{{
+            {"enabled",  cfg.global_announce_config.enabled},
             {"announce_url", cfg.global_announce_config.announce_url.full},
             {"device_id", cfg.global_announce_config.device_id},
             {"cert_file", cfg.global_announce_config.cert_file},
@@ -207,7 +244,13 @@ configuration_t generate_config(const boost::filesystem::path &config_path) {
     configuration_t cfg;
     cfg.timeout = 5000;
     cfg.device_name = device;
+    cfg.local_announce_config = local_announce_config_t {
+        true,
+        21027,
+        30
+    };
     cfg.global_announce_config = global_announce_config_t{
+        true,
         utils::parse("https://discovery.syncthing.net/").value(),
         "LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW",
         cert_file,

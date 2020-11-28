@@ -1,5 +1,6 @@
 #include "net_supervisor.h"
 #include "global_discovery_actor.h"
+#include "local_discovery_actor.h"
 #include "upnp_actor.h"
 #include "acceptor_actor.h"
 #include "ssdp_actor.h"
@@ -70,6 +71,15 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
         .rx_buff_size(app_cfg.upnp_config.rx_buff_size)
         .external_port(app_cfg.upnp_config.external_port)
         .finish();
+    if (app_cfg.local_announce_config.enabled) {
+        auto &cfg = app_cfg.local_announce_config;
+        create_actor<local_discovery_actor_t>()
+            .port(cfg.port)
+            .frequency(cfg.frequency)
+            .device_id(device_id)
+            .timeout(timeout)
+            .finish();
+    }
 
     // temporally hard-code
     peer_list_t peers;
@@ -106,19 +116,21 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
         return do_shutdown();
     }
 
-    auto timeout = shutdown_timeout * 9 / 10;
-    tcp::endpoint external_ep(message.payload.external_ip, app_cfg.upnp_config.external_port);
     auto &cfg = app_cfg.global_announce_config;
-    global_discovery_addr = create_actor<global_discovery_actor_t>()
-                                .timeout(timeout)
-                                .endpoint(external_ep)
-                                .ssl_pair(&ssl_pair)
-                                .announce_url(cfg.announce_url)
-                                .device_id(model::device_id_t(cfg.device_id))
-                                .rx_buff_size(cfg.rx_buff_size)
-                                .io_timeout(cfg.timeout)
-                                .finish()
-                                ->get_address();
+    if (cfg.enabled) {
+        auto timeout = shutdown_timeout * 9 / 10;
+        tcp::endpoint external_ep(message.payload.external_ip, app_cfg.upnp_config.external_port);
+        global_discovery_addr = create_actor<global_discovery_actor_t>()
+                                    .timeout(timeout)
+                                    .endpoint(external_ep)
+                                    .ssl_pair(&ssl_pair)
+                                    .announce_url(cfg.announce_url)
+                                    .device_id(model::device_id_t(cfg.device_id))
+                                    .rx_buff_size(cfg.rx_buff_size)
+                                    .io_timeout(cfg.timeout)
+                                    .finish()
+                                    ->get_address();
+    }
 }
 
 void net_supervisor_t::on_announce(message::announce_notification_t &) noexcept {

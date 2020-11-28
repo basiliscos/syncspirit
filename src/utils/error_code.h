@@ -41,6 +41,7 @@ enum class error_code {
     malformed_url,
     malformed_date,
     transport_not_available,
+    wrong_magic,
 };
 
 enum class bep_error_code {

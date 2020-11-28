@@ -1,3 +1,22 @@
+- local-discovery
+    pre-route on localhost
+
+sysctl -w net.ipv4.conf.wlp2s0.bc_forwarding=1
+sysctl -w net.ipv4.conf.wlp2s0.forwarding=1
+sysctl -w net.ipv4.conf.wlp2s0.route_localnet=1
+
+iptables -t nat -A OUTPUT -p udp --dport 21027 -j DNAT --to-destination 127.0.0.1:21026
+
+tcp://0.0.0.0:22000
+[transport-available] message
+
+https://serverfault.com/questions/976211/iptables-to-forward-duplicate-mirror-locally-generated-udp-traffic
+https://unix.stackexchange.com/questions/241174/dev-tcp-not-found
+https://unix.stackexchange.com/questions/77874/transform-a-udp-unicast-packet-into-a-broadcast
+
+
+- syncthing-relay(7), syncthing-faq(7), syncthing-networking(7)
+- relay://78.46.89.67:22067/?id=WAVJNLF-AVVZAPT-V6JEQA5-B3EPEW6-6SAR3C4-NFZBOW2-CWR3QM4-QJT2OA6&pingInterval=1m0s&networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=frogeye.fr
 
 4. discovery_support, upnp_support-> proto ?
 

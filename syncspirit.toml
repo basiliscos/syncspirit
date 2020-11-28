@@ -2,9 +2,10 @@
 timeout = 5000
 device_name = "hp-note"
 
-[local_announce]
+[local_discovery]
 enabled = 0
-port = 21027
+port = 21026
+frequency = 30
 
 [global_discovery]
 announce_url = "https://discovery.syncthing.net/"

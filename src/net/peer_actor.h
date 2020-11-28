@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../configuration.h"
+#include "../proto/bep_support.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>
@@ -8,6 +9,7 @@
 #include <list>
 
 namespace syncspirit {
+
 namespace net {
 
 struct peer_actor_config_t : public r::actor_config_t {
@@ -80,6 +82,7 @@ struct peer_actor_t : public r::actor_base_t {
     using tx_item_t = r::intrusive_ptr_t<confidential::payload::tx_item_t>;
     using tx_message_t = confidential::message::tx_item_t;
     using tx_queue_t = std::list<tx_item_t>;
+    using read_action_t = std::function<void(proto::message::message_t &&msg)>;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_connect(resolve_it_t) noexcept;
@@ -92,10 +95,12 @@ struct peer_actor_t : public r::actor_base_t {
     void on_handshake_error(sys::error_code ec) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void read_more() noexcept;
-    void authorize() noexcept;
     void push_write(fmt::memory_buffer &&buff, bool final) noexcept;
     void process_tx_queue() noexcept;
     void cancel_timer() noexcept;
+
+    void read_hello(proto::message::message_t &&msg) noexcept;
+    void read_cluster_config(proto::message::message_t &&msg) noexcept;
 
     std::string_view device_name;
     model::peer_contact_t contact;
@@ -109,6 +114,7 @@ struct peer_actor_t : public r::actor_base_t {
     fmt::memory_buffer rx_buff;
     std::size_t rx_idx = 0;
     bool valid_peer = false;
+    read_action_t read_action;
 };
 
 } // namespace net

@@ -20,7 +20,10 @@ void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::starter_plugin_t>(
         [&](auto &p) { p.subscribe_actor(&acceptor_actor_t::on_endpoint_request); });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::acceptor, get_address()); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.register_name(names::acceptor, get_address());
+        p.discover_name(names::coordinator, coordinator, false).link();
+    });
 }
 
 void acceptor_actor_t::on_start() noexcept {
