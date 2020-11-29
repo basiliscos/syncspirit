@@ -102,7 +102,7 @@ void local_discovery_actor_t::announce() noexcept {
     static const constexpr std::uint64_t instance = 0;
     spdlog::trace("local_discovery_actor_t::announce", (void *)address.get());
 
-    auto sz = proto::make_announce_message(tx_buff, device_id.value, uris, instance);
+    auto sz = proto::make_announce_message(tx_buff, device_id.get_value(), uris, instance);
     auto buff = asio::buffer(tx_buff.data(), sz);
     auto fwd_send =
         ra::forwarder_t(*this, &local_discovery_actor_t::on_write, &local_discovery_actor_t::on_write_error);

@@ -41,7 +41,7 @@ outcome::result<URI> make_announce_request(fmt::memory_buffer &buff, const URI &
 
 outcome::result<URI> make_discovery_request(fmt::memory_buffer &buff, const URI &announce_uri,
                                             const model::device_id_t device_id) noexcept {
-    auto target = fmt::format("?device={}", device_id.value);
+    auto target = fmt::format("?device={}", device_id.get_value());
     utils::URI uri = announce_uri;
     uri.set_query(target);
 

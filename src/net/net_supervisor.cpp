@@ -83,7 +83,9 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
 
     // temporally hard-code
     peer_list_t peers;
-    peers.push_back(model::device_id_t("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
+    auto sample_peer =
+        model::device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
+    peers.push_back(sample_peer.value());
     peers_addr = create_actor<peer_supervisor_t>()
                      .ssl_pair(&ssl_pair)
                      .device_name(app_cfg.device_name)
@@ -118,6 +120,13 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
 
     auto &cfg = app_cfg.global_announce_config;
     if (cfg.enabled) {
+        auto global_device_id = model::device_id_t::from_string(cfg.device_id);
+        if (!global_device_id) {
+            spdlog::debug(
+                "net_supervisor_t::on_port_mapping invalid global device id :: {} global discovery will not be used",
+                cfg.device_id);
+            return;
+        }
         auto timeout = shutdown_timeout * 9 / 10;
         tcp::endpoint external_ep(message.payload.external_ip, app_cfg.upnp_config.external_port);
         global_discovery_addr = create_actor<global_discovery_actor_t>()
@@ -125,7 +134,7 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
                                     .endpoint(external_ep)
                                     .ssl_pair(&ssl_pair)
                                     .announce_url(cfg.announce_url)
-                                    .device_id(model::device_id_t(cfg.device_id))
+                                    .device_id(std::move(global_device_id.value()))
                                     .rx_buff_size(cfg.rx_buff_size)
                                     .io_timeout(cfg.timeout)
                                     .finish()
