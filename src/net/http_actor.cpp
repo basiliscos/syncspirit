@@ -37,7 +37,6 @@ void http_actor_t::on_request(message::http_request_t &req) noexcept {
 
 void http_actor_t::on_cancel(message::http_cancel_t &req) noexcept {
     if (queue.empty()) {
-        cancel_sock();
         return;
     }
 
@@ -70,7 +69,9 @@ void http_actor_t::process() noexcept {
             reply_with_error(*req, ec);
         }
         queue.clear();
-        cancel_sock();
+        if (resources->has(resource::io)) {
+            transport->cancel();
+        }
         return;
     }
 
@@ -92,8 +93,8 @@ void http_actor_t::process() noexcept {
             spdlog::warn("http_actor_t ({}) :: different endpoint is used: {}:{} vs {}:{}", registry_name,
                          resolved_url.host, resolved_url.port, url.host, url.port);
             kept_alive = false;
-            cancel_sock();
-            process();
+            transport->cancel();
+            return;
         }
     } else {
         auto port = std::to_string(url.port);
@@ -102,8 +103,6 @@ void http_actor_t::process() noexcept {
 }
 
 void http_actor_t::spawn_timer() noexcept {
-    resources->acquire(resource::io);
-
     timer_request = start_timer(request_timeout, *this, &http_actor_t::on_timer);
     resources->acquire(resource::request_timer);
 }
@@ -141,19 +140,21 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     transport::connect_fn_t on_connect = [&](auto arg) { this->on_connect(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     transport->async_connect(addresses, on_connect, on_error);
+    resources->acquire(resource::io);
     spawn_timer();
     resolved_url = payload->url;
 }
 
 void http_actor_t::on_connect(resolve_it_t) noexcept {
+    resources->release(resource::io);
     if (!need_response || stop_io) {
-        resources->release(resource::io);
         return process();
     }
 
     transport::handshake_fn_t handshake_fn([&](auto arg, auto peer) { on_handshake(arg, peer); });
     transport::error_fn_t error_fn([&](auto arg) { on_handshake_error(arg); });
     transport->async_handshake(handshake_fn, error_fn);
+    resources->acquire(resource::io);
 }
 
 void http_actor_t::write_request() noexcept {
@@ -165,11 +166,12 @@ void http_actor_t::write_request() noexcept {
     transport::io_fn_t on_write = [&](auto arg) { this->on_request_sent(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     transport->async_send(buff, on_write, on_error);
+    resources->acquire(resource::io);
 }
 
 void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
+    resources->release(resource::io);
     if (!need_response || stop_io) {
-        resources->release(resource::io);
         return process();
     }
 
@@ -179,9 +181,11 @@ void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
     transport::io_fn_t on_read = [&](auto arg) { this->on_request_read(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     http_adapter->async_read(*rx_buff, http_response, on_read, on_error);
+    resources->acquire(resource::io);
 }
 
 void http_actor_t::on_request_read(std::size_t bytes) noexcept {
+    resources->release(resource::io);
     response_size = bytes;
 
     /*
@@ -198,7 +202,6 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
         http_adapter = nullptr;
     }
 
-    resources->release(resource::io);
     if (resources->has(resource::request_timer)) {
         cancel_timer(*timer_request);
     }
@@ -224,6 +227,7 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
 }
 
 void http_actor_t::on_handshake(bool valid_peer, X509 *) noexcept {
+    resources->release(resource::io);
     if (!need_response || stop_io) {
         resources->release(resource::io);
         return process();
@@ -271,21 +275,22 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     process();
 }
 
-void http_actor_t::cancel_sock() noexcept {
-    transport.reset();
-    http_adapter = nullptr;
-}
-
 void http_actor_t::on_start() noexcept {
     spdlog::trace("http_actor_t::on_start({}) (addr = {})", registry_name, (void *)address.get());
     r::actor_base_t::on_start();
 }
 
+void http_actor_t::shutdown_finish() noexcept {
+    spdlog::trace("http_actor_t::shutdown_finish({}) (addr = {})", registry_name, (void *)address.get());
+    r::actor_base_t::shutdown_finish();
+    transport.reset();
+}
+
 void http_actor_t::on_close_connection(message::http_close_connection_t &) noexcept {
     if (kept_alive) {
         stop_io = true;
-        if (queue.empty()) {
-            cancel_sock();
+        if (queue.empty() && resources->has(resource::io)) {
+            transport->cancel();
         }
     }
 }

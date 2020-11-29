@@ -58,6 +58,7 @@ struct http_actor_t : public r::actor_base_t {
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
+    void shutdown_finish() noexcept override;
 
   private:
     using queue_t = std::list<request_ptr_t>;
@@ -79,7 +80,6 @@ struct http_actor_t : public r::actor_base_t {
     void on_shutdown_timer(r::request_id_t, bool cancelled) noexcept;
     void on_handshake(bool valid_peer, X509 *) noexcept;
     void on_handshake_error(sys::error_code ec) noexcept;
-    void cancel_sock() noexcept;
     void cancel_io() noexcept;
     void write_request() noexcept;
     void start_shutdown_timer() noexcept;

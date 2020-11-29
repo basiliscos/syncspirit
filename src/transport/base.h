@@ -60,6 +60,7 @@ struct base_t {
     rotor::asio::supervisor_asio_t &supervisor;
     strand_t &strand;
     model::device_id_t actual_peer;
+    bool cancelling;
 
     template <typename Socket>
     void async_connect_impl(Socket &sock, const resolved_hosts_t &hosts, connect_fn_t &on_connect,
@@ -67,6 +68,9 @@ struct base_t {
         asio::async_connect(sock, hosts.begin(), hosts.end(), [this, on_connect, on_error](auto &ec, auto addr) {
             if (ec) {
                 strand.post([ec = ec, on_error, this]() {
+                    if (ec == asio::error::operation_aborted) {
+                        cancelling = false;
+                    }
                     on_error(ec);
                     supervisor.do_process();
                 });
@@ -85,6 +89,9 @@ struct base_t {
         asio::async_write(sock, buff, [&, on_write, on_error, this](auto &ec, auto bytes) {
             if (ec) {
                 strand.post([ec = ec, on_error, this]() {
+                    if (ec == asio::error::operation_aborted) {
+                        cancelling = false;
+                    }
                     on_error(ec);
                     supervisor.do_process();
                 });
@@ -103,6 +110,9 @@ struct base_t {
         sock.async_read_some(buff, [&, on_write, on_error, this](auto &ec, auto bytes) {
             if (ec) {
                 strand.post([ec = ec, on_error, this]() {
+                    if (ec == asio::error::operation_aborted) {
+                        cancelling = false;
+                    }
                     on_error(ec);
                     supervisor.do_process();
                 });
@@ -117,9 +127,12 @@ struct base_t {
 
     template <typename Socket> void cancel_impl(Socket &sock) noexcept {
         sys::error_code ec;
-        sock.cancel(ec);
-        if (ec) {
-            spdlog::error("base_t::cancel() :: {}", ec.message());
+        if (!cancelling) {
+            cancelling = true;
+            sock.cancel(ec);
+            if (ec) {
+                spdlog::error("base_t::cancel() :: {}", ec.message());
+            }
         }
     }
 };
@@ -138,6 +151,7 @@ struct http_base_t {
 
   protected:
     rotor::asio::supervisor_asio_t &supervisor;
+    bool in_progess = false;
 
     template <typename Socket>
     void async_read_impl(Socket &sock, strand_t &strand, rx_buff_t &rx_buff, response_t &response,
@@ -145,16 +159,19 @@ struct http_base_t {
         http::async_read(sock, rx_buff, response, [&, on_read, on_error, this](auto ec, auto bytes) {
             if (ec) {
                 strand.post([ec = ec, on_error, this]() {
+                    in_progess = false;
                     on_error(ec);
                     supervisor.do_process();
                 });
                 return;
             }
             strand.post([bytes = bytes, on_read, this]() {
+                in_progess = false;
                 on_read(bytes);
                 supervisor.do_process();
             });
         });
+        in_progess = true;
     }
 };
 
