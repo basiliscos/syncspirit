@@ -19,8 +19,13 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
         spdlog::critical("cannot load certificate/key pair :: {}", result.error().message());
         throw result.error();
     }
+    auto device = model::device_id_t::from_cert(ssl_pair.cert_data);
+    if (!device) {
+        spdlog::critical("cannot create device_id from certificate");
+        throw "cannot create device_id from certificate";
+    }
     ssl_pair = std::move(result.value());
-    device_id = model::device_id_t(ssl_pair.cert_data);
+    device_id = std::move(device.value());
     spdlog::info("net_supervisor_t, device name = {},  device id = {}", app_cfg.device_name, device_id);
 }
 
@@ -34,6 +39,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_announce);
         p.subscribe_actor(&net_supervisor_t::on_discovery_req);
         p.subscribe_actor(&net_supervisor_t::on_discovery_res);
+        p.subscribe_actor(&net_supervisor_t::on_discovery_notify);
         launch_ssdp();
     });
 }
@@ -168,4 +174,9 @@ void net_supervisor_t::on_discovery_res(message::discovery_response_t &res) noex
         reply_to(*orig, std::move(peer));
     }
     discovery_map.erase(it);
+}
+
+void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message) noexcept {
+    auto &device_id = message.payload.device_id;
+    spdlog::debug("net_supervisor_t::on_discovery_notify, locally discovered peer = {}", device_id.get_value());
 }

@@ -35,7 +35,7 @@ void peer_actor_t::try_next_uri() noexcept {
     while (uri_idx < (std::int32_t)contact.uris.size()) {
         auto &uri = contact.uris[++uri_idx];
         auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
-        spdlog::warn("url: {}", uri.full);
+        // spdlog::warn("url: {}", uri.full);
         transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup};
         auto result = transport::initiate(cfg);
         if (result) {

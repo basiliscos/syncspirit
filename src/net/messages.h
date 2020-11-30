@@ -123,6 +123,12 @@ struct discovery_request_t : r::arc_base_t<discovery_request_t> {
     model::device_id_t device_id;
 };
 
+struct discovery_notification_t {
+    model::device_id_t device_id;
+    model::peer_contact_option_t peer;
+    udp::endpoint peer_endpoint;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -146,6 +152,7 @@ using http_close_connection_t = r::message_t<payload::http_close_connection_t>;
 using discovery_request_t = r::request_traits_t<payload::discovery_request_t>::request::message_t;
 using discovery_response_t = r::request_traits_t<payload::discovery_request_t>::response::message_t;
 using discovery_cancel_t = r::request_traits_t<payload::discovery_request_t>::response::message_t;
+using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
 
 } // end of namespace message
 

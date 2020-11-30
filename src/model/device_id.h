@@ -17,9 +17,10 @@ struct device_id_t {
     static const constexpr std::size_t DASHED_SIZE = LUHNIZED_SIZE + DASH_ITERATIONS - 1;
 
     static std::optional<device_id_t> from_string(const std::string &value) noexcept;
+    static std::optional<device_id_t> from_sha256(const std::string &sha_256) noexcept;
+    static std::optional<device_id_t> from_cert(const utils::cert_data_t &cert) noexcept;
 
     device_id_t() noexcept {};
-    device_id_t(const utils::cert_data_t &) noexcept;
 
     bool operator==(const device_id_t &other) const noexcept { return other.value == value; }
     bool operator!=(const device_id_t &other) const noexcept { return !(other.value == value); }
@@ -33,6 +34,7 @@ struct device_id_t {
     }
 
   private:
+    device_id_t(const utils::cert_data_t &) noexcept;
     device_id_t(const std::string_view &value_, const std::string_view &sha256_) noexcept
         : value(value_), sha256{sha256_} {};
 

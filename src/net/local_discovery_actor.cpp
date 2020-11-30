@@ -81,6 +81,7 @@ void local_discovery_actor_t::on_endpoint(message::endpoint_response_t &res) noe
 void local_discovery_actor_t::on_start() noexcept {
     spdlog::trace("local_discovery_actor_t::on_start (addr = {})", (void *)address.get());
     r::actor_base_t::on_start();
+    do_read();
     announce();
 }
 
@@ -100,7 +101,7 @@ void local_discovery_actor_t::shutdown_start() noexcept {
 
 void local_discovery_actor_t::announce() noexcept {
     static const constexpr std::uint64_t instance = 0;
-    spdlog::trace("local_discovery_actor_t::announce", (void *)address.get());
+    // spdlog::trace("local_discovery_actor_t::announce", (void *)address.get());
 
     auto sz = proto::make_announce_message(tx_buff, device_id.get_sha256(), uris, instance);
     auto buff = asio::buffer(tx_buff.data(), sz);
@@ -132,13 +133,35 @@ void local_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept
 
 void local_discovery_actor_t::on_read(size_t bytes) noexcept {
     resources->release(resource::io);
+    // spdlog::trace("local_discovery_actor_t::on_read");
     auto buff = asio::buffer(rx_buff.data(), bytes);
     auto result = proto::parse_announce(buff);
     if (!result) {
         spdlog::trace("local_discovery_actor_t::on_read, cannot parse incoming UDP packet {} bytes from {} :: {}",
                       bytes, peer_endpoint, result.error().message());
     } else {
-        std::abort();
+        auto &msg = result.value();
+        auto &sha = msg->id();
+        auto device_id = model::device_id_t::from_sha256(sha);
+        if (device_id) {
+            model::peer_contact_t::uri_container_t uris;
+            for (int i = 0; i < msg->addresses_size(); ++i) {
+                auto uri = utils::parse(msg->addresses(i).c_str());
+                if (uri) {
+                    uris.emplace_back(std::move(uri.value()));
+                }
+            }
+            if (!uris.empty()) {
+                boost::posix_time::ptime now(boost::posix_time::microsec_clock::local_time());
+                model::peer_contact_t contact{std::move(now), std::move(uris)};
+                send<payload::discovery_notification_t>(coordinator, std::move(device_id.value()), std::move(contact),
+                                                        std::move(peer_endpoint));
+            } else {
+                spdlog::warn("local_discovery_actor_t::on_read, no valid uris from:: {}", peer_endpoint);
+            }
+        } else {
+            spdlog::warn("local_discovery_actor_t::on_read, wrong device id, coming from :: {}", peer_endpoint);
+        }
     }
     return do_read();
 }

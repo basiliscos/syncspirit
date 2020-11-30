@@ -29,7 +29,10 @@ TEST_CASE("device_id", "[protocol]") {
     auto load_result = load_pair(cert_path.c_str(), key_path.c_str());
     REQUIRE(load_result);
     auto& pair = load_result.value();
-    auto device_id = device_id_t(pair.cert_data);
+    auto opt_device_id = device_id_t::from_cert(pair.cert_data);
+    REQUIRE(opt_device_id);
+
+    auto& device_id = opt_device_id.value();
     auto expected = std::string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
     REQUIRE(device_id.get_value().size() == expected.size());
     REQUIRE(device_id.get_value() == expected);
@@ -40,4 +43,8 @@ TEST_CASE("device_id", "[protocol]") {
 
     opt = device_id_t::from_string("KHQNO2S-5QSILRE-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
     REQUIRE(!opt);
+
+    opt = device_id_t::from_sha256(device_id.get_sha256());
+    REQUIRE((bool)opt);
+    CHECK(opt.value() == device_id);
 }

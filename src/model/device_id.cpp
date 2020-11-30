@@ -7,38 +7,6 @@ using namespace syncspirit::proto;
 using namespace syncspirit::model;
 using namespace syncspirit::utils;
 
-device_id_t::device_id_t(const cert_data_t &data) noexcept {
-    auto sha_result = sha256_digest(data.bytes);
-    assert(sha_result && "cannot calc sha256 from certificate");
-    sha256 = base32::encode(sha_result.value());
-    assert(sha256.size() == SHA256_B32_SIZE);
-
-    auto sha_ptr = sha256.data();
-    char luhnized[LUHNIZED_SIZE];
-    char *luhn_ptr = luhnized;
-    for (std::size_t i = 0; i < LUHN_ITERATIONS; ++i) {
-        std::memcpy(luhn_ptr, sha_ptr, CHECK_DIGIT_INT);
-        auto piece_ptr = luhn_ptr;
-        luhn_ptr += CHECK_DIGIT_INT;
-        *luhn_ptr = luhn32::calculate(std::string_view(piece_ptr, CHECK_DIGIT_INT));
-        ++luhn_ptr;
-        sha_ptr += CHECK_DIGIT_INT;
-    }
-
-    char dashed[DASHED_SIZE];
-    luhn_ptr = luhnized;
-    char *dashed_ptr = dashed;
-    for (std::size_t i = 0; i < DASH_ITERATIONS; ++i) {
-        std::memcpy(dashed_ptr, luhn_ptr, DASH_INT);
-        luhn_ptr += DASH_INT;
-        dashed_ptr += DASH_INT;
-        if (i < DASH_ITERATIONS - 1) {
-            *dashed_ptr++ = '-';
-        }
-    }
-    value = std::string_view(dashed, DASHED_SIZE);
-}
-
 std::optional<device_id_t> device_id_t::from_string(const std::string &value) noexcept {
     using result_t = std::optional<device_id_t>;
     char buff[DASHED_SIZE];
@@ -67,7 +35,7 @@ std::optional<device_id_t> device_id_t::from_string(const std::string &value) no
 
     // remove luhn check digits
     auto ptr = buff;
-    for (int i = 0, c = 0; i < LUHNIZED_SIZE; ++i, ++c) {
+    for (size_t i = 0, c = 0; i < LUHNIZED_SIZE; ++i, ++c) {
         if (c == CHECK_DIGIT_INT) {
             c = -1;
             // SKIP
@@ -83,4 +51,47 @@ std::optional<device_id_t> device_id_t::from_string(const std::string &value) no
         return device_id_t{value, sha.value()};
     }
     return result_t{};
+}
+
+std::optional<device_id_t> device_id_t::from_sha256(const std::string &sha_256) noexcept {
+    using result_t = std::optional<device_id_t>;
+    auto sha256_enc = base32::encode(sha_256);
+    if (sha256_enc.size() != SHA256_B32_SIZE) {
+        return result_t{};
+    }
+
+    auto sha_ptr = sha256_enc.data();
+    char luhnized[LUHNIZED_SIZE];
+    char *luhn_ptr = luhnized;
+    for (std::size_t i = 0; i < LUHN_ITERATIONS; ++i) {
+        std::memcpy(luhn_ptr, sha_ptr, CHECK_DIGIT_INT);
+        auto piece_ptr = luhn_ptr;
+        luhn_ptr += CHECK_DIGIT_INT;
+        *luhn_ptr = luhn32::calculate(std::string_view(piece_ptr, CHECK_DIGIT_INT));
+        ++luhn_ptr;
+        sha_ptr += CHECK_DIGIT_INT;
+    }
+
+    char dashed[DASHED_SIZE];
+    luhn_ptr = luhnized;
+    char *dashed_ptr = dashed;
+    for (std::size_t i = 0; i < DASH_ITERATIONS; ++i) {
+        std::memcpy(dashed_ptr, luhn_ptr, DASH_INT);
+        luhn_ptr += DASH_INT;
+        dashed_ptr += DASH_INT;
+        if (i < DASH_ITERATIONS - 1) {
+            *dashed_ptr++ = '-';
+        }
+    }
+    auto str = std::string_view(dashed, DASHED_SIZE);
+    return device_id_t{str, sha_256};
+}
+
+std::optional<device_id_t> device_id_t::from_cert(const cert_data_t &data) noexcept {
+    using result_t = std::optional<device_id_t>;
+    auto sha_result = sha256_digest(data.bytes);
+    if (!sha_result) {
+        return result_t{};
+    }
+    return from_sha256(sha_result.value());
 }

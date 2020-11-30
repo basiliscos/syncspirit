@@ -150,7 +150,7 @@ std::size_t make_announce_message(fmt::memory_buffer &buff, const std::string_vi
     bool ok = msg.SerializeToArray(ptr_32, sz);
     (void)ok;
     assert(ok);
-    return sz;
+    return sz + 4;
 }
 
 outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff) noexcept {

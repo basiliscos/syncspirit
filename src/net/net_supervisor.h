@@ -43,6 +43,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
     void on_discovery_req(message::discovery_request_t &req) noexcept;
     void on_discovery_res(message::discovery_response_t &req) noexcept;
+    void on_discovery_notify(message::discovery_notify_t &message) noexcept;
     bool launch_ssdp() noexcept;
 
     config::configuration_t app_cfg;

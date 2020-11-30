@@ -14,6 +14,7 @@ https://serverfault.com/questions/976211/iptables-to-forward-duplicate-mirror-lo
 https://unix.stackexchange.com/questions/241174/dev-tcp-not-found
 https://unix.stackexchange.com/questions/77874/transform-a-udp-unicast-packet-into-a-broadcast
 
+- https://stackoverflow.com/questions/29890/how-to-get-your-own-local-ip-address-from-an-udp-socket-c-c
 
 - syncthing-relay(7), syncthing-faq(7), syncthing-networking(7)
 - relay://78.46.89.67:22067/?id=WAVJNLF-AVVZAPT-V6JEQA5-B3EPEW6-6SAR3C4-NFZBOW2-CWR3QM4-QJT2OA6&pingInterval=1m0s&networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=frogeye.fr
