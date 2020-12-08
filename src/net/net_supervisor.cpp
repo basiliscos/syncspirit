@@ -40,17 +40,27 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_discovery_req);
         p.subscribe_actor(&net_supervisor_t::on_discovery_res);
         p.subscribe_actor(&net_supervisor_t::on_discovery_notify);
-        launch_ssdp();
     });
 }
 
 void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept {
     parent_t::on_child_shutdown(actor, ec);
     spdlog::trace("net_supervisor_t::on_child_shutdown(), addr = {}", (void *)actor->get_address().get());
-    if (!ec && ssdp_addr && actor->get_address() == ssdp_addr) {
-        return;
+    if (ssdp_addr && actor->get_address() == ssdp_addr) {
+        if (!ec && state == r::state_t::OPERATIONAL) {
+            launch_ssdp();
+            return;
+        }
     }
-    do_shutdown();
+    if (state == r::state_t::OPERATIONAL) {
+        do_shutdown();
+    }
+}
+
+void net_supervisor_t::on_start() noexcept {
+    spdlog::trace("net_supervisor_t::on_start (addr = {})", (void *)address.get());
+    parent_t::on_start();
+    launch_ssdp();
 }
 
 void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {

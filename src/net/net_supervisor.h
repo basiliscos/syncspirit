@@ -33,6 +33,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     explicit net_supervisor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept override;
+    void on_start() noexcept override;
 
   private:
     using discovery_map_t =

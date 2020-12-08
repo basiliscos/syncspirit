@@ -146,6 +146,7 @@ int main(int argc, char **argv) {
                            .strand(stand)
                            .timeout(timeout)
                            .create_registry()
+                           .guard_context(true)
                            .finish();
         sup_net->start();
 
