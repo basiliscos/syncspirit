@@ -1,31 +1,22 @@
+- lz4
+
 - local-discovery
-    pre-route on localhost
+    iptables -t nat -A OUTPUT -p udp --dport 21027 -j DNAT --to-destination 127.0.0.1:21026
 
-sysctl -w net.ipv4.conf.wlp2s0.bc_forwarding=1
-sysctl -w net.ipv4.conf.wlp2s0.forwarding=1
-sysctl -w net.ipv4.conf.wlp2s0.route_localnet=1
+- DB
+    https://github.com/erthink/libmdbx
+    https://en.wikipedia.org/wiki/Cdb_(software)
+    https://en.wikipedia.org/wiki/LevelDB
 
-iptables -t nat -A OUTPUT -p udp --dport 21027 -j DNAT --to-destination 127.0.0.1:21026
 
-tcp://0.0.0.0:22000
-[transport-available] message
+-relay
+    syncthing-relay(7)
+    relay://78.46.89.67:22067/?id=WAVJNLF-AVVZAPT-V6JEQA5-B3EPEW6-6SAR3C4-NFZBOW2-CWR3QM4-QJT2OA6&pingInterval=1m0s&networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=frogeye.fr
 
-https://serverfault.com/questions/976211/iptables-to-forward-duplicate-mirror-locally-generated-udp-traffic
-https://unix.stackexchange.com/questions/241174/dev-tcp-not-found
-https://unix.stackexchange.com/questions/77874/transform-a-udp-unicast-packet-into-a-broadcast
-
-- https://stackoverflow.com/questions/29890/how-to-get-your-own-local-ip-address-from-an-udp-socket-c-c
-
-- syncthing-relay(7), syncthing-faq(7), syncthing-networking(7)
-- relay://78.46.89.67:22067/?id=WAVJNLF-AVVZAPT-V6JEQA5-B3EPEW6-6SAR3C4-NFZBOW2-CWR3QM4-QJT2OA6&pingInterval=1m0s&networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=frogeye.fr
-
-4. discovery_support, upnp_support-> proto ?
+- discovery_support, upnp_support-> proto ?
+- вообще не отвечает upnp
 
 openssl x509 -inform PEM -outform DER -in ~/.config/syncthing/cert.pem -out /tmp/cert.der
-
-
-[start] 22:09:45 INFO: syncthing v1.8.0 "Fermium Flea" (go1.14.7 linux-amd64) unknown@unknown 1970-01-01 00:00:00 UTC
-[KHQNO] 22:09:45 INFO: My ID: KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD
 
 - статически собирать бинарь под линь ( https://www.youtube.com/watch?v=Z7WuUhPJ-cU&list=PLZN9ZGiWZoZruMY-MlkAd-nHzdP9TfLRC&index=25 )
 

@@ -61,18 +61,10 @@ void net_supervisor_t::on_start() noexcept {
     spdlog::trace("net_supervisor_t::on_start (addr = {})", (void *)address.get());
     parent_t::on_start();
     launch_ssdp();
-}
 
-void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
-    spdlog::trace("net_supervisor_t::on_ssdp");
-    /* we no longer need it */
-    send<r::message::shutdown_trigger_t>(get_address(), ssdp_addr);
-    ssdp_addr.reset();
-
-    auto &igd_url = message.payload.igd.location;
     auto timeout = shutdown_timeout * 9 / 10;
     auto io_timeout = shutdown_timeout * 8 / 10;
-    create_actor<acceptor_actor_t>().timeout(timeout).local_address(message.payload.local_address).finish();
+    create_actor<acceptor_actor_t>().timeout(timeout).finish();
     create_actor<resolver_actor_t>().timeout(timeout).resolve_timeout(io_timeout).finish();
     create_actor<http_actor_t>()
         .timeout(timeout)
@@ -81,21 +73,6 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
         .registry_name(names::http10)
         .keep_alive(false)
         .finish();
-    create_actor<upnp_actor_t>()
-        .timeout(timeout)
-        .descr_url(igd_url)
-        .rx_buff_size(app_cfg.upnp_config.rx_buff_size)
-        .external_port(app_cfg.upnp_config.external_port)
-        .finish();
-    if (app_cfg.local_announce_config.enabled) {
-        auto &cfg = app_cfg.local_announce_config;
-        create_actor<local_discovery_actor_t>()
-            .port(cfg.port)
-            .frequency(cfg.frequency)
-            .device_id(device_id)
-            .timeout(timeout)
-            .finish();
-    }
 
     // temporally hard-code
     peer_list_t peers;
@@ -111,6 +88,32 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
                      .bep_config(app_cfg.bep_config)
                      .finish()
                      ->get_address();
+
+    if (app_cfg.local_announce_config.enabled) {
+        auto &cfg = app_cfg.local_announce_config;
+        create_actor<local_discovery_actor_t>()
+            .port(cfg.port)
+            .frequency(cfg.frequency)
+            .device_id(device_id)
+            .timeout(timeout)
+            .finish();
+    }
+}
+
+void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
+    spdlog::trace("net_supervisor_t::on_ssdp");
+    /* we no longer need it */
+    send<r::message::shutdown_trigger_t>(get_address(), ssdp_addr);
+    ssdp_addr.reset();
+
+    auto &igd_url = message.payload.igd.location;
+    auto timeout = shutdown_timeout * 9 / 10;
+    create_actor<upnp_actor_t>()
+        .timeout(timeout)
+        .descr_url(igd_url)
+        .rx_buff_size(app_cfg.upnp_config.rx_buff_size)
+        .external_port(app_cfg.upnp_config.external_port)
+        .finish();
 }
 
 bool net_supervisor_t::launch_ssdp() noexcept {
@@ -164,11 +167,16 @@ void net_supervisor_t::on_announce(message::announce_notification_t &) noexcept 
 }
 
 void net_supervisor_t::on_discovery_req(message::discovery_request_t &req) noexcept {
-    assert(global_discovery_addr);
-    auto timeout = shutdown_timeout / 2;
-    auto &device_id = req.payload.request_payload->device_id;
-    auto req_id = request<payload::discovery_request_t>(global_discovery_addr, device_id).send(timeout);
-    discovery_map.emplace(req_id, &req);
+    if (global_discovery_addr) {
+        assert(global_discovery_addr);
+        auto timeout = shutdown_timeout / 2;
+        auto &device_id = req.payload.request_payload->device_id;
+        auto req_id = request<payload::discovery_request_t>(global_discovery_addr, device_id).send(timeout);
+        discovery_map.emplace(req_id, &req);
+    } else {
+        auto ec = r::make_error_code(r::error_code_t::unknown_service);
+        reply_with_error(req, ec);
+    }
 }
 
 void net_supervisor_t::on_discovery_res(message::discovery_response_t &res) noexcept {
@@ -188,5 +196,14 @@ void net_supervisor_t::on_discovery_res(message::discovery_response_t &res) noex
 
 void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message) noexcept {
     auto &device_id = message.payload.device_id;
+    auto &peer_contact = message.payload.peer;
     spdlog::debug("net_supervisor_t::on_discovery_notify, locally discovered peer = {}", device_id.get_value());
+    // TODO check, do we need that peer
+    if (peers_addr && peer_contact.has_value()) {
+        // TODO check, do we need that peer
+        if (device_id.get_value() != "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD") {
+            return;
+        }
+        send<payload::discovery_notification_t>(peers_addr, std::move(message.payload));
+    }
 }

@@ -13,8 +13,7 @@ r::plugin::resource_id_t accepting = 0;
 
 acceptor_actor_t::acceptor_actor_t(config_t &config)
     : r::actor_base_t{config}, strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()},
-      sock{strand}, endpoint{config.local_address, 0 /* let it be assigned by system*/}, acceptor{strand},
-      peer{strand} {}
+      sock{strand}, acceptor{strand}, peer{strand} {}
 
 void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -56,7 +55,8 @@ void acceptor_actor_t::on_start() noexcept {
         return do_shutdown();
     }
 
-    accept_next();
+    // temporally disabled
+    // accept_next();
     r::actor_base_t::on_start();
 }
 

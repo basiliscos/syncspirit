@@ -58,7 +58,10 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
   private:
     void on_announce(message::announce_notification_t &msg) noexcept;
     void on_discovery(message::discovery_response_t &res) noexcept;
+    void on_discovery_notify(message::discovery_notify_t &message) noexcept;
     void discover_next_peer() noexcept;
+
+    void launch_peer(const model::device_id_t &peer_device, const model::peer_contact_t &contact) noexcept;
 
     r::address_ptr_t coordinator;
     peer_list_t peer_list;

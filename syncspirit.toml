@@ -5,7 +5,7 @@ device_name = "hp-note"
 [local_discovery]
 enabled = 1
 port = 21026
-frequency = 30
+frequency = 10
 
 [global_discovery]
 enabled = 1
