@@ -132,8 +132,9 @@ int main(int argc, char **argv) {
             }
         }
 
-        spdlog::info("starting {} {}, libraries: protobuf v{}, lz4: v{}", constants::client_name, constants::client_version,
-                     google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION), LZ4_versionString());
+        spdlog::info("starting {} {}, libraries: protobuf v{}, lz4: v{}", constants::client_name,
+                     constants::client_version, google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION),
+                     LZ4_versionString());
 
         /* pre-init actors */
         asio::io_context io_context;

@@ -2,12 +2,13 @@
 #include "test-utils.h"
 #include "proto/bep_support.h"
 #include "model/device_id.h"
+#include "utils/uri.h"
 
+using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::utils;
 using namespace syncspirit::proto;
 using namespace syncspirit::model;
-
 
 TEST_CASE("announce", "[bep]") {
     unsigned char buff_raw[] = {
@@ -37,4 +38,52 @@ TEST_CASE("announce", "[bep]") {
     CHECK(device_id.value().get_value() == "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
     REQUIRE(v->addresses_size() == 5);
     CHECK(v->addresses(1) == "tcp://192.168.100.6:22000");
+
+    SECTION("make") {
+        fmt::memory_buffer out;
+        out.resize(1500);
+        payload::URIs uris{utils::parse("tcp://192.168.100.6:22000").value()};
+        auto sz = make_announce_message(out, "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD", uris, 1234);
+        CHECK(sz == 99);
+    }
 }
+
+TEST_CASE("hello", "[bep]") {
+    unsigned char buff_raw[] = {
+        0x2e, 0xa7, 0xd9, 0x0b, 0x00, 0x1f, 0x0a, 0x09,
+        0x6c, 0x6f, 0x63, 0x61, 0x6c, 0x68, 0x6f, 0x73,
+        0x74, 0x12, 0x09, 0x73, 0x79, 0x6e, 0x63, 0x74,
+        0x68, 0x69, 0x6e, 0x67, 0x1a, 0x07, 0x76, 0x31,
+        0x2e, 0x31, 0x31, 0x2e, 0x31
+    };
+
+    constexpr auto buff_sz = sizeof(buff_raw);
+    auto buff = boost::asio::buffer(buff_raw, buff_sz);
+    auto r = parse_bep(buff);
+    REQUIRE((bool)r);
+    auto& v = r.value();
+    CHECK(v.consumed == buff_sz);
+    auto& msg = std::get<proto::message::Hello>(v.message);
+    CHECK(msg->device_name() == "localhost");
+    CHECK(msg->client_name() == "syncthing");
+    CHECK(msg->client_version() == "v1.11.1");
+
+    SECTION("make") {
+        fmt::memory_buffer out;
+        out.resize(1500);
+        payload::URIs uris{utils::parse("tcp://192.168.100.6:22000").value()};
+        make_hello_message(out, "test-device");
+        auto buff = boost::asio::buffer(out.data(), out.size());
+        auto r = parse_bep(buff);
+
+        REQUIRE((bool)r);
+        auto& v = r.value();
+        CHECK(v.consumed == out.size());
+        auto& msg = std::get<proto::message::Hello>(v.message);
+        CHECK(msg->device_name() == "test-device");
+        CHECK(msg->client_name() == "syncspirit");
+        CHECK(msg->client_version() == "v0.01");
+    }
+
+}
+
