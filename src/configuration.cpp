@@ -150,6 +150,12 @@ config_result_t get_config(std::istream &config) {
         }
         c.max_wait = max_wait.value();
 
+        auto discovery_attempts = t["discovery_attempts"].value<std::uint32_t>();
+        if (!discovery_attempts) {
+            return "global_discovery/discovery_attempts is incorrect or missing";
+        }
+        c.discovery_attempts = discovery_attempts.value();
+
         auto timeout = t["timeout"].value<std::uint32_t>();
         if (!timeout) {
             return "upnp/timeout is incorrect or missing";
@@ -205,6 +211,7 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
             {"timeout",  cfg.global_announce_config.timeout},
         }}},
         {"upnp", toml::table{{
+            {"discovery_attempts", cfg.upnp_config.discovery_attempts},
             {"max_wait", cfg.upnp_config.max_wait},
             {"timeout",  cfg.upnp_config.timeout},
             {"external_port",  cfg.upnp_config.external_port},
@@ -260,6 +267,7 @@ configuration_t generate_config(const boost::filesystem::path &config_path) {
         10 * 60,
     };
     cfg.upnp_config = upnp_config_t {
+        2,          /* discovery_attempts */
         1,          /* max_wait */
         10,         /* timeout */
         22001,      /* external port */

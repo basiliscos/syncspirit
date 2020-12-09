@@ -123,7 +123,7 @@ void ssdp_actor_t::on_udp_recv_error(const sys::error_code &ec) noexcept {
 void ssdp_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::timer);
     if (!cancelled) {
-        spdlog::warn("ssdp_actor_t::on_timer_trigger");
+        spdlog::debug("ssdp_actor_t::on_timer_trigger");
         do_shutdown();
     }
 }

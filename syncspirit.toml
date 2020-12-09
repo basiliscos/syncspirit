@@ -17,6 +17,7 @@ rx_buff_size = 32768
 timeout = 3000
 
 [upnp]
+discovery_attempts = 2
 max_wait = 1
 timeout = 10
 external_port = 22001

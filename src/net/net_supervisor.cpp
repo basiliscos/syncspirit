@@ -117,13 +117,10 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
 }
 
 bool net_supervisor_t::launch_ssdp() noexcept {
-    if (ssdp_attempts < 3) {
+    auto &cfg = app_cfg.upnp_config;
+    if (ssdp_attempts < cfg.discovery_attempts) {
         auto timeout = shutdown_timeout / 2;
-        ssdp_addr = create_actor<ssdp_actor_t>()
-                        .timeout(timeout)
-                        .max_wait(app_cfg.upnp_config.max_wait)
-                        .finish()
-                        ->get_address();
+        ssdp_addr = create_actor<ssdp_actor_t>().timeout(timeout).max_wait(cfg.max_wait).finish()->get_address();
         ++ssdp_attempts;
         spdlog::trace("net_supervisor_t::launching ssdp, attempt #{}", ssdp_attempts);
         return true;

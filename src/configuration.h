@@ -37,13 +37,14 @@ struct global_announce_config_t {
 };
 
 struct upnp_config_t {
+    std::uint32_t discovery_attempts;
     std::uint32_t max_wait;
     std::uint32_t timeout;
     std::uint16_t external_port;
     std::uint32_t rx_buff_size;
     inline bool operator==(const upnp_config_t &other) const noexcept {
-        return max_wait == other.max_wait && timeout == other.timeout && external_port == other.external_port &&
-               rx_buff_size == other.rx_buff_size;
+        return discovery_attempts == other.discovery_attempts && max_wait == other.max_wait &&
+               timeout == other.timeout && external_port == other.external_port && rx_buff_size == other.rx_buff_size;
     }
 };
 
