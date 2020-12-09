@@ -6,6 +6,7 @@
 #include <vector>
 
 #include <google/protobuf/stubs/common.h>
+#include <lz4.h>
 #include <boost/filesystem.hpp>
 
 #include "constants.h"
@@ -131,8 +132,8 @@ int main(int argc, char **argv) {
             }
         }
 
-        spdlog::info("starting {} {}, libraries: protobuf v{}", constants::client_name, constants::client_version,
-                     google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION));
+        spdlog::info("starting {} {}, libraries: protobuf v{}, lz4: v{}", constants::client_name, constants::client_version,
+                     google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION), LZ4_versionString());
 
         /* pre-init actors */
         asio::io_context io_context;

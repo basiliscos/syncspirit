@@ -19,3 +19,6 @@
 [submodule "lib/tomlplusplus"]
 	path = lib/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
+[submodule "lib/lz4"]
+	path = lib/lz4
+	url = https://github.com/lz4/lz4.git
