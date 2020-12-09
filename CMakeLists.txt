@@ -87,8 +87,7 @@ target_include_directories(syncspirit_lib PUBLIC
     ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-target_link_libraries(syncspirit
-    syncspirit_lib
+target_link_libraries(syncspirit_lib
     rotor_asio
     pugixml
     fmt::fmt
@@ -98,6 +97,7 @@ target_link_libraries(syncspirit
     uriparser
     lz4_static
 )
+target_link_libraries(syncspirit syncspirit_lib)
 
 enable_testing()
 add_subdirectory("tests")

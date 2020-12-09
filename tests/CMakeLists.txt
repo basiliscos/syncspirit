@@ -13,15 +13,7 @@ find_package(OpenSSL REQUIRED)
 add_library(syncspirit_test_lib
     test-main.cpp
 )
-target_link_libraries(syncspirit_test_lib
-    syncspirit_lib
-    rotor_asio
-    pugixml
-    fmt::fmt
-    ${Boost_LIBRARIES}
-    OpenSSL::SSL
-    uriparser
-)
+target_link_libraries(syncspirit_test_lib syncspirit_lib)
 target_include_directories(syncspirit_test_lib PUBLIC
     "${syncspirit_SOURCE_DIR}/src"
 )
@@ -53,4 +45,8 @@ add_test(014-configuration "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/014-configuration"
 add_executable(050-device_id 050-device_id.cpp)
 target_link_libraries(050-device_id syncspirit_test_lib)
 add_test(050-device_id "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-device_id")
+
+add_executable(060-bep 060-bep.cpp)
+target_link_libraries(060-bep syncspirit_test_lib)
+add_test(060-bep "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/060-bep")
 
