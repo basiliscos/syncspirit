@@ -4,6 +4,7 @@
 #include <boost/endian/arithmetic.hpp>
 #include <boost/endian/conversion.hpp>
 #include <algorithm>
+#include <lz4.h>
 
 using namespace syncspirit;
 namespace be = boost::endian;
@@ -92,9 +93,12 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
             return make_error_code(utils::bep_error_code::protobuf_err);
         }
         auto type = header.type();
-        ptr_32 = reinterpret_cast<const std::uint32_t *>(ptr_16 + header_sz);
+        ptr_32 = reinterpret_cast<const std::uint32_t *>(((const char *)ptr_16) + header_sz);
         auto message_sz = be::big_to_native(*ptr_32++);
         auto tail = static_cast<const std::uint32_t *>(buff.data()) + sz;
+        if (ptr_32 + message_sz > tail) {
+            return wrap(message::message_t(), 0u);
+        }
 
         auto parse_msg = [type](const asio::const_buffer &buff, std::size_t consumed) noexcept {
             switch (type) {
@@ -119,14 +123,29 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
             }
         };
 
+        std::vector<char> uncompressed;
+        asio::const_buffer msg_buff;
+        std::size_t consumed = 2 + header_sz + 4;
         if (header.compression() == proto::MessageCompression::NONE) {
-            if (ptr_32 + message_sz > tail) {
-                return wrap(message::message_t(), 0u);
-            }
             auto msg_buff = asio::buffer(reinterpret_cast<const char *>(ptr_32), message_sz);
-            return parse_msg(msg_buff, 2 + header_sz + 4);
+            return parse_msg(msg_buff, consumed);
         } else {
-            std::abort();
+            auto uncompr_sz = be::big_to_native(*ptr_32++);
+            auto block_sz = sz - (header_sz + sizeof(std::uint16_t) + sizeof(std::uint32_t) * 2);
+            uncompressed.resize(uncompr_sz);
+            auto dec =
+                LZ4_decompress_safe(reinterpret_cast<const char *>(ptr_32), uncompressed.data(), block_sz, uncompr_sz);
+            if (dec < 0) {
+                return make_error_code(utils::bep_error_code::lz4_decoding);
+            }
+            msg_buff = asio::buffer(uncompressed.data(), uncompr_sz);
+            auto &&r = parse_msg(msg_buff, 0); // consumed is ignored anyway
+            if (r) {
+                auto &parsed = r.value().message;
+                return wrap(std::move(parsed), static_cast<size_t>(consumed + message_sz));
+            } else {
+                return std::move(r);
+            }
         }
     }
 }

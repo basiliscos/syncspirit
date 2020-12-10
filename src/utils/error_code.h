@@ -47,6 +47,7 @@ enum class error_code {
 enum class bep_error_code {
     success = 0,
     protobuf_err,
+    lz4_decoding,
 };
 
 namespace detail {
