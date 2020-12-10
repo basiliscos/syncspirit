@@ -2,6 +2,7 @@
 #include "test-utils.h"
 #include "proto/bep_support.h"
 #include "model/device_id.h"
+#include "utils/error_code.h"
 #include "utils/uri.h"
 
 using namespace syncspirit;
@@ -114,9 +115,37 @@ TEST_CASE("cluster config", "[bep]") {
     auto& v = r.value();
     CHECK(v.consumed == buff_sz);
     auto& msg = std::get<proto::message::ClusterConfig>(v.message);
-    /*
-    CHECK(msg->device_name() == "localhost");
-    CHECK(msg->client_name() == "syncthing");
-    CHECK(msg->client_version() == "v1.11.1");
-    */
+    REQUIRE(msg->folders_size() == 1);
+    auto& folder = msg->folders(0);
+    CHECK(folder.label() == "data");
+    CHECK(!folder.read_only());
+    REQUIRE(folder.devices_size() == 3);
+    auto& d1 = folder.devices(0);
+    auto& d2 = folder.devices(1);
+    auto& d3 = folder.devices(2);
+    CHECK(device_id_t::from_sha256(d1.id()).value().get_value() == "IVZHKNV-L6XS3PS-6PHRW63-722UOLD-OWKBRHD-DDAW5IV-EX3OB6F-FEAG7QQ");
+    CHECK(device_id_t::from_sha256(d2.id()).value().get_value() == "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
+    CHECK(device_id_t::from_sha256(d3.id()).value().get_value() == "RF7ZHME-VCU75G2-UXE6X5L-3DGFFVV-5C2ILA6-N3G5V6F-FZYTV73-PFOYJAR");
+
+    CHECK(!d1.introducer());
+    CHECK(!d2.introducer());
+    CHECK(!d3.introducer());
+
+    CHECK(d1.name() == "hp-note");
+    CHECK(d2.name() == "localhost");
+    CHECK(d3.name() == "hp-note");
+
+    CHECK(d1.addresses_size() == 1);
+    CHECK(d1.addresses(0) == "dynamic");
+
+    CHECK(d2.addresses_size() == 1);
+    CHECK(d2.addresses(0) == "dynamic");
+
+    SECTION("corrupt data a little bit") {
+        buff_raw[11] = 0xC0;
+        auto buff = boost::asio::buffer(buff_raw, buff_sz);
+        auto r = parse_bep(buff);
+        REQUIRE(!r);
+        CHECK(r.error() == utils::make_error_code(utils::bep_error_code::lz4_decoding));
+    }
 }
