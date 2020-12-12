@@ -14,6 +14,7 @@ find_package(
 )
 find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
+find_package(ZLIB REQUIRED)
 
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
     src/proto/bep.proto
@@ -96,6 +97,7 @@ target_link_libraries(syncspirit_lib
     protobuf::libprotobuf
     uriparser
     lz4_static
+    ZLIB::ZLIB
 )
 target_link_libraries(syncspirit syncspirit_lib)
 
