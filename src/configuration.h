@@ -58,13 +58,15 @@ struct configuration_t {
     upnp_config_t upnp_config;
     global_announce_config_t global_announce_config;
     bep_config_t bep_config;
+
     std::uint32_t timeout;
     std::string device_name;
+    std::string default_folder;
 
     inline bool operator==(const configuration_t &other) const noexcept {
         return local_announce_config == other.local_announce_config && upnp_config == other.upnp_config &&
                global_announce_config == other.global_announce_config && bep_config == other.bep_config &&
-               timeout == other.timeout && device_name == other.device_name;
+               timeout == other.timeout && device_name == other.device_name && default_folder == other.default_folder;
     }
 };
 

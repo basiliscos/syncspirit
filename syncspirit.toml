@@ -1,6 +1,7 @@
 [global]
 timeout = 5000
 device_name = "hp-note"
+default_folder = "/tmp"
 
 [local_discovery]
 enabled = 1
@@ -26,3 +27,24 @@ rx_buff_size = 65536
 [bep]
 # 32 MB
 rx_buff_size = 33554432
+
+[devices]
+    [devices.1]
+    id = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"
+    name = "tmp_cl"
+    address = "dynamic"
+    introducer = true
+    auto_accept = true
+
+[folders]
+    [folder.1]
+        id = "my_folder"
+        name = "my_folder"
+        path = "/data"
+        shared = ["tmp_cl"]
+
+    [folder.2]
+        id = "tex"
+        name = "tex"
+        path = "/home/b/development/tex"
+

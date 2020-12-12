@@ -23,6 +23,7 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
 add_library(syncspirit_lib
     src/configuration.cpp
     src/constants.cpp
+    src/model/device.cpp
     src/model/device_id.cpp
     src/net/acceptor_actor.cpp
     src/net/global_discovery_actor.cpp

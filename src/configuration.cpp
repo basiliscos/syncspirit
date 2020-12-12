@@ -48,11 +48,12 @@ config_result_t get_config(std::istream &config) {
     // global
     do {
         auto t = root_tbl["global"];
+        auto &c = cfg;
         auto timeout = t["timeout"].value<std::uint32_t>();
         if (!timeout) {
             return "global/timeout is incorrect or missing";
         }
-        cfg.timeout = timeout.value();
+        c.timeout = timeout.value();
 
         auto device_name = t["device_name"].value<std::string>();
         if (!device_name) {
@@ -61,7 +62,13 @@ config_result_t get_config(std::istream &config) {
                 return option.error().message();
             device_name = option.value();
         }
-        cfg.device_name = device_name.value();
+        c.device_name = device_name.value();
+
+        auto default_folder = t["default_folder"].value<std::string>();
+        if (!default_folder) {
+            return "global/default_folder is incorrect or missing";
+        }
+        c.default_folder = expand_home(default_folder.value(), home);
     } while (0);
 
     // local_discovery
@@ -194,7 +201,8 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
     auto tbl = toml::table{{
         {"global", toml::table{{
             {"timeout",  cfg.timeout},
-            {"device_name", cfg.device_name}
+            {"device_name", cfg.device_name},
+            {"default_folder", cfg.default_folder}
         }}},
         {"local_discovery", toml::table{{
             {"enabled",  cfg.local_announce_config.enabled},
@@ -251,6 +259,7 @@ configuration_t generate_config(const boost::filesystem::path &config_path) {
     configuration_t cfg;
     cfg.timeout = 5000;
     cfg.device_name = device;
+    cfg.default_folder = is_home ? "~/" : config_path.c_str();
     cfg.local_announce_config = local_announce_config_t {
         true,
         21027,
