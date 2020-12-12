@@ -15,6 +15,9 @@ static const std::string home_path = "~/.config/syncspirit";
 
 namespace syncspirit::config {
 
+using device_name_t = outcome::result<std::string>;
+using device_option_t = outcome::outcome<model::device_t, std::string>;
+
 static std::string expand_home(const std::string &path, const char *home) {
     if (home && path.size() && path[0] == '~') {
         std::string new_path(home);
@@ -24,8 +27,6 @@ static std::string expand_home(const std::string &path, const char *home) {
     return path;
 }
 
-using device_name_t = outcome::result<std::string>;
-
 static device_name_t get_device_name() noexcept {
     boost::system::error_code ec;
     auto device_name = boost::asio::ip::host_name(ec);
@@ -33,6 +34,59 @@ static device_name_t get_device_name() noexcept {
         return ec;
     }
     return device_name;
+}
+
+static device_option_t get_device(toml::table &t) {
+    auto id = t["id"].value<std::string>();
+    if (!id) {
+        return "device/id is incorrect or missing";
+    }
+    auto id_v = id.value();
+
+    auto name = t["name"].value<std::string>();
+    if (!name) {
+        return "device/name is incorrect or missing";
+    }
+    auto name_v = name.value();
+
+    auto introducer = t["introducer"].value<bool>();
+    if (!introducer) {
+        return "device/introducer is incorrect or missing";
+    }
+    auto introducer_v = introducer.value();
+
+    auto auto_accept = t["auto_accept"].value<bool>();
+    if (!auto_accept) {
+        return "device/auto_accept is incorrect or missing";
+    }
+    auto auto_accept_v = auto_accept.value();
+
+    model::device_t::static_addresses_t addresses;
+    auto address = t["addresses"];
+    if (address) {
+        if (auto arr = address.as_array()) {
+            for (size_t i = 0; i < arr->size(); ++i) {
+                auto node = arr->get(i);
+                if (node->is_string()) {
+                    auto &value = node->as_string()->get();
+                    auto url = utils::parse(value);
+                    if (!url) {
+                        std::string err = "cannot parse address '";
+                        err += value;
+                        err += "' as valid url";
+                        return err;
+                    }
+                    addresses.emplace_back(std::move(url.value()));
+                }
+            }
+        }
+    }
+    auto device = model::device_id_t::from_string(id_v);
+    if (!device) {
+        return "incorrect device_id : " + id_v;
+    }
+    return model::device_t{std::move(device.value()), std::move(name_v), std::move(addresses), introducer_v,
+                           auto_accept_v};
 }
 
 config_result_t get_config(std::istream &config) {
@@ -46,7 +100,7 @@ config_result_t get_config(std::istream &config) {
 
     auto &root_tbl = r.table();
     // global
-    do {
+    {
         auto t = root_tbl["global"];
         auto &c = cfg;
         auto timeout = t["timeout"].value<std::uint32_t>();
@@ -69,10 +123,10 @@ config_result_t get_config(std::istream &config) {
             return "global/default_folder is incorrect or missing";
         }
         c.default_folder = expand_home(default_folder.value(), home);
-    } while (0);
+    };
 
     // local_discovery
-    do {
+    {
         auto t = root_tbl["local_discovery"];
         auto &c = cfg.local_announce_config;
 
@@ -93,10 +147,10 @@ config_result_t get_config(std::istream &config) {
             return "local_discovery/frequency is incorrect or missing";
         }
         c.frequency = frequency.value();
-    } while (0);
+    }
 
     // global_discovery
-    do {
+    {
         auto t = root_tbl["global_discovery"];
         auto &c = cfg.global_announce_config;
 
@@ -145,10 +199,10 @@ config_result_t get_config(std::istream &config) {
             return "global_discovery/timeout is incorrect or missing";
         }
         c.timeout = timeout.value();
-    } while (0);
+    };
 
     // upnp
-    do {
+    {
         auto t = root_tbl["upnp"];
         auto &c = cfg.upnp_config;
         auto max_wait = t["max_wait"].value<std::uint32_t>();
@@ -180,11 +234,10 @@ config_result_t get_config(std::istream &config) {
             return "upng/rx_buff_size is incorrect or missing";
         }
         c.rx_buff_size = rx_buff_size.value();
-
-    } while (0);
+    };
 
     // bep
-    do {
+    {
         auto t = root_tbl["bep"];
         auto &c = cfg.bep_config;
         auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
@@ -192,7 +245,28 @@ config_result_t get_config(std::istream &config) {
             return "bep/rx_buff_size is incorrect or missing";
         }
         c.rx_buff_size = rx_buff_size.value();
-    } while (0);
+    }
+
+    // devices
+    {
+        auto td = root_tbl["device"];
+        if (td.is_array_of_tables()) {
+            auto arr = td.as_array();
+            for (size_t i = 0; i < arr->size(); ++i) {
+                auto node = arr->get(i);
+                auto &value = *node->as_table();
+                auto device = get_device(value);
+                if (!device) {
+                    auto error = device.error();
+                    error += ", context: device index = " + std::to_string(i + 1);
+                    return error;
+                }
+                cfg.devices.emplace_back(std::move(device.value()));
+            }
+        } else {
+            return "device is not an array of tables";
+        }
+    }
     return std::move(cfg);
 }
 
