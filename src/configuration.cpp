@@ -36,6 +36,7 @@ static device_name_t get_device_name() noexcept {
     return device_name;
 }
 
+#if 0
 static device_option_t get_device(toml::table &t) {
     auto id = t["id"].value<std::string>();
     if (!id) {
@@ -88,6 +89,7 @@ static device_option_t get_device(toml::table &t) {
     return model::device_t{std::move(device.value()), std::move(name_v), std::move(addresses), introducer_v,
                            auto_accept_v};
 }
+#endif
 
 config_result_t get_config(std::istream &config) {
     configuration_t cfg;
@@ -247,6 +249,7 @@ config_result_t get_config(std::istream &config) {
         c.rx_buff_size = rx_buff_size.value();
     }
 
+#if 0
     // devices
     {
         auto td = root_tbl["device"];
@@ -267,6 +270,7 @@ config_result_t get_config(std::istream &config) {
             return "device is not an array of tables";
         }
     }
+#endif
     return std::move(cfg);
 }
 

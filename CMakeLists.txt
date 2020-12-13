@@ -66,12 +66,14 @@ set(URIPARSER_ENABLE_INSTALL false CACHE BOOL "URIPARSER_ENABLE_INSTALL")
 set(BUILD_SHARED_LIBS false CACHE BOOL "BUILD_SHARED_LIBS")
 set(LZ4_BUILD_CLI false CACHE BOOL "LZ4_BUILD_CLI")
 set(LZ4_BUILD_LEGACY_LZ4C false CACHE BOOL "LZ4_BUILD_LEGACY_LZ4C")
+set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
 
 add_subdirectory("lib/fmt")
 add_subdirectory("lib/lz4/build/cmake/")
 add_subdirectory("lib/pugixml")
 add_subdirectory("lib/rotor")
 add_subdirectory("lib/uriparser")
+add_subdirectory("lib/mbdx")
 
 target_compile_definitions(pugixml PUBLIC "PUGIXML_NO_EXCEPTIONS")
 
@@ -83,6 +85,7 @@ target_include_directories(syncspirit_lib PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/pugixml/src
     ${syncspirit_SOURCE_DIR}/lib/uriparser/include
     ${syncspirit_SOURCE_DIR}/lib/tomlplusplus/include
+    ${syncspirit_SOURCE_DIR}/lib/lz4/lib
     ${syncspirit_SOURCE_DIR}/lib/lz4/lib
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
@@ -99,6 +102,7 @@ target_link_libraries(syncspirit_lib
     uriparser
     lz4_static
     ZLIB::ZLIB
+    mdbx-static
 )
 target_link_libraries(syncspirit syncspirit_lib)
 
