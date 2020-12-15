@@ -2,7 +2,7 @@
 #include "../utils/uri.h"
 #include "../model/device_id.h"
 #include "../model/peer_contact.h"
-#include <fmt/format.h>
+#include <fmt/fmt.h>
 #include <string>
 #include <vector>
 #include <boost/outcome.hpp>

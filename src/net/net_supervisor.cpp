@@ -60,6 +60,7 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_c
 void net_supervisor_t::on_start() noexcept {
     spdlog::trace("net_supervisor_t::on_start (addr = {})", (void *)address.get());
     parent_t::on_start();
+
     launch_ssdp();
 
     auto timeout = shutdown_timeout * 9 / 10;

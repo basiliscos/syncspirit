@@ -65,7 +65,7 @@ struct configuration_t {
     std::string device_name;
     std::string default_folder;
 
-    //std::vector<model::device_t> devices;
+    // std::vector<model::device_t> devices;
 
     inline bool operator==(const configuration_t &other) const noexcept {
         return local_announce_config == other.local_announce_config && upnp_config == other.upnp_config &&

@@ -8,14 +8,16 @@
 #include <google/protobuf/stubs/common.h>
 #include <lz4.h>
 #include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
+#include <rotor/asio.hpp>
+#include <spdlog/spdlog.h>
 
 #include "constants.h"
 #include "configuration.h"
 #include "utils/location.h"
 #include "net/net_supervisor.h"
-#include <boost/program_options.hpp>
-#include <rotor/asio.hpp>
-#include <spdlog/spdlog.h>
+#include "console/sink.h"
+#include "console/tui_actor.h"
 
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
@@ -73,6 +75,11 @@ int main(int argc, char **argv) {
 
         auto log_level_str = vm["log_level"].as<std::string>();
         auto log_level = get_log_level(log_level_str);
+        std::mutex std_out_mutex;
+        std::string prompt = "> ";
+        auto console_sink =
+            std::make_shared<console::sink_t>(stdout, spdlog::color_mode::automatic, std_out_mutex, prompt);
+        spdlog::set_default_logger(std::make_shared<spdlog::logger>("", console_sink));
         spdlog::set_level(log_level);
 
         fs::path config_file_path;
@@ -141,8 +148,6 @@ int main(int argc, char **argv) {
         ra::system_context_ptr_t sys_context{new ra::system_context_asio_t{io_context}};
         auto stand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
-        // ra::supervisor_config_asio_t sup_conf{timeout, std::move(stand)};
-        // auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>(sup_conf, *cfg_option);
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                            .app_config(cfg)
                            .strand(stand)
@@ -153,13 +158,9 @@ int main(int argc, char **argv) {
         sup_net->start();
 
         /* launch actors */
-        auto sleep_quant = std::chrono::milliseconds(100);
         auto net_thread = std::thread([&]() {
             io_context.run();
             console_flag = true;
-            while (!net_flag || !console_flag) {
-                std::this_thread::sleep_for(sleep_quant);
-            }
             spdlog::trace("net thread has been terminated");
         });
 
@@ -169,18 +170,24 @@ int main(int argc, char **argv) {
             spdlog::critical("cannot set signal handler");
             return 1;
         }
-        auto console_thread = std::thread([&] {
-            while (!console_flag) {
-                std::this_thread::sleep_for(sleep_quant);
-            }
-            sup_net->shutdown();
-            console_flag = true;
-            spdlog::trace("console thread has been terminated");
-        });
 
-        spdlog::trace("waiting console thread termination");
-        console_thread.join();
-        net_flag = true;
+        asio::io_context console_context;
+        ra::system_context_asio_t con_context{console_context};
+        auto con_stand = std::make_shared<asio::io_context::strand>(console_context);
+        auto sup_con = con_context.create_supervisor<ra::supervisor_asio_t>()
+                           .strand(con_stand)
+                           .timeout(timeout)
+                           .registry_address(sup_net->get_registry_address())
+                           .guard_context(true)
+                           .finish();
+        sup_con->start();
+        sup_con->create_actor<console::tui_actor_t>()
+                             .mutex(&std_out_mutex)
+                             .prompt(&prompt)
+                             .shutdown(&console_flag)
+                             .timeout(timeout)
+                             .finish();
+        console_context.run();
         spdlog::trace("waiting net thread termination");
         net_thread.join();
 
@@ -194,5 +201,6 @@ int main(int argc, char **argv) {
     google::protobuf::ShutdownProtobufLibrary();
     /* exit */
     spdlog::info("normal exit");
+    spdlog::drop_all();
     return 0;
 }

@@ -1,3 +1,14 @@
+- tty less-like output1
+    - optional, i.e. detect if stdin is terminal
+    - write custom sink
+https://github.com/gabime/spdlog/wiki/4.-Sinks
+https://viewsourcecode.org/snaptoken/kilo/02.enteringRawMode.html
+http://www.sigala.it/sergio/tvision/images.html
+http://www.sigala.it/sergio/tvision/
+http://www.climagic.org/mirrors/VT100_Escape_Codes.html
+https://github.com/luser-dr00g/xpost/blob/3063f60d342251754f5e78f454ffb5e69687fa9b/src/lib/xpost_compat.c#L132
+https://metacpan.org/pod/release/JSTOWE/TermReadKey-2.30/ReadKey.pm
+
 - DB
     https://github.com/erthink/libmdbx
     https://iowow.io/
@@ -126,8 +137,37 @@ db.keyer.GenerateGlobalVersionKey(gk, folder, name)
 // file name
 keyBuf, _ = t.updateGlobal(gk, keyBuf, folder, device, f, meta)         // ?
 
+MDBX_WRITEMAP
+MDBX_NOTLS
+
+MDBX_NOMETASYNC
+MDBX_SAFE_NOSYNC
+
+-> % python ./get-all-keys.py | grep "b'\\\\x06"
+(bytearray(b'\x06\x00\x00\x00\x00\x00\x00\x00\x00'), bytearray(b''))
+(bytearray(b'\x06\x00\x00\x00\x01\x00\x00\x00\x00'), bytearray(b'data'))
+(bytearray(b'\x06\x00\x00\x00\x02\x00\x00\x00\x00'), bytearray(b'4ioks-ei2kj'))
 
 
+(bytearray(b'\x00\x00\x00\x00\x02\x00\x00\x00\x01contacts_2018-11-12_23-28.vcf'), bytearray(b'\n\x1dcontacts_2018-11-12_23-28.vcf\x18\xce\x06 \xb0\x03(\xeb\xc4\xa7\xdf\x05@\x01J\x13\n\x11\x08\x8d\xf4\x83\xc4\xb2\xa1\xf3\x95\xad\x01\x10\x86\xea\xd1\xfe\x05P\x01X\x81\x84\xe1\xcb\x01`\x8d\xf4\x83\xc4\xb2\xa1\xf3\x95\xad\x01h\x80\x80\x08\x82\x01+\x10\xce\x06\x1a Z1y\x180,\xe4\x86\xf8\xf9\xfc\x967\xf3,\xae4Qvo\xc9\xb8\x04[\xab\xb25b\x9f\xd8\x9cn \xb8\x91\xdc\xfe\x03\x92\x01 \x14\x18\x1c\xa3\xe0\xba\xdbu\x02\x00\x12~\xc3v\xb9\x11^W\xea\xdf\xc2iuh\x10\xdb\xb5\x0f\xb4HQ\xe2'))
+(bytearray(b'\x00\x00\x00\x00\x02\x00\x00\x00\x0bcontacts_2018-11-12_23-28.vcf'), bytearray(b'\n\x1dcontacts_2018-11-12_23-28.vcf\x18\xce\x06 \xb0\x03(\xeb\xc4\xa7\xdf\x05@\x01J\x13\n\x11\x08\x8d\xf4\x83\xc4\xb2\xa1\xf3\x95\xad\x01\x10\x86\xea\xd1\xfe\x05P\x01X\x81\x84\xe1\xcb\x01`\x8d\xf4\x83\xc4\xb2\xa1\xf3\x95\xad\x01h\x80\x80\x08\x82\x01+\x10\xce\x06\x1a Z1y\x180,\xe4\x86\xf8\xf9\xfc\x967\xf3,\xae4Qvo\xc9\xb8\x04[\xab\xb25b\x9f\xd8\x9cn \xb8\x91\xdc\xfe\x03\x92\x01 \x14\x18\x1c\xa3\xe0\xba\xdbu\x02\x00\x12~\xc3v\xb9\x11^W\xea\xdf\xc2iuh\x10\xdb\xb5\x0f\xb4HQ\xe2'))
+(bytearray(b'\x01\x00\x00\x00\x02contacts_2018-11-12_23-28.vcf'), bytearray(b'\nY\n\x13\n\x11\x08\x8d\xf4\x83\xc4\xb2\xa1\xf3\x95\xad\x01\x10\x86\xea\xd1\xfe\x05\x1a \xad+\xcd\x0b(\x80\xfa\r\xc5\xe4\x0b\xd9\xca\xd6\n\xf1=i(_\x0b\xea\x98\x1c\xfc~G\xceT\x8d\x17\xac\x1a \xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'))
+(bytearray(b'\x02\x00\x00\x00\x02Z1y\x180,\xe4\x86\xf8\xf9\xfc\x967\xf3,\xae4Qvo\xc9\xb8\x04[\xab\xb25b\x9f\xd8\x9cncontacts_2018-11-12_23-28.vcf'), bytearray(b'\x00\x00\x00\x00'))
+(bytearray(b'\x0b\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01'), bytearray(b'\x00\x00\x00\x00\x02\x00\x00\x00\x01contacts_2018-11-12_23-28.vcf'))
+(bytearray(b'\x0e\x00\x00\x00\x02\x14\x18\x1c\xa3\xe0\xba\xdbu\x02\x00\x12~\xc3v\xb9\x11^W\xea\xdf\xc2iuh\x10\xdb\xb5\x0f\xb4HQ\xe2contacts_2018-11-12_23-28.vcf'), bytearray(b''))
+
+
+func (s *FileSet) IndexID(device protocol.DeviceID) protocol.IndexID {
+        id := s.db.getIndexID(device[:], []byte(s.folder))
+        if id == 0 && device == protocol.LocalDeviceID {
+                // No index ID set yet. We create one now.
+                id = protocol.NewIndexID()
+                s.db.setIndexID(device[:], []byte(s.folder), id)
+        }
+        return id
+}
+
+=============================================================================================================================================
 
 - local-discovery
     iptables -t nat -A OUTPUT -p udp --dport 21027 -j DNAT --to-destination 127.0.0.1:21026
@@ -145,3 +185,4 @@ openssl x509 -inform PEM -outform DER -in ~/.config/syncthing/cert.pem -out /tmp
 
 - статически собирать бинарь под линь ( https://www.youtube.com/watch?v=Z7WuUhPJ-cU&list=PLZN9ZGiWZoZruMY-MlkAd-nHzdP9TfLRC&index=25 )
 
+- protobuf light?

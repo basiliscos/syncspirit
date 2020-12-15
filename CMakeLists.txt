@@ -23,6 +23,8 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
 add_library(syncspirit_lib
     src/configuration.cpp
     src/constants.cpp
+    src/console/sink.cpp
+    src/console/tui_actor.cpp
     src/model/device.cpp
     src/model/device_id.cpp
     src/net/acceptor_actor.cpp
@@ -68,7 +70,6 @@ set(LZ4_BUILD_CLI false CACHE BOOL "LZ4_BUILD_CLI")
 set(LZ4_BUILD_LEGACY_LZ4C false CACHE BOOL "LZ4_BUILD_LEGACY_LZ4C")
 set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
 
-add_subdirectory("lib/fmt")
 add_subdirectory("lib/lz4/build/cmake/")
 add_subdirectory("lib/pugixml")
 add_subdirectory("lib/rotor")
@@ -80,7 +81,7 @@ target_compile_definitions(pugixml PUBLIC "PUGIXML_NO_EXCEPTIONS")
 target_include_directories(syncspirit_lib PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/rotor/include
     ${syncspirit_SOURCE_DIR}/lib/spdlog/include
-    ${syncspirit_SOURCE_DIR}/lib/fmt/include
+    ${syncspirit_SOURCE_DIR}/lib/spdlog/include/spdlog/
     ${syncspirit_SOURCE_DIR}/lib/json/include
     ${syncspirit_SOURCE_DIR}/lib/pugixml/src
     ${syncspirit_SOURCE_DIR}/lib/uriparser/include
@@ -95,7 +96,6 @@ target_include_directories(syncspirit_lib PUBLIC
 target_link_libraries(syncspirit_lib
     rotor_asio
     pugixml
-    fmt::fmt
     ${Boost_LIBRARIES}
     OpenSSL::SSL
     protobuf::libprotobuf

@@ -10,7 +10,7 @@
 #include <memory>
 #include <optional>
 
-#include <fmt/format.h>
+#include <fmt/fmt.h>
 #include "../model/upnp.h"
 #include "../model/peer_contact.h"
 #include "../transport/base.h"

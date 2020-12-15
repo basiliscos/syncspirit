@@ -1,7 +1,7 @@
 #pragma once
 #include "../utils/uri.h"
 #include "../model/upnp.h"
-#include <fmt/format.h>
+#include <fmt/fmt.h>
 #include <string>
 #include <vector>
 #include <boost/outcome.hpp>

@@ -1,7 +1,7 @@
 #pragma once
 #include <boost/beast/http.hpp>
 #include <boost/outcome.hpp>
-#include <fmt/format.h>
+#include <fmt/fmt.h>
 
 namespace syncspirit::utils {
 namespace sys = boost::system;
