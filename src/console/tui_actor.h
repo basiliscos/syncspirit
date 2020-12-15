@@ -1,11 +1,11 @@
 #pragma once
 
 #include "../configuration.h"
-//#include "messages.h"
 #include <rotor/asio.hpp>
 #include <boost/asio.hpp>
 #include <optional>
 #include <atomic>
+#include <fmt/fmt.h>
 
 namespace syncspirit {
 namespace console {
@@ -19,6 +19,7 @@ struct tui_actor_config_t : r::actor_config_t {
     std::mutex *mutex;
     std::string *prompt;
     std::atomic_bool *shutdown;
+    config::tui_config_t tui_config;
 };
 
 template <typename Actor> struct tui_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -40,6 +41,11 @@ template <typename Actor> struct tui_actor_config_builder_t : r::actor_config_bu
         parent_t::config.shutdown = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&tui_config(const config::tui_config_t &value) &&noexcept {
+        parent_t::config.tui_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct tui_actor_t : public r::actor_base_t {
@@ -58,6 +64,14 @@ struct tui_actor_t : public r::actor_base_t {
     void do_read() noexcept;
     void on_read(size_t bytes) noexcept;
     void on_read_error(const sys::error_code &ec) noexcept;
+    void action_quit() noexcept;
+    void action_help() noexcept;
+    void action_more_logs() noexcept;
+    void action_less_logs() noexcept;
+    void action_esc() noexcept;
+    void set_prompt(const std::string &value) noexcept;
+    void reset_prompt() noexcept;
+    void flush_prompt() noexcept;
 
     using tty_t = std::unique_ptr<asio::posix::stream_descriptor>;
 
@@ -69,9 +83,12 @@ struct tui_actor_t : public r::actor_base_t {
     std::optional<r::request_id_t> timer_id;
     std::mutex *mutex;
     std::string *prompt;
+    std::string prompt_buff;
     std::atomic_bool *shutdown_flag;
-    char input[2];
+    config::tui_config_t tui_config;
     r::address_ptr_t coordinator;
+    char input[2];
+    char progress_symbol;
 };
 
 } // namespace console

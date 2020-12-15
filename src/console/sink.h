@@ -19,25 +19,25 @@ struct sink_t : spdlog::sinks::sink {
     void set_formatter(std::unique_ptr<spdlog::formatter> sink_formatter) override;
 
     // Formatting codes
-    const spdlog::string_view_t reset = "\033[m";
-    const spdlog::string_view_t bold = "\033[1m";
-    const spdlog::string_view_t dark = "\033[2m";
-    const spdlog::string_view_t underline = "\033[4m";
-    const spdlog::string_view_t blink = "\033[5m";
-    const spdlog::string_view_t reverse = "\033[7m";
-    const spdlog::string_view_t concealed = "\033[8m";
-    const spdlog::string_view_t clear_line = "\033[K";
-    const spdlog::string_view_t clear_promt = "\033[1K";
+    static const constexpr spdlog::string_view_t reset = "\033[m";
+    static const constexpr spdlog::string_view_t bold = "\033[1m";
+    static const constexpr spdlog::string_view_t dark = "\033[2m";
+    static const constexpr spdlog::string_view_t underline = "\033[4m";
+    static const constexpr spdlog::string_view_t blink = "\033[5m";
+    static const constexpr spdlog::string_view_t reverse = "\033[7m";
+    static const constexpr spdlog::string_view_t concealed = "\033[8m";
+    static const constexpr spdlog::string_view_t clear_line = "\033[K";
+    static const constexpr spdlog::string_view_t clear_promt = "\033[1K";
 
     // Foreground colors
-    const spdlog::string_view_t black = "\033[30m";
-    const spdlog::string_view_t red = "\033[31m";
-    const spdlog::string_view_t green = "\033[32m";
-    const spdlog::string_view_t yellow = "\033[33m";
-    const spdlog::string_view_t blue = "\033[34m";
-    const spdlog::string_view_t magenta = "\033[35m";
-    const spdlog::string_view_t cyan = "\033[36m";
-    const spdlog::string_view_t white = "\033[37m";
+    static const constexpr spdlog::string_view_t black = "\033[30m";
+    static const constexpr spdlog::string_view_t red = "\033[31m";
+    static const constexpr spdlog::string_view_t green = "\033[32m";
+    static const constexpr spdlog::string_view_t yellow = "\033[33m";
+    static const constexpr spdlog::string_view_t blue = "\033[34m";
+    static const constexpr spdlog::string_view_t magenta = "\033[35m";
+    static const constexpr spdlog::string_view_t cyan = "\033[36m";
+    static const constexpr spdlog::string_view_t white = "\033[37m";
 
     /// Background colors
     const spdlog::string_view_t on_black = "\033[40m";

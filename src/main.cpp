@@ -182,11 +182,12 @@ int main(int argc, char **argv) {
                            .finish();
         sup_con->start();
         sup_con->create_actor<console::tui_actor_t>()
-                             .mutex(&std_out_mutex)
-                             .prompt(&prompt)
-                             .shutdown(&console_flag)
-                             .timeout(timeout)
-                             .finish();
+            .mutex(&std_out_mutex)
+            .prompt(&prompt)
+            .tui_config(cfg.tui_config)
+            .shutdown(&console_flag)
+            .timeout(timeout)
+            .finish();
         console_context.run();
         spdlog::trace("waiting net thread termination");
         net_thread.join();

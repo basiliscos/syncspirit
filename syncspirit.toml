@@ -28,21 +28,10 @@ rx_buff_size = 65536
 # 32 MB
 rx_buff_size = 33554432
 
-[[device]]
-id = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"
-name = "tmp_cl"
-address = "dynamic"
-introducer = true
-auto_accept = true
-
-[[folder]]
-id = "my_folder"
-name = "my_folder"
-path = "/data"
-shared_with = "tmp_cl"
-
-[[folder]]
-id = "tex"
-name = "tex"
-path = "/home/b/development/tex"
+[tui]
+refresh_interval = 50
+key_quit      = "q"
+key_more_logs = "+"
+key_less_logs = "-"
+key_help      = "?"
 

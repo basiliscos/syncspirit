@@ -36,61 +36,6 @@ static device_name_t get_device_name() noexcept {
     return device_name;
 }
 
-#if 0
-static device_option_t get_device(toml::table &t) {
-    auto id = t["id"].value<std::string>();
-    if (!id) {
-        return "device/id is incorrect or missing";
-    }
-    auto id_v = id.value();
-
-    auto name = t["name"].value<std::string>();
-    if (!name) {
-        return "device/name is incorrect or missing";
-    }
-    auto name_v = name.value();
-
-    auto introducer = t["introducer"].value<bool>();
-    if (!introducer) {
-        return "device/introducer is incorrect or missing";
-    }
-    auto introducer_v = introducer.value();
-
-    auto auto_accept = t["auto_accept"].value<bool>();
-    if (!auto_accept) {
-        return "device/auto_accept is incorrect or missing";
-    }
-    auto auto_accept_v = auto_accept.value();
-
-    model::device_t::static_addresses_t addresses;
-    auto address = t["addresses"];
-    if (address) {
-        if (auto arr = address.as_array()) {
-            for (size_t i = 0; i < arr->size(); ++i) {
-                auto node = arr->get(i);
-                if (node->is_string()) {
-                    auto &value = node->as_string()->get();
-                    auto url = utils::parse(value);
-                    if (!url) {
-                        std::string err = "cannot parse address '";
-                        err += value;
-                        err += "' as valid url";
-                        return err;
-                    }
-                    addresses.emplace_back(std::move(url.value()));
-                }
-            }
-        }
-    }
-    auto device = model::device_id_t::from_string(id_v);
-    if (!device) {
-        return "incorrect device_id : " + id_v;
-    }
-    return model::device_t{std::move(device.value()), std::move(name_v), std::move(addresses), introducer_v,
-                           auto_accept_v};
-}
-#endif
-
 config_result_t get_config(std::istream &config) {
     configuration_t cfg;
 
@@ -249,28 +194,41 @@ config_result_t get_config(std::istream &config) {
         c.rx_buff_size = rx_buff_size.value();
     }
 
-#if 0
-    // devices
+    // tui
     {
-        auto td = root_tbl["device"];
-        if (td.is_array_of_tables()) {
-            auto arr = td.as_array();
-            for (size_t i = 0; i < arr->size(); ++i) {
-                auto node = arr->get(i);
-                auto &value = *node->as_table();
-                auto device = get_device(value);
-                if (!device) {
-                    auto error = device.error();
-                    error += ", context: device index = " + std::to_string(i + 1);
-                    return error;
-                }
-                cfg.devices.emplace_back(std::move(device.value()));
-            }
-        } else {
-            return "device is not an array of tables";
+        auto t = root_tbl["tui"];
+        auto &c = cfg.tui_config;
+        auto refresh_interval = t["refresh_interval"].value<std::uint32_t>();
+        if (!refresh_interval) {
+            return "tui/refresh_interval is incorrect or missing";
         }
+        c.refresh_interval = refresh_interval.value();
+
+        auto key_quit = t["key_quit"].value<std::string>();
+        if (!key_quit || key_quit.value().empty()) {
+            return "tui/key_quit is incorrect or missing";
+        }
+        c.key_quit = key_quit.value()[0];
+
+        auto key_more_logs = t["key_more_logs"].value<std::string>();
+        if (!key_more_logs || key_more_logs.value().empty()) {
+            return "tui/key_more_logs is incorrect or missing";
+        }
+        c.key_more_logs = key_more_logs.value()[0];
+
+        auto key_less_logs = t["key_less_logs"].value<std::string>();
+        if (!key_less_logs || key_less_logs.value().empty()) {
+            return "tui/key_less_logs is incorrect or missing";
+        }
+        c.key_less_logs = key_less_logs.value()[0];
+
+        auto key_help = t["key_help"].value<std::string>();
+        if (!key_help || key_help.value().empty()) {
+            return "tui/key_help is incorrect or missing";
+        }
+        c.key_help = key_help.value()[0];
     }
-#endif
+
     return std::move(cfg);
 }
 
@@ -305,6 +263,13 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
         }}},
         {"bep", toml::table{{
             {"rx_buff_size", cfg.bep_config.rx_buff_size},
+        }}},
+        {"tui", toml::table{{
+            {"refresh_interval", cfg.tui_config.refresh_interval},
+            {"key_quit", std::string_view(&cfg.tui_config.key_quit, 1)},
+            {"key_more_logs", std::string_view(&cfg.tui_config.key_more_logs, 1)},
+            {"key_less_logs", std::string_view(&cfg.tui_config.key_less_logs, 1)},
+            {"key_help", std::string_view(&cfg.tui_config.key_help, 1)},
         }}},
     }};
     // clang-format on
@@ -362,6 +327,13 @@ configuration_t generate_config(const boost::filesystem::path &config_path) {
     };
     cfg.bep_config = bep_config_t {
         16 * 1024 * 1024,   /* rx_buff */
+    };
+    cfg.tui_config = tui_config_t {
+        100,   /* refresh_interval */
+        'q',   /* key_quit */
+        '+',   /* key_more_logs */
+        '-',   /* key_less_logs */
+        '?'    /* key_help */
     };
     return cfg;
 }

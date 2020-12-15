@@ -13,6 +13,20 @@ namespace syncspirit::config {
 
 namespace outcome = boost::outcome_v2;
 
+struct tui_config_t {
+    std::uint32_t refresh_interval;
+    char key_quit;
+    char key_more_logs;
+    char key_less_logs;
+    char key_help;
+
+    inline bool operator==(const tui_config_t &other) const noexcept {
+        return refresh_interval == other.refresh_interval && key_quit == other.key_quit &&
+               key_more_logs == other.key_more_logs && key_less_logs == other.key_less_logs &&
+               key_help == other.key_help;
+    }
+};
+
 struct local_announce_config_t {
     bool enabled;
     std::uint16_t port;
@@ -60,17 +74,17 @@ struct configuration_t {
     upnp_config_t upnp_config;
     global_announce_config_t global_announce_config;
     bep_config_t bep_config;
+    tui_config_t tui_config;
 
     std::uint32_t timeout;
     std::string device_name;
     std::string default_folder;
 
-    // std::vector<model::device_t> devices;
-
     inline bool operator==(const configuration_t &other) const noexcept {
         return local_announce_config == other.local_announce_config && upnp_config == other.upnp_config &&
                global_announce_config == other.global_announce_config && bep_config == other.bep_config &&
-               timeout == other.timeout && device_name == other.device_name && default_folder == other.default_folder;
+               tui_config == other.tui_config && timeout == other.timeout && device_name == other.device_name &&
+               default_folder == other.default_folder;
     }
 };
 
