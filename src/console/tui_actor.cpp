@@ -33,7 +33,9 @@ void tui_actor_t::shutdown_start() noexcept {
     spdlog::debug("tui_actor_t::shutdown_start (addr = {})", (void *)address.get());
     r::actor_base_t::shutdown_start();
     supervisor->do_shutdown();
-    send<r::payload::shutdown_trigger_t>(coordinator, coordinator);
+    if (coordinator) {
+        send<r::payload::shutdown_trigger_t>(coordinator, coordinator);
+    }
     if (resources->has(resource::tty)) {
         tty->cancel();
     }
