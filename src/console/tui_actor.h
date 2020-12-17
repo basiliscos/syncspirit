@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../configuration.h"
+#include "../ui/messages.hpp"
 #include <rotor/asio.hpp>
 #include <boost/asio.hpp>
 #include <optional>
@@ -59,6 +60,7 @@ struct tui_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:
+    void on_discovery(ui::message::discovery_notify_t &message) noexcept;
     void start_timer() noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void do_read() noexcept;
@@ -87,6 +89,7 @@ struct tui_actor_t : public r::actor_base_t {
     std::atomic_bool *shutdown_flag;
     config::tui_config_t tui_config;
     r::address_ptr_t coordinator;
+    r::address_ptr_t controller;
     char input[2];
     char progress_symbol;
 };

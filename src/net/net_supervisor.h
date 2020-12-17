@@ -44,12 +44,12 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
     void on_discovery_req(message::discovery_request_t &req) noexcept;
     void on_discovery_res(message::discovery_response_t &req) noexcept;
-    void on_discovery_notify(message::discovery_notify_t &message) noexcept;
-    bool launch_ssdp() noexcept;
+    void launch_ssdp() noexcept;
 
     config::configuration_t app_cfg;
     r::address_ptr_t ssdp_addr;
     r::address_ptr_t peers_addr;
+    r::address_ptr_t controller_addr;
     r::address_ptr_t global_discovery_addr;
     std::uint32_t ssdp_attempts = 0;
     model::device_id_t device_id;

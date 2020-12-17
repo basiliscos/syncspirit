@@ -30,6 +30,7 @@ void tui_actor_t::on_start() noexcept {
 }
 
 void tui_actor_t::shutdown_start() noexcept {
+    spdlog::debug("tui_actor_t::shutdown_start (addr = {})", (void *)address.get());
     r::actor_base_t::shutdown_start();
     supervisor->do_shutdown();
     send<r::payload::shutdown_trigger_t>(coordinator, coordinator);
@@ -40,8 +41,16 @@ void tui_actor_t::shutdown_start() noexcept {
 
 void tui_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.discover_name(net::names::coordinator, coordinator, true).link(); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.discover_name(net::names::coordinator, coordinator, true).link();
+        p.discover_name(net::names::controller, controller, true).link().callback([&](auto phase, auto &ec) {
+            if (!ec && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&tui_actor_t::on_discovery, controller);
+            }
+        });
+    });
 }
 
 void tui_actor_t::start_timer() noexcept {
@@ -88,22 +97,6 @@ void tui_actor_t::on_timer(r::request_id_t, bool) noexcept {
     }
     flush_prompt();
     start_timer();
-}
-
-void tui_actor_t::flush_prompt() noexcept {
-    char c;
-    if (progress_idx < progress_last) {
-        c = progress[progress_idx];
-        ++progress_idx;
-    } else {
-        c = progress[progress_idx = 0];
-    }
-    auto r = fmt::format("\r\033[2K[{}{}{}{}] {}", sink_t::bold, sink_t::cyan, std::string_view(&c, 1), sink_t::reset,
-                         prompt_buff);
-    std::lock_guard<std::mutex> lock(*mutex);
-    *prompt = r;
-    fwrite(prompt->data(), sizeof(char), prompt->size(), stdout);
-    fflush(stdout);
 }
 
 void tui_actor_t::set_prompt(const std::string &value) noexcept {
@@ -154,3 +147,23 @@ void tui_actor_t::action_less_logs() noexcept {
 }
 
 void tui_actor_t::action_esc() noexcept { reset_prompt(); }
+
+void tui_actor_t::on_discovery(ui::message::discovery_notify_t &message) noexcept {
+    spdlog::critical("tui_actor_t::on_discovery");
+}
+
+void tui_actor_t::flush_prompt() noexcept {
+    char c;
+    if (progress_idx < progress_last) {
+        c = progress[progress_idx];
+        ++progress_idx;
+    } else {
+        c = progress[progress_idx = 0];
+    }
+    auto r = fmt::format("\r\033[2K[{}{}{}{}] {}", sink_t::bold, sink_t::cyan, std::string_view(&c, 1), sink_t::reset,
+                         prompt_buff);
+    std::lock_guard<std::mutex> lock(*mutex);
+    *prompt = r;
+    fwrite(prompt->data(), sizeof(char), prompt->size(), stdout);
+    fflush(stdout);
+}

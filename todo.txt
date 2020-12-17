@@ -1,17 +1,7 @@
-1. controller
+1. controller?
 
-- tty less-like output1
-    - optional, i.e. detect if stdin is terminal
-    - write custom sink
-https://github.com/gabime/spdlog/wiki/4.-Sinks
-https://viewsourcecode.org/snaptoken/kilo/02.enteringRawMode.html
-http://www.sigala.it/sergio/tvision/images.html
-http://www.sigala.it/sergio/tvision/
-http://www.climagic.org/mirrors/VT100_Escape_Codes.html
-https://github.com/luser-dr00g/xpost/blob/3063f60d342251754f5e78f454ffb5e69687fa9b/src/lib/xpost_compat.c#L132
-https://metacpan.org/pod/release/JSTOWE/TermReadKey-2.30/ReadKey.pm
 
-- DB
+2. DB
     https://github.com/erthink/libmdbx
     https://iowow.io/
     https://symas.com/lmdb/

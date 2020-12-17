@@ -13,7 +13,6 @@ using peer_list_t = std::list<model::device_id_t>;
 
 struct peer_supervisor_config_t : ra::supervisor_config_asio_t {
     std::string_view device_name;
-    peer_list_t peer_list;
     const utils::key_pair_t *ssl_pair;
     config::bep_config_t bep_config;
 };
@@ -23,11 +22,6 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
     using builder_t = typename Supervisor::template config_builder_t<Supervisor>;
     using parent_t = ra::supervisor_config_asio_builder_t<Supervisor>;
     using parent_t::parent_t;
-
-    builder_t &&peer_list(const peer_list_t &value) &&noexcept {
-        parent_t::config.peer_list = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
 
     builder_t &&device_name(const std::string_view &value) &&noexcept {
         parent_t::config.device_name = value;
@@ -64,10 +58,8 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
     void launch_peer(const model::device_id_t &peer_device, const model::peer_contact_t &contact) noexcept;
 
     r::address_ptr_t coordinator;
-    peer_list_t peer_list;
     std::string_view device_name;
     const utils::key_pair_t &ssl_pair;
-    peer_list_t discover_queue;
     config::bep_config_t bep_config;
 };
 

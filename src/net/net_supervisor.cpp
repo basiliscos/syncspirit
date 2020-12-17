@@ -7,6 +7,7 @@
 #include "http_actor.h"
 #include "resolver_actor.h"
 #include "peer_supervisor.h"
+#include "controller_actor.h"
 #include "names.h"
 #include <spdlog/spdlog.h>
 
@@ -39,7 +40,6 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_announce);
         p.subscribe_actor(&net_supervisor_t::on_discovery_req);
         p.subscribe_actor(&net_supervisor_t::on_discovery_res);
-        p.subscribe_actor(&net_supervisor_t::on_discovery_notify);
     });
 }
 
@@ -75,15 +75,11 @@ void net_supervisor_t::on_start() noexcept {
         .keep_alive(false)
         .finish();
 
-    // temporally hard-code
-    peer_list_t peers;
-    auto sample_peer =
-        model::device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
-    peers.push_back(sample_peer.value());
+    controller_addr = create_actor<controller_actor_t>().timeout(timeout).device_id(device_id).finish()->get_address();
+
     peers_addr = create_actor<peer_supervisor_t>()
                      .ssl_pair(&ssl_pair)
                      .device_name(app_cfg.device_name)
-                     .peer_list(peers)
                      .strand(strand)
                      .timeout(timeout)
                      .bep_config(app_cfg.bep_config)
@@ -117,16 +113,14 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
         .finish();
 }
 
-bool net_supervisor_t::launch_ssdp() noexcept {
+void net_supervisor_t::launch_ssdp() noexcept {
     auto &cfg = app_cfg.upnp_config;
     if (ssdp_attempts < cfg.discovery_attempts) {
         auto timeout = shutdown_timeout / 2;
         ssdp_addr = create_actor<ssdp_actor_t>().timeout(timeout).max_wait(cfg.max_wait).finish()->get_address();
         ++ssdp_attempts;
         spdlog::trace("net_supervisor_t::launching ssdp, attempt #{}", ssdp_attempts);
-        return true;
     }
-    return false;
 }
 
 void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &message) noexcept {
@@ -139,7 +133,7 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
     if (cfg.enabled) {
         auto global_device_id = model::device_id_t::from_string(cfg.device_id);
         if (!global_device_id) {
-            spdlog::debug(
+            spdlog::error(
                 "net_supervisor_t::on_port_mapping invalid global device id :: {} global discovery will not be used",
                 cfg.device_id);
             return;
@@ -190,18 +184,4 @@ void net_supervisor_t::on_discovery_res(message::discovery_response_t &res) noex
         reply_to(*orig, std::move(peer));
     }
     discovery_map.erase(it);
-}
-
-void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message) noexcept {
-    auto &device_id = message.payload.device_id;
-    auto &peer_contact = message.payload.peer;
-    spdlog::debug("net_supervisor_t::on_discovery_notify, locally discovered peer = {}", device_id.get_value());
-    // TODO check, do we need that peer
-    if (peers_addr && peer_contact.has_value()) {
-        // TODO check, do we need that peer
-        if (device_id.get_value() != "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD") {
-            return;
-        }
-        send<payload::discovery_notification_t>(peers_addr, std::move(message.payload));
-    }
 }

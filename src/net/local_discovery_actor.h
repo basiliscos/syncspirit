@@ -66,7 +66,7 @@ struct local_discovery_actor_t : public r::actor_base_t {
     model::device_id_t device_id;
     asio::io_context::strand &strand;
     udp_socket_t sock;
-    r::address_ptr_t coordinator;
+    r::address_ptr_t controller;
     fmt::memory_buffer rx_buff;
     fmt::memory_buffer tx_buff;
     std::vector<utils::URI> uris;
