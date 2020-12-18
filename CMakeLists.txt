@@ -25,6 +25,7 @@ add_library(syncspirit_lib
     src/constants.cpp
     src/console/sink.cpp
     src/console/tui_actor.cpp
+    src/console/utils.cpp
     src/model/device.cpp
     src/model/device_id.cpp
     src/net/acceptor_actor.cpp

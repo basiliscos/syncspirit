@@ -1,5 +1,6 @@
 #include "tui_actor.h"
 #include "sink.h"
+#include "utils.h"
 #include <spdlog/spdlog.h>
 #include "../net/names.h"
 
@@ -15,7 +16,11 @@ const char *tui_actor_t::progress = "|/-\\";
 
 tui_actor_t::tui_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()},
-      mutex{cfg.mutex}, prompt{cfg.prompt}, shutdown_flag{cfg.shutdown}, tui_config{cfg.tui_config} {
+      mutex{cfg.mutex}, prompt{cfg.prompt}, tui_config{cfg.tui_config} {
+    if (!console::install_signal_handlers()) {
+        spdlog::critical("signal handlers cannot be installed");
+        throw std::runtime_error("signal handlers cannot be installed");
+    }
 
     progress_last = strlen(progress);
     tty = std::make_unique<tty_t::element_type>(strand.context(), STDIN_FILENO);
@@ -61,10 +66,12 @@ void tui_actor_t::start_timer() noexcept {
 }
 
 void tui_actor_t::do_read() noexcept {
-    resources->acquire(resource::tty);
-    auto fwd = ra::forwarder_t(*this, &tui_actor_t::on_read, &tui_actor_t::on_read_error);
-    asio::mutable_buffer buff(input, 1);
-    asio::async_read(*tty, buff, std::move(fwd));
+    if (state < r::state_t::SHUTTING_DOWN) {
+        resources->acquire(resource::tty);
+        auto fwd = ra::forwarder_t(*this, &tui_actor_t::on_read, &tui_actor_t::on_read_error);
+        asio::mutable_buffer buff(input, 1);
+        asio::async_read(*tty, buff, std::move(fwd));
+    }
 }
 
 void tui_actor_t::on_read(size_t) noexcept {
@@ -94,9 +101,15 @@ void tui_actor_t::on_read_error(const sys::error_code &ec) noexcept {
 }
 
 void tui_actor_t::on_timer(r::request_id_t, bool) noexcept {
-    if (*shutdown_flag) {
+    if (console::shutdown_flag) {
         return do_shutdown();
     }
+    if (console::reset_term_flag) {
+        console::term_prepare();
+        tty->non_blocking(true);
+        console::reset_term_flag = false;
+    }
+
     flush_prompt();
     start_timer();
 }
@@ -108,7 +121,7 @@ void tui_actor_t::set_prompt(const std::string &value) noexcept {
 
 void tui_actor_t::action_quit() noexcept {
     spdlog::info("tui_actor_t::action_quit");
-    *shutdown_flag = true;
+    console::shutdown_flag = true;
 }
 
 void tui_actor_t::reset_prompt() noexcept {

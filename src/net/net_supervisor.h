@@ -51,6 +51,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     r::address_ptr_t peers_addr;
     r::address_ptr_t controller_addr;
     r::address_ptr_t global_discovery_addr;
+    r::address_ptr_t local_discovery_addr;
     std::uint32_t ssdp_attempts = 0;
     model::device_id_t device_id;
     utils::key_pair_t ssl_pair;

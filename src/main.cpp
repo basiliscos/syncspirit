@@ -1,5 +1,4 @@
 #include <chrono>
-#include <csignal>
 #include <fstream>
 #include <iostream>
 #include <thread>
@@ -18,6 +17,7 @@
 #include "net/net_supervisor.h"
 #include "console/sink.h"
 #include "console/tui_actor.h"
+#include "console/utils.h"
 
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
@@ -47,12 +47,10 @@ spdlog::level::level_enum get_log_level(const std::string &log_level) {
     return value;
 }
 
-std::atomic_bool console_flag = false;
-std::atomic_bool net_flag = false;
-
 int main(int argc, char **argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
+    console::term_prepare();
     try {
         // clang-format off
         /* parse command-line & config options */
@@ -160,16 +158,9 @@ int main(int argc, char **argv) {
         /* launch actors */
         auto net_thread = std::thread([&]() {
             io_context.run();
-            console_flag = true;
+            console::shutdown_flag = true;
             spdlog::trace("net thread has been terminated");
         });
-
-        struct sigaction act;
-        act.sa_handler = [](int) { console_flag = true; };
-        if (sigaction(SIGINT, &act, nullptr) != 0) {
-            spdlog::critical("cannot set signal handler");
-            return 1;
-        }
 
         asio::io_context console_context;
         ra::system_context_asio_t con_context{console_context};
@@ -185,7 +176,6 @@ int main(int argc, char **argv) {
             .mutex(&std_out_mutex)
             .prompt(&prompt)
             .tui_config(cfg.tui_config)
-            .shutdown(&console_flag)
             .timeout(timeout)
             .finish();
         console_context.run();

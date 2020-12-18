@@ -1,24 +1,8 @@
 #include "sink.h"
 #include "spdlog/pattern_formatter.h"
 
-using namespace syncspirit::console;
 using namespace spdlog;
-
-#include <termios.h>
-
-static termios orig_termios;
-
-void echo_off() noexcept {
-    struct termios ts;
-
-    tcgetattr(STDIN_FILENO, &ts);
-    tcgetattr(STDIN_FILENO, &orig_termios);
-    ts.c_lflag &= ~(ECHO | ICANON);
-
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &ts);
-}
-
-void echo_on() noexcept { tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios); }
+using namespace syncspirit::console;
 
 using mutex_t = std::mutex;
 
@@ -33,13 +17,11 @@ sink_t::sink_t(FILE *target_file, spdlog::color_mode mode, std::mutex &mutex_, s
     colors_[level::err] = to_string_(red_bold);
     colors_[level::critical] = to_string_(bold_on_red);
     colors_[level::off] = to_string_(reset);
-    echo_off();
 }
 
 sink_t::~sink_t() {
     print_ccode_(clear_promt);
     print_("\r", 1);
-    echo_on();
 }
 
 void sink_t::set_color(level::level_enum color_level, string_view_t color) {

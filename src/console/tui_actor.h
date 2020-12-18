@@ -19,7 +19,6 @@ namespace sys = boost::system;
 struct tui_actor_config_t : r::actor_config_t {
     std::mutex *mutex;
     std::string *prompt;
-    std::atomic_bool *shutdown;
     config::tui_config_t tui_config;
 };
 
@@ -86,7 +85,6 @@ struct tui_actor_t : public r::actor_base_t {
     std::mutex *mutex;
     std::string *prompt;
     std::string prompt_buff;
-    std::atomic_bool *shutdown_flag;
     config::tui_config_t tui_config;
     r::address_ptr_t coordinator;
     r::address_ptr_t controller;

@@ -46,11 +46,16 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept {
     parent_t::on_child_shutdown(actor, ec);
     spdlog::trace("net_supervisor_t::on_child_shutdown(), addr = {}", (void *)actor->get_address().get());
-    if (ssdp_addr && actor->get_address() == ssdp_addr) {
+    auto &child_addr = actor->get_address();
+    if (ssdp_addr && child_addr == ssdp_addr) {
         if (!ec && state == r::state_t::OPERATIONAL) {
             launch_ssdp();
             return;
         }
+    }
+    if (local_discovery_addr && child_addr == local_discovery_addr) {
+        // ignore
+        return;
     }
     if (state == r::state_t::OPERATIONAL) {
         do_shutdown();
@@ -88,12 +93,13 @@ void net_supervisor_t::on_start() noexcept {
 
     if (app_cfg.local_announce_config.enabled) {
         auto &cfg = app_cfg.local_announce_config;
-        create_actor<local_discovery_actor_t>()
-            .port(cfg.port)
-            .frequency(cfg.frequency)
-            .device_id(device_id)
-            .timeout(timeout)
-            .finish();
+        local_discovery_addr = create_actor<local_discovery_actor_t>()
+                                   .port(cfg.port)
+                                   .frequency(cfg.frequency)
+                                   .device_id(device_id)
+                                   .timeout(timeout)
+                                   .finish()
+                                   ->get_address();
     }
 }
 
