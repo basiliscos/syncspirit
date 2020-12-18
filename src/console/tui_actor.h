@@ -2,11 +2,14 @@
 
 #include "../configuration.h"
 #include "../ui/messages.hpp"
+#include "activity.h"
 #include <rotor/asio.hpp>
 #include <boost/asio.hpp>
+#include <fmt/fmt.h>
 #include <optional>
 #include <atomic>
-#include <fmt/fmt.h>
+#include <memory>
+#include <list>
 
 namespace syncspirit {
 namespace console {
@@ -37,11 +40,6 @@ template <typename Actor> struct tui_actor_config_builder_t : r::actor_config_bu
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&shutdown(std::atomic_bool *value) &&noexcept {
-        parent_t::config.shutdown = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
     builder_t &&tui_config(const config::tui_config_t &value) &&noexcept {
         parent_t::config.tui_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
@@ -58,7 +56,10 @@ struct tui_actor_t : public r::actor_base_t {
     void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
-  private:
+    using tty_t = std::unique_ptr<asio::posix::stream_descriptor>;
+    using activity_ptr_t = std::unique_ptr<activity_t>;
+    using activities_t = std::list<activity_ptr_t>;
+
     void on_discovery(ui::message::discovery_notify_t &message) noexcept;
     void start_timer() noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
@@ -66,15 +67,12 @@ struct tui_actor_t : public r::actor_base_t {
     void on_read(size_t bytes) noexcept;
     void on_read_error(const sys::error_code &ec) noexcept;
     void action_quit() noexcept;
-    void action_help() noexcept;
     void action_more_logs() noexcept;
     void action_less_logs() noexcept;
     void action_esc() noexcept;
     void set_prompt(const std::string &value) noexcept;
-    void reset_prompt() noexcept;
     void flush_prompt() noexcept;
-
-    using tty_t = std::unique_ptr<asio::posix::stream_descriptor>;
+    void push_activity(activity_ptr_t &&activity) noexcept;
 
     asio::io_context::strand &strand;
     tty_t tty;
@@ -90,6 +88,7 @@ struct tui_actor_t : public r::actor_base_t {
     r::address_ptr_t controller;
     char input[2];
     char progress_symbol;
+    activities_t activities;
 };
 
 } // namespace console

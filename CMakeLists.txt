@@ -23,6 +23,9 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
 add_library(syncspirit_lib
     src/configuration.cpp
     src/constants.cpp
+    src/console/activity.cpp
+    src/console/default_activity.cpp
+    src/console/local_peer_activity.cpp
     src/console/sink.cpp
     src/console/tui_actor.cpp
     src/console/utils.cpp

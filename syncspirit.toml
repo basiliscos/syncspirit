@@ -34,4 +34,5 @@ key_quit      = "q"
 key_more_logs = "+"
 key_less_logs = "-"
 key_help      = "?"
+key_next      = "n"
 

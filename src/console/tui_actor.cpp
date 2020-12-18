@@ -3,6 +3,8 @@
 #include "utils.h"
 #include <spdlog/spdlog.h>
 #include "../net/names.h"
+#include "default_activity.h"
+#include "local_peer_activity.h"
 
 using namespace syncspirit::console;
 
@@ -24,7 +26,7 @@ tui_actor_t::tui_actor_t(config_t &cfg)
 
     progress_last = strlen(progress);
     tty = std::make_unique<tty_t::element_type>(strand.context(), STDIN_FILENO);
-    reset_prompt();
+    push_activity(std::make_unique<default_activity_t>(*this, activity_type_t::DEFAULT));
 }
 
 void tui_actor_t::on_start() noexcept {
@@ -78,16 +80,16 @@ void tui_actor_t::on_read(size_t) noexcept {
     resources->release(resource::tty);
     input[1] = 0;
     auto k = input[0];
-    if (k == tui_config.key_quit) {
-        action_quit();
-    } else if (k == tui_config.key_help) {
-        action_help();
-    } else if (k == tui_config.key_more_logs) {
-        action_more_logs();
-    } else if (k == tui_config.key_less_logs) {
-        action_less_logs();
-    } else if (k == 27) { /* escape */
-        action_esc();
+    if (!activities.front()->handle(k)) {
+        if (k == tui_config.key_quit) {
+            action_quit();
+        } else if (k == tui_config.key_more_logs) {
+            action_more_logs();
+        } else if (k == tui_config.key_less_logs) {
+            action_less_logs();
+        } else if (k == 27) { /* escape */
+            action_esc();
+        }
     }
     do_read();
 }
@@ -119,27 +121,14 @@ void tui_actor_t::set_prompt(const std::string &value) noexcept {
     flush_prompt();
 }
 
+void tui_actor_t::push_activity(activity_ptr_t &&activity) noexcept {
+    activities.push_front(std::move(activity));
+    activities.front()->display();
+}
+
 void tui_actor_t::action_quit() noexcept {
     spdlog::info("tui_actor_t::action_quit");
     console::shutdown_flag = true;
-}
-
-void tui_actor_t::reset_prompt() noexcept {
-    auto p = fmt::format("{}{}{}{} - help > ", sink_t::bold, sink_t::white, "?", sink_t::reset);
-    set_prompt(std::string(p.begin(), p.end()));
-}
-
-void tui_actor_t::action_help() noexcept {
-    auto letter = [](char c) -> std::string {
-        return fmt::format("{}{}{}{}", sink_t::bold, sink_t::white, std::string_view(&c, 1), sink_t::reset);
-    };
-    auto key = [](const char *val) -> std::string {
-        return fmt::format("{}{}{}{}", sink_t::bold, sink_t::white, val, sink_t::reset);
-    };
-
-    auto p = fmt::format("[{}] - quit,  [{}] - more logs, [{}] - less logs, [{}] - back > ", letter('q'), letter('+'),
-                         letter('-'), key("ESC"));
-    set_prompt(p);
 }
 
 void tui_actor_t::action_more_logs() noexcept {
@@ -161,10 +150,10 @@ void tui_actor_t::action_less_logs() noexcept {
     }
 }
 
-void tui_actor_t::action_esc() noexcept { reset_prompt(); }
+void tui_actor_t::action_esc() noexcept { activities.front()->forget(); }
 
 void tui_actor_t::on_discovery(ui::message::discovery_notify_t &message) noexcept {
-    spdlog::critical("tui_actor_t::on_discovery");
+    push_activity(std::make_unique<local_peer_activity_t>(*this, activity_type_t::LOCAL_PEER, message));
 }
 
 void tui_actor_t::flush_prompt() noexcept {
