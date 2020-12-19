@@ -122,9 +122,13 @@ void tui_actor_t::set_prompt(const std::string &value) noexcept {
 }
 
 void tui_actor_t::push_activity(activity_ptr_t &&activity) noexcept {
-    ++activities_count;
-    activities.push_front(std::move(activity));
-    activities.front()->display();
+    auto predicate = [&](auto &it) { return *it == *activity; };
+    auto count = std::count_if(activities.begin(), activities.end(), predicate);
+    if (count == 0) {
+        ++activities_count;
+        activities.push_front(std::move(activity));
+        activities.front()->display();
+    }
 }
 
 void tui_actor_t::postpone_activity() noexcept {
@@ -137,6 +141,7 @@ void tui_actor_t::postpone_activity() noexcept {
 }
 
 void tui_actor_t::discard_activity() noexcept {
+    --activities_count;
     activities.pop_front();
     activities.front()->display();
 }
@@ -168,7 +173,10 @@ void tui_actor_t::action_less_logs() noexcept {
 void tui_actor_t::action_esc() noexcept { postpone_activity(); }
 
 void tui_actor_t::on_discovery(ui::message::discovery_notify_t &message) noexcept {
-    push_activity(std::make_unique<local_peer_activity_t>(*this, activity_type_t::LOCAL_PEER, message));
+    auto &device_id = message.payload.net_message->payload.device_id;
+    if (ignored_devices.count(device_id) == 0) {
+        push_activity(std::make_unique<local_peer_activity_t>(*this, activity_type_t::LOCAL_PEER, message));
+    }
 }
 
 void tui_actor_t::flush_prompt() noexcept {

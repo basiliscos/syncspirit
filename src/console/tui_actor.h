@@ -2,6 +2,7 @@
 
 #include "../configuration.h"
 #include "../ui/messages.hpp"
+#include "../model/device_id.h"
 #include "activity.h"
 #include <rotor/asio.hpp>
 #include <boost/asio.hpp>
@@ -10,6 +11,7 @@
 #include <atomic>
 #include <memory>
 #include <list>
+#include <unordered_set>
 
 namespace syncspirit {
 namespace console {
@@ -59,6 +61,7 @@ struct tui_actor_t : public r::actor_base_t {
     using tty_t = std::unique_ptr<asio::posix::stream_descriptor>;
     using activity_ptr_t = std::unique_ptr<activity_t>;
     using activities_t = std::list<activity_ptr_t>;
+    using ignored_devices_t = std::unordered_set<model::device_id_t>;
 
     void on_discovery(ui::message::discovery_notify_t &message) noexcept;
     void start_timer() noexcept;
@@ -92,6 +95,7 @@ struct tui_actor_t : public r::actor_base_t {
     char progress_symbol;
     activities_t activities;
     size_t activities_count = 0;
+    ignored_devices_t ignored_devices;
 };
 
 } // namespace console

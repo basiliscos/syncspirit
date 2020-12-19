@@ -43,3 +43,12 @@ struct device_id_t {
 };
 
 } // namespace syncspirit::model
+
+namespace std {
+template <> struct hash<syncspirit::model::device_id_t> {
+    inline size_t operator()(const syncspirit::model::device_id_t &device_id) const noexcept {
+        return std::hash<std::string>()(device_id.get_value());
+    }
+};
+
+} // namespace std

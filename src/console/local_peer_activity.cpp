@@ -11,7 +11,14 @@ local_peer_activity_t::local_peer_activity_t(tui_actor_t &actor_, activity_type_
                                              ui::message::discovery_notify_t &message_) noexcept
     : activity_t{actor_, type_}, message{message_.payload.net_message} {}
 
-bool local_peer_activity_t::handle(const char key) noexcept { return false; }
+bool local_peer_activity_t::handle(const char key) noexcept {
+    if (key == 'n') {
+        actor.ignored_devices.emplace(message->payload.device_id);
+        actor.discard_activity();
+        return true;
+    }
+    return false;
+}
 
 void local_peer_activity_t::display() noexcept {
     auto &payload = message->payload;

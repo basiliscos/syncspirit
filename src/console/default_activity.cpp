@@ -46,13 +46,3 @@ bool default_activity_t::handle(const char pressed) noexcept {
     details_shown = true;
     return true;
 }
-
-/*
-void default_activity_t::forget() noexcept {
-    auto c = actor.tui_config.key_help;
-    auto p = fmt::format("{}{}A{}, {}{}{}{} - help > ",
-                         sink_t::yellow, actor.activities_count - 1, sink_t::reset,
-                         sink_t::bold, sink_t::white, std::string_view(&c, 1), sink_t::reset);
-    actor.set_prompt(std::string(p.begin(), p.end()));
-}
-*/
