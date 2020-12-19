@@ -3,7 +3,4 @@
 
 using namespace syncspirit::console;
 
-void activity_t::forget() noexcept {
-    actor.activities.pop_front();
-    actor.activities.front()->display();
-}
+void activity_t::forget() noexcept { actor.postpone_activity(); }

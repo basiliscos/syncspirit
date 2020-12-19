@@ -8,12 +8,28 @@ using namespace syncspirit::console;
 default_activity_t::default_activity_t(tui_actor_t &actor_, activity_type_t type_) noexcept
     : activity_t{actor_, type_} {}
 
-void default_activity_t::display() noexcept { forget(); }
+void default_activity_t::display() noexcept { display_default(); }
 
 bool default_activity_t::operator==(const activity_t &other) const noexcept { return type == other.type; }
 
+void default_activity_t::display_default() noexcept {
+    auto c = actor.tui_config.key_help;
+    auto p = fmt::format("{}{}A{}, {}{}{}{} - help > ", sink_t::yellow, actor.activities_count - 1, sink_t::reset,
+                         sink_t::bold, sink_t::white, std::string_view(&c, 1), sink_t::reset);
+    actor.set_prompt(std::string(p.begin(), p.end()));
+    details_shown = false;
+}
+
 bool default_activity_t::handle(const char pressed) noexcept {
     auto &c = actor.tui_config;
+    if (pressed == 27) {
+        if (details_shown) {
+            display_default();
+            return true;
+        }
+        return false;
+    }
+
     if (pressed != c.key_help) {
         return false;
     }
@@ -27,11 +43,16 @@ bool default_activity_t::handle(const char pressed) noexcept {
     auto p = fmt::format("[{}] - quit,  [{}] - more logs, [{}] - less logs, [{}] - back > ", letter(c.key_quit),
                          letter(c.key_more_logs), letter(c.key_less_logs), key("ESC"));
     actor.set_prompt(std::string(p.begin(), p.end()));
+    details_shown = true;
     return true;
 }
 
+/*
 void default_activity_t::forget() noexcept {
     auto c = actor.tui_config.key_help;
-    auto p = fmt::format("{}{}{}{} - help > ", sink_t::bold, sink_t::white, std::string_view(&c, 1), sink_t::reset);
+    auto p = fmt::format("{}{}A{}, {}{}{}{} - help > ",
+                         sink_t::yellow, actor.activities_count - 1, sink_t::reset,
+                         sink_t::bold, sink_t::white, std::string_view(&c, 1), sink_t::reset);
     actor.set_prompt(std::string(p.begin(), p.end()));
 }
+*/

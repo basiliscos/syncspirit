@@ -73,6 +73,8 @@ struct tui_actor_t : public r::actor_base_t {
     void set_prompt(const std::string &value) noexcept;
     void flush_prompt() noexcept;
     void push_activity(activity_ptr_t &&activity) noexcept;
+    void postpone_activity() noexcept;
+    void discard_activity() noexcept;
 
     asio::io_context::strand &strand;
     tty_t tty;
@@ -89,6 +91,7 @@ struct tui_actor_t : public r::actor_base_t {
     char input[2];
     char progress_symbol;
     activities_t activities;
+    size_t activities_count = 0;
 };
 
 } // namespace console
