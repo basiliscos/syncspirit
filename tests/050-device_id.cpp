@@ -47,4 +47,6 @@ TEST_CASE("device_id", "[protocol]") {
     opt = device_id_t::from_sha256(device_id.get_sha256());
     REQUIRE((bool)opt);
     CHECK(opt.value() == device_id);
+
+    CHECK(opt.value() != local_device_id);
 }

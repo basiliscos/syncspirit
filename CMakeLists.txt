@@ -80,6 +80,7 @@ set(LZ4_BUILD_CLI false CACHE BOOL "LZ4_BUILD_CLI")
 set(LZ4_BUILD_LEGACY_LZ4C false CACHE BOOL "LZ4_BUILD_LEGACY_LZ4C")
 set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
 
+add_subdirectory("lib/spdlog")
 add_subdirectory("lib/lz4/build/cmake/")
 add_subdirectory("lib/pugixml")
 add_subdirectory("lib/rotor")
@@ -109,6 +110,7 @@ target_link_libraries(syncspirit_lib
     ${Boost_LIBRARIES}
     OpenSSL::SSL
     protobuf::libprotobuf
+    spdlog::spdlog
     uriparser
     lz4_static
     ZLIB::ZLIB

@@ -2,6 +2,7 @@
 #include <cassert>
 #include "../utils/base32.h"
 #include "../proto/luhn32.h"
+#include <openssl/sha.h>
 
 using namespace syncspirit::proto;
 using namespace syncspirit::model;
@@ -95,3 +96,12 @@ std::optional<device_id_t> device_id_t::from_cert(const cert_data_t &data) noexc
     }
     return from_sha256(sha_result.value());
 }
+
+namespace syncspirit::model {
+
+static const unsigned char local_device_sha265[SHA256_DIGEST_LENGTH] = {0xFF};
+
+const device_id_t local_device_id =
+    device_id_t::from_cert(cert_data_t{std::string((char *)local_device_sha265, SHA256_DIGEST_LENGTH)}).value();
+
+} // namespace syncspirit::model

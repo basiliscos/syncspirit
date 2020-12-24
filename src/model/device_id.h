@@ -42,6 +42,8 @@ struct device_id_t {
     std::string sha256;
 };
 
+extern const device_id_t local_device_id;
+
 } // namespace syncspirit::model
 
 namespace std {
