@@ -8,8 +8,8 @@ namespace syncspirit::db {
 using discr_t = std::byte;
 
 namespace prefix {
-static const constexpr discr_t device{7};
-static const constexpr discr_t misc{10};
+static const constexpr discr_t misc{0x01};
+static const constexpr discr_t device{0x02};
 } // namespace prefix
 
 struct value_t {

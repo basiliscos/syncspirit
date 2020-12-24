@@ -1,4 +1,10 @@
-2. DB
+модификация конфига
+ - добавить/удалить/изменить директорию
+ - удалить/добавить/изменить девайс
+ - игнорированные девайсы: показать, добавить, удалить
+
+======================
+DB
     https://github.com/erthink/libmdbx
     https://iowow.io/
     https://symas.com/lmdb/
@@ -28,8 +34,6 @@ v: bytearray(b"\n\x13photos/IMG_7038.JPG\x18\xfc\xdb\x18 \xa4\x03(\xd3\x9f\xe8\x
 
 (bytearray(b'\x02\x00\x00\x00\x01\xb7#_\x80\x96\x14uTz\xae\\\xb2\xb5\xbd0\xfe\xf1\xc2\xd3\xd7\xe3\xbf\xacJ.+%\xe9k\x1e\xaa9photos/img-079.jpg'), bytearray(b'\x00\x00\x00\x1b'))
 
-
-================
 
 (bytearray(b'\x00\x00\x00\x00\x02\x00\x00\x00\x01barsik.jpg'), bytearray(b'\n\nbarsik.jpg\x18\xd2\xe4\xaa\x01 \xb0\x03(\x9f\xe8\xd1\xfe\x05@\x01J\x13\n\x11\x08\x8d\xf4\x83\xc4\xb2\xa1\xf3\x95\xad\x01\x10\x86\xea\xd1\xfe\x05P\x02X\xed\x98\xdeM`\x8d\xf4\x83\xc4\xb2\xa1\xf3\x95\xad\x01h\x80\x80\x08\x92\x01 \x01z\xb4\xfe\xacD\x87\x88\xc3\xf1\xd8\xb0k`\n\x92\xc2\xd7Z\x90\xc5\x136\xfb{\xeb4\x85kc\xe7\x07'))
 (bytearray(b'\x00\x00\x00\x00\x02\x00\x00\x00\x0bbarsik.jpg'), bytearray(b'\n\nbarsik.jpg\x18\xd2\xe4\xaa\x01 \xb0\x03(\x9f\xe8\xd1\xfe\x05@\x01J\x13\n\x11\x08\x8d\xf4\x83\xc4\xb2\xa1\xf3\x95\xad\x01\x10\x86\xea\xd1\xfe\x05P\x02X\xed\x98\xdeM`\x8d\xf4\x83\xc4\xb2\xa1\xf3\x95\xad\x01h\x80\x80\x08\x92\x01 \x01z\xb4\xfe\xacD\x87\x88\xc3\xf1\xd8\xb0k`\n\x92\xc2\xd7Z\x90\xc5\x136\xfb{\xeb4\x85kc\xe7\x07'))
@@ -155,6 +159,11 @@ func (s *FileSet) IndexID(device protocol.DeviceID) protocol.IndexID {
         }
         return id
 }
+
+[SKHI6] 2020/12/24 15:49:12.401188 model.go:2491: INFO: Adding folder "sample-phone-folder" (4ioks-ei2kj)
+[SKHI6] 2020/12/24 15:49:12.401432 lowlevel.go:859: INFO: No stored folder metadata for "4ioks-ei2kj"; recalculating
+[SKHI6] 2020/12/24 15:49:12.402443 model.go:385: INFO: Ready to synchronize "sample-phone-folder" (4ioks-ei2kj) (sendreceive)
+
 
 =============================================================================================================================================
 
