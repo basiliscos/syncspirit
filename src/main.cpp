@@ -112,7 +112,8 @@ int main(int argc, char **argv) {
             spdlog::error("Cannot open config file {}", config_file_path_c);
             return 1;
         }
-        config::config_result_t cfg_option = config::get_config(config_file);
+
+        config::config_result_t cfg_option = config::get_config(config_file, config_file_path.parent_path());
         if (!cfg_option) {
             spdlog::error("Config file {} is incorrect :: {}", config_file_path_c, cfg_option.error());
             return 1;

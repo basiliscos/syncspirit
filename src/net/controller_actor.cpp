@@ -20,8 +20,8 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void controller_actor_t::on_start() noexcept {
-    spdlog::trace("controller_actor_t::on_start (addr = {})", (void *)address.get());
     r::actor_base_t::on_start();
+    spdlog::trace("controller_actor_t::on_start (addr = {})", (void *)address.get());
 
     // temporally hard-code
     /*

@@ -70,6 +70,7 @@ struct bep_config_t {
 };
 
 struct configuration_t {
+    boost::filesystem::path config_path;
     local_announce_config_t local_announce_config;
     upnp_config_t upnp_config;
     global_announce_config_t global_announce_config;
@@ -84,13 +85,13 @@ struct configuration_t {
         return local_announce_config == other.local_announce_config && upnp_config == other.upnp_config &&
                global_announce_config == other.global_announce_config && bep_config == other.bep_config &&
                tui_config == other.tui_config && timeout == other.timeout && device_name == other.device_name &&
-               default_folder == other.default_folder;
+               default_folder == other.default_folder && config_path == other.config_path;
     }
 };
 
 using config_result_t = outcome::outcome<configuration_t, std::string>;
 
-config_result_t get_config(std::istream &config);
+config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path);
 
 configuration_t generate_config(const boost::filesystem::path &config_path);
 

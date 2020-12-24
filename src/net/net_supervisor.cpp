@@ -8,10 +8,13 @@
 #include "resolver_actor.h"
 #include "peer_supervisor.h"
 #include "controller_actor.h"
+#include "db_actor.h"
 #include "names.h"
 #include <spdlog/spdlog.h>
+#include <boost/filesystem.hpp>
 
 using namespace syncspirit::net;
+namespace fs = boost::filesystem;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{cfg}, app_cfg{cfg.app_config} {
     auto &files_cfg = app_cfg.global_announce_config;
@@ -79,6 +82,11 @@ void net_supervisor_t::on_start() noexcept {
         .registry_name(names::http10)
         .keep_alive(false)
         .finish();
+
+    fs::path path(app_cfg.config_path);
+    auto db_dir = path.append("mbdx-db");
+
+    create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).finish();
 
     controller_addr = create_actor<controller_actor_t>().timeout(timeout).device_id(device_id).finish()->get_address();
 

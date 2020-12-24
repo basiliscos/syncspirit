@@ -29,10 +29,14 @@ add_library(syncspirit_lib
     src/console/sink.cpp
     src/console/tui_actor.cpp
     src/console/utils.cpp
+    src/db/error_code.cpp
+    src/db/transaction.cpp
+    src/db/utils.cpp
     src/model/device.cpp
     src/model/device_id.cpp
     src/net/acceptor_actor.cpp
     src/net/controller_actor.cpp
+    src/net/db_actor.cpp
     src/net/global_discovery_actor.cpp
     src/net/http_actor.cpp
     src/net/local_discovery_actor.cpp
@@ -92,7 +96,7 @@ target_include_directories(syncspirit_lib PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/uriparser/include
     ${syncspirit_SOURCE_DIR}/lib/tomlplusplus/include
     ${syncspirit_SOURCE_DIR}/lib/lz4/lib
-    ${syncspirit_SOURCE_DIR}/lib/lz4/lib
+    ${syncspirit_SOURCE_DIR}/lib/mbdx
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}

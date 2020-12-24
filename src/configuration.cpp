@@ -36,8 +36,9 @@ static device_name_t get_device_name() noexcept {
     return device_name;
 }
 
-config_result_t get_config(std::istream &config) {
+config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path) {
     configuration_t cfg;
+    cfg.config_path = config_path;
 
     auto home = std::getenv("HOME");
     auto r = toml::parse(config);
@@ -300,6 +301,7 @@ configuration_t generate_config(const boost::filesystem::path &config_path) {
 
     // clang-format off
     configuration_t cfg;
+    cfg.config_path = config_path;
     cfg.timeout = 5000;
     cfg.device_name = device;
     cfg.default_folder = is_home ? "~/" : config_path.c_str();
