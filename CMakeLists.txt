@@ -30,6 +30,7 @@ add_library(syncspirit_lib
     src/console/tui_actor.cpp
     src/console/utils.cpp
     src/db/error_code.cpp
+    src/db/prefix.cpp
     src/db/transaction.cpp
     src/db/utils.cpp
     src/model/device.cpp
