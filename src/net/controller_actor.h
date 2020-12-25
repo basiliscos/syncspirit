@@ -39,6 +39,7 @@ struct controller_actor_t : public r::actor_base_t {
   private:
     void on_discovery_notify(message::discovery_notify_t &message) noexcept;
     void on_config_request(ui::message::config_request_t &message) noexcept;
+    void on_config_save(ui::message::config_save_request_t &message) noexcept;
 
     config::configuration_t app_config;
     model::device_id_t device_id;

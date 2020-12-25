@@ -63,7 +63,10 @@ void tui_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&tui_actor_t::on_config); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&tui_actor_t::on_config);
+        p.subscribe_actor(&tui_actor_t::on_config_save);
+    });
 }
 
 void tui_actor_t::start_timer() noexcept {
@@ -182,16 +185,33 @@ void tui_actor_t::action_config() noexcept {
     push_activity(std::make_unique<config_activity_t>(*this, activity_type_t::CONFIG, app_config, app_config_orig));
 }
 
+void tui_actor_t::save_config() noexcept {
+    auto timeout = init_timeout / 2;
+    request<ui::payload::config_save_request_t>(controller, app_config).send(timeout);
+}
+
 void tui_actor_t::on_discovery(ui::message::discovery_notify_t &message) noexcept {
-    auto &device_id = message.payload.net_message->payload.device_id;
-    if (ignored_devices.count(device_id) == 0) {
-        push_activity(std::make_unique<local_peer_activity_t>(*this, activity_type_t::LOCAL_PEER, message));
-    }
+    push_activity(std::make_unique<local_peer_activity_t>(*this, activity_type_t::LOCAL_PEER, message));
 }
 
 void tui_actor_t::on_config(ui::message::config_response_t &message) noexcept {
     app_config_orig = app_config = message.payload.res;
 }
+
+void tui_actor_t::on_config_save(ui::message::config_save_response_t &message) noexcept {
+    auto &ec = message.payload.ec;
+    if (ec) {
+        spdlog::error("tui_actor_t, cannot save config: {}", ec.message());
+        return;
+    }
+    spdlog::trace("tui_actor_t::on_config_save");
+    app_config_orig = app_config;
+}
+
+void tui_actor_t::ignore_device(const model::device_id_t & device_id) noexcept {
+
+}
+
 
 void tui_actor_t::flush_prompt() noexcept {
     char c;

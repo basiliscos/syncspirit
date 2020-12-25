@@ -12,8 +12,8 @@ local_peer_activity_t::local_peer_activity_t(tui_actor_t &actor_, activity_type_
     : activity_t{actor_, type_}, message{message_.payload.net_message} {}
 
 bool local_peer_activity_t::handle(const char key) noexcept {
-    if (key == 'n') {
-        actor.ignored_devices.emplace(message->payload.device_id);
+    if (key == 'i') {
+        actor.ignore_device(message->payload.device_id);
         actor.discard_activity();
         return true;
     }
@@ -22,8 +22,11 @@ bool local_peer_activity_t::handle(const char key) noexcept {
 
 void local_peer_activity_t::display() noexcept {
     auto &payload = message->payload;
-    auto p = fmt::format("add device {}{}{}{} ({}) y/n? ", sink_t::bold, sink_t::white, payload.device_id.get_value(),
-                         sink_t::reset, payload.peer_endpoint.address().to_string());
+    auto p = fmt::format("{}{}a{}dd or {}{}i{}gnore device {}{}{}{} ({})? ",
+                         sink_t::bold, sink_t::white, sink_t::reset,                                    /* add */
+                         sink_t::bold, sink_t::white, sink_t::reset,                                    /* ignore */
+                         sink_t::bold, sink_t::green, payload.device_id.get_value(), sink_t::reset,     /* device */
+                         payload.peer_endpoint.address().to_string());                                  /* IP */
     actor.set_prompt(std::string(p.begin(), p.end()));
 }
 

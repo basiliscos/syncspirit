@@ -1,41 +1,35 @@
-[global]
-timeout = 5000
-device_name = "hp-note"
-ignored_devices = [
-    "KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7"
-]
-
-
-[local_discovery]
-enabled = 1
-port = 21026
-frequency = 10
-
-[global_discovery]
-enabled = 1
-announce_url = "https://discovery.syncthing.net/"
-device_id = "LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW"
-cert_file = "~/.config/syncthing/cert.pem"
-key_file = "~/.config/syncthing/key.pem"
-rx_buff_size = 32768
-timeout = 3000
-
-[upnp]
-discovery_attempts = 2
-max_wait = 1
-timeout = 10
-external_port = 22001
-rx_buff_size = 65536
-
 [bep]
 rx_buff_size = 33554432
 
-[tui]
-refresh_interval = 50
-key_quit      = "q"
-key_more_logs = "+"
-key_less_logs = "-"
-key_help      = "?"
-key_next      = "n"
-key_config    = "c"
+[global]
+device_name = 'hp-notebook'
+timeout = 5000
 
+[global_discovery]
+announce_url = 'https://discovery.syncthing.net/'
+cert_file = '/home/b/.config/syncthing/cert.pem'
+device_id = 'LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW'
+enabled = true
+key_file = '/home/b/.config/syncthing/key.pem'
+rx_buff_size = 32768
+timeout = 3000
+
+[local_discovery]
+enabled = true
+frequency = 10
+port = 21026
+
+[tui]
+key_config = 'c'
+key_help = '?'
+key_less_logs = '-'
+key_more_logs = '+'
+key_quit = 'q'
+refresh_interval = 50
+
+[upnp]
+discovery_attempts = 2
+external_port = 22001
+max_wait = 1
+rx_buff_size = 65536
+timeout = 10

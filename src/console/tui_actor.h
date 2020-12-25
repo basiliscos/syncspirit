@@ -11,7 +11,6 @@
 #include <atomic>
 #include <memory>
 #include <list>
-#include <unordered_set>
 
 namespace syncspirit {
 namespace console {
@@ -61,10 +60,10 @@ struct tui_actor_t : public r::actor_base_t {
     using tty_t = std::unique_ptr<asio::posix::stream_descriptor>;
     using activity_ptr_t = std::unique_ptr<activity_t>;
     using activities_t = std::list<activity_ptr_t>;
-    using ignored_devices_t = std::unordered_set<model::device_id_t>;
 
     void on_discovery(ui::message::discovery_notify_t &message) noexcept;
     void on_config(ui::message::config_response_t &message) noexcept;
+    void on_config_save(ui::message::config_save_response_t &message) noexcept;
     void start_timer() noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void do_read() noexcept;
@@ -75,11 +74,13 @@ struct tui_actor_t : public r::actor_base_t {
     void action_less_logs() noexcept;
     void action_esc() noexcept;
     void action_config() noexcept;
+    void save_config() noexcept;
     void set_prompt(const std::string &value) noexcept;
     void flush_prompt() noexcept;
     void push_activity(activity_ptr_t &&activity) noexcept;
     void postpone_activity() noexcept;
     void discard_activity() noexcept;
+    void ignore_device(const model::device_id_t &) noexcept;
 
     asio::io_context::strand &strand;
     config::configuration_t app_config;
@@ -99,7 +100,6 @@ struct tui_actor_t : public r::actor_base_t {
     char progress_symbol;
     activities_t activities;
     size_t activities_count = 0;
-    ignored_devices_t ignored_devices;
 };
 
 } // namespace console

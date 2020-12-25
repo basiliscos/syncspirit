@@ -2,8 +2,11 @@
 #include "names.h"
 #include "spdlog/spdlog.h"
 #include "../ui/messages.hpp"
+#include <fstream>
+#include <boost/filesystem.hpp>
 
 using namespace syncspirit::net;
+namespace fs = boost::filesystem;
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, app_config{*config.config}, device_id(config.device_id) {}
@@ -19,6 +22,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_discovery_notify);
         p.subscribe_actor(&controller_actor_t::on_config_request);
+        p.subscribe_actor(&controller_actor_t::on_config_save);
     });
 }
 
@@ -51,4 +55,28 @@ void controller_actor_t::on_discovery_notify(message::discovery_notify_t &messag
 
 void controller_actor_t::on_config_request(ui::message::config_request_t &message) noexcept {
     reply_to(message, app_config);
+}
+
+void controller_actor_t::on_config_save(ui::message::config_save_request_t &message) noexcept {
+    spdlog::trace("controller_actor_t::on_config_save");
+    auto &cfg = message.payload.request_payload.config;
+    auto path_tmp = cfg.config_path;
+    path_tmp.append("syncspirit.toml.tmp");
+    std::ofstream out(path_tmp.string(), out.binary);
+    auto r = config::serialize(cfg, out);
+    if (!r) {
+        reply_with_error(message, r.error());
+        return;
+    }
+    out.close();
+    auto path = cfg.config_path;
+    path.append("syncspirit.toml");
+    sys::error_code ec;
+    fs::rename(path_tmp, path, ec);
+    if (ec) {
+        reply_with_error(message, r.error());
+        return;
+    }
+    app_config = cfg;
+    reply_to(message);
 }

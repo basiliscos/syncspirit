@@ -55,6 +55,11 @@ bool config_activity_t::handle_main(const char key) noexcept {
         memcpy(buff, config.device_name.data(), device_sz);
         display_device();
         return true;
+    } else if (key == 's') {
+        if (!(config == config_orig)) {
+            actor.save_config();
+            forget();
+        }
     }
     return false;
 }
