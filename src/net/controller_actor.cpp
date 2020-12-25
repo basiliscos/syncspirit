@@ -43,10 +43,11 @@ void controller_actor_t::on_start() noexcept {
 void controller_actor_t::on_discovery_notify(message::discovery_notify_t &message) noexcept {
     auto &device_id = message.payload.device_id;
     auto &peer_contact = message.payload.peer;
-    // TODO check, do we need that peer
     if (peer_contact.has_value()) {
-        bool has_peer = false;
-        if (!has_peer) {
+        // TODO: check in the list of known devices too
+        bool notify = app_config.ingored_devices.count(device_id.get_value()) == 0;
+        // bool has_peer = false;
+        if (notify) {
             using original_ptr_t = ui::payload::discovery_notification_t::net_message_ptr_t;
             send<ui::payload::discovery_notification_t>(address, original_ptr_t{&message});
         }
@@ -78,5 +79,6 @@ void controller_actor_t::on_config_save(ui::message::config_save_request_t &mess
         return;
     }
     app_config = cfg;
+    spdlog::warn("controller_actor_t::on_config_save, apply changes");
     reply_to(message);
 }

@@ -3,6 +3,7 @@
 #include "../configuration.h"
 #include "messages.h"
 #include "../ui/messages.hpp"
+#include <set>
 
 namespace syncspirit {
 namespace net {

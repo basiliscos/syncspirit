@@ -208,10 +208,10 @@ void tui_actor_t::on_config_save(ui::message::config_save_response_t &message) n
     app_config_orig = app_config;
 }
 
-void tui_actor_t::ignore_device(const model::device_id_t & device_id) noexcept {
-
+void tui_actor_t::ignore_device(const model::device_id_t &device_id) noexcept {
+    app_config.ingored_devices.emplace(device_id.get_value());
+    save_config();
 }
-
 
 void tui_actor_t::flush_prompt() noexcept {
     char c;

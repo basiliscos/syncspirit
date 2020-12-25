@@ -23,5 +23,18 @@ TEST_CASE("default config is OK", "[config]") {
     auto cfg2 = cfg_opt.value();
     CHECK(cfg == cfg2);
     fs::remove_all(dir);
+
+    SECTION("ignored devices") {
+        out.clear();
+        cfg.ingored_devices.emplace("O4LHPKG-O6BQ36W-MUOVKTI-MKAVHSC-Y7EC3U4-DHNLEDE-MZBJWQN-UIX6QAL");
+        auto r = config::serialize(cfg, out);
+        REQUIRE((bool)r);
+        CHECK(out.str().find("O4LHPKG") != std::string::npos);
+        INFO(out.str());
+        auto cfg2 = config::get_config(out, dir);
+        auto d = cfg2.value().ingored_devices.size();
+        CHECK(d == 1);
+        CHECK(cfg2.value() == cfg);
+    }
 }
 

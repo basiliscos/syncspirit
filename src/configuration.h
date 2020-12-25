@@ -7,6 +7,7 @@
 #include <istream>
 #include <ostream>
 #include <vector>
+#include <set>
 #include "model/device.h"
 
 namespace syncspirit::config {
@@ -71,6 +72,8 @@ struct bep_config_t {
 };
 
 struct configuration_t {
+    using ingored_devices_t = std::set<std::string>;
+
     boost::filesystem::path config_path;
     local_announce_config_t local_announce_config;
     upnp_config_t upnp_config;
@@ -80,12 +83,13 @@ struct configuration_t {
 
     std::uint32_t timeout;
     std::string device_name;
+    ingored_devices_t ingored_devices;
 
     inline bool operator==(const configuration_t &other) const noexcept {
         return local_announce_config == other.local_announce_config && upnp_config == other.upnp_config &&
                global_announce_config == other.global_announce_config && bep_config == other.bep_config &&
                tui_config == other.tui_config && timeout == other.timeout && device_name == other.device_name &&
-               config_path == other.config_path;
+               config_path == other.config_path && ingored_devices == other.ingored_devices;
     }
 };
 

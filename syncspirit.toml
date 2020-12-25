@@ -2,7 +2,8 @@
 rx_buff_size = 33554432
 
 [global]
-device_name = 'hp-notebook'
+device_name = 'hp-note'
+ignored_devices = [ 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7' ]
 timeout = 5000
 
 [global_discovery]

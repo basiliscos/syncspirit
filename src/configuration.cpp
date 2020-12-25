@@ -5,6 +5,7 @@
 #include <boost/algorithm/string.hpp>
 #include <spdlog/spdlog.h>
 #include <cstdlib>
+#include "model/device_id.h"
 
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.h>
@@ -65,6 +66,23 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             device_name = option.value();
         }
         c.device_name = device_name.value();
+
+        auto ignored_devices = t["ignored_devices"];
+        if (ignored_devices.is_array()) {
+            auto arr = ignored_devices.as_array();
+            for (size_t i = 0; i < arr->size(); ++i) {
+                auto node = arr->get(i);
+                if (node->is_string()) {
+                    auto &value = node->as_string()->get();
+                    auto device_id = model::device_id_t::from_string(value);
+                    if (device_id) {
+                        c.ingored_devices.insert(value);
+                    } else {
+                        spdlog::warn("invalid device_id : {}, ignored", value);
+                    }
+                }
+            }
+        }
     };
 
     // local_discovery
@@ -234,11 +252,16 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
 }
 
 outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) noexcept {
+    auto ignored_devices = toml::array{};
+    for (auto &device_id : cfg.ingored_devices) {
+        ignored_devices.emplace_back<std::string>(device_id);
+    }
     // clang-format off
     auto tbl = toml::table{{
         {"global", toml::table{{
             {"timeout",  cfg.timeout},
             {"device_name", cfg.device_name},
+            {"ignored_devices", ignored_devices},
         }}},
         {"local_discovery", toml::table{{
             {"enabled",  cfg.local_announce_config.enabled},
