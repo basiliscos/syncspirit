@@ -9,8 +9,7 @@ struct default_activity_t : activity_t {
     bool handle(const char key) noexcept override;
     void display() noexcept override;
     void display_default() noexcept;
-    // void forget() noexcept override;
-    bool operator==(const activity_t &other) const noexcept override;
+
     bool details_shown = false;
 };
 

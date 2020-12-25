@@ -1,7 +1,10 @@
 [global]
 timeout = 5000
 device_name = "hp-note"
-default_folder = "/tmp"
+ignored_devices = [
+    "KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7"
+]
+
 
 [local_discovery]
 enabled = 1
@@ -25,7 +28,6 @@ external_port = 22001
 rx_buff_size = 65536
 
 [bep]
-# 32 MB
 rx_buff_size = 33554432
 
 [tui]
@@ -35,4 +37,5 @@ key_more_logs = "+"
 key_less_logs = "-"
 key_help      = "?"
 key_next      = "n"
+key_config    = "c"
 

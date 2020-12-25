@@ -19,11 +19,12 @@ struct tui_config_t {
     char key_more_logs;
     char key_less_logs;
     char key_help;
+    char key_config;
 
     inline bool operator==(const tui_config_t &other) const noexcept {
         return refresh_interval == other.refresh_interval && key_quit == other.key_quit &&
                key_more_logs == other.key_more_logs && key_less_logs == other.key_less_logs &&
-               key_help == other.key_help;
+               key_help == other.key_help && key_config == other.key_config;
     }
 };
 
@@ -79,13 +80,12 @@ struct configuration_t {
 
     std::uint32_t timeout;
     std::string device_name;
-    std::string default_folder;
 
     inline bool operator==(const configuration_t &other) const noexcept {
         return local_announce_config == other.local_announce_config && upnp_config == other.upnp_config &&
                global_announce_config == other.global_announce_config && bep_config == other.bep_config &&
                tui_config == other.tui_config && timeout == other.timeout && device_name == other.device_name &&
-               default_folder == other.default_folder && config_path == other.config_path;
+               config_path == other.config_path;
     }
 };
 

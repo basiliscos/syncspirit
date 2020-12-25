@@ -1,7 +1,11 @@
 модификация конфига
+ - сохранение конфига
+ - игнорированные девайсы: показать, добавить, удалить
  - добавить/удалить/изменить директорию
  - удалить/добавить/изменить девайс
- - игнорированные девайсы: показать, добавить, удалить
+
+https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_sequences
+https://stackoverflow.com/questions/64035952/how-to-key-press-detection-on-a-linux-terminal-low-level-style-in-python
 
 ======================
 DB

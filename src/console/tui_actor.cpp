@@ -3,6 +3,7 @@
 #include "utils.h"
 #include <spdlog/spdlog.h>
 #include "../net/names.h"
+#include "config_activity.h"
 #include "default_activity.h"
 #include "local_peer_activity.h"
 
@@ -57,9 +58,12 @@ void tui_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&tui_actor_t::on_discovery, controller);
+                auto timeout = init_timeout / 2;
+                request<ui::payload::config_request_t>(controller).send(timeout);
             }
         });
     });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&tui_actor_t::on_config); });
 }
 
 void tui_actor_t::start_timer() noexcept {
@@ -87,6 +91,8 @@ void tui_actor_t::on_read(size_t) noexcept {
             action_more_logs();
         } else if (k == tui_config.key_less_logs) {
             action_less_logs();
+        } else if (k == tui_config.key_config) {
+            action_config();
         } else if (k == 27) { /* escape */
             action_esc();
         }
@@ -170,13 +176,21 @@ void tui_actor_t::action_less_logs() noexcept {
     }
 }
 
-void tui_actor_t::action_esc() noexcept { postpone_activity(); }
+void tui_actor_t::action_esc() noexcept { activities.front()->forget(); }
+
+void tui_actor_t::action_config() noexcept {
+    push_activity(std::make_unique<config_activity_t>(*this, activity_type_t::CONFIG, app_config, app_config_orig));
+}
 
 void tui_actor_t::on_discovery(ui::message::discovery_notify_t &message) noexcept {
     auto &device_id = message.payload.net_message->payload.device_id;
     if (ignored_devices.count(device_id) == 0) {
         push_activity(std::make_unique<local_peer_activity_t>(*this, activity_type_t::LOCAL_PEER, message));
     }
+}
+
+void tui_actor_t::on_config(ui::message::config_response_t &message) noexcept {
+    app_config_orig = app_config = message.payload.res;
 }
 
 void tui_actor_t::flush_prompt() noexcept {

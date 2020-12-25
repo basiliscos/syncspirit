@@ -65,12 +65,6 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             device_name = option.value();
         }
         c.device_name = device_name.value();
-
-        auto default_folder = t["default_folder"].value<std::string>();
-        if (!default_folder) {
-            return "global/default_folder is incorrect or missing";
-        }
-        c.default_folder = expand_home(default_folder.value(), home);
     };
 
     // local_discovery
@@ -223,6 +217,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.key_less_logs = key_less_logs.value()[0];
 
+        auto key_config = t["key_config"].value<std::string>();
+        if (!key_config || key_config.value().empty()) {
+            return "tui/key_config is incorrect or missing";
+        }
+        c.key_config = key_config.value()[0];
+
         auto key_help = t["key_help"].value<std::string>();
         if (!key_help || key_help.value().empty()) {
             return "tui/key_help is incorrect or missing";
@@ -239,7 +239,6 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
         {"global", toml::table{{
             {"timeout",  cfg.timeout},
             {"device_name", cfg.device_name},
-            {"default_folder", cfg.default_folder}
         }}},
         {"local_discovery", toml::table{{
             {"enabled",  cfg.local_announce_config.enabled},
@@ -270,6 +269,7 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
             {"key_quit", std::string_view(&cfg.tui_config.key_quit, 1)},
             {"key_more_logs", std::string_view(&cfg.tui_config.key_more_logs, 1)},
             {"key_less_logs", std::string_view(&cfg.tui_config.key_less_logs, 1)},
+            {"key_config", std::string_view(&cfg.tui_config.key_config, 1)},
             {"key_help", std::string_view(&cfg.tui_config.key_help, 1)},
         }}},
     }};
@@ -304,7 +304,6 @@ configuration_t generate_config(const boost::filesystem::path &config_path) {
     cfg.config_path = config_path;
     cfg.timeout = 5000;
     cfg.device_name = device;
-    cfg.default_folder = is_home ? "~/" : config_path.c_str();
     cfg.local_announce_config = local_announce_config_t {
         true,
         21027,
@@ -335,6 +334,7 @@ configuration_t generate_config(const boost::filesystem::path &config_path) {
         'q',   /* key_quit */
         '+',   /* key_more_logs */
         '-',   /* key_less_logs */
+        'c',   /* key_config */
         '?'    /* key_help */
     };
     return cfg;

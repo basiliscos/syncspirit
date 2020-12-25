@@ -5,7 +5,8 @@
 
 using namespace syncspirit::net;
 
-controller_actor_t::controller_actor_t(config_t &config) : r::actor_base_t{config}, device_id(config.device_id) {}
+controller_actor_t::controller_actor_t(config_t &config)
+    : r::actor_base_t{config}, app_config{*config.config}, device_id(config.device_id) {}
 
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -15,8 +16,10 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.discover_name(names::coordinator, coordinator, false).link();
         p.discover_name(names::peers, peers, true).link();
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) { p.subscribe_actor(&controller_actor_t::on_discovery_notify); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&controller_actor_t::on_discovery_notify);
+        p.subscribe_actor(&controller_actor_t::on_config_request);
+    });
 }
 
 void controller_actor_t::on_start() noexcept {
@@ -44,4 +47,8 @@ void controller_actor_t::on_discovery_notify(message::discovery_notify_t &messag
             send<ui::payload::discovery_notification_t>(address, original_ptr_t{&message});
         }
     }
+}
+
+void controller_actor_t::on_config_request(ui::message::config_request_t &message) noexcept {
+    reply_to(message, app_config);
 }

@@ -88,7 +88,12 @@ void net_supervisor_t::on_start() noexcept {
 
     create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).finish();
 
-    controller_addr = create_actor<controller_actor_t>().timeout(timeout).device_id(device_id).finish()->get_address();
+    controller_addr = create_actor<controller_actor_t>()
+                          .timeout(timeout)
+                          .device_id(device_id)
+                          .config(&app_cfg)
+                          .finish()
+                          ->get_address();
 
     peers_addr = create_actor<peer_supervisor_t>()
                      .ssl_pair(&ssl_pair)

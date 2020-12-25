@@ -8,6 +8,7 @@ struct tui_actor_t;
 enum class activity_type_t {
     DEFAULT,
     LOCAL_PEER,
+    CONFIG,
 };
 
 struct activity_t {
@@ -15,7 +16,7 @@ struct activity_t {
     virtual void display() noexcept = 0;
     virtual bool handle(const char key) noexcept = 0;
     virtual void forget() noexcept;
-    virtual bool operator==(const activity_t &other) const noexcept = 0;
+    virtual bool operator==(const activity_t &other) const noexcept;
 
     tui_actor_t &actor;
     activity_type_t type;
