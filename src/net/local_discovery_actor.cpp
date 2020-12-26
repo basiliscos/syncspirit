@@ -35,7 +35,7 @@ void local_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexce
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::acceptor, acceptor, true).link(true);
-        p.discover_name(names::controller, controller, true).link(false);
+        p.discover_name(names::coordinator, coordinator, true).link(false);
     });
 }
 
@@ -156,7 +156,7 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
                     boost::posix_time::ptime now(boost::posix_time::microsec_clock::local_time());
                     model::peer_contact_t contact{std::move(now), std::move(uris)};
                     spdlog::trace("local_discovery_actor_t::on_read, local peer = {} ", device_id.value().get_value());
-                    send<payload::discovery_notification_t>(controller, std::move(device_id.value()),
+                    send<payload::discovery_notification_t>(coordinator, std::move(device_id.value()),
                                                             std::move(contact), std::move(peer_endpoint));
                 } else {
                     spdlog::warn("local_discovery_actor_t::on_read, no valid uris from:: {}", peer_endpoint);

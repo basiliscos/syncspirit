@@ -52,14 +52,13 @@ void tui_actor_t::shutdown_start() noexcept {
 void tui_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(net::names::coordinator, coordinator, true).link();
-        p.discover_name(net::names::controller, controller, true).link().callback([&](auto phase, auto &ec) {
+        p.discover_name(net::names::coordinator, coordinator, true).link().callback([&](auto phase, auto &ec) {
             if (!ec && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&tui_actor_t::on_discovery, controller);
+                plugin->subscribe_actor(&tui_actor_t::on_discovery, coordinator);
                 auto timeout = init_timeout / 2;
-                request<ui::payload::config_request_t>(controller).send(timeout);
+                request<ui::payload::config_request_t>(coordinator).send(timeout);
             }
         });
     });
@@ -187,7 +186,7 @@ void tui_actor_t::action_config() noexcept {
 
 void tui_actor_t::save_config() noexcept {
     auto timeout = init_timeout / 2;
-    request<ui::payload::config_save_request_t>(controller, app_config).send(timeout);
+    request<ui::payload::config_save_request_t>(coordinator, app_config).send(timeout);
 }
 
 void tui_actor_t::on_discovery(ui::message::discovery_notify_t &message) noexcept {

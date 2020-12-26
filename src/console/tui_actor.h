@@ -95,7 +95,6 @@ struct tui_actor_t : public r::actor_base_t {
     std::string prompt_buff;
     config::tui_config_t tui_config;
     r::address_ptr_t coordinator;
-    r::address_ptr_t controller;
     char input[2];
     char progress_symbol;
     activities_t activities;

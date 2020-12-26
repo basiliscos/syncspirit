@@ -2,6 +2,7 @@
 
 #include "../configuration.h"
 #include "messages.h"
+#include "../ui/messages.hpp"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 #include <unordered_map>
@@ -44,9 +45,14 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
     void on_discovery_req(message::discovery_request_t &req) noexcept;
     void on_discovery_res(message::discovery_response_t &req) noexcept;
+    void on_discovery_notify(message::discovery_notify_t &message) noexcept;
+    void on_config_request(ui::message::config_request_t &message) noexcept;
+    void on_config_save(ui::message::config_save_request_t &message) noexcept;
+
+    void launch_children() noexcept;
     void launch_ssdp() noexcept;
 
-    config::configuration_t app_cfg;
+    config::configuration_t app_config;
     r::address_ptr_t ssdp_addr;
     r::address_ptr_t peers_addr;
     r::address_ptr_t controller_addr;
