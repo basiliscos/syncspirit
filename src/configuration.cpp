@@ -37,6 +37,51 @@ static device_name_t get_device_name() noexcept {
     return device_name;
 }
 
+static std::optional<device_config_t> get_device(toml::table &t) noexcept {
+    using result_t = std::optional<device_config_t>;
+    auto id = t["id"].value<std::string>();
+    if (!id) {
+        return result_t();
+    }
+
+    auto device_id = model::device_id_t::from_string(id.value());
+    if (!device_id) {
+        return result_t();
+    }
+
+    auto name = t["name"].value<std::string>();
+    if (!name) {
+        return result_t();
+    }
+
+    auto compression = t["compression"].value<std::uint32_t>();
+    if (!compression) {
+        return result_t();
+    }
+    auto compr_value = static_cast<compression_t>(compression.value());
+    if (compr_value < compression_t::min || compr_value > compression_t::max) {
+        return result_t();
+    }
+
+    auto introducer = t["introducer"].value<bool>();
+    if (!introducer) {
+        return result_t();
+    }
+
+    auto auto_accept = t["auto_accept"].value<bool>();
+    if (!auto_accept) {
+        return result_t();
+    }
+
+    auto paused = t["paused"].value<bool>();
+    if (!paused) {
+        return result_t();
+    }
+
+    return device_config_t{id.value(),         name.value(),        compr_value,
+                           introducer.value(), auto_accept.value(), paused.value()};
+}
+
 config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path) {
     configuration_t cfg;
     cfg.config_path = config_path;
@@ -248,6 +293,22 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         c.key_help = key_help.value()[0];
     }
 
+    // devices
+    {
+        auto td = root_tbl["device"];
+        if (td.is_array_of_tables()) {
+            auto arr = td.as_array();
+            for (size_t i = 0; i < arr->size(); ++i) {
+                auto node = arr->get(i);
+                auto &value = *node->as_table();
+                auto device = get_device(value);
+                if (device) {
+                    cfg.devices.emplace(std::move(device.value()));
+                }
+            }
+        }
+    }
+
     return std::move(cfg);
 }
 
@@ -256,7 +317,19 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
     for (auto &device_id : cfg.ingored_devices) {
         ignored_devices.emplace_back<std::string>(device_id);
     }
+    auto devices = toml::array{};
     // clang-format off
+    for (auto &device : cfg.devices) {
+        auto device_table = toml::table{{
+            {"id", device.id},
+            {"name", device.name},
+            {"compression", static_cast<std::uint32_t>(device.compression)},
+            {"introducer", device.introducer},
+            {"auto_accept", device.auto_accept},
+            {"paused", device.paused},
+        }};
+        devices.push_back(device_table);
+    }
     auto tbl = toml::table{{
         {"global", toml::table{{
             {"timeout",  cfg.timeout},
@@ -295,6 +368,7 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
             {"key_config", std::string_view(&cfg.tui_config.key_config, 1)},
             {"key_help", std::string_view(&cfg.tui_config.key_help, 1)},
         }}},
+        {"device", devices},
     }};
     // clang-format on
     out << tbl;

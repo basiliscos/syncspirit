@@ -14,6 +14,27 @@ namespace syncspirit::config {
 
 namespace outcome = boost::outcome_v2;
 
+enum class compression_t { none = 1, meta, all, min = none, max = all };
+
+struct device_config_t {
+    std::string id;
+    std::string name;
+    compression_t compression;
+    bool introducer;
+    bool auto_accept;
+    bool paused;
+    inline bool operator==(const device_config_t &other) const noexcept {
+        return id == other.id && name == other.name && compression == other.compression &&
+               introducer == other.introducer && auto_accept == other.auto_accept && paused == other.paused;
+    }
+};
+
+struct device_config_comparator_t {
+    bool operator()(const device_config_t &l, const device_config_t &r) const noexcept {
+        return std::less<std::string>()(l.id, r.id);
+    }
+};
+
 struct tui_config_t {
     std::uint32_t refresh_interval;
     char key_quit;
@@ -73,6 +94,7 @@ struct bep_config_t {
 
 struct configuration_t {
     using ingored_devices_t = std::set<std::string>;
+    using devices_t = std::set<device_config_t, device_config_comparator_t>;
 
     boost::filesystem::path config_path;
     local_announce_config_t local_announce_config;
@@ -84,12 +106,13 @@ struct configuration_t {
     std::uint32_t timeout;
     std::string device_name;
     ingored_devices_t ingored_devices;
+    devices_t devices;
 
     inline bool operator==(const configuration_t &other) const noexcept {
         return local_announce_config == other.local_announce_config && upnp_config == other.upnp_config &&
                global_announce_config == other.global_announce_config && bep_config == other.bep_config &&
                tui_config == other.tui_config && timeout == other.timeout && device_name == other.device_name &&
-               config_path == other.config_path && ingored_devices == other.ingored_devices;
+               config_path == other.config_path && ingored_devices == other.ingored_devices && devices == other.devices;
     }
 };
 
