@@ -72,7 +72,7 @@ bool config_activity_t::handle_device(const char key) noexcept {
             buff[sz - 1] = 0;
         }
         handled = true;
-    } else if (std::isalnum(key) || key == '_' || key == '+' || key == '-') {
+    } else if (std::isalnum(key) || key == '_' || key == '+' || key == '-' || key == '.') {
         auto sz = strlen(buff);
         if (sz < MAX_DEVICE_NAME - 1) {
             buff[sz] = key;

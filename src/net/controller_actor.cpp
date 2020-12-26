@@ -44,9 +44,8 @@ void controller_actor_t::on_discovery_notify(message::discovery_notify_t &messag
     auto &device_id = message.payload.device_id;
     auto &peer_contact = message.payload.peer;
     if (peer_contact.has_value()) {
-        // TODO: check in the list of known devices too
-        bool notify = app_config.ingored_devices.count(device_id.get_value()) == 0;
-        // bool has_peer = false;
+        bool notify = app_config.ingored_devices.count(device_id.get_value()) == 0 &&
+                      app_config.devices.count(device_id.get_value()) == 0;
         if (notify) {
             using original_ptr_t = ui::payload::discovery_notification_t::net_message_ptr_t;
             send<ui::payload::discovery_notification_t>(address, original_ptr_t{&message});

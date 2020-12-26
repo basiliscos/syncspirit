@@ -8,6 +8,8 @@ using namespace syncspirit::proto;
 using namespace syncspirit::model;
 using namespace syncspirit::utils;
 
+const std::string_view device_id_t::get_short() const noexcept { return std::string_view(value.data(), DASH_INT); }
+
 std::optional<device_id_t> device_id_t::from_string(const std::string &value) noexcept {
     using result_t = std::optional<device_id_t>;
     char buff[DASHED_SIZE];

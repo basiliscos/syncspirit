@@ -303,7 +303,8 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
                 auto &value = *node->as_table();
                 auto device = get_device(value);
                 if (device) {
-                    cfg.devices.emplace(std::move(device.value()));
+                    auto id = device->id;
+                    cfg.devices.emplace(id, std::move(device.value()));
                 }
             }
         }
@@ -319,7 +320,8 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
     }
     auto devices = toml::array{};
     // clang-format off
-    for (auto &device : cfg.devices) {
+    for (auto &it : cfg.devices) {
+        auto &device = it.second;
         auto device_table = toml::table{{
             {"id", device.id},
             {"name", device.name},

@@ -27,6 +27,7 @@ struct device_id_t {
     operator bool() const noexcept { return !value.empty(); }
 
     const std::string &get_value() const noexcept { return value; }
+    const std::string_view get_short() const noexcept;
     const std::string &get_sha256() const noexcept { return sha256; }
 
     template <typename OStream> friend OStream &operator<<(OStream &os, const device_id_t &device_id) {

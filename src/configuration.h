@@ -7,6 +7,7 @@
 #include <istream>
 #include <ostream>
 #include <vector>
+#include <map>
 #include <set>
 #include "model/device.h"
 
@@ -94,7 +95,7 @@ struct bep_config_t {
 
 struct configuration_t {
     using ingored_devices_t = std::set<std::string>;
-    using devices_t = std::set<device_config_t, device_config_comparator_t>;
+    using devices_t = std::map<std::string, device_config_t>;
 
     boost::filesystem::path config_path;
     local_announce_config_t local_announce_config;

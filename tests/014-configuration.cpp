@@ -48,14 +48,14 @@ TEST_CASE("default config is OK", "[config]") {
             true,
             false
         };
-        cfg.devices.emplace(device);
+        cfg.devices.emplace(device.id, device);
         auto r = config::serialize(cfg, out);
         REQUIRE((bool)r);
         CHECK(out.str().find("O4LHPKG") != std::string::npos);
         INFO(out.str());
         auto cfg2 = config::get_config(out, dir);
+        CHECK(cfg2.value().devices.count(device.id) == 1);
         CHECK(cfg2.value() == cfg);
-        CHECK(cfg2.value().devices.count(device) == 1);
     }
 }
 

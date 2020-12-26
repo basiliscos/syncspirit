@@ -36,6 +36,7 @@ TEST_CASE("device_id", "[protocol]") {
     auto expected = std::string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
     REQUIRE(device_id.get_value().size() == expected.size());
     REQUIRE(device_id.get_value() == expected);
+    CHECK(device_id.get_short() == "KHQNO2S");
 
     auto opt = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
     REQUIRE((bool)opt);

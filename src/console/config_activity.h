@@ -7,6 +7,7 @@ namespace syncspirit::console {
 
 struct config_activity_t : activity_t {
     static const constexpr size_t MAX_DEVICE_NAME = 30;
+
     enum class sub_activity_t {
         main,
         editing_device,

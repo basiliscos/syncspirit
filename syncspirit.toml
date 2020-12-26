@@ -3,7 +3,7 @@ rx_buff_size = 33554432
 
 [global]
 device_name = 'hp-note'
-ignored_devices = [ 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7' ]
+ignored_devices = []
 timeout = 5000
 
 [global_discovery]
@@ -34,3 +34,11 @@ external_port = 22001
 max_wait = 1
 rx_buff_size = 65536
 timeout = 10
+
+[[device]]
+auto_accept = false
+compression = 2
+id = 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7'
+introducer = false
+name = 'synth-orig'
+paused = false
