@@ -4,13 +4,14 @@
 #include <vector>
 #include <optional>
 #include "../utils/uri.h"
+#include "../configuration.h"
 #include "device_id.h"
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 
 namespace syncspirit::model {
 
 struct peer_contact_t {
-    using uri_container_t = std::vector<utils::URI>;
+    using uri_container_t = config::device_config_t::addresses_t;
     using date_t = boost::posix_time::ptime;
     /*
         peer_contact_t() noexcept {}

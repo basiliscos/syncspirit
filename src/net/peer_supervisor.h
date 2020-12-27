@@ -50,12 +50,15 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
     void on_start() noexcept override;
 
   private:
+    void on_connect(message::connect_request_t &msg) noexcept;
+#if 0
     void on_announce(message::announce_notification_t &msg) noexcept;
     void on_discovery(message::discovery_response_t &res) noexcept;
     void on_discovery_notify(message::discovery_notify_t &message) noexcept;
     void discover_next_peer() noexcept;
-
-    void launch_peer(const model::device_id_t &peer_device, const model::peer_contact_t &contact) noexcept;
+#endif
+    void launch_peer(const model::device_id_t &peer_device,
+                     const model::peer_contact_t::uri_container_t &urist) noexcept;
 
     r::address_ptr_t coordinator;
     std::string_view device_name;

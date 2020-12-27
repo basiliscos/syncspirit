@@ -129,6 +129,14 @@ struct discovery_notification_t {
     udp::endpoint peer_endpoint;
 };
 
+struct connect_response_t {};
+
+struct connect_request_t {
+    using response_t = connect_response_t;
+    model::device_id_t device_id;
+    config::device_config_t::addresses_t uris;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -151,8 +159,11 @@ using http_close_connection_t = r::message_t<payload::http_close_connection_t>;
 
 using discovery_request_t = r::request_traits_t<payload::discovery_request_t>::request::message_t;
 using discovery_response_t = r::request_traits_t<payload::discovery_request_t>::response::message_t;
-using discovery_cancel_t = r::request_traits_t<payload::discovery_request_t>::response::message_t;
+using discovery_cancel_t = r::request_traits_t<payload::discovery_request_t>::cancel::message_t;
 using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
+
+using connect_request_t = r::request_traits_t<payload::connect_request_t>::request::message_t;
+using connect_response_t = r::request_traits_t<payload::connect_request_t>::response::message_t;
 
 } // end of namespace message
 

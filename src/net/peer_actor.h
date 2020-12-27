@@ -15,7 +15,7 @@ namespace net {
 struct peer_actor_config_t : public r::actor_config_t {
     std::string_view device_name;
     model::device_id_t peer_device_id;
-    model::peer_contact_t contact;
+    model::peer_contact_t::uri_container_t uris;
     const utils::key_pair_t *ssl_pair;
     config::bep_config_t bep_config;
 };
@@ -30,8 +30,8 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&contact(const model::peer_contact_t &value) &&noexcept {
-        parent_t::config.contact = value;
+    builder_t &&uris(const model::peer_contact_t::uri_container_t &value) &&noexcept {
+        parent_t::config.uris = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -103,7 +103,7 @@ struct peer_actor_t : public r::actor_base_t {
     void read_cluster_config(proto::message::message_t &&msg) noexcept;
 
     std::string_view device_name;
-    model::peer_contact_t contact;
+    model::peer_contact_t::uri_container_t uris;
     const utils::key_pair_t &ssl_pair;
     r::address_ptr_t resolver;
     transport::transport_sp_t transport;

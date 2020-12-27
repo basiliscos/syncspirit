@@ -6,6 +6,7 @@
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 #include <unordered_map>
+#include "../model/device.h"
 
 namespace syncspirit {
 namespace net {
@@ -29,26 +30,28 @@ struct net_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<Su
 struct net_supervisor_t : public ra::supervisor_asio_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = net_supervisor_config_t;
+
     template <typename Actor> using config_builder_t = net_supervisor_config_builder_t<Actor>;
 
     explicit net_supervisor_t(config_t &config);
+    void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept override;
     void on_start() noexcept override;
 
   private:
-    using discovery_map_t =
-        std::unordered_map<rotor::request_id_t, rotor::intrusive_ptr_t<message::discovery_request_t>>;
+    using discovery_map_t = std::set<rotor::request_id_t>;
+    using devices_t = std::unordered_map<std::string, model::device_ptr_t>;
 
     void on_ssdp(message::ssdp_notification_t &message) noexcept;
     void on_announce(message::announce_notification_t &message) noexcept;
     void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
-    void on_discovery_req(message::discovery_request_t &req) noexcept;
-    void on_discovery_res(message::discovery_response_t &req) noexcept;
+    void on_discovery(message::discovery_response_t &req) noexcept;
     void on_discovery_notify(message::discovery_notify_t &message) noexcept;
     void on_config_request(ui::message::config_request_t &message) noexcept;
     void on_config_save(ui::message::config_save_request_t &message) noexcept;
 
+    void discover(model::device_ptr_t &device) noexcept;
     void launch_children() noexcept;
     void launch_ssdp() noexcept;
 
@@ -62,6 +65,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     model::device_id_t device_id;
     utils::key_pair_t ssl_pair;
     discovery_map_t discovery_map;
+    devices_t devices;
 };
 
 } // namespace net

@@ -15,7 +15,7 @@ r::plugin::resource_id_t timer = 3;
 
 peer_actor_t::peer_actor_t(config_t &config)
     : r::actor_base_t{config}, device_id{config.peer_device_id},
-      device_name{config.device_name}, contact{config.contact}, ssl_pair{*config.ssl_pair} {
+      device_name{config.device_name}, uris{config.uris}, ssl_pair{*config.ssl_pair} {
     rx_buff.resize(config.bep_config.rx_buff_size);
 }
 
@@ -32,15 +32,16 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void peer_actor_t::try_next_uri() noexcept {
     transport::ssl_junction_t ssl{device_id, &ssl_pair, false};
-    while (uri_idx < (std::int32_t)contact.uris.size()) {
-        auto &uri = contact.uris[++uri_idx];
+    while (uri_idx < (std::int32_t)uris.size()) {
+        auto &uri = uris[++uri_idx];
         auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
         // spdlog::warn("url: {}", uri.full);
         transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup};
         auto result = transport::initiate(cfg);
         if (result) {
+            initiate(std::move(result), uri);
             resources->release(resource::uris);
-            return initiate(std::move(result), uri);
+            return;
         }
     }
 
@@ -91,7 +92,7 @@ void peer_actor_t::on_connect(resolve_it_t) noexcept {
 void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        spdlog::warn("http_actor_t::on_io_error, {} :: {}", device_id, ec.message());
+        spdlog::warn("peer_actor_t::on_io_error, {} :: {}", device_id, ec.message());
     }
     cancel_timer();
     if (resources->has(resource::uris)) {

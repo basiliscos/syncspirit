@@ -17,7 +17,6 @@ static const std::string home_path = "~/.config/syncspirit";
 namespace syncspirit::config {
 
 using device_name_t = outcome::result<std::string>;
-using device_option_t = outcome::outcome<model::device_t, std::string>;
 
 static std::string expand_home(const std::string &path, const char *home) {
     if (home && path.size() && path[0] == '~') {

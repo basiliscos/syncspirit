@@ -30,6 +30,11 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
     ssl_pair = std::move(result.value());
     device_id = std::move(device.value());
     spdlog::info("net_supervisor_t, device name = {},  device id = {}", app_config.device_name, device_id);
+
+    for (auto &it : app_config.devices) {
+        auto device = model::device_ptr_t{new model::device_t(it.second)};
+        devices.emplace(it.first, std::move(device));
+    }
 }
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -40,8 +45,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_ssdp);
         p.subscribe_actor(&net_supervisor_t::on_port_mapping);
         p.subscribe_actor(&net_supervisor_t::on_announce);
-        p.subscribe_actor(&net_supervisor_t::on_discovery_req);
-        p.subscribe_actor(&net_supervisor_t::on_discovery_res);
+        p.subscribe_actor(&net_supervisor_t::on_discovery);
         p.subscribe_actor(&net_supervisor_t::on_discovery_notify);
         p.subscribe_actor(&net_supervisor_t::on_config_request);
         p.subscribe_actor(&net_supervisor_t::on_config_save);
@@ -69,8 +73,6 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_c
 }
 
 void net_supervisor_t::launch_children() noexcept {
-    launch_ssdp();
-
     auto timeout = shutdown_timeout * 9 / 10;
     auto io_timeout = shutdown_timeout * 8 / 10;
     create_actor<acceptor_actor_t>().timeout(timeout).finish();
@@ -112,15 +114,7 @@ void net_supervisor_t::launch_children() noexcept {
 void net_supervisor_t::on_start() noexcept {
     spdlog::trace("net_supervisor_t::on_start (addr = {})", (void *)address.get());
     parent_t::on_start();
-
-    // temporally hard-code
-    /*
-    send to peers supervisor connect messages
-    peer_list_t peers;
-    auto sample_peer =
-        model::device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
-    peers.push_back(sample_peer.value());
-    */
+    launch_ssdp();
 }
 
 void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
@@ -180,10 +174,12 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
 }
 
 void net_supervisor_t::on_announce(message::announce_notification_t &) noexcept {
-    // this is needed to have multiple discovery services, i.e. global & local
-    send<payload::announce_notification_t>(peers_addr, get_address());
+    for (auto it : devices) {
+        discover(it.second);
+    }
 }
 
+#if 0
 void net_supervisor_t::on_discovery_req(message::discovery_request_t &req) noexcept {
     if (global_discovery_addr) {
         assert(global_discovery_addr);
@@ -196,20 +192,29 @@ void net_supervisor_t::on_discovery_req(message::discovery_request_t &req) noexc
         reply_with_error(req, ec);
     }
 }
+#endif
 
-void net_supervisor_t::on_discovery_res(message::discovery_response_t &res) noexcept {
+void net_supervisor_t::on_discovery(message::discovery_response_t &res) noexcept {
     auto &ec = res.payload.ec;
     auto &req_id = res.payload.req->payload.id;
     auto it = discovery_map.find(req_id);
     assert(it != discovery_map.end());
-    auto &orig = it->second;
-    if (ec) {
-        reply_with_error(*orig, ec);
-    } else {
-        auto &peer = res.payload.res->peer;
-        reply_to(*orig, std::move(peer));
-    }
     discovery_map.erase(it);
+    auto &req = *res.payload.req->payload.request_payload;
+    if (!ec) {
+        auto &contact = res.payload.res->peer;
+        if (contact) {
+            auto timeout = shutdown_timeout / 2;
+            auto &urls = contact.value().uris;
+            spdlog::warn("TODO: net_supervisor_t::on_discovery, update last_seen", req.device_id);
+            request<payload::connect_request_t>(peers_addr, req.device_id, urls).send(timeout);
+        } else {
+            spdlog::trace("net_supervisor_t::on_discovery, no contact for {} has been discovered", req.device_id);
+        }
+    } else {
+        spdlog::warn("net_supervisor_t::on_discovery, can't discover contacts for {} :: {}", req.device_id,
+                     ec.message());
+    }
 }
 
 void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message) noexcept {
@@ -252,4 +257,26 @@ void net_supervisor_t::on_config_save(ui::message::config_save_request_t &messag
     app_config = cfg;
     spdlog::warn("net_supervisor_t::on_config_save, apply changes");
     reply_to(message);
+}
+
+void net_supervisor_t::discover(model::device_ptr_t &device) noexcept {
+    if (device->is_dynamic()) {
+        if (global_discovery_addr) {
+            assert(global_discovery_addr);
+            auto timeout = shutdown_timeout / 2;
+            auto &device_id = device->device_id;
+            auto req_id = request<payload::discovery_request_t>(global_discovery_addr, device_id).send(timeout);
+            discovery_map.emplace(req_id);
+        }
+    } else {
+        auto timeout = shutdown_timeout / 2;
+        request<payload::connect_request_t>(peers_addr, device->device_id, device->static_addresses).send(timeout);
+    }
+}
+
+void net_supervisor_t::shutdown_start() noexcept {
+    for (auto request_id : discovery_map) {
+        send<message::discovery_cancel_t::payload_t>(global_discovery_addr, request_id);
+    }
+    parent_t::shutdown_start();
 }

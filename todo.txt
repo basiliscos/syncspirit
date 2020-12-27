@@ -184,6 +184,9 @@ func (s *FileSet) IndexID(device protocol.DeviceID) protocol.IndexID {
 - discovery_support, upnp_support-> proto ?
 - вообще не отвечает upnp
 
+
+- restart all on config change
+
 openssl x509 -inform PEM -outform DER -in ~/.config/syncthing/cert.pem -out /tmp/cert.der
 
 - статически собирать бинарь под линь ( https://www.youtube.com/watch?v=Z7WuUhPJ-cU&list=PLZN9ZGiWZoZruMY-MlkAd-nHzdP9TfLRC&index=25 )

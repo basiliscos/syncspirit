@@ -12,12 +12,15 @@ void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::peers, get_address());
-        p.discover_name(names::coordinator, coordinator, false).link();
+        p.discover_name(names::coordinator, coordinator, true).link(false);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&peer_supervisor_t::on_connect);
+#if 0
         p.subscribe_actor(&peer_supervisor_t::on_announce);
         p.subscribe_actor(&peer_supervisor_t::on_discovery);
         p.subscribe_actor(&peer_supervisor_t::on_discovery_notify);
+#endif
     });
 }
 
@@ -30,6 +33,7 @@ void peer_supervisor_t::on_start() noexcept {
     spdlog::trace("peer_supervisor_t::on_start (addr = {})", (void *)address.get());
     parent_t::on_start();
 }
+#if 0
 
 void peer_supervisor_t::discover_next_peer() noexcept {
     spdlog::trace("peer_supervisor_t::discover_next_peer");
@@ -66,23 +70,31 @@ void peer_supervisor_t::on_discovery(message::discovery_response_t &res) noexcep
     }
     launch_peer(device_id, peer_option.value());
 }
+#endif
 
 void peer_supervisor_t::launch_peer(const model::device_id_t &peer_device,
-                                    const model::peer_contact_t &contact) noexcept {
+                                    const model::peer_contact_t::uri_container_t &uris) noexcept {
     auto timeout = shutdown_timeout * 7 / 10;
     spdlog::trace("peer_supervisor_t, peer {} found, initiating connection", peer_device);
     create_actor<peer_actor_t>()
         .ssl_pair(&ssl_pair)
         .device_name(device_name)
         .peer_device_id(peer_device)
-        .contact(contact)
+        .uris(uris)
         .bep_config(bep_config)
         .timeout(timeout)
         .finish();
 }
 
+#if 0
 void peer_supervisor_t::on_discovery_notify(message::discovery_notify_t &message) noexcept {
     auto &peer_device = message.payload.device_id;
     auto &peer_contact = message.payload.peer;
     launch_peer(peer_device, peer_contact.value());
+}
+#endif
+
+void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
+    auto &payload = msg.payload.request_payload;
+    launch_peer(payload.device_id, payload.uris);
 }

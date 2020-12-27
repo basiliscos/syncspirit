@@ -9,7 +9,6 @@
 #include <vector>
 #include <map>
 #include <set>
-#include "model/device.h"
 
 namespace syncspirit::config {
 
@@ -18,15 +17,20 @@ namespace outcome = boost::outcome_v2;
 enum class compression_t { none = 1, meta, all, min = none, max = all };
 
 struct device_config_t {
+    using addresses_t = std::vector<utils::URI>;
+
     std::string id;
     std::string name;
     compression_t compression;
     bool introducer;
     bool auto_accept;
     bool paused;
+    addresses_t static_addresses;
+
     inline bool operator==(const device_config_t &other) const noexcept {
         return id == other.id && name == other.name && compression == other.compression &&
-               introducer == other.introducer && auto_accept == other.auto_accept && paused == other.paused;
+               introducer == other.introducer && auto_accept == other.auto_accept && paused == other.paused &&
+               static_addresses == other.static_addresses;
     }
 };
 

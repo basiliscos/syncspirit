@@ -21,7 +21,7 @@ void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         [&](auto &p) { p.subscribe_actor(&acceptor_actor_t::on_endpoint_request); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::acceptor, get_address());
-        p.discover_name(names::coordinator, coordinator, false).link();
+        p.discover_name(names::coordinator, coordinator, true).link(false);
     });
 }
 
