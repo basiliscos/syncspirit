@@ -249,6 +249,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "bep/rx_buff_size is incorrect or missing";
         }
         c.rx_buff_size = rx_buff_size.value();
+
+        auto connect_timeout = t["connect_timeout"].value<std::uint32_t>();
+        if (!connect_timeout) {
+            return "bep/connect_timeout is incorrect or missing";
+        }
+        c.connect_timeout = connect_timeout.value();
     }
 
     // tui
@@ -360,6 +366,7 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
         }}},
         {"bep", toml::table{{
             {"rx_buff_size", cfg.bep_config.rx_buff_size},
+            {"connect_timeout", cfg.bep_config.connect_timeout},
         }}},
         {"tui", toml::table{{
             {"refresh_interval", cfg.tui_config.refresh_interval},
@@ -425,6 +432,7 @@ configuration_t generate_config(const boost::filesystem::path &config_path) {
         64 * 1024,  /* rx_buff */
     };
     cfg.bep_config = bep_config_t {
+        5000,               /* connect_timeout */
         16 * 1024 * 1024,   /* rx_buff */
     };
     cfg.tui_config = tui_config_t {

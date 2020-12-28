@@ -19,8 +19,9 @@ void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void peer_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept {
-    auto *peer = static_cast<peer_actor_t *>(actor);
-    spdlog::trace("peer_supervisor_t::on_child_shutdown, peer = {}", peer->device_id);
+    auto& peer_id = addr2id.at(actor->get_address());
+    spdlog::trace("peer_supervisor_t::on_child_shutdown, peer: {}, reason: {}", peer_id, ec.message());
+    parent_t::on_child_shutdown(actor, ec);
 }
 
 void peer_supervisor_t::on_start() noexcept {
@@ -31,15 +32,18 @@ void peer_supervisor_t::on_start() noexcept {
 void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
     auto &payload = msg.payload.request_payload;
     auto timeout = shutdown_timeout * 7 / 10;
-    auto &peer_device = payload.device_id;
+    auto &peer_id = payload.device_id;
     auto &uris = payload.uris;
-    spdlog::trace("peer_supervisor_t, peer {} found, initiating connection", peer_device);
-    create_actor<peer_actor_t>()
+    spdlog::trace("peer_supervisor_t::on_connect, initiating connection with {}", peer_id);
+    auto peer_addr = create_actor<peer_actor_t>()
         .ssl_pair(&ssl_pair)
         .device_name(device_name)
-        .peer_device_id(peer_device)
+        .peer_device_id(peer_id)
         .uris(uris)
         .bep_config(bep_config)
         .timeout(timeout)
-        .finish();
+        .finish()
+        ->get_address();
+    addr2id.emplace(peer_addr, peer_id);
+    id2addr.emplace(peer_id, peer_addr);
 }

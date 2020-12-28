@@ -4,7 +4,7 @@
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
-#include <list>
+#include <map>
 
 namespace syncspirit {
 namespace net {
@@ -40,6 +40,9 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
 struct peer_supervisor_t : public ra::supervisor_asio_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = peer_supervisor_config_t;
+    using id2addr_t = std::map<model::device_id_t, r::address_ptr_t>;
+    using addr2id_t = std::map<r::address_ptr_t, model::device_id_t>;
+
     template <typename Actor> using config_builder_t = peer_supervisor_config_builder_t<Actor>;
 
     explicit peer_supervisor_t(peer_supervisor_config_t &config);
@@ -53,6 +56,8 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
     std::string_view device_name;
     const utils::key_pair_t &ssl_pair;
     config::bep_config_t bep_config;
+    id2addr_t id2addr;
+    addr2id_t addr2id;
 };
 
 } // namespace net

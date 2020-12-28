@@ -1,5 +1,6 @@
 [bep]
 rx_buff_size = 33554432
+connect_timeout = 5000
 
 [global]
 device_name = 'hp-note'

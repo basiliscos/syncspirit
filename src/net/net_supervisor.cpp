@@ -204,7 +204,7 @@ void net_supervisor_t::on_discovery(message::discovery_response_t &res) noexcept
     if (!ec) {
         auto &contact = res.payload.res->peer;
         if (contact) {
-            auto timeout = shutdown_timeout / 2;
+            auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout};
             auto &urls = contact.value().uris;
             spdlog::warn("TODO: net_supervisor_t::on_discovery, update last_seen", req.device_id);
             request<payload::connect_request_t>(peers_addr, req.device_id, urls).send(timeout);
@@ -270,7 +270,7 @@ void net_supervisor_t::discover(model::device_ptr_t &device) noexcept {
             discovery_map.emplace(req_id);
         }
     } else {
-        auto timeout = shutdown_timeout / 2;
+        auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout};
         request<payload::connect_request_t>(peers_addr, device->device_id, device->static_addresses).send(timeout);
     }
 }

@@ -239,7 +239,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
         },
         msg);
     if (ok) {
-        // authorize
+        // authorize?
         if (!valid_peer) {
             spdlog::info("peer_actor_t::authorize, {} :: non-valid peer", device_id);
             return do_shutdown();
@@ -252,7 +252,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
 
 void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept {
     spdlog::trace("peer_actor_t::read_cluster_config, device_id = {}", device_id);
-    std::visit(
+    bool ok = std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::message::ClusterConfig>) {
@@ -275,4 +275,7 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
             }
         },
         msg);
+    if (ok) {
+    }
+
 }

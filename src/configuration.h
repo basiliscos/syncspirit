@@ -94,7 +94,10 @@ struct upnp_config_t {
 
 struct bep_config_t {
     std::uint32_t rx_buff_size;
-    inline bool operator==(const bep_config_t &other) const noexcept { return rx_buff_size == other.rx_buff_size; }
+    std::uint32_t connect_timeout;
+    inline bool operator==(const bep_config_t &other) const noexcept {
+        return rx_buff_size == other.rx_buff_size && connect_timeout == other.connect_timeout;
+    }
 };
 
 struct configuration_t {
