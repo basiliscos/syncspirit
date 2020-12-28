@@ -209,7 +209,8 @@ void net_supervisor_t::on_discovery(message::discovery_response_t &res) noexcept
             spdlog::warn("TODO: net_supervisor_t::on_discovery, update last_seen", req.device_id);
             request<payload::connect_request_t>(peers_addr, req.device_id, urls).send(timeout);
         } else {
-            spdlog::trace("net_supervisor_t::on_discovery, no contact for {} has been discovered", req.device_id);
+            spdlog::trace("net_supervisor_t::on_discovery, no contact for {} has been discovered",
+                          req.device_id.get_short());
         }
     } else {
         spdlog::warn("net_supervisor_t::on_discovery, can't discover contacts for {} :: {}", req.device_id,

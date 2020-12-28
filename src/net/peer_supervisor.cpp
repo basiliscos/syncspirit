@@ -14,14 +14,8 @@ void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.register_name(names::peers, get_address());
         p.discover_name(names::coordinator, coordinator, true).link(false);
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&peer_supervisor_t::on_connect);
-#if 0
-        p.subscribe_actor(&peer_supervisor_t::on_announce);
-        p.subscribe_actor(&peer_supervisor_t::on_discovery);
-        p.subscribe_actor(&peer_supervisor_t::on_discovery_notify);
-#endif
-    });
+    plugin.with_casted<r::plugin::starter_plugin_t>(
+        [&](auto &p) { p.subscribe_actor(&peer_supervisor_t::on_connect); });
 }
 
 void peer_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept {
@@ -33,48 +27,12 @@ void peer_supervisor_t::on_start() noexcept {
     spdlog::trace("peer_supervisor_t::on_start (addr = {})", (void *)address.get());
     parent_t::on_start();
 }
-#if 0
 
-void peer_supervisor_t::discover_next_peer() noexcept {
-    spdlog::trace("peer_supervisor_t::discover_next_peer");
-    /*
-        if (discover_queue.empty()) {
-            spdlog::trace("peer_supervisor_t:: nobody to discover");
-            return;
-        }
-        auto peer = discover_queue.front();
-        auto timeout = shutdown_timeout * 9 / 10;
-        request<payload::discovery_request_t>(coordinator, peer).send(timeout);
-
-        discover_queue.pop_front();
-    */
-}
-
-void peer_supervisor_t::on_announce(message::announce_notification_t &) noexcept {
-    spdlog::trace("peer_supervisor_t::on_announce()");
-    // discover_next_peer();
-}
-
-void peer_supervisor_t::on_discovery(message::discovery_response_t &res) noexcept {
-    auto &ec = res.payload.ec;
-    auto &device_id = res.payload.req->payload.request_payload->device_id;
-    if (ec) {
-        spdlog::warn("peer_supervisor_t, peer {} wasn't discovered : {}", device_id, ec.message());
-        return discover_next_peer();
-    }
-
-    auto &peer_option = res.payload.res->peer;
-    if (!peer_option) {
-        spdlog::debug("peer_supervisor_t, peer {} not found", device_id);
-        return discover_next_peer();
-    }
-    launch_peer(device_id, peer_option.value());
-}
-#endif
-
-void peer_supervisor_t::launch_peer(const model::device_id_t &peer_device,
-                                    const model::peer_contact_t::uri_container_t &uris) noexcept {
+void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
+    auto &payload = msg.payload.request_payload;
     auto timeout = shutdown_timeout * 7 / 10;
+    auto &peer_device = payload.device_id;
+    auto &uris = payload.uris;
     spdlog::trace("peer_supervisor_t, peer {} found, initiating connection", peer_device);
     create_actor<peer_actor_t>()
         .ssl_pair(&ssl_pair)
@@ -84,17 +42,4 @@ void peer_supervisor_t::launch_peer(const model::device_id_t &peer_device,
         .bep_config(bep_config)
         .timeout(timeout)
         .finish();
-}
-
-#if 0
-void peer_supervisor_t::on_discovery_notify(message::discovery_notify_t &message) noexcept {
-    auto &peer_device = message.payload.device_id;
-    auto &peer_contact = message.payload.peer;
-    launch_peer(peer_device, peer_contact.value());
-}
-#endif
-
-void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
-    auto &payload = msg.payload.request_payload;
-    launch_peer(payload.device_id, payload.uris);
 }
