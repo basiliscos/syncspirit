@@ -42,6 +42,7 @@ enum class error_code {
     malformed_date,
     transport_not_available,
     wrong_magic,
+    cannot_connect_to_peer,
 };
 
 enum class bep_error_code {

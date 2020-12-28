@@ -14,6 +14,7 @@
 #include "../model/upnp.h"
 #include "../model/peer_contact.h"
 #include "../transport/base.h"
+#include "../proto/bep_support.h"
 
 namespace syncspirit {
 namespace net {
@@ -129,12 +130,30 @@ struct discovery_notification_t {
     udp::endpoint peer_endpoint;
 };
 
-struct connect_response_t {};
+struct connect_response_t : r::arc_base_t<connect_response_t> {
+    r::address_ptr_t peer_addr;
+    proto::ClusterConfig cluster_config;
 
-struct connect_request_t {
-    using response_t = connect_response_t;
+    connect_response_t(const r::address_ptr_t &peer_addr_, proto::ClusterConfig &&cluster_config_) noexcept
+        : peer_addr{peer_addr_}, cluster_config{cluster_config_} {}
+};
+
+struct connect_request_t : r::arc_base_t<connect_request_t> {
+    using response_t = r::intrusive_ptr_t<connect_response_t>;
+
+    connect_request_t(const model::device_id_t &device_id_, const config::device_config_t::addresses_t &uris_) noexcept
+        : device_id{device_id_}, uris{uris_} {}
     model::device_id_t device_id;
     config::device_config_t::addresses_t uris;
+};
+
+struct connect_notify_t {
+    r::address_ptr_t peer_addr;
+    proto::ClusterConfig cluster_config;
+};
+
+struct disconnect_notify_t {
+    r::address_ptr_t peer_addr;
 };
 
 } // end of namespace payload
@@ -164,6 +183,8 @@ using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
 
 using connect_request_t = r::request_traits_t<payload::connect_request_t>::request::message_t;
 using connect_response_t = r::request_traits_t<payload::connect_request_t>::response::message_t;
+using connect_notify_t = r::message_t<payload::connect_notify_t>;
+using disconnect_notify_t = r::message_t<payload::disconnect_notify_t>;
 
 } // end of namespace message
 

@@ -40,9 +40,6 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
 struct peer_supervisor_t : public ra::supervisor_asio_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = peer_supervisor_config_t;
-    using id2addr_t = std::map<model::device_id_t, r::address_ptr_t>;
-    using addr2id_t = std::map<r::address_ptr_t, model::device_id_t>;
-
     template <typename Actor> using config_builder_t = peer_supervisor_config_builder_t<Actor>;
 
     explicit peer_supervisor_t(peer_supervisor_config_t &config);
@@ -51,13 +48,21 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
     void on_start() noexcept override;
 
   private:
-    void on_connect(message::connect_request_t &msg) noexcept;
+    using connect_ptr_t = r::intrusive_ptr_t<message::connect_request_t>;
+    using id2addr_t = std::map<model::device_id_t, r::address_ptr_t>;
+    using addr2id_t = std::map<r::address_ptr_t, model::device_id_t>;
+    using addr2req_t = std::map<r::address_ptr_t, connect_ptr_t>;
+
+    void on_connect_request(message::connect_request_t &msg) noexcept;
+    void on_connect_notify(message::connect_notify_t &msg) noexcept;
+
     r::address_ptr_t coordinator;
     std::string_view device_name;
     const utils::key_pair_t &ssl_pair;
     config::bep_config_t bep_config;
     id2addr_t id2addr;
     addr2id_t addr2id;
+    addr2req_t addr2req;
 };
 
 } // namespace net

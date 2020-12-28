@@ -252,30 +252,26 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
 
 void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept {
     spdlog::trace("peer_actor_t::read_cluster_config, device_id = {}", device_id);
-    bool ok = std::visit(
+    std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::message::ClusterConfig>) {
                 proto::ClusterConfig &config = *msg;
+                /*
                 for (int i = 0; i < config.folders_size(); ++i) {
                     auto &f = config.folders(i);
                     printf("folder : %s/%s\n", f.label().c_str(), f.id().c_str());
                 }
-                /*
                 auto& m = *msg;
                 for(size_t i = 0; i < m.folders_size())
                 spdlog::info("peer_actor_t::on_read, {} hello from {} ({} {})", device_id, msg->device_name(),
                              msg->client_name(), msg->client_version());
                 */
-                return true;
+                send<payload::connect_notify_t>(supervisor->get_address(), get_address(), std::move(config));
             } else {
                 spdlog::warn("peer_actor_t::read_cluster_config, {} :: unexpected_message", device_id);
                 do_shutdown();
-                return false;
             }
         },
         msg);
-    if (ok) {
-    }
-
 }

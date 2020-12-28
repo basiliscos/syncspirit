@@ -49,6 +49,8 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_discovery_notify);
         p.subscribe_actor(&net_supervisor_t::on_config_request);
         p.subscribe_actor(&net_supervisor_t::on_config_save);
+        p.subscribe_actor(&net_supervisor_t::on_connect);
+        p.subscribe_actor(&net_supervisor_t::on_disconnect);
         launch_children();
     });
 }
@@ -273,6 +275,24 @@ void net_supervisor_t::discover(model::device_ptr_t &device) noexcept {
         auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout};
         request<payload::connect_request_t>(peers_addr, device->device_id, device->static_addresses).send(timeout);
     }
+}
+
+void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept {
+    auto &ec = message.payload.ec;
+    if (!ec) {
+        auto &config = message.payload.res->cluster_config;
+        for (int i = 0; i < config.folders_size(); ++i) {
+            auto &f = config.folders(i);
+            spdlog::info("folder : {} / {}", f.label().c_str(), f.id().c_str());
+        }
+    } else {
+        spdlog::debug("net_supervisor_t::on_connect, cannot establish connection to {} :: {}",
+                      message.payload.req->payload.request_payload->device_id, ec.message());
+    }
+}
+
+void net_supervisor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
+    spdlog::warn("disconnected peer");
 }
 
 void net_supervisor_t::shutdown_start() noexcept {

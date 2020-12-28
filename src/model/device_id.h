@@ -57,10 +57,9 @@ template <> struct hash<syncspirit::model::device_id_t> {
 
 template <> struct less<syncspirit::model::device_id_t> {
     using device_id_t = syncspirit::model::device_id_t;
-    inline bool operator() (const device_id_t& lhs, const device_id_t& rhs) const noexcept {
+    inline bool operator()(const device_id_t &lhs, const device_id_t &rhs) const noexcept {
         return lhs.get_value() < rhs.get_value();
     }
 };
-
 
 } // namespace std
