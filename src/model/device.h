@@ -19,6 +19,7 @@ struct device_t : arc_base_t<device_t> {
     bool intoducer;
     bool auto_accept;
     bool paused;
+    bool online = false;
 
     inline bool is_dynamic() const noexcept { return static_addresses.empty(); }
 };

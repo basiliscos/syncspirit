@@ -224,11 +224,20 @@ void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message)
     auto &device_id = message.payload.device_id;
     auto &peer_contact = message.payload.peer;
     if (peer_contact.has_value()) {
-        bool notify = app_config.ingored_devices.count(device_id.get_value()) == 0 &&
-                      app_config.devices.count(device_id.get_value()) == 0;
-        if (notify) {
-            using original_ptr_t = ui::payload::discovery_notification_t::net_message_ptr_t;
-            send<ui::payload::discovery_notification_t>(address, original_ptr_t{&message});
+        auto &peer = peer_contact.value();
+        auto &id = device_id.get_value();
+        auto it = devices.find(id);
+        if (it != devices.end()) {
+            if (!it->second->online) {
+                auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout};
+                request<payload::connect_request_t>(peers_addr, device_id, peer.uris).send(timeout);
+            }
+        } else {
+            bool notify = app_config.ingored_devices.count(id) == 0 && app_config.devices.count(id) == 0;
+            if (notify) {
+                using original_ptr_t = ui::payload::discovery_notification_t::net_message_ptr_t;
+                send<ui::payload::discovery_notification_t>(address, original_ptr_t{&message});
+            }
         }
     }
 }
