@@ -94,6 +94,7 @@ struct http_actor_t : public r::actor_base_t {
     bool need_response = false;
     bool stop_io = false;
     transport::transport_sp_t transport;
+    std::optional<asio::ip::address> local_address;
     transport::http_base_t *http_adapter = nullptr;
     http::request<http::empty_body> http_request;
     http::response<http::string_body> http_response;

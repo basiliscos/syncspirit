@@ -151,6 +151,21 @@ void http_actor_t::on_connect(resolve_it_t) noexcept {
         return process();
     }
 
+    if (queue.front()->payload.request_payload->local_ip) {
+        sys::error_code ec;
+        local_address = transport->local_address(ec);
+        if (ec) {
+            spdlog::warn("http_actor_t::on_connect, get local addr error :: {}", ec.message());
+            reply_with_error(*queue.front(), ec);
+            queue.pop_front();
+            need_response = false;
+            if (resources->has(resource::request_timer)) {
+                cancel_timer(*timer_request);
+            }
+            return process();
+        }
+    }
+
     transport::handshake_fn_t handshake_fn([&](auto arg, auto peer) { on_handshake(arg, peer); });
     transport::error_fn_t error_fn([&](auto arg) { on_handshake_error(arg); });
     transport->async_handshake(handshake_fn, error_fn);
@@ -261,7 +276,7 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     }
 
     if (cancelled) {
-        reply_to(*queue.front(), std::move(http_response), response_size);
+        reply_to(*queue.front(), std::move(http_response), response_size, std::move(local_address));
     } else {
         auto ec = r::make_error_code(r::error_code_t::request_timeout);
         reply_with_error(*queue.front(), ec);

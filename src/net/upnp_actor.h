@@ -56,9 +56,11 @@ struct upnp_actor_t : public r::actor_base_t {
     void on_external_ip(message::http_response_t &res) noexcept;
     void on_mapping_port(message::http_response_t &res) noexcept;
     void on_unmapping_port(message::http_response_t &res) noexcept;
-    void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff) noexcept;
+    void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
+                      bool get_local_address = false) noexcept;
     void request_finish() noexcept;
 
+    asio::ip::address local_address;
     utils::URI main_url;
     utils::URI igd_control_url;
     r::address_ptr_t http_client;

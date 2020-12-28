@@ -55,8 +55,7 @@ void acceptor_actor_t::on_start() noexcept {
         return do_shutdown();
     }
 
-    // temporally disabled
-    // accept_next();
+    accept_next();
     r::actor_base_t::on_start();
 }
 
@@ -83,6 +82,7 @@ void acceptor_actor_t::shutdown_start() noexcept {
 
 void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
     resources->release(resource::accepting);
+    spdlog::trace("acceptor_actor_t::on_accept");
     if (ec) {
         if (ec != asio::error::operation_aborted) {
             spdlog::warn("accepting error :: ", ec.message());
@@ -91,7 +91,6 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
             return shutdown_continue();
         }
     }
-    spdlog::trace("acceptor_actor_t::on_accept");
 
     std::abort();
 }

@@ -30,6 +30,14 @@ void tcp_t::async_recv(asio::mutable_buffer buff, const io_fn_t &on_read, error_
 
 void tcp_t::cancel() noexcept { cancel_impl(sock); }
 
+asio::ip::address tcp_t::local_address(sys::error_code &ec) noexcept {
+    auto endpoint = sock.local_endpoint(ec);
+    if (!ec) {
+        return endpoint.address();
+    }
+    return {};
+}
+
 void http_t::async_read(rx_buff_t &rx_buff, response_t &response, const io_fn_t &on_read,
                         error_fn_t &on_error) noexcept {
     async_read_impl(sock, strand, rx_buff, response, on_read, on_error);

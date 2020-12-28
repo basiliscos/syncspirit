@@ -64,15 +64,16 @@ void upnp_actor_t::on_start() noexcept {
         spdlog::trace("upnp_actor_t::error making description request :: {}", res.error().message());
         return do_shutdown();
     }
-    make_request(addr_description, main_url, std::move(tx_buff));
+    make_request(addr_description, main_url, std::move(tx_buff), true);
 }
 
-void upnp_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff) noexcept {
+void upnp_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
+                                bool get_local_address) noexcept {
     resources->acquire(resource::http_req);
     auto timeout = shutdown_timeout * 8 / 9;
-    http_request =
-        request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff, rx_buff_size)
-            .send(timeout);
+    http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
+                                                        rx_buff_size, get_local_address)
+                       .send(timeout);
 }
 
 void upnp_actor_t::request_finish() noexcept {
@@ -96,6 +97,7 @@ void upnp_actor_t::on_endpoint(message::endpoint_response_t &res) noexcept {
 void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
     spdlog::trace("upnp_actor_t::on_igd_description");
     request_finish();
+    local_address = msg.payload.res->local_addr.value();
 
     if (msg.payload.ec) {
         spdlog::warn("upnp_actor:: get IGD description: {}", msg.payload.ec.message());
@@ -160,13 +162,12 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
         return do_shutdown();
     }
 
-    auto local_ip = accepting_endpoint.address().to_string();
     auto local_port = accepting_endpoint.port();
-    spdlog::debug("upnp_actor:: going to map {0}:{1} => {2}:{3}", external_addr.to_string(), external_port, local_ip,
-                  local_port);
+    spdlog::debug("upnp_actor:: going to map {0}:{1} => {2}:{3}", external_addr.to_string(), external_port,
+                  local_address, local_port);
 
     fmt::memory_buffer tx_buff;
-    auto res = make_mapping_request(tx_buff, igd_control_url, external_port, local_ip, local_port);
+    auto res = make_mapping_request(tx_buff, igd_control_url, external_port, local_address.to_string(), local_port);
     if (!res) {
         spdlog::trace("upnp_actor_t::error making port mapping request :: {}", res.error().message());
         return do_shutdown();

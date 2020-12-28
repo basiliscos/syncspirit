@@ -63,9 +63,11 @@ struct http_response_t : public r::arc_base_t<http_response_t> {
     using raw_http_response_t = http::response<http::string_body>;
     raw_http_response_t response;
     std::size_t bytes;
+    std::optional<asio::ip::address> local_addr;
 
-    http_response_t(raw_http_response_t &&response_, std::size_t bytes_)
-        : response(std::move(response_)), bytes{bytes_} {}
+    http_response_t(raw_http_response_t &&response_, std::size_t bytes_,
+                    std::optional<asio::ip::address> local_addr_ = {})
+        : response(std::move(response_)), bytes{bytes_}, local_addr{std::move(local_addr_)} {}
 };
 
 struct http_request_t : r::arc_base_t<http_request_t> {
@@ -80,15 +82,18 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     rx_buff_ptr_t rx_buff;
     std::size_t rx_buff_size;
     ssl_option_t ssl_context;
+    bool local_ip = false;
 
     template <typename URI>
-    http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_)
-        : url{std::forward<URI>(url_)}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_} {}
+    http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
+                   bool local_ip_)
+        : url{std::forward<URI>(url_)}, data{std::move(data_)}, rx_buff{rx_buff_},
+          rx_buff_size{rx_buff_size_}, local_ip{local_ip_} {}
 
     template <typename URI>
     http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
                    transport::ssl_junction_t &&ssl_)
-        : http_request_t(std::forward<URI>(url_), std::move(data_), rx_buff_, rx_buff_size_) {
+        : http_request_t(std::forward<URI>(url_), std::move(data_), rx_buff_, rx_buff_size_, {}) {
         ssl_context = ssl_option_t(std::move(ssl_));
     }
 };
