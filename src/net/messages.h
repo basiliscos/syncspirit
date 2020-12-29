@@ -137,28 +137,51 @@ struct discovery_notification_t {
 
 struct connect_response_t : r::arc_base_t<connect_response_t> {
     r::address_ptr_t peer_addr;
+    model::device_id_t peer_device_id;
     proto::ClusterConfig cluster_config;
 
-    connect_response_t(const r::address_ptr_t &peer_addr_, proto::ClusterConfig &&cluster_config_) noexcept
-        : peer_addr{peer_addr_}, cluster_config{cluster_config_} {}
+    connect_response_t(const r::address_ptr_t &peer_addr_, model::device_id_t &peer_device_id_,
+                       proto::ClusterConfig &&cluster_config_) noexcept
+        : peer_addr{peer_addr_}, peer_device_id{peer_device_id_}, cluster_config{cluster_config_} {}
 };
 
 struct connect_request_t : r::arc_base_t<connect_request_t> {
     using response_t = r::intrusive_ptr_t<connect_response_t>;
 
+    struct connect_info_t {
+        model::device_id_t device_id;
+        config::device_config_t::addresses_t uris;
+    };
+
+    struct connected_info_t {
+        tcp_socket_t sock;
+        tcp::endpoint remote;
+    };
+
+    using payload_t = std::variant<connect_info_t, connected_info_t>;
+
     connect_request_t(const model::device_id_t &device_id_, const config::device_config_t::addresses_t &uris_) noexcept
-        : device_id{device_id_}, uris{uris_} {}
-    model::device_id_t device_id;
-    config::device_config_t::addresses_t uris;
+        : payload{connect_info_t{device_id_, uris_}} {}
+
+    connect_request_t(tcp_socket_t &&sock, const tcp::endpoint &remote) noexcept
+        : payload{connected_info_t{std::move(sock), remote}} {}
+
+    payload_t payload;
 };
 
 struct connect_notify_t {
     r::address_ptr_t peer_addr;
+    model::device_id_t peer_device_id;
     proto::ClusterConfig cluster_config;
 };
 
 struct disconnect_notify_t {
     r::address_ptr_t peer_addr;
+};
+
+struct connection_notify_t {
+    tcp_socket_t sock;
+    tcp::endpoint remote;
 };
 
 } // end of namespace payload
@@ -190,6 +213,7 @@ using connect_request_t = r::request_traits_t<payload::connect_request_t>::reque
 using connect_response_t = r::request_traits_t<payload::connect_request_t>::response::message_t;
 using connect_notify_t = r::message_t<payload::connect_notify_t>;
 using disconnect_notify_t = r::message_t<payload::disconnect_notify_t>;
+using connection_notify_t = r::message_t<payload::connection_notify_t>;
 
 } // end of namespace message
 

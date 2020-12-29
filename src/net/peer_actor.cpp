@@ -267,7 +267,7 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
                 spdlog::info("peer_actor_t::on_read, {} hello from {} ({} {})", device_id, msg->device_name(),
                              msg->client_name(), msg->client_version());
                 */
-                send<payload::connect_notify_t>(supervisor->get_address(), get_address(), std::move(config));
+                send<payload::connect_notify_t>(supervisor->get_address(), get_address(), device_id, std::move(config));
             } else {
                 spdlog::warn("peer_actor_t::read_cluster_config, {} :: unexpected_message", device_id);
                 do_shutdown();

@@ -51,6 +51,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_config_save);
         p.subscribe_actor(&net_supervisor_t::on_connect);
         p.subscribe_actor(&net_supervisor_t::on_disconnect);
+        p.subscribe_actor(&net_supervisor_t::on_connection);
         launch_children();
     });
 }
@@ -286,6 +287,8 @@ void net_supervisor_t::discover(model::device_ptr_t &device) noexcept {
     }
 }
 
+template <class> inline constexpr bool always_false_v = false;
+
 void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept {
     auto &ec = message.payload.ec;
     if (!ec) {
@@ -295,13 +298,32 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
             spdlog::info("folder : {} / {}", f.label().c_str(), f.id().c_str());
         }
     } else {
-        spdlog::debug("net_supervisor_t::on_connect, cannot establish connection to {} :: {}",
-                      message.payload.req->payload.request_payload->device_id, ec.message());
+        auto &payload = message.payload.req->payload.request_payload->payload;
+        std::visit(
+            [&](auto &&arg) {
+                using P = payload::connect_request_t;
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, P::connect_info_t>) {
+                    spdlog::debug("net_supervisor_t::on_connect, cannot establish connection to {} :: {}",
+                                  arg.device_id, ec.message());
+                } else if constexpr (std::is_same_v<T, P::connected_info_t>) {
+                    spdlog::debug("net_supervisor_t::on_connect, cannot authorize {} :: {}", arg.remote, ec.message());
+                } else {
+                    static_assert(always_false_v<T>, "non-exhaustive visitor!");
+                }
+            },
+            payload);
     }
 }
 
 void net_supervisor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
     spdlog::warn("disconnected peer");
+}
+
+void net_supervisor_t::on_connection(message::connection_notify_t &message) noexcept {
+    auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout};
+    auto &payload = message.payload;
+    request<payload::connect_request_t>(peers_addr, std::move(payload.sock), payload.remote).send(timeout);
 }
 
 void net_supervisor_t::shutdown_start() noexcept {

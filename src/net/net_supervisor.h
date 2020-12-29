@@ -52,6 +52,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_config_save(ui::message::config_save_request_t &message) noexcept;
     void on_connect(message::connect_response_t &message) noexcept;
     void on_disconnect(message::disconnect_notify_t &message) noexcept;
+    void on_connection(message::connection_notify_t &message) noexcept;
 
     void discover(model::device_ptr_t &device) noexcept;
     void launch_children() noexcept;

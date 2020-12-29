@@ -82,15 +82,22 @@ void acceptor_actor_t::shutdown_start() noexcept {
 
 void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
     resources->release(resource::accepting);
-    spdlog::trace("acceptor_actor_t::on_accept");
     if (ec) {
         if (ec != asio::error::operation_aborted) {
             spdlog::warn("accepting error :: ", ec.message());
-            return do_shutdown();
+            do_shutdown();
         } else {
-            return shutdown_continue();
+            shutdown_continue();
         }
+        return;
     }
-
-    std::abort();
+    sys::error_code err;
+    auto remote = peer.remote_endpoint(err);
+    if (err) {
+        spdlog::trace("acceptor_actor_t::on_accept, cannot get remote endpoint:: {}", err.message());
+        return accept_next();
+    }
+    spdlog::trace("acceptor_actor_t::on_accept, peer = {}", remote);
+    send<payload::connection_notify_t>(coordinator, std::move(peer), remote);
+    accept_next();
 }
