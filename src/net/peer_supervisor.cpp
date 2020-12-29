@@ -61,7 +61,7 @@ void peer_supervisor_t::on_connect_request(message::connect_request_t &msg) noex
                 return std::move(builder).peer_device_id(peer_id).uris(uris).finish()->get_address();
             } else if constexpr (std::is_same_v<T, P::connected_info_t>) {
                 return std::move(builder)
-                    .sock(std::make_unique<tcp_socket_t>(std::move(arg.sock)))
+                    .sock(std::optional<tcp_socket_t>(std::move(arg.sock)))
                     .finish()
                     ->get_address();
             } else {

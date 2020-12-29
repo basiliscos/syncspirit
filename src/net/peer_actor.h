@@ -16,7 +16,7 @@ struct peer_actor_config_t : public r::actor_config_t {
     std::string_view device_name;
     model::device_id_t peer_device_id;
     model::peer_contact_t::uri_container_t uris;
-    std::unique_ptr<tcp_socket_t> sock;
+    std::optional<tcp_socket_t> sock;
     const utils::key_pair_t *ssl_pair;
     config::bep_config_t bep_config;
 };
@@ -51,7 +51,7 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&sock(std::unique_ptr<tcp_socket_t> &&value) &&noexcept {
+    builder_t &&sock(std::optional<tcp_socket_t> &&value) &&noexcept {
         parent_t::config.sock = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -64,8 +64,6 @@ struct peer_actor_t : public r::actor_base_t {
     peer_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void shutdown_start() noexcept override;
-
-    model::device_id_t device_id;
 
   private:
     struct confidential {
@@ -109,7 +107,9 @@ struct peer_actor_t : public r::actor_base_t {
     void read_cluster_config(proto::message::message_t &&msg) noexcept;
 
     std::string_view device_name;
+    model::device_id_t peer_device_id;
     model::peer_contact_t::uri_container_t uris;
+    std::optional<tcp_socket_t> sock;
     const utils::key_pair_t &ssl_pair;
     r::address_ptr_t resolver;
     transport::transport_sp_t transport;

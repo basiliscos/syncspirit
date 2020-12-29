@@ -14,8 +14,8 @@ r::plugin::resource_id_t timer = 3;
 } // namespace
 
 peer_actor_t::peer_actor_t(config_t &config)
-    : r::actor_base_t{config}, device_id{config.peer_device_id},
-      device_name{config.device_name}, uris{config.uris}, ssl_pair{*config.ssl_pair} {
+    : r::actor_base_t{config}, peer_device_id{config.peer_device_id},
+      device_name{config.device_name}, uris{config.uris}, sock(std::move(config.sock)), ssl_pair{*config.ssl_pair} {
     rx_buff.resize(config.bep_config.rx_buff_size);
 }
 
@@ -31,7 +31,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void peer_actor_t::try_next_uri() noexcept {
-    transport::ssl_junction_t ssl{device_id, &ssl_pair, false};
+    transport::ssl_junction_t ssl{peer_device_id, &ssl_pair, false};
     while (uri_idx < (std::int32_t)uris.size()) {
         auto &uri = uris[++uri_idx];
         auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
@@ -45,7 +45,7 @@ void peer_actor_t::try_next_uri() noexcept {
         }
     }
 
-    spdlog::trace("peer_actor_t::try_next_uri, no way to conenct with {} found, shut down", device_id);
+    spdlog::trace("peer_actor_t::try_next_uri, no way to conenct with {} found, shut down", peer_device_id);
     resources->release(resource::uris);
     do_shutdown();
 }
@@ -53,7 +53,7 @@ void peer_actor_t::try_next_uri() noexcept {
 void peer_actor_t::initiate(transport::transport_sp_t tran, const utils::URI &url) noexcept {
     transport = std::move(tran);
 
-    spdlog::trace("peer_actor_t::try_next_uri(), will initate connection with {} via {}", device_id, url.full);
+    spdlog::trace("peer_actor_t::try_next_uri(), will initate connection with {} via {}", peer_device_id, url.full);
     pt::time_duration resolve_timeout = init_timeout / 2;
     auto port = std::to_string(url.port);
     request<payload::address_request_t>(resolver, url.host, port).send(resolve_timeout);
@@ -66,7 +66,7 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 
     auto &ec = res.payload.ec;
     if (ec) {
-        spdlog::warn("peer_actor_t::on_resolve error, {} : {}", device_id, ec.message());
+        spdlog::warn("peer_actor_t::on_resolve error, {} : {}", peer_device_id, ec.message());
         return try_next_uri();
     }
 
@@ -82,7 +82,7 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 }
 
 void peer_actor_t::on_connect(resolve_it_t) noexcept {
-    spdlog::trace("peer_actor_t::on_connect(), device_id = {}", device_id);
+    spdlog::trace("peer_actor_t::on_connect(), device_id = {}", peer_device_id);
 
     transport::handshake_fn_t handshake_fn([&](auto arg, auto peer_cert) { on_handshake(arg, peer_cert); });
     transport::error_fn_t error_fn([&](auto arg) { on_handshake_error(arg); });
@@ -92,7 +92,7 @@ void peer_actor_t::on_connect(resolve_it_t) noexcept {
 void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        spdlog::warn("peer_actor_t::on_io_error, {} :: {}", device_id, ec.message());
+        spdlog::warn("peer_actor_t::on_io_error, {} :: {}", peer_device_id, ec.message());
     }
     cancel_timer();
     if (resources->has(resource::uris)) {
@@ -118,7 +118,7 @@ void peer_actor_t::process_tx_queue() noexcept {
         } else {
             assert(tx_item->final);
             spdlog::trace("peer_actor_t::process_tx_queue, device_id = {}, final empty message, shutting down ",
-                          device_id);
+                          peer_device_id);
             do_shutdown();
         }
     }
@@ -133,7 +133,7 @@ void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
 void peer_actor_t::on_handshake(bool valid_peer, X509 *) noexcept {
     resources->release(resource::io);
     this->valid_peer = valid_peer;
-    spdlog::trace("peer_actor_t::on_handshake, device_id = {}, valid = {} ", device_id, valid_peer);
+    spdlog::trace("peer_actor_t::on_handshake, device_id = {}, valid = {} ", peer_device_id, valid_peer);
 
     fmt::memory_buffer buff;
     proto::make_hello_message(buff, device_name);
@@ -146,13 +146,13 @@ void peer_actor_t::on_handshake(bool valid_peer, X509 *) noexcept {
 void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        spdlog::warn("peer_actor_t::on_handshake_error, {} :: {}", device_id, ec.message());
+        spdlog::warn("peer_actor_t::on_handshake_error, {} :: {}", peer_device_id, ec.message());
     }
 }
 
 void peer_actor_t::read_more() noexcept {
     if (rx_idx >= rx_buff.size()) {
-        spdlog::warn("peer_actor_t::read_more, {} :: rx buffer limit reached, {}", device_id, rx_buff.size());
+        spdlog::warn("peer_actor_t::read_more, {} :: rx buffer limit reached, {}", peer_device_id, rx_buff.size());
         return do_shutdown();
     }
 
@@ -165,11 +165,11 @@ void peer_actor_t::read_more() noexcept {
 
 void peer_actor_t::on_write(std::size_t sz) noexcept {
     resources->release(resource::io);
-    spdlog::trace("peer_actor_t::on_write, {} :: {} bytes", device_id, sz);
+    spdlog::trace("peer_actor_t::on_write, {} :: {} bytes", peer_device_id, sz);
     assert(tx_item);
     if (tx_item->final) {
         spdlog::trace("peer_actor_t::process_tx_queue, device_id = {}, final message has been sent, shutting down ",
-                      device_id);
+                      peer_device_id);
         do_shutdown();
     } else {
         tx_item.reset();
@@ -180,23 +180,23 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
 void peer_actor_t::on_read(std::size_t bytes) noexcept {
     assert(read_action);
     resources->release(resource::io);
-    spdlog::trace("peer_actor_t::on_read, {} :: {} bytes", device_id, bytes);
+    spdlog::trace("peer_actor_t::on_read, {} :: {} bytes", peer_device_id, bytes);
     auto buff = asio::buffer(rx_buff.data(), bytes);
     auto result = proto::parse_bep(buff);
     if (!result) {
-        spdlog::warn("peer_actor_t::on_read, {} error parsing message:: {}", device_id, result.error().message());
+        spdlog::warn("peer_actor_t::on_read, {} error parsing message:: {}", peer_device_id, result.error().message());
         do_shutdown();
     }
     auto &value = result.value();
     if (!value.consumed) {
-        spdlog::trace("peer_actor_t::on_read, {} :: incomplete message", device_id);
+        spdlog::trace("peer_actor_t::on_read, {} :: incomplete message", peer_device_id);
         return read_more();
     }
 
     cancel_timer();
     read_action(std::move(value.message));
     rx_idx += bytes - value.consumed;
-    spdlog::trace("peer_actor_t::on_read, {}, rx_idx = {} ", device_id, rx_idx);
+    spdlog::trace("peer_actor_t::on_read, {}, rx_idx = {} ", peer_device_id, rx_idx);
 }
 
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
@@ -223,16 +223,16 @@ void peer_actor_t::cancel_timer() noexcept {
 }
 
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
-    spdlog::trace("peer_actor_t::read_hello, device_id = {}", device_id);
+    spdlog::trace("peer_actor_t::read_hello, device_id = {}", peer_device_id);
     bool ok = std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
-                spdlog::info("peer_actor_t::on_read, {} hello from {} ({} {})", device_id, msg->device_name(),
+                spdlog::info("peer_actor_t::on_read, {} hello from {} ({} {})", peer_device_id, msg->device_name(),
                              msg->client_name(), msg->client_version());
                 return true;
             } else {
-                spdlog::warn("peer_actor_t::on_read, {} :: unexpected_message", device_id);
+                spdlog::warn("peer_actor_t::on_read, {} :: unexpected_message", peer_device_id);
                 do_shutdown();
                 return false;
             }
@@ -241,7 +241,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
     if (ok) {
         // authorize?
         if (!valid_peer) {
-            spdlog::info("peer_actor_t::authorize, {} :: non-valid peer", device_id);
+            spdlog::info("peer_actor_t::authorize, {} :: non-valid peer", peer_device_id);
             return do_shutdown();
         } else {
             read_action = [this](auto &&msg) { read_cluster_config(std::move(msg)); };
@@ -251,7 +251,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
 }
 
 void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept {
-    spdlog::trace("peer_actor_t::read_cluster_config, device_id = {}", device_id);
+    spdlog::trace("peer_actor_t::read_cluster_config, device_id = {}", peer_device_id);
     std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
@@ -267,9 +267,10 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
                 spdlog::info("peer_actor_t::on_read, {} hello from {} ({} {})", device_id, msg->device_name(),
                              msg->client_name(), msg->client_version());
                 */
-                send<payload::connect_notify_t>(supervisor->get_address(), get_address(), device_id, std::move(config));
+                send<payload::connect_notify_t>(supervisor->get_address(), get_address(), peer_device_id,
+                                                std::move(config));
             } else {
-                spdlog::warn("peer_actor_t::read_cluster_config, {} :: unexpected_message", device_id);
+                spdlog::warn("peer_actor_t::read_cluster_config, {} :: unexpected_message", peer_device_id);
                 do_shutdown();
             }
         },
