@@ -97,7 +97,7 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
         spdlog::trace("acceptor_actor_t::on_accept, cannot get remote endpoint:: {}", err.message());
         return accept_next();
     }
-    spdlog::trace("acceptor_actor_t::on_accept, peer = {}", remote);
+    spdlog::trace("acceptor_actor_t::on_accept, peer = {}, sock = {}", remote, peer.native_handle());
     send<payload::connection_notify_t>(coordinator, std::move(peer), remote);
     accept_next();
 }

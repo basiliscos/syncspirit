@@ -6,7 +6,7 @@ using namespace syncspirit::transport;
 static tls_t::socket_t mk_sock(transport_config_t &config, ssl::context &ctx, strand_t &strand) noexcept {
     if (config.sock) {
         tcp::socket sock(std::move(config.sock.value()));
-        return {std::move(config.sock.value()), ctx};
+        return {std::move(sock), ctx};
     } else {
         tcp::socket sock(strand.context());
         return {std::move(sock), ctx};
@@ -25,6 +25,7 @@ tls_t::tls_t(transport_config_t &config) noexcept
         }
     }
     auto mode = ssl::verify_peer | ssl::verify_fail_if_no_peer_cert | ssl::verify_client_once;
+    spdlog::warn("sock = {}", sock.next_layer().native_handle());
     sock.set_verify_depth(1);
     sock.set_verify_mode(mode);
     sock.set_verify_callback([&](bool, ssl::verify_context &peer_ctx) -> bool {
@@ -53,9 +54,11 @@ tls_t::tls_t(transport_config_t &config) noexcept
             spdlog::trace("tls, peer device_id = {}", actual_peer);
         }
 
-        if (actual_peer != expected_peer) {
-            spdlog::warn("unexcpected peer device_id. Got: {}, expected: {}", actual_peer, expected_peer);
-            return false;
+        if (role == ssl::stream_base::handshake_type::client) {
+            if (actual_peer != expected_peer) {
+                spdlog::warn("unexcpected peer device_id. Got: {}, expected: {}", actual_peer, expected_peer);
+                return false;
+            }
         }
         validation_passed = true;
         return true;
