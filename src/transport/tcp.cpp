@@ -5,7 +5,7 @@ using namespace syncspirit::transport;
 
 http_t::http_t(const transport_config_t &config) noexcept : tcp_t{config}, http_base_t(config.supervisor) {}
 
-tcp_t::tcp_t(const transport_config_t &config) noexcept : base_t{config.supervisor}, sock(strand) {
+tcp_t::tcp_t(const transport_config_t &config) noexcept : base_t{config.supervisor}, sock(strand.context()) {
     assert(!config.ssl_junction);
 }
 

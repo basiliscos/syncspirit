@@ -53,6 +53,7 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
     using addr2id_t = std::map<r::address_ptr_t, model::device_id_t>;
     using addr2req_t = std::map<r::address_ptr_t, connect_ptr_t>;
 
+    std::string get_peer_identity(const actor_base_t &actor) const noexcept;
     void on_connect_request(message::connect_request_t &msg) noexcept;
     void on_connect_notify(message::connect_notify_t &msg) noexcept;
 

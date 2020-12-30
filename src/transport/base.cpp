@@ -16,7 +16,7 @@ http_base_t::~http_base_t() {
         std::abort();
 }
 
-transport_sp_t initiate(const transport_config_t &config) noexcept {
+transport_sp_t initiate(transport_config_t &config) noexcept {
     auto &proto = config.uri.proto;
     if (!config.ssl_junction) {
         if (proto == "http") {

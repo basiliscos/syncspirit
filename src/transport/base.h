@@ -42,6 +42,7 @@ struct transport_config_t {
     ssl_option_t ssl_junction;
     utils::URI uri;
     rotor::asio::supervisor_asio_t &supervisor;
+    std::optional<tcp::socket> sock;
 };
 
 struct base_t {
@@ -139,7 +140,7 @@ struct base_t {
 };
 
 using transport_sp_t = std::unique_ptr<base_t>;
-transport_sp_t initiate(const transport_config_t &config) noexcept;
+transport_sp_t initiate(transport_config_t &config) noexcept;
 
 struct http_base_t {
     using rx_buff_t = boost::beast::flat_buffer;

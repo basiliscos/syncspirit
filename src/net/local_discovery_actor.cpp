@@ -18,7 +18,7 @@ r::plugin::resource_id_t req_acceptor = 2;
 
 local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, frequency{r::pt::seconds(cfg.frequency)}, device_id{cfg.device_id},
-      strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, sock{strand},
+      strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, sock{strand.context()},
       bc_endpoint(udp::v4(), cfg.port) {
     rx_buff.resize(BUFF_SZ);
     tx_buff.resize(BUFF_SZ);

@@ -3,11 +3,20 @@
 
 using namespace syncspirit::transport;
 
-https_t::https_t(const transport_config_t &config) noexcept : tls_t{config}, http_base_t(config.supervisor) {}
+static tls_t::socket_t mk_sock(transport_config_t &config, ssl::context &ctx, strand_t &strand) noexcept {
+    if (config.sock) {
+        tcp::socket sock(std::move(config.sock.value()));
+        return {std::move(config.sock.value()), ctx};
+    } else {
+        tcp::socket sock(strand.context());
+        return {std::move(sock), ctx};
+    }
+}
 
-tls_t::tls_t(const transport_config_t &config) noexcept
+tls_t::tls_t(transport_config_t &config) noexcept
     : base_t(config.supervisor), expected_peer(config.ssl_junction->peer), me(*config.ssl_junction->me),
-      ctx(get_context(*this)), sock{strand, ctx} {
+      ctx(get_context(*this)), role(config.sock ? ssl::stream_base::server : ssl::stream_base::client),
+      sock(mk_sock(config, ctx, strand)) {
     if (config.ssl_junction->sni_extension) {
         auto &host = config.uri.host;
         if (!SSL_set_tlsext_host_name(sock.native_handle(), host.c_str())) {
@@ -69,7 +78,7 @@ void tls_t::async_connect(const resolved_hosts_t &hosts, connect_fn_t &on_connec
 }
 
 void tls_t::async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) noexcept {
-    sock.async_handshake(ssl::stream_base::client, [&, on_handshake, on_error](auto ec) {
+    sock.async_handshake(role, [&, on_handshake, on_error](auto ec) {
         if (ec) {
             strand.post([ec = ec, on_error, this]() {
                 on_error(ec);
@@ -102,6 +111,8 @@ asio::ip::address tls_t::local_address(sys::error_code &ec) noexcept {
     }
     return {};
 }
+
+https_t::https_t(transport_config_t &config) noexcept : tls_t{config}, http_base_t(config.supervisor) {}
 
 void https_t::async_read(rx_buff_t &rx_buff, response_t &response, const io_fn_t &on_read,
                          error_fn_t &on_error) noexcept {

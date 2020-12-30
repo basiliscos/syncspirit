@@ -6,7 +6,9 @@
 namespace syncspirit::transport {
 
 struct tls_t : base_t {
-    tls_t(const transport_config_t &config) noexcept;
+    using socket_t = ssl::stream<tcp::socket>;
+
+    tls_t(transport_config_t &config) noexcept;
     void async_connect(const resolved_hosts_t &hosts, connect_fn_t &on_connect, error_fn_t &on_error) noexcept override;
     void async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) noexcept override;
     void async_send(asio::const_buffer buff, const io_fn_t &on_write, error_fn_t &on_error) noexcept override;
@@ -18,17 +20,16 @@ struct tls_t : base_t {
     ssl::context get_context(tls_t &me) noexcept;
 
   protected:
-    using socket_t = ssl::stream<tcp::socket>;
-
     model::device_id_t expected_peer;
     const utils::key_pair_t &me;
     ssl::context ctx;
+    ssl::stream_base::handshake_type role;
     socket_t sock;
     bool validation_passed = false;
 };
 
 struct https_t : tls_t, http_base_t {
-    https_t(const transport_config_t &config) noexcept;
+    https_t(transport_config_t &config) noexcept;
 
     void async_read(rx_buff_t &rx_buff, response_t &response, const io_fn_t &on_read,
                     error_fn_t &on_error) noexcept override;
