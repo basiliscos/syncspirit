@@ -76,6 +76,7 @@ void peer_supervisor_t::on_connect_request(message::connect_request_t &msg) noex
                        .ssl_pair(&ssl_pair)
                        .device_name(device_name)
                        .bep_config(bep_config)
+                       .coordinator(coordinator)
                        .timeout(timeout);
     auto peer_addr = std::visit(
         [&, builder = std::move(builder)](auto &&arg) mutable -> r::address_ptr_t {

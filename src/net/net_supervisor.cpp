@@ -52,6 +52,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_connect);
         p.subscribe_actor(&net_supervisor_t::on_disconnect);
         p.subscribe_actor(&net_supervisor_t::on_connection);
+        p.subscribe_actor(&net_supervisor_t::on_auth);
         launch_children();
     });
 }
@@ -182,21 +183,6 @@ void net_supervisor_t::on_announce(message::announce_notification_t &) noexcept 
     }
 }
 
-#if 0
-void net_supervisor_t::on_discovery_req(message::discovery_request_t &req) noexcept {
-    if (global_discovery_addr) {
-        assert(global_discovery_addr);
-        auto timeout = shutdown_timeout / 2;
-        auto &device_id = req.payload.request_payload->device_id;
-        auto req_id = request<payload::discovery_request_t>(global_discovery_addr, device_id).send(timeout);
-        discovery_map.emplace(req_id, &req);
-    } else {
-        auto ec = r::make_error_code(r::error_code_t::unknown_service);
-        reply_with_error(req, ec);
-    }
-}
-#endif
-
 void net_supervisor_t::on_discovery(message::discovery_response_t &res) noexcept {
     auto &ec = res.payload.ec;
     auto &req_id = res.payload.req->payload.id;
@@ -236,7 +222,7 @@ void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message)
         } else {
             bool notify = app_config.ingored_devices.count(id) == 0 && app_config.devices.count(id) == 0;
             if (notify) {
-                using original_ptr_t = ui::payload::discovery_notification_t::net_message_ptr_t;
+                using original_ptr_t = ui::payload::discovery_notification_t::message_ptr_t;
                 send<ui::payload::discovery_notification_t>(address, original_ptr_t{&message});
             }
         }
@@ -324,6 +310,28 @@ void net_supervisor_t::on_connection(message::connection_notify_t &message) noex
     auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout};
     auto &payload = message.payload;
     request<payload::connect_request_t>(peers_addr, std::move(payload.sock), payload.remote).send(timeout);
+}
+
+void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
+    auto &device_id = message.payload.request_payload.peer_device_id;
+    auto it = devices.find(device_id.get_value());
+    bool result = false;
+    if (it == devices.end()) {
+        result = false;
+        if (app_config.ingored_devices.count(device_id.get_value()) == 0) {
+            send<ui::payload::auth_notification_t>(address, &message);
+        }
+    } else {
+        if (it->second->online) {
+            spdlog::warn(
+                "net_supervisor_t::on_auth, {} requested authtorization, but there is already active connection???");
+            result = false;
+        } else {
+            result = true;
+        }
+    }
+    reply_to(message, result);
+    spdlog::debug("net_supervisor_t::on_auth, {} requested authtorization. Result : {}", device_id, result);
 }
 
 void net_supervisor_t::shutdown_start() noexcept {

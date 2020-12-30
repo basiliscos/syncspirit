@@ -27,7 +27,7 @@ using resolved_item_t = resolved_hosts_t::iterator;
 
 using connect_fn_t = std::function<void(resolved_item_t)>;
 using error_fn_t = std::function<void(const sys::error_code &)>;
-using handshake_fn_t = std::function<void(bool valid, X509 *peer)>;
+using handshake_fn_t = std::function<void(bool valid, X509 *peer, const model::device_id_t *peer_device)>;
 using io_fn_t = std::function<void(std::size_t)>;
 
 struct ssl_junction_t {

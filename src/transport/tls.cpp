@@ -25,7 +25,6 @@ tls_t::tls_t(transport_config_t &config) noexcept
         }
     }
     auto mode = ssl::verify_peer | ssl::verify_fail_if_no_peer_cert | ssl::verify_client_once;
-    spdlog::warn("sock = {}", sock.next_layer().native_handle());
     sock.set_verify_depth(1);
     sock.set_verify_mode(mode);
     sock.set_verify_callback([&](bool, ssl::verify_context &peer_ctx) -> bool {
@@ -91,7 +90,7 @@ void tls_t::async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) 
         }
         strand.post([this, on_handshake]() {
             auto peer_cert = SSL_get_peer_certificate(sock.native_handle());
-            on_handshake(validation_passed, peer_cert);
+            on_handshake(validation_passed, peer_cert, &actual_peer);
             supervisor.do_process();
         });
     });

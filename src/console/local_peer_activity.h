@@ -6,7 +6,7 @@
 namespace syncspirit::console {
 
 struct local_peer_activity_t : activity_t {
-    using message_ptr_t = ui::payload::discovery_notification_t::net_message_ptr_t;
+    using message_ptr_t = ui::payload::discovery_notification_t::message_ptr_t;
     static const constexpr size_t MAX_DEVICE_NAME = 30;
 
     enum class sub_activity_t {

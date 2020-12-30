@@ -169,6 +169,15 @@ struct connect_request_t : r::arc_base_t<connect_request_t> {
     payload_t payload;
 };
 
+using auth_response = bool;
+
+struct auth_request_t {
+    using response_t = auth_response;
+    r::address_ptr_t peer_addr;
+    model::device_id_t peer_device_id;
+    proto::Hello hello;
+};
+
 struct connect_notify_t {
     r::address_ptr_t peer_addr;
     model::device_id_t peer_device_id;
@@ -214,6 +223,9 @@ using connect_response_t = r::request_traits_t<payload::connect_request_t>::resp
 using connect_notify_t = r::message_t<payload::connect_notify_t>;
 using disconnect_notify_t = r::message_t<payload::disconnect_notify_t>;
 using connection_notify_t = r::message_t<payload::connection_notify_t>;
+
+using auth_request_t = r::request_traits_t<payload::auth_request_t>::request::message_t;
+using auth_response_t = r::request_traits_t<payload::auth_request_t>::response::message_t;
 
 } // end of namespace message
 

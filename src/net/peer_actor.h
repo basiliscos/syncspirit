@@ -20,6 +20,7 @@ struct peer_actor_config_t : public r::actor_config_t {
     std::optional<std::string> peer_identity;
     const utils::key_pair_t *ssl_pair;
     config::bep_config_t bep_config;
+    r::address_ptr_t coordinator;
 };
 
 template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -49,6 +50,11 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
 
     builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
         parent_t::config.bep_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&coordinator(const r::address_ptr_t &value) &&noexcept {
+        parent_t::config.coordinator = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -95,13 +101,14 @@ struct peer_actor_t : public r::actor_base_t {
     using read_action_t = std::function<void(proto::message::message_t &&msg)>;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
+    void on_auth(message::auth_response_t &res) noexcept;
     void on_connect(resolve_it_t) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;
     void on_write(std::size_t bytes) noexcept;
     void on_read(std::size_t bytes) noexcept;
     void try_next_uri() noexcept;
     void initiate(transport::transport_sp_t tran, const utils::URI &url) noexcept;
-    void on_handshake(bool valid_peer, X509 *peer_cert) noexcept;
+    void on_handshake(bool valid_peer, X509 *peer_cert, const model::device_id_t *peer_device) noexcept;
     void on_handshake_error(sys::error_code ec) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void read_more() noexcept;
@@ -116,9 +123,11 @@ struct peer_actor_t : public r::actor_base_t {
     void read_cluster_config(proto::message::message_t &&msg) noexcept;
 
     std::string_view device_name;
+    r::address_ptr_t coordinator;
     model::device_id_t peer_device_id;
     model::peer_contact_t::uri_container_t uris;
     std::string peer_identity;
+    bool need_auth;
     std::optional<tcp_socket_t> sock;
     const utils::key_pair_t &ssl_pair;
     r::address_ptr_t resolver;

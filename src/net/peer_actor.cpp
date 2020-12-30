@@ -14,9 +14,9 @@ r::plugin::resource_id_t timer = 3;
 } // namespace
 
 peer_actor_t::peer_actor_t(config_t &config)
-    : r::actor_base_t{config}, device_name{config.device_name},
+    : r::actor_base_t{config}, device_name{config.device_name}, coordinator{config.coordinator},
       peer_device_id{config.peer_device_id}, uris{config.uris},
-      peer_identity(config.peer_identity ? std::move(config.peer_identity.value()) : ""),
+      peer_identity(config.peer_identity ? std::move(config.peer_identity.value()) : ""), need_auth{config.sock},
       sock(std::move(config.sock)), ssl_pair{*config.ssl_pair} {
     rx_buff.resize(config.bep_config.rx_buff_size);
 }
@@ -25,6 +25,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&peer_actor_t::on_resolve);
+        p.subscribe_actor(&peer_actor_t::on_auth);
         instantiate_transport();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
@@ -104,7 +105,7 @@ void peer_actor_t::on_connect(resolve_it_t) noexcept {
 }
 
 void peer_actor_t::initiate_handshake() noexcept {
-    transport::handshake_fn_t handshake_fn([&](auto arg, auto peer_cert) { on_handshake(arg, peer_cert); });
+    transport::handshake_fn_t handshake_fn([&](auto &&...args) { on_handshake(args...); });
     transport::error_fn_t error_fn([&](auto arg) { on_handshake_error(arg); });
     transport->async_handshake(handshake_fn, error_fn);
 }
@@ -150,10 +151,18 @@ void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
     process_tx_queue();
 }
 
-void peer_actor_t::on_handshake(bool valid_peer, X509 *) noexcept {
+void peer_actor_t::on_handshake(bool valid_peer, X509 *, const model::device_id_t *peer_device) noexcept {
     resources->release(resource::io);
+    if (!peer_device) {
+        spdlog::warn("peer_actor_t::on_handshake, {} :: missing peer device id", peer_identity);
+        return do_shutdown();
+    }
+
+    spdlog::trace("peer_actor_t::on_handshake, peer = {} ( => {}), valid = {} ", peer_identity,
+                  peer_device->get_short(), valid_peer);
     this->valid_peer = valid_peer;
-    spdlog::trace("peer_actor_t::on_handshake, peer = {}, valid = {} ", peer_identity, valid_peer);
+    this->peer_device_id = *peer_device;
+    this->peer_identity = peer_device_id.get_short();
 
     fmt::memory_buffer buff;
     proto::make_hello_message(buff, device_name);
@@ -242,15 +251,29 @@ void peer_actor_t::cancel_timer() noexcept {
     }
 }
 
+void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
+    bool ok = res.payload.res;
+    spdlog::trace("peer_actor_t::read_hello, peer = {}, value = {}", peer_identity, ok);
+    if (!ok) {
+        spdlog::debug("peer_actor_t::on_auth, peer {} has been rejected in authorization, disconnecting");
+        return do_shutdown();
+    }
+}
+
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
     spdlog::trace("peer_actor_t::read_hello, peer = {}", peer_identity);
-    bool ok = std::visit(
+    bool read_next = std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
-                spdlog::info("peer_actor_t::on_read, {} hello from {} ({} {})", peer_identity, msg->device_name(),
-                             msg->client_name(), msg->client_version());
-                return true;
+                spdlog::trace("peer_actor_t::on_read, {} hello from {} ({} {})", peer_identity, msg->device_name(),
+                              msg->client_name(), msg->client_version());
+                if (!need_auth) {
+                    return true;
+                }
+                request<payload::auth_request_t>(coordinator, get_address(), peer_device_id, std::move(*msg))
+                    .send(init_timeout / 2);
+                return false;
             } else {
                 spdlog::warn("peer_actor_t::on_read, {} :: unexpected_message", peer_identity);
                 do_shutdown();
@@ -258,15 +281,13 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
             }
         },
         msg);
-    if (ok) {
-        // authorize?
+    if (read_next) {
         if (!valid_peer) {
             spdlog::info("peer_actor_t::authorize, {} :: non-valid peer", peer_identity);
             return do_shutdown();
-        } else {
-            read_action = [this](auto &&msg) { read_cluster_config(std::move(msg)); };
-            read_more();
         }
+        read_action = [this](auto &&msg) { read_cluster_config(std::move(msg)); };
+        read_more();
     }
 }
 

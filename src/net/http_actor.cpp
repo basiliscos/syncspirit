@@ -124,7 +124,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto &payload = queue.front()->payload.request_payload;
     auto &ssl_ctx = payload->ssl_context;
     auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
-    transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup};
+    transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup, {}};
     transport = transport::initiate(cfg);
     if (!transport) {
         auto ec = utils::make_error_code(utils::error_code::transport_not_available);
@@ -166,7 +166,7 @@ void http_actor_t::on_connect(resolve_it_t) noexcept {
         }
     }
 
-    transport::handshake_fn_t handshake_fn([&](auto arg, auto peer) { on_handshake(arg, peer); });
+    transport::handshake_fn_t handshake_fn([&](auto &&...args) { on_handshake(args...); });
     transport::error_fn_t error_fn([&](auto arg) { on_handshake_error(arg); });
     transport->async_handshake(handshake_fn, error_fn);
     resources->acquire(resource::io);
@@ -241,7 +241,7 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     need_response = false;
 }
 
-void http_actor_t::on_handshake(bool valid_peer, X509 *) noexcept {
+void http_actor_t::on_handshake(bool, X509 *, const model::device_id_t *) noexcept {
     resources->release(resource::io);
     if (!need_response || stop_io) {
         resources->release(resource::io);
