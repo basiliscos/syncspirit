@@ -258,6 +258,8 @@ void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
         spdlog::debug("peer_actor_t::on_auth, peer {} has been rejected in authorization, disconnecting");
         return do_shutdown();
     }
+    read_action = [this](auto &&msg) { read_cluster_config(std::move(msg)); };
+    read_more();
 }
 
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
