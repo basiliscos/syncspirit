@@ -77,8 +77,18 @@ static std::optional<device_config_t> get_device(toml::table &t) noexcept {
         return result_t();
     }
 
-    return device_config_t{id.value(),         name.value(),        compr_value,
-                           introducer.value(), auto_accept.value(), paused.value()};
+    auto skip_introduction_removals = t["skip_introduction_removals"].value<bool>();
+    if (!paused) {
+        return result_t();
+    }
+
+    return device_config_t{id.value(),
+                           name.value(),
+                           compr_value,
+                           introducer.value(),
+                           auto_accept.value(),
+                           paused.value(),
+                           skip_introduction_removals.value()};
 }
 
 config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path) {
@@ -334,6 +344,7 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
             {"introducer", device.introducer},
             {"auto_accept", device.auto_accept},
             {"paused", device.paused},
+            {"skip_introduction_removals", device.skip_introduction_removals},
         }};
         devices.push_back(device_table);
     }

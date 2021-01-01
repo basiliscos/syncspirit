@@ -1,4 +1,6 @@
-- discovery attemps after timeout
+- device::
+    cert_name,
+    index_id,
 
 - config & tui
  - игнорированные девайсы: показать, удалить

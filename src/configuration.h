@@ -25,12 +25,14 @@ struct device_config_t {
     bool introducer;
     bool auto_accept;
     bool paused;
+    bool skip_introduction_removals;
     addresses_t static_addresses;
 
     inline bool operator==(const device_config_t &other) const noexcept {
         return id == other.id && name == other.name && compression == other.compression &&
                introducer == other.introducer && auto_accept == other.auto_accept && paused == other.paused &&
-               static_addresses == other.static_addresses;
+               static_addresses == other.static_addresses &&
+               skip_introduction_removals == other.skip_introduction_removals;
     }
 };
 
