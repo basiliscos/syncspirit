@@ -8,6 +8,7 @@
 #include <ostream>
 #include <vector>
 #include <map>
+#include <optional>
 #include <set>
 
 namespace syncspirit::config {
@@ -18,10 +19,12 @@ enum class compression_t { none = 1, meta, all, min = none, max = all };
 
 struct device_config_t {
     using addresses_t = std::vector<utils::URI>;
+    using cert_name_t = std::optional<std::string>;
 
     std::string id;
     std::string name;
     compression_t compression;
+    cert_name_t cert_name;
     bool introducer;
     bool auto_accept;
     bool paused;
@@ -30,8 +33,8 @@ struct device_config_t {
 
     inline bool operator==(const device_config_t &other) const noexcept {
         return id == other.id && name == other.name && compression == other.compression &&
-               introducer == other.introducer && auto_accept == other.auto_accept && paused == other.paused &&
-               static_addresses == other.static_addresses &&
+               cert_name == other.cert_name && introducer == other.introducer && auto_accept == other.auto_accept &&
+               paused == other.paused && static_addresses == other.static_addresses &&
                skip_introduction_removals == other.skip_introduction_removals;
     }
 };

@@ -82,13 +82,14 @@ static std::optional<device_config_t> get_device(toml::table &t) noexcept {
         return result_t();
     }
 
-    return device_config_t{id.value(),
-                           name.value(),
-                           compr_value,
-                           introducer.value(),
-                           auto_accept.value(),
-                           paused.value(),
-                           skip_introduction_removals.value()};
+    device_config_t::cert_name_t cert_name;
+    auto cn = t["cert_name"].value<std::string>();
+    if (cn) {
+        cert_name = cn.value();
+    }
+
+    return device_config_t{id.value(),         name.value(),        compr_value,    cert_name,
+                           introducer.value(), auto_accept.value(), paused.value(), skip_introduction_removals.value()};
 }
 
 config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path) {
@@ -346,6 +347,9 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
             {"paused", device.paused},
             {"skip_introduction_removals", device.skip_introduction_removals},
         }};
+        if (device.cert_name) {
+            device_table.insert("cert_name", device.cert_name.value());
+        }
         devices.push_back(device_table);
     }
     auto tbl = toml::table{{

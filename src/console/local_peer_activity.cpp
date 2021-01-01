@@ -63,9 +63,8 @@ bool local_peer_activity_t::handle_label(const char key) noexcept {
         if (sz > 0) {
             auto &devices = actor.app_config.devices;
             auto &id = message->payload.device_id.get_value();
-            auto new_device = config::device_config_t{
-                id, buff, config::compression_t::meta, false, false, false,
-            };
+            auto new_device =
+                config::device_config_t{id, buff, config::compression_t::meta, {}, false, false, false, false, {}};
             devices.emplace(id, std::move(new_device));
             actor.save_config();
             actor.discard_activity();
