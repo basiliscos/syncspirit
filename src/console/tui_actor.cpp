@@ -27,7 +27,7 @@ tui_actor_t::tui_actor_t(config_t &cfg)
 
     progress_last = strlen(progress);
     tty = std::make_unique<tty_t::element_type>(strand.context(), STDIN_FILENO);
-    push_activity(std::make_unique<default_activity_t>(*this, activity_type_t::DEFAULT));
+    push_activity(std::make_unique<default_activity_t>(*this));
 }
 
 void tui_actor_t::on_start() noexcept {
@@ -181,7 +181,7 @@ void tui_actor_t::action_less_logs() noexcept {
 void tui_actor_t::action_esc() noexcept { activities.front()->forget(); }
 
 void tui_actor_t::action_config() noexcept {
-    push_activity(std::make_unique<config_activity_t>(*this, activity_type_t::CONFIG, app_config, app_config_orig));
+    push_activity(std::make_unique<config_activity_t>(*this, app_config, app_config_orig));
 }
 
 void tui_actor_t::save_config() noexcept {
@@ -190,7 +190,7 @@ void tui_actor_t::save_config() noexcept {
 }
 
 void tui_actor_t::on_discovery(ui::message::discovery_notify_t &message) noexcept {
-    push_activity(std::make_unique<local_peer_activity_t>(*this, activity_type_t::LOCAL_PEER, message));
+    push_activity(std::make_unique<local_peer_activity_t>(*this, message));
 }
 
 void tui_actor_t::on_config(ui::message::config_response_t &message) noexcept {

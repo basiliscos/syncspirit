@@ -13,7 +13,7 @@ struct config_activity_t : activity_t {
         editing_device,
     };
 
-    config_activity_t(tui_actor_t &actor_, activity_type_t type_, config::configuration_t &config_,
+    config_activity_t(tui_actor_t &actor_, config::configuration_t &config_,
                       config::configuration_t &config_orig_) noexcept;
 
     bool handle(const char key) noexcept override;

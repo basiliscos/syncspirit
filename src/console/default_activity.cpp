@@ -5,8 +5,7 @@
 
 using namespace syncspirit::console;
 
-default_activity_t::default_activity_t(tui_actor_t &actor_, activity_type_t type_) noexcept
-    : activity_t{actor_, type_} {}
+default_activity_t::default_activity_t(tui_actor_t &actor_) noexcept : activity_t{actor_, activity_type_t::DEFAULT} {}
 
 void default_activity_t::display() noexcept { display_default(); }
 

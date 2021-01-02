@@ -11,13 +11,13 @@ timeout = 5000
 announce_url = 'https://discovery.syncthing.net/'
 cert_file = '/home/b/.config/syncthing/cert.pem'
 device_id = 'LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW'
-enabled = true
+enabled = false
 key_file = '/home/b/.config/syncthing/key.pem'
 rx_buff_size = 32768
 timeout = 3000
 
 [local_discovery]
-enabled = true
+enabled = false
 frequency = 10
 port = 21026
 
@@ -35,13 +35,3 @@ external_port = 22001
 max_wait = 1
 rx_buff_size = 65536
 timeout = 10
-
-[[device]]
-auto_accept = false
-cert_name = 'syncthing'
-compression = 2
-id = 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7'
-introducer = false
-name = 'my-peer'
-paused = false
-skip_introduction_removals = false

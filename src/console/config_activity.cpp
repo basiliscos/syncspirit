@@ -6,9 +6,10 @@
 
 using namespace syncspirit::console;
 
-config_activity_t::config_activity_t(tui_actor_t &actor_, activity_type_t type_, config::configuration_t &config_,
+config_activity_t::config_activity_t(tui_actor_t &actor_, config::configuration_t &config_,
                                      config::configuration_t &config_orig_) noexcept
-    : activity_t{actor_, type_}, config{config_}, config_orig{config_orig_}, sub_activity{sub_activity_t::main} {}
+    : activity_t{actor_, activity_type_t::CONFIG}, config{config_}, config_orig{config_orig_},
+      sub_activity{sub_activity_t::main} {}
 
 void config_activity_t::display() noexcept { display_menu(); }
 

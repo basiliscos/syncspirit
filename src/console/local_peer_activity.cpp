@@ -7,9 +7,9 @@
 
 using namespace syncspirit::console;
 
-local_peer_activity_t::local_peer_activity_t(tui_actor_t &actor_, activity_type_t type_,
-                                             ui::message::discovery_notify_t &message_) noexcept
-    : activity_t{actor_, type_}, message{message_.payload.net_message}, sub_activity{sub_activity_t::main} {
+local_peer_activity_t::local_peer_activity_t(tui_actor_t &actor_, ui::message::discovery_notify_t &message_) noexcept
+    : activity_t{actor_, activity_type_t::LOCAL_PEER}, message{message_.payload.net_message},
+      sub_activity{sub_activity_t::main} {
     auto &payload = message->payload;
     address = payload.peer_endpoint.address().to_string();
     short_id = payload.device_id.get_short();
