@@ -37,5 +37,7 @@ outcome::result<std::string> sha256_digest(const std::string &data) noexcept;
 
 outcome::result<std::string> as_serialized_der(X509 *cert) noexcept;
 
+outcome::result<std::string> get_common_name(X509 *cert) noexcept;
+
 } // namespace utils
 } // namespace syncspirit

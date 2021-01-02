@@ -1,15 +1,18 @@
 #pragma once
 
 #include "../configuration.h"
-#include "messages.h"
+#include "../model/device.h"
 #include "../ui/messages.hpp"
+#include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 #include <unordered_map>
-#include "../model/device.h"
+#include <boost/outcome.hpp>
 
 namespace syncspirit {
 namespace net {
+
+namespace outcome = boost::outcome_v2;
 
 struct net_supervisor_config_t : ra::supervisor_config_asio_t {
     config::configuration_t app_config;
@@ -58,6 +61,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void discover(model::device_ptr_t &device) noexcept;
     void launch_children() noexcept;
     void launch_ssdp() noexcept;
+    outcome::result<void> save_config(const config::configuration_t &new_cfg) noexcept;
 
     config::configuration_t app_config;
     r::address_ptr_t ssdp_addr;

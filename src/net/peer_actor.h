@@ -127,7 +127,6 @@ struct peer_actor_t : public r::actor_base_t {
     model::device_id_t peer_device_id;
     model::peer_contact_t::uri_container_t uris;
     std::string peer_identity;
-    bool need_auth;
     std::optional<tcp_socket_t> sock;
     const utils::key_pair_t &ssl_pair;
     r::address_ptr_t resolver;
@@ -139,6 +138,7 @@ struct peer_actor_t : public r::actor_base_t {
     fmt::memory_buffer rx_buff;
     std::size_t rx_idx = 0;
     bool valid_peer = false;
+    std::string cert_name;
     read_action_t read_action;
 };
 

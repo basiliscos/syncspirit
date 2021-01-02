@@ -1,6 +1,9 @@
 - device::
     cert_name,
-    index_id,
+
+
+- save devices on exit
+- device, index_id ?
 
 - config & tui
  - игнорированные девайсы: показать, удалить

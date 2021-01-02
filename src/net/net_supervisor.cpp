@@ -236,26 +236,33 @@ void net_supervisor_t::on_config_request(ui::message::config_request_t &message)
 void net_supervisor_t::on_config_save(ui::message::config_save_request_t &message) noexcept {
     spdlog::trace("net_supervisor_t::on_config_save");
     auto &cfg = message.payload.request_payload.config;
-    auto path_tmp = cfg.config_path;
+    auto result = save_config(cfg);
+    if (result) {
+        reply_to(message);
+    } else {
+        reply_with_error(message, result.error());
+    }
+}
+
+outcome::result<void> net_supervisor_t::save_config(const config::configuration_t &new_cfg) noexcept {
+    auto path_tmp = new_cfg.config_path;
     path_tmp.append("syncspirit.toml.tmp");
     std::ofstream out(path_tmp.string(), out.binary);
-    auto r = config::serialize(cfg, out);
+    auto r = config::serialize(new_cfg, out);
     if (!r) {
-        reply_with_error(message, r.error());
-        return;
+        return r;
     }
     out.close();
-    auto path = cfg.config_path;
+    auto path = new_cfg.config_path;
     path.append("syncspirit.toml");
     sys::error_code ec;
     fs::rename(path_tmp, path, ec);
     if (ec) {
-        reply_with_error(message, r.error());
-        return;
+        return ec;
     }
-    app_config = cfg;
+    app_config = new_cfg;
     spdlog::warn("net_supervisor_t::on_config_save, apply changes");
-    reply_to(message);
+    return outcome::success();
 }
 
 void net_supervisor_t::discover(model::device_ptr_t &device) noexcept {
@@ -322,12 +329,19 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
             send<ui::payload::auth_notification_t>(address, &message);
         }
     } else {
-        if (it->second->online) {
+        auto &device = it->second;
+        if (device->online) {
             spdlog::warn(
                 "net_supervisor_t::on_auth, {} requested authtorization, but there is already active connection???");
             result = false;
         } else {
-            result = true;
+            auto &cert_name = device->cert_name;
+            if (cert_name) {
+                result = cert_name.value() == message.payload.request_payload.cert_name;
+            } else {
+                result = true;
+                cert_name = message.payload.request_payload.cert_name;
+            }
         }
     }
     reply_to(message, result);

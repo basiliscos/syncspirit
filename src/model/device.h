@@ -15,6 +15,7 @@ struct device_t : arc_base_t<device_t> {
 
     device_id_t device_id;
     std::string name;
+    std::optional<std::string> cert_name;
     static_addresses_t static_addresses;
     bool intoducer;
     bool auto_accept;

@@ -39,6 +39,7 @@ timeout = 10
 [[device]]
 auto_accept = false
 compression = 2
+cert_name = "syncthing"
 id = 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7'
 introducer = false
 name = 'my-peer'

@@ -1,5 +1,6 @@
 #include "peer_actor.h"
 #include "names.h"
+#include "../utils/tls.h"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::net;
@@ -16,7 +17,7 @@ r::plugin::resource_id_t timer = 3;
 peer_actor_t::peer_actor_t(config_t &config)
     : r::actor_base_t{config}, device_name{config.device_name}, coordinator{config.coordinator},
       peer_device_id{config.peer_device_id}, uris{config.uris},
-      peer_identity(config.peer_identity ? std::move(config.peer_identity.value()) : ""), need_auth{config.sock},
+      peer_identity(config.peer_identity ? std::move(config.peer_identity.value()) : ""),
       sock(std::move(config.sock)), ssl_pair{*config.ssl_pair} {
     rx_buff.resize(config.bep_config.rx_buff_size);
 }
@@ -151,15 +152,23 @@ void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
     process_tx_queue();
 }
 
-void peer_actor_t::on_handshake(bool valid_peer, X509 *, const model::device_id_t *peer_device) noexcept {
+void peer_actor_t::on_handshake(bool valid_peer, X509 *cert, const model::device_id_t *peer_device) noexcept {
     resources->release(resource::io);
     if (!peer_device) {
         spdlog::warn("peer_actor_t::on_handshake, {} :: missing peer device id", peer_identity);
         return do_shutdown();
     }
 
-    spdlog::trace("peer_actor_t::on_handshake, peer = {} ( => {}), valid = {} ", peer_identity,
-                  peer_device->get_short(), valid_peer);
+    auto cert_name = utils::get_common_name(cert);
+    if (!cert_name) {
+        spdlog::warn("peer_actor_t::on_handshake, can't cat certificate name from {} :: {}", peer_identity,
+                     cert_name.error().message());
+        return do_shutdown();
+    }
+    spdlog::trace("peer_actor_t::on_handshake, peer = {} ( => {}), valid = {}, issued by {}", peer_identity,
+                  peer_device->get_short(), valid_peer, cert_name.value());
+
+    this->cert_name = cert_name.value();
     this->valid_peer = valid_peer;
     this->peer_device_id = *peer_device;
     this->peer_identity = peer_device_id.get_short();
@@ -264,33 +273,20 @@ void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
 
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
     spdlog::trace("peer_actor_t::read_hello, peer = {}", peer_identity);
-    bool read_next = std::visit(
+    std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
                 spdlog::trace("peer_actor_t::on_read, {} hello from {} ({} {})", peer_identity, msg->device_name(),
                               msg->client_name(), msg->client_version());
-                if (!need_auth) {
-                    return true;
-                }
-                request<payload::auth_request_t>(coordinator, get_address(), peer_device_id, std::move(*msg))
+                request<payload::auth_request_t>(coordinator, get_address(), peer_device_id, cert_name, std::move(*msg))
                     .send(init_timeout / 2);
-                return false;
             } else {
                 spdlog::warn("peer_actor_t::on_read, {} :: unexpected_message", peer_identity);
                 do_shutdown();
-                return false;
             }
         },
         msg);
-    if (read_next) {
-        if (!valid_peer) {
-            spdlog::info("peer_actor_t::authorize, {} :: non-valid peer", peer_identity);
-            return do_shutdown();
-        }
-        read_action = [this](auto &&msg) { read_cluster_config(std::move(msg)); };
-        read_more();
-    }
 }
 
 void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept {

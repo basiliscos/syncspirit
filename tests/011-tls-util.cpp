@@ -40,6 +40,10 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
 
     bool bytes_equal = load_result.value().cert_data.bytes == pair.value().cert_data.bytes;
     REQUIRE(bytes_equal);
+
+    auto cn = get_common_name(value.cert.get());
+    REQUIRE(cn);
+    REQUIRE(cn.value() == "sample");
 }
 
 TEST_CASE("sha256 for certificate", "[support][tls]") {

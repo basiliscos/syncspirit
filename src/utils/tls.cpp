@@ -266,4 +266,15 @@ outcome::result<std::string> sha256_digest(const std::string &data) noexcept {
     return std::string(buff, buff + SHA256_DIGEST_LENGTH);
 }
 
+outcome::result<std::string> get_common_name(X509 *cert) noexcept {
+    auto name = X509_get_subject_name(cert);
+
+    char buff[256] = {};
+    int r = X509_NAME_get_text_by_NID(name, NID_commonName, buff, 256);
+    if (r == -1) {
+        return error_code::tls_cn_missing;
+    }
+    return std::string(buff, r);
+}
+
 } // namespace syncspirit::utils
