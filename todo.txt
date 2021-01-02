@@ -1,7 +1,3 @@
-- device::
-    cert_name,
-
-
 - save devices on exit
 - device, index_id ?
 

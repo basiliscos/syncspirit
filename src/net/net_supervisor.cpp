@@ -71,6 +71,9 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_c
         // ignore
         return;
     }
+    if (peers_addr && peers_addr == child_addr) {
+        persist_data();
+    }
     if (state == r::state_t::OPERATIONAL) {
         do_shutdown();
     }
@@ -353,4 +356,20 @@ void net_supervisor_t::shutdown_start() noexcept {
         send<message::discovery_cancel_t::payload_t>(global_discovery_addr, request_id);
     }
     parent_t::shutdown_start();
+}
+
+void net_supervisor_t::persist_data() noexcept {
+    auto config_copy = app_config;
+    auto &devs = config_copy.devices;
+    devs.clear();
+    for (auto &[device_id, device] : devices) {
+        devs.emplace(device_id, device->serialize());
+    }
+    if (!(app_config == config_copy)) {
+        spdlog::debug("net_supervisor_t::persist_data, saving config");
+        auto r = save_config(config_copy);
+        if (!r) {
+            spdlog::error("net_supervisor_t::persist_data, failed to save config:: {}", r.error().message());
+        }
+    }
 }

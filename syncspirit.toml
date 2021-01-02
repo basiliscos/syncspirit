@@ -1,6 +1,6 @@
 [bep]
-rx_buff_size = 33554432
 connect_timeout = 5000
+rx_buff_size = 33554432
 
 [global]
 device_name = 'hp-note'
@@ -38,8 +38,8 @@ timeout = 10
 
 [[device]]
 auto_accept = false
+cert_name = 'syncthing'
 compression = 2
-cert_name = "syncthing"
 id = 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7'
 introducer = false
 name = 'my-peer'
