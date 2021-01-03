@@ -88,9 +88,17 @@ void tls_t::async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) 
             });
             return;
         }
-        strand.post([this, on_handshake]() {
+        auto endpoint = sock.next_layer().remote_endpoint(ec);
+        if (ec) {
+            strand.post([on_error, ec, this]() {
+                on_error(ec);
+                supervisor.do_process();
+            });
+            return;
+        }
+        strand.post([this, endpoint, on_handshake]() {
             auto peer_cert = SSL_get_peer_certificate(sock.native_handle());
-            on_handshake(validation_passed, peer_cert, &actual_peer);
+            on_handshake(validation_passed, peer_cert, endpoint, &actual_peer);
             supervisor.do_process();
         });
     });

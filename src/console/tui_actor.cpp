@@ -57,6 +57,8 @@ void tui_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&tui_actor_t::on_discovery, coordinator);
+                plugin->subscribe_actor(&tui_actor_t::on_auth, coordinator);
+
                 auto timeout = init_timeout / 2;
                 request<ui::payload::config_request_t>(coordinator).send(timeout);
             }
@@ -190,6 +192,10 @@ void tui_actor_t::save_config() noexcept {
 }
 
 void tui_actor_t::on_discovery(ui::message::discovery_notify_t &message) noexcept {
+    push_activity(std::make_unique<local_peer_activity_t>(*this, message));
+}
+
+void tui_actor_t::on_auth(ui::message::auth_notify_t &message) noexcept {
     push_activity(std::make_unique<local_peer_activity_t>(*this, message));
 }
 

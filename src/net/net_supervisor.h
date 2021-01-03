@@ -62,6 +62,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void launch_children() noexcept;
     void launch_ssdp() noexcept;
     void persist_data() noexcept;
+    void update_devices() noexcept;
     outcome::result<void> save_config(const config::configuration_t &new_cfg) noexcept;
 
     config::configuration_t app_config;

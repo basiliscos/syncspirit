@@ -31,10 +31,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
     device_id = std::move(device.value());
     spdlog::info("net_supervisor_t, device name = {},  device id = {}", app_config.device_name, device_id);
 
-    for (auto &it : app_config.devices) {
-        auto device = model::device_ptr_t{new model::device_t(it.second)};
-        devices.emplace(it.first, std::move(device));
-    }
+    update_devices();
 }
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -265,6 +262,7 @@ outcome::result<void> net_supervisor_t::save_config(const config::configuration_
     }
     app_config = new_cfg;
     spdlog::warn("net_supervisor_t::on_config_save, apply changes");
+    update_devices();
     return outcome::success();
 }
 
@@ -356,6 +354,13 @@ void net_supervisor_t::shutdown_start() noexcept {
         send<message::discovery_cancel_t::payload_t>(global_discovery_addr, request_id);
     }
     parent_t::shutdown_start();
+}
+
+void net_supervisor_t::update_devices() noexcept {
+    for (auto &it : app_config.devices) {
+        auto device = model::device_ptr_t{new model::device_t(it.second)};
+        devices.emplace(it.first, std::move(device));
+    }
 }
 
 void net_supervisor_t::persist_data() noexcept {

@@ -13,9 +13,18 @@ void tcp_t::async_connect(const resolved_hosts_t &hosts, connect_fn_t &on_connec
     async_connect_impl(sock, hosts, on_connect, on_error);
 }
 
-void tcp_t::async_handshake(handshake_fn_t &on_handshake, error_fn_t &) noexcept {
-    strand.post([on_handshake, this]() {
-        on_handshake(true, nullptr, nullptr);
+void tcp_t::async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) noexcept {
+    sys::error_code ec;
+    auto endpoint = sock.remote_endpoint(ec);
+    if (ec) {
+        strand.post([on_error, ec, this]() {
+            on_error(ec);
+            supervisor.do_process();
+        });
+        return;
+    }
+    strand.post([on_handshake, endpoint, this]() {
+        on_handshake(true, nullptr, endpoint, nullptr);
         supervisor.do_process();
     });
 }

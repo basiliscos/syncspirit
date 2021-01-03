@@ -1,4 +1,5 @@
-- config & tui
+ - config & tui
+ - auth, req, should contain tcp::endpoint;
  - local_peer_activity => peer_activity
 
 - config & tui

@@ -62,6 +62,7 @@ struct tui_actor_t : public r::actor_base_t {
     using activities_t = std::list<activity_ptr_t>;
 
     void on_discovery(ui::message::discovery_notify_t &message) noexcept;
+    void on_auth(ui::message::auth_notify_t &message) noexcept;
     void on_config(ui::message::config_response_t &message) noexcept;
     void on_config_save(ui::message::config_save_response_t &message) noexcept;
     void start_timer() noexcept;

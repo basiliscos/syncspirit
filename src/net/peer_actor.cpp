@@ -152,7 +152,8 @@ void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
     process_tx_queue();
 }
 
-void peer_actor_t::on_handshake(bool valid_peer, X509 *cert, const model::device_id_t *peer_device) noexcept {
+void peer_actor_t::on_handshake(bool valid_peer, X509 *cert, const tcp::endpoint &peer_endpoint,
+                                const model::device_id_t *peer_device) noexcept {
     resources->release(resource::io);
     if (!peer_device) {
         spdlog::warn("peer_actor_t::on_handshake, {} :: missing peer device id", peer_identity);
@@ -165,12 +166,13 @@ void peer_actor_t::on_handshake(bool valid_peer, X509 *cert, const model::device
                      cert_name.error().message());
         return do_shutdown();
     }
-    spdlog::trace("peer_actor_t::on_handshake, peer = {} ( => {}), valid = {}, issued by {}", peer_identity,
+    spdlog::trace("peer_actor_t::on_handshake, peer = {} / {}, valid = {}, issued by {}", peer_endpoint,
                   peer_device->get_short(), valid_peer, cert_name.value());
 
     this->cert_name = cert_name.value();
     this->valid_peer = valid_peer;
     this->peer_device_id = *peer_device;
+    this->peer_endpoint = peer_endpoint;
     this->peer_identity = peer_device_id.get_short();
 
     fmt::memory_buffer buff;
@@ -279,7 +281,8 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
                 spdlog::trace("peer_actor_t::on_read, {} hello from {} ({} {})", peer_identity, msg->device_name(),
                               msg->client_name(), msg->client_version());
-                request<payload::auth_request_t>(coordinator, get_address(), peer_device_id, cert_name, std::move(*msg))
+                request<payload::auth_request_t>(coordinator, get_address(), peer_endpoint, peer_device_id, cert_name,
+                                                 std::move(*msg))
                     .send(init_timeout / 2);
             } else {
                 spdlog::warn("peer_actor_t::on_read, {} :: unexpected_message", peer_identity);

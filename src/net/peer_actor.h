@@ -108,7 +108,8 @@ struct peer_actor_t : public r::actor_base_t {
     void on_read(std::size_t bytes) noexcept;
     void try_next_uri() noexcept;
     void initiate(transport::transport_sp_t tran, const utils::URI &url) noexcept;
-    void on_handshake(bool valid_peer, X509 *peer_cert, const model::device_id_t *peer_device) noexcept;
+    void on_handshake(bool valid_peer, X509 *peer_cert, const tcp::endpoint &peer_endpoint,
+                      const model::device_id_t *peer_device) noexcept;
     void on_handshake_error(sys::error_code ec) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void read_more() noexcept;
@@ -139,6 +140,7 @@ struct peer_actor_t : public r::actor_base_t {
     std::size_t rx_idx = 0;
     bool valid_peer = false;
     std::string cert_name;
+    tcp::endpoint peer_endpoint;
     read_action_t read_action;
 };
 
