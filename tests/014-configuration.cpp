@@ -44,6 +44,7 @@ TEST_CASE("default config is OK", "[config]") {
             "O4LHPKG-O6BQ36W-MUOVKTI-MKAVHSC-Y7EC3U4-DHNLEDE-MZBJWQN-UIX6QAL",
             "my-device",
             config::compression_t::meta,
+            "cert-issuer",
             true,
             true,
             false

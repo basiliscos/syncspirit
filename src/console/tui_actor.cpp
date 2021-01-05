@@ -5,7 +5,7 @@
 #include "../net/names.h"
 #include "config_activity.h"
 #include "default_activity.h"
-#include "local_peer_activity.h"
+#include "peer_activity.h"
 
 using namespace syncspirit::console;
 
@@ -192,11 +192,11 @@ void tui_actor_t::save_config() noexcept {
 }
 
 void tui_actor_t::on_discovery(ui::message::discovery_notify_t &message) noexcept {
-    push_activity(std::make_unique<local_peer_activity_t>(*this, message));
+    push_activity(std::make_unique<peer_activity_t>(*this, message));
 }
 
 void tui_actor_t::on_auth(ui::message::auth_notify_t &message) noexcept {
-    push_activity(std::make_unique<local_peer_activity_t>(*this, message));
+    push_activity(std::make_unique<peer_activity_t>(*this, message));
 }
 
 void tui_actor_t::on_config(ui::message::config_response_t &message) noexcept {

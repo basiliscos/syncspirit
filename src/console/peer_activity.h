@@ -6,7 +6,7 @@
 
 namespace syncspirit::console {
 
-struct local_peer_activity_t : activity_t {
+struct peer_activity_t : activity_t {
     static const constexpr size_t MAX_DEVICE_NAME = 30;
 
     enum class sub_activity_t {
@@ -14,8 +14,8 @@ struct local_peer_activity_t : activity_t {
         editing_name,
     };
 
-    local_peer_activity_t(tui_actor_t &actor_, ui::message::discovery_notify_t &message) noexcept;
-    local_peer_activity_t(tui_actor_t &actor_, ui::message::auth_notify_t &message) noexcept;
+    peer_activity_t(tui_actor_t &actor_, ui::message::discovery_notify_t &message) noexcept;
+    peer_activity_t(tui_actor_t &actor_, ui::message::auth_notify_t &message) noexcept;
     bool handle(const char key) noexcept override;
     bool handle_main(const char key) noexcept;
     bool handle_label(const char key) noexcept;

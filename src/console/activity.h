@@ -7,7 +7,7 @@ struct tui_actor_t;
 
 enum class activity_type_t {
     DEFAULT,
-    LOCAL_PEER,
+    PEER,
     CONFIG,
 };
 

@@ -1,4 +1,4 @@
-#include "local_peer_activity.h"
+#include "peer_activity.h"
 
 #include "default_activity.h"
 #include "tui_actor.h"
@@ -7,15 +7,15 @@
 
 using namespace syncspirit::console;
 
-local_peer_activity_t::local_peer_activity_t(tui_actor_t &actor_, ui::message::discovery_notify_t &message) noexcept
-    : activity_t{actor_, activity_type_t::LOCAL_PEER}, sub_activity{sub_activity_t::main} {
+peer_activity_t::peer_activity_t(tui_actor_t &actor_, ui::message::discovery_notify_t &message) noexcept
+    : activity_t{actor_, activity_type_t::PEER}, sub_activity{sub_activity_t::main} {
     auto &payload = message.payload.net_message->payload;
     peer_name = peer_details = fmt::format("{}", payload.peer_endpoint);
     device_id = payload.device_id;
 }
 
-local_peer_activity_t::local_peer_activity_t(tui_actor_t &actor_, ui::message::auth_notify_t &message) noexcept
-    : activity_t{actor_, activity_type_t::LOCAL_PEER}, sub_activity{sub_activity_t::main} {
+peer_activity_t::peer_activity_t(tui_actor_t &actor_, ui::message::auth_notify_t &message) noexcept
+    : activity_t{actor_, activity_type_t::PEER}, sub_activity{sub_activity_t::main} {
     auto &payload = message.payload.net_message->payload.request_payload;
     auto &hello = payload.hello;
     peer_details = fmt::format("{}, {}/{}", payload.endpoint, hello.client_name(), hello.client_version());
@@ -24,7 +24,7 @@ local_peer_activity_t::local_peer_activity_t(tui_actor_t &actor_, ui::message::a
     peer_name = hello.device_name();
 }
 
-bool local_peer_activity_t::handle(const char key) noexcept {
+bool peer_activity_t::handle(const char key) noexcept {
     switch (sub_activity) {
     case sub_activity_t::main:
         return handle_main(key);
@@ -34,7 +34,7 @@ bool local_peer_activity_t::handle(const char key) noexcept {
     return false;
 }
 
-bool local_peer_activity_t::handle_main(const char key) noexcept {
+bool peer_activity_t::handle_main(const char key) noexcept {
     if (key == 'i') {
         actor.ignore_device(device_id);
         actor.discard_activity();
@@ -49,7 +49,7 @@ bool local_peer_activity_t::handle_main(const char key) noexcept {
     return false;
 }
 
-bool local_peer_activity_t::handle_label(const char key) noexcept {
+bool peer_activity_t::handle_label(const char key) noexcept {
     bool handled = false;
     auto sz = strlen(buff);
     if (key == 0x08 || key == 0x7F) { /* backspace or del */
@@ -90,9 +90,9 @@ bool local_peer_activity_t::handle_label(const char key) noexcept {
     }
 }
 
-void local_peer_activity_t::display() noexcept { display_menu(); }
+void peer_activity_t::display() noexcept { display_menu(); }
 
-void local_peer_activity_t::display_menu() noexcept {
+void peer_activity_t::display_menu() noexcept {
     auto short_id = device_id.get_short();
     auto p = fmt::format("{}{}a{}dd or {}{}i{}gnore device {}{}{}{} ({})? ", sink_t::bold, sink_t::white,
                          sink_t::reset,                                        /* add */
@@ -102,17 +102,17 @@ void local_peer_activity_t::display_menu() noexcept {
     actor.set_prompt(std::string(p.begin(), p.end()));
 }
 
-void local_peer_activity_t::display_label() noexcept {
+void peer_activity_t::display_label() noexcept {
     auto p = fmt::format("peer {} label: {}{}{}{}", peer_details,         /* peer address */
                          sink_t::bold, sink_t::green, buff, sink_t::reset /* label */
     );
     actor.set_prompt(std::string(p.begin(), p.end()));
 }
 
-bool local_peer_activity_t::operator==(const activity_t &other) const noexcept {
+bool peer_activity_t::operator==(const activity_t &other) const noexcept {
     if (type != other.type) {
         return false;
     }
-    auto o = (const local_peer_activity_t &)other;
+    auto o = (const peer_activity_t &)other;
     return device_id == o.device_id;
 }
