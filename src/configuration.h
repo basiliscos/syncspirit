@@ -16,6 +16,8 @@ namespace syncspirit::config {
 namespace outcome = boost::outcome_v2;
 
 enum class compression_t { none = 1, meta, all, min = none, max = all };
+enum class folder_type_t { send, receive, send_and_receive };
+enum class pull_order_t { random, alphabetic, smallest, largest, oldest, newest };
 
 struct device_config_t {
     using addresses_t = std::vector<utils::URI>;
@@ -36,6 +38,27 @@ struct device_config_t {
                cert_name == other.cert_name && introducer == other.introducer && auto_accept == other.auto_accept &&
                paused == other.paused && static_addresses == other.static_addresses &&
                skip_introduction_removals == other.skip_introduction_removals;
+    }
+};
+
+struct folder_config_t {
+    using device_ids_t = std::set<std::string>;
+
+    std::uint64_t id;
+    std::string label;
+    std::string path;
+    device_ids_t device_ids;
+    folder_type_t folder_type;
+    std::uint32_t rescan_interval;
+    pull_order_t pull_order;
+    bool watched;
+    bool ignore_permissions;
+
+    inline bool operator==(const folder_config_t &other) const noexcept {
+        return id == other.id && label == other.label && path == other.path && device_ids == other.device_ids &&
+               folder_type == other.folder_type && rescan_interval == other.rescan_interval &&
+               pull_order == other.pull_order && watched == other.watched &&
+               ignore_permissions == other.ignore_permissions;
     }
 };
 
@@ -108,6 +131,7 @@ struct bep_config_t {
 struct configuration_t {
     using ingored_devices_t = std::set<std::string>;
     using devices_t = std::map<std::string, device_config_t>;
+    using folders_t = std::map<std::uint64_t, folder_config_t>;
 
     boost::filesystem::path config_path;
     local_announce_config_t local_announce_config;
@@ -120,12 +144,14 @@ struct configuration_t {
     std::string device_name;
     ingored_devices_t ingored_devices;
     devices_t devices;
+    folders_t folders;
 
     inline bool operator==(const configuration_t &other) const noexcept {
         return local_announce_config == other.local_announce_config && upnp_config == other.upnp_config &&
                global_announce_config == other.global_announce_config && bep_config == other.bep_config &&
                tui_config == other.tui_config && timeout == other.timeout && device_name == other.device_name &&
-               config_path == other.config_path && ingored_devices == other.ingored_devices && devices == other.devices;
+               config_path == other.config_path && ingored_devices == other.ingored_devices &&
+               devices == other.devices && folders == other.folders;
     }
 };
 

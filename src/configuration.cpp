@@ -88,8 +88,39 @@ static std::optional<device_config_t> get_device(toml::table &t) noexcept {
         cert_name = cn.value();
     }
 
-    return device_config_t{id.value(),         name.value(),        compr_value,    cert_name,
-                           introducer.value(), auto_accept.value(), paused.value(), skip_introduction_removals.value()};
+    // utils::parse(url.value().c_str());
+    auto addresses = t["addresses"];
+
+    device_config_t::addresses_t device_addresses;
+    if (addresses.is_array()) {
+        auto arr = addresses.as_array();
+        for (size_t i = 0; i < arr->size(); ++i) {
+            auto node = arr->get(i);
+            if (node->is_string()) {
+                auto &value = node->as_string()->get();
+                auto url = utils::parse(value.c_str());
+                if (url) {
+                    device_addresses.emplace_back(std::move(url.value()));
+                } else {
+                    spdlog::warn("invalid url : {}, ignored", value);
+                }
+            }
+        }
+    }
+
+    return device_config_t{id.value(),
+                           name.value(),
+                           compr_value,
+                           cert_name,
+                           introducer.value(),
+                           auto_accept.value(),
+                           paused.value(),
+                           skip_introduction_removals.value(),
+                           std::move(device_addresses)};
+}
+
+static std::optional<folder_config_t> get_folder(toml::table &t, const configuration_t::devices_t &devices) noexcept {
+    std::abort();
 }
 
 config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path) {
@@ -326,6 +357,24 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
     }
 
+    // folders
+    {
+        auto &devices = cfg.devices;
+        auto td = root_tbl["folders"];
+        if (td.is_array_of_tables()) {
+            auto arr = td.as_array();
+            for (size_t i = 0; i < arr->size(); ++i) {
+                auto node = arr->get(i);
+                auto &value = *node->as_table();
+                auto folder = get_folder(value, devices);
+                if (folder) {
+                    auto id = folder.value().id;
+                    cfg.folders.emplace(id, std::move(folder.value()));
+                }
+            }
+        }
+    }
+
     return std::move(cfg);
 }
 
@@ -349,6 +398,13 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
         }};
         if (device.cert_name) {
             device_table.insert("cert_name", device.cert_name.value());
+        }
+        if (!device.static_addresses.empty()) {
+            auto addresses = toml::array{};
+            for(auto& url: device.static_addresses) {
+                addresses.emplace_back<std::string>(url.full);
+            }
+            device_table.insert("addresses", addresses);
         }
         devices.push_back(device_table);
     }

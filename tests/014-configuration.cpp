@@ -1,6 +1,7 @@
 #include "catch.hpp"
 #include "test-utils.h"
-#include <configuration.h>
+#include "configuration.h"
+#include "utils/uri.h"
 #include <boost/filesystem.hpp>
 #include <sstream>
 
@@ -47,7 +48,9 @@ TEST_CASE("default config is OK", "[config]") {
             "cert-issuer",
             true,
             true,
-            false
+            false,
+            true,
+            { utils::parse("tcp://127.0.0.1:1234").value() },
         };
         cfg.devices.emplace(device.id, device);
         auto r = config::serialize(cfg, out);
