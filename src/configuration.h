@@ -16,8 +16,8 @@ namespace syncspirit::config {
 namespace outcome = boost::outcome_v2;
 
 enum class compression_t { none = 1, meta, all, min = none, max = all };
-enum class folder_type_t { send, receive, send_and_receive };
-enum class pull_order_t { random, alphabetic, smallest, largest, oldest, newest };
+enum class folder_type_t { send = 1, receive, send_and_receive, first = send, last = send_and_receive };
+enum class pull_order_t { random, alphabetic, smallest, largest, oldest, newest, first = random, last = newest };
 
 struct device_config_t {
     using addresses_t = std::vector<utils::URI>;

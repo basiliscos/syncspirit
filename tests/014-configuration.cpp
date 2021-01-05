@@ -28,7 +28,6 @@ TEST_CASE("default config is OK", "[config]") {
     }
 
     SECTION("ignored devices") {
-        out.clear();
         cfg.ingored_devices.emplace("O4LHPKG-O6BQ36W-MUOVKTI-MKAVHSC-Y7EC3U4-DHNLEDE-MZBJWQN-UIX6QAL");
         auto r = config::serialize(cfg, out);
         REQUIRE((bool)r);
@@ -39,8 +38,7 @@ TEST_CASE("default config is OK", "[config]") {
         CHECK(cfg2.value() == cfg);
     }
 
-    SECTION("devices") {
-        out.clear();
+    SECTION("devices & folders") {
         auto device = config::device_config_t{
             "O4LHPKG-O6BQ36W-MUOVKTI-MKAVHSC-Y7EC3U4-DHNLEDE-MZBJWQN-UIX6QAL",
             "my-device",
@@ -53,13 +51,40 @@ TEST_CASE("default config is OK", "[config]") {
             { utils::parse("tcp://127.0.0.1:1234").value() },
         };
         cfg.devices.emplace(device.id, device);
-        auto r = config::serialize(cfg, out);
-        REQUIRE((bool)r);
-        CHECK(out.str().find("O4LHPKG") != std::string::npos);
-        INFO(out.str());
-        auto cfg2 = config::get_config(out, dir);
-        CHECK(cfg2.value().devices.count(device.id) == 1);
-        CHECK(cfg2.value() == cfg);
+
+        /*
+        SECTION("device save & load") {
+            auto r = config::serialize(cfg, out);
+            REQUIRE((bool)r);
+            CHECK(out.str().find("O4LHPKG") != std::string::npos);
+            INFO(out.str());
+            auto cfg2 = config::get_config(out, dir);
+            CHECK(cfg2.value().devices.count(device.id) == 1);
+            CHECK(cfg2.value() == cfg);
+        }
+        */
+
+        SECTION("folders") {
+            auto folder = config::folder_config_t {
+                12345,
+                "my-label",
+                "/home/user/shared-folder",
+                { device.id },
+                config::folder_type_t::send_and_receive,
+                3600,
+                config::pull_order_t::alphabetic,
+                true,
+                true
+            };
+            cfg.folders.emplace(folder.id, folder);
+            auto r = config::serialize(cfg, out);
+            REQUIRE((bool)r);
+            INFO(out.str());
+            auto cfg2 = config::get_config(out, dir);
+            CHECK(cfg2.value().folders.count(folder.id) == 1);
+            CHECK(cfg2.value() == cfg);
+            INFO(out.str());
+        }
     }
 }
 

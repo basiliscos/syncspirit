@@ -120,7 +120,85 @@ static std::optional<device_config_t> get_device(toml::table &t) noexcept {
 }
 
 static std::optional<folder_config_t> get_folder(toml::table &t, const configuration_t::devices_t &devices) noexcept {
-    std::abort();
+    using result_t = std::optional<folder_config_t>;
+    auto id = t["id"].value<std::uint64_t>();
+    if (!id) {
+        return result_t();
+    }
+
+    auto label = t["label"].value<std::string>();
+    if (!label) {
+        return result_t();
+    }
+
+    auto path = t["path"].value<std::string>();
+    if (!path) {
+        return result_t();
+    }
+
+    auto ft = t["folder_type"].value<std::uint32_t>();
+    if (!ft) {
+        return result_t();
+    }
+    bool ft_not_fits = ft.value() < static_cast<std::uint32_t>(folder_type_t::first) ||
+                       ft.value() > static_cast<std::uint32_t>(folder_type_t::last);
+    if (ft_not_fits) {
+        return result_t();
+    }
+    folder_type_t folder_type(static_cast<folder_type_t>(ft.value()));
+
+    auto rescan_interval = t["rescan_interval"].value<std::uint32_t>();
+    if (!rescan_interval) {
+        return result_t();
+    }
+
+    auto po = t["pull_order"].value<std::uint32_t>();
+    if (!po) {
+        return result_t();
+    }
+    bool po_not_fits = po.value() < static_cast<std::uint32_t>(pull_order_t::first) ||
+                       po.value() > static_cast<std::uint32_t>(pull_order_t::last);
+    if (po_not_fits) {
+        return result_t();
+    }
+    pull_order_t pull_order(static_cast<pull_order_t>(po.value()));
+
+    auto watched = t["watched"].value<bool>();
+    if (!watched) {
+        return result_t();
+    }
+
+    auto ignore_permissions = t["ignore_permissions"].value<bool>();
+    if (!ignore_permissions) {
+        return result_t();
+    }
+
+    folder_config_t::device_ids_t device_ids;
+    auto devs = t["devices"];
+    if (devs.is_array()) {
+        auto arr = devs.as_array();
+        for (size_t i = 0; i < arr->size(); ++i) {
+            auto node = arr->get(i);
+            if (node->is_string()) {
+                auto &value = node->as_string()->get();
+                if (devices.count(value)) {
+                    device_ids.emplace(value);
+                } else {
+                    spdlog::warn("unknown device: {}, for folder {} / {}", value, label.value(), id.value());
+                }
+            }
+        }
+    }
+
+    return folder_config_t{id.value(),
+                           label.value(),
+                           path.value(),
+                           std::move(device_ids),
+                           folder_type,
+                           rescan_interval.value(),
+                           pull_order,
+                           watched.value(),
+                           ignore_permissions.value()};
 }
 
 config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path) {
@@ -360,7 +438,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
     // folders
     {
         auto &devices = cfg.devices;
-        auto td = root_tbl["folders"];
+        auto td = root_tbl["folder"];
         if (td.is_array_of_tables()) {
             auto arr = td.as_array();
             for (size_t i = 0; i < arr->size(); ++i) {
@@ -384,6 +462,7 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
         ignored_devices.emplace_back<std::string>(device_id);
     }
     auto devices = toml::array{};
+    auto folders = toml::array{};
     // clang-format off
     for (auto &it : cfg.devices) {
         auto &device = it.second;
@@ -407,6 +486,25 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
             device_table.insert("addresses", addresses);
         }
         devices.push_back(device_table);
+    }
+    for (auto &it : cfg.folders) {
+        auto& folder = it.second;
+        auto folder_table = toml::table{{
+            {"id", toml::value(folder.id)},
+            {"label", folder.label},
+            {"path", folder.path},
+            {"folder_type", static_cast<std::uint32_t>(folder.folder_type)},
+            {"rescan_interval", folder.rescan_interval},
+            {"pull_order", static_cast<std::uint32_t>(folder.pull_order)},
+            {"watched", folder.watched},
+            {"ignore_permissions", folder.ignore_permissions},
+        }};
+        auto device_ids = toml::array{};
+        for(auto& it: folder.device_ids) {
+            device_ids.emplace_back<std::string>(it);
+        }
+        folder_table.insert("devices", device_ids);
+        folders.push_back(folder_table);
     }
     auto tbl = toml::table{{
         {"global", toml::table{{
@@ -448,6 +546,7 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
             {"key_help", std::string_view(&cfg.tui_config.key_help, 1)},
         }}},
         {"device", devices},
+        {"folder", folders},
     }};
     // clang-format on
     out << tbl;
