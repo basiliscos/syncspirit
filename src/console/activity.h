@@ -17,6 +17,7 @@ struct activity_t {
     virtual bool handle(const char key) noexcept = 0;
     virtual void forget() noexcept;
     virtual bool operator==(const activity_t &other) const noexcept;
+    virtual bool locked() noexcept;
 
     tui_actor_t &actor;
     activity_type_t type;

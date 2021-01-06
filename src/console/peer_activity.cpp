@@ -90,6 +90,8 @@ bool peer_activity_t::handle_label(const char key) noexcept {
     }
 }
 
+bool peer_activity_t::locked() noexcept { return sub_activity != sub_activity_t::main; }
+
 void peer_activity_t::display() noexcept { display_menu(); }
 
 void peer_activity_t::display_menu() noexcept {

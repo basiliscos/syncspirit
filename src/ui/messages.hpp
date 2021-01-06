@@ -34,12 +34,17 @@ struct config_save_request_t {
     config::configuration_t config;
 };
 
+struct new_folder_notify_t {
+    proto::Folder folder;
+};
+
 } // namespace payload
 
 namespace message {
 
 using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
 using auth_notify_t = r::message_t<payload::auth_notification_t>;
+using new_folder_notify_t = r::message_t<payload::new_folder_notify_t>;
 
 using config_request_t = r::request_traits_t<payload::config_request_t>::request::message_t;
 using config_response_t = r::request_traits_t<payload::config_request_t>::response::message_t;

@@ -19,6 +19,7 @@ struct config_activity_t : activity_t {
     bool handle(const char key) noexcept override;
     void display() noexcept override;
     void forget() noexcept override;
+    bool locked() noexcept override;
 
   private:
     void display_menu() noexcept;

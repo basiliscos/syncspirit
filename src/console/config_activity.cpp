@@ -15,6 +15,8 @@ void config_activity_t::display() noexcept { display_menu(); }
 
 void config_activity_t::forget() noexcept { actor.discard_activity(); }
 
+bool config_activity_t::locked() noexcept { return sub_activity != sub_activity_t::main; }
+
 void config_activity_t::display_menu() noexcept {
     auto letter = [](char c) -> std::string {
         return fmt::format("{}{}{}{}", sink_t::bold, sink_t::white, std::string_view(&c, 1), sink_t::reset);

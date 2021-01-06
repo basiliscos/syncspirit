@@ -21,6 +21,7 @@ struct peer_activity_t : activity_t {
     bool handle_label(const char key) noexcept;
 
     void display() noexcept override;
+    bool locked() noexcept override;
     void display_menu() noexcept;
     void display_label() noexcept;
 

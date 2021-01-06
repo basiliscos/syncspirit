@@ -29,7 +29,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
     }
     ssl_pair = std::move(result.value());
     device_id = std::move(device.value());
-    spdlog::info("net_supervisor_t, device name = {},  device id = {}", app_config.device_name, device_id);
+    spdlog::info("net_supervisor_t, device name = {}, device id = {}", app_config.device_name, device_id);
 
     update_devices();
 }
@@ -289,12 +289,19 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
         auto &config = message.payload.res->cluster_config;
         for (int i = 0; i < config.folders_size(); ++i) {
             auto &f = config.folders(i);
+            spdlog::warn("net_supervisor_t::on_connect, check if there is a folder '{}' in model ", f.label());
+            bool have_folder = false;
+            if (!have_folder) {
+                send<ui::payload::new_folder_notify_t>(address, f);
+            }
+            /*
             spdlog::info("folder : {} / {}", f.label().c_str(), f.id().c_str());
             for (int j = 0; j < f.devices_size(); ++j) {
                 auto &d = f.devices(j);
                 spdlog::info("device: name = {}, issued by {}, max sequence = {}, index_id = {}", d.name(),
                              d.cert_name(), d.max_sequence(), d.index_id());
             }
+            */
         }
     } else {
         auto &payload = message.payload.req->payload.request_payload->payload;

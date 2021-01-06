@@ -134,9 +134,23 @@ void tui_actor_t::set_prompt(const std::string &value) noexcept {
 void tui_actor_t::push_activity(activity_ptr_t &&activity) noexcept {
     auto predicate = [&](auto &it) { return *it == *activity; };
     auto count = std::count_if(activities.begin(), activities.end(), predicate);
-    if (count == 0) {
-        ++activities_count;
-        activities.push_front(std::move(activity));
+    // skip duplicates
+    if (count != 0) {
+        return;
+    }
+    auto it = activities.begin();
+    while (it != activities.end()) {
+        auto &prev = *it;
+        if (!prev->locked()) {
+            break;
+        }
+        ++it;
+    }
+
+    bool display = it == activities.begin();
+    ++activities_count;
+    activities.insert(it, std::move(activity));
+    if (display) {
         activities.front()->display();
     }
 }
