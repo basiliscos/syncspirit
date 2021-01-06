@@ -140,9 +140,7 @@ static std::optional<device_config_t> get_device(toml::table &t) noexcept {
         cert_name = cn.value();
     }
 
-    // utils::parse(url.value().c_str());
     auto addresses = t["addresses"];
-
     device_config_t::addresses_t device_addresses;
     if (addresses.is_array()) {
         auto arr = addresses.as_array();
@@ -160,15 +158,35 @@ static std::optional<device_config_t> get_device(toml::table &t) noexcept {
         }
     }
 
-    return device_config_t{id.value(),
-                           name.value(),
-                           compr_value,
-                           cert_name,
-                           introducer.value(),
-                           auto_accept.value(),
-                           paused.value(),
-                           skip_introduction_removals.value(),
-                           std::move(device_addresses)};
+    auto folders = t["ignored_folders"];
+    device_config_t::ignored_folders_t ignored_folders;
+    if (folders.is_array_of_tables()) {
+        auto arr = folders.as_array();
+        for (size_t i = 0; i < arr->size(); ++i) {
+            auto node = arr->get(i);
+            if (node->is_table()) {
+                auto folder = *node->as_table();
+                auto id = folder["id"].value<std::string>();
+                auto label = folder["label"].value<std::string>();
+                if (id && label) {
+                    ignored_folders.emplace(ignored_folder_config_t{id.value(), label.value()});
+                }
+            }
+        }
+    }
+
+    return device_config_t{
+        id.value(),
+        name.value(),
+        compr_value,
+        cert_name,
+        introducer.value(),
+        auto_accept.value(),
+        paused.value(),
+        skip_introduction_removals.value(),
+        std::move(device_addresses),
+        std::move(ignored_folders),
+    };
 }
 
 static std::optional<folder_config_t> get_folder(toml::table &t, const main_t::devices_t &devices) noexcept {
@@ -536,6 +554,16 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                 addresses.emplace_back<std::string>(url.full);
             }
             device_table.insert("addresses", addresses);
+        }
+        if (!device.ignored_folders.empty()) {
+            auto ignored_folders = toml::array{};
+            for(auto& folder: device.ignored_folders) {
+                ignored_folders.push_back(toml::table{{
+                    {"id", folder.id},
+                    {"label", folder.label}
+                }});
+            }
+            device_table.insert("ignored_folders", ignored_folders);
         }
         devices.push_back(device_table);
     }

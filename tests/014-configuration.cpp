@@ -49,6 +49,7 @@ TEST_CASE("default config is OK", "[config]") {
             false,
             true,
             { utils::parse("tcp://127.0.0.1:1234").value() },
+            {config::ignored_folder_config_t{ "123", "folder-label" } },
         };
         cfg.devices.emplace(device.id, device);
 
