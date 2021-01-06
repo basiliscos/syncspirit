@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../configuration.h"
 #include "../transport/base.h"
 #include "messages.h"
 #include <boost/asio.hpp>

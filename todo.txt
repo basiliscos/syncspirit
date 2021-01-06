@@ -1,4 +1,15 @@
- - config & tui
+device:
+ max_sequence
+ index_id
+
+The index id field contains the unique identifier for the current set of index data. See Delta Index Exchange for the usage of this field.
+The max sequence field contains the highest sequence number of the files in the index.
+The sequence field is the value of a device local monotonic clock at the time of last local database update to a file. The clock ticks on every local database update, thus forming a sequence number over database updates.
+
+Index ID: Each folder has an Index ID. This is a 64 bit random identifier set at index creation time.
+
+
+- config & tui
  - игнорированные девайсы: показать, удалить
  - добавить/удалить/изменить директорию
  - удалить/добавить/изменить девайс

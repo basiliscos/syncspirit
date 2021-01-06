@@ -1,11 +1,11 @@
-#include "configuration.h"
+#include "utils.h"
+
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <spdlog/spdlog.h>
-#include <cstdlib>
-#include "model/device_id.h"
+#include "../model/device_id.h"
 
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.h>
@@ -15,6 +15,58 @@ namespace fs = boost::filesystem;
 static const std::string home_path = "~/.config/syncspirit";
 
 namespace syncspirit::config {
+
+bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
+    return lhs.rx_buff_size == rhs.rx_buff_size && lhs.connect_timeout == rhs.connect_timeout;
+}
+
+bool operator==(const ignored_folder_config_t &lhs, const ignored_folder_config_t &rhs) noexcept {
+    return lhs.id == rhs.id && lhs.label == rhs.label;
+}
+
+bool operator==(const device_config_t &lhs, const device_config_t &rhs) noexcept {
+    return lhs.id == rhs.id && lhs.name == rhs.name && lhs.compression == rhs.compression &&
+           lhs.cert_name == rhs.cert_name && lhs.introducer == rhs.introducer && lhs.auto_accept == rhs.auto_accept &&
+           lhs.paused == rhs.paused && lhs.static_addresses == rhs.static_addresses &&
+           lhs.skip_introduction_removals == rhs.skip_introduction_removals &&
+           lhs.ignored_folders == rhs.ignored_folders;
+}
+
+bool operator==(const folder_config_t &lhs, const folder_config_t &rhs) noexcept {
+    return lhs.id == rhs.id && lhs.label == rhs.label && lhs.path == rhs.path && lhs.device_ids == rhs.device_ids &&
+           lhs.folder_type == rhs.folder_type && lhs.rescan_interval == rhs.rescan_interval &&
+           lhs.pull_order == rhs.pull_order && lhs.watched == rhs.watched &&
+           lhs.ignore_permissions == rhs.ignore_permissions;
+}
+
+bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
+    return lhs.enabled == rhs.enabled && lhs.announce_url == rhs.announce_url && lhs.device_id == rhs.device_id &&
+           lhs.cert_file == rhs.cert_file && lhs.key_file == rhs.key_file && lhs.rx_buff_size == rhs.rx_buff_size &&
+           lhs.timeout == rhs.timeout && lhs.reannounce_after == rhs.reannounce_after;
+}
+
+bool operator==(const local_announce_config_t &lhs, const local_announce_config_t &rhs) noexcept {
+    return lhs.enabled == rhs.enabled && lhs.port == rhs.port && lhs.frequency == rhs.frequency;
+}
+
+bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
+    return lhs.local_announce_config == rhs.local_announce_config && lhs.upnp_config == rhs.upnp_config &&
+           lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
+           lhs.tui_config == rhs.tui_config && lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
+           lhs.config_path == rhs.config_path && lhs.ignored_devices == rhs.ignored_devices &&
+           lhs.devices == rhs.devices && lhs.folders == rhs.folders;
+}
+
+bool operator==(const tui_config_t &lhs, const tui_config_t &rhs) noexcept {
+    return lhs.refresh_interval == rhs.refresh_interval && lhs.key_quit == rhs.key_quit &&
+           lhs.key_more_logs == rhs.key_more_logs && lhs.key_less_logs == rhs.key_less_logs &&
+           lhs.key_help == rhs.key_help && lhs.key_config == rhs.key_config;
+}
+
+bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept {
+    return lhs.discovery_attempts == rhs.discovery_attempts && lhs.max_wait == rhs.max_wait &&
+           lhs.timeout == rhs.timeout && lhs.external_port == rhs.external_port && lhs.rx_buff_size == rhs.rx_buff_size;
+}
 
 using device_name_t = outcome::result<std::string>;
 
@@ -119,7 +171,7 @@ static std::optional<device_config_t> get_device(toml::table &t) noexcept {
                            std::move(device_addresses)};
 }
 
-static std::optional<folder_config_t> get_folder(toml::table &t, const configuration_t::devices_t &devices) noexcept {
+static std::optional<folder_config_t> get_folder(toml::table &t, const main_t::devices_t &devices) noexcept {
     using result_t = std::optional<folder_config_t>;
     auto id = t["id"].value<std::string>();
     if (!id) {
@@ -202,7 +254,7 @@ static std::optional<folder_config_t> get_folder(toml::table &t, const configura
 }
 
 config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path) {
-    configuration_t cfg;
+    main_t cfg;
     cfg.config_path = config_path;
 
     auto home = std::getenv("HOME");
@@ -212,9 +264,9 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
     }
 
     auto &root_tbl = r.table();
-    // global
+    // main
     {
-        auto t = root_tbl["global"];
+        auto t = root_tbl["main"];
         auto &c = cfg;
         auto timeout = t["timeout"].value<std::uint32_t>();
         if (!timeout) {
@@ -456,7 +508,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
     return std::move(cfg);
 }
 
-outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) noexcept {
+outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
     auto ignored_devices = toml::array{};
     for (auto &device_id : cfg.ignored_devices) {
         ignored_devices.emplace_back<std::string>(device_id);
@@ -507,7 +559,7 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
         folders.push_back(folder_table);
     }
     auto tbl = toml::table{{
-        {"global", toml::table{{
+        {"main", toml::table{{
             {"timeout",  cfg.timeout},
             {"device_name", cfg.device_name},
             {"ignored_devices", ignored_devices},
@@ -553,7 +605,7 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
     return outcome::success();
 }
 
-configuration_t generate_config(const boost::filesystem::path &config_path) {
+main_t generate_config(const boost::filesystem::path &config_path) {
     auto dir = config_path.parent_path();
     if (!fs::exists(dir)) {
         spdlog::info("creating directory {}", dir.c_str());
@@ -575,7 +627,7 @@ configuration_t generate_config(const boost::filesystem::path &config_path) {
     auto device = std::string(device_name ? device_name.value() : "localhost");
 
     // clang-format off
-    configuration_t cfg;
+    main_t cfg;
     cfg.config_path = config_path;
     cfg.timeout = 5000;
     cfg.device_name = device;
@@ -616,4 +668,5 @@ configuration_t generate_config(const boost::filesystem::path &config_path) {
     return cfg;
 }
 
-} // namespace syncspirit::config
+
+}

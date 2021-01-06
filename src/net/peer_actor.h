@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../configuration.h"
+#include "../config/bep.h"
 #include "../proto/bep_support.h"
 #include "messages.h"
 #include <boost/asio.hpp>

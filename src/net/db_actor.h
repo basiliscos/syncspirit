@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../configuration.h"
 #include "messages.h"
 #include "mdbx.h"
 #include <optional>

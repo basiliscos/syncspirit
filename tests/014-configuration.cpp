@@ -1,6 +1,6 @@
 #include "catch.hpp"
 #include "test-utils.h"
-#include "configuration.h"
+#include "config/utils.h"
 #include "utils/uri.h"
 #include <boost/filesystem.hpp>
 #include <sstream>

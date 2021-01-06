@@ -12,7 +12,7 @@
 #include <spdlog/spdlog.h>
 
 #include "constants.h"
-#include "configuration.h"
+#include "config/utils.h"
 #include "utils/location.h"
 #include "net/net_supervisor.h"
 #include "console/sink.h"

@@ -1,13 +1,14 @@
 #include "config_activity.h"
 #include "tui_actor.h"
+#include "../config/utils.h"
 #include "sink.h"
 #include <fmt/fmt.h>
 #include <cctype>
 
 using namespace syncspirit::console;
 
-config_activity_t::config_activity_t(tui_actor_t &actor_, config::configuration_t &config_,
-                                     config::configuration_t &config_orig_) noexcept
+config_activity_t::config_activity_t(tui_actor_t &actor_, config::main_t &config_,
+                                     config::main_t &config_orig_) noexcept
     : activity_t{actor_, activity_type_t::CONFIG}, config{config_}, config_orig{config_orig_},
       sub_activity{sub_activity_t::main} {}
 

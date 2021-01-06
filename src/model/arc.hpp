@@ -1,9 +1,9 @@
 #pragma once
 
-namespace syncspirit::model {
-
 #include <boost/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
+
+namespace syncspirit::model {
 
 template <typename T> using arc_base_t = boost::intrusive_ref_counter<T, boost::thread_safe_counter>;
 

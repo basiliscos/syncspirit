@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../net/messages.h"
-#include "../configuration.h"
+#include "../config/main.h"
 
 namespace syncspirit::ui {
 
@@ -21,7 +21,7 @@ struct auth_notification_t {
     message_ptr_t net_message;
 };
 
-using config_response_t = config::configuration_t;
+using config_response_t = config::main_t;
 
 struct config_request_t {
     using response_t = config_response_t;
@@ -31,7 +31,7 @@ struct config_save_response_t {};
 
 struct config_save_request_t {
     using response_t = config_save_response_t;
-    config::configuration_t config;
+    config::main_t config;
 };
 
 struct new_folder_notify_t {

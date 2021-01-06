@@ -1,18 +1,16 @@
 #pragma once
 
-#include "device_id.h"
-#include <string>
-#include <vector>
-#include "../utils/uri.h"
-#include "../configuration.h"
 #include "arc.hpp"
+#include "device_id.h"
+#include "../utils/uri.h"
+#include "../config/device.h"
 
 namespace syncspirit::model {
 
 struct device_t : arc_base_t<device_t> {
     using static_addresses_t = std::vector<utils::URI>;
-    device_t(config::device_config_t &config) noexcept;
 
+    device_t(config::device_config_t &config) noexcept;
     device_id_t device_id;
     std::string name;
     config::compression_t compression;

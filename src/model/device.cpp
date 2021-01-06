@@ -18,5 +18,6 @@ config::device_config_t device_t::serialize() noexcept {
                                    auto_accept,
                                    paused,
                                    skip_introduction_removals,
-                                   static_addresses};
+                                   static_addresses,
+                                   {}};
 }

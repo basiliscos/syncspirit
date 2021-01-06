@@ -4,7 +4,7 @@
 #include <vector>
 #include <optional>
 #include "../utils/uri.h"
-#include "../configuration.h"
+#include "../config/device.h"
 #include "device_id.h"
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 

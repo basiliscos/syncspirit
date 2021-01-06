@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../configuration.h"
 #include "../model/device.h"
 #include "../ui/messages.hpp"
 #include "messages.h"
@@ -15,7 +14,7 @@ namespace net {
 namespace outcome = boost::outcome_v2;
 
 struct net_supervisor_config_t : ra::supervisor_config_asio_t {
-    config::configuration_t app_config;
+    config::main_t app_config;
 };
 
 template <typename Supervisor>
@@ -24,7 +23,7 @@ struct net_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<Su
     using parent_t = ra::supervisor_config_asio_builder_t<Supervisor>;
     using parent_t::parent_t;
 
-    builder_t &&app_config(const config::configuration_t &value) &&noexcept {
+    builder_t &&app_config(const config::main_t &value) &&noexcept {
         parent_t::config.app_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -63,9 +62,9 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void launch_ssdp() noexcept;
     void persist_data() noexcept;
     void update_devices() noexcept;
-    outcome::result<void> save_config(const config::configuration_t &new_cfg) noexcept;
+    outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
 
-    config::configuration_t app_config;
+    config::main_t app_config;
     r::address_ptr_t ssdp_addr;
     r::address_ptr_t peers_addr;
     r::address_ptr_t controller_addr;

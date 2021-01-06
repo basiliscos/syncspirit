@@ -9,6 +9,7 @@
 #include "peer_supervisor.h"
 #include "db_actor.h"
 #include "names.h"
+#include "../config/utils.h"
 #include <spdlog/spdlog.h>
 #include <boost/filesystem.hpp>
 
@@ -244,7 +245,7 @@ void net_supervisor_t::on_config_save(ui::message::config_save_request_t &messag
     }
 }
 
-outcome::result<void> net_supervisor_t::save_config(const config::configuration_t &new_cfg) noexcept {
+outcome::result<void> net_supervisor_t::save_config(const config::main_t &new_cfg) noexcept {
     auto path_tmp = new_cfg.config_path;
     path_tmp.append("syncspirit.toml.tmp");
     std::ofstream out(path_tmp.string(), out.binary);

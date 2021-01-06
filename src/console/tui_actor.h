@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../configuration.h"
+#include "../config/main.h"
 #include "../ui/messages.hpp"
 #include "../model/device_id.h"
 #include "activity.h"
@@ -86,8 +86,8 @@ struct tui_actor_t : public r::actor_base_t {
     void ignore_device(const model::device_id_t &) noexcept;
 
     asio::io_context::strand &strand;
-    config::configuration_t app_config;
-    config::configuration_t app_config_orig;
+    config::main_t app_config;
+    config::main_t app_config_orig;
     tty_t tty;
     size_t progress_idx = 0;
     size_t progress_last;
