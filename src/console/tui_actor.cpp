@@ -58,7 +58,7 @@ void tui_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&tui_actor_t::on_discovery, coordinator);
                 plugin->subscribe_actor(&tui_actor_t::on_auth, coordinator);
-                // plugin->subscribe_actor(&tui_actor_t::on_new_folder, coordinator);
+                plugin->subscribe_actor(&tui_actor_t::on_new_folder, coordinator);
 
                 auto timeout = init_timeout / 2;
                 request<ui::payload::config_request_t>(coordinator).send(timeout);
@@ -214,7 +214,7 @@ void tui_actor_t::on_auth(ui::message::auth_notify_t &message) noexcept {
     push_activity(std::make_unique<peer_activity_t>(*this, message));
 }
 
-void tui_actor_t::on_new_folder(ui::message::new_folder_notify_t) noexcept {}
+void tui_actor_t::on_new_folder(ui::message::new_folder_notify_t &message) noexcept {}
 
 void tui_actor_t::on_config(ui::message::config_response_t &message) noexcept {
     app_config_orig = app_config = message.payload.res;
@@ -231,7 +231,7 @@ void tui_actor_t::on_config_save(ui::message::config_save_response_t &message) n
 }
 
 void tui_actor_t::ignore_device(const model::device_id_t &device_id) noexcept {
-    app_config.ingored_devices.emplace(device_id.get_value());
+    app_config.ignored_devices.emplace(device_id.get_value());
     save_config();
 }
 

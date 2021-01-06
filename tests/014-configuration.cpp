@@ -28,13 +28,13 @@ TEST_CASE("default config is OK", "[config]") {
     }
 
     SECTION("ignored devices") {
-        cfg.ingored_devices.emplace("O4LHPKG-O6BQ36W-MUOVKTI-MKAVHSC-Y7EC3U4-DHNLEDE-MZBJWQN-UIX6QAL");
+        cfg.ignored_devices.emplace("O4LHPKG-O6BQ36W-MUOVKTI-MKAVHSC-Y7EC3U4-DHNLEDE-MZBJWQN-UIX6QAL");
         auto r = config::serialize(cfg, out);
         REQUIRE((bool)r);
         CHECK(out.str().find("O4LHPKG") != std::string::npos);
         //INFO(out.str());
         auto cfg2 = config::get_config(out, dir);
-        CHECK(cfg2.value().ingored_devices.size() == 1);
+        CHECK(cfg2.value().ignored_devices.size() == 1);
         CHECK(cfg2.value() == cfg);
     }
 
@@ -52,7 +52,6 @@ TEST_CASE("default config is OK", "[config]") {
         };
         cfg.devices.emplace(device.id, device);
 
-        /*
         SECTION("device save & load") {
             auto r = config::serialize(cfg, out);
             REQUIRE((bool)r);
@@ -62,7 +61,6 @@ TEST_CASE("default config is OK", "[config]") {
             CHECK(cfg2.value().devices.count(device.id) == 1);
             CHECK(cfg2.value() == cfg);
         }
-        */
 
         SECTION("folders") {
             auto folder = config::folder_config_t {

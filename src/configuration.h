@@ -19,9 +19,15 @@ enum class compression_t { none = 1, meta, all, min = none, max = all };
 enum class folder_type_t { send = 1, receive, send_and_receive, first = send, last = send_and_receive };
 enum class pull_order_t { random, alphabetic, smallest, largest, oldest, newest, first = random, last = newest };
 
+struct ignored_folder_config_t {
+    std::string id;
+    std::string label;
+};
+
 struct device_config_t {
     using addresses_t = std::vector<utils::URI>;
     using cert_name_t = std::optional<std::string>;
+    using ignored_folders_t = std::set<ignored_folder_config_t>;
 
     std::string id;
     std::string name;
@@ -32,12 +38,14 @@ struct device_config_t {
     bool paused;
     bool skip_introduction_removals;
     addresses_t static_addresses;
+    // ignored_folders_t ignored_folders;
 
     inline bool operator==(const device_config_t &other) const noexcept {
         return id == other.id && name == other.name && compression == other.compression &&
                cert_name == other.cert_name && introducer == other.introducer && auto_accept == other.auto_accept &&
                paused == other.paused && static_addresses == other.static_addresses &&
-               skip_introduction_removals == other.skip_introduction_removals;
+               skip_introduction_removals ==
+                   other.skip_introduction_removals /* && ignored_folders == other.ignored_folders */;
     }
 };
 
@@ -129,7 +137,7 @@ struct bep_config_t {
 };
 
 struct configuration_t {
-    using ingored_devices_t = std::set<std::string>;
+    using ignored_devices_t = std::set<std::string>;
     using devices_t = std::map<std::string, device_config_t>;
     using folders_t = std::map<std::string, folder_config_t>;
 
@@ -142,7 +150,7 @@ struct configuration_t {
 
     std::uint32_t timeout;
     std::string device_name;
-    ingored_devices_t ingored_devices;
+    ignored_devices_t ignored_devices;
     devices_t devices;
     folders_t folders;
 
@@ -150,7 +158,7 @@ struct configuration_t {
         return local_announce_config == other.local_announce_config && upnp_config == other.upnp_config &&
                global_announce_config == other.global_announce_config && bep_config == other.bep_config &&
                tui_config == other.tui_config && timeout == other.timeout && device_name == other.device_name &&
-               config_path == other.config_path && ingored_devices == other.ingored_devices &&
+               config_path == other.config_path && ignored_devices == other.ignored_devices &&
                devices == other.devices && folders == other.folders;
     }
 };

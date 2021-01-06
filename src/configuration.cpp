@@ -240,7 +240,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
                     auto &value = node->as_string()->get();
                     auto device_id = model::device_id_t::from_string(value);
                     if (device_id) {
-                        c.ingored_devices.insert(value);
+                        c.ignored_devices.insert(value);
                     } else {
                         spdlog::warn("invalid device_id : {}, ignored", value);
                     }
@@ -458,7 +458,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
 
 outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) noexcept {
     auto ignored_devices = toml::array{};
-    for (auto &device_id : cfg.ingored_devices) {
+    for (auto &device_id : cfg.ignored_devices) {
         ignored_devices.emplace_back<std::string>(device_id);
     }
     auto devices = toml::array{};
