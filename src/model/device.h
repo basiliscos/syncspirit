@@ -20,6 +20,7 @@ struct device_t : arc_base_t<device_t> {
     bool auto_accept;
     bool paused;
     bool skip_introduction_removals;
+    config::device_config_t::ignored_folders_t ignored_folders;
     bool online = false;
 
     config::device_config_t serialize() noexcept;

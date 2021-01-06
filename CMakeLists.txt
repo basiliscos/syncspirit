@@ -26,6 +26,7 @@ add_library(syncspirit_lib
     src/console/activity.cpp
     src/console/config_activity.cpp
     src/console/default_activity.cpp
+    src/console/new_folder_activity.cpp
     src/console/peer_activity.cpp
     src/console/sink.cpp
     src/console/tui_actor.cpp

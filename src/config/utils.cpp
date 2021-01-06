@@ -625,9 +625,13 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
             {"key_config", std::string_view(&cfg.tui_config.key_config, 1)},
             {"key_help", std::string_view(&cfg.tui_config.key_help, 1)},
         }}},
-        {"device", devices},
-        {"folder", folders},
     }};
+    if (!devices.empty()) {
+        tbl.insert("device", devices);
+    }
+    if (!folders.empty()) {
+        tbl.insert("folder", folders);
+    }
     // clang-format on
     out << tbl;
     return outcome::success();

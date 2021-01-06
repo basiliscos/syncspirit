@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/device.h"
 #include "../net/messages.h"
 #include "../config/main.h"
 
@@ -36,6 +37,7 @@ struct config_save_request_t {
 
 struct new_folder_notify_t {
     proto::Folder folder;
+    model::device_ptr_t source;
 };
 
 } // namespace payload

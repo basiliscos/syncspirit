@@ -84,6 +84,7 @@ struct tui_actor_t : public r::actor_base_t {
     void postpone_activity() noexcept;
     void discard_activity() noexcept;
     void ignore_device(const model::device_id_t &) noexcept;
+    void ignore_folder(const proto::Folder &folder, const model::device_id_t &source) noexcept;
 
     asio::io_context::strand &strand;
     config::main_t app_config;

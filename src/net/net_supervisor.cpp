@@ -287,13 +287,15 @@ template <class> inline constexpr bool always_false_v = false;
 void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept {
     auto &ec = message.payload.ec;
     if (!ec) {
+        auto &device_id = message.payload.res->peer_device_id;
+        auto &device = devices.at(device_id.get_value());
         auto &config = message.payload.res->cluster_config;
         for (int i = 0; i < config.folders_size(); ++i) {
             auto &f = config.folders(i);
             spdlog::warn("net_supervisor_t::on_connect, check if there is a folder '{}' in model ", f.label());
             bool have_folder = false;
             if (!have_folder) {
-                send<ui::payload::new_folder_notify_t>(address, f);
+                send<ui::payload::new_folder_notify_t>(address, f, device);
             }
             /*
             spdlog::info("folder : {} / {}", f.label().c_str(), f.id().c_str());
@@ -372,7 +374,7 @@ void net_supervisor_t::shutdown_start() noexcept {
 void net_supervisor_t::update_devices() noexcept {
     for (auto &it : app_config.devices) {
         auto device = model::device_ptr_t{new model::device_t(it.second)};
-        devices.emplace(it.first, std::move(device));
+        devices.insert_or_assign(it.first, std::move(device));
     }
 }
 

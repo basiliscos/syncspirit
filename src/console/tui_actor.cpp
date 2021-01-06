@@ -5,6 +5,7 @@
 #include "../net/names.h"
 #include "config_activity.h"
 #include "default_activity.h"
+#include "new_folder_activity.h"
 #include "peer_activity.h"
 
 using namespace syncspirit::console;
@@ -214,7 +215,15 @@ void tui_actor_t::on_auth(ui::message::auth_notify_t &message) noexcept {
     push_activity(std::make_unique<peer_activity_t>(*this, message));
 }
 
-void tui_actor_t::on_new_folder(ui::message::new_folder_notify_t &message) noexcept {}
+void tui_actor_t::on_new_folder(ui::message::new_folder_notify_t &message) noexcept {
+    auto &payload = message.payload;
+    auto &folder = payload.folder;
+    auto candidate = config::ignored_folder_config_t{folder.id(), folder.label()};
+    auto &device = app_config.devices.at(payload.source->device_id.get_value());
+    if (device.ignored_folders.count(candidate) == 0) {
+        push_activity(std::make_unique<new_folder_activity_t>(*this, message));
+    }
+}
 
 void tui_actor_t::on_config(ui::message::config_response_t &message) noexcept {
     app_config_orig = app_config = message.payload.res;
@@ -232,6 +241,13 @@ void tui_actor_t::on_config_save(ui::message::config_save_response_t &message) n
 
 void tui_actor_t::ignore_device(const model::device_id_t &device_id) noexcept {
     app_config.ignored_devices.emplace(device_id.get_value());
+    save_config();
+}
+
+void tui_actor_t::ignore_folder(const proto::Folder &folder, const model::device_id_t &source) noexcept {
+    auto &device = app_config.devices.at(source.get_value());
+    auto ignored = config::ignored_folder_config_t{folder.id(), folder.label()};
+    device.ignored_folders.insert(ignored);
     save_config();
 }
 

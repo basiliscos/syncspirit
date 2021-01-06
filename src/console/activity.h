@@ -9,6 +9,7 @@ enum class activity_type_t {
     DEFAULT,
     PEER,
     CONFIG,
+    NEW_FOLDER,
 };
 
 struct activity_t {
