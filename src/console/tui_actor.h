@@ -65,6 +65,8 @@ struct tui_actor_t : public r::actor_base_t {
     void on_auth(ui::message::auth_notify_t &message) noexcept;
     void on_config(ui::message::config_response_t &message) noexcept;
     void on_config_save(ui::message::config_save_response_t &message) noexcept;
+    void on_new_folder(ui::message::new_folder_notify_t) noexcept;
+
     void start_timer() noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void do_read() noexcept;

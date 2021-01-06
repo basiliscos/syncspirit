@@ -44,7 +44,7 @@ struct device_config_t {
 struct folder_config_t {
     using device_ids_t = std::set<std::string>;
 
-    std::uint64_t id;
+    std::string id;
     std::string label;
     std::string path;
     device_ids_t device_ids;
@@ -131,7 +131,7 @@ struct bep_config_t {
 struct configuration_t {
     using ingored_devices_t = std::set<std::string>;
     using devices_t = std::map<std::string, device_config_t>;
-    using folders_t = std::map<std::uint64_t, folder_config_t>;
+    using folders_t = std::map<std::string, folder_config_t>;
 
     boost::filesystem::path config_path;
     local_announce_config_t local_announce_config;

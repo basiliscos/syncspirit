@@ -121,7 +121,7 @@ static std::optional<device_config_t> get_device(toml::table &t) noexcept {
 
 static std::optional<folder_config_t> get_folder(toml::table &t, const configuration_t::devices_t &devices) noexcept {
     using result_t = std::optional<folder_config_t>;
-    auto id = t["id"].value<std::uint64_t>();
+    auto id = t["id"].value<std::string>();
     if (!id) {
         return result_t();
     }
@@ -490,7 +490,7 @@ outcome::result<void> serialize(const configuration_t cfg, std::ostream &out) no
     for (auto &it : cfg.folders) {
         auto& folder = it.second;
         auto folder_table = toml::table{{
-            {"id", toml::value(folder.id)},
+            {"id", folder.id},
             {"label", folder.label},
             {"path", folder.path},
             {"folder_type", static_cast<std::uint32_t>(folder.folder_type)},

@@ -66,7 +66,7 @@ TEST_CASE("default config is OK", "[config]") {
 
         SECTION("folders") {
             auto folder = config::folder_config_t {
-                12345,
+                "fpwop-79ucw",
                 "my-label",
                 "/home/user/shared-folder",
                 { device.id },

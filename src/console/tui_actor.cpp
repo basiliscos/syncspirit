@@ -58,6 +58,7 @@ void tui_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&tui_actor_t::on_discovery, coordinator);
                 plugin->subscribe_actor(&tui_actor_t::on_auth, coordinator);
+                // plugin->subscribe_actor(&tui_actor_t::on_new_folder, coordinator);
 
                 auto timeout = init_timeout / 2;
                 request<ui::payload::config_request_t>(coordinator).send(timeout);
@@ -212,6 +213,8 @@ void tui_actor_t::on_discovery(ui::message::discovery_notify_t &message) noexcep
 void tui_actor_t::on_auth(ui::message::auth_notify_t &message) noexcept {
     push_activity(std::make_unique<peer_activity_t>(*this, message));
 }
+
+void tui_actor_t::on_new_folder(ui::message::new_folder_notify_t) noexcept {}
 
 void tui_actor_t::on_config(ui::message::config_response_t &message) noexcept {
     app_config_orig = app_config = message.payload.res;
