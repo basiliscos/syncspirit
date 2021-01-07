@@ -20,6 +20,7 @@ port = 21026
 device_name = 'hp-note'
 ignored_devices = []
 timeout = 5000
+default_location = '/home/b'
 
 [tui]
 key_config = 'c'

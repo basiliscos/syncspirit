@@ -288,7 +288,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         auto &c = cfg;
         auto timeout = t["timeout"].value<std::uint32_t>();
         if (!timeout) {
-            return "global/timeout is incorrect or missing";
+            return "main/timeout is incorrect or missing";
         }
         c.timeout = timeout.value();
 
@@ -300,6 +300,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             device_name = option.value();
         }
         c.device_name = device_name.value();
+
+        auto default_location = t["default_location"].value<std::string>();
+        if (!default_location) {
+            return "main/default_location is incorrect or missing";
+        }
+        c.default_location = default_location.value();
 
         auto ignored_devices = t["ignored_devices"];
         if (ignored_devices.is_array()) {
@@ -591,6 +597,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
             {"timeout",  cfg.timeout},
             {"device_name", cfg.device_name},
             {"ignored_devices", ignored_devices},
+            {"default_location", cfg.default_location.c_str()},
         }}},
         {"local_discovery", toml::table{{
             {"enabled",  cfg.local_announce_config.enabled},
@@ -647,8 +654,8 @@ main_t generate_config(const boost::filesystem::path &config_path) {
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
     auto home = std::getenv("HOME");
-    auto home_dir = fs::path(home).append(".config").append("syncthing");
-    bool is_home = dir == fs::path(home_dir);
+    auto config_dir = fs::path(home).append(".config").append("syncthing");
+    bool is_home = dir == fs::path(config_dir);
     if (!is_home) {
         using boost::algorithm::replace_all_copy;
         cert_file = replace_all_copy(cert_file, home_path, dir.string());
@@ -661,6 +668,7 @@ main_t generate_config(const boost::filesystem::path &config_path) {
     // clang-format off
     main_t cfg;
     cfg.config_path = config_path;
+    cfg.default_location = fs::path(home);
     cfg.timeout = 5000;
     cfg.device_name = device;
     cfg.local_announce_config = local_announce_config_t {
@@ -694,8 +702,8 @@ main_t generate_config(const boost::filesystem::path &config_path) {
         'q',   /* key_quit */
         '+',   /* key_more_logs */
         '-',   /* key_less_logs */
-        'c',   /* key_config */
-        '?'    /* key_help */
+        '?',   /* key_help */
+        'c'   /* key_config */
     };
     return cfg;
 }

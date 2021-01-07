@@ -18,6 +18,7 @@ struct main_t {
     using folders_t = std::map<std::string, folder_config_t>;
 
     boost::filesystem::path config_path;
+    boost::filesystem::path default_location;
     local_announce_config_t local_announce_config;
     upnp_config_t upnp_config;
     global_announce_config_t global_announce_config;
