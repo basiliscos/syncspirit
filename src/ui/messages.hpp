@@ -40,6 +40,16 @@ struct new_folder_notify_t {
     model::device_ptr_t source;
 };
 
+struct create_folder_response_t {
+    config::main_t config;
+};
+
+struct create_folder_request_t {
+    using response_t = create_folder_response_t;
+    config::folder_config_t folder;
+    model::device_ptr_t source;
+};
+
 } // namespace payload
 
 namespace message {
@@ -53,6 +63,9 @@ using config_response_t = r::request_traits_t<payload::config_request_t>::respon
 
 using config_save_request_t = r::request_traits_t<payload::config_save_request_t>::request::message_t;
 using config_save_response_t = r::request_traits_t<payload::config_save_request_t>::response::message_t;
+
+using create_folder_request_t = r::request_traits_t<payload::create_folder_request_t>::request::message_t;
+using create_folder_response_t = r::request_traits_t<payload::create_folder_request_t>::response::message_t;
 
 } // namespace message
 

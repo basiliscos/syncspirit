@@ -3,6 +3,7 @@
 #include "utils.h"
 #include <spdlog/spdlog.h>
 #include "../net/names.h"
+#include "../constants.h"
 #include "config_activity.h"
 #include "default_activity.h"
 #include "new_folder_activity.h"
@@ -69,6 +70,7 @@ void tui_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&tui_actor_t::on_config);
         p.subscribe_actor(&tui_actor_t::on_config_save);
+        p.subscribe_actor(&tui_actor_t::on_create_folder);
     });
 }
 
@@ -239,16 +241,38 @@ void tui_actor_t::on_config_save(ui::message::config_save_response_t &message) n
     app_config_orig = app_config;
 }
 
+void tui_actor_t::on_create_folder(ui::message::create_folder_response_t &message) noexcept {
+    spdlog::warn("tui_actor_t::on_create_folder");
+}
+
 void tui_actor_t::ignore_device(const model::device_id_t &device_id) noexcept {
     app_config.ignored_devices.emplace(device_id.get_value());
     save_config();
 }
 
-void tui_actor_t::ignore_folder(const proto::Folder &folder, const model::device_id_t &source) noexcept {
-    auto &device = app_config.devices.at(source.get_value());
+void tui_actor_t::ignore_folder(const proto::Folder &folder, model::device_ptr_t &source) noexcept {
+    auto &device = app_config.devices.at(source->device_id.get_value());
     auto ignored = config::ignored_folder_config_t{folder.id(), folder.label()};
     device.ignored_folders.insert(ignored);
     save_config();
+}
+
+void tui_actor_t::create_folder(const proto::Folder &folder, model::device_ptr_t &source) noexcept {
+    config::folder_config_t::device_ids_t device_ids;
+    for (int i = 0; i < folder.devices_size(); ++i) {
+        device_ids.emplace(folder.devices(i).id());
+    }
+    config::folder_config_t folder_cfg{folder.id(),
+                                       folder.label(),
+                                       "/to-do/path",
+                                       std::move(device_ids),
+                                       config::folder_type_t::send_and_receive,
+                                       constants::rescan_interval,
+                                       config::pull_order_t::random,
+                                       true,
+                                       false};
+    auto timeout = init_timeout / 2;
+    request<ui::payload::create_folder_request_t>(coordinator, std::move(folder_cfg), source).send(timeout);
 }
 
 void tui_actor_t::flush_prompt() noexcept {

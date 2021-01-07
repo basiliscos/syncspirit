@@ -66,6 +66,7 @@ struct tui_actor_t : public r::actor_base_t {
     void on_config(ui::message::config_response_t &message) noexcept;
     void on_config_save(ui::message::config_save_response_t &message) noexcept;
     void on_new_folder(ui::message::new_folder_notify_t &message) noexcept;
+    void on_create_folder(ui::message::create_folder_response_t &message) noexcept;
 
     void start_timer() noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
@@ -84,7 +85,8 @@ struct tui_actor_t : public r::actor_base_t {
     void postpone_activity() noexcept;
     void discard_activity() noexcept;
     void ignore_device(const model::device_id_t &) noexcept;
-    void ignore_folder(const proto::Folder &folder, const model::device_id_t &source) noexcept;
+    void ignore_folder(const proto::Folder &folder, model::device_ptr_t &source) noexcept;
+    void create_folder(const proto::Folder &folder, model::device_ptr_t &source) noexcept;
 
     asio::io_context::strand &strand;
     config::main_t app_config;

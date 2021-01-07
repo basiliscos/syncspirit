@@ -31,7 +31,7 @@ void new_folder_activity_t::display() noexcept {
 
 bool new_folder_activity_t::handle(const char key) noexcept {
     if (key == 'i') {
-        actor.ignore_folder(folder, source->device_id);
+        actor.ignore_folder(folder, source);
         actor.discard_activity();
         return true;
     } else if (key == 'a') {
