@@ -703,7 +703,7 @@ main_t generate_config(const boost::filesystem::path &config_path) {
         '+',   /* key_more_logs */
         '-',   /* key_less_logs */
         '?',   /* key_help */
-        'c'   /* key_config */
+        'c'    /* key_config */
     };
     return cfg;
 }
