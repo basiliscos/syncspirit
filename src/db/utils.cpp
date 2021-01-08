@@ -1,3 +1,4 @@
+#include "utils.h"
 #include "transaction.h"
 #include "error_code.h"
 #include "prefix.h"
@@ -66,6 +67,33 @@ outcome::result<void> migrate(uint32_t from, transaction_t &txn) noexcept {
         if (!r)
             return r;
         ++from;
+    }
+    return outcome::success();
+}
+
+outcome::result<void> update_folder_info(const proto::Folder &folder, transaction_t &txn) noexcept {
+    auto key = prefixer_t<prefix::folder_info>::make(folder.id());
+    auto data = folder.SerializeAsString();
+    MDBX_val value;
+    value.iov_base = data.data();
+    value.iov_len = data.size();
+    auto r = mdbx_put(txn.txn, txn.dbi, key, &value, MDBX_UPSERT);
+    if (r != MDBX_SUCCESS) {
+        return make_error_code(r);
+    }
+    return outcome::success();
+}
+
+outcome::result<void> create_folder_index(const proto::Folder &folder, const model::index_id_t &index_id,
+                                          transaction_t &txn) noexcept {
+    auto key = prefixer_t<prefix::folder_index>::make(folder.id());
+    auto data = be::native_to_big(index_id);
+    MDBX_val value;
+    value.iov_base = &data;
+    value.iov_len = sizeof(data);
+    auto r = mdbx_put(txn.txn, txn.dbi, key, &value, MDBX_UPSERT);
+    if (r != MDBX_SUCCESS) {
+        return make_error_code(r);
     }
     return outcome::success();
 }

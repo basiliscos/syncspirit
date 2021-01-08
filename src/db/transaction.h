@@ -24,11 +24,11 @@ struct transaction_t {
 
     outcome::result<void> commit() noexcept;
 
-    MDBX_txn *txn;
+    static outcome::result<transaction_t> make(transaction_type_t type, MDBX_env *env_) noexcept;
+
+    MDBX_txn *txn = nullptr;
     MDBX_dbi dbi;
     transaction_type_t type;
-
-    static outcome::result<transaction_t> make(transaction_type_t type, MDBX_env *env_) noexcept;
 
   private:
     transaction_t(transaction_type_t type_, MDBX_txn *txn_, MDBX_dbi dbi_) noexcept

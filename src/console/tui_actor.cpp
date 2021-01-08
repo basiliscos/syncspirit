@@ -262,9 +262,10 @@ void tui_actor_t::create_folder(const proto::Folder &folder, model::device_ptr_t
     for (int i = 0; i < folder.devices_size(); ++i) {
         device_ids.emplace(folder.devices(i).id());
     }
+    auto path = app_config.default_location / folder.label();
     config::folder_config_t folder_cfg{folder.id(),
                                        folder.label(),
-                                       "/to-do/path",
+                                       path.string(),
                                        std::move(device_ids),
                                        config::folder_type_t::send_and_receive,
                                        constants::rescan_interval,
@@ -272,7 +273,7 @@ void tui_actor_t::create_folder(const proto::Folder &folder, model::device_ptr_t
                                        true,
                                        false};
     auto timeout = init_timeout / 2;
-    request<ui::payload::create_folder_request_t>(coordinator, std::move(folder_cfg), source).send(timeout);
+    request<ui::payload::create_folder_request_t>(coordinator, folder, std::move(folder_cfg), source).send(timeout);
 }
 
 void tui_actor_t::flush_prompt() noexcept {

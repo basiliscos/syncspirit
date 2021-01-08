@@ -51,6 +51,8 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_disconnect);
         p.subscribe_actor(&net_supervisor_t::on_connection);
         p.subscribe_actor(&net_supervisor_t::on_auth);
+        p.subscribe_actor(&net_supervisor_t::on_create_folder);
+        p.subscribe_actor(&net_supervisor_t::on_make_index);
         launch_children();
     });
 }
@@ -93,7 +95,12 @@ void net_supervisor_t::launch_children() noexcept {
     fs::path path(app_config.config_path);
     auto db_dir = path.append("mbdx-db");
 
-    create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).finish();
+    db_addr = create_actor<db_actor_t>()
+                  .timeout(timeout)
+                  .db_dir(db_dir.string())
+                  .device_id(device_id)
+                  .finish()
+                  ->get_address();
 
     peers_addr = create_actor<peer_supervisor_t>()
                      .ssl_pair(&ssl_pair)
@@ -245,6 +252,25 @@ void net_supervisor_t::on_config_save(ui::message::config_save_request_t &messag
     }
 }
 
+void net_supervisor_t::on_create_folder(ui::message::create_folder_request_t &message) noexcept {
+    auto &folder = message.payload.request_payload.folder;
+    spdlog::trace("net_supervisor_t::on_create_folder, {} / {}", folder.label(), folder.id());
+    auto timeout = init_timeout / 2;
+    auto request_id = request<payload::make_index_id_request_t>(db_addr, folder).send(timeout);
+    folder_requests.emplace(request_id, &message);
+}
+
+void net_supervisor_t::on_make_index(message::make_index_id_response_t &message) noexcept {
+    auto &request_id = message.payload.req->payload.id;
+    auto it = folder_requests.find(request_id);
+    auto &request = *it->second;
+    auto &ec = message.payload.ec;
+    if (ec) {
+        reply_with_error(request, ec);
+        return;
+    }
+}
+
 outcome::result<void> net_supervisor_t::save_config(const config::main_t &new_cfg) noexcept {
     auto path_tmp = new_cfg.config_path;
     path_tmp.append("syncspirit.toml.tmp");
@@ -297,14 +323,12 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
             if (!have_folder) {
                 send<ui::payload::new_folder_notify_t>(address, f, device);
             }
-            /*
             spdlog::info("folder : {} / {}", f.label().c_str(), f.id().c_str());
             for (int j = 0; j < f.devices_size(); ++j) {
                 auto &d = f.devices(j);
                 spdlog::info("device: name = {}, issued by {}, max sequence = {}, index_id = {}", d.name(),
                              d.cert_name(), d.max_sequence(), d.index_id());
             }
-            */
         }
     } else {
         auto &payload = message.payload.req->payload.request_payload->payload;

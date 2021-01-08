@@ -42,20 +42,24 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_start() noexcept override;
 
   private:
+    using create_folder_req_ptr_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
     using discovery_map_t = std::set<rotor::request_id_t>;
     using devices_t = std::unordered_map<std::string, model::device_ptr_t>;
+    using folder_requests_t = std::unordered_map<r::request_id_t, create_folder_req_ptr_t>;
 
     void on_ssdp(message::ssdp_notification_t &message) noexcept;
     void on_announce(message::announce_notification_t &message) noexcept;
     void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
     void on_discovery(message::discovery_response_t &req) noexcept;
     void on_discovery_notify(message::discovery_notify_t &message) noexcept;
-    void on_config_request(ui::message::config_request_t &message) noexcept;
-    void on_config_save(ui::message::config_save_request_t &message) noexcept;
     void on_connect(message::connect_response_t &message) noexcept;
     void on_disconnect(message::disconnect_notify_t &message) noexcept;
     void on_connection(message::connection_notify_t &message) noexcept;
     void on_auth(message::auth_request_t &message) noexcept;
+    void on_config_request(ui::message::config_request_t &message) noexcept;
+    void on_config_save(ui::message::config_save_request_t &message) noexcept;
+    void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
+    void on_make_index(message::make_index_id_response_t &message) noexcept;
 
     void discover(model::device_ptr_t &device) noexcept;
     void launch_children() noexcept;
@@ -67,6 +71,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     config::main_t app_config;
     r::address_ptr_t ssdp_addr;
     r::address_ptr_t peers_addr;
+    r::address_ptr_t db_addr;
     r::address_ptr_t controller_addr;
     r::address_ptr_t global_discovery_addr;
     r::address_ptr_t local_discovery_addr;
@@ -75,6 +80,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     utils::key_pair_t ssl_pair;
     discovery_map_t discovery_map;
     devices_t devices;
+    folder_requests_t folder_requests;
 };
 
 } // namespace net

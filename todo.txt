@@ -1,3 +1,16 @@
+1. mkdir
+2. launch_folder_actor(
+    $folder,
+    $sequence_id,
+    coordinator,
+    &peers_map
+    connects to peer, which it needs
+);
+
+
+#${index_id_prefix}{$seq} = file
+
+
 device:
  max_sequence
  index_id

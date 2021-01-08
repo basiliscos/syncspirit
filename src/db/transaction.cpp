@@ -47,6 +47,7 @@ FAILURE:
 outcome::result<void> transaction_t::commit() noexcept {
     auto r = mdbx_txn_commit(txn);
     if (r == MDBX_SUCCESS) {
+        txn = nullptr;
         return outcome::success();
     }
     return outcome::failure(make_error_code(r));

@@ -15,7 +15,8 @@ r::plugin::resource_id_t db = 0;
 
 } // namespace
 
-db_actor_t::db_actor_t(config_t &config) : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir} {
+db_actor_t::db_actor_t(config_t &config)
+    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, device_id{config.device_id} {
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
         spdlog::critical("db_actor_t::db_actor_t, mbdx environment creation error ({}): {}", r, mdbx_strerror(r));
@@ -34,9 +35,11 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::db, get_address());
         // p.discover_name(names::coordinator, coordinator, false).link();
-        // p.discover_name(names::peers, peers, true).link();
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { open(); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        open();
+        p.subscribe_actor(&db_actor_t::on_make_index_id);
+    });
 }
 
 void db_actor_t::open() noexcept {
@@ -85,6 +88,37 @@ void db_actor_t::open() noexcept {
 void db_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     spdlog::trace("db_actor_t::on_start (addr = {})", (void *)address.get());
+}
+
+void db_actor_t::on_make_index_id(message::make_index_id_request_t &message) noexcept {
+    auto txn = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn) {
+        return reply_with_error(message, txn.error());
+    }
+    auto &orig = message.payload.request_payload.folder;
+    proto::Folder copy = orig;
+    copy.clear_devices();
+    for (int i = 0; i < orig.devices_size(); ++i) {
+        auto &folder_device = orig.devices(i);
+        if (folder_device.id() != device_id.get_value()) {
+            *copy.add_devices() = folder_device;
+        }
+    }
+    model::index_id_t index_id{distribution(rd)};
+    auto r = db::update_folder_info(copy, txn.value());
+    if (!r) {
+        return reply_with_error(message, r.error());
+    }
+    r = db::create_folder_index(copy, index_id, txn.value());
+    if (!r) {
+        return reply_with_error(message, r.error());
+    }
+    r = txn.value().commit();
+    if (!r) {
+        return reply_with_error(message, r.error());
+    }
+    spdlog::trace("db_actor_t::on_make_index_id, created index = {} for folder = {}", index_id, orig.label());
+    reply_to(message, index_id);
 }
 
 } // namespace syncspirit::net

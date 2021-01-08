@@ -46,7 +46,8 @@ struct create_folder_response_t {
 
 struct create_folder_request_t {
     using response_t = create_folder_response_t;
-    config::folder_config_t folder;
+    proto::Folder folder;
+    config::folder_config_t folder_config;
     model::device_ptr_t source;
 };
 

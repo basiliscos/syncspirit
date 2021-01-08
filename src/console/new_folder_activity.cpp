@@ -35,7 +35,9 @@ bool new_folder_activity_t::handle(const char key) noexcept {
         actor.discard_activity();
         return true;
     } else if (key == 'a') {
-        std::abort();
+        actor.create_folder(folder, source);
+        actor.discard_activity();
+        return true;
     }
     return false;
 }

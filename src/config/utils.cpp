@@ -158,7 +158,7 @@ static std::optional<device_config_t> get_device(toml::table &t) noexcept {
         }
     }
 
-    auto folders = t["ignored_folders"];
+    auto folders = t["ignored_folder"];
     device_config_t::ignored_folders_t ignored_folders;
     if (folders.is_array_of_tables()) {
         auto arr = folders.as_array();
@@ -569,7 +569,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                     {"label", folder.label}
                 }});
             }
-            device_table.insert("ignored_folders", ignored_folders);
+            device_table.insert("ignored_folder", ignored_folders);
         }
         devices.push_back(device_table);
     }

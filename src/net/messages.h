@@ -13,6 +13,7 @@
 #include <fmt/fmt.h>
 #include "../model/upnp.h"
 #include "../model/peer_contact.h"
+#include "../model/folder.h"
 #include "../transport/base.h"
 #include "../proto/bep_support.h"
 
@@ -195,6 +196,15 @@ struct connection_notify_t {
     tcp::endpoint remote;
 };
 
+struct make_index_id_response_t {
+    model::index_id_t index_id;
+};
+
+struct make_index_id_request_t {
+    using response_t = make_index_id_response_t;
+    proto::Folder folder;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -228,6 +238,9 @@ using connection_notify_t = r::message_t<payload::connection_notify_t>;
 
 using auth_request_t = r::request_traits_t<payload::auth_request_t>::request::message_t;
 using auth_response_t = r::request_traits_t<payload::auth_request_t>::response::message_t;
+
+using make_index_id_request_t = r::request_traits_t<payload::make_index_id_request_t>::request::message_t;
+using make_index_id_response_t = r::request_traits_t<payload::make_index_id_request_t>::response::message_t;
 
 } // end of namespace message
 
