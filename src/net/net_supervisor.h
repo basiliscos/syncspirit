@@ -44,7 +44,6 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
   private:
     using create_folder_req_ptr_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
     using discovery_map_t = std::set<rotor::request_id_t>;
-    using devices_t = std::unordered_map<std::string, model::device_ptr_t>;
     using folder_requests_t = std::unordered_map<r::request_id_t, create_folder_req_ptr_t>;
 
     void on_ssdp(message::ssdp_notification_t &message) noexcept;
@@ -79,7 +78,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     model::device_id_t device_id;
     utils::key_pair_t ssl_pair;
     discovery_map_t discovery_map;
-    devices_t devices;
+    model::devices_map_t devices;
     folder_requests_t folder_requests;
 };
 

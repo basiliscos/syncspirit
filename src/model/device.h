@@ -1,5 +1,6 @@
 #pragma once
 
+#include <unordered_map>
 #include "arc.hpp"
 #include "device_id.h"
 #include "../utils/uri.h"
@@ -28,5 +29,7 @@ struct device_t : arc_base_t<device_t> {
 };
 
 using device_ptr_t = intrusive_ptr_t<device_t>;
+
+using devices_map_t = std::unordered_map<std::string, device_ptr_t>;
 
 } // namespace syncspirit::model

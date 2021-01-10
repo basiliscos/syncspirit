@@ -3,6 +3,7 @@
 #include "error_code.h"
 #include "prefix.h"
 #include <boost/endian/conversion.hpp>
+#include <spdlog.h>
 
 namespace syncspirit::db {
 
@@ -96,6 +97,37 @@ outcome::result<void> create_folder_index(const proto::Folder &folder, const mod
         return make_error_code(r);
     }
     return outcome::success();
+}
+
+outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder_cfg,
+                                                 const model::devices_map_t &devices, transaction_t &txn) noexcept {
+    model::folder_ptr_t folder(new model::folder_t(folder_cfg));
+    auto key_info = prefixer_t<prefix::folder_info>::make(folder->id);
+
+    MDBX_val value;
+    auto r = mdbx_get(txn.txn, txn.dbi, key_info, &value);
+    if (r != MDBX_SUCCESS) {
+        if (r == MDBX_NOTFOUND) {
+            return make_error_code(error_code::folder_info_not_found);
+        }
+        return make_error_code(r);
+    }
+
+    proto::Folder folder_data;
+    if (!folder_data.ParseFromArray(value.iov_base, value.iov_len)) {
+        return make_error_code(error_code::folder_info_deserialization_failure_t);
+    }
+
+    for (int i = 0; i < folder_data.devices_size(); ++i) {
+        auto &d = folder_data.devices(i);
+        auto &device_id = d.id();
+        auto it = devices.find(device_id);
+        if (it == devices.end()) {
+            spdlog::warn("load_folder, unknown device {}, ignoring", device_id);
+        } else {
+            folder->devices.emplace(model::folder_device_t{it->second, d.index_id(), d.max_sequence()});
+        }
+    }
 }
 
 } // namespace syncspirit::db

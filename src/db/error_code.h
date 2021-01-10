@@ -5,7 +5,12 @@
 namespace syncspirit {
 namespace db {
 
-enum class error_code { success = 0, db_version_size_mismatch };
+enum class error_code {
+    success = 0,
+    db_version_size_mismatch,
+    folder_info_not_found,
+    folder_info_deserialization_failure_t,
+};
 
 namespace detail {
 

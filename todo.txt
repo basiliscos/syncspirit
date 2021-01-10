@@ -1,3 +1,4 @@
+model: cluster/folder
 1. mkdir
 2. launch_folder_actor(
     $folder,

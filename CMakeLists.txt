@@ -37,6 +37,7 @@ add_library(syncspirit_lib
     src/db/utils.cpp
     src/model/device.cpp
     src/model/device_id.cpp
+    src/model/folder.cpp
     src/net/acceptor_actor.cpp
     src/net/db_actor.cpp
     src/net/global_discovery_actor.cpp

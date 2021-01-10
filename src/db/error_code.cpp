@@ -26,6 +26,12 @@ std::string mbdx_code_category::message(int c) const {
     case error_code::db_version_size_mismatch:
         r = "db version size mismatch";
         break;
+    case error_code::folder_info_not_found:
+        r = "folder info not found in DB";
+        break;
+    case error_code::folder_info_deserialization_failure_t:
+        r = "cannot deserialize folder info";
+        break;
     default:
         r = "unknown";
     }
