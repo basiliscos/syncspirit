@@ -205,6 +205,16 @@ struct make_index_id_request_t {
     proto::Folder folder;
 };
 
+struct load_folder_response_t {
+    model::folder_ptr_t folder;
+};
+
+struct load_folder_request_t {
+    using response_t = load_folder_response_t;
+    config::folder_config_t folder;
+    model::devices_map_t *devices;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -241,6 +251,9 @@ using auth_response_t = r::request_traits_t<payload::auth_request_t>::response::
 
 using make_index_id_request_t = r::request_traits_t<payload::make_index_id_request_t>::request::message_t;
 using make_index_id_response_t = r::request_traits_t<payload::make_index_id_request_t>::response::message_t;
+
+using load_folder_request_t = r::request_traits_t<payload::load_folder_request_t>::request::message_t;
+using load_folder_response_t = r::request_traits_t<payload::load_folder_request_t>::response::message_t;
 
 } // end of namespace message
 

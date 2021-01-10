@@ -39,6 +39,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         open();
         p.subscribe_actor(&db_actor_t::on_make_index_id);
+        p.subscribe_actor(&db_actor_t::on_load_folder);
     });
 }
 
@@ -120,6 +121,20 @@ void db_actor_t::on_make_index_id(message::make_index_id_request_t &message) noe
     }
     spdlog::trace("db_actor_t::on_make_index_id, created index = {} for folder = {}", index_id, orig.label());
     reply_to(message, index_id);
+}
+
+void db_actor_t::on_load_folder(message::load_folder_request_t &message) noexcept {
+    auto txn = db::make_transaction(db::transaction_type_t::RO, env);
+    if (!txn) {
+        return reply_with_error(message, txn.error());
+    }
+    auto &p = message.payload.request_payload;
+    auto r = db::load_folder(p.folder, *p.devices, txn.value());
+    if (r) {
+        reply_with_error(message, r.error());
+    } else {
+        reply_to(message, r.value());
+    }
 }
 
 } // namespace syncspirit::net

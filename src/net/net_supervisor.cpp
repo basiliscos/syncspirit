@@ -70,6 +70,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_auth);
         p.subscribe_actor(&net_supervisor_t::on_create_folder);
         p.subscribe_actor(&net_supervisor_t::on_make_index);
+        p.subscribe_actor(&net_supervisor_t::on_load_folder);
         launch_children();
     });
 }
