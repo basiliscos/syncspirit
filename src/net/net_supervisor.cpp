@@ -282,6 +282,18 @@ void net_supervisor_t::on_make_index(message::make_index_id_response_t &message)
         reply_with_error(request, ec);
         return;
     }
+    auto &payload = request.payload.request_payload;
+    auto &cfg = payload.folder_config;
+    sys::error_code fs_ec;
+    fs::create_directories(cfg.path, fs_ec);
+    if (fs_ec) {
+        reply_with_error(request, ec);
+        return;
+    }
+    auto folder = model::folder_ptr_t(new model::folder_t(cfg));
+    auto &index_id = message.payload.res.index_id;
+    folder->assign(payload.folder, devices);
+    folder->devices.insert(model::folder_device_t{device, index_id, model::sequence_id_t{}});
 }
 
 outcome::result<void> net_supervisor_t::save_config(const config::main_t &new_cfg) noexcept {

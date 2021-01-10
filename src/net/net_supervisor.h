@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../model/device.h"
+#include "../model/cluster.h"
 #include "../ui/messages.hpp"
 #include "messages.h"
 #include <boost/asio.hpp>
@@ -76,6 +77,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     r::address_ptr_t local_discovery_addr;
     std::uint32_t ssdp_attempts = 0;
     model::device_ptr_t device;
+    model::cluster_ptr_t cluster;
     utils::key_pair_t ssl_pair;
     discovery_map_t discovery_map;
     model::devices_map_t devices;

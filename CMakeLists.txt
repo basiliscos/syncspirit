@@ -35,6 +35,7 @@ add_library(syncspirit_lib
     src/db/prefix.cpp
     src/db/transaction.cpp
     src/db/utils.cpp
+    src/model/cluster.cpp
     src/model/device.cpp
     src/model/device_id.cpp
     src/model/folder.cpp

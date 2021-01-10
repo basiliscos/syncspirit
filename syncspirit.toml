@@ -17,7 +17,7 @@ frequency = 10
 port = 21026
 
 [main]
-default_location = '/home/b'
+default_location = '/tmp/syncspirit'
 device_name = 'hp-note'
 ignored_devices = []
 timeout = 5000
