@@ -10,6 +10,10 @@ enum class error_code {
     db_version_size_mismatch,
     folder_info_not_found,
     folder_info_deserialization_failure_t,
+    folder_local_device_not_found,
+    folder_index_not_found,
+    folder_index_deserialization_failure_t,
+    unknown_local_device,
 };
 
 namespace detail {

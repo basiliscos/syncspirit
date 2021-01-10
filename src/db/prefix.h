@@ -11,6 +11,7 @@ namespace prefix {
 static const constexpr discr_t misc{0x01};
 static const constexpr discr_t folder_info{0x02};
 static const constexpr discr_t folder_index{0x03};
+static const constexpr discr_t folder_local_device{0x04};
 } // namespace prefix
 
 struct value_t {
@@ -31,5 +32,8 @@ template <discr_t> struct prefixer_t;
 template <> struct prefixer_t<prefix::misc> { static value_t make(std::string_view name) noexcept; };
 template <> struct prefixer_t<prefix::folder_info> { static value_t make(const std::string_view &id) noexcept; };
 template <> struct prefixer_t<prefix::folder_index> { static value_t make(const std::string_view &id) noexcept; };
+template <> struct prefixer_t<prefix::folder_local_device> {
+    static value_t make(const std::string_view &id) noexcept;
+};
 
 } // namespace syncspirit::db

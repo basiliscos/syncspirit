@@ -16,7 +16,7 @@ r::plugin::resource_id_t db = 0;
 } // namespace
 
 db_actor_t::db_actor_t(config_t &config)
-    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, device_id{config.device_id} {
+    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, device{config.device} {
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
         spdlog::critical("db_actor_t::db_actor_t, mbdx environment creation error ({}): {}", r, mdbx_strerror(r));
@@ -98,9 +98,10 @@ void db_actor_t::on_make_index_id(message::make_index_id_request_t &message) noe
     auto &orig = message.payload.request_payload.folder;
     proto::Folder copy = orig;
     copy.clear_devices();
+    auto &my_device_id = device->device_id.get_value();
     for (int i = 0; i < orig.devices_size(); ++i) {
         auto &folder_device = orig.devices(i);
-        if (folder_device.id() != device_id.get_value()) {
+        if (folder_device.id() != my_device_id) {
             *copy.add_devices() = folder_device;
         }
     }
@@ -109,7 +110,7 @@ void db_actor_t::on_make_index_id(message::make_index_id_request_t &message) noe
     if (!r) {
         return reply_with_error(message, r.error());
     }
-    r = db::create_folder_index(copy, index_id, txn.value());
+    r = db::create_folder(copy, index_id, device->device_id, txn.value());
     if (!r) {
         return reply_with_error(message, r.error());
     }

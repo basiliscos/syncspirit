@@ -25,3 +25,7 @@ value_t prefixer_t<prefix::folder_info>::make(const std::string_view &id) noexce
 value_t prefixer_t<prefix::folder_index>::make(const std::string_view &id) noexcept {
     return mk_folder_prefix((char)prefix::folder_index, id);
 }
+
+value_t prefixer_t<prefix::folder_local_device>::make(const std::string_view &id) noexcept {
+    return mk_folder_prefix((char)prefix::folder_local_device, id);
+}

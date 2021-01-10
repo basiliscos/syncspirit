@@ -1,3 +1,4 @@
+#include "../config/utils.h"
 #include "net_supervisor.h"
 #include "global_discovery_actor.h"
 #include "local_discovery_actor.h"
@@ -9,7 +10,6 @@
 #include "peer_supervisor.h"
 #include "db_actor.h"
 #include "names.h"
-#include "../config/utils.h"
 #include <spdlog/spdlog.h>
 #include <boost/filesystem.hpp>
 
@@ -23,15 +23,32 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
         spdlog::critical("cannot load certificate/key pair :: {}", result.error().message());
         throw result.error();
     }
-    auto device = model::device_id_t::from_cert(ssl_pair.cert_data);
-    if (!device) {
+    auto device_id = model::device_id_t::from_cert(ssl_pair.cert_data);
+    if (!device_id) {
         spdlog::critical("cannot create device_id from certificate");
         throw "cannot create device_id from certificate";
     }
     ssl_pair = std::move(result.value());
-    device_id = std::move(device.value());
-    spdlog::info("net_supervisor_t, device name = {}, device id = {}", app_config.device_name, device_id);
+    spdlog::info("net_supervisor_t, device name = {}, device id = {}", app_config.device_name, device_id.value());
 
+    auto cn = utils::get_common_name(ssl_pair.cert.get());
+    if (!cn) {
+        spdlog::critical("cannot get common name from certificate");
+        throw "cannot get common name from certificate";
+    }
+    auto my_device = config::device_config_t{
+        device_id.value().get_value(),
+        app_config.device_name,
+        config::compression_t::meta,
+        cn.value(),
+        false,
+        false, /* auto accept */
+        false, /* paused */
+        false,
+        {},
+        {},
+    };
+    device = model::device_ptr_t(new model::device_t(my_device));
     update_devices();
 }
 
@@ -95,12 +112,8 @@ void net_supervisor_t::launch_children() noexcept {
     fs::path path(app_config.config_path);
     auto db_dir = path.append("mbdx-db");
 
-    db_addr = create_actor<db_actor_t>()
-                  .timeout(timeout)
-                  .db_dir(db_dir.string())
-                  .device_id(device_id)
-                  .finish()
-                  ->get_address();
+    db_addr =
+        create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
 
     peers_addr = create_actor<peer_supervisor_t>()
                      .ssl_pair(&ssl_pair)
@@ -116,7 +129,7 @@ void net_supervisor_t::launch_children() noexcept {
         local_discovery_addr = create_actor<local_discovery_actor_t>()
                                    .port(cfg.port)
                                    .frequency(cfg.frequency)
-                                   .device_id(device_id)
+                                   .device(device)
                                    .timeout(timeout)
                                    .finish()
                                    ->get_address();
@@ -400,6 +413,7 @@ void net_supervisor_t::update_devices() noexcept {
         auto device = model::device_ptr_t{new model::device_t(it.second)};
         devices.insert_or_assign(it.first, std::move(device));
     }
+    devices.insert({device->device_id.get_value(), device});
 }
 
 void net_supervisor_t::persist_data() noexcept {

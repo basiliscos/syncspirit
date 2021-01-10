@@ -10,7 +10,7 @@ namespace net {
 
 struct db_actor_config_t : r::actor_config_t {
     std::string db_dir;
-    model::device_id_t device_id;
+    model::device_ptr_t device;
 };
 
 template <typename Actor> struct db_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -23,8 +23,8 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&device_id(const model::device_id_t &value) &&noexcept {
-        parent_t::config.device_id = value;
+    builder_t &&device(const model::device_ptr_t &value) &&noexcept {
+        parent_t::config.device = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -47,7 +47,7 @@ struct db_actor_t : public r::actor_base_t {
     std::uniform_int_distribution<model::index_id_t> distribution;
     MDBX_env *env;
     std::string db_dir;
-    model::device_id_t device_id;
+    model::device_ptr_t device;
 };
 
 } // namespace net

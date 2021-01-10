@@ -10,7 +10,7 @@ namespace net {
 struct local_discovery_actor_config_t : r::actor_config_t {
     std::uint16_t port;
     std::uint32_t frequency;
-    model::device_id_t device_id;
+    model::device_ptr_t device;
 };
 
 template <typename Actor> struct local_discovery_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -18,8 +18,8 @@ template <typename Actor> struct local_discovery_actor_config_builder_t : r::act
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&device_id(const model::device_id_t &value) &&noexcept {
-        parent_t::config.device_id = std::move(value);
+    builder_t &&device(const model::device_ptr_t &value) &&noexcept {
+        parent_t::config.device = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -62,7 +62,7 @@ struct local_discovery_actor_t : public r::actor_base_t {
 
     r::address_ptr_t acceptor;
     r::pt::time_duration frequency;
-    model::device_id_t device_id;
+    model::device_ptr_t device;
     asio::io_context::strand &strand;
     udp_socket_t sock;
     r::address_ptr_t coordinator;

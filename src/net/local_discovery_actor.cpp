@@ -17,7 +17,7 @@ r::plugin::resource_id_t req_acceptor = 2;
 } // namespace
 
 local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, frequency{r::pt::seconds(cfg.frequency)}, device_id{cfg.device_id},
+    : r::actor_base_t{cfg}, frequency{r::pt::seconds(cfg.frequency)}, device{cfg.device},
       strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, sock{strand.context()},
       bc_endpoint(udp::v4(), cfg.port) {
     rx_buff.resize(BUFF_SZ);
@@ -103,7 +103,8 @@ void local_discovery_actor_t::announce() noexcept {
     static const constexpr std::uint64_t instance = 0;
     // spdlog::trace("local_discovery_actor_t::announce", (void *)address.get());
 
-    auto sz = proto::make_announce_message(tx_buff, device_id.get_sha256(), uris, instance);
+    auto &digest = device->device_id.get_sha256();
+    auto sz = proto::make_announce_message(tx_buff, digest, uris, instance);
     auto buff = asio::buffer(tx_buff.data(), sz);
     auto fwd_send =
         ra::forwarder_t(*this, &local_discovery_actor_t::on_write, &local_discovery_actor_t::on_write_error);
@@ -144,7 +145,7 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
         auto &sha = msg->id();
         auto device_id = model::device_id_t::from_sha256(sha);
         if (device_id) {
-            if (device_id != this->device_id) { // skip "self" discovery via network
+            if (device_id != device->device_id) { // skip "self" discovery via network
                 model::peer_contact_t::uri_container_t uris;
                 for (int i = 0; i < msg->addresses_size(); ++i) {
                     auto uri = utils::parse(msg->addresses(i).c_str());
