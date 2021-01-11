@@ -39,6 +39,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     explicit net_supervisor_t(config_t &config);
     void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void on_child_init(actor_base_t *actor, const std::error_code &ec) noexcept override;
     void on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept override;
     void on_start() noexcept override;
 
@@ -46,6 +47,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     using create_folder_req_ptr_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
     using discovery_map_t = std::set<rotor::request_id_t>;
     using folder_requests_t = std::unordered_map<r::request_id_t, create_folder_req_ptr_t>;
+    using folder_iterator_t = typename config::main_t::folders_t::iterator;
 
     void on_ssdp(message::ssdp_notification_t &message) noexcept;
     void on_announce(message::announce_notification_t &message) noexcept;
@@ -64,9 +66,11 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
 
     void discover(model::device_ptr_t &device) noexcept;
     void launch_children() noexcept;
+    void launch_db() noexcept;
     void launch_ssdp() noexcept;
     void persist_data() noexcept;
     void update_devices() noexcept;
+    void load_cluster(folder_iterator_t it) noexcept;
     outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
 
     config::main_t app_config;

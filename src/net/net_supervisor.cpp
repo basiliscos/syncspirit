@@ -71,7 +71,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_create_folder);
         p.subscribe_actor(&net_supervisor_t::on_make_index);
         p.subscribe_actor(&net_supervisor_t::on_load_folder);
-        launch_children();
+        launch_db();
     });
 }
 
@@ -97,6 +97,26 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_c
     }
 }
 
+void net_supervisor_t::on_child_init(actor_base_t *actor, const std::error_code &ec) noexcept {
+    parent_t::on_child_init(actor, ec);
+    auto &child_addr = actor->get_address();
+    if (!ec && db_addr && child_addr == db_addr) {
+        spdlog::trace("net_supervisor_t::on_child_init, starting loading cluster...",
+                      (void *)actor->get_address().get());
+        load_cluster(app_config.folders.begin());
+    }
+}
+
+void net_supervisor_t::launch_db() noexcept {
+    auto timeout = shutdown_timeout * 9 / 10;
+    fs::path path(app_config.config_path);
+    auto db_dir = path.append("mbdx-db");
+
+    cluster = new model::cluster_t();
+    db_addr =
+        create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
+}
+
 void net_supervisor_t::launch_children() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     auto io_timeout = shutdown_timeout * 8 / 10;
@@ -109,12 +129,6 @@ void net_supervisor_t::launch_children() noexcept {
         .registry_name(names::http10)
         .keep_alive(false)
         .finish();
-
-    fs::path path(app_config.config_path);
-    auto db_dir = path.append("mbdx-db");
-
-    db_addr =
-        create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
 
     peers_addr = create_actor<peer_supervisor_t>()
                      .ssl_pair(&ssl_pair)
@@ -295,6 +309,7 @@ void net_supervisor_t::on_make_index(message::make_index_id_response_t &message)
     auto &index_id = message.payload.res.index_id;
     folder->assign(payload.folder, devices);
     folder->devices.insert(model::folder_device_t{device, index_id, model::sequence_id_t{}});
+    cluster->add_folder(folder);
 }
 
 outcome::result<void> net_supervisor_t::save_config(const config::main_t &new_cfg) noexcept {
@@ -414,6 +429,22 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
     spdlog::debug("net_supervisor_t::on_auth, {} requested authtorization. Result : {}", device_id, result);
 }
 
+void net_supervisor_t::on_load_folder(message::load_folder_response_t &message) noexcept {
+    auto &folder_config = message.payload.req->payload.request_payload.folder;
+    auto predicate = [&](auto &it) { return it.first == folder_config.id; };
+    auto it = std::find_if(app_config.folders.begin(), app_config.folders.end(), predicate);
+    assert(it != app_config.folders.end());
+    auto &ec = message.payload.ec;
+    if (ec) {
+        spdlog::warn("net_supervisor_t::on_load_folder, cannot load folder {} / {} : {}", folder_config.label,
+                     folder_config.id, ec.message());
+    } else {
+        auto &folder = message.payload.res.folder;
+        cluster->add_folder(folder);
+    }
+    load_cluster(++it);
+}
+
 void net_supervisor_t::shutdown_start() noexcept {
     for (auto request_id : discovery_map) {
         send<message::discovery_cancel_t::payload_t>(global_discovery_addr, request_id);
@@ -436,6 +467,9 @@ void net_supervisor_t::persist_data() noexcept {
     for (auto &[device_id, device] : devices) {
         devs.emplace(device_id, device->serialize());
     }
+    if (cluster) {
+        config_copy.folders = cluster->serialize();
+    }
     if (!(app_config == config_copy)) {
         spdlog::debug("net_supervisor_t::persist_data, saving config");
         auto r = save_config(config_copy);
@@ -443,4 +477,15 @@ void net_supervisor_t::persist_data() noexcept {
             spdlog::error("net_supervisor_t::persist_data, failed to save config:: {}", r.error().message());
         }
     }
+}
+
+void net_supervisor_t::load_cluster(folder_iterator_t it) noexcept {
+    if (it != app_config.folders.end()) {
+        auto &[folder_id, folder_config] = *it;
+        auto timeout = init_timeout / 2;
+        request<payload::load_folder_request_t>(db_addr, folder_config, &devices).send(timeout);
+        return;
+    }
+    spdlog::trace("net_supervisor_t::load_cluster, complete");
+    launch_children();
 }

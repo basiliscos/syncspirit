@@ -50,3 +50,7 @@ add_executable(060-bep 060-bep.cpp)
 target_link_libraries(060-bep syncspirit_test_lib)
 add_test(060-bep "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/060-bep")
 
+add_executable(070-db 070-db.cpp)
+target_link_libraries(070-db syncspirit_test_lib)
+add_test(070-db "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/070-db")
+

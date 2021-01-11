@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../config/main.h"
 #include "folder.h"
 #include "arc.hpp"
 #include <unordered_map>
@@ -8,8 +9,10 @@ namespace syncspirit::model {
 
 struct cluster_t : arc_base_t<cluster_t> {
     using folders_t = std::unordered_map<std::string, folder_ptr_t>;
+    using folders_config_t = config::main_t::folders_t;
 
     void add_folder(const folder_ptr_t &folder) noexcept;
+    folders_config_t serialize() noexcept;
 
     folders_t folders;
 };
