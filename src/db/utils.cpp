@@ -124,7 +124,7 @@ outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder
 
     proto::Folder folder_data;
     if (!folder_data.ParseFromArray(value.iov_base, value.iov_len)) {
-        return make_error_code(error_code::folder_info_deserialization_failure_t);
+        return make_error_code(error_code::folder_info_deserialization_failure);
     }
     folder->assign(folder_data, devices);
 
@@ -144,7 +144,7 @@ outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder
     auto &device = it->second;
 
     auto key_index = prefixer_t<prefix::folder_index>::make(folder->id);
-    r = mdbx_get(txn.txn, txn.dbi, key_device, &value);
+    r = mdbx_get(txn.txn, txn.dbi, key_index, &value);
     if (r != MDBX_SUCCESS) {
         if (r == MDBX_NOTFOUND) {
             return make_error_code(error_code::folder_index_not_found);
@@ -152,12 +152,15 @@ outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder
         return make_error_code(r);
     }
     if (value.iov_len != sizeof(model::index_id_t)) {
-        return make_error_code(error_code::folder_info_deserialization_failure_t);
+        return make_error_code(error_code::folder_index_deserialization_failure);
     }
     auto index = be::big_to_native(*((model::index_id_t *)value.iov_base));
     auto sequence = model::sequence_id_t{0};
 
-    folder->devices.emplace(model::folder_device_t{device, index, sequence});
+    auto e_r = folder->devices.emplace(model::folder_device_t{device, index, sequence});
+    assert(e_r.second);
+    (void)e_r;
+
     return folder;
 }
 

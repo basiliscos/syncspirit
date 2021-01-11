@@ -29,7 +29,7 @@ std::string mbdx_code_category::message(int c) const {
     case error_code::folder_info_not_found:
         r = "folder info not found in DB";
         break;
-    case error_code::folder_info_deserialization_failure_t:
+    case error_code::folder_info_deserialization_failure:
         r = "cannot deserialize folder info";
         break;
     case error_code::folder_local_device_not_found:
@@ -41,7 +41,7 @@ std::string mbdx_code_category::message(int c) const {
     case error_code::folder_index_not_found:
         r = "folder index not found";
         break;
-    case error_code::folder_index_deserialization_failure_t:
+    case error_code::folder_index_deserialization_failure:
         r = "cannot deserialize folder index";
         break;
     default:

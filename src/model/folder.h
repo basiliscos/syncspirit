@@ -25,8 +25,9 @@ struct folder_device_t {
 namespace std {
 template <> struct less<syncspirit::model::folder_device_t> {
     using fd_t = syncspirit::model::folder_device_t;
-    inline bool operator()(const fd_t &lhs, const fd_t &rhs) const noexcept {
-        return lhs.device->device_id < rhs.device->device_id;
+    bool operator()(const fd_t &lhs, const fd_t &rhs) const noexcept {
+        auto r = lhs.device->device_id.get_sha256().compare(rhs.device->device_id.get_sha256());
+        return r;
     }
 };
 } // namespace std

@@ -359,8 +359,8 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
         auto &config = message.payload.res->cluster_config;
         for (int i = 0; i < config.folders_size(); ++i) {
             auto &f = config.folders(i);
-            spdlog::warn("net_supervisor_t::on_connect, check if there is a folder '{}' in model ", f.label());
-            bool have_folder = false;
+
+            bool have_folder = cluster->has_folder(f.id());
             if (!have_folder) {
                 send<ui::payload::new_folder_notify_t>(address, f, device);
             }

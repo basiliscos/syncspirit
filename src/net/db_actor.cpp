@@ -130,7 +130,7 @@ void db_actor_t::on_load_folder(message::load_folder_request_t &message) noexcep
     }
     auto &p = message.payload.request_payload;
     auto r = db::load_folder(p.folder, *p.devices, txn.value());
-    if (r) {
+    if (!r) {
         reply_with_error(message, r.error());
     } else {
         reply_to(message, r.value());
