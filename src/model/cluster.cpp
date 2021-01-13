@@ -12,4 +12,10 @@ cluster_t::folders_config_t cluster_t::serialize() noexcept {
     return r;
 }
 
-bool cluster_t::has_folder(const std::string &folder_id) noexcept { return folders.count(folder_id) != 0; }
+folder_ptr_t cluster_t::get_folder(const std::string &folder_id) noexcept {
+    auto it = folders.find(folder_id);
+    if (it != folders.end()) {
+        return it->second;
+    }
+    return folder_ptr_t{};
+}

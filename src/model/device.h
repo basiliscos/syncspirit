@@ -23,9 +23,12 @@ struct device_t : arc_base_t<device_t> {
     bool skip_introduction_removals;
     config::device_config_t::ignored_folders_t ignored_folders;
     bool online = false;
+    bool trusted = false;
 
     config::device_config_t serialize() noexcept;
     inline bool is_dynamic() const noexcept { return static_addresses.empty(); }
+    void mark_online(bool value) noexcept;
+    void mark_trusted(bool value) noexcept;
 };
 
 using device_ptr_t = intrusive_ptr_t<device_t>;

@@ -21,3 +21,7 @@ config::device_config_t device_t::serialize() noexcept {
                                    static_addresses,
                                    ignored_folders};
 }
+
+void device_t::mark_online(bool value) noexcept { online = value; }
+
+void device_t::mark_trusted(bool value) noexcept { trusted = value; }

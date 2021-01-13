@@ -12,7 +12,7 @@ struct cluster_t : arc_base_t<cluster_t> {
     using folders_config_t = config::main_t::folders_t;
 
     void add_folder(const folder_ptr_t &folder) noexcept;
-    bool has_folder(const std::string &folder_id) noexcept;
+    folder_ptr_t get_folder(const std::string &folder_id) noexcept;
     folders_config_t serialize() noexcept;
 
     folders_t folders;

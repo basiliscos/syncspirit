@@ -360,9 +360,11 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
         for (int i = 0; i < config.folders_size(); ++i) {
             auto &f = config.folders(i);
 
-            bool have_folder = cluster->has_folder(f.id());
-            if (!have_folder) {
+            auto folder = cluster->get_folder(f.id());
+            if (!folder) {
                 send<ui::payload::new_folder_notify_t>(address, f, device);
+            } else {
+                folder->assign(f, devices);
             }
             spdlog::info("folder : {} / {}", f.label().c_str(), f.id().c_str());
             for (int j = 0; j < f.devices_size(); ++j) {
@@ -403,30 +405,33 @@ void net_supervisor_t::on_connection(message::connection_notify_t &message) noex
 void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
     auto &device_id = message.payload.request_payload.peer_device_id;
     auto it = devices.find(device_id.get_value());
-    bool result = false;
+    model::device_ptr_t device;
     if (it == devices.end()) {
-        result = false;
         if (app_config.ignored_devices.count(device_id.get_value()) == 0) {
             send<ui::payload::auth_notification_t>(address, &message);
         }
     } else {
-        auto &device = it->second;
+        device = it->second;
         if (device->online) {
             spdlog::warn(
                 "net_supervisor_t::on_auth, {} requested authtorization, but there is already active connection???");
-            result = false;
         } else {
             auto &cert_name = device->cert_name;
             if (cert_name) {
-                result = cert_name.value() == message.payload.request_payload.cert_name;
+                bool ok = cert_name.value() == message.payload.request_payload.cert_name;
+                if (!ok) {
+                    device.reset();
+                }
             } else {
-                result = true;
                 cert_name = message.payload.request_payload.cert_name;
             }
         }
     }
-    reply_to(message, result);
-    spdlog::debug("net_supervisor_t::on_auth, {} requested authtorization. Result : {}", device_id, result);
+    reply_to(message, (bool)device);
+    if (device) {
+        device->mark_online(true);
+    }
+    spdlog::debug("net_supervisor_t::on_auth, {} requested authtorization. Result : {}", device_id, (bool)device);
 }
 
 void net_supervisor_t::on_load_folder(message::load_folder_response_t &message) noexcept {
@@ -455,6 +460,7 @@ void net_supervisor_t::shutdown_start() noexcept {
 void net_supervisor_t::update_devices() noexcept {
     for (auto &it : app_config.devices) {
         auto device = model::device_ptr_t{new model::device_t(it.second)};
+        device->mark_trusted(true);
         devices.insert_or_assign(it.first, std::move(device));
     }
     devices.insert({device->device_id.get_value(), device});
