@@ -112,7 +112,7 @@ void net_supervisor_t::launch_db() noexcept {
     fs::path path(app_config.config_path);
     auto db_dir = path.append("mbdx-db");
 
-    cluster = new model::cluster_t();
+    cluster = new model::cluster_t(device);
     db_addr =
         create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
 }
@@ -282,7 +282,8 @@ void net_supervisor_t::on_config_save(ui::message::config_save_request_t &messag
 
 void net_supervisor_t::on_create_folder(ui::message::create_folder_request_t &message) noexcept {
     auto &folder = message.payload.request_payload.folder;
-    spdlog::trace("net_supervisor_t::on_create_folder, {} / {}", folder.label(), folder.id());
+    spdlog::trace("net_supervisor_t::on_create_folder, {} / {} shared with {} devices", folder.label(), folder.id(),
+                  folder.devices_size());
     auto timeout = init_timeout / 2;
     auto request_id = request<payload::make_index_id_request_t>(db_addr, folder).send(timeout);
     folder_requests.emplace(request_id, &message);
@@ -358,7 +359,8 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
         auto &device = devices.at(device_id.get_value());
         auto &config = message.payload.res->cluster_config;
         for (int i = 0; i < config.folders_size(); ++i) {
-            auto &f = config.folders(i);
+            auto &f = *config.mutable_folders(i);
+            cluster->sanitize(f, devices);
 
             auto folder = cluster->get_folder(f.id());
             if (!folder) {
@@ -458,9 +460,9 @@ void net_supervisor_t::shutdown_start() noexcept {
 }
 
 void net_supervisor_t::update_devices() noexcept {
+    devices.clear();
     for (auto &it : app_config.devices) {
         auto device = model::device_ptr_t{new model::device_t(it.second)};
-        device->mark_trusted(true);
         devices.insert_or_assign(it.first, std::move(device));
     }
     devices.insert({device->device_id.get_value(), device});
@@ -471,7 +473,9 @@ void net_supervisor_t::persist_data() noexcept {
     auto &devs = config_copy.devices;
     devs.clear();
     for (auto &[device_id, device] : devices) {
-        devs.emplace(device_id, device->serialize());
+        if (device_id != this->device->device_id.get_value()) {
+            devs.emplace(device_id, device->serialize());
+        }
     }
     if (cluster) {
         config_copy.folders = cluster->serialize();

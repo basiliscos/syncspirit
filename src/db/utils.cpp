@@ -136,8 +136,8 @@ outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder
         }
         return make_error_code(r);
     }
-    std::string device_id((char *)value.iov_base, value.iov_len);
-    auto it = devices.find(device_id);
+    std::string local_device_id((char *)value.iov_base, value.iov_len);
+    auto it = devices.find(local_device_id);
     if (it == devices.end()) {
         return make_error_code(error_code::unknown_local_device);
     }

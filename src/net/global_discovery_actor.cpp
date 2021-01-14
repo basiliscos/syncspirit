@@ -126,7 +126,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
 }
 
 void global_discovery_actor_t::on_discovery(message::discovery_request_t &req) noexcept {
-    spdlog::trace("global_discovery_actor_t::on_on_discovery");
+    spdlog::trace("global_discovery_actor_t::on_discovery");
 
     fmt::memory_buffer tx_buff;
     auto r = proto::make_discovery_request(tx_buff, announce_url, req.payload.request_payload->device_id);

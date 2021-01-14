@@ -96,22 +96,14 @@ void db_actor_t::on_make_index_id(message::make_index_id_request_t &message) noe
     if (!txn) {
         return reply_with_error(message, txn.error());
     }
-    auto &orig = message.payload.request_payload.folder;
-    proto::Folder copy = orig;
-    copy.clear_devices();
-    auto &my_device_id = device->device_id.get_value();
-    for (int i = 0; i < orig.devices_size(); ++i) {
-        auto &folder_device = orig.devices(i);
-        if (folder_device.id() != my_device_id) {
-            *copy.add_devices() = folder_device;
-        }
-    }
+    auto &payload = message.payload.request_payload;
+    auto &orig = payload.folder;
     model::index_id_t index_id{distribution(rd)};
-    auto r = db::update_folder_info(copy, txn.value());
+    auto r = db::update_folder_info(orig, txn.value());
     if (!r) {
         return reply_with_error(message, r.error());
     }
-    r = db::create_folder(copy, index_id, device->device_id, txn.value());
+    r = db::create_folder(orig, index_id, device->device_id, txn.value());
     if (!r) {
         return reply_with_error(message, r.error());
     }

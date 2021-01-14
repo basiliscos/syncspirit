@@ -40,7 +40,7 @@ struct folder_t : arc_base_t<folder_t> {
     folder_t(const config::folder_config_t &cfg) noexcept;
 
     bool assign(const proto::Folder &source, const devices_map_t &devices) noexcept;
-    config::folder_config_t serialize() noexcept;
+    config::folder_config_t serialize(device_ptr_t local_device) noexcept;
 
     // from config
     std::string id;
