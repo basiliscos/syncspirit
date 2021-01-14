@@ -1,5 +1,3 @@
-[2021-01-14 10:45:03.400] [trace] net_supervisor_t::on_discovery, no contact for 4OYMIQU has been discovered
-
 model: cluster/folder
 2. update_folder(proto::folder) (index/max_sequence)
 3. do not allow multiple connections from the same peer

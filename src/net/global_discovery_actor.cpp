@@ -122,6 +122,13 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
         return reply_with_error(*orig_req, res.error());
     }
 
+    if (res && res.value()) {
+        auto& uris = res.value().value().uris;
+        auto& id = orig_req->payload.request_payload->device_id;
+        for(auto uri: uris) {
+            spdlog::trace("global_discovery_actor_t::on_discovery_response, {} reacheable via {}", id, uri.full);
+        }
+    }
     reply_to(*orig_req, std::move(res.value()));
 }
 

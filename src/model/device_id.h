@@ -22,8 +22,8 @@ struct device_id_t {
 
     device_id_t() noexcept {};
 
-    bool operator==(const device_id_t &other) const noexcept { return other.value == value; }
-    bool operator!=(const device_id_t &other) const noexcept { return !(other.value == value); }
+    bool operator==(const device_id_t &other) const noexcept { return other.sha256 == sha256; }
+    bool operator!=(const device_id_t &other) const noexcept { return !(other.sha256 == sha256); }
     operator bool() const noexcept { return !value.empty(); }
 
     const std::string &get_value() const noexcept { return value; }

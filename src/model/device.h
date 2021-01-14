@@ -12,6 +12,7 @@ struct device_t : arc_base_t<device_t> {
     using static_addresses_t = std::vector<utils::URI>;
 
     device_t(config::device_config_t &config) noexcept;
+
     device_id_t device_id;
     std::string name;
     config::compression_t compression;
@@ -23,6 +24,9 @@ struct device_t : arc_base_t<device_t> {
     bool skip_introduction_removals;
     config::device_config_t::ignored_folders_t ignored_folders;
     bool online = false;
+
+    bool operator==(const device_t &other) const noexcept { return other.device_id == device_id; }
+    bool operator!=(const device_t &other) const noexcept { return other.device_id != device_id; }
 
     config::device_config_t serialize() noexcept;
     inline bool is_dynamic() const noexcept { return static_addresses.empty(); }

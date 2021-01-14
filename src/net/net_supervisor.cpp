@@ -215,7 +215,10 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
 
 void net_supervisor_t::on_announce(message::announce_notification_t &) noexcept {
     for (auto it : devices) {
-        discover(it.second);
+        auto &d = it.second;
+        if (*d != *device) {
+            discover(it.second);
+        }
     }
 }
 
