@@ -124,6 +124,7 @@ struct peer_actor_t : public r::actor_base_t {
     void read_cluster_config(proto::message::message_t &&msg) noexcept;
 
     std::string_view device_name;
+    config::bep_config_t bep_config;
     r::address_ptr_t coordinator;
     model::device_id_t peer_device_id;
     model::peer_contact_t::uri_container_t uris;
@@ -138,6 +139,7 @@ struct peer_actor_t : public r::actor_base_t {
     tx_item_t tx_item;
     fmt::memory_buffer rx_buff;
     std::size_t rx_idx = 0;
+    bool connected = false;
     bool valid_peer = false;
     std::string cert_name;
     tcp::endpoint peer_endpoint;

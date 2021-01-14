@@ -15,8 +15,8 @@ r::plugin::resource_id_t timer = 3;
 } // namespace
 
 peer_actor_t::peer_actor_t(config_t &config)
-    : r::actor_base_t{config}, device_name{config.device_name}, coordinator{config.coordinator},
-      peer_device_id{config.peer_device_id}, uris{config.uris},
+    : r::actor_base_t{config}, device_name{config.device_name}, bep_config{config.bep_config},
+      coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, uris{config.uris},
       peer_identity(config.peer_identity ? std::move(config.peer_identity.value()) : ""),
       sock(std::move(config.sock)), ssl_pair{*config.ssl_pair} {
     rx_buff.resize(config.bep_config.rx_buff_size);
@@ -72,7 +72,8 @@ void peer_actor_t::try_next_uri() noexcept {
 void peer_actor_t::initiate(transport::transport_sp_t tran, const utils::URI &url) noexcept {
     transport = std::move(tran);
 
-    spdlog::trace("peer_actor_t::try_next_uri(), will initate connection with {} via {}", peer_identity, url.full);
+    spdlog::trace("peer_actor_t::try_next_uri(), will initate connection with {} via {} (transport = {})",
+                  peer_identity, url.full, (void *)transport.get());
     pt::time_duration resolve_timeout = init_timeout / 2;
     auto port = std::to_string(url.port);
     request<payload::address_request_t>(resolver, url.host, port).send(resolve_timeout);
@@ -86,6 +87,7 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto &ec = res.payload.ec;
     if (ec) {
         spdlog::warn("peer_actor_t::on_resolve error, {} : {}", peer_identity, ec.message());
+        resources->acquire(resource::uris);
         return try_next_uri();
     }
 
@@ -95,7 +97,7 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     transport->async_connect(addresses, on_connect, on_error);
     resources->acquire(resource::io);
 
-    pt::time_duration timeout = init_timeout * 8 / 10;
+    auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
     timer_request = start_timer(timeout, *this, &peer_actor_t::on_timer);
     resources->acquire(resource::timer);
 }
@@ -106,6 +108,7 @@ void peer_actor_t::on_connect(resolve_it_t) noexcept {
 }
 
 void peer_actor_t::initiate_handshake() noexcept {
+    connected = true;
     transport::handshake_fn_t handshake_fn([&](auto &&...args) { on_handshake(args...); });
     transport::error_fn_t error_fn([&](auto arg) { on_handshake_error(arg); });
     transport->async_handshake(handshake_fn, error_fn);
@@ -117,7 +120,9 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
         spdlog::warn("peer_actor_t::on_io_error, {} :: {}", peer_identity, ec.message());
     }
     cancel_timer();
-    if (resources->has(resource::uris)) {
+    if (!connected && state < r::state_t::SHUTTING_DOWN) {
+        transport.reset();
+        resources->acquire(resource::uris);
         try_next_uri();
     } else {
         do_shutdown();
@@ -243,7 +248,11 @@ void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::timer);
     // spdlog::trace("peer_actor_t::on_timer_trigger, peer = {}, cancelled = {}", peer_identity, cancelled);
     if (!cancelled) {
-        do_shutdown();
+        if (connected) {
+            do_shutdown();
+        } else {
+            transport->cancel();
+        }
     }
 }
 

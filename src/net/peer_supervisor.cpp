@@ -70,7 +70,7 @@ void peer_supervisor_t::on_start() noexcept {
 
 void peer_supervisor_t::on_connect_request(message::connect_request_t &msg) noexcept {
     auto &payload = msg.payload.request_payload->payload;
-    auto timeout = shutdown_timeout * 7 / 10;
+    auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
 
     auto builder = create_actor<peer_actor_t>()
                        .ssl_pair(&ssl_pair)
@@ -85,6 +85,7 @@ void peer_supervisor_t::on_connect_request(message::connect_request_t &msg) noex
             if constexpr (std::is_same_v<T, P::connect_info_t>) {
                 auto &peer_id = arg.device_id;
                 auto &uris = arg.uris;
+                timeout *= uris.size();
                 spdlog::trace("peer_supervisor_t::on_connect, initiating connection with {}", peer_id);
                 return std::move(builder).peer_device_id(peer_id).uris(uris).finish()->get_address();
             } else if constexpr (std::is_same_v<T, P::connected_info_t>) {

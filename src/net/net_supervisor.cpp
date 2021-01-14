@@ -232,8 +232,8 @@ void net_supervisor_t::on_discovery(message::discovery_response_t &res) noexcept
     if (!ec) {
         auto &contact = res.payload.res->peer;
         if (contact) {
-            auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout};
             auto &urls = contact.value().uris;
+            auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout * (urls.size() + 1)};
             spdlog::warn("TODO: net_supervisor_t::on_discovery, update last_seen", req.device_id);
             request<payload::connect_request_t>(peers_addr, req.device_id, urls).send(timeout);
         } else {
@@ -255,7 +255,8 @@ void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message)
         auto it = devices.find(id);
         if (it != devices.end()) {
             if (!it->second->online) {
-                auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout};
+                auto &urls = peer.uris;
+                auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout * (urls.size() + 1)};
                 request<payload::connect_request_t>(peers_addr, device_id, peer.uris).send(timeout);
             }
         } else {
@@ -348,7 +349,8 @@ void net_supervisor_t::discover(model::device_ptr_t &device) noexcept {
             discovery_map.emplace(req_id);
         }
     } else {
-        auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout};
+        auto &urls = device->static_addresses;
+        auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout * (urls.size() + 1)};
         request<payload::connect_request_t>(peers_addr, device->device_id, device->static_addresses).send(timeout);
     }
 }
