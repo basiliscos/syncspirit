@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../transport/base.h"
+#include "../transport/http.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor.hpp>
@@ -92,9 +92,8 @@ struct http_actor_t : public r::actor_base_t {
     queue_t queue;
     bool need_response = false;
     bool stop_io = false;
-    transport::transport_sp_t transport;
+    transport::http_sp_t transport;
     std::optional<asio::ip::address> local_address;
-    transport::http_base_t *http_adapter = nullptr;
     http::request<http::empty_body> http_request;
     http::response<http::string_body> http_response;
     size_t response_size = 0;

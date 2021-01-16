@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../config/bep.h"
+#include "../transport/stream.h"
 #include "../proto/bep_support.h"
 #include "messages.h"
 #include <boost/asio.hpp>
@@ -107,7 +108,7 @@ struct peer_actor_t : public r::actor_base_t {
     void on_write(std::size_t bytes) noexcept;
     void on_read(std::size_t bytes) noexcept;
     void try_next_uri() noexcept;
-    void initiate(transport::transport_sp_t tran, const utils::URI &url) noexcept;
+    void initiate(transport::stream_sp_t tran, const utils::URI &url) noexcept;
     void on_handshake(bool valid_peer, X509 *peer_cert, const tcp::endpoint &peer_endpoint,
                       const model::device_id_t *peer_device) noexcept;
     void on_handshake_error(sys::error_code ec) noexcept;
@@ -132,7 +133,7 @@ struct peer_actor_t : public r::actor_base_t {
     std::optional<tcp_socket_t> sock;
     const utils::key_pair_t &ssl_pair;
     r::address_ptr_t resolver;
-    transport::transport_sp_t transport;
+    transport::stream_sp_t transport;
     std::int32_t uri_idx = -1;
     std::optional<r::request_id_t> timer_request;
     tx_queue_t tx_queue;

@@ -39,7 +39,7 @@ void peer_actor_t::instantiate_transport() noexcept {
         auto uri = utils::parse("tcp://0.0.0.0/").value();
         auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
         transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup, std::move(sock)};
-        transport = transport::initiate(cfg);
+        transport = transport::initiate_stream(cfg);
         resources->acquire(resource::io);
         initiate_handshake();
     } else {
@@ -51,12 +51,12 @@ void peer_actor_t::instantiate_transport() noexcept {
 
 void peer_actor_t::try_next_uri() noexcept {
     transport::ssl_junction_t ssl{peer_device_id, &ssl_pair, false};
-    while (uri_idx < (std::int32_t)uris.size()) {
-        auto &uri = uris[++uri_idx];
+    while (++uri_idx < (std::int32_t)uris.size()) {
+        auto &uri = uris[uri_idx];
         auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
         // spdlog::warn("url: {}", uri.full);
         transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup, {}};
-        auto result = transport::initiate(cfg);
+        auto result = transport::initiate_stream(cfg);
         if (result) {
             initiate(std::move(result), uri);
             resources->release(resource::uris);
@@ -69,7 +69,7 @@ void peer_actor_t::try_next_uri() noexcept {
     do_shutdown();
 }
 
-void peer_actor_t::initiate(transport::transport_sp_t tran, const utils::URI &url) noexcept {
+void peer_actor_t::initiate(transport::stream_sp_t tran, const utils::URI &url) noexcept {
     transport = std::move(tran);
 
     spdlog::trace("peer_actor_t::try_next_uri(), will initate connection with {} via {} (transport = {})",
@@ -115,13 +115,14 @@ void peer_actor_t::initiate_handshake() noexcept {
 }
 
 void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
+    spdlog::trace("peer_actor_t::on_io_error, {} :: {}", peer_identity, ec.message());
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
         spdlog::warn("peer_actor_t::on_io_error, {} :: {}", peer_identity, ec.message());
     }
     cancel_timer();
     if (!connected && state < r::state_t::SHUTTING_DOWN) {
-        transport.reset();
+        // transport.reset();
         resources->acquire(resource::uris);
         try_next_uri();
     } else {

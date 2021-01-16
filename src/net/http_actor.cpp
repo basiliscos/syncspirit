@@ -125,7 +125,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto &ssl_ctx = payload->ssl_context;
     auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
     transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup, {}};
-    transport = transport::initiate(cfg);
+    transport = transport::initiate_http(cfg);
     if (!transport) {
         auto ec = utils::make_error_code(utils::error_code::transport_not_available);
         reply_with_error(*queue.front(), ec);
@@ -133,8 +133,6 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
         need_response = false;
         return process();
     }
-    http_adapter = dynamic_cast<transport::http_base_t *>(transport.get());
-    assert(http_adapter);
 
     auto &addresses = res.payload.res->results;
     transport::connect_fn_t on_connect = [&](auto arg) { this->on_connect(arg); };
@@ -195,7 +193,7 @@ void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
     rx_buff->prepare(payload.rx_buff_size);
     transport::io_fn_t on_read = [&](auto arg) { this->on_request_read(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
-    http_adapter->async_read(*rx_buff, http_response, on_read, on_error);
+    transport->async_read(*rx_buff, http_response, on_read, on_error);
     resources->acquire(resource::io);
 }
 
@@ -214,7 +212,6 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     } else {
         kept_alive = false;
         transport.reset();
-        http_adapter = nullptr;
     }
 
     if (resources->has(resource::request_timer)) {

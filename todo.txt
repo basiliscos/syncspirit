@@ -55,7 +55,8 @@ https://stackoverflow.com/questions/64035952/how-to-key-press-detection-on-a-lin
 openssl x509 -inform PEM -outform DER -in ~/.config/syncthing/cert.pem -out /tmp/cert.der
 
 - статически собирать бинарь под линь ( https://www.youtube.com/watch?v=Z7WuUhPJ-cU&list=PLZN9ZGiWZoZruMY-MlkAd-nHzdP9TfLRC&index=25 )
-
+- case: когда коннектимся к пиру, но он ранее приконнектился к нам
+- dialer-actor
 - protobuf light?
 
 - DB
