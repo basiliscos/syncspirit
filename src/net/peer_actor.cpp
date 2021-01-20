@@ -273,12 +273,13 @@ void peer_actor_t::cancel_timer() noexcept {
 }
 
 void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
-    bool ok = res.payload.res;
+    bool ok = res.payload.res.authorized;
     spdlog::trace("peer_actor_t::read_hello, peer = {}, value = {}", peer_identity, ok);
     if (!ok) {
         spdlog::debug("peer_actor_t::on_auth, peer {} has been rejected in authorization, disconnecting");
         return do_shutdown();
     }
+
     read_action = [this](auto &&msg) { read_cluster_config(std::move(msg)); };
     read_more();
 }

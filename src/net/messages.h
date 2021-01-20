@@ -170,10 +170,13 @@ struct connect_request_t : r::arc_base_t<connect_request_t> {
     payload_t payload;
 };
 
-using auth_response = bool;
+struct auth_response_t {
+    bool authorized;
+    proto::ClusterConfig cluster_config;
+};
 
 struct auth_request_t {
-    using response_t = auth_response;
+    using response_t = auth_response_t;
     r::address_ptr_t peer_addr;
     tcp::endpoint endpoint;
     model::device_id_t peer_device_id;
