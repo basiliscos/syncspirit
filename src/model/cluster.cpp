@@ -1,4 +1,5 @@
 #include "cluster.h"
+#include <spdlog/spdlog.h>
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -21,6 +22,29 @@ folder_ptr_t cluster_t::get_folder(const std::string &folder_id) noexcept {
         return it->second;
     }
     return folder_ptr_t{};
+}
+
+cluster_t::unknown_folders_t cluster_t::update(proto::ClusterConfig &config, const devices_map_t &devices) noexcept {
+    unknown_folders_t unknown;
+    for (int i = 0; i < config.folders_size(); ++i) {
+        auto &f = *config.mutable_folders(i);
+        sanitize(f, devices);
+
+        auto folder = get_folder(f.id());
+        if (!folder) {
+            unknown.emplace_back(f);
+        } else {
+            folder->assign(f, devices);
+        }
+
+        spdlog::debug("cluster_t::update, folder : {} / {}", f.label().c_str(), f.id().c_str());
+        for (int j = 0; j < f.devices_size(); ++j) {
+            auto &d = f.devices(j);
+            spdlog::trace("device: name = {}, issued by {}, max sequence = {}, index_id = {}", d.name(), d.cert_name(),
+                          d.max_sequence(), d.index_id());
+        }
+    }
+    return unknown;
 }
 
 void cluster_t::sanitize(proto::Folder &folder, const devices_map_t &devices) noexcept {

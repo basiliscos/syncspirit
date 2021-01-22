@@ -362,23 +362,9 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
     if (!ec) {
         auto &device_id = message.payload.res->peer_device_id;
         auto &device = devices.at(device_id.get_value());
-        auto &config = message.payload.res->cluster_config;
-        for (int i = 0; i < config.folders_size(); ++i) {
-            auto &f = *config.mutable_folders(i);
-            cluster->sanitize(f, devices);
-
-            auto folder = cluster->get_folder(f.id());
-            if (!folder) {
-                send<ui::payload::new_folder_notify_t>(address, f, device);
-            } else {
-                folder->assign(f, devices);
-            }
-            spdlog::info("folder : {} / {}", f.label().c_str(), f.id().c_str());
-            for (int j = 0; j < f.devices_size(); ++j) {
-                auto &d = f.devices(j);
-                spdlog::info("device: name = {}, issued by {}, max sequence = {}, index_id = {}", d.name(),
-                             d.cert_name(), d.max_sequence(), d.index_id());
-            }
+        auto unknown = cluster->update(message.payload.res->cluster_config, devices);
+        for (auto &folder : unknown) {
+            send<ui::payload::new_folder_notify_t>(address, folder, device);
         }
     } else {
         auto &payload = message.payload.req->payload.request_payload->payload;
