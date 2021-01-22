@@ -48,14 +48,14 @@ paused = false
 skip_introduction_removals = false
 
     [[device.ignored_folder]]
-    id = 'default'
-    label = 'Default Folder'
+    id = 'nagkw-srrjz'
+    label = 'Sync'
 
 [[folder]]
 devices = [ 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7' ]
 disable_temp_indixes = false
 folder_type = 3
-id = 'fpwop-79ucw'
+id = 'e59yo-b73fz'
 ignore_delete = false
 ignore_permissions = false
 label = 'sample-folder'
@@ -70,7 +70,7 @@ watched = true
 devices = [ 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7' ]
 disable_temp_indixes = false
 folder_type = 3
-id = 'ogyq9-pxtzk'
+id = 'ig6gw-nhbjt'
 ignore_delete = false
 ignore_permissions = false
 label = 'empty-folder'

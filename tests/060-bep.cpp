@@ -148,4 +148,11 @@ TEST_CASE("cluster config", "[bep]") {
         REQUIRE(!r);
         CHECK(r.error() == utils::make_error_code(utils::bep_error_code::lz4_decoding));
     }
+
+    SECTION("serialize") {
+        proto::ClusterConfig cluster;
+        cluster.add_folders();
+        auto s = cluster.SerializePartialAsString();
+        CHECK(s.size() > 0);
+    }
 }

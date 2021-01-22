@@ -190,4 +190,15 @@ outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff
     return std::move(msg);
 }
 
+void serialize(fmt::memory_buffer &buff, proto::ClusterConfig &cluster) noexcept {
+    if (cluster.folders_size() == 0) {
+        // side effect, avoid just serialization to empty string
+        cluster.add_folders();
+    }
+    auto sz = cluster.ByteSizeLong();
+    assert(sz);
+    buff.resize(sz);
+    cluster.SerializeToArray(buff.begin(), sz);
+}
+
 } // namespace syncspirit::proto

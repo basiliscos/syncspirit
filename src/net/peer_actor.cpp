@@ -1,6 +1,7 @@
 #include "peer_actor.h"
 #include "names.h"
 #include "../utils/tls.h"
+#include "../proto/bep_support.h"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::net;
@@ -282,10 +283,7 @@ void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
     }
 
     fmt::memory_buffer buff;
-    auto sz = cluster->ByteSizeLong();
-    assert(sz);
-    buff.resize(sz);
-    cluster->SerializeToArray(buff.begin(), sz);
+    serialize(buff, *cluster);
     push_write(std::move(buff), false);
 
     read_action = [this](auto &&msg) { read_cluster_config(std::move(msg)); };
