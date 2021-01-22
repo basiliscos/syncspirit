@@ -271,6 +271,10 @@ void tui_actor_t::create_folder(const proto::Folder &folder, model::device_ptr_t
                                        constants::rescan_interval,
                                        config::pull_order_t::random,
                                        true,
+                                       false,
+                                       false,
+                                       false,
+                                       false,
                                        false};
     auto timeout = init_timeout / 2;
     request<ui::payload::create_folder_request_t>(coordinator, folder, std::move(folder_cfg), source).send(timeout);

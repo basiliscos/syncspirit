@@ -97,7 +97,7 @@ void db_actor_t::on_make_index_id(message::make_index_id_request_t &message) noe
         return reply_with_error(message, txn.error());
     }
     auto &payload = message.payload.request_payload;
-    auto &orig = payload.folder;
+    auto &orig = payload->folder;
     model::index_id_t index_id{distribution(rd)};
     auto r = db::update_folder_info(orig, txn.value());
     if (!r) {

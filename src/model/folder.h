@@ -42,6 +42,8 @@ struct folder_t : arc_base_t<folder_t> {
     bool assign(const proto::Folder &source, const devices_map_t &devices) noexcept;
     config::folder_config_t serialize(device_ptr_t local_device) noexcept;
 
+    proto::Folder get() noexcept;
+
     // from config
     std::string id;
     std::string label;
@@ -51,7 +53,11 @@ struct folder_t : arc_base_t<folder_t> {
     std::uint32_t rescan_interval;
     config::pull_order_t pull_order;
     bool watched;
+    bool read_only;
     bool ignore_permissions;
+    bool ignore_delete;
+    bool disable_temp_indixes;
+    bool paused;
 };
 
 using folder_ptr_t = intrusive_ptr_t<folder_t>;

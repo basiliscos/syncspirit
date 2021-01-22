@@ -20,6 +20,10 @@ struct folder_config_t {
     pull_order_t pull_order;
     bool watched;
     bool ignore_permissions;
+    bool read_only;
+    bool ignore_delete;
+    bool disable_temp_indixes;
+    bool paused;
 };
 
 } // namespace syncspirit::config

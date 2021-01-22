@@ -35,8 +35,9 @@ bool operator==(const device_config_t &lhs, const device_config_t &rhs) noexcept
 bool operator==(const folder_config_t &lhs, const folder_config_t &rhs) noexcept {
     return lhs.id == rhs.id && lhs.label == rhs.label && lhs.path == rhs.path && lhs.device_ids == rhs.device_ids &&
            lhs.folder_type == rhs.folder_type && lhs.rescan_interval == rhs.rescan_interval &&
-           lhs.pull_order == rhs.pull_order && lhs.watched == rhs.watched &&
-           lhs.ignore_permissions == rhs.ignore_permissions;
+           lhs.pull_order == rhs.pull_order && lhs.watched == rhs.watched && lhs.read_only == rhs.read_only &&
+           lhs.ignore_permissions == rhs.ignore_permissions && lhs.ignore_delete == rhs.ignore_delete &&
+           lhs.disable_temp_indixes == rhs.disable_temp_indixes && lhs.paused == rhs.paused;
 }
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
@@ -243,6 +244,26 @@ static std::optional<folder_config_t> get_folder(toml::table &t, const main_t::d
         return result_t();
     }
 
+    auto read_only = t["read_only"].value<bool>();
+    if (!read_only) {
+        return result_t();
+    }
+
+    auto ignore_delete = t["ignore_delete"].value<bool>();
+    if (!ignore_delete) {
+        return result_t();
+    }
+
+    auto disable_temp_indixes = t["disable_temp_indixes"].value<bool>();
+    if (!disable_temp_indixes) {
+        return result_t();
+    }
+
+    auto paused = t["paused"].value<bool>();
+    if (!paused) {
+        return result_t();
+    }
+
     folder_config_t::device_ids_t device_ids;
     auto devs = t["devices"];
     if (devs.is_array()) {
@@ -268,7 +289,11 @@ static std::optional<folder_config_t> get_folder(toml::table &t, const main_t::d
                            rescan_interval.value(),
                            pull_order,
                            watched.value(),
-                           ignore_permissions.value()};
+                           read_only.value(),
+                           ignore_permissions.value(),
+                           ignore_delete.value(),
+                           disable_temp_indixes.value(),
+                           paused.value()};
 }
 
 config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path) {
@@ -584,6 +609,10 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
             {"pull_order", static_cast<std::uint32_t>(folder.pull_order)},
             {"watched", folder.watched},
             {"ignore_permissions", folder.ignore_permissions},
+            {"read_only", folder.read_only},
+            {"ignore_delete", folder.ignore_delete},
+            {"disable_temp_indixes", folder.disable_temp_indixes},
+            {"paused", folder.paused},
         }};
         auto device_ids = toml::array{};
         for(auto& it: folder.device_ids) {

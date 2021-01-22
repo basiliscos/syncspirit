@@ -17,10 +17,10 @@ peer_activity_t::peer_activity_t(tui_actor_t &actor_, ui::message::discovery_not
 peer_activity_t::peer_activity_t(tui_actor_t &actor_, ui::message::auth_notify_t &message) noexcept
     : activity_t{actor_, activity_type_t::PEER}, sub_activity{sub_activity_t::main} {
     auto &payload = message.payload.net_message->payload.request_payload;
-    auto &hello = payload.hello;
-    peer_details = fmt::format("{}, {}/{}", payload.endpoint, hello.client_name(), hello.client_version());
-    device_id = payload.peer_device_id;
-    cert_name = payload.cert_name;
+    auto &hello = payload->hello;
+    peer_details = fmt::format("{}, {}/{}", payload->endpoint, hello.client_name(), hello.client_version());
+    device_id = payload->peer_device_id;
+    cert_name = payload->cert_name;
     peer_name = hello.device_name();
 }
 

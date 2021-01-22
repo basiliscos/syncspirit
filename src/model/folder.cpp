@@ -6,7 +6,9 @@ using namespace syncspirit::model;
 
 folder_t::folder_t(const config::folder_config_t &cfg) noexcept
     : id{cfg.id}, label{cfg.label}, path{cfg.path}, folder_type{cfg.folder_type}, rescan_interval{cfg.rescan_interval},
-      pull_order{cfg.pull_order}, watched{cfg.watched}, ignore_permissions{cfg.ignore_permissions} {}
+      pull_order{cfg.pull_order}, watched{cfg.watched}, read_only{cfg.read_only},
+      ignore_permissions{cfg.ignore_permissions}, ignore_delete{cfg.ignore_delete},
+      disable_temp_indixes{cfg.disable_temp_indixes}, paused{cfg.paused} {}
 
 bool folder_t::assign(const proto::Folder &source, const devices_map_t &devices_map) noexcept {
     // remove outdated
@@ -56,6 +58,47 @@ config::folder_config_t folder_t::serialize(device_ptr_t local_device) noexcept 
         }
     }
     return config::folder_config_t{
-        id,         label,   path.string(),     std::move(devices), folder_type, rescan_interval,
-        pull_order, watched, ignore_permissions};
+        id,      label,     path.string(),      std::move(devices), folder_type,          rescan_interval, pull_order,
+        watched, read_only, ignore_permissions, ignore_delete,      disable_temp_indixes, paused};
+}
+
+static proto::Compression compression(model::device_ptr_t device) noexcept {
+    using C = proto::Compression;
+    switch (device->compression) {
+    case config::compression_t::none:
+        return C::NEVER;
+    case config::compression_t::meta:
+        return C::METADATA;
+    case config::compression_t::all:
+        return C::ALWAYS;
+    }
+    return C::NEVER;
+}
+
+proto::Folder folder_t::get() noexcept {
+    proto::Folder r;
+    r.set_id(id);
+    r.set_label(label);
+    r.set_read_only(read_only);
+    r.set_ignore_permissions(ignore_permissions);
+    r.set_ignore_delete(ignore_delete);
+    r.set_disable_temp_indexes(disable_temp_indixes);
+    r.set_paused(paused);
+    int i = 0;
+    for (auto &fd : this->devices) {
+        auto &id = fd.device->device_id.get_value();
+        proto::Device pd;
+        auto &device = fd.device;
+        pd.set_id(id);
+        pd.set_name(device->name);
+        pd.set_compression(compression(device));
+        if (device->cert_name)
+            pd.set_cert_name(device->cert_name.value());
+        pd.set_max_sequence(fd.max_sequence);
+        pd.set_introducer(device->introducer);
+        pd.set_index_id(fd.index_id);
+        pd.set_skip_introduction_removals(device->skip_introduction_removals);
+        *r.add_devices() = pd;
+    }
+    return r;
 }

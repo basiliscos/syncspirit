@@ -1,5 +1,6 @@
 #include "cluster.h"
 
+using namespace syncspirit;
 using namespace syncspirit::model;
 
 cluster_t::cluster_t(device_ptr_t device_) noexcept : device(std::move(device_)) {}
@@ -35,4 +36,12 @@ void cluster_t::sanitize(proto::Folder &folder, const devices_map_t &devices) no
             *folder.add_devices() = fd;
         }
     }
+}
+
+proto::ClusterConfig cluster_t::get() noexcept {
+    proto::ClusterConfig r;
+    for (auto &[id, folder] : folders) {
+        *(r.add_folders()) = folder->get();
+    }
+    return r;
 }

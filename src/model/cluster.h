@@ -17,6 +17,7 @@ struct cluster_t : arc_base_t<cluster_t> {
     void sanitize(proto::Folder &folder, const devices_map_t &devices) noexcept;
     folder_ptr_t get_folder(const std::string &folder_id) noexcept;
     folders_config_t serialize() noexcept;
+    proto::ClusterConfig get() noexcept;
 
     device_ptr_t device;
     folders_t folders;

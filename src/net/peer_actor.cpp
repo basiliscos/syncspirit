@@ -144,9 +144,9 @@ void peer_actor_t::process_tx_queue() noexcept {
             resources->acquire(resource::io);
             transport->async_send(asio::buffer(tx_buff.data(), tx_buff.size()), on_write, on_error);
         } else {
-            assert(tx_item->final);
             spdlog::trace("peer_actor_t::process_tx_queue, device_id = {}, final empty message, shutting down ",
                           peer_device_id);
+            assert(tx_item->final);
             do_shutdown();
         }
     }
@@ -273,12 +273,20 @@ void peer_actor_t::cancel_timer() noexcept {
 }
 
 void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
-    bool ok = res.payload.res.authorized;
-    spdlog::trace("peer_actor_t::read_hello, peer = {}, value = {}", peer_identity, ok);
+    auto &cluster = res.payload.res->cluster_config;
+    bool ok = (bool)cluster;
+    spdlog::trace("peer_actor_t::on_auth, peer = {}, value = {}", peer_identity, ok);
     if (!ok) {
         spdlog::debug("peer_actor_t::on_auth, peer {} has been rejected in authorization, disconnecting");
         return do_shutdown();
     }
+
+    fmt::memory_buffer buff;
+    auto sz = cluster->ByteSizeLong();
+    assert(sz);
+    buff.resize(sz);
+    cluster->SerializeToArray(buff.begin(), sz);
+    push_write(std::move(buff), false);
 
     read_action = [this](auto &&msg) { read_cluster_config(std::move(msg)); };
     read_more();

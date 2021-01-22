@@ -170,18 +170,27 @@ struct connect_request_t : r::arc_base_t<connect_request_t> {
     payload_t payload;
 };
 
-struct auth_response_t {
-    bool authorized;
-    proto::ClusterConfig cluster_config;
+struct auth_response_t : r::arc_base_t<auth_response_t> {
+    using cluster_config_ptr_t = std::unique_ptr<proto::ClusterConfig>;
+    cluster_config_ptr_t cluster_config;
+
+    auth_response_t(cluster_config_ptr_t &&cluster_config_) noexcept : cluster_config{std::move(cluster_config_)} {}
 };
 
-struct auth_request_t {
-    using response_t = auth_response_t;
+struct auth_request_t : r::arc_base_t<auth_request_t> {
+    using response_t = r::intrusive_ptr_t<auth_response_t>;
+
     r::address_ptr_t peer_addr;
     tcp::endpoint endpoint;
     model::device_id_t peer_device_id;
     std::string cert_name;
     proto::Hello hello;
+
+    auth_request_t(r::address_ptr_t peer_addr_, const tcp::endpoint &endpoint_,
+                   const model::device_id_t &peer_device_id_, const std::string &cert_name_,
+                   proto::Hello &&hello_) noexcept
+        : peer_addr{peer_addr_}, endpoint{endpoint_},
+          peer_device_id{peer_device_id_}, cert_name{cert_name_}, hello{std::move(hello_)} {}
 };
 
 struct connect_notify_t {
@@ -203,9 +212,11 @@ struct make_index_id_response_t {
     model::index_id_t index_id;
 };
 
-struct make_index_id_request_t {
+struct make_index_id_request_t : r::arc_base_t<make_index_id_request_t> {
     using response_t = make_index_id_response_t;
     proto::Folder folder;
+
+    make_index_id_request_t(const proto::Folder &folder_) noexcept : folder{folder_} {}
 };
 
 struct load_folder_response_t {
