@@ -18,6 +18,7 @@ http_actor_t::http_actor_t(config_t &config)
 
 void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(registry_name, true); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&http_actor_t::on_request);
         p.subscribe_actor(&http_actor_t::on_resolve);
@@ -54,7 +55,7 @@ void http_actor_t::on_cancel(message::http_cancel_t &req) noexcept {
             auto &http_req = **it;
             if (http_req.payload.id == request_id) {
                 auto ec = r::make_error_code(r::error_code_t::cancelled);
-                reply_with_error(http_req, ec);
+                reply_with_error(http_req, make_error(ec));
                 queue.erase(it);
                 return;
             }
@@ -66,7 +67,7 @@ void http_actor_t::process() noexcept {
     if (stop_io) {
         auto ec = utils::make_error_code(utils::error_code::service_not_available);
         for (auto req : queue) {
-            reply_with_error(*req, ec);
+            reply_with_error(*req, make_error(ec));
         }
         queue.clear();
         if (resources->has(resource::io)) {
@@ -74,8 +75,8 @@ void http_actor_t::process() noexcept {
         }
         return;
     }
-
-    auto skip = queue.empty() || resources->has(resource::io) || resources->has(resource::request_timer);
+    auto skip =
+        queue.empty() || resources->has(resource::io) || resources->has(resource::request_timer) || resolve_request;
     if (skip)
         return;
 
@@ -86,12 +87,12 @@ void http_actor_t::process() noexcept {
 
     if (keep_alive && kept_alive) {
         if (url.host == resolved_url.host && url.port == resolved_url.port) {
-            spdlog::trace("http_actor_t ({}) reusing connection", registry_name);
+            spdlog::trace("{} reusing connection", identity);
             spawn_timer();
             write_request();
         } else {
-            spdlog::warn("http_actor_t ({}) :: different endpoint is used: {}:{} vs {}:{}", registry_name,
-                         resolved_url.host, resolved_url.port, url.host, url.port);
+            spdlog::warn("{} :: different endpoint is used: {}:{} vs {}:{}", identity, resolved_url.host,
+                         resolved_url.port, url.host, url.port);
             kept_alive = false;
             transport->cancel();
             return;
@@ -103,6 +104,7 @@ void http_actor_t::process() noexcept {
 }
 
 void http_actor_t::spawn_timer() noexcept {
+    assert(!timer_request);
     timer_request = start_timer(request_timeout, *this, &http_actor_t::on_timer);
     resources->acquire(resource::request_timer);
 }
@@ -111,14 +113,14 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     resolve_request.reset();
     auto &ec = res.payload.ec;
     if (ec) {
-        spdlog::warn("http_actor_t::on_resolve error: {} ({})", ec.message(), ec.category().name());
+        spdlog::warn("{}, on_resolve error: {}", identity, ec->message());
         reply_with_error(*queue.front(), ec);
         queue.pop_front();
         need_response = false;
         return process();
     }
 
-    if (stop_io)
+    if (stop_io || queue.empty())
         return process();
 
     auto &payload = queue.front()->payload.request_payload;
@@ -128,7 +130,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     transport = transport::initiate_http(cfg);
     if (!transport) {
         auto ec = utils::make_error_code(utils::error_code::transport_not_available);
-        reply_with_error(*queue.front(), ec);
+        reply_with_error(*queue.front(), make_error(ec));
         queue.pop_front();
         need_response = false;
         return process();
@@ -153,8 +155,8 @@ void http_actor_t::on_connect(resolve_it_t) noexcept {
         sys::error_code ec;
         local_address = transport->local_address(ec);
         if (ec) {
-            spdlog::warn("http_actor_t::on_connect, get local addr error :: {}", ec.message());
-            reply_with_error(*queue.front(), ec);
+            spdlog::warn("{}, on_connect, get local addr error :: {}", identity, ec.message());
+            reply_with_error(*queue.front(), make_error(ec));
             queue.pop_front();
             need_response = false;
             if (resources->has(resource::request_timer)) {
@@ -174,7 +176,7 @@ void http_actor_t::write_request() noexcept {
     auto &payload = *queue.front()->payload.request_payload;
     auto &url = payload.url;
     auto &data = payload.data;
-    spdlog::trace("http_actor_t ({}) :: sending {} bytes to {} ", registry_name, data.size(), url.full);
+    spdlog::trace("{} :: sending {} bytes to {} ", identity, data.size(), url.full);
     auto buff = asio::buffer(data.data(), data.size());
     transport::io_fn_t on_write = [&](auto arg) { this->on_request_sent(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
@@ -224,7 +226,7 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     kept_alive = false;
     if (ec != asio::error::operation_aborted) {
-        spdlog::warn("http_actor_t::on_io_error :: {}", ec.message());
+        spdlog::warn("{}, on_io_error :: {}", identity, ec.message());
     }
     if (resources->has(resource::request_timer)) {
         cancel_timer(*timer_request);
@@ -233,7 +235,7 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
         return process();
     }
 
-    reply_with_error(*queue.front(), ec);
+    reply_with_error(*queue.front(), make_error(ec));
     queue.pop_front();
     need_response = false;
 }
@@ -250,12 +252,12 @@ void http_actor_t::on_handshake(bool, X509 *, const tcp::endpoint &, const model
 void http_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        spdlog::warn("http_actor_t::on_handshake_error :: {}", ec.message());
+        spdlog::warn("{}, on_handshake_error :: {}", identity, ec.message());
     }
     if (!need_response || stop_io) {
         return process();
     }
-    reply_with_error(*queue.front(), ec);
+    reply_with_error(*queue.front(), make_error(ec));
     queue.pop_front();
     need_response = false;
     if (resources->has(resource::request_timer)) {
@@ -276,7 +278,7 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
         reply_to(*queue.front(), std::move(http_response), response_size, std::move(local_address));
     } else {
         auto ec = r::make_error_code(r::error_code_t::request_timeout);
-        reply_with_error(*queue.front(), ec);
+        reply_with_error(*queue.front(), make_error(ec));
     }
     queue.pop_front();
     need_response = false;
@@ -288,12 +290,12 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 }
 
 void http_actor_t::on_start() noexcept {
-    spdlog::trace("http_actor_t::on_start({}) (addr = {})", registry_name, (void *)address.get());
+    spdlog::trace("{}, on_start", identity);
     r::actor_base_t::on_start();
 }
 
 void http_actor_t::shutdown_finish() noexcept {
-    spdlog::trace("http_actor_t::shutdown_finish({}) (addr = {})", registry_name, (void *)address.get());
+    spdlog::trace("{}, shutdown_finish", identity);
     r::actor_base_t::shutdown_finish();
     transport.reset();
 }

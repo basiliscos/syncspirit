@@ -8,11 +8,22 @@ using namespace syncspirit::net;
 
 template <class> inline constexpr bool always_false_v = false;
 
+namespace {
+namespace to {
+struct shutdown_reason {};
+} // namespace to
+} // namespace
+
+namespace rotor {
+template <> auto &actor_base_t::access<to::shutdown_reason>() noexcept { return shutdown_reason; }
+} // namespace rotor
+
 peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
     : parent_t{cfg}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair}, bep_config(cfg.bep_config) {}
 
 void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("peer_superivsor", false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::peers, get_address());
         p.discover_name(names::coordinator, coordinator, true).link(false);
@@ -50,13 +61,15 @@ std::string peer_supervisor_t::get_peer_identity(const actor_base_t &actor) cons
     return peer_identity;
 }
 
-void peer_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept {
+void peer_supervisor_t::on_child_shutdown(actor_base_t *actor, const rotor::extended_error_ptr_t &ec) noexcept {
     auto &peer_addr = actor->get_address();
-    auto identity = get_peer_identity(*actor);
-    spdlog::trace("peer_supervisor_t::on_child_shutdown, peer: {}, reason: {}", identity, ec.message());
+    auto peer_id = get_peer_identity(*actor);
+    auto &reason = actor->access<to::shutdown_reason>();
+    spdlog::trace("{}, on_child_shutdown, peer: {}, reason: {}", identity, peer_id, reason->message());
     auto it_req = addr2req.find(peer_addr);
     if (it_req != addr2req.end()) {
-        reply_with_error(*it_req->second, utils::make_error_code(utils::error_code::cannot_connect_to_peer));
+        auto inner = utils::make_error_code(utils::error_code::cannot_connect_to_peer);
+        reply_with_error(*it_req->second, make_error(inner, ec));
     } else {
         send<payload::disconnect_notify_t>(coordinator, peer_addr);
     }
@@ -64,7 +77,7 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_
 }
 
 void peer_supervisor_t::on_start() noexcept {
-    spdlog::trace("peer_supervisor_t::on_start (addr = {})", (void *)address.get());
+    spdlog::trace("{}, on_start", identity);
     parent_t::on_start();
 }
 
@@ -86,7 +99,7 @@ void peer_supervisor_t::on_connect_request(message::connect_request_t &msg) noex
                 auto &peer_id = arg.device_id;
                 auto &uris = arg.uris;
                 timeout *= uris.size();
-                spdlog::trace("peer_supervisor_t::on_connect, initiating connection with {}", peer_id);
+                spdlog::trace("{}, on_connect, initiating connection with {}", identity, peer_id);
                 return std::move(builder).peer_device_id(peer_id).uris(uris).finish()->get_address();
             } else if constexpr (std::is_same_v<T, P::connected_info_t>) {
                 std::stringstream ss;

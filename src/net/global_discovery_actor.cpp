@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
 #include "../proto/discovery_support.h"
+#include "../utils/error_code.h"
 #include "http_actor.h"
 
 using namespace syncspirit::net;
@@ -31,6 +32,7 @@ void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexc
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         addr_announce = p.create_address();
         addr_discovery = p.create_address();
+        p.set_identity("global_discovery", false);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         auto timeout = (shutdown_timeout * 9) / 10;
@@ -55,44 +57,45 @@ void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexc
 }
 
 void global_discovery_actor_t::on_start() noexcept {
-    spdlog::trace("global_discovery_actor_t::on_start (addr = {})", (void *)address.get());
+    spdlog::trace("{}, on_start (addr = {})", identity, (void *)address.get());
     announce();
 }
 
 void global_discovery_actor_t::announce() noexcept {
-    spdlog::trace("global_discovery_actor_t::announce");
+    spdlog::trace("{}, announce", identity);
 
     fmt::memory_buffer tx_buff;
     auto res = proto::make_announce_request(tx_buff, announce_url, endpoint);
     if (!res) {
-        spdlog::trace("global_discovery_actor_t::error making announce request :: {}", res.error().message());
-        return do_shutdown();
+        spdlog::trace("{}, error making announce request :: {}", identity, res.error().message());
+        return do_shutdown(make_error(res.error()));
     }
     make_request(addr_announce, res.value(), std::move(tx_buff));
 }
 
 void global_discovery_actor_t::on_announce_response(message::http_response_t &message) noexcept {
-    spdlog::trace("global_discovery_actor_t::on_announce_response");
+    spdlog::trace("{}, on_announce_response", identity);
     resources->release(resource::http);
     http_request.reset();
 
     auto &ec = message.payload.ec;
     if (ec) {
-        spdlog::error("global_discovery_actor_t, announcing error = {}", ec.message());
-        return do_shutdown();
+        spdlog::error("{}, announcing error = {}", identity, ec->message());
+        auto inner = utils::make_error_code(utils::error_code::announce_failed);
+        return do_shutdown(make_error(inner, ec));
     }
 
     auto res = proto::parse_announce(message.payload.res->response);
     if (!res) {
-        spdlog::warn("global_discovery_actor_t, parsing announce error = {}", res.error().message());
-        return do_shutdown();
+        spdlog::warn("{}, parsing announce error = {}", identity, res.error().message());
+        return do_shutdown(make_error(res.error()));
     }
 
     if (state >= r::state_t::SHUTTING_DOWN)
         return;
 
     auto reannounce = res.value();
-    spdlog::debug("global_discovery_actor_t:: will reannounce after {} seconds", reannounce);
+    spdlog::debug("{}, will reannounce after {} seconds", identity, reannounce);
 
     auto timeout = pt::seconds(reannounce);
     timer_request = start_timer(timeout, *this, &global_discovery_actor_t::on_timer);
@@ -105,7 +108,7 @@ void global_discovery_actor_t::on_announce_response(message::http_response_t &me
 }
 
 void global_discovery_actor_t::on_discovery_response(message::http_response_t &message) noexcept {
-    spdlog::trace("global_discovery_actor_t::on_discovery_response");
+    spdlog::trace("{}, on_discovery_response", identity);
     resources->release(resource::http);
     http_request.reset();
 
@@ -113,13 +116,14 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     auto orig_req = discovery_queue.front();
     discovery_queue.pop_front();
     if (ec) {
-        return reply_with_error(*orig_req, ec);
+        auto inner = utils::make_error_code(utils::error_code::discovery_failed);
+        return reply_with_error(*orig_req, make_error(inner, ec));
     }
 
     auto res = proto::parse_contact(message.payload.res->response);
     if (!res) {
-        spdlog::warn("global_discovery_actor_t, parsing discovery error = {}", res.error().message());
-        return reply_with_error(*orig_req, res.error());
+        spdlog::warn("{}, parsing discovery error = {}", identity, res.error().message());
+        return reply_with_error(*orig_req, make_error(res.error()));
     }
 
 #if 0
@@ -135,13 +139,13 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
 }
 
 void global_discovery_actor_t::on_discovery(message::discovery_request_t &req) noexcept {
-    spdlog::trace("global_discovery_actor_t::on_discovery");
+    spdlog::trace("{}, on_discovery", identity);
 
     fmt::memory_buffer tx_buff;
     auto r = proto::make_discovery_request(tx_buff, announce_url, req.payload.request_payload->device_id);
     if (!r) {
-        spdlog::trace("global_discovery_actor_t::error making discovery request :: {}", r.error().message());
-        return do_shutdown();
+        spdlog::trace("{}, error making discovery request :: {}", identity, r.error().message());
+        return do_shutdown(make_error(r.error()));
     }
 
     make_request(addr_discovery, r.value(), std::move(tx_buff));
@@ -166,7 +170,7 @@ void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils:
 }
 
 void global_discovery_actor_t::shutdown_start() noexcept {
-    spdlog::trace("global_discovery_actor_t::shutdown_start");
+    spdlog::trace("{}, shutdown_start", identity);
     if (resources->has(resource::http)) {
         send<message::http_cancel_t::payload_t>(http_client, *http_request, get_address());
     }

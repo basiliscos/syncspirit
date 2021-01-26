@@ -1,8 +1,9 @@
-#include "local_discovery_actor.h"
-
 #include <spdlog/spdlog.h>
+
+#include "local_discovery_actor.h"
 #include "names.h"
 #include "../proto/bep_support.h"
+#include "../utils/error_code.h"
 
 using namespace syncspirit::net;
 
@@ -26,6 +27,7 @@ local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
 
 void local_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("local_discovery", false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         init();
         p.subscribe_actor(&local_discovery_actor_t::on_endpoint);
@@ -40,38 +42,39 @@ void local_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexce
 }
 
 void local_discovery_actor_t::init() noexcept {
-    spdlog::trace("local_discovery_actor_t::init, will announce to port = {}", bc_endpoint.port());
+    spdlog::trace("{}, init, will announce to port = {}", identity, bc_endpoint.port());
 
     sys::error_code ec;
 
     sock.open(bc_endpoint.protocol(), ec);
     if (ec) {
-        spdlog::warn("local_discovery_actor_t::init, can't open socket :: {}", ec.message());
-        return do_shutdown();
+        spdlog::warn("{}, init, can't open socket :: {}", identity, ec.message());
+        return do_shutdown(make_error(ec));
     }
 
     sock.bind(bc_endpoint, ec);
     if (ec) {
-        spdlog::warn("local_discovery_actor_t::init, can't bind socket :: {}", ec.message());
-        return do_shutdown();
+        spdlog::warn("{}, init, can't bind socket :: {}", identity, ec.message());
+        return do_shutdown(make_error(ec));
     }
 
     sock.set_option(udp_socket_t::broadcast(true), ec);
     if (ec) {
-        spdlog::warn("local_discovery_actor_t::ini, can't set broadcast option :: {}", ec.message());
-        return do_shutdown();
+        spdlog::warn("{}, init, can't set broadcast option :: {}", identity, ec.message());
+        return do_shutdown(make_error(ec));
     }
 }
 
 void local_discovery_actor_t::on_endpoint(message::endpoint_response_t &res) noexcept {
-    spdlog::trace("local_discovery_actor_t::on_endpoint");
+    spdlog::trace("{}, on_endpoint", identity);
     endpoint_request.reset();
     resources->release(resource::req_acceptor);
 
     auto &ec = res.payload.ec;
     if (ec) {
-        spdlog::warn("local_discovery_actor_t::on_endpoint, cannot get acceptor endpoint :: {}", ec.message());
-        return do_shutdown();
+        spdlog::warn("{}, on_endpoint, cannot get acceptor endpoint :: {}", identity, ec->message());
+        auto inner = utils::make_error_code(utils::error_code::endpoint_failed);
+        return do_shutdown(make_error(inner, ec));
     }
     auto &ep = res.payload.res.local_endpoint;
     std::string my_url = fmt::format("tcp://{}:{}", ep.address().to_string(), ep.port());
@@ -79,7 +82,7 @@ void local_discovery_actor_t::on_endpoint(message::endpoint_response_t &res) noe
 }
 
 void local_discovery_actor_t::on_start() noexcept {
-    spdlog::trace("local_discovery_actor_t::on_start (addr = {})", (void *)address.get());
+    spdlog::trace("{}, on_start", identity);
     r::actor_base_t::on_start();
     do_read();
     announce();
@@ -93,7 +96,7 @@ void local_discovery_actor_t::shutdown_start() noexcept {
         sys::error_code ec;
         sock.cancel(ec);
         if (ec) {
-            spdlog::warn("local_discovery_actor_t::shutdown_start, socket cancellation error:: {}", ec.message());
+            spdlog::warn("{}, shutdown_start, socket cancellation error:: {}", identity, ec.message());
         }
     }
     r::actor_base_t::shutdown_start();
@@ -138,8 +141,8 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
     auto buff = asio::buffer(rx_buff.data(), bytes);
     auto result = proto::parse_announce(buff);
     if (!result) {
-        spdlog::trace("local_discovery_actor_t::on_read, cannot parse incoming UDP packet {} bytes from {} :: {}",
-                      bytes, peer_endpoint, result.error().message());
+        spdlog::trace("{}::on_read, cannot parse incoming UDP packet {} bytes from {} :: {}", identity, bytes,
+                      peer_endpoint, result.error().message());
     } else {
         auto &msg = result.value();
         auto &sha = msg->id();
@@ -156,15 +159,15 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
                 if (!uris.empty()) {
                     boost::posix_time::ptime now(boost::posix_time::microsec_clock::local_time());
                     model::peer_contact_t contact{std::move(now), std::move(uris)};
-                    spdlog::trace("local_discovery_actor_t::on_read, local peer = {} ", device_id.value().get_value());
+                    spdlog::trace("{}, on_read, local peer = {} ", identity, device_id.value().get_value());
                     send<payload::discovery_notification_t>(coordinator, std::move(device_id.value()),
                                                             std::move(contact), std::move(peer_endpoint));
                 } else {
-                    spdlog::warn("local_discovery_actor_t::on_read, no valid uris from:: {}", peer_endpoint);
+                    spdlog::warn("{}, on_read, no valid uris from: {}", identity, peer_endpoint);
                 }
             }
         } else {
-            spdlog::warn("local_discovery_actor_t::on_read, wrong device id, coming from :: {}", peer_endpoint);
+            spdlog::warn("{}, on_read, wrong device id, coming from: {}", identity, peer_endpoint);
         }
     }
     return do_read();
@@ -173,8 +176,8 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
 void local_discovery_actor_t::on_read_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        spdlog::error("local_discovery_actor_t::on_read_error, error = {}", ec.message());
-        do_shutdown();
+        spdlog::error("{}, on_read_error, error = {}", identity, ec.message());
+        do_shutdown(make_error(ec));
     }
 }
 
@@ -183,7 +186,7 @@ void local_discovery_actor_t::on_write(size_t) noexcept { resources->release(res
 void local_discovery_actor_t::on_write_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        spdlog::error("local_discovery_actor_t::on_write_error, error = {}", ec.message());
-        do_shutdown();
+        spdlog::error("{}, on_write_error, error = {}", identity, ec.message());
+        do_shutdown(make_error(ec));
     }
 }

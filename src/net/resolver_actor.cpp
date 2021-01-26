@@ -19,15 +19,16 @@ resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
 
 void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::resolver, false); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::resolver, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&resolver_actor_t::on_request);
         p.subscribe_actor(&resolver_actor_t::on_cancel);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::resolver, get_address()); });
 }
 
 void resolver_actor_t::on_start() noexcept {
-    spdlog::trace("resolver_actor_t::on_start (addr = {})", (void *)address.get());
+    spdlog::trace("{}, on_start", identity);
     r::actor_base_t::on_start();
 }
 
@@ -36,7 +37,7 @@ bool resolver_actor_t::cancel_timer() noexcept {
     if (resources->has(resource::timer)) {
         timer.cancel(ec);
         if (ec) {
-            get_supervisor().do_shutdown();
+            do_shutdown(make_error(ec));
         }
     }
     return (bool)ec;
@@ -68,7 +69,7 @@ void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
         for (; it != queue.end(); ++it) {
             if (matches(*it)) {
                 auto ec = r::make_error_code(r::error_code_t::cancelled);
-                reply_with_error(**it, ec);
+                reply_with_error(**it, make_error(ec));
                 queue.erase(it);
                 return;
             }
@@ -81,7 +82,7 @@ void resolver_actor_t::mass_reply(const endpoint_t &endpoint, const resolve_resu
 }
 
 void resolver_actor_t::mass_reply(const endpoint_t &endpoint, const std::error_code &ec) noexcept {
-    reply(endpoint, [&](auto &message) { reply_with_error(message, ec); });
+    reply(endpoint, [&](auto &message) { reply_with_error(message, make_error(ec)); });
 }
 
 void resolver_actor_t::process() noexcept {
@@ -135,7 +136,7 @@ void resolver_actor_t::on_resolve_error(const sys::error_code &ec) noexcept {
     if (ec == asio::error::operation_aborted) {
         if (resources->has(resource::io)) {
             auto ec = r::make_error_code(r::error_code_t::cancelled);
-            reply_with_error(*queue.front(), ec);
+            reply_with_error(*queue.front(), make_error(ec));
             queue.pop_front();
             return;
         }
@@ -152,12 +153,12 @@ void resolver_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
     if (ec == asio::error::operation_aborted) {
         if (resources->has(resource::io)) {
             auto ec = r::make_error_code(r::error_code_t::cancelled);
-            reply_with_error(*queue.front(), ec);
+            reply_with_error(*queue.front(), make_error(ec));
             queue.pop_front();
             return;
         }
     } else {
-        spdlog::warn("resolver_actor_t::on_timer_error :: {}", ec.message());
+        spdlog::warn("{}, on_timer_error :: {}", identity, ec.message());
     }
     process();
 }

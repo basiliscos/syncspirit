@@ -1,4 +1,5 @@
 #include "../config/utils.h"
+#include "../utils/error_code.h"
 #include "net_supervisor.h"
 #include "global_discovery_actor.h"
 #include "local_discovery_actor.h"
@@ -16,6 +17,18 @@
 using namespace syncspirit::net;
 namespace fs = boost::filesystem;
 
+namespace {
+namespace to {
+struct shutdown_reason {};
+struct identity {};
+} // namespace to
+} // namespace
+
+namespace rotor {
+template <> auto &actor_base_t::access<to::shutdown_reason>() noexcept { return shutdown_reason; }
+template <> auto &actor_base_t::access<to::identity>() noexcept { return identity; }
+} // namespace rotor
+
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{cfg}, app_config{cfg.app_config} {
     auto &files_cfg = app_config.global_announce_config;
     auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
@@ -29,7 +42,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
         throw "cannot create device_id from certificate";
     }
     ssl_pair = std::move(result.value());
-    spdlog::info("net_supervisor_t, device name = {}, device id = {}", app_config.device_name, device_id.value());
+    spdlog::info("{}, device name = {}, device id = {}", names::coordinator, app_config.device_name, device_id.value());
 
     auto cn = utils::get_common_name(ssl_pair.cert.get());
     if (!cn) {
@@ -54,6 +67,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::coordinator, false); });
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.register_name(names::coordinator, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -75,11 +89,13 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
 }
 
-void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept {
+void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const rotor::extended_error_ptr_t &ec) noexcept {
     parent_t::on_child_shutdown(actor, ec);
-    spdlog::trace("net_supervisor_t::on_child_shutdown(), addr = {}", (void *)actor->get_address().get());
+    auto &reason = actor->access<to::shutdown_reason>();
+    spdlog::trace("{}, on_child_shutdown, '{}' reason: {}", identity, actor->access<to::identity>(), reason->message());
     auto &child_addr = actor->get_address();
     if (ssdp_addr && child_addr == ssdp_addr) {
+        ssdp_addr.reset();
         if (!ec && state == r::state_t::OPERATIONAL) {
             launch_ssdp();
             return;
@@ -93,16 +109,16 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const std::error_c
         persist_data();
     }
     if (state == r::state_t::OPERATIONAL) {
-        do_shutdown();
+        auto inner = r::make_error_code(r::shutdown_code_t::child_down);
+        do_shutdown(make_error(inner, ec));
     }
 }
 
-void net_supervisor_t::on_child_init(actor_base_t *actor, const std::error_code &ec) noexcept {
+void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
     parent_t::on_child_init(actor, ec);
     auto &child_addr = actor->get_address();
     if (!ec && db_addr && child_addr == db_addr) {
-        spdlog::trace("net_supervisor_t::on_child_init, starting loading cluster...",
-                      (void *)actor->get_address().get());
+        spdlog::trace("{}, on_child_init, starting loading cluster...", identity);
         load_cluster(app_config.folders.begin());
     }
 }
@@ -152,50 +168,51 @@ void net_supervisor_t::launch_children() noexcept {
 }
 
 void net_supervisor_t::on_start() noexcept {
-    spdlog::trace("net_supervisor_t::on_start (addr = {})", (void *)address.get());
+    spdlog::trace("{}, on_start", identity);
     parent_t::on_start();
     launch_ssdp();
 }
 
 void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
-    spdlog::trace("net_supervisor_t::on_ssdp");
+    spdlog::trace("{}, on_ssdp", identity);
     /* we no longer need it */
-    send<r::message::shutdown_trigger_t>(get_address(), ssdp_addr);
-    ssdp_addr.reset();
+    auto ec = r::make_error_code(r::shutdown_code_t::normal);
+    send<r::payload::shutdown_trigger_t>(get_address(), ssdp_addr, make_error(ec));
 
     auto &igd_url = message.payload.igd.location;
     auto timeout = shutdown_timeout * 9 / 10;
-    create_actor<upnp_actor_t>()
-        .timeout(timeout)
-        .descr_url(igd_url)
-        .rx_buff_size(app_config.upnp_config.rx_buff_size)
-        .external_port(app_config.upnp_config.external_port)
-        .finish();
+    upnp_addr = create_actor<upnp_actor_t>()
+                    .timeout(timeout)
+                    .descr_url(igd_url)
+                    .rx_buff_size(app_config.upnp_config.rx_buff_size)
+                    .external_port(app_config.upnp_config.external_port)
+                    .finish()
+                    ->get_address();
 }
 
 void net_supervisor_t::launch_ssdp() noexcept {
     auto &cfg = app_config.upnp_config;
-    if (ssdp_attempts < cfg.discovery_attempts) {
+    if (ssdp_attempts < cfg.discovery_attempts && !upnp_addr) {
         auto timeout = shutdown_timeout / 2;
         ssdp_addr = create_actor<ssdp_actor_t>().timeout(timeout).max_wait(cfg.max_wait).finish()->get_address();
         ++ssdp_attempts;
-        spdlog::trace("net_supervisor_t::launching ssdp, attempt #{}", ssdp_attempts);
+        spdlog::trace("{}, launching ssdp, attempt #{}", identity, ssdp_attempts);
     }
 }
 
 void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &message) noexcept {
     if (!message.payload.success) {
-        spdlog::debug("net_supervisor_t::on_port_mapping shutting down self, unsuccesful port mapping");
-        return do_shutdown();
+        spdlog::debug("{}, on_port_mapping shutting down self, unsuccesful port mapping", identity);
+        auto ec = utils::make_error_code(utils::error_code::portmapping_failed);
+        return do_shutdown(make_error(ec));
     }
 
     auto &cfg = app_config.global_announce_config;
     if (cfg.enabled) {
         auto global_device_id = model::device_id_t::from_string(cfg.device_id);
         if (!global_device_id) {
-            spdlog::error(
-                "net_supervisor_t::on_port_mapping invalid global device id :: {} global discovery will not be used",
-                cfg.device_id);
+            spdlog::error("{}, on_port_mapping invalid global device id :: {} global discovery will not be used",
+                          identity, cfg.device_id);
             return;
         }
         auto timeout = shutdown_timeout * 9 / 10;
@@ -234,15 +251,14 @@ void net_supervisor_t::on_discovery(message::discovery_response_t &res) noexcept
         if (contact) {
             auto &urls = contact.value().uris;
             auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout * (urls.size() + 1)};
-            spdlog::warn("TODO: net_supervisor_t::on_discovery, update last_seen", req.device_id);
+            spdlog::warn("TODO: {}t::on_discovery, update last_seen", identity, req.device_id);
             request<payload::connect_request_t>(peers_addr, req.device_id, urls).send(timeout);
         } else {
-            spdlog::trace("net_supervisor_t::on_discovery, no contact for {} has been discovered",
+            spdlog::trace("{}, on_discovery, no contact for {} has been discovered", identity,
                           req.device_id.get_short());
         }
     } else {
-        spdlog::warn("net_supervisor_t::on_discovery, can't discover contacts for {} :: {}", req.device_id,
-                     ec.message());
+        spdlog::warn("{}, on_discovery, can't discover contacts for {} :: {}", req.device_id, identity, ec->message());
     }
 }
 
@@ -274,19 +290,19 @@ void net_supervisor_t::on_config_request(ui::message::config_request_t &message)
 }
 
 void net_supervisor_t::on_config_save(ui::message::config_save_request_t &message) noexcept {
-    spdlog::trace("net_supervisor_t::on_config_save");
+    spdlog::trace("{}, on_config_save", identity);
     auto &cfg = message.payload.request_payload.config;
     auto result = save_config(cfg);
     if (result) {
         reply_to(message);
     } else {
-        reply_with_error(message, result.error());
+        reply_with_error(message, make_error(result.error()));
     }
 }
 
 void net_supervisor_t::on_create_folder(ui::message::create_folder_request_t &message) noexcept {
     auto &folder = message.payload.request_payload.folder;
-    spdlog::trace("net_supervisor_t::on_create_folder, {} / {} shared with {} devices", folder.label(), folder.id(),
+    spdlog::trace("{}, on_create_folder, {} / {} shared with {} devices", identity, folder.label(), folder.id(),
                   folder.devices_size());
     auto timeout = init_timeout / 2;
     auto request_id = request<payload::make_index_id_request_t>(db_addr, folder).send(timeout);
@@ -334,7 +350,7 @@ outcome::result<void> net_supervisor_t::save_config(const config::main_t &new_cf
         return ec;
     }
     app_config = new_cfg;
-    spdlog::warn("net_supervisor_t::on_config_save, apply changes");
+    spdlog::warn("{}, on_config_save, apply changes", identity);
     update_devices();
     return outcome::success();
 }
@@ -373,10 +389,10 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
                 using P = payload::connect_request_t;
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, P::connect_info_t>) {
-                    spdlog::debug("net_supervisor_t::on_connect, cannot establish connection to {} :: {}",
-                                  arg.device_id, ec.message());
+                    spdlog::debug("{}, on_connect, cannot establish connection to {} :: {}", identity, arg.device_id,
+                                  ec->message());
                 } else if constexpr (std::is_same_v<T, P::connected_info_t>) {
-                    spdlog::debug("net_supervisor_t::on_connect, cannot authorize {} :: {}", arg.remote, ec.message());
+                    spdlog::debug("{}, on_connect, cannot authorize {} :: {}", identity, arg.remote, ec->message());
                 } else {
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
                 }
@@ -386,7 +402,7 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
 }
 
 void net_supervisor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
-    spdlog::warn("disconnected peer");
+    spdlog::warn("{}, disconnected peer", identity);
 }
 
 void net_supervisor_t::on_connection(message::connection_notify_t &message) noexcept {
@@ -407,8 +423,8 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
     } else {
         device = it->second;
         if (device->online) {
-            spdlog::warn(
-                "net_supervisor_t::on_auth, {} requested authtorization, but there is already active connection???");
+            spdlog::warn("{}, on_auth, {} requested authtorization, but there is already active connection?", identity,
+                         device->device_id);
         } else {
             auto &cert_name = device->cert_name;
             if (cert_name) {
@@ -429,7 +445,7 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
     } else {
         reply_to(message, cluster_config_ptr_t{});
     }
-    spdlog::debug("net_supervisor_t::on_auth, {} requested authtorization. Result : {}", device_id, (bool)device);
+    spdlog::debug("{}, on_auth, {} requested authtorization. Result : {}", identity, device_id, (bool)device);
 }
 
 void net_supervisor_t::on_load_folder(message::load_folder_response_t &message) noexcept {
@@ -439,8 +455,8 @@ void net_supervisor_t::on_load_folder(message::load_folder_response_t &message) 
     assert(it != app_config.folders.end());
     auto &ec = message.payload.ec;
     if (ec) {
-        spdlog::warn("net_supervisor_t::on_load_folder, cannot load folder {} / {} : {}", folder_config.label,
-                     folder_config.id, ec.message());
+        spdlog::warn("{}, on_load_folder, cannot load folder {} / {} : {}", identity, folder_config.label,
+                     folder_config.id, ec->message());
     } else {
         auto &folder = message.payload.res.folder;
         cluster->add_folder(folder);
@@ -477,10 +493,10 @@ void net_supervisor_t::persist_data() noexcept {
         config_copy.folders = cluster->serialize();
     }
     if (!(app_config == config_copy)) {
-        spdlog::debug("net_supervisor_t::persist_data, saving config");
+        spdlog::debug("{}, persist_data, saving config", identity);
         auto r = save_config(config_copy);
         if (!r) {
-            spdlog::error("net_supervisor_t::persist_data, failed to save config:: {}", r.error().message());
+            spdlog::error("{}, persist_data, failed to save config:: {}", identity, r.error().message());
         }
     }
 }
@@ -492,6 +508,6 @@ void net_supervisor_t::load_cluster(folder_iterator_t it) noexcept {
         request<payload::load_folder_request_t>(db_addr, folder_config, &devices).send(timeout);
         return;
     }
-    spdlog::trace("net_supervisor_t::load_cluster, complete");
+    spdlog::trace("{}, load_cluster, complete", identity);
     launch_children();
 }

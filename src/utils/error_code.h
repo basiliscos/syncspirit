@@ -44,12 +44,25 @@ enum class error_code {
     transport_not_available,
     wrong_magic,
     cannot_connect_to_peer,
+    announce_failed,
+    discovery_failed,
+    endpoint_failed,
+    portmapping_failed,
+    connection_impossible,
+    missing_device_id,
+    missing_cn,
+    rx_limit_reached,
+    non_authorized,
+    igd_description_failed,
+    unparseable_control_url,
+    external_ip_failed,
 };
 
 enum class bep_error_code {
     success = 0,
     protobuf_err,
     lz4_decoding,
+    unexpected_message,
 };
 
 namespace detail {

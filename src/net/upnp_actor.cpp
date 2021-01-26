@@ -1,5 +1,6 @@
 #include "upnp_actor.h"
 #include "../proto/upnp_support.h"
+#include "../utils/error_code.h"
 #include "spdlog/spdlog.h"
 #include "names.h"
 
@@ -21,6 +22,7 @@ upnp_actor_t::upnp_actor_t(config_t &cfg)
 void upnp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity("upnp", false);
         addr_description = p.create_address();
         addr_external_ip = p.create_address();
         addr_mapping = p.create_address();
@@ -55,14 +57,15 @@ void upnp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void upnp_actor_t::on_start() noexcept {
-    spdlog::trace("upnp_actor_t::on_start(), addr = {}", (void *)address.get());
+    spdlog::trace("{}, on_start", identity);
     rx_buff = std::make_shared<payload::http_request_t::rx_buff_t>();
 
     fmt::memory_buffer tx_buff;
     auto res = make_description_request(tx_buff, main_url);
     if (!res) {
-        spdlog::trace("upnp_actor_t::error making description request :: {}", res.error().message());
-        return do_shutdown();
+        auto &ec = res.error();
+        spdlog::trace("{}, error making description request :: {}", identity, ec.message());
+        return do_shutdown(make_error(ec));
     }
     make_request(addr_description, main_url, std::move(tx_buff), true);
 }
@@ -82,119 +85,129 @@ void upnp_actor_t::request_finish() noexcept {
 }
 
 void upnp_actor_t::on_endpoint(message::endpoint_response_t &res) noexcept {
-    spdlog::trace("upnp_actor_t::on_endpoint");
+    spdlog::trace("{}, on_endpoint", identity);
     resources->release(resource::req_acceptor);
     auto &ec = res.payload.ec;
     if (ec) {
-        spdlog::warn("upnp_actor_t::on_endpoint, cannot get acceptor endpoint :: {}", ec.message());
-        return do_shutdown();
+        auto inner = utils::make_error_code(utils::error_code::endpoint_failed);
+        spdlog::warn("{}, on_endpoint, cannot get acceptor endpoint :: {}", identity, ec->message());
+        return do_shutdown(make_error(inner, ec));
     }
     accepting_endpoint = res.payload.res.local_endpoint;
-    spdlog::debug("upnp_actor_t:: local endpoint = {}:{}", accepting_endpoint.address().to_string(),
-                  accepting_endpoint.port());
+    spdlog::debug("{}, local endpoint = {}", identity, accepting_endpoint);
 }
 
 void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
-    spdlog::trace("upnp_actor_t::on_igd_description");
+    spdlog::trace("{}, on_igd_description", identity);
     request_finish();
-    local_address = msg.payload.res->local_addr.value();
 
-    if (msg.payload.ec) {
-        spdlog::warn("upnp_actor:: get IGD description: {}", msg.payload.ec.message());
-        return do_shutdown();
+    auto &ec = msg.payload.ec;
+    if (ec) {
+        auto inner = utils::make_error_code(utils::error_code::igd_description_failed);
+        spdlog::warn("{}, get IGD description: {}", identity, ec->message());
+        return do_shutdown(make_error(inner, ec));
     }
 
+    local_address = msg.payload.res->local_addr.value();
     auto &body = msg.payload.res->response.body();
     auto igd_result = parse_igd(body.data(), body.size());
     if (!igd_result) {
-        spdlog::warn("upnp_actor:: can't get IGD result: {}", igd_result.error().message());
+        auto &ec = igd_result.error();
+        spdlog::warn("{}, can't get IGD result: {}", identity, ec.message());
         std::string xml(body);
         spdlog::debug("xml:\n{0}\n", xml);
-        return do_shutdown();
+        return do_shutdown(make_error(ec));
     }
 
     rx_buff->consume(msg.payload.res->bytes);
     auto &igd = igd_result.value();
     std::string control_url = fmt::format("http://{0}:{1}{2}", main_url.host, main_url.port, igd.control_path);
     std::string descr_url = fmt::format("http://{0}:{1}{2}", main_url.host, main_url.port, igd.description_path);
-    spdlog::debug("IGD control url: {0}, description url: {1}", control_url, descr_url);
+    spdlog::debug("{}, IGD control url: {}, description url: {}", identity, control_url, descr_url);
 
     auto url_option = utils::parse(control_url.c_str());
     if (!url_option) {
-        spdlog::error("upnp_actor:: can't parse IGD url {}", control_url);
-        return do_shutdown();
+        spdlog::error("{}, can't parse IGD url {}", identity, control_url);
+        auto ec = utils::make_error_code(utils::error_code::unparseable_control_url);
+        return do_shutdown(make_error(ec));
     }
     igd_control_url = url_option.value();
 
     fmt::memory_buffer tx_buff;
     auto res = make_external_ip_request(tx_buff, igd_control_url);
     if (!res) {
-        spdlog::trace("upnp_actor_t::error making external ip address request :: {}", res.error().message());
-        return do_shutdown();
+        auto &ec = res.error();
+        spdlog::trace("{}, error making external ip address request :: {}", identity, ec.message());
+        return do_shutdown(make_error(ec));
     }
     make_request(addr_external_ip, igd_control_url, std::move(tx_buff));
 }
 
 void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
-    spdlog::trace("upnp_actor_t::on_external_ip");
+    spdlog::trace("{}, on_external_ip", identity);
     request_finish();
 
-    if (msg.payload.ec) {
-        spdlog::warn("upnp_actor:: get external IP address: {}", msg.payload.ec.message());
-        return do_shutdown();
+    auto &ec = msg.payload.ec;
+    if (ec) {
+        spdlog::warn("{}, get external IP address: {}", identity, ec->message());
+        auto inner = utils::make_error_code(utils::error_code::external_ip_failed);
+        return do_shutdown(make_error(inner, ec));
     }
     auto &body = msg.payload.res->response.body();
     auto ip_addr_result = parse_external_ip(body.data(), body.size());
     if (!ip_addr_result) {
-        spdlog::warn("upnp_actor:: can't get external IP address: {}", ip_addr_result.error().message());
+        auto &ec = ip_addr_result.error();
+        spdlog::warn("{}, can't get external IP address: {}", identity, ec.message());
         std::string xml(body);
         spdlog::debug("xml:\n{0}\n", xml);
-        return do_shutdown();
+        return do_shutdown(make_error(ec));
     }
     auto &ip_addr = ip_addr_result.value();
-    spdlog::debug("external IP addr: {}", ip_addr);
+    spdlog::debug("{}, external IP addr: {}", identity, ip_addr);
     rx_buff->consume(msg.payload.res->bytes);
 
-    sys::error_code ec;
-    external_addr = asio::ip::address::from_string(ip_addr, ec);
+    sys::error_code io_ec;
+    external_addr = asio::ip::address::from_string(ip_addr, io_ec);
     if (ec) {
-        spdlog::warn("upnp_actor:: can't external IP address '{0}' is incorrect: {}", ip_addr, ec.message());
-        return do_shutdown();
+        spdlog::warn("{}, can't external IP address '{}' is incorrect: {}", identity, ip_addr, io_ec.message());
+        return do_shutdown(make_error(io_ec));
     }
 
     auto local_port = accepting_endpoint.port();
-    spdlog::debug("upnp_actor:: going to map {0}:{1} => {2}:{3}", external_addr.to_string(), external_port,
-                  local_address, local_port);
+    spdlog::debug("{}, going to map {}:{} => {}:{}", identity, external_addr.to_string(), external_port, local_address,
+                  local_port);
 
     fmt::memory_buffer tx_buff;
     auto res = make_mapping_request(tx_buff, igd_control_url, external_port, local_address.to_string(), local_port);
     if (!res) {
-        spdlog::trace("upnp_actor_t::error making port mapping request :: {}", res.error().message());
-        return do_shutdown();
+        auto &ec = res.error();
+        spdlog::trace("{}, error making port mapping request :: {}", identity, ec.message());
+        return do_shutdown(make_error(ec));
     }
     make_request(addr_mapping, igd_control_url, std::move(tx_buff));
 }
 
 void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
-    spdlog::trace("upnp_actor_t::on_mapping_port");
+    spdlog::trace("{}, on_mapping_port", identity);
     request_finish();
 
     bool ok = false;
-    if (msg.payload.ec) {
-        spdlog::warn("upnp_actor:: unsuccessfull port mapping: {}", msg.payload.ec.message());
+    auto &ec = msg.payload.ec;
+    if (ec) {
+        spdlog::warn("{}, unsuccessfull port mapping: {}", ec->message(), identity);
     } else if (state < r::state_t::SHUTTING_DOWN) {
         auto &body = msg.payload.res->response.body();
         auto result = parse_mapping(body.data(), body.size());
         if (!result) {
-            spdlog::warn("upnp_actor:: can't parse port mapping reply : {}", result.error().message());
+            spdlog::warn("{}, can't parse port mapping reply : {}", identity, result.error().message());
             std::string xml(body);
             spdlog::debug("xml:\n{0}\n", xml);
         } else {
             rx_buff->consume(msg.payload.res->bytes);
             if (!result.value()) {
-                spdlog::warn("upnp_actor:: unsuccessfull port mapping");
+                spdlog::warn("{}, unsuccessfull port mapping", identity);
             } else {
-                spdlog::debug("upnp_actor_t:: port mapping succeeded");
+                spdlog::debug("{}, port mapping succeeded", identity);
                 ok = true;
                 resources->acquire(resource::external_port);
             }
@@ -204,22 +217,23 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
 }
 
 void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
-    spdlog::trace("actor_t::on_unmapping_port");
+    spdlog::trace("{}, on_unmapping_port", identity);
     request_finish();
     resources->release(resource::external_port);
 
-    if (msg.payload.ec) {
-        spdlog::warn("upnp_actor:: unsuccessfull port mapping: {}", msg.payload.ec.message());
+    auto &ec = msg.payload.ec;
+    if (ec) {
+        spdlog::warn("upnp_actor:: unsuccessfull port mapping: {}", ec->message());
         return;
     }
     auto &body = msg.payload.res->response.body();
     auto result = parse_unmapping(body.data(), body.size());
     if (!result) {
-        spdlog::warn("upnp_actor:: can't parse port unmapping reply : {}", result.error().message());
+        spdlog::warn("{}, can't parse port unmapping reply : {}", identity, result.error().message());
         std::string xml(body);
         spdlog::debug("xml:\n{0}\n", xml);
     } else {
-        spdlog::debug("upnp_actor_t, succesfully unmapped external port {}", external_port);
+        spdlog::debug("{}, succesfully unmapped external port {}", identity, external_port);
     }
     if (unlink_request) {
         auto p = get_plugin(r::plugin::link_client_plugin_t::class_identity);
@@ -230,7 +244,7 @@ void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
 }
 
 void upnp_actor_t::shutdown_start() noexcept {
-    spdlog::trace("upnp_actor_t::shutdown_start");
+    spdlog::trace("{}, shutdown_start", identity);
     r::actor_base_t::shutdown_start();
     if (resources->has(resource::req_acceptor)) {
         resources->release(resource::req_acceptor);
@@ -241,11 +255,11 @@ void upnp_actor_t::shutdown_start() noexcept {
     }
 
     if (resources->has(resource::external_port)) {
-        spdlog::trace("upnp_actor_t, going to unmap extenal port {}", external_port);
+        spdlog::trace("{}, going to unmap extenal port {}", identity, external_port);
         fmt::memory_buffer tx_buff;
         auto res = make_unmapping_request(tx_buff, igd_control_url, external_port);
         if (!res) {
-            spdlog::warn("upnp_actor_t::error making port mapping request :: {}", res.error().message());
+            spdlog::warn("{}, error making port mapping request :: {}", identity, res.error().message());
             resources->release(resource::external_port);
             return;
         }

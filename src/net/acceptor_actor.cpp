@@ -17,6 +17,7 @@ acceptor_actor_t::acceptor_actor_t(config_t &config)
 
 void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::acceptor, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>(
         [&](auto &p) { p.subscribe_actor(&acceptor_actor_t::on_endpoint_request); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
@@ -26,33 +27,34 @@ void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void acceptor_actor_t::on_start() noexcept {
-    spdlog::trace("acceptor_actor_t::on_start (addr = {})", (void *)address.get());
+    spdlog::trace("{}, on_start", identity);
     sys::error_code ec;
 
     acceptor.open(endpoint.protocol(), ec);
     if (ec) {
-        spdlog::error("cannot open endpoint ({0}:{1}) : {2}", endpoint.address().to_string(), endpoint.port(),
-                      ec.message());
-        return do_shutdown();
+        spdlog::error("{}, cannot open endpoint ({0}:{1}) : {2}", identity, endpoint.address().to_string(),
+                      endpoint.port(), ec.message());
+        return do_shutdown(make_error(ec));
     }
 
     acceptor.bind(endpoint, ec);
     if (ec) {
-        spdlog::error("cannot bind endpoint ({0}:{1}) : {2}", endpoint.address().to_string(), endpoint.port(),
-                      ec.message());
-        return do_shutdown();
+        spdlog::error("{}, cannot bind endpoint ({0}:{1}) : {2}", identity, endpoint.address().to_string(),
+                      endpoint.port(), ec.message());
+        return do_shutdown(make_error(ec));
     }
 
     acceptor.listen(asio::socket_base::max_listen_connections, ec);
     if (ec) {
-        spdlog::error("cannot listen ({0}:{1}) : {2}", endpoint.address().to_string(), endpoint.port(), ec.message());
-        return do_shutdown();
+        spdlog::error("{}, cannot listen ({0}:{1}) : {2}", identity, endpoint.address().to_string(), endpoint.port(),
+                      ec.message());
+        return do_shutdown(make_error(ec));
     }
 
     endpoint = acceptor.local_endpoint(ec);
     if (ec) {
-        spdlog::error("cannot get local endpoint {}", ec.message());
-        return do_shutdown();
+        spdlog::error("{}, cannot get local endpoint {}", identity, ec.message());
+        return do_shutdown(make_error(ec));
     }
 
     accept_next();
@@ -75,7 +77,7 @@ void acceptor_actor_t::shutdown_start() noexcept {
         sys::error_code ec;
         acceptor.cancel(ec);
         if (ec) {
-            spdlog::error("cannot cancel accepting :: ", ec.message());
+            spdlog::error("{}, cannot cancel accepting :: ", identity, ec.message());
         }
     }
 }
@@ -84,8 +86,8 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
     resources->release(resource::accepting);
     if (ec) {
         if (ec != asio::error::operation_aborted) {
-            spdlog::warn("accepting error :: ", ec.message());
-            do_shutdown();
+            spdlog::warn("{}, accepting error :: ", identity, ec.message());
+            return do_shutdown(make_error(ec));
         } else {
             shutdown_continue();
         }
@@ -94,10 +96,10 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
     sys::error_code err;
     auto remote = peer.remote_endpoint(err);
     if (err) {
-        spdlog::trace("acceptor_actor_t::on_accept, cannot get remote endpoint:: {}", err.message());
+        spdlog::trace("{}, on_accept, cannot get remote endpoint:: {}", identity, err.message());
         return accept_next();
     }
-    spdlog::trace("acceptor_actor_t::on_accept, peer = {}, sock = {}", remote, peer.native_handle());
+    spdlog::trace("{}, on_accept, peer = {}, sock = {}", identity, remote, peer.native_handle());
     send<payload::connection_notify_t>(coordinator, std::move(peer), remote);
     accept_next();
 }

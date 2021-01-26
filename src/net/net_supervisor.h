@@ -39,8 +39,8 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     explicit net_supervisor_t(config_t &config);
     void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
-    void on_child_init(actor_base_t *actor, const std::error_code &ec) noexcept override;
-    void on_child_shutdown(actor_base_t *actor, const std::error_code &ec) noexcept override;
+    void on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override;
+    void on_child_shutdown(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override;
     void on_start() noexcept override;
 
   private:
@@ -75,6 +75,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
 
     config::main_t app_config;
     r::address_ptr_t ssdp_addr;
+    r::address_ptr_t upnp_addr;
     r::address_ptr_t peers_addr;
     r::address_ptr_t db_addr;
     r::address_ptr_t controller_addr;
