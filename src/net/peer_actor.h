@@ -63,11 +63,6 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         parent_t::config.sock = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
-    builder_t &&peer_identity(std::string &&value) &&noexcept {
-        parent_t::config.peer_identity = std::move(value);
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
 };
 
 struct peer_actor_t : public r::actor_base_t {
@@ -129,7 +124,6 @@ struct peer_actor_t : public r::actor_base_t {
     r::address_ptr_t coordinator;
     model::device_id_t peer_device_id;
     model::peer_contact_t::uri_container_t uris;
-    std::string peer_identity;
     std::optional<tcp_socket_t> sock;
     const utils::key_pair_t &ssl_pair;
     r::address_ptr_t resolver;

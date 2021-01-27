@@ -17,18 +17,6 @@
 using namespace syncspirit::net;
 namespace fs = boost::filesystem;
 
-namespace {
-namespace to {
-struct shutdown_reason {};
-struct identity {};
-} // namespace to
-} // namespace
-
-namespace rotor {
-template <> auto &actor_base_t::access<to::shutdown_reason>() noexcept { return shutdown_reason; }
-template <> auto &actor_base_t::access<to::identity>() noexcept { return identity; }
-} // namespace rotor
-
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{cfg}, app_config{cfg.app_config} {
     auto &files_cfg = app_config.global_announce_config;
     auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
@@ -89,14 +77,14 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
 }
 
-void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const rotor::extended_error_ptr_t &ec) noexcept {
-    parent_t::on_child_shutdown(actor, ec);
-    auto &reason = actor->access<to::shutdown_reason>();
-    spdlog::trace("{}, on_child_shutdown, '{}' reason: {}", identity, actor->access<to::identity>(), reason->message());
+void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
+    parent_t::on_child_shutdown(actor);
+    auto &reason = actor->get_shutdown_reason();
+    spdlog::trace("{}, on_child_shutdown, {} due to {} ", identity, actor->get_identity(), reason->message());
     auto &child_addr = actor->get_address();
     if (ssdp_addr && child_addr == ssdp_addr) {
         ssdp_addr.reset();
-        if (!ec && state == r::state_t::OPERATIONAL) {
+        if (reason->ec != r::shutdown_code_t::normal && state == r::state_t::OPERATIONAL) {
             launch_ssdp();
             return;
         }
@@ -110,7 +98,7 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor, const rotor::exten
     }
     if (state == r::state_t::OPERATIONAL) {
         auto inner = r::make_error_code(r::shutdown_code_t::child_down);
-        do_shutdown(make_error(inner, ec));
+        do_shutdown(make_error(inner, reason));
     }
 }
 

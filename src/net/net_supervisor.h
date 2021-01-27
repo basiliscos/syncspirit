@@ -40,7 +40,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override;
-    void on_child_shutdown(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override;
+    void on_child_shutdown(actor_base_t *actor) noexcept override;
     void on_start() noexcept override;
 
   private:

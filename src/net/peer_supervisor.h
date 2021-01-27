@@ -44,7 +44,7 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
 
     explicit peer_supervisor_t(peer_supervisor_config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
-    void on_child_shutdown(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override;
+    void on_child_shutdown(actor_base_t *actor) noexcept override;
     void on_start() noexcept override;
 
   private:
@@ -53,7 +53,6 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
     using addr2id_t = std::map<r::address_ptr_t, model::device_id_t>;
     using addr2req_t = std::map<r::address_ptr_t, connect_ptr_t>;
 
-    std::string get_peer_identity(const actor_base_t &actor) const noexcept;
     void on_connect_request(message::connect_request_t &msg) noexcept;
     void on_connect_notify(message::connect_notify_t &msg) noexcept;
 
