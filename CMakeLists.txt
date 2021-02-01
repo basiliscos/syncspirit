@@ -40,6 +40,7 @@ add_library(syncspirit_lib
     src/model/device_id.cpp
     src/model/folder.cpp
     src/net/acceptor_actor.cpp
+    src/net/cluster_supervisor.cpp
     src/net/db_actor.cpp
     src/net/global_discovery_actor.cpp
     src/net/http_actor.cpp

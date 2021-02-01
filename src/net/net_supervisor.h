@@ -44,10 +44,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_start() noexcept override;
 
   private:
-    using create_folder_req_ptr_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
     using discovery_map_t = std::set<rotor::request_id_t>;
-    using folder_requests_t = std::unordered_map<r::request_id_t, create_folder_req_ptr_t>;
-    using folder_iterator_t = typename config::main_t::folders_t::iterator;
 
     void on_ssdp(message::ssdp_notification_t &message) noexcept;
     void on_announce(message::announce_notification_t &message) noexcept;
@@ -61,23 +58,20 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_config_request(ui::message::config_request_t &message) noexcept;
     void on_config_save(ui::message::config_save_request_t &message) noexcept;
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
-    void on_make_index(message::make_index_id_response_t &message) noexcept;
-    void on_load_folder(message::load_folder_response_t &message) noexcept;
 
     void discover(model::device_ptr_t &device) noexcept;
     void launch_children() noexcept;
-    void launch_db() noexcept;
+    void launch_cluster() noexcept;
     void launch_ssdp() noexcept;
     void persist_data() noexcept;
     void update_devices() noexcept;
-    void load_cluster(folder_iterator_t it) noexcept;
     outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
 
     config::main_t app_config;
     r::address_ptr_t ssdp_addr;
     r::address_ptr_t upnp_addr;
     r::address_ptr_t peers_addr;
-    r::address_ptr_t db_addr;
+    r::address_ptr_t cluster_addr;
     r::address_ptr_t controller_addr;
     r::address_ptr_t global_discovery_addr;
     r::address_ptr_t local_discovery_addr;
@@ -87,7 +81,6 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     utils::key_pair_t ssl_pair;
     discovery_map_t discovery_map;
     model::devices_map_t devices;
-    folder_requests_t folder_requests;
 };
 
 } // namespace net

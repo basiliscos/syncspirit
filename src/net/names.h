@@ -5,6 +5,7 @@ namespace net {
 
 struct names {
     static const char *coordinator;
+    static const char *cluster;
     static const char *resolver;
     static const char *http10;
     static const char *acceptor;

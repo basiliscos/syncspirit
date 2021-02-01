@@ -48,35 +48,9 @@ paused = false
 skip_introduction_removals = false
 
     [[device.ignored_folder]]
+    id = 'ig6gw-nhbjt'
+    label = 'empty-folder'
+
+    [[device.ignored_folder]]
     id = 'nagkw-srrjz'
     label = 'Sync'
-
-[[folder]]
-devices = [ 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7' ]
-disable_temp_indixes = false
-folder_type = 3
-id = 'e59yo-b73fz'
-ignore_delete = false
-ignore_permissions = false
-label = 'sample-folder'
-path = '/tmp/syncspirit/sample-folder'
-paused = false
-pull_order = 0
-read_only = false
-rescan_interval = 3600
-watched = true
-
-[[folder]]
-devices = [ 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7' ]
-disable_temp_indixes = false
-folder_type = 3
-id = 'ig6gw-nhbjt'
-ignore_delete = false
-ignore_permissions = false
-label = 'empty-folder'
-path = '/tmp/syncspirit/empty-folder'
-paused = false
-pull_order = 0
-read_only = false
-rescan_interval = 3600
-watched = true

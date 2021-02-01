@@ -3,6 +3,7 @@
 using namespace syncspirit::net;
 
 const char *names::coordinator = "net::coodinator";
+const char *names::cluster = "net::cluster";
 const char *names::resolver = "net::resolver";
 const char *names::http10 = "net::http10";
 const char *names::acceptor = "net::accceptor";

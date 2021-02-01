@@ -1,8 +1,9 @@
+- save config
+
 model: cluster/folder
 2. update_folder(proto::folder) (index/max_sequence)
 3. do not allow multiple connections from the same peer
 
-1. mkdir
 2. launch_folder_actor(
     $folder,
     $sequence_id,

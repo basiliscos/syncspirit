@@ -3,6 +3,7 @@
 #include "net_supervisor.h"
 #include "global_discovery_actor.h"
 #include "local_discovery_actor.h"
+#include "cluster_supervisor.h"
 #include "upnp_actor.h"
 #include "acceptor_actor.h"
 #include "ssdp_actor.h"
@@ -14,8 +15,8 @@
 #include <spdlog/spdlog.h>
 #include <boost/filesystem.hpp>
 
-using namespace syncspirit::net;
 namespace fs = boost::filesystem;
+using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{cfg}, app_config{cfg.app_config} {
     auto &files_cfg = app_config.global_announce_config;
@@ -70,10 +71,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_disconnect);
         p.subscribe_actor(&net_supervisor_t::on_connection);
         p.subscribe_actor(&net_supervisor_t::on_auth);
-        p.subscribe_actor(&net_supervisor_t::on_create_folder);
-        p.subscribe_actor(&net_supervisor_t::on_make_index);
-        p.subscribe_actor(&net_supervisor_t::on_load_folder);
-        launch_db();
+        launch_cluster();
     });
 }
 
@@ -105,20 +103,28 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
 void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
     parent_t::on_child_init(actor, ec);
     auto &child_addr = actor->get_address();
-    if (!ec && db_addr && child_addr == db_addr) {
-        spdlog::trace("{}, on_child_init, starting loading cluster...", identity);
-        load_cluster(app_config.folders.begin());
+    if (!ec && cluster_addr && child_addr == cluster_addr) {
+        spdlog::trace("{}, on_child_init, cluster has been loaded, laucning other children...", identity);
+        launch_children();
     }
 }
 
-void net_supervisor_t::launch_db() noexcept {
+void net_supervisor_t::launch_cluster() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     fs::path path(app_config.config_path);
     auto db_dir = path.append("mbdx-db");
 
     cluster = new model::cluster_t(device);
-    db_addr =
-        create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
+    create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish();
+    cluster_addr = create_actor<cluster_supervisor_t>()
+                       .timeout(timeout)
+                       .strand(strand)
+                       .device(device)
+                       .devices(&devices)
+                       .cluster(cluster)
+                       .folders(&app_config.folders)
+                       .finish()
+                       ->get_address();
 }
 
 void net_supervisor_t::launch_children() noexcept {
@@ -288,39 +294,6 @@ void net_supervisor_t::on_config_save(ui::message::config_save_request_t &messag
     }
 }
 
-void net_supervisor_t::on_create_folder(ui::message::create_folder_request_t &message) noexcept {
-    auto &folder = message.payload.request_payload.folder;
-    spdlog::trace("{}, on_create_folder, {} / {} shared with {} devices", identity, folder.label(), folder.id(),
-                  folder.devices_size());
-    auto timeout = init_timeout / 2;
-    auto request_id = request<payload::make_index_id_request_t>(db_addr, folder).send(timeout);
-    folder_requests.emplace(request_id, &message);
-}
-
-void net_supervisor_t::on_make_index(message::make_index_id_response_t &message) noexcept {
-    auto &request_id = message.payload.req->payload.id;
-    auto it = folder_requests.find(request_id);
-    auto &request = *it->second;
-    auto &ec = message.payload.ec;
-    if (ec) {
-        reply_with_error(request, ec);
-        return;
-    }
-    auto &payload = request.payload.request_payload;
-    auto &cfg = payload.folder_config;
-    sys::error_code fs_ec;
-    fs::create_directories(cfg.path, fs_ec);
-    if (fs_ec) {
-        reply_with_error(request, ec);
-        return;
-    }
-    auto folder = model::folder_ptr_t(new model::folder_t(cfg));
-    auto &index_id = message.payload.res.index_id;
-    folder->assign(payload.folder, devices);
-    folder->devices.insert(model::folder_device_t{device, index_id, model::sequence_id_t{}});
-    cluster->add_folder(folder);
-}
-
 outcome::result<void> net_supervisor_t::save_config(const config::main_t &new_cfg) noexcept {
     auto path_tmp = new_cfg.config_path;
     path_tmp.append("syncspirit.toml.tmp");
@@ -436,22 +409,6 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
     spdlog::debug("{}, on_auth, {} requested authtorization. Result : {}", identity, device_id, (bool)device);
 }
 
-void net_supervisor_t::on_load_folder(message::load_folder_response_t &message) noexcept {
-    auto &folder_config = message.payload.req->payload.request_payload.folder;
-    auto predicate = [&](auto &it) { return it.first == folder_config.id; };
-    auto it = std::find_if(app_config.folders.begin(), app_config.folders.end(), predicate);
-    assert(it != app_config.folders.end());
-    auto &ec = message.payload.ec;
-    if (ec) {
-        spdlog::warn("{}, on_load_folder, cannot load folder {} / {} : {}", identity, folder_config.label,
-                     folder_config.id, ec->message());
-    } else {
-        auto &folder = message.payload.res.folder;
-        cluster->add_folder(folder);
-    }
-    load_cluster(++it);
-}
-
 void net_supervisor_t::shutdown_start() noexcept {
     for (auto request_id : discovery_map) {
         send<message::discovery_cancel_t::payload_t>(global_discovery_addr, request_id);
@@ -487,15 +444,4 @@ void net_supervisor_t::persist_data() noexcept {
             spdlog::error("{}, persist_data, failed to save config:: {}", identity, r.error().message());
         }
     }
-}
-
-void net_supervisor_t::load_cluster(folder_iterator_t it) noexcept {
-    if (it != app_config.folders.end()) {
-        auto &[folder_id, folder_config] = *it;
-        auto timeout = init_timeout / 2;
-        request<payload::load_folder_request_t>(db_addr, folder_config, &devices).send(timeout);
-        return;
-    }
-    spdlog::trace("{}, load_cluster, complete", identity);
-    launch_children();
 }
