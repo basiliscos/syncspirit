@@ -108,9 +108,9 @@ outcome::result<void> create_folder(const proto::Folder &folder, const model::in
     return outcome::success();
 }
 
-outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder_cfg,
+outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder_cfg, const model::device_ptr_t &owner,
                                                  const model::devices_map_t &devices, transaction_t &txn) noexcept {
-    model::folder_ptr_t folder(new model::folder_t(folder_cfg));
+    model::folder_ptr_t folder(new model::folder_t(folder_cfg, owner));
     auto key_info = prefixer_t<prefix::folder_info>::make(folder->id);
 
     MDBX_val value;

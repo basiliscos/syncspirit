@@ -4,11 +4,11 @@
 using namespace syncspirit;
 using namespace syncspirit::model;
 
-folder_t::folder_t(const config::folder_config_t &cfg) noexcept
+folder_t::folder_t(const config::folder_config_t &cfg, const device_ptr_t &device_) noexcept
     : id{cfg.id}, label{cfg.label}, path{cfg.path}, folder_type{cfg.folder_type}, rescan_interval{cfg.rescan_interval},
       pull_order{cfg.pull_order}, watched{cfg.watched}, read_only{cfg.read_only},
       ignore_permissions{cfg.ignore_permissions}, ignore_delete{cfg.ignore_delete},
-      disable_temp_indixes{cfg.disable_temp_indixes}, paused{cfg.paused} {}
+      disable_temp_indixes{cfg.disable_temp_indixes}, paused{cfg.paused}, device{device_} {}
 
 bool folder_t::assign(const proto::Folder &source, const devices_map_t &devices_map) noexcept {
     // remove outdated

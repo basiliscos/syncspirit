@@ -37,7 +37,7 @@ namespace syncspirit::model {
 struct folder_t : arc_base_t<folder_t> {
     using devices_t = std::set<folder_device_t>;
 
-    folder_t(const config::folder_config_t &cfg) noexcept;
+    folder_t(const config::folder_config_t &cfg, const device_ptr_t &device_) noexcept;
 
     bool assign(const proto::Folder &source, const devices_map_t &devices) noexcept;
     config::folder_config_t serialize(device_ptr_t local_device) noexcept;
@@ -58,6 +58,8 @@ struct folder_t : arc_base_t<folder_t> {
     bool ignore_delete;
     bool disable_temp_indixes;
     bool paused;
+    //
+    device_ptr_t device;
 };
 
 using folder_ptr_t = intrusive_ptr_t<folder_t>;

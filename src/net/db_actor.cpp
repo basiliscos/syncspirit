@@ -120,7 +120,7 @@ void db_actor_t::on_load_folder(message::load_folder_request_t &message) noexcep
         return reply_with_error(message, make_error(txn.error()));
     }
     auto &p = message.payload.request_payload;
-    auto r = db::load_folder(p.folder, *p.devices, txn.value());
+    auto r = db::load_folder(p.folder, device, *p.devices, txn.value());
     if (!r) {
         return reply_with_error(message, make_error(r.error()));
     } else {

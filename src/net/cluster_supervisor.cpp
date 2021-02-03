@@ -87,7 +87,7 @@ void cluster_supervisor_t::on_make_index(message::make_index_id_response_t &mess
         reply_with_error(request, ec);
         return;
     }
-    auto folder = model::folder_ptr_t(new model::folder_t(cfg));
+    auto folder = model::folder_ptr_t(new model::folder_t(cfg, device));
     auto &index_id = message.payload.res.index_id;
     folder->assign(payload.folder, *devices);
     folder->devices.insert(model::folder_device_t{device, index_id, model::sequence_id_t{}});
