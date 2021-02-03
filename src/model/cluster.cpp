@@ -69,3 +69,18 @@ proto::ClusterConfig cluster_t::get() noexcept {
     }
     return r;
 }
+
+folder_ptr_t cluster_t::opt_for_synch(const device_ptr_t &peer_device) noexcept {
+    assert(peer_device != device);
+    std::int64_t max_score = 0;
+    folder_ptr_t best_folder;
+    for (auto &it : folders) {
+        auto &folder = it.second;
+        auto score = folder->score(peer_device);
+        if (score > max_score) {
+            max_score = score;
+            best_folder = folder;
+        }
+    }
+    return best_folder;
+}

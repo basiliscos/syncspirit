@@ -43,6 +43,7 @@ struct folder_t : arc_base_t<folder_t> {
     config::folder_config_t serialize(device_ptr_t local_device) noexcept;
 
     proto::Folder get() noexcept;
+    std::int64_t score(const device_ptr_t &peer_device) noexcept;
 
     // from config
     std::string id;

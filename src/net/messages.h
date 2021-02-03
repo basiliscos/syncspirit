@@ -229,6 +229,13 @@ struct load_folder_request_t {
     model::devices_map_t *devices;
 };
 
+struct start_sync_t {
+    model::device_ptr_t device;
+    r::address_ptr_t peer;
+};
+
+struct stop_sync_t {};
+
 } // end of namespace payload
 
 namespace message {
@@ -268,6 +275,9 @@ using make_index_id_response_t = r::request_traits_t<payload::make_index_id_requ
 
 using load_folder_request_t = r::request_traits_t<payload::load_folder_request_t>::request::message_t;
 using load_folder_response_t = r::request_traits_t<payload::load_folder_request_t>::response::message_t;
+
+using start_sync_t = r::message_t<payload::start_sync_t>;
+using stop_sync_t = r::message_t<payload::stop_sync_t>;
 
 } // end of namespace message
 

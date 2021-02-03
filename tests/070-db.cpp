@@ -118,7 +118,11 @@ TEST_CASE("save & load folder", "[db]") {
         3600,
         config::pull_order_t::random,
         true,
-        true
+        true,
+        false,
+        false,
+        false,
+        false,
     };
     auto folder_opt = db::load_folder(folder_cfg, device1, devices, txn);
     REQUIRE(folder_opt);

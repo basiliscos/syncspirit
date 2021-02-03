@@ -6,7 +6,6 @@
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
-#include <map>
 
 namespace syncspirit {
 namespace net {
@@ -52,13 +51,15 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
 
     explicit cluster_supervisor_t(cluster_supervisor_config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
-    // void on_child_shutdown(actor_base_t *actor) noexcept override;
+    void on_child_shutdown(actor_base_t *actor) noexcept override;
     void on_start() noexcept override;
 
   private:
     using folder_iterator_t = typename config::main_t::folders_t::iterator;
     using create_folder_req_ptr_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
     using folder_requests_t = std::unordered_map<r::request_id_t, create_folder_req_ptr_t>;
+    using actors_map_t = std::unordered_map<std::string, r::address_ptr_t>;     // folder_id: folder_actor
+    using syncing_map_t = std::unordered_map<std::string, model::folder_ptr_t>; // device_id: folder
 
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
     void on_connect(message::connect_notify_t &message) noexcept;
@@ -75,6 +76,8 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     model::devices_map_t *devices;
     config::main_t::folders_t *folders;
     folder_requests_t folder_requests;
+    actors_map_t actors_map;
+    syncing_map_t syncing_map;
 };
 
 } // namespace net

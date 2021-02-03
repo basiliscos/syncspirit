@@ -1,4 +1,5 @@
 #include "cluster_supervisor.h"
+#include "folder_actor.h"
 #include "names.h"
 #include <spdlog/spdlog.h>
 #include <boost/filesystem.hpp>
@@ -37,6 +38,18 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
 void cluster_supervisor_t::on_start() noexcept {
     spdlog::trace("{}, on_start", identity);
     ra::supervisor_asio_t::on_start();
+}
+
+void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
+    spdlog::trace("{}, on_start", identity);
+    ra::supervisor_asio_t::on_child_shutdown(actor);
+    auto &reason = actor->get_shutdown_reason();
+    if (state == r::state_t::OPERATIONAL && reason->ec != r::shutdown_code_t::normal) {
+        spdlog::debug("{}, on_child_shutdown, child {} abnormal termination: {}, will shut self down", identity,
+                      actor->get_identity(), reason);
+        auto error = r::make_error(identity, r::error_code_t::failure_escalation, reason);
+        do_shutdown(error);
+    }
 }
 
 void cluster_supervisor_t::load_db() noexcept {
@@ -106,6 +119,12 @@ void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexce
     for (auto &folder : unknown) {
         send<ui::payload::new_folder_notify_t>(address, folder, device);
     }
+    auto folder = cluster->opt_for_synch(device);
+    if (folder) {
+        auto &folder_actor = actors_map.at(folder->id);
+        auto &peer_addr = message.payload.peer_addr;
+        send<payload::start_sync_t>(folder_actor, device, peer_addr);
+    }
 }
 
 void cluster_supervisor_t::load_cluster(folder_iterator_t it) noexcept {
@@ -114,6 +133,16 @@ void cluster_supervisor_t::load_cluster(folder_iterator_t it) noexcept {
         auto timeout = init_timeout / 2;
         request<payload::load_folder_request_t>(db, folder_config, devices).send(timeout);
         return;
+    }
+    for (auto &it : cluster->folders) {
+        auto &folder = it.second;
+        auto addr = create_actor<folder_actor_t>()
+                        .timeout(init_timeout / 2)
+                        .device(device)
+                        .folder(folder)
+                        .finish()
+                        ->get_address();
+        actors_map.emplace(folder->id, addr);
     }
     spdlog::trace("{}, load_cluster, complete", identity);
     resources->release(resource::db);

@@ -21,6 +21,7 @@ struct cluster_t : arc_base_t<cluster_t> {
     folder_ptr_t get_folder(const std::string &folder_id) noexcept;
     folders_config_t serialize() noexcept;
     proto::ClusterConfig get() noexcept;
+    folder_ptr_t opt_for_synch(const device_ptr_t &peer_device) noexcept;
 
     device_ptr_t device;
     folders_t folders;

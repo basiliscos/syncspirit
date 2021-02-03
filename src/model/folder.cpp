@@ -84,7 +84,6 @@ proto::Folder folder_t::get() noexcept {
     r.set_ignore_delete(ignore_delete);
     r.set_disable_temp_indexes(disable_temp_indixes);
     r.set_paused(paused);
-    int i = 0;
     for (auto &fd : this->devices) {
         auto &id = fd.device->device_id.get_value();
         proto::Device pd;
@@ -99,6 +98,26 @@ proto::Folder folder_t::get() noexcept {
         pd.set_index_id(fd.index_id);
         pd.set_skip_introduction_removals(device->skip_introduction_removals);
         *r.add_devices() = pd;
+    }
+    return r;
+}
+
+int64_t folder_t::score(const device_ptr_t &peer_device) noexcept {
+    std::int64_t r = 0;
+    sequence_id_t my_seq = 0;
+    sequence_id_t peer_seq = 0;
+    for (auto &fd : devices) {
+        if (fd.device == device) {
+            my_seq = fd.max_sequence;
+        } else if (fd.device == peer_device) {
+            peer_seq = fd.max_sequence;
+        }
+        if (my_seq && peer_seq) {
+            break;
+        }
+    }
+    if (peer_seq > my_seq) {
+        return peer_seq - my_seq;
     }
     return r;
 }
