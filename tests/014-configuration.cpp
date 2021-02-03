@@ -73,7 +73,11 @@ TEST_CASE("default config is OK", "[config]") {
                 3600,
                 config::pull_order_t::alphabetic,
                 true,
-                true
+                true,
+                false,
+                false,
+                false,
+                false
             };
             cfg.folders.emplace(folder.id, folder);
             auto r = config::serialize(cfg, out);

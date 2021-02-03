@@ -120,10 +120,11 @@ TEST_CASE("save & load folder", "[db]") {
         true,
         true
     };
-    auto folder_opt = db::load_folder(folder_cfg, devices, txn);
+    auto folder_opt = db::load_folder(folder_cfg, device1, devices, txn);
     REQUIRE(folder_opt);
     auto& folder = folder_opt.value();
     CHECK(folder->id == folder_src.id());
+    CHECK(folder->device == device1);
     REQUIRE(folder->devices.size() == 2);
 
     auto& fd1 = *folder->devices.begin();

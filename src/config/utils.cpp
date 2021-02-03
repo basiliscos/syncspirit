@@ -289,8 +289,8 @@ static std::optional<folder_config_t> get_folder(toml::table &t, const main_t::d
                            rescan_interval.value(),
                            pull_order,
                            watched.value(),
-                           read_only.value(),
                            ignore_permissions.value(),
+                           read_only.value(),
                            ignore_delete.value(),
                            disable_temp_indixes.value(),
                            paused.value()};
