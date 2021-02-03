@@ -41,7 +41,7 @@ struct new_folder_notify_t {
 };
 
 struct create_folder_response_t {
-    config::main_t config;
+    config::folder_config_t folder;
 };
 
 struct create_folder_request_t {

@@ -92,6 +92,9 @@ void cluster_supervisor_t::on_make_index(message::make_index_id_response_t &mess
     folder->assign(payload.folder, *devices);
     folder->devices.insert(model::folder_device_t{device, index_id, model::sequence_id_t{}});
     cluster->add_folder(folder);
+
+    reply_to(request, folder->serialize(device));
+    folder_requests.erase(it);
 }
 
 void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexcept {

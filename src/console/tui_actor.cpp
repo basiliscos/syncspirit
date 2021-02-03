@@ -252,7 +252,13 @@ void tui_actor_t::on_config_save(ui::message::config_save_response_t &message) n
 }
 
 void tui_actor_t::on_create_folder(ui::message::create_folder_response_t &message) noexcept {
-    spdlog::warn("{}, on_create_folder", identity);
+    auto &folder = message.payload.req->payload.request_payload.folder_config;
+    app_config.folders.emplace(folder.id, folder);
+    spdlog::debug("{}, on_create_folder, '{}'", identity, folder.label);
+    auto &ec = message.payload.ec;
+    if (ec) {
+        spdlog::warn("{}, on_create_folder, '{}' error: {}q", identity, folder.label, ec->message());
+    }
 }
 
 void tui_actor_t::ignore_device(const model::device_id_t &device_id) noexcept {
