@@ -1,4 +1,5 @@
 - save config
+- devices & folders  config should be stored in DB?
 
 model: cluster/folder
 2. update_folder(proto::folder) (index/max_sequence)

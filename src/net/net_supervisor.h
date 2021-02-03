@@ -57,7 +57,6 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_auth(message::auth_request_t &message) noexcept;
     void on_config_request(ui::message::config_request_t &message) noexcept;
     void on_config_save(ui::message::config_save_request_t &message) noexcept;
-    void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
 
     void discover(model::device_ptr_t &device) noexcept;
     void launch_children() noexcept;

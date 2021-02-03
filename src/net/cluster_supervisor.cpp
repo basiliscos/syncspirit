@@ -29,6 +29,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
         p.subscribe_actor(&cluster_supervisor_t::on_create_folder);
         p.subscribe_actor(&cluster_supervisor_t::on_load_folder);
         p.subscribe_actor(&cluster_supervisor_t::on_make_index);
+        p.subscribe_actor(&cluster_supervisor_t::on_connect);
         load_db();
     });
 }
@@ -91,6 +92,17 @@ void cluster_supervisor_t::on_make_index(message::make_index_id_response_t &mess
     folder->assign(payload.folder, *devices);
     folder->devices.insert(model::folder_device_t{device, index_id, model::sequence_id_t{}});
     cluster->add_folder(folder);
+}
+
+void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexcept {
+    auto &payload = message.payload;
+    auto &device_id = payload.peer_device_id;
+    spdlog::trace("{}, on_connect, peer = ", payload.peer_device_id);
+    auto &device = devices->at(device_id.get_value());
+    auto unknown = cluster->update(payload.cluster_config, *devices);
+    for (auto &folder : unknown) {
+        send<ui::payload::new_folder_notify_t>(address, folder, device);
+    }
 }
 
 void cluster_supervisor_t::load_cluster(folder_iterator_t it) noexcept {

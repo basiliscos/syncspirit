@@ -61,6 +61,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     using folder_requests_t = std::unordered_map<r::request_id_t, create_folder_req_ptr_t>;
 
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
+    void on_connect(message::connect_notify_t &message) noexcept;
 
     void load_db() noexcept;
     void load_cluster(folder_iterator_t it) noexcept;

@@ -92,6 +92,12 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
         return;
     }
     if (peers_addr && peers_addr == child_addr) {
+        peers_addr.reset();
+    }
+    if (cluster_addr && cluster_addr == child_addr) {
+        cluster_addr.reset();
+    }
+    if (!peers_addr && !cluster_addr && cluster) {
         persist_data();
     }
     if (state == r::state_t::OPERATIONAL) {
@@ -337,12 +343,16 @@ template <class> inline constexpr bool always_false_v = false;
 void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept {
     auto &ec = message.payload.ec;
     if (!ec) {
+        /*
         auto &device_id = message.payload.res->peer_device_id;
         auto &device = devices.at(device_id.get_value());
         auto unknown = cluster->update(message.payload.res->cluster_config, devices);
         for (auto &folder : unknown) {
             send<ui::payload::new_folder_notify_t>(address, folder, device);
         }
+        */
+        auto &p = message.payload.res;
+        send<payload::connect_notify_t>(cluster_addr, p->peer_addr, p->peer_device_id, p->cluster_config);
     } else {
         auto &payload = message.payload.req->payload.request_payload->payload;
         std::visit(
