@@ -29,6 +29,8 @@ template <typename Actor> struct folder_actor_config_builder_t : r::actor_config
     }
 };
 
+enum class sync_state_t { none, syncing, paused };
+
 struct folder_actor_t : public r::actor_base_t {
     using config_t = folder_actor_config_t;
     template <typename Actor> using config_builder_t = folder_actor_config_builder_t<Actor>;
@@ -36,7 +38,7 @@ struct folder_actor_t : public r::actor_base_t {
     folder_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
-    // void shutdown_start() noexcept override;
+    void shutdown_start() noexcept override;
 
   private:
     void on_start_sync(message::start_sync_t &message) noexcept;
@@ -45,6 +47,7 @@ struct folder_actor_t : public r::actor_base_t {
     model::folder_ptr_t folder;
     model::device_ptr_t device;
     r::address_ptr_t db;
+    sync_state_t sync_state;
 };
 
 } // namespace net

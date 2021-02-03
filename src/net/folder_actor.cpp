@@ -4,8 +4,15 @@
 
 using namespace syncspirit::net;
 
+namespace {
+namespace resource {
+r::plugin::resource_id_t peer = 0;
+}
+
+} // namespace
+
 folder_actor_t::folder_actor_t(config_t &config)
-    : r::actor_base_t{config}, folder{config.folder}, device{config.device} {}
+    : r::actor_base_t{config}, folder{config.folder}, device{config.device}, sync_state{sync_state_t::none} {}
 
 void folder_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -27,10 +34,22 @@ void folder_actor_t::on_start() noexcept {
     spdlog::trace("{}, on_start", identity);
 }
 
-void folder_actor_t::on_start_sync(message::start_sync_t &message) noexcept {
-    spdlog::trace("{}, on_start_sync", identity);
+void folder_actor_t::shutdown_start() noexcept {
+    if (sync_state != sync_state_t::none) {
+        resources->acquire(resource::peer);
+    }
+    r::actor_base_t::shutdown_start();
 }
 
-void folder_actor_t::on_stop_sync(message::stop_sync_t &message) noexcept {
+void folder_actor_t::on_start_sync(message::start_sync_t &) noexcept {
+    spdlog::trace("{}, on_start_sync", identity);
+    sync_state = sync_state_t::syncing;
+}
+
+void folder_actor_t::on_stop_sync(message::stop_sync_t &) noexcept {
     spdlog::trace("{}, on_stop_sync", identity);
+    if (sync_state != sync_state_t::none) {
+        resources->release(resource::peer);
+    }
+    sync_state = sync_state_t::none;
 }

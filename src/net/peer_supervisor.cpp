@@ -32,8 +32,15 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     if (it_req != addr2req.end()) {
         auto inner = utils::make_error_code(utils::error_code::cannot_connect_to_peer);
         reply_with_error(*it_req->second, make_error(inner, reason));
+        addr2req.erase(it_req);
     } else {
-        send<payload::disconnect_notify_t>(coordinator, peer_addr);
+        auto it = addr2id.find(peer_addr);
+        assert(it != addr2id.end());
+        auto &device_id = it->second;
+        send<payload::disconnect_notify_t>(coordinator, device_id, peer_addr);
+        auto it_id = id2addr.find(device_id);
+        id2addr.erase(it_id);
+        addr2id.erase(it);
     }
     parent_t::on_child_shutdown(actor);
 }

@@ -373,7 +373,9 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
 }
 
 void net_supervisor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
-    spdlog::warn("{}, disconnected peer", identity);
+    auto &device_id = message.payload.peer_device_id;
+    spdlog::info("{}, disconnected peer: {}", identity, device_id);
+    send<payload::disconnect_notify_t>(cluster_addr, device_id, message.payload.peer_addr);
 }
 
 void net_supervisor_t::on_connection(message::connection_notify_t &message) noexcept {

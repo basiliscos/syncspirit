@@ -31,6 +31,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
         p.subscribe_actor(&cluster_supervisor_t::on_load_folder);
         p.subscribe_actor(&cluster_supervisor_t::on_make_index);
         p.subscribe_actor(&cluster_supervisor_t::on_connect);
+        p.subscribe_actor(&cluster_supervisor_t::on_disconnect);
         load_db();
     });
 }
@@ -124,6 +125,20 @@ void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexce
         auto &folder_actor = actors_map.at(folder->id);
         auto &peer_addr = message.payload.peer_addr;
         send<payload::start_sync_t>(folder_actor, device, peer_addr);
+        syncing_map.emplace(device_id.get_value(), folder);
+    }
+}
+
+void cluster_supervisor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
+    auto &device_id = message.payload.peer_device_id;
+    auto it = syncing_map.find(device_id.get_value());
+    if (it != syncing_map.end()) {
+        auto &folder = it->second;
+        auto it_folder = actors_map.find(folder->id);
+        auto &folder_actor = it_folder->second;
+        send<payload::stop_sync_t>(folder_actor);
+        actors_map.erase(it_folder);
+        syncing_map.erase(it);
     }
 }
 

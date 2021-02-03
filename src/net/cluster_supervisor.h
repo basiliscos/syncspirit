@@ -63,6 +63,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
 
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
     void on_connect(message::connect_notify_t &message) noexcept;
+    void on_disconnect(message::disconnect_notify_t &message) noexcept;
 
     void load_db() noexcept;
     void load_cluster(folder_iterator_t it) noexcept;

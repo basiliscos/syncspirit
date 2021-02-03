@@ -200,6 +200,7 @@ struct connect_notify_t {
 };
 
 struct disconnect_notify_t {
+    model::device_id_t peer_device_id;
     r::address_ptr_t peer_addr;
 };
 
