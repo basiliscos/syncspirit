@@ -237,6 +237,13 @@ struct start_sync_t {
 
 struct stop_sync_t {};
 
+struct start_reading_t {
+    r::address_ptr_t controller;
+};
+
+using forwarted_message_t = std::variant<proto::message::Index, proto::message::IndexUpdate, proto::message::Request,
+                                         proto::message::Response, proto::message::DownloadProgress>;
+
 } // end of namespace payload
 
 namespace message {
@@ -279,6 +286,8 @@ using load_folder_response_t = r::request_traits_t<payload::load_folder_request_
 
 using start_sync_t = r::message_t<payload::start_sync_t>;
 using stop_sync_t = r::message_t<payload::stop_sync_t>;
+using start_reading_t = r::message_t<payload::start_reading_t>;
+using forwarted_message_t = r::message_t<payload::forwarted_message_t>;
 
 } // end of namespace message
 

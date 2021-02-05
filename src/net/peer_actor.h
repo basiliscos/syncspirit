@@ -98,6 +98,8 @@ struct peer_actor_t : public r::actor_base_t {
 
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_auth(message::auth_response_t &res) noexcept;
+    void on_start_reading(message::start_reading_t &) noexcept;
+
     void on_connect(resolve_it_t) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;
     void on_write(std::size_t bytes) noexcept;
@@ -118,6 +120,10 @@ struct peer_actor_t : public r::actor_base_t {
 
     void read_hello(proto::message::message_t &&msg) noexcept;
     void read_cluster_config(proto::message::message_t &&msg) noexcept;
+    void read_controlled(proto::message::message_t &&msg) noexcept;
+
+    void handle_ping(proto::message::Ping &&) noexcept;
+    void handle_close(proto::message::Close &&) noexcept;
 
     std::string_view device_name;
     config::bep_config_t bep_config;
@@ -139,6 +145,7 @@ struct peer_actor_t : public r::actor_base_t {
     std::string cert_name;
     tcp::endpoint peer_endpoint;
     read_action_t read_action;
+    r::address_ptr_t controller;
 };
 
 } // namespace net

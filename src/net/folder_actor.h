@@ -1,9 +1,7 @@
 #pragma once
 
 #include "messages.h"
-#include "mdbx.h"
-#include <optional>
-#include <random>
+#include <unordered_set>
 
 namespace syncspirit {
 namespace net {
@@ -39,15 +37,19 @@ struct folder_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
+    bool on_unlink(const r::address_ptr_t &peer_addr) noexcept override;
 
   private:
+    using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     void on_start_sync(message::start_sync_t &message) noexcept;
     void on_stop_sync(message::stop_sync_t &message) noexcept;
+    void on_forward(message::forwarted_message_t &message) noexcept;
 
     model::folder_ptr_t folder;
     model::device_ptr_t device;
     r::address_ptr_t db;
     sync_state_t sync_state;
+    peers_map_t peers_map;
 };
 
 } // namespace net

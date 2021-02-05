@@ -57,6 +57,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&peer_actor_t::on_resolve);
         p.subscribe_actor(&peer_actor_t::on_auth);
+        p.subscribe_actor(&peer_actor_t::on_start_reading);
         instantiate_transport();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
@@ -328,6 +329,13 @@ void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
     read_more();
 }
 
+void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept {
+    spdlog::trace("{}, on_start_reading", identity);
+    controller = message.payload.controller;
+    read_action = [this](auto &&msg) { read_controlled(std::move(msg)); };
+    read_more();
+}
+
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
     spdlog::trace("{}, read_hello", identity);
     std::visit(
@@ -364,4 +372,40 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
             }
         },
         msg);
+}
+
+void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
+    spdlog::trace("{}, read_controlled", identity);
+    std::visit(
+        [&](auto &&msg) {
+            using T = std::decay_t<decltype(msg)>;
+            namespace m = proto::message;
+            const constexpr bool unexpected = std::is_same_v<T, m::Hello> || std::is_same_v<T, m::ClusterConfig>;
+            if constexpr (unexpected) {
+                spdlog::warn("{}, hello, unexpected_message", identity);
+                auto ec = utils::make_error_code(utils::bep_error_code::unexpected_message);
+                do_shutdown(make_error(ec));
+            } else if constexpr (std::is_same_v<T, m::Ping>) {
+                handle_ping(std::move(msg));
+            } else if constexpr (std::is_same_v<T, m::Close>) {
+                handle_close(std::move(msg));
+            } else {
+                auto fwd = payload::forwarted_message_t{std::move(msg)};
+                send<payload::forwarted_message_t>(controller, std::move(fwd));
+            }
+        },
+        msg);
+}
+
+void peer_actor_t::handle_ping(proto::message::Ping &&) noexcept { spdlog::trace("{}, handle_ping", identity); }
+
+void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
+    auto &reason = message->reason();
+    const char *str = reason.c_str();
+    spdlog::trace("{}, handle_close, reason = {}", identity, reason);
+    if (reason.size() == 0) {
+        str = "no reason specified";
+    }
+    auto ee = r::make_error(str, r::shutdown_code_t::normal);
+    do_shutdown(ee);
 }
