@@ -14,6 +14,7 @@ r::plugin::resource_id_t resolving = 0;
 r::plugin::resource_id_t uris = 1;
 r::plugin::resource_id_t io = 2;
 r::plugin::resource_id_t timer = 3;
+r::plugin::resource_id_t inactivity = 4;
 } // namespace resource
 } // namespace
 
@@ -302,6 +303,9 @@ void peer_actor_t::shutdown_start() noexcept {
     if (resources->has(resource::io)) {
         transport->cancel();
     }
+    if (inactivity_request) {
+        r::actor_base_t::cancel_timer(*inactivity_request);
+    }
 }
 
 void peer_actor_t::cancel_timer() noexcept {
@@ -365,6 +369,7 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
                 proto::ClusterConfig &config = *msg;
                 send<payload::connect_notify_t>(supervisor->get_address(), get_address(), peer_device_id,
                                                 std::move(config));
+                reset_inactivity_timer();
             } else {
                 spdlog::warn("{}, read_cluster_config: unexpected_message", identity);
                 auto ec = utils::make_error_code(utils::bep_error_code::unexpected_message);
@@ -408,4 +413,27 @@ void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
     }
     auto ee = r::make_error(str, r::shutdown_code_t::normal);
     do_shutdown(ee);
+}
+
+void peer_actor_t::reset_inactivity_timer() noexcept {
+    if (state == r::state_t::OPERATIONAL) {
+        if (inactivity_request) {
+            r::actor_base_t::cancel_timer(*inactivity_request);
+        }
+        auto timeout = pt::milliseconds(bep_config.ping_timeout);
+        inactivity_request = start_timer(timeout, *this, &peer_actor_t::on_inactivity_timeout);
+        resources->acquire(resource::inactivity);
+    }
+}
+
+void peer_actor_t::on_inactivity_timeout(r::request_id_t, bool cancelled) noexcept {
+    resources->release(resource::inactivity);
+    inactivity_request.reset();
+    if (!cancelled) {
+        fmt::memory_buffer buff;
+        proto::Ping ping;
+        proto::serialize(buff, ping);
+        push_write(std::move(buff), false);
+        reset_inactivity_timer();
+    }
 }

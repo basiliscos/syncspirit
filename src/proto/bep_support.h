@@ -5,6 +5,7 @@
 #include <memory>
 #include <variant>
 #include <vector>
+#include <type_traits>
 #include "bep.pb.h"
 #include "../utils/uri.h"
 
@@ -48,7 +49,9 @@ void make_hello_message(fmt::memory_buffer &buff, const std::string_view &device
 std::size_t make_announce_message(fmt::memory_buffer &buff, const std::string_view &device_name,
                                   const payload::URIs &uris, std::int64_t instance) noexcept;
 
-void serialize(fmt::memory_buffer &buff, proto::ClusterConfig &cluster) noexcept;
+template <typename Message>
+void serialize(fmt::memory_buffer &buff, const Message &message,
+               proto::MessageCompression compression = proto::MessageCompression::NONE) noexcept;
 
 outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &buff) noexcept;
 

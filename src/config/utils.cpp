@@ -17,7 +17,8 @@ static const std::string home_path = "~/.config/syncspirit";
 namespace syncspirit::config {
 
 bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
-    return lhs.rx_buff_size == rhs.rx_buff_size && lhs.connect_timeout == rhs.connect_timeout;
+    return lhs.rx_buff_size == rhs.rx_buff_size && lhs.connect_timeout == rhs.connect_timeout &&
+           lhs.ping_timeout == rhs.ping_timeout;
 }
 
 bool operator==(const ignored_folder_config_t &lhs, const ignored_folder_config_t &rhs) noexcept {
@@ -476,6 +477,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "bep/connect_timeout is incorrect or missing";
         }
         c.connect_timeout = connect_timeout.value();
+
+        auto ping_timeout = t["ping_timeout"].value<std::uint32_t>();
+        if (!ping_timeout) {
+            return "bep/oing_timeout is incorrect or missing";
+        }
+        c.ping_timeout = ping_timeout.value();
     }
 
     // tui
@@ -652,6 +659,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"bep", toml::table{{
             {"rx_buff_size", cfg.bep_config.rx_buff_size},
             {"connect_timeout", cfg.bep_config.connect_timeout},
+            {"ping_timeout", cfg.bep_config.ping_timeout},
         }}},
         {"tui", toml::table{{
             {"refresh_interval", cfg.tui_config.refresh_interval},
@@ -723,8 +731,9 @@ main_t generate_config(const boost::filesystem::path &config_path) {
         64 * 1024,  /* rx_buff */
     };
     cfg.bep_config = bep_config_t {
-        5000,               /* connect_timeout */
         16 * 1024 * 1024,   /* rx_buff */
+        5000,               /* connect_timeout */
+        90000,              /* ping_timeout */
     };
     cfg.tui_config = tui_config_t {
         100,   /* refresh_interval */

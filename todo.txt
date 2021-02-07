@@ -1,18 +1,16 @@
+- handle ping, add ping interval into config, ping send, ping receive
+rx/tx timeouts
+
+
+- gracefully shutdown
+- why index is not received? because max_sequence is 0?
+
 - save config
 - devices & folders  config should be stored in DB?
 
 model: cluster/folder
 2. update_folder(proto::folder) (index/max_sequence)
 3. do not allow multiple connections from the same peer
-
-2. launch_folder_actor(
-    $folder,
-    $sequence_id,
-    coordinator,
-    &peers_map
-    connects to peer, which it needs
-);
-
 
 #${index_id_prefix}{$seq} = file
 
@@ -26,7 +24,6 @@ The max sequence field contains the highest sequence number of the files in the 
 The sequence field is the value of a device local monotonic clock at the time of last local database update to a file. The clock ticks on every local database update, thus forming a sequence number over database updates.
 
 Index ID: Each folder has an Index ID. This is a 64 bit random identifier set at index creation time.
-
 
 - config & tui
  - игнорированные девайсы: показать, удалить

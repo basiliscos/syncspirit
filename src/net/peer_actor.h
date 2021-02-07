@@ -116,8 +116,9 @@ struct peer_actor_t : public r::actor_base_t {
     void cancel_timer() noexcept;
     void instantiate_transport() noexcept;
     void initiate_handshake() noexcept;
-    const std::string_view &get_identity() const noexcept;
+    void on_inactivity_timeout(r::request_id_t, bool cancelled) noexcept;
 
+    void reset_inactivity_timer() noexcept;
     void read_hello(proto::message::message_t &&msg) noexcept;
     void read_cluster_config(proto::message::message_t &&msg) noexcept;
     void read_controlled(proto::message::message_t &&msg) noexcept;
@@ -136,6 +137,7 @@ struct peer_actor_t : public r::actor_base_t {
     transport::stream_sp_t transport;
     std::int32_t uri_idx = -1;
     std::optional<r::request_id_t> timer_request;
+    std::optional<r::request_id_t> inactivity_request;
     tx_queue_t tx_queue;
     tx_item_t tx_item;
     fmt::memory_buffer rx_buff;

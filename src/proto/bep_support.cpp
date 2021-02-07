@@ -6,6 +6,9 @@
 #include <algorithm>
 #include <lz4.h>
 
+#include <google/protobuf/any.h>
+#include <sstream>
+
 using namespace syncspirit;
 namespace be = boost::endian;
 
@@ -60,6 +63,18 @@ template <> struct T2M<MT::RESPONSE> { using type = proto::Response; };
 template <> struct T2M<MT::DOWNLOAD_PROGRESS> { using type = proto::DownloadProgress; };
 template <> struct T2M<MT::PING> { using type = proto::Ping; };
 template <> struct T2M<MT::CLOSE> { using type = proto::Close; };
+
+template <typename M> struct M2T;
+template <> struct M2T<typename proto::ClusterConfig> { using type = std::integral_constant<MT, MT::CLUSTER_CONFIG>; };
+template <> struct M2T<typename proto::Index> { using type = std::integral_constant<MT, MT::INDEX>; };
+template <> struct M2T<typename proto::IndexUpdate> { using type = std::integral_constant<MT, MT::INDEX_UPDATE>; };
+template <> struct M2T<typename proto::Request> { using type = std::integral_constant<MT, MT::REQUEST>; };
+template <> struct M2T<typename proto::Response> { using type = std::integral_constant<MT, MT::RESPONSE>; };
+template <> struct M2T<typename proto::DownloadProgress> {
+    using type = std::integral_constant<MT, MT::DOWNLOAD_PROGRESS>;
+};
+template <> struct M2T<typename proto::Ping> { using type = std::integral_constant<MT, MT::PING>; };
+template <> struct M2T<typename proto::Close> { using type = std::integral_constant<MT, MT::CLOSE>; };
 
 template <MessageType T>
 outcome::result<message::wrapped_message_t> parse(const asio::const_buffer &buff, std::size_t consumed) noexcept {
@@ -190,15 +205,41 @@ outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff
     return std::move(msg);
 }
 
-void serialize(fmt::memory_buffer &buff, proto::ClusterConfig &cluster) noexcept {
-    if (cluster.folders_size() == 0) {
-        // side effect, avoid just serialization to empty string
-        cluster.add_folders();
-    }
-    auto sz = cluster.ByteSizeLong();
-    assert(sz);
-    buff.resize(sz);
-    cluster.SerializeToArray(buff.begin(), sz);
+template <typename Message>
+void serialize(fmt::memory_buffer &buff, const Message &message, proto::MessageCompression compression) noexcept {
+    using type = typename M2T<Message>::type;
+    proto::Header header;
+    header.set_compression(compression);
+    header.set_type(type::value);
+    auto header_sz = header.ByteSizeLong();
+    auto message_sz = message.ByteSizeLong();
+    buff.resize(4 + header_sz + 4 + message_sz);
+    std::uint32_t *ptr_32 = reinterpret_cast<std::uint32_t *>(buff.data());
+
+    *ptr_32++ = be::native_to_big(header_sz);
+    header.SerializePartialToArray(ptr_32, header_sz);
+    char *ptr = reinterpret_cast<char *>(ptr_32) + header_sz;
+
+    ptr_32 = reinterpret_cast<std::uint32_t *>(ptr);
+    *ptr_32++ = be::native_to_big(message_sz);
+    message.SerializeToArray(ptr, message_sz);
 }
+
+template void serialize(fmt::memory_buffer &buff, const proto::ClusterConfig &message,
+                        proto::MessageCompression compression) noexcept;
+template void serialize(fmt::memory_buffer &buff, const proto::Index &message,
+                        proto::MessageCompression compression) noexcept;
+template void serialize(fmt::memory_buffer &buff, const proto::IndexUpdate &message,
+                        proto::MessageCompression compression) noexcept;
+template void serialize(fmt::memory_buffer &buff, const proto::Request &message,
+                        proto::MessageCompression compression) noexcept;
+template void serialize(fmt::memory_buffer &buff, const proto::Response &message,
+                        proto::MessageCompression compression) noexcept;
+template void serialize(fmt::memory_buffer &buff, const proto::DownloadProgress &message,
+                        proto::MessageCompression compression) noexcept;
+template void serialize(fmt::memory_buffer &buff, const proto::Ping &message,
+                        proto::MessageCompression compression) noexcept;
+template void serialize(fmt::memory_buffer &buff, const proto::Close &message,
+                        proto::MessageCompression compression) noexcept;
 
 } // namespace syncspirit::proto

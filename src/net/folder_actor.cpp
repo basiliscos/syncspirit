@@ -44,7 +44,6 @@ void folder_actor_t::shutdown_start() noexcept {
 }
 
 bool folder_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {
-    spdlog::trace("{}, on_unlink", identity);
     auto it = peers_map.find(peer_addr);
     if (it != peers_map.end()) {
         auto &device = it->second;
