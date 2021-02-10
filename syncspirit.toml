@@ -1,7 +1,8 @@
 [bep]
 connect_timeout = 5000
-ping_timeout = 500
 rx_buff_size = 33554432
+rx_timeout = 300000
+tx_timeout = 1000
 
 [global_discovery]
 announce_url = 'https://discovery.syncthing.net/'
@@ -48,23 +49,15 @@ name = 'synth-orig'
 paused = false
 skip_introduction_removals = false
 
-    [[device.ignored_folder]]
-    id = 'ig6gw-nhbjt'
-    label = 'empty-folder'
-
-    [[device.ignored_folder]]
-    id = 'nagkw-srrjz'
-    label = 'Sync'
-
 [[folder]]
 devices = [ 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7' ]
 disable_temp_indixes = false
 folder_type = 3
-id = 'e59yo-b73fz'
+id = 'nagkw-srrjz'
 ignore_delete = false
 ignore_permissions = false
-label = 'sample-folder'
-path = '/tmp/syncspirit/sample-folder'
+label = 'Sync'
+path = '/tmp/syncspirit/Sync'
 paused = false
 pull_order = 0
 read_only = false

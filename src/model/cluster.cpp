@@ -6,7 +6,7 @@ using namespace syncspirit::model;
 
 cluster_t::cluster_t(device_ptr_t device_) noexcept : device(std::move(device_)) {}
 
-void cluster_t::add_folder(const folder_ptr_t &folder) noexcept { folders.emplace(folder->id, folder); }
+void cluster_t::add_folder(const folder_ptr_t &folder) noexcept { folders.emplace(folder->id(), folder); }
 
 cluster_t::folders_config_t cluster_t::serialize() noexcept {
     folders_config_t r;

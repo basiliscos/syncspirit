@@ -5,7 +5,7 @@ using namespace syncspirit;
 using namespace syncspirit::model;
 
 folder_t::folder_t(const config::folder_config_t &cfg, const device_ptr_t &device_) noexcept
-    : id{cfg.id}, label{cfg.label}, path{cfg.path}, folder_type{cfg.folder_type}, rescan_interval{cfg.rescan_interval},
+    : _id{cfg.id}, label{cfg.label}, path{cfg.path}, folder_type{cfg.folder_type}, rescan_interval{cfg.rescan_interval},
       pull_order{cfg.pull_order}, watched{cfg.watched}, read_only{cfg.read_only},
       ignore_permissions{cfg.ignore_permissions}, ignore_delete{cfg.ignore_delete},
       disable_temp_indixes{cfg.disable_temp_indixes}, paused{cfg.paused}, device{device_} {}
@@ -21,12 +21,7 @@ bool folder_t::assign(const proto::Folder &source, const devices_map_t &devices_
                 break;
             }
         }
-        if (!has) {
-            it = devices.erase(it);
-            changed = true;
-        } else {
-            ++it;
-        }
+        ++it;
     }
     // append possibly new
     for (int i = 0; i < source.devices_size(); ++i) {
@@ -49,6 +44,12 @@ bool folder_t::assign(const proto::Folder &source, const devices_map_t &devices_
     return changed;
 }
 
+void folder_t::assing_self(index_id_t index, sequence_id_t max_sequence) noexcept {
+    auto e_r = devices.emplace(model::folder_device_t{device, index, max_sequence});
+    assert(e_r.second);
+    (void)e_r;
+}
+
 config::folder_config_t folder_t::serialize(device_ptr_t local_device) noexcept {
     config::folder_config_t::device_ids_t devices;
     for (auto &fd : this->devices) {
@@ -58,7 +59,7 @@ config::folder_config_t folder_t::serialize(device_ptr_t local_device) noexcept 
         }
     }
     return config::folder_config_t{
-        id,      label,     path.string(),      std::move(devices), folder_type,          rescan_interval, pull_order,
+        _id,     label,     path.string(),      std::move(devices), folder_type,          rescan_interval, pull_order,
         watched, read_only, ignore_permissions, ignore_delete,      disable_temp_indixes, paused};
 }
 
@@ -77,7 +78,7 @@ static proto::Compression compression(model::device_ptr_t device) noexcept {
 
 proto::Folder folder_t::get() noexcept {
     proto::Folder r;
-    r.set_id(id);
+    r.set_id(_id);
     r.set_label(label);
     r.set_read_only(read_only);
     r.set_ignore_permissions(ignore_permissions);
@@ -85,14 +86,15 @@ proto::Folder folder_t::get() noexcept {
     r.set_disable_temp_indexes(disable_temp_indixes);
     r.set_paused(paused);
     for (auto &fd : this->devices) {
-        auto &id = fd.device->device_id.get_value();
+        auto &id = fd.device->device_id.get_sha256();
         proto::Device pd;
         auto &device = fd.device;
         pd.set_id(id);
         pd.set_name(device->name);
         pd.set_compression(compression(device));
-        if (device->cert_name)
+        if (device->cert_name) {
             pd.set_cert_name(device->cert_name.value());
+        }
         pd.set_max_sequence(fd.max_sequence);
         pd.set_introducer(device->introducer);
         pd.set_index_id(fd.index_id);

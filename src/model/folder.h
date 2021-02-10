@@ -40,13 +40,17 @@ struct folder_t : arc_base_t<folder_t> {
     folder_t(const config::folder_config_t &cfg, const device_ptr_t &device_) noexcept;
 
     bool assign(const proto::Folder &source, const devices_map_t &devices) noexcept;
+    void assing_self(index_id_t index, sequence_id_t max_sequence) noexcept;
     config::folder_config_t serialize(device_ptr_t local_device) noexcept;
 
     proto::Folder get() noexcept;
     std::int64_t score(const device_ptr_t &peer_device) noexcept;
 
+    const std::string &id() noexcept { return _id; }
+
+  private:
     // from config
-    std::string id;
+    std::string _id;
     std::string label;
     fs::path path;
     devices_t devices;

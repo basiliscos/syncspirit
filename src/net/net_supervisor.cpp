@@ -25,12 +25,12 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
         spdlog::critical("cannot load certificate/key pair :: {}", result.error().message());
         throw result.error();
     }
+    ssl_pair = std::move(result.value());
     auto device_id = model::device_id_t::from_cert(ssl_pair.cert_data);
     if (!device_id) {
         spdlog::critical("cannot create device_id from certificate");
         throw "cannot create device_id from certificate";
     }
-    ssl_pair = std::move(result.value());
     spdlog::info("{}, device name = {}, device id = {}", names::coordinator, app_config.device_name, device_id.value());
 
     auto cn = utils::get_common_name(ssl_pair.cert.get());

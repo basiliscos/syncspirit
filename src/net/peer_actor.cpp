@@ -13,8 +13,9 @@ namespace resource {
 r::plugin::resource_id_t resolving = 0;
 r::plugin::resource_id_t uris = 1;
 r::plugin::resource_id_t io = 2;
-r::plugin::resource_id_t timer = 3;
-r::plugin::resource_id_t inactivity = 4;
+r::plugin::resource_id_t io_timer = 3;
+r::plugin::resource_id_t tx_timer = 4;
+r::plugin::resource_id_t rx_timer = 5;
 } // namespace resource
 } // namespace
 
@@ -131,7 +132,7 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 
     auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
     timer_request = start_timer(timeout, *this, &peer_actor_t::on_timer);
-    resources->acquire(resource::timer);
+    resources->acquire(resource::io_timer);
 }
 
 void peer_actor_t::on_connect(resolve_it_t) noexcept {
@@ -285,7 +286,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
 }
 
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
-    resources->release(resource::timer);
+    resources->release(resource::io_timer);
     // spdlog::trace("peer_actor_t::on_timer_trigger, peer = {}, cancelled = {}", peer_identity, cancelled);
     if (!cancelled) {
         if (connected) {
@@ -303,13 +304,16 @@ void peer_actor_t::shutdown_start() noexcept {
     if (resources->has(resource::io)) {
         transport->cancel();
     }
-    if (inactivity_request) {
-        r::actor_base_t::cancel_timer(*inactivity_request);
+    if (tx_timer_request) {
+        r::actor_base_t::cancel_timer(*tx_timer_request);
+    }
+    if (rx_timer_request) {
+        r::actor_base_t::cancel_timer(*rx_timer_request);
     }
 }
 
 void peer_actor_t::cancel_timer() noexcept {
-    if (resources->has(resource::timer)) {
+    if (resources->has(resource::io_timer)) {
         r::actor_base_t::cancel_timer(*timer_request);
         timer_request.reset();
     }
@@ -324,6 +328,17 @@ void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
         auto ec = utils::make_error_code(utils::error_code::non_authorized);
         return do_shutdown(make_error(ec));
     }
+
+    /*
+    for (int i = 0; i < cluster->folders_size(); ++i) {
+        auto &f = cluster->folders(i);
+        for (auto j = 0; j < f.devices_size(); ++j) {
+            auto &d = f.devices(j);
+            spdlog::debug(">> {}, folder {}, for device {} has index/max_seq = {}/{} ", identity, f.id(), d.id(),
+                          d.index_id(), d.max_sequence());
+        }
+    }
+    */
 
     fmt::memory_buffer buff;
     serialize(buff, *cluster);
@@ -369,7 +384,8 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
                 proto::ClusterConfig &config = *msg;
                 send<payload::connect_notify_t>(supervisor->get_address(), get_address(), peer_device_id,
                                                 std::move(config));
-                reset_inactivity_timer();
+                reset_tx_timer();
+                reset_rx_timer();
             } else {
                 spdlog::warn("{}, read_cluster_config: unexpected_message", identity);
                 auto ec = utils::make_error_code(utils::bep_error_code::unexpected_message);
@@ -397,6 +413,7 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
             } else {
                 auto fwd = payload::forwarted_message_t{std::move(msg)};
                 send<payload::forwarted_message_t>(controller, std::move(fwd));
+                reset_rx_timer();
             }
         },
         msg);
@@ -415,25 +432,46 @@ void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
     do_shutdown(ee);
 }
 
-void peer_actor_t::reset_inactivity_timer() noexcept {
+void peer_actor_t::reset_tx_timer() noexcept {
     if (state == r::state_t::OPERATIONAL) {
-        if (inactivity_request) {
-            r::actor_base_t::cancel_timer(*inactivity_request);
+        if (tx_timer_request) {
+            r::actor_base_t::cancel_timer(*tx_timer_request);
         }
-        auto timeout = pt::milliseconds(bep_config.ping_timeout);
-        inactivity_request = start_timer(timeout, *this, &peer_actor_t::on_inactivity_timeout);
-        resources->acquire(resource::inactivity);
+        auto timeout = pt::milliseconds(bep_config.tx_timeout);
+        tx_timer_request = start_timer(timeout, *this, &peer_actor_t::on_tx_timeout);
+        resources->acquire(resource::tx_timer);
     }
 }
 
-void peer_actor_t::on_inactivity_timeout(r::request_id_t, bool cancelled) noexcept {
-    resources->release(resource::inactivity);
-    inactivity_request.reset();
+void peer_actor_t::on_tx_timeout(r::request_id_t, bool cancelled) noexcept {
+    resources->release(resource::tx_timer);
+    tx_timer_request.reset();
     if (!cancelled) {
         fmt::memory_buffer buff;
         proto::Ping ping;
         proto::serialize(buff, ping);
         push_write(std::move(buff), false);
-        reset_inactivity_timer();
+        reset_tx_timer();
+    }
+}
+
+void peer_actor_t::reset_rx_timer() noexcept {
+    if (state == r::state_t::OPERATIONAL) {
+        if (rx_timer_request) {
+            r::actor_base_t::cancel_timer(*rx_timer_request);
+        }
+        auto timeout = pt::milliseconds(bep_config.rx_timeout);
+        rx_timer_request = start_timer(timeout, *this, &peer_actor_t::on_rx_timeout);
+        resources->acquire(resource::rx_timer);
+    }
+}
+
+void peer_actor_t::on_rx_timeout(r::request_id_t, bool cancelled) noexcept {
+    resources->release(resource::rx_timer);
+    rx_timer_request.reset();
+    if (!cancelled) {
+        auto ec = utils::make_error_code(utils::error_code::rx_timeout);
+        auto reason = make_error(ec);
+        do_shutdown(reason);
     }
 }

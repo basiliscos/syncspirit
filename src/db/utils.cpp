@@ -111,7 +111,7 @@ outcome::result<void> create_folder(const proto::Folder &folder, const model::in
 outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder_cfg, const model::device_ptr_t &owner,
                                                  const model::devices_map_t &devices, transaction_t &txn) noexcept {
     model::folder_ptr_t folder(new model::folder_t(folder_cfg, owner));
-    auto key_info = prefixer_t<prefix::folder_info>::make(folder->id);
+    auto key_info = prefixer_t<prefix::folder_info>::make(folder->id());
 
     MDBX_val value;
     auto r = mdbx_get(txn.txn, txn.dbi, key_info, &value);
@@ -128,7 +128,7 @@ outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder
     }
     folder->assign(folder_data, devices);
 
-    auto key_device = prefixer_t<prefix::folder_local_device>::make(folder->id);
+    auto key_device = prefixer_t<prefix::folder_local_device>::make(folder->id());
     r = mdbx_get(txn.txn, txn.dbi, key_device, &value);
     if (r != MDBX_SUCCESS) {
         if (r == MDBX_NOTFOUND) {
@@ -141,9 +141,8 @@ outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder
     if (it == devices.end()) {
         return make_error_code(error_code::unknown_local_device);
     }
-    auto &device = it->second;
 
-    auto key_index = prefixer_t<prefix::folder_index>::make(folder->id);
+    auto key_index = prefixer_t<prefix::folder_index>::make(folder->id());
     r = mdbx_get(txn.txn, txn.dbi, key_index, &value);
     if (r != MDBX_SUCCESS) {
         if (r == MDBX_NOTFOUND) {
@@ -155,11 +154,9 @@ outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder
         return make_error_code(error_code::folder_index_deserialization_failure);
     }
     auto index = be::big_to_native(*((model::index_id_t *)value.iov_base));
-    auto sequence = model::sequence_id_t{0};
+    auto sequence = model::sequence_id_t{1};
 
-    auto e_r = folder->devices.emplace(model::folder_device_t{device, index, sequence});
-    assert(e_r.second);
-    (void)e_r;
+    folder->assing_self(index, sequence);
 
     return folder;
 }

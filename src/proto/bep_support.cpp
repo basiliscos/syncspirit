@@ -5,6 +5,7 @@
 #include <boost/endian/conversion.hpp>
 #include <algorithm>
 #include <lz4.h>
+#include <spdlog/spdlog.h>
 
 #include <google/protobuf/any.h>
 #include <sstream>
@@ -211,18 +212,18 @@ void serialize(fmt::memory_buffer &buff, const Message &message, proto::MessageC
     proto::Header header;
     header.set_compression(compression);
     header.set_type(type::value);
-    auto header_sz = header.ByteSizeLong();
-    auto message_sz = message.ByteSizeLong();
-    buff.resize(4 + header_sz + 4 + message_sz);
-    std::uint32_t *ptr_32 = reinterpret_cast<std::uint32_t *>(buff.data());
+    std::uint16_t header_sz = header.ByteSizeLong();
+    std::uint32_t message_sz = message.ByteSizeLong();
+    buff.resize(2 + header_sz + 4 + message_sz);
+    std::uint16_t *ptr_16 = reinterpret_cast<std::uint16_t *>(buff.data());
 
-    *ptr_32++ = be::native_to_big(header_sz);
-    header.SerializePartialToArray(ptr_32, header_sz);
-    char *ptr = reinterpret_cast<char *>(ptr_32) + header_sz;
+    *ptr_16++ = be::native_to_big(header_sz);
+    header.SerializeToArray(ptr_16, header_sz);
+    char *ptr = reinterpret_cast<char *>(ptr_16) + header_sz;
 
-    ptr_32 = reinterpret_cast<std::uint32_t *>(ptr);
+    std::uint32_t *ptr_32 = reinterpret_cast<std::uint32_t *>(ptr);
     *ptr_32++ = be::native_to_big(message_sz);
-    message.SerializeToArray(ptr, message_sz);
+    message.SerializeToArray(ptr_32, message_sz);
 }
 
 template void serialize(fmt::memory_buffer &buff, const proto::ClusterConfig &message,

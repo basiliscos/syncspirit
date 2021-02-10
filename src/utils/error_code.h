@@ -56,6 +56,7 @@ enum class error_code {
     igd_description_failed,
     unparseable_control_url,
     external_ip_failed,
+    rx_timeout,
 };
 
 enum class bep_error_code {

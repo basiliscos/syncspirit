@@ -18,7 +18,7 @@ void folder_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         std::string id = "folder/";
-        id += folder->id;
+        id += folder->id();
         p.set_identity(id, false);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(

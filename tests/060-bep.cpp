@@ -149,10 +149,14 @@ TEST_CASE("cluster config", "[bep]") {
         CHECK(r.error() == utils::make_error_code(utils::bep_error_code::lz4_decoding));
     }
 
-    SECTION("serialize") {
-        proto::ClusterConfig cluster;
-        cluster.add_folders();
-        auto s = cluster.SerializePartialAsString();
-        CHECK(s.size() > 0);
+    SECTION("serialize, round-trip") {
+        fmt::memory_buffer buff;
+        serialize(buff, *msg);
+        auto r2 = parse_bep(asio::buffer(buff.begin(), buff.size()));
+        REQUIRE(r2);
+        auto& v2 = r.value();
+        auto& msg2 = std::get<proto::message::ClusterConfig>(v.message);
+        CHECK(v2.consumed == buff_sz);
+        CHECK(msg2->folders(0).devices(0).id() == msg->folders(0).devices(0).id());
     }
 }

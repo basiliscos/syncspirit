@@ -104,7 +104,7 @@ void cluster_supervisor_t::on_make_index(message::make_index_id_response_t &mess
     auto folder = model::folder_ptr_t(new model::folder_t(cfg, device));
     auto &index_id = message.payload.res.index_id;
     folder->assign(payload.folder, *devices);
-    folder->devices.insert(model::folder_device_t{device, index_id, model::sequence_id_t{}});
+    folder->assing_self(index_id, {});
     cluster->add_folder(folder);
 
     reply_to(request, folder->serialize(device));
@@ -122,7 +122,7 @@ void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexce
     }
     auto folder = cluster->opt_for_synch(device);
     if (folder) {
-        auto &folder_actor = actors_map.at(folder->id);
+        auto &folder_actor = actors_map.at(folder->id());
         auto &peer_addr = message.payload.peer_addr;
         send<payload::start_sync_t>(folder_actor, device, peer_addr);
         syncing_map.emplace(device_id.get_value(), folder);
@@ -134,10 +134,9 @@ void cluster_supervisor_t::on_disconnect(message::disconnect_notify_t &message) 
     auto it = syncing_map.find(device_id.get_value());
     if (it != syncing_map.end()) {
         auto &folder = it->second;
-        auto it_folder = actors_map.find(folder->id);
+        auto it_folder = actors_map.find(folder->id());
         auto &folder_actor = it_folder->second;
         send<payload::stop_sync_t>(folder_actor);
-        actors_map.erase(it_folder);
         syncing_map.erase(it);
     }
 }
@@ -157,7 +156,8 @@ void cluster_supervisor_t::load_cluster(folder_iterator_t it) noexcept {
                         .folder(folder)
                         .finish()
                         ->get_address();
-        actors_map.emplace(folder->id, addr);
+        actors_map.emplace(folder->id(), addr);
+        spdlog::trace("{}, create folder actor {}, complete", identity, folder->id());
     }
     spdlog::trace("{}, load_cluster, complete", identity);
     resources->release(resource::db);

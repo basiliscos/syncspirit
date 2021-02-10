@@ -18,7 +18,7 @@ namespace syncspirit::config {
 
 bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
     return lhs.rx_buff_size == rhs.rx_buff_size && lhs.connect_timeout == rhs.connect_timeout &&
-           lhs.ping_timeout == rhs.ping_timeout;
+           lhs.tx_timeout == rhs.tx_timeout && lhs.rx_timeout == rhs.rx_timeout;
 }
 
 bool operator==(const ignored_folder_config_t &lhs, const ignored_folder_config_t &rhs) noexcept {
@@ -478,11 +478,17 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.connect_timeout = connect_timeout.value();
 
-        auto ping_timeout = t["ping_timeout"].value<std::uint32_t>();
-        if (!ping_timeout) {
-            return "bep/oing_timeout is incorrect or missing";
+        auto tx_timeout = t["tx_timeout"].value<std::uint32_t>();
+        if (!tx_timeout) {
+            return "bep/tx_timeout is incorrect or missing";
         }
-        c.ping_timeout = ping_timeout.value();
+        c.tx_timeout = tx_timeout.value();
+
+        auto rx_timeout = t["rx_timeout"].value<std::uint32_t>();
+        if (!rx_timeout) {
+            return "bep/rx_timeout is incorrect or missing";
+        }
+        c.rx_timeout = rx_timeout.value();
     }
 
     // tui
@@ -659,7 +665,8 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"bep", toml::table{{
             {"rx_buff_size", cfg.bep_config.rx_buff_size},
             {"connect_timeout", cfg.bep_config.connect_timeout},
-            {"ping_timeout", cfg.bep_config.ping_timeout},
+            {"tx_timeout", cfg.bep_config.tx_timeout},
+            {"rx_timeout", cfg.bep_config.rx_timeout},
         }}},
         {"tui", toml::table{{
             {"refresh_interval", cfg.tui_config.refresh_interval},
@@ -733,7 +740,8 @@ main_t generate_config(const boost::filesystem::path &config_path) {
     cfg.bep_config = bep_config_t {
         16 * 1024 * 1024,   /* rx_buff */
         5000,               /* connect_timeout */
-        90000,              /* ping_timeout */
+        90000,              /* tx_timeout */
+        300000,             /* rx_timeout */
     };
     cfg.tui_config = tui_config_t {
         100,   /* refresh_interval */
