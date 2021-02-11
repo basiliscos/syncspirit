@@ -154,7 +154,7 @@ outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder
         return make_error_code(error_code::folder_index_deserialization_failure);
     }
     auto index = be::big_to_native(*((model::index_id_t *)value.iov_base));
-    auto sequence = model::sequence_id_t{1};
+    auto sequence = model::sequence_id_t{0};
 
     folder->assing_self(index, sequence);
 

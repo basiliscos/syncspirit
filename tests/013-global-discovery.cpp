@@ -14,7 +14,7 @@ using namespace syncspirit::test;
 
 TEST_CASE("parse valid announce sample", "[support]") {
     std::string body =
-            R""(
+        R""(
                 {"seen":"2020-10-13T18:41:37.02287354Z",
                 "addresses":["quic://192.168.100.15:22000",
                 "quic://81.52.93.44:22000",
@@ -30,13 +30,13 @@ TEST_CASE("parse valid announce sample", "[support]") {
     http::response<http::string_body> res;
     res.result(200);
     res.body() = body;
-    auto r =  parse_contact(res);
+    auto r = parse_contact(res);
     REQUIRE((bool)r);
 
-    auto& o = r.value();
+    auto &o = r.value();
     REQUIRE((bool)o);
 
-    auto& c = o.value();
+    auto &c = o.value();
     CHECK(c.uris.size() == 9);
     CHECK(c.uris[0].full == "quic://192.168.100.15:22000");
 }
@@ -47,40 +47,39 @@ TEST_CASE("malformed url", "[support]") {
     res.result(200);
 
     SECTION("malformed url") {
-        res.body()= R""( {"seen":"2020-10-13T18:41:37.02287354Z", "addresses":["q uic://192.168.100.15:22000" ]})"";
-        auto r =  parse_contact(res);
+        res.body() = R""( {"seen":"2020-10-13T18:41:37.02287354Z", "addresses":["q uic://192.168.100.15:22000" ]})"";
+        auto r = parse_contact(res);
         CHECK(r.error() == make_error_code(error_code::malformed_url));
     }
 
     SECTION("malformed json") {
-        res.body()= R""( {"seen":"2020-10-13T18:41:37.02287354Z" "addresses":["qic://192.168.100.15:22000" ]})"";
-        auto r =  parse_contact(res);
+        res.body() = R""( {"seen":"2020-10-13T18:41:37.02287354Z" "addresses":["qic://192.168.100.15:22000" ]})"";
+        auto r = parse_contact(res);
         CHECK(r.error() == make_error_code(error_code::malformed_json));
     }
 
     SECTION("incorrect json") {
-        res.body()= R""( {"seen":"2020-10-13T18:41:37.02287354Z", "Addresses":["quic://192.168.100.15:22000" ]})"";
-        auto r =  parse_contact(res);
+        res.body() = R""( {"seen":"2020-10-13T18:41:37.02287354Z", "Addresses":["quic://192.168.100.15:22000" ]})"";
+        auto r = parse_contact(res);
         CHECK(r.error() == make_error_code(error_code::incorrect_json));
     }
 
     SECTION("malformed date") {
-        res.body()= R""( {"seen":"2020-99-13T18:41:37.02287354Z", "addresses":["qic://192.168.100.15:22000" ]})"";
-        auto r =  parse_contact(res);
+        res.body() = R""( {"seen":"2020-99-13T18:41:37.02287354Z", "addresses":["qic://192.168.100.15:22000" ]})"";
+        auto r = parse_contact(res);
         CHECK(r.error() == make_error_code(error_code::malformed_date));
     }
 
     SECTION("wrong code") {
         res.result(500);
-        auto r =  parse_contact(res);
+        auto r = parse_contact(res);
         CHECK(r.error() == make_error_code(error_code::unexpected_response_code));
     }
 
     SECTION("not found") {
         res.result(404);
-        auto r =  parse_contact(res);
+        auto r = parse_contact(res);
         REQUIRE((bool)r);
         CHECK(!(bool)r.value());
     }
-
 }

@@ -111,10 +111,10 @@ void http_actor_t::spawn_timer() noexcept {
 
 void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     resolve_request.reset();
-    auto &ec = res.payload.ec;
-    if (ec) {
-        spdlog::warn("{}, on_resolve error: {}", identity, ec->message());
-        reply_with_error(*queue.front(), ec);
+    auto &ee = res.payload.ee;
+    if (ee) {
+        spdlog::warn("{}, on_resolve error: {}", identity, ee->message());
+        reply_with_error(*queue.front(), ee);
         queue.pop_front();
         need_response = false;
         return process();

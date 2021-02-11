@@ -1,7 +1,4 @@
-- handle ping, add ping interval into config, ping send, ping receive
-rx/tx timeouts
-
-
+- dialer
 - gracefully shutdown
 - why index is not received? because max_sequence is 0?
 

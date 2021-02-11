@@ -240,13 +240,13 @@ void net_supervisor_t::on_announce(message::announce_notification_t &) noexcept 
 }
 
 void net_supervisor_t::on_discovery(message::discovery_response_t &res) noexcept {
-    auto &ec = res.payload.ec;
+    auto &ee = res.payload.ee;
     auto &req_id = res.payload.req->payload.id;
     auto it = discovery_map.find(req_id);
     assert(it != discovery_map.end());
     discovery_map.erase(it);
     auto &req = *res.payload.req->payload.request_payload;
-    if (!ec) {
+    if (!ee) {
         auto &contact = res.payload.res->peer;
         if (contact) {
             auto &urls = contact.value().uris;
@@ -258,7 +258,7 @@ void net_supervisor_t::on_discovery(message::discovery_response_t &res) noexcept
                           req.device_id.get_short());
         }
     } else {
-        spdlog::warn("{}, on_discovery, can't discover contacts for {} :: {}", req.device_id, identity, ec->message());
+        spdlog::warn("{}, on_discovery, can't discover contacts for {} :: {}", req.device_id, identity, ee->message());
     }
 }
 
@@ -341,8 +341,8 @@ void net_supervisor_t::discover(model::device_ptr_t &device) noexcept {
 template <class> inline constexpr bool always_false_v = false;
 
 void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept {
-    auto &ec = message.payload.ec;
-    if (!ec) {
+    auto &ee = message.payload.ee;
+    if (!ee) {
         /*
         auto &device_id = message.payload.res->peer_device_id;
         auto &device = devices.at(device_id.get_value());
@@ -361,9 +361,9 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, P::connect_info_t>) {
                     spdlog::debug("{}, on_connect, cannot establish connection to {} :: {}", identity, arg.device_id,
-                                  ec->message());
+                                  ee->message());
                 } else if constexpr (std::is_same_v<T, P::connected_info_t>) {
-                    spdlog::debug("{}, on_connect, cannot authorize {} :: {}", identity, arg.remote, ec->message());
+                    spdlog::debug("{}, on_connect, cannot authorize {} :: {}", identity, arg.remote, ee->message());
                 } else {
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
                 }

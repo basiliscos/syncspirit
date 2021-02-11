@@ -78,11 +78,11 @@ void global_discovery_actor_t::on_announce_response(message::http_response_t &me
     resources->release(resource::http);
     http_request.reset();
 
-    auto &ec = message.payload.ec;
-    if (ec) {
-        spdlog::error("{}, announcing error = {}", identity, ec->message());
+    auto &ee = message.payload.ee;
+    if (ee) {
+        spdlog::error("{}, announcing error = {}", identity, ee->message());
         auto inner = utils::make_error_code(utils::error_code::announce_failed);
-        return do_shutdown(make_error(inner, ec));
+        return do_shutdown(make_error(inner, ee));
     }
 
     auto res = proto::parse_announce(message.payload.res->response);
@@ -112,12 +112,12 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     resources->release(resource::http);
     http_request.reset();
 
-    auto &ec = message.payload.ec;
+    auto &ee = message.payload.ee;
     auto orig_req = discovery_queue.front();
     discovery_queue.pop_front();
-    if (ec) {
+    if (ee) {
         auto inner = utils::make_error_code(utils::error_code::discovery_failed);
-        return reply_with_error(*orig_req, make_error(inner, ec));
+        return reply_with_error(*orig_req, make_error(inner, ee));
     }
 
     auto res = proto::parse_contact(message.payload.res->response);

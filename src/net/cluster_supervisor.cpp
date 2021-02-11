@@ -64,10 +64,10 @@ void cluster_supervisor_t::on_load_folder(message::load_folder_response_t &messa
     auto predicate = [&](auto &it) { return it.first == folder_config.id; };
     auto it = std::find_if(folders->begin(), folders->end(), predicate);
     assert(it != folders->end());
-    auto &ec = message.payload.ec;
-    if (ec) {
+    auto &ee = message.payload.ee;
+    if (ee) {
         spdlog::warn("{}, on_load_folder, cannot load folder {} / {} : {}", identity, folder_config.label,
-                     folder_config.id, ec->message());
+                     folder_config.id, ee->message());
     } else {
         auto &folder = message.payload.res.folder;
         cluster->add_folder(folder);
@@ -88,9 +88,9 @@ void cluster_supervisor_t::on_make_index(message::make_index_id_response_t &mess
     auto &request_id = message.payload.req->payload.id;
     auto it = folder_requests.find(request_id);
     auto &request = *it->second;
-    auto &ec = message.payload.ec;
-    if (ec) {
-        reply_with_error(request, ec);
+    auto &ee = message.payload.ee;
+    if (ee) {
+        reply_with_error(request, ee);
         return;
     }
     auto &payload = request.payload.request_payload;
@@ -98,7 +98,7 @@ void cluster_supervisor_t::on_make_index(message::make_index_id_response_t &mess
     sys::error_code fs_ec;
     fs::create_directories(cfg.path, fs_ec);
     if (fs_ec) {
-        reply_with_error(request, ec);
+        reply_with_error(request, ee);
         return;
     }
     auto folder = model::folder_ptr_t(new model::folder_t(cfg, device));

@@ -32,7 +32,7 @@ TEST_CASE("default config is OK", "[config]") {
         auto r = config::serialize(cfg, out);
         REQUIRE((bool)r);
         CHECK(out.str().find("O4LHPKG") != std::string::npos);
-        //INFO(out.str());
+        // INFO(out.str());
         auto cfg2 = config::get_config(out, dir);
         CHECK(cfg2.value().ignored_devices.size() == 1);
         CHECK(cfg2.value() == cfg);
@@ -48,8 +48,8 @@ TEST_CASE("default config is OK", "[config]") {
             true,
             false,
             true,
-            { utils::parse("tcp://127.0.0.1:1234").value() },
-            {config::ignored_folder_config_t{ "123", "folder-label" } },
+            {utils::parse("tcp://127.0.0.1:1234").value()},
+            {config::ignored_folder_config_t{"123", "folder-label"}},
         };
         cfg.devices.emplace(device.id, device);
 
@@ -64,21 +64,19 @@ TEST_CASE("default config is OK", "[config]") {
         }
 
         SECTION("folders") {
-            auto folder = config::folder_config_t {
-                "fpwop-79ucw",
-                "my-label",
-                "/home/user/shared-folder",
-                { device.id },
-                config::folder_type_t::send_and_receive,
-                3600,
-                config::pull_order_t::alphabetic,
-                true,
-                true,
-                false,
-                false,
-                false,
-                false
-            };
+            auto folder = config::folder_config_t{"fpwop-79ucw",
+                                                  "my-label",
+                                                  "/home/user/shared-folder",
+                                                  {device.id},
+                                                  config::folder_type_t::send_and_receive,
+                                                  3600,
+                                                  config::pull_order_t::alphabetic,
+                                                  true,
+                                                  true,
+                                                  false,
+                                                  false,
+                                                  false,
+                                                  false};
             cfg.folders.emplace(folder.id, folder);
             auto r = config::serialize(cfg, out);
             REQUIRE((bool)r);
@@ -90,4 +88,3 @@ TEST_CASE("default config is OK", "[config]") {
         }
     }
 }
-

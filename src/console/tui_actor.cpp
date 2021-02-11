@@ -242,9 +242,9 @@ void tui_actor_t::on_config(ui::message::config_response_t &message) noexcept {
 }
 
 void tui_actor_t::on_config_save(ui::message::config_save_response_t &message) noexcept {
-    auto &ec = message.payload.ec;
-    if (ec) {
-        spdlog::error("{}, cannot save config: {}", identity, ec->message());
+    auto &ee = message.payload.ee;
+    if (ee) {
+        spdlog::error("{}, cannot save config: {}", identity, ee->message());
         return;
     }
     spdlog::trace("{}, on_config_save", identity);
@@ -254,9 +254,9 @@ void tui_actor_t::on_config_save(ui::message::config_save_response_t &message) n
 void tui_actor_t::on_create_folder(ui::message::create_folder_response_t &message) noexcept {
     auto &folder_orig = message.payload.req->payload.request_payload.folder_config;
     spdlog::debug("{}, on_create_folder, '{}'", identity, folder_orig.label);
-    auto &ec = message.payload.ec;
-    if (ec) {
-        spdlog::warn("{}, on_create_folder, '{}' error: {}q", identity, folder_orig.label, ec->message());
+    auto &ee = message.payload.ee;
+    if (ee) {
+        spdlog::warn("{}, on_create_folder, '{}' error: {}q", identity, folder_orig.label, ee->message());
     } else {
         auto &folder = message.payload.res.folder;
         app_config.folders.emplace(folder.id, folder);

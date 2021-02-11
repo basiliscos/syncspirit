@@ -117,9 +117,9 @@ void peer_actor_t::initiate(transport::stream_sp_t tran, const utils::URI &url) 
 void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     resources->release(resource::resolving);
 
-    auto &ec = res.payload.ec;
-    if (ec) {
-        spdlog::warn("{}, on_resolve error : {}", identity, ec->message());
+    auto &ee = res.payload.ee;
+    if (ee) {
+        spdlog::warn("{}, on_resolve error : {}", identity, ee->message());
         resources->acquire(resource::uris);
         return try_next_uri();
     }

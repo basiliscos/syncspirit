@@ -28,11 +28,11 @@ TEST_CASE("device_id", "[protocol]") {
     auto key_path = file_path("/data/sample-key.pem");
     auto load_result = load_pair(cert_path.c_str(), key_path.c_str());
     REQUIRE(load_result);
-    auto& pair = load_result.value();
+    auto &pair = load_result.value();
     auto opt_device_id = device_id_t::from_cert(pair.cert_data);
     REQUIRE(opt_device_id);
 
-    auto& device_id = opt_device_id.value();
+    auto &device_id = opt_device_id.value();
     auto expected = std::string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
     REQUIRE(device_id.get_value().size() == expected.size());
     REQUIRE(device_id.get_value() == expected);

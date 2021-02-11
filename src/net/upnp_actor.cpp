@@ -87,11 +87,11 @@ void upnp_actor_t::request_finish() noexcept {
 void upnp_actor_t::on_endpoint(message::endpoint_response_t &res) noexcept {
     spdlog::trace("{}, on_endpoint", identity);
     resources->release(resource::req_acceptor);
-    auto &ec = res.payload.ec;
-    if (ec) {
+    auto &ee = res.payload.ee;
+    if (ee) {
         auto inner = utils::make_error_code(utils::error_code::endpoint_failed);
-        spdlog::warn("{}, on_endpoint, cannot get acceptor endpoint :: {}", identity, ec->message());
-        return do_shutdown(make_error(inner, ec));
+        spdlog::warn("{}, on_endpoint, cannot get acceptor endpoint :: {}", identity, ee->message());
+        return do_shutdown(make_error(inner, ee));
     }
     accepting_endpoint = res.payload.res.local_endpoint;
     spdlog::debug("{}, local endpoint = {}", identity, accepting_endpoint);
@@ -101,11 +101,11 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
     spdlog::trace("{}, on_igd_description", identity);
     request_finish();
 
-    auto &ec = msg.payload.ec;
-    if (ec) {
+    auto &ee = msg.payload.ee;
+    if (ee) {
         auto inner = utils::make_error_code(utils::error_code::igd_description_failed);
-        spdlog::warn("{}, get IGD description: {}", identity, ec->message());
-        return do_shutdown(make_error(inner, ec));
+        spdlog::warn("{}, get IGD description: {}", identity, ee->message());
+        return do_shutdown(make_error(inner, ee));
     }
 
     local_address = msg.payload.res->local_addr.value();
@@ -147,11 +147,11 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
     spdlog::trace("{}, on_external_ip", identity);
     request_finish();
 
-    auto &ec = msg.payload.ec;
-    if (ec) {
-        spdlog::warn("{}, get external IP address: {}", identity, ec->message());
+    auto &ee = msg.payload.ee;
+    if (ee) {
+        spdlog::warn("{}, get external IP address: {}", identity, ee->message());
         auto inner = utils::make_error_code(utils::error_code::external_ip_failed);
-        return do_shutdown(make_error(inner, ec));
+        return do_shutdown(make_error(inner, ee));
     }
     auto &body = msg.payload.res->response.body();
     auto ip_addr_result = parse_external_ip(body.data(), body.size());
@@ -168,7 +168,7 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
 
     sys::error_code io_ec;
     external_addr = asio::ip::address::from_string(ip_addr, io_ec);
-    if (ec) {
+    if (ee) {
         spdlog::warn("{}, can't external IP address '{}' is incorrect: {}", identity, ip_addr, io_ec.message());
         return do_shutdown(make_error(io_ec));
     }
@@ -192,9 +192,9 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     request_finish();
 
     bool ok = false;
-    auto &ec = msg.payload.ec;
-    if (ec) {
-        spdlog::warn("{}, unsuccessfull port mapping: {}", ec->message(), identity);
+    auto &ee = msg.payload.ee;
+    if (ee) {
+        spdlog::warn("{}, unsuccessfull port mapping: {}", ee->message(), identity);
     } else if (state < r::state_t::SHUTTING_DOWN) {
         auto &body = msg.payload.res->response.body();
         auto result = parse_mapping(body.data(), body.size());
@@ -221,9 +221,9 @@ void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
     request_finish();
     resources->release(resource::external_port);
 
-    auto &ec = msg.payload.ec;
-    if (ec) {
-        spdlog::warn("upnp_actor:: unsuccessfull port mapping: {}", ec->message());
+    auto &ee = msg.payload.ee;
+    if (ee) {
+        spdlog::warn("upnp_actor:: unsuccessfull port mapping: {}", ee->message());
         return;
     }
     auto &body = msg.payload.res->response.body();

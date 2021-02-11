@@ -48,6 +48,9 @@ struct folder_t : arc_base_t<folder_t> {
 
     const std::string &id() noexcept { return _id; }
 
+    template <typename T> auto &access() noexcept;
+    template <typename T> auto &access() const noexcept;
+
   private:
     // from config
     std::string _id;

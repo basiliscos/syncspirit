@@ -27,6 +27,9 @@ bool folder_t::assign(const proto::Folder &source, const devices_map_t &devices_
     for (int i = 0; i < source.devices_size(); ++i) {
         auto &d = source.devices(i);
         auto &raw_id = d.id();
+        if (raw_id == device->device_id.get_sha256()) {
+            continue;
+        }
         auto device_id_option = device_id_t::from_sha256(raw_id);
         if (!device_id_option) {
             spdlog::warn("load_folder, cannot obtain device id from digest: {}", raw_id);
