@@ -70,6 +70,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_disconnect);
         p.subscribe_actor(&net_supervisor_t::on_connection);
         p.subscribe_actor(&net_supervisor_t::on_auth);
+        p.subscribe_actor(&net_supervisor_t::on_dial_ready);
         launch_cluster();
     });
 }

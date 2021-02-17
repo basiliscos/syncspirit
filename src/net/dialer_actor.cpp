@@ -133,11 +133,27 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
 }
 
 void dialer_actor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
-    spdlog::warn("{}, on_disconnect", identity);
+    auto &peer_id = message.payload.peer_device_id;
+    spdlog::trace("{}, on_disconnect, peer = {}", identity, peer_id);
+    auto &peer = devices->at(peer_id.get_value());
+    discover(peer);
 }
 
 void dialer_actor_t::on_connect(message::connect_notify_t &message) noexcept {
-    spdlog::warn("{}, on_connect", identity);
+    auto &peer_id = message.payload.peer_device_id;
+    spdlog::trace("{}, on_connect, peer = {}", identity, peer_id);
+
+    auto &peer = devices->at(peer_id.get_value());
+
+    auto it_redial = redial_map.find(peer);
+    if (it_redial != redial_map.end()) {
+        cancel_timer(it_redial->second);
+    }
+
+    auto it_discovery = discovery_map.find(peer);
+    if (it_discovery != discovery_map.end()) {
+        send<message::discovery_cancel_t::payload_t>(global_discovery, it_discovery->second);
+    }
 }
 
 } // namespace syncspirit::net
