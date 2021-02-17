@@ -38,3 +38,19 @@ using device_ptr_t = intrusive_ptr_t<device_t>;
 using devices_map_t = std::unordered_map<std::string, device_ptr_t>;
 
 } // namespace syncspirit::model
+
+namespace std {
+
+template <> struct hash<syncspirit::model::device_t> {
+    inline size_t operator()(const syncspirit::model::device_t &device) const noexcept {
+        return std::hash<syncspirit::model::device_id_t>()(device.device_id);
+    }
+};
+
+template <> struct hash<syncspirit::model::device_ptr_t> {
+    inline size_t operator()(const syncspirit::model::device_ptr_t &device) const noexcept {
+        return std::hash<syncspirit::model::device_t>()(*device);
+    }
+};
+
+} // namespace std

@@ -1,0 +1,143 @@
+#include "dialer_actor.h"
+#include "names.h"
+#include "spdlog/spdlog.h"
+
+namespace syncspirit::net {
+
+namespace {
+namespace resource {
+r::plugin::resource_id_t timer = 0;
+r::plugin::resource_id_t request = 1;
+} // namespace resource
+} // namespace
+
+dialer_actor_t::dialer_actor_t(config_t &config)
+    : r::actor_base_t{config}, redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}},
+      device{config.device}, devices{config.devices} {
+    online_map.emplace(device);
+}
+
+void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
+    r::actor_base_t::configure(plugin);
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("dialer", false); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.discover_name(net::names::cluster, cluster, true).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&dialer_actor_t::on_connect, cluster);
+                plugin->subscribe_actor(&dialer_actor_t::on_disconnect, cluster);
+            }
+        });
+        p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&dialer_actor_t::on_announce, coordinator);
+            }
+        });
+        p.discover_name(names::global_discovery, global_discovery, true).link(true);
+    });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&dialer_actor_t::on_discovery); });
+}
+
+void dialer_actor_t::on_start() noexcept {
+    spdlog::trace("{}, on_start", identity);
+    r::actor_base_t::on_start();
+}
+
+void dialer_actor_t::shutdown_start() noexcept {
+    r::actor_base_t::shutdown_start();
+    for (auto &it : discovery_map) {
+        send<message::discovery_cancel_t::payload_t>(global_discovery, it.second);
+    }
+    while (!redial_map.empty()) {
+        cancel_timer(redial_map.begin()->second);
+    }
+}
+
+void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
+    spdlog::trace("{}, on_announce", identity);
+    for (auto it : *devices) {
+        auto &d = it.second;
+        if (*d != *device) {
+            discover(it.second);
+        }
+    }
+}
+
+void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
+    if (peer_device->is_dynamic()) {
+        if (global_discovery) {
+            assert(global_discovery);
+            auto timeout = shutdown_timeout / 2;
+            auto &device_id = peer_device->device_id;
+            auto req_id = request<payload::discovery_request_t>(global_discovery, device_id).send(timeout);
+            discovery_map.insert_or_assign(peer_device, req_id);
+            resources->acquire(resource::request);
+        }
+    } else {
+        on_ready(peer_device, peer_device->static_addresses);
+    }
+}
+
+void dialer_actor_t::schedule_redial(const model::device_ptr_t &peer_device) noexcept {
+    spdlog::trace("{}, scheduling redial to {}, ", identity, peer_device->device_id);
+    auto redial_timer = start_timer(redial_timeout, *this, &dialer_actor_t::on_timer);
+    redial_map.insert_or_assign(peer_device, redial_timer);
+    resources->acquire(resource::timer);
+}
+
+void dialer_actor_t::on_ready(const model::device_ptr_t &peer_device,
+                              const config::device_config_t::addresses_t &uris) noexcept {
+    spdlog::trace("{}, on_ready to dial to {}, ", identity, peer_device->device_id);
+    schedule_redial(peer_device);
+    send<payload::dial_ready_notification_t>(coordinator, peer_device->device_id, uris);
+}
+
+void dialer_actor_t::on_discovery(message::discovery_response_t &res) noexcept {
+    resources->release(resource::request);
+    auto &ee = res.payload.ee;
+    auto &peer_id = res.payload.req->payload.request_payload->device_id;
+    auto &peer = devices->at(peer_id.get_value());
+    auto it = discovery_map.find(peer);
+    assert(it != discovery_map.end());
+    auto &req = *res.payload.req->payload.request_payload;
+    if (!ee) {
+        auto &contact = res.payload.res->peer;
+        if (contact) {
+            auto &urls = contact.value().uris;
+            on_ready(peer, urls);
+        } else {
+            spdlog::trace("{}, on_discovery, no contact for {} has been discovered", identity, peer_id);
+            schedule_redial(peer);
+        }
+    } else {
+        spdlog::debug("{}, on_discovery, can't discover contacts for {} :: {}", identity, req.device_id, ee->message());
+        schedule_redial(peer);
+    }
+    discovery_map.erase(it);
+}
+
+void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexcept {
+    spdlog::trace("{}, on_timer, cancelled = {}", identity, cancelled);
+    using value_t = typename redial_map_t::value_type;
+    resources->release(resource::timer);
+    auto predicate = [&](const value_t &val) -> bool { return val.second == request_id; };
+    auto it = std::find_if(redial_map.begin(), redial_map.end(), predicate);
+    assert(it != redial_map.end());
+    if (!cancelled) {
+        discover(it->first);
+    }
+    redial_map.erase(it);
+}
+
+void dialer_actor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
+    spdlog::warn("{}, on_disconnect", identity);
+}
+
+void dialer_actor_t::on_connect(message::connect_notify_t &message) noexcept {
+    spdlog::warn("{}, on_connect", identity);
+}
+
+} // namespace syncspirit::net

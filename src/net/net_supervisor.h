@@ -37,28 +37,26 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     template <typename Actor> using config_builder_t = net_supervisor_config_builder_t<Actor>;
 
     explicit net_supervisor_t(config_t &config);
-    void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override;
     void on_child_shutdown(actor_base_t *actor) noexcept override;
     void on_start() noexcept override;
 
   private:
-    using discovery_map_t = std::set<rotor::request_id_t>;
+    using uris_t = config::device_config_t::addresses_t;
 
     void on_ssdp(message::ssdp_notification_t &message) noexcept;
-    void on_announce(message::announce_notification_t &message) noexcept;
     void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
-    void on_discovery(message::discovery_response_t &req) noexcept;
     void on_discovery_notify(message::discovery_notify_t &message) noexcept;
     void on_connect(message::connect_response_t &message) noexcept;
     void on_disconnect(message::disconnect_notify_t &message) noexcept;
     void on_connection(message::connection_notify_t &message) noexcept;
+    void on_dial_ready(message::dial_ready_notify_t &message) noexcept;
     void on_auth(message::auth_request_t &message) noexcept;
     void on_config_request(ui::message::config_request_t &message) noexcept;
     void on_config_save(ui::message::config_save_request_t &message) noexcept;
 
-    void discover(model::device_ptr_t &device) noexcept;
+    void dial_peer(const model::device_id_t &peer_device_id, const uris_t &uris) noexcept;
     void launch_children() noexcept;
     void launch_cluster() noexcept;
     void launch_ssdp() noexcept;
@@ -72,13 +70,11 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     r::address_ptr_t peers_addr;
     r::address_ptr_t cluster_addr;
     r::address_ptr_t controller_addr;
-    r::address_ptr_t global_discovery_addr;
     r::address_ptr_t local_discovery_addr;
     std::uint32_t ssdp_attempts = 0;
     model::device_ptr_t device;
     model::cluster_ptr_t cluster;
     utils::key_pair_t ssl_pair;
-    discovery_map_t discovery_map;
     model::devices_map_t devices;
 };
 

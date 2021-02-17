@@ -136,6 +136,11 @@ struct discovery_notification_t {
     udp::endpoint peer_endpoint;
 };
 
+struct dial_ready_notification_t {
+    model::device_id_t device_id;
+    config::device_config_t::addresses_t uris;
+};
+
 struct connect_response_t : r::arc_base_t<connect_response_t> {
     r::address_ptr_t peer_addr;
     model::device_id_t peer_device_id;
@@ -269,6 +274,7 @@ using discovery_response_t = r::request_traits_t<payload::discovery_request_t>::
 using discovery_cancel_t = r::request_traits_t<payload::discovery_request_t>::cancel::message_t;
 using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
 
+using dial_ready_notify_t = r::message_t<payload::dial_ready_notification_t>;
 using connect_request_t = r::request_traits_t<payload::connect_request_t>::request::message_t;
 using connect_response_t = r::request_traits_t<payload::connect_request_t>::response::message_t;
 using connect_notify_t = r::message_t<payload::connect_notify_t>;

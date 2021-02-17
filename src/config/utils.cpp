@@ -25,6 +25,10 @@ bool operator==(const ignored_folder_config_t &lhs, const ignored_folder_config_
     return lhs.id == rhs.id && lhs.label == rhs.label;
 }
 
+bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept {
+    return lhs.enabled == rhs.enabled && lhs.redial_timeout == rhs.redial_timeout;
+}
+
 bool operator==(const device_config_t &lhs, const device_config_t &rhs) noexcept {
     return lhs.id == rhs.id && lhs.name == rhs.name && lhs.compression == rhs.compression &&
            lhs.cert_name == rhs.cert_name && lhs.introducer == rhs.introducer && lhs.auto_accept == rhs.auto_accept &&
@@ -491,6 +495,24 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         c.rx_timeout = rx_timeout.value();
     }
 
+    // dialer
+    {
+        auto t = root_tbl["dialer"];
+        auto &c = cfg.dialer_config;
+
+        auto enabled = t["enabled"].value<bool>();
+        if (!enabled) {
+            return "dialer/enabled is incorrect or missing";
+        }
+        c.enabled = enabled.value();
+
+        auto redial_timeout = t["redial_timeout"].value<std::uint32_t>();
+        if (!redial_timeout) {
+            return "dialer/redial_timeout is incorrect or missing";
+        }
+        c.redial_timeout = redial_timeout.value();
+    }
+
     // tui
     {
         auto t = root_tbl["tui"];
@@ -668,6 +690,10 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
             {"tx_timeout", cfg.bep_config.tx_timeout},
             {"rx_timeout", cfg.bep_config.rx_timeout},
         }}},
+        {"dialer", toml::table{{
+            {"enabled",  cfg.dialer_config.enabled},
+            {"redial_timeout", cfg.dialer_config.redial_timeout},
+        }}},
         {"tui", toml::table{{
             {"refresh_interval", cfg.tui_config.refresh_interval},
             {"key_quit", std::string_view(&cfg.tui_config.key_quit, 1)},
@@ -750,6 +776,10 @@ main_t generate_config(const boost::filesystem::path &config_path) {
         '-',   /* key_less_logs */
         '?',   /* key_help */
         'c'    /* key_config */
+    };
+    cfg.dialer_config = dialer_config_t {
+        true,       /* enabled */
+        5 * 60000   /* redial timeout */
     };
     return cfg;
 }

@@ -4,6 +4,11 @@ rx_buff_size = 33554432
 rx_timeout = 300000
 tx_timeout = 1000
 
+[dialer]
+enabled = true
+redial_timeout = 300000
+
+
 [global_discovery]
 announce_url = 'https://discovery.syncthing.net/'
 cert_file = '/home/b/.config/syncthing/cert.pem'

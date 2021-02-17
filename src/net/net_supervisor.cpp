@@ -10,6 +10,7 @@
 #include "http_actor.h"
 #include "resolver_actor.h"
 #include "peer_supervisor.h"
+#include "dialer_actor.h"
 #include "db_actor.h"
 #include "names.h"
 #include <spdlog/spdlog.h>
@@ -62,8 +63,6 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&net_supervisor_t::on_ssdp);
         p.subscribe_actor(&net_supervisor_t::on_port_mapping);
-        p.subscribe_actor(&net_supervisor_t::on_announce);
-        p.subscribe_actor(&net_supervisor_t::on_discovery);
         p.subscribe_actor(&net_supervisor_t::on_discovery_notify);
         p.subscribe_actor(&net_supervisor_t::on_config_request);
         p.subscribe_actor(&net_supervisor_t::on_config_save);
@@ -207,58 +206,34 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
         return do_shutdown(make_error(ec));
     }
 
-    auto &cfg = app_config.global_announce_config;
-    if (cfg.enabled) {
-        auto global_device_id = model::device_id_t::from_string(cfg.device_id);
+    auto &gcfg = app_config.global_announce_config;
+    if (gcfg.enabled) {
+        auto global_device_id = model::device_id_t::from_string(gcfg.device_id);
         if (!global_device_id) {
             spdlog::error("{}, on_port_mapping invalid global device id :: {} global discovery will not be used",
-                          identity, cfg.device_id);
+                          identity, gcfg.device_id);
             return;
         }
         auto timeout = shutdown_timeout * 9 / 10;
         tcp::endpoint external_ep(message.payload.external_ip, app_config.upnp_config.external_port);
-        global_discovery_addr = create_actor<global_discovery_actor_t>()
-                                    .timeout(timeout)
-                                    .endpoint(external_ep)
-                                    .ssl_pair(&ssl_pair)
-                                    .announce_url(cfg.announce_url)
-                                    .device_id(std::move(global_device_id.value()))
-                                    .rx_buff_size(cfg.rx_buff_size)
-                                    .io_timeout(cfg.timeout)
-                                    .finish()
-                                    ->get_address();
-    }
-}
-
-void net_supervisor_t::on_announce(message::announce_notification_t &) noexcept {
-    for (auto it : devices) {
-        auto &d = it.second;
-        if (*d != *device) {
-            discover(it.second);
+        create_actor<global_discovery_actor_t>()
+            .timeout(timeout)
+            .endpoint(external_ep)
+            .ssl_pair(&ssl_pair)
+            .announce_url(gcfg.announce_url)
+            .device_id(std::move(global_device_id.value()))
+            .rx_buff_size(gcfg.rx_buff_size)
+            .io_timeout(gcfg.timeout)
+            .finish();
+        auto dcfg = app_config.dialer_config;
+        if (dcfg.enabled) {
+            create_actor<dialer_actor_t>()
+                .timeout(timeout)
+                .dialer_config(dcfg)
+                .device(device)
+                .devices(&devices)
+                .finish();
         }
-    }
-}
-
-void net_supervisor_t::on_discovery(message::discovery_response_t &res) noexcept {
-    auto &ee = res.payload.ee;
-    auto &req_id = res.payload.req->payload.id;
-    auto it = discovery_map.find(req_id);
-    assert(it != discovery_map.end());
-    discovery_map.erase(it);
-    auto &req = *res.payload.req->payload.request_payload;
-    if (!ee) {
-        auto &contact = res.payload.res->peer;
-        if (contact) {
-            auto &urls = contact.value().uris;
-            auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout * (urls.size() + 1)};
-            spdlog::warn("TODO: {}t::on_discovery, update last_seen", identity, req.device_id);
-            request<payload::connect_request_t>(peers_addr, req.device_id, urls).send(timeout);
-        } else {
-            spdlog::trace("{}, on_discovery, no contact for {} has been discovered", identity,
-                          req.device_id.get_short());
-        }
-    } else {
-        spdlog::warn("{}, on_discovery, can't discover contacts for {} :: {}", req.device_id, identity, ee->message());
     }
 }
 
@@ -271,9 +246,7 @@ void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message)
         auto it = devices.find(id);
         if (it != devices.end()) {
             if (!it->second->online) {
-                auto &urls = peer.uris;
-                auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout * (urls.size() + 1)};
-                request<payload::connect_request_t>(peers_addr, device_id, peer.uris).send(timeout);
+                dial_peer(device_id, peer.uris);
             }
         } else {
             bool notify = app_config.ignored_devices.count(id) == 0 && app_config.devices.count(id) == 0;
@@ -283,6 +256,16 @@ void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message)
             }
         }
     }
+}
+
+void net_supervisor_t::on_dial_ready(message::dial_ready_notify_t &message) noexcept {
+    auto &payload = message.payload;
+    dial_peer(payload.device_id, payload.uris);
+}
+
+void net_supervisor_t::dial_peer(const model::device_id_t &peer_device_id, const uris_t &uris) noexcept {
+    auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout * (uris.size() + 1)};
+    request<payload::connect_request_t>(peers_addr, peer_device_id, uris).send(timeout);
 }
 
 void net_supervisor_t::on_config_request(ui::message::config_request_t &message) noexcept {
@@ -322,35 +305,11 @@ outcome::result<void> net_supervisor_t::save_config(const config::main_t &new_cf
     return outcome::success();
 }
 
-void net_supervisor_t::discover(model::device_ptr_t &device) noexcept {
-    if (device->is_dynamic()) {
-        if (global_discovery_addr) {
-            assert(global_discovery_addr);
-            auto timeout = shutdown_timeout / 2;
-            auto &device_id = device->device_id;
-            auto req_id = request<payload::discovery_request_t>(global_discovery_addr, device_id).send(timeout);
-            discovery_map.emplace(req_id);
-        }
-    } else {
-        auto &urls = device->static_addresses;
-        auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout * (urls.size() + 1)};
-        request<payload::connect_request_t>(peers_addr, device->device_id, device->static_addresses).send(timeout);
-    }
-}
-
 template <class> inline constexpr bool always_false_v = false;
 
 void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept {
     auto &ee = message.payload.ee;
     if (!ee) {
-        /*
-        auto &device_id = message.payload.res->peer_device_id;
-        auto &device = devices.at(device_id.get_value());
-        auto unknown = cluster->update(message.payload.res->cluster_config, devices);
-        for (auto &folder : unknown) {
-            send<ui::payload::new_folder_notify_t>(address, folder, device);
-        }
-        */
         auto &p = message.payload.res;
         send<payload::connect_notify_t>(cluster_addr, p->peer_addr, p->peer_device_id, p->cluster_config);
     } else {
@@ -419,13 +378,6 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
         reply_to(message, cluster_config_ptr_t{});
     }
     spdlog::debug("{}, on_auth, {} requested authtorization. Result : {}", identity, device_id, (bool)device);
-}
-
-void net_supervisor_t::shutdown_start() noexcept {
-    for (auto request_id : discovery_map) {
-        send<message::discovery_cancel_t::payload_t>(global_discovery_addr, request_id);
-    }
-    parent_t::shutdown_start();
 }
 
 void net_supervisor_t::update_devices() noexcept {
