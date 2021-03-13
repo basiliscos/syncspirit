@@ -147,7 +147,7 @@ void dialer_actor_t::on_connect(message::connect_notify_t &message) noexcept {
     auto &peer_id = message.payload.peer_device_id;
     spdlog::trace("{}, on_connect, peer = {}", identity, peer_id);
 
-    auto peer = devices->by_id(peer_id.get_value());
+    auto peer = devices->by_id(peer_id.get_sha256());
     assert(peer);
 
     auto it_redial = redial_map.find(peer);

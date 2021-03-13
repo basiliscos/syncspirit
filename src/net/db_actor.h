@@ -42,8 +42,9 @@ struct db_actor_t : public r::actor_base_t {
 
   private:
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
-    void on_store_ingnored_device(message::store_ignored_device_request_t &message) noexcept;
+    void on_store_ignored_device(message::store_ignored_device_request_t &message) noexcept;
     void on_store_device(message::store_device_request_t &message) noexcept;
+    void on_store_ignored_folder(message::store_ignored_folder_request_t &message) noexcept;
 
     void open() noexcept;
     std::random_device rd;

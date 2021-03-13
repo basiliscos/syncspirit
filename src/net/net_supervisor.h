@@ -44,7 +44,9 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
 
   private:
     using ignore_device_req_t = r::intrusive_ptr_t<ui::message::ignore_device_request_t>;
+    using ignore_folder_req_t = r::intrusive_ptr_t<ui::message::ignore_folder_request_t>;
     using update_peer_req_t = r::intrusive_ptr_t<ui::message::update_peer_request_t>;
+    using ingored_folder_requests_t = std::list<ignore_folder_req_t>;
 
     void on_ssdp(message::ssdp_notification_t &message) noexcept;
     void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
@@ -57,10 +59,12 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_config_request(ui::message::config_request_t &message) noexcept;
     void on_config_save(ui::message::config_save_request_t &message) noexcept;
     void on_load_cluster(message::load_cluster_response_t &message) noexcept;
-    void on_ingnore_device(ui::message::ignore_device_request_t &message) noexcept;
+    void on_ignore_device(ui::message::ignore_device_request_t &message) noexcept;
     void on_update_peer(ui::message::update_peer_request_t &message) noexcept;
-    void on_store_ingnored_device(message::store_ignored_device_response_t &message) noexcept;
+    void on_ignore_folder(ui::message::ignore_folder_request_t &message) noexcept;
+    void on_store_ignored_device(message::store_ignored_device_response_t &message) noexcept;
     void on_store_device(message::store_device_response_t &message) noexcept;
+    void on_store_ignored_folder(message::store_ignored_folder_response_t &message) noexcept;
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
     void launch_db() noexcept;
@@ -85,7 +89,9 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     utils::key_pair_t ssl_pair;
     model::devices_map_t devices;
     model::ignored_devices_map_t ignored_devices;
+    model::ignored_folders_map_t ignored_folders;
     ignore_device_req_t ignore_device_req;
+    ingored_folder_requests_t ingored_folder_requests;
     update_peer_req_t update_peer_req;
 };
 

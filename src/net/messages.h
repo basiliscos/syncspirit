@@ -253,10 +253,10 @@ struct remove_device_t {
     model::device_ptr_t device;
 };
 
-struct store_ignore_device_response_t {};
+struct store_ignored_device_response_t {};
 
 struct store_ignored_device_request_t {
-    using response_t = store_ignore_device_response_t;
+    using response_t = store_ignored_device_response_t;
     model::ignored_device_ptr_t device;
 };
 
@@ -265,6 +265,13 @@ struct store_device_response_t {};
 struct store_device_request_t {
     using response_t = store_device_response_t;
     model::device_ptr_t device;
+};
+
+struct store_ignored_folder_response_t {};
+
+struct store_ignored_folder_request_t {
+    using response_t = store_ignored_folder_response_t;
+    model::ignored_folder_ptr_t folder;
 };
 
 } // end of namespace payload
@@ -305,6 +312,10 @@ using auth_response_t = r::request_traits_t<payload::auth_request_t>::response::
 using store_ignored_device_request_t = r::request_traits_t<payload::store_ignored_device_request_t>::request::message_t;
 using store_ignored_device_response_t =
     r::request_traits_t<payload::store_ignored_device_request_t>::response::message_t;
+
+using store_ignored_folder_request_t = r::request_traits_t<payload::store_ignored_folder_request_t>::request::message_t;
+using store_ignored_folder_response_t =
+    r::request_traits_t<payload::store_ignored_folder_request_t>::response::message_t;
 
 using store_device_request_t = r::request_traits_t<payload::store_device_request_t>::request::message_t;
 using store_device_response_t = r::request_traits_t<payload::store_device_request_t>::response::message_t;

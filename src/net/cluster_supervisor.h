@@ -15,7 +15,7 @@ struct cluster_supervisor_config_t : ra::supervisor_config_asio_t {
     model::device_ptr_t device;
     model::cluster_ptr_t cluster;
     model::devices_map_t *devices;
-    model::ignored_folders_map_t ignored_folders;
+    model::ignored_folders_map_t *ignored_folders;
 };
 
 template <typename Supervisor>
@@ -39,8 +39,8 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&ignored_folders(model::ignored_folders_map_t &&value) &&noexcept {
-        parent_t::config.ignored_folders = std::move(value);
+    builder_t &&ignored_folders(model::ignored_folders_map_t *value) &&noexcept {
+        parent_t::config.ignored_folders = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -71,7 +71,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     model::cluster_ptr_t cluster;
     model::devices_map_t *devices;
     model::folders_map_t folders;
-    model::ignored_folders_map_t ignored_folders;
+    model::ignored_folders_map_t *ignored_folders;
     actors_map_t actors_map;
     syncing_map_t syncing_map;
 };

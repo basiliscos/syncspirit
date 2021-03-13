@@ -10,13 +10,18 @@
 namespace syncspirit::model {
 
 struct cluster_t : arc_base_t<cluster_t> {
-    using unknown_folders_t = std::vector<proto::Folder>;
+
+    struct update_info_t {
+        using unknown_folders_t = std::vector<proto::Folder>;
+
+        unknown_folders_t unknown_folders;
+    };
 
     cluster_t(device_ptr_t device_) noexcept;
 
     void assign_folders(folders_map_t &&folders) noexcept;
     proto::ClusterConfig get() noexcept;
-    unknown_folders_t update(proto::ClusterConfig &config, const devices_map_t &devices) noexcept;
+    update_info_t update(proto::ClusterConfig &config, const devices_map_t &devices) noexcept;
     folder_ptr_t opt_for_synch(const device_ptr_t &peer_device) noexcept;
 
     const folders_map_t &get_folders() const noexcept;

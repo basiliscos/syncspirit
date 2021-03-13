@@ -82,6 +82,7 @@ void tui_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&tui_actor_t::on_create_folder);
         p.subscribe_actor(&tui_actor_t::on_ignrore_device);
         p.subscribe_actor(&tui_actor_t::on_update_peer);
+        p.subscribe_actor(&tui_actor_t::on_ignrore_folder);
     });
 }
 
@@ -230,16 +231,7 @@ void tui_actor_t::on_auth(ui::message::auth_notify_t &message) noexcept {
 }
 
 void tui_actor_t::on_new_folder(ui::message::new_folder_notify_t &message) noexcept {
-    /*
-    auto &payload = message.payload;
-    auto &folder = payload.folder;
-    auto candidate = config::ignored_folder_config_t{folder.id(), folder.label()};
-    auto &device = app_config.devices.at(payload.source->device_id.get_value());
-    if (device.ignored_folders.count(candidate) == 0) {
-        push_activity(std::make_unique<new_folder_activity_t>(*this, message));
-    }
-    */
-    assert(0 && "TODO");
+    push_activity(std::make_unique<new_folder_activity_t>(*this, message));
 }
 
 void tui_actor_t::on_config(ui::message::config_response_t &message) noexcept {
@@ -258,11 +250,11 @@ void tui_actor_t::on_config_save(ui::message::config_save_response_t &message) n
 
 void tui_actor_t::on_ignrore_device(ui::message::ignore_device_response_t &message) noexcept {
     auto &ee = message.payload.ee;
+    auto &device = message.payload.req->payload.request_payload.device;
     if (ee) {
-        spdlog::error("{}, cannot ignore device: {}", identity, ee->message());
+        spdlog::error("{}, cannot ignore device {}: {}", identity, *device, ee->message());
         return;
     }
-    auto &device = message.payload.req->payload.request_payload.device;
     spdlog::info("{}, device '{}' marked as ignored", identity, *device);
 }
 
@@ -274,6 +266,16 @@ void tui_actor_t::on_update_peer(ui::message::update_peer_response_t &message) n
         return;
     }
     spdlog::info("{}, peerd device '{}' has been added", identity, peer->device_id);
+}
+
+void tui_actor_t::on_ignrore_folder(ui::message::ignore_folder_response_t &message) noexcept {
+    auto &ee = message.payload.ee;
+    auto &folder = message.payload.req->payload.request_payload.folder;
+    if (ee) {
+        spdlog::error("{}, cannot ignore folder {}: {}", identity, folder->id, ee->message());
+        return;
+    }
+    spdlog::info("{}, folder '{}/{}' marked as ignored", identity, folder->id, folder->label);
 }
 
 void tui_actor_t::on_create_folder(ui::message::create_folder_response_t &message) noexcept {
@@ -298,13 +300,11 @@ void tui_actor_t::ignore_device(const model::device_id_t &device_id) noexcept {
 }
 
 void tui_actor_t::ignore_folder(const proto::Folder &folder, model::device_ptr_t &source) noexcept {
-    /*
-        auto &device = app_config.devices.at(source->device_id.get_value());
-        auto ignored = config::ignored_folder_config_t{folder.id(), folder.label()};
-        device.ignored_folders.insert(ignored);
-        save_config();
-    */
-    assert(0 && "TODO");
+    auto folder_db = db::IgnoredFolder();
+    folder_db.set_id(folder.id());
+    folder_db.set_label(folder.label());
+    auto f = model::ignored_folder_ptr_t(new model::ignored_folder_t(folder_db));
+    request<ui::payload::ignore_folder_request_t>(coordinator, f).send(init_timeout);
 }
 
 void tui_actor_t::create_folder(const proto::Folder &folder, model::device_ptr_t &source) noexcept {

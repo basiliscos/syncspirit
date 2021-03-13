@@ -16,7 +16,7 @@ r::plugin::resource_id_t db = 0;
 
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
     : ra::supervisor_asio_t{config}, device{config.device}, cluster{config.cluster}, devices{config.devices},
-      folders{cluster->get_folders()} {}
+      folders{cluster->get_folders()}, ignored_folders(config.ignored_folders) {}
 
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     ra::supervisor_asio_t::configure(plugin);
@@ -111,9 +111,11 @@ void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexce
     auto &device_id = payload.peer_device_id;
     spdlog::trace("{}, on_connect, peer = ", payload.peer_device_id);
     auto device = devices->by_id(device_id.get_sha256());
-    auto unknown = cluster->update(payload.cluster_config, *devices);
-    for (auto &folder : unknown) {
-        send<ui::payload::new_folder_notify_t>(address, folder, device);
+    auto update_result = cluster->update(payload.cluster_config, *devices);
+    for (auto &folder : update_result.unknown_folders) {
+        if (!ignored_folders->by_key(folder.id())) {
+            send<ui::payload::new_folder_notify_t>(address, folder, device);
+        }
     }
     auto folder = cluster->opt_for_synch(device);
     if (folder) {

@@ -67,10 +67,12 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_auth);
         p.subscribe_actor(&net_supervisor_t::on_dial_ready);
         p.subscribe_actor(&net_supervisor_t::on_load_cluster);
-        p.subscribe_actor(&net_supervisor_t::on_ingnore_device);
-        p.subscribe_actor(&net_supervisor_t::on_store_ingnored_device);
+        p.subscribe_actor(&net_supervisor_t::on_ignore_device);
+        p.subscribe_actor(&net_supervisor_t::on_ignore_folder);
+        p.subscribe_actor(&net_supervisor_t::on_store_ignored_device);
         p.subscribe_actor(&net_supervisor_t::on_update_peer);
         p.subscribe_actor(&net_supervisor_t::on_store_device);
+        p.subscribe_actor(&net_supervisor_t::on_store_ignored_folder);
         launch_db();
     });
 }
@@ -137,8 +139,9 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
     auto &p = message.payload.res;
     devices = std::move(p.devices);
     ignored_devices = std::move(p.ignored_devices);
-    spdlog::debug("{}, load cluster. devices = {}, ignored devices = {}", identity, devices.size(),
-                  ignored_devices.size());
+    ignored_folders = std::move(p.ignored_folders);
+    spdlog::debug("{}, load cluster. devices = {}, ignored devices = {}, ignored folders = {}", identity,
+                  devices.size(), ignored_devices.size(), ignored_folders.size());
     cluster = new model::cluster_t(device);
 
     auto timeout = shutdown_timeout * 9 / 10;
@@ -149,7 +152,7 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
                        .strand(strand)
                        .device(device)
                        .devices(&devices)
-                       .ignored_folders(std::move(p.ignored_folders))
+                       .ignored_folders(&ignored_folders)
                        .cluster(cluster)
                        .finish()
                        ->get_address();
@@ -403,10 +406,10 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
     spdlog::debug("{}, on_auth, {} requested authtorization. Result : {}", identity, device_id, (bool)device);
 }
 
-void net_supervisor_t::on_ingnore_device(ui::message::ignore_device_request_t &message) noexcept {
+void net_supervisor_t::on_ignore_device(ui::message::ignore_device_request_t &message) noexcept {
     ignore_device_req.reset(&message);
     auto &peer = message.payload.request_payload.device;
-    spdlog::trace("{}, on_ingnore_device, {}", identity, *peer);
+    spdlog::trace("{}, on_ignore_device, {}", identity, *peer);
     assert(!ignored_devices.by_key(peer->get_sha256()));
     request<payload::store_ignored_device_request_t>(db_addr, peer).send(init_timeout / 2);
 }
@@ -418,7 +421,15 @@ void net_supervisor_t::on_update_peer(ui::message::update_peer_request_t &messag
     request<payload::store_device_request_t>(db_addr, device).send(init_timeout / 2);
 }
 
-void net_supervisor_t::on_store_ingnored_device(message::store_ignored_device_response_t &message) noexcept {
+void net_supervisor_t::on_ignore_folder(ui::message::ignore_folder_request_t &message) noexcept {
+    ingored_folder_requests.emplace_back(&message);
+    auto &folder = message.payload.request_payload.folder;
+    spdlog::trace("{}, on_ignore_folder, {}", identity, folder->id);
+    assert(!ignored_folders.by_key(folder->id));
+    request<payload::store_ignored_folder_request_t>(db_addr, folder).send(init_timeout / 2);
+}
+
+void net_supervisor_t::on_store_ignored_device(message::store_ignored_device_response_t &message) noexcept {
     auto &peer = message.payload.req->payload.request_payload.device;
     spdlog::trace("{}, on_store_ingnored_device, {}", identity, *peer);
     assert(ignore_device_req);
@@ -426,7 +437,7 @@ void net_supervisor_t::on_store_ingnored_device(message::store_ignored_device_re
     if (ee) {
         reply_with_error(*ignore_device_req, ee);
     } else {
-        spdlog::debug("{}, ignoring, {}", identity, *peer);
+        spdlog::debug("{}, ignoring device {}", identity, *peer);
         ignored_devices.put(peer);
         reply_to(*ignore_device_req);
     }
@@ -453,6 +464,23 @@ void net_supervisor_t::on_store_device(message::store_device_response_t &message
         }
     }
     update_peer_req.reset();
+}
+
+void net_supervisor_t::on_store_ignored_folder(message::store_ignored_folder_response_t &message) noexcept {
+    auto &folder = message.payload.req->payload.request_payload.folder;
+    spdlog::trace("{}, on_store_ingnored_folder, {}", identity, folder->id);
+    auto predicate = [&](ignore_folder_req_t &req) { return req->payload.request_payload.folder == folder; };
+    auto it = std::find_if(ingored_folder_requests.begin(), ingored_folder_requests.end(), predicate);
+    assert(it != ingored_folder_requests.end());
+    auto &ee = message.payload.ee;
+    if (ee) {
+        reply_with_error(**it, ee);
+    } else {
+        spdlog::debug("{}, ignoring folder {}/{}", identity, folder->id, folder->label);
+        ignored_folders.put(folder);
+        reply_to(**it);
+    }
+    ingored_folder_requests.erase(it);
 }
 
 #if 0

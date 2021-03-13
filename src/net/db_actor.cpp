@@ -38,8 +38,9 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         open();
         p.subscribe_actor(&db_actor_t::on_cluster_load);
-        p.subscribe_actor(&db_actor_t::on_store_ingnored_device);
+        p.subscribe_actor(&db_actor_t::on_store_ignored_device);
         p.subscribe_actor(&db_actor_t::on_store_device);
+        p.subscribe_actor(&db_actor_t::on_store_ignored_folder);
     });
 }
 
@@ -136,6 +137,12 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
     }
     auto &ignored_devices = ignored_devices_opt.value();
 
+    auto ignored_folders_opt = db::load_ignored_folders(txn);
+    if (!ignored_folders_opt) {
+        return reply_with_error(message, make_error(ignored_folders_opt.error()));
+    }
+    auto &ignored_folders = ignored_folders_opt.value();
+
     auto folders_opt = db::load_folders(txn_opt.value());
     if (!folders_opt) {
         return reply_with_error(message, make_error(folders_opt.error()));
@@ -171,10 +178,10 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
 
     auto cluster = model::cluster_ptr_t(new model::cluster_t(device));
     cluster->assign_folders(std::move(folders));
-    reply_to(message, std::move(cluster), std::move(devices), std::move(ignored_devices));
+    reply_to(message, std::move(cluster), std::move(devices), std::move(ignored_devices), std::move(ignored_folders));
 }
 
-void db_actor_t::on_store_ingnored_device(message::store_ignored_device_request_t &message) noexcept {
+void db_actor_t::on_store_ignored_device(message::store_ignored_device_request_t &message) noexcept {
     auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
     if (!txn_opt) {
         return reply_with_error(message, make_error(txn_opt.error()));
@@ -204,6 +211,28 @@ void db_actor_t::on_store_device(message::store_device_request_t &message) noexc
     auto &txn = txn_opt.value();
     auto &peer_device = message.payload.request_payload.device;
     auto r = db::store_device(peer_device, txn);
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    r = txn.commit();
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    reply_to(message);
+}
+
+void db_actor_t::on_store_ignored_folder(message::store_ignored_folder_request_t &message) noexcept {
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return reply_with_error(message, make_error(txn_opt.error()));
+    }
+    auto &txn = txn_opt.value();
+    auto &folder = message.payload.request_payload.folder;
+    auto r = db::store_ignored_folder(folder, txn);
     if (!r) {
         reply_with_error(message, make_error(r.error()));
         return;

@@ -42,6 +42,13 @@ struct ignore_device_request_t {
     model::ignored_device_ptr_t device;
 };
 
+struct ignore_folder_response_t {};
+
+struct ignore_folder_request_t {
+    using response_t = ignore_folder_response_t;
+    model::ignored_folder_ptr_t folder;
+};
+
 struct update_peer_response_t {};
 
 struct update_peer_request_t {
@@ -81,6 +88,9 @@ using create_folder_response_t = r::request_traits_t<payload::create_folder_requ
 
 using ignore_device_request_t = r::request_traits_t<payload::ignore_device_request_t>::request::message_t;
 using ignore_device_response_t = r::request_traits_t<payload::ignore_device_request_t>::response::message_t;
+
+using ignore_folder_request_t = r::request_traits_t<payload::ignore_folder_request_t>::request::message_t;
+using ignore_folder_response_t = r::request_traits_t<payload::ignore_folder_request_t>::response::message_t;
 
 using update_peer_request_t = r::request_traits_t<payload::update_peer_request_t>::request::message_t;
 using update_peer_response_t = r::request_traits_t<payload::update_peer_request_t>::response::message_t;

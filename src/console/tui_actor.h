@@ -68,6 +68,7 @@ struct tui_actor_t : public r::actor_base_t {
     void on_new_folder(ui::message::new_folder_notify_t &message) noexcept;
     void on_create_folder(ui::message::create_folder_response_t &message) noexcept;
     void on_ignrore_device(ui::message::ignore_device_response_t &message) noexcept;
+    void on_ignrore_folder(ui::message::ignore_folder_response_t &message) noexcept;
     void on_update_peer(ui::message::update_peer_response_t &message) noexcept;
 
     void start_timer() noexcept;
