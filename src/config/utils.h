@@ -10,10 +10,7 @@ namespace outcome = boost::outcome_v2;
 // comparators
 
 bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept;
-bool operator==(const ignored_folder_config_t &lhs, const ignored_folder_config_t &rhs) noexcept;
-bool operator==(const device_config_t &lhs, const device_config_t &rhs) noexcept;
 bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept;
-bool operator==(const folder_config_t &lhs, const folder_config_t &rhs) noexcept;
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept;
 bool operator==(const local_announce_config_t &lhs, const local_announce_config_t &rhs) noexcept;
 bool operator==(const main_t &lhs, const main_t &rhs) noexcept;

@@ -87,4 +87,4 @@ void folder_actor_t::on_stop_sync(message::stop_sync_t &) noexcept {
     sync_state = sync_state_t::none;
 }
 
-void folder_actor_t::on_forward(message::forwarted_message_t &message) noexcept {}
+void folder_actor_t::on_forward(message::forwarded_message_t &message) noexcept {}

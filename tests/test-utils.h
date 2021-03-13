@@ -17,5 +17,6 @@ struct path_guard_t {
 
 std::string file_path(const char* test_file);
 std::string read_file(const char* test_file);
+std::string device_id2sha256(const char* device_id);
 
 }

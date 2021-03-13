@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mdbx.h"
+#include "cursor.h"
 #include <functional>
 #include <boost/outcome.hpp>
 
@@ -23,6 +24,8 @@ struct transaction_t {
     transaction_t &operator=(transaction_t &&other) noexcept;
 
     outcome::result<void> commit() noexcept;
+    outcome::result<cursor_t> cursor() noexcept;
+    outcome::result<std::uint64_t> next_sequence() noexcept;
 
     static outcome::result<transaction_t> make(transaction_type_t type, MDBX_env *env_) noexcept;
 

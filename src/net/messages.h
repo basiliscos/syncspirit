@@ -12,6 +12,7 @@
 
 #include <fmt/fmt.h>
 #include "../model/upnp.h"
+#include "../model/cluster.h"
 #include "../model/peer_contact.h"
 #include "../model/folder.h"
 #include "../transport/base.h"
@@ -138,7 +139,7 @@ struct discovery_notification_t {
 
 struct dial_ready_notification_t {
     model::device_id_t device_id;
-    config::device_config_t::addresses_t uris;
+    utils::uri_container_t uris;
 };
 
 struct connect_response_t : r::arc_base_t<connect_response_t> {
@@ -156,7 +157,7 @@ struct connect_request_t : r::arc_base_t<connect_request_t> {
 
     struct connect_info_t {
         model::device_id_t device_id;
-        config::device_config_t::addresses_t uris;
+        utils::uri_container_t uris;
     };
 
     struct connected_info_t {
@@ -166,7 +167,7 @@ struct connect_request_t : r::arc_base_t<connect_request_t> {
 
     using payload_t = std::variant<connect_info_t, connected_info_t>;
 
-    connect_request_t(const model::device_id_t &device_id_, const config::device_config_t::addresses_t &uris_) noexcept
+    connect_request_t(const model::device_id_t &device_id_, const utils::uri_container_t &uris_) noexcept
         : payload{connect_info_t{device_id_, uris_}} {}
 
     connect_request_t(tcp_socket_t &&sock, const tcp::endpoint &remote) noexcept
@@ -214,25 +215,15 @@ struct connection_notify_t {
     tcp::endpoint remote;
 };
 
-struct make_index_id_response_t {
-    model::index_id_t index_id;
+struct load_cluster_response_t {
+    model::cluster_ptr_t cluster;
+    model::devices_map_t devices;
+    model::ignored_devices_map_t ignored_devices;
+    model::ignored_folders_map_t ignored_folders;
 };
 
-struct make_index_id_request_t : r::arc_base_t<make_index_id_request_t> {
-    using response_t = make_index_id_response_t;
-    proto::Folder folder;
-
-    make_index_id_request_t(const proto::Folder &folder_) noexcept : folder{folder_} {}
-};
-
-struct load_folder_response_t {
-    model::folder_ptr_t folder;
-};
-
-struct load_folder_request_t {
-    using response_t = load_folder_response_t;
-    config::folder_config_t folder;
-    model::devices_map_t *devices;
+struct load_cluster_request_t {
+    using response_t = load_cluster_response_t;
 };
 
 struct start_sync_t {
@@ -246,8 +237,35 @@ struct start_reading_t {
     r::address_ptr_t controller;
 };
 
-using forwarted_message_t = std::variant<proto::message::Index, proto::message::IndexUpdate, proto::message::Request,
+using forwarded_message_t = std::variant<proto::message::Index, proto::message::IndexUpdate, proto::message::Request,
                                          proto::message::Response, proto::message::DownloadProgress>;
+
+struct add_device_t {
+    model::device_ptr_t device;
+};
+
+struct update_device_t {
+    model::device_ptr_t prev_device;
+    model::device_ptr_t device;
+};
+
+struct remove_device_t {
+    model::device_ptr_t device;
+};
+
+struct store_ignore_device_response_t {};
+
+struct store_ignored_device_request_t {
+    using response_t = store_ignore_device_response_t;
+    model::ignored_device_ptr_t device;
+};
+
+struct store_device_response_t {};
+
+struct store_device_request_t {
+    using response_t = store_device_response_t;
+    model::device_ptr_t device;
+};
 
 } // end of namespace payload
 
@@ -284,16 +302,24 @@ using connection_notify_t = r::message_t<payload::connection_notify_t>;
 using auth_request_t = r::request_traits_t<payload::auth_request_t>::request::message_t;
 using auth_response_t = r::request_traits_t<payload::auth_request_t>::response::message_t;
 
-using make_index_id_request_t = r::request_traits_t<payload::make_index_id_request_t>::request::message_t;
-using make_index_id_response_t = r::request_traits_t<payload::make_index_id_request_t>::response::message_t;
+using store_ignored_device_request_t = r::request_traits_t<payload::store_ignored_device_request_t>::request::message_t;
+using store_ignored_device_response_t =
+    r::request_traits_t<payload::store_ignored_device_request_t>::response::message_t;
 
-using load_folder_request_t = r::request_traits_t<payload::load_folder_request_t>::request::message_t;
-using load_folder_response_t = r::request_traits_t<payload::load_folder_request_t>::response::message_t;
+using store_device_request_t = r::request_traits_t<payload::store_device_request_t>::request::message_t;
+using store_device_response_t = r::request_traits_t<payload::store_device_request_t>::response::message_t;
+
+using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
+using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
 
 using start_sync_t = r::message_t<payload::start_sync_t>;
 using stop_sync_t = r::message_t<payload::stop_sync_t>;
 using start_reading_t = r::message_t<payload::start_reading_t>;
-using forwarted_message_t = r::message_t<payload::forwarted_message_t>;
+using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
+
+using add_device_t = r::message_t<payload::add_device_t>;
+using update_device_t = r::message_t<payload::update_device_t>;
+using remove_device_t = r::message_t<payload::remove_device_t>;
 
 } // end of namespace message
 

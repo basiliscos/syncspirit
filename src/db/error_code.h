@@ -8,12 +8,16 @@ namespace db {
 enum class error_code {
     success = 0,
     db_version_size_mismatch,
+    deserialization_falure,
+    invalid_device_id,
+    /*
     folder_info_not_found,
     folder_info_deserialization_failure,
     folder_local_device_not_found,
     folder_index_not_found,
     folder_index_deserialization_failure,
     unknown_local_device,
+    */
 };
 
 namespace detail {

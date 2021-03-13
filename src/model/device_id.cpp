@@ -10,7 +10,7 @@ using namespace syncspirit::utils;
 
 const std::string_view device_id_t::get_short() const noexcept { return std::string_view(value.data(), DASH_INT); }
 
-std::optional<device_id_t> device_id_t::from_string(const std::string &value) noexcept {
+std::optional<device_id_t> device_id_t::from_string(std::string_view value) noexcept {
     using result_t = std::optional<device_id_t>;
     char buff[DASHED_SIZE];
     if (value.size() != DASHED_SIZE) {
@@ -56,7 +56,7 @@ std::optional<device_id_t> device_id_t::from_string(const std::string &value) no
     return result_t{};
 }
 
-std::optional<device_id_t> device_id_t::from_sha256(const std::string &sha_256) noexcept {
+std::optional<device_id_t> device_id_t::from_sha256(std::string_view sha_256) noexcept {
     using result_t = std::optional<device_id_t>;
     auto sha256_enc = base32::encode(sha_256);
     if (sha256_enc.size() != SHA256_B32_SIZE) {

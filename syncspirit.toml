@@ -2,12 +2,11 @@
 connect_timeout = 5000
 rx_buff_size = 33554432
 rx_timeout = 300000
-tx_timeout = 1000
+tx_timeout = 10000
 
 [dialer]
 enabled = true
 redial_timeout = 300000
-
 
 [global_discovery]
 announce_url = 'https://discovery.syncthing.net/'
@@ -43,28 +42,3 @@ external_port = 22001
 max_wait = 1
 rx_buff_size = 65536
 timeout = 10
-
-[[device]]
-auto_accept = false
-cert_name = 'syncthing'
-compression = 2
-id = 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7'
-introducer = false
-name = 'synth-orig'
-paused = false
-skip_introduction_removals = false
-
-[[folder]]
-devices = [ 'KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7' ]
-disable_temp_indixes = false
-folder_type = 3
-id = 'nagkw-srrjz'
-ignore_delete = false
-ignore_permissions = false
-label = 'Sync'
-path = '/tmp/syncspirit/Sync'
-paused = false
-pull_order = 0
-read_only = false
-rescan_interval = 3600
-watched = true

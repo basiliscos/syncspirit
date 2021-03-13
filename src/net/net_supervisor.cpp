@@ -15,6 +15,7 @@
 #include "names.h"
 #include <spdlog/spdlog.h>
 #include <boost/filesystem.hpp>
+#include <algorithm>
 
 namespace fs = boost::filesystem;
 using namespace syncspirit::net;
@@ -39,20 +40,14 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
         spdlog::critical("cannot get common name from certificate");
         throw "cannot get common name from certificate";
     }
-    auto my_device = config::device_config_t{
-        device_id.value().get_value(),
-        app_config.device_name,
-        config::compression_t::meta,
-        cn.value(),
-        false,
-        false, /* auto accept */
-        false, /* paused */
-        false,
-        {},
-        {},
-    };
-    device = model::device_ptr_t(new model::device_t(my_device));
-    update_devices();
+    db::Device my_device;
+    my_device.set_id(device_id.value().get_sha256());
+    my_device.set_name(app_config.device_name);
+    // my_device.set_compression()
+    my_device.set_cert_name(cn.value());
+    device = model::device_ptr_t(new model::local_device_t(my_device));
+    devices.put(device);
+    // update_devices();
 }
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -71,7 +66,12 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_connection);
         p.subscribe_actor(&net_supervisor_t::on_auth);
         p.subscribe_actor(&net_supervisor_t::on_dial_ready);
-        launch_cluster();
+        p.subscribe_actor(&net_supervisor_t::on_load_cluster);
+        p.subscribe_actor(&net_supervisor_t::on_ingnore_device);
+        p.subscribe_actor(&net_supervisor_t::on_store_ingnored_device);
+        p.subscribe_actor(&net_supervisor_t::on_update_peer);
+        p.subscribe_actor(&net_supervisor_t::on_store_device);
+        launch_db();
     });
 }
 
@@ -98,7 +98,7 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
         cluster_addr.reset();
     }
     if (!peers_addr && !cluster_addr && cluster) {
-        persist_data();
+        spdlog::warn("{}, TODO, persist_data", identity);
     }
     if (state == r::state_t::OPERATIONAL) {
         auto inner = r::make_error_code(r::shutdown_code_t::child_down);
@@ -109,33 +109,51 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
 void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
     parent_t::on_child_init(actor, ec);
     auto &child_addr = actor->get_address();
-    if (!ec && cluster_addr && child_addr == cluster_addr) {
-        spdlog::trace("{}, on_child_init, cluster has been loaded, laucning other children...", identity);
-        launch_children();
+    if (!ec && db_addr && child_addr == db_addr) {
+        spdlog::trace("{}, on_child_init, db has been launched, let's load it...", identity);
+        load_db();
     }
 }
 
-void net_supervisor_t::launch_cluster() noexcept {
+void net_supervisor_t::launch_db() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     fs::path path(app_config.config_path);
     auto db_dir = path.append("mbdx-db");
+    db_addr =
+        create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
+}
 
+void net_supervisor_t::load_db() noexcept {
+    auto timeout = init_timeout * 9 / 10;
+    request<payload::load_cluster_request_t>(db_addr).send(timeout);
+}
+
+void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message) noexcept {
+    auto &ee = message.payload.ee;
+    if (ee) {
+        spdlog::error("{}, cannot load clusted : {}", identity, ee->message());
+        return do_shutdown(ee);
+    }
+    auto &p = message.payload.res;
+    devices = std::move(p.devices);
+    ignored_devices = std::move(p.ignored_devices);
+    spdlog::debug("{}, load cluster. devices = {}, ignored devices = {}", identity, devices.size(),
+                  ignored_devices.size());
     cluster = new model::cluster_t(device);
-    create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish();
+
+    auto timeout = shutdown_timeout * 9 / 10;
+    auto io_timeout = shutdown_timeout * 8 / 10;
+
     cluster_addr = create_actor<cluster_supervisor_t>()
                        .timeout(timeout)
                        .strand(strand)
                        .device(device)
                        .devices(&devices)
+                       .ignored_folders(std::move(p.ignored_folders))
                        .cluster(cluster)
-                       .folders(&app_config.folders)
                        .finish()
                        ->get_address();
-}
 
-void net_supervisor_t::launch_children() noexcept {
-    auto timeout = shutdown_timeout * 9 / 10;
-    auto io_timeout = shutdown_timeout * 8 / 10;
     create_actor<acceptor_actor_t>().timeout(timeout).finish();
     create_actor<resolver_actor_t>().timeout(timeout).resolve_timeout(io_timeout).finish();
     create_actor<http_actor_t>()
@@ -243,17 +261,19 @@ void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message)
     auto &peer_contact = message.payload.peer;
     if (peer_contact.has_value()) {
         auto &peer = peer_contact.value();
-        auto &id = device_id.get_value();
-        auto it = devices.find(id);
-        if (it != devices.end()) {
-            if (!it->second->online) {
+        auto &id = device_id.get_sha256();
+        auto target_device = devices.by_id(id);
+        if (target_device) {
+            if (!target_device->online) {
                 dial_peer(device_id, peer.uris);
             }
         } else {
-            bool notify = app_config.ignored_devices.count(id) == 0 && app_config.devices.count(id) == 0;
-            if (notify) {
+            auto ignored_device = ignored_devices.by_key(id);
+            if (!ignored_device && id != this->device->device_id.get_sha256()) {
                 using original_ptr_t = ui::payload::discovery_notification_t::message_ptr_t;
                 send<ui::payload::discovery_notification_t>(address, original_ptr_t{&message});
+            } else {
+                spdlog::info("{}, on_discovery_notify, ignoring {}", identity, *ignored_device);
             }
         }
     }
@@ -264,7 +284,8 @@ void net_supervisor_t::on_dial_ready(message::dial_ready_notify_t &message) noex
     dial_peer(payload.device_id, payload.uris);
 }
 
-void net_supervisor_t::dial_peer(const model::device_id_t &peer_device_id, const uris_t &uris) noexcept {
+void net_supervisor_t::dial_peer(const model::device_id_t &peer_device_id,
+                                 const utils::uri_container_t &uris) noexcept {
     auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout * (uris.size() + 1)};
     request<payload::connect_request_t>(peers_addr, peer_device_id, uris).send(timeout);
 }
@@ -302,7 +323,7 @@ outcome::result<void> net_supervisor_t::save_config(const config::main_t &new_cf
     }
     app_config = new_cfg;
     spdlog::warn("{}, on_config_save, apply changes", identity);
-    update_devices();
+    // update_devices();
     return outcome::success();
 }
 
@@ -347,14 +368,15 @@ void net_supervisor_t::on_connection(message::connection_notify_t &message) noex
 void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
     auto &payload = message.payload.request_payload;
     auto &device_id = payload->peer_device_id;
-    auto it = devices.find(device_id.get_value());
-    model::device_ptr_t device;
-    if (it == devices.end()) {
-        if (app_config.ignored_devices.count(device_id.get_value()) == 0) {
+    auto device = devices.by_id(device_id.get_sha256());
+    if (!device) {
+        if (!ignored_devices.by_key(device_id.get_sha256())) {
             send<ui::payload::auth_notification_t>(address, &message);
+        } else {
+            spdlog::info("{}, on_auth, ignoring {}", identity, device_id);
         }
+
     } else {
-        device = it->second;
         if (device->online) {
             spdlog::warn("{}, on_auth, {} requested authtorization, but there is already active connection?", identity,
                          device->device_id);
@@ -381,13 +403,96 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
     spdlog::debug("{}, on_auth, {} requested authtorization. Result : {}", identity, device_id, (bool)device);
 }
 
-void net_supervisor_t::update_devices() noexcept {
-    devices.clear();
-    for (auto &it : app_config.devices) {
-        auto device = model::device_ptr_t{new model::device_t(it.second)};
-        devices.insert_or_assign(it.first, std::move(device));
+void net_supervisor_t::on_ingnore_device(ui::message::ignore_device_request_t &message) noexcept {
+    ignore_device_req.reset(&message);
+    auto &peer = message.payload.request_payload.device;
+    spdlog::trace("{}, on_ingnore_device, {}", identity, *peer);
+    assert(!ignored_devices.by_key(peer->get_sha256()));
+    request<payload::store_ignored_device_request_t>(db_addr, peer).send(init_timeout / 2);
+}
+
+void net_supervisor_t::on_update_peer(ui::message::update_peer_request_t &message) noexcept {
+    update_peer_req.reset(&message);
+    auto &device = message.payload.request_payload.peer;
+    spdlog::trace("{}, on_update_peer, {}", identity, device->device_id);
+    request<payload::store_device_request_t>(db_addr, device).send(init_timeout / 2);
+}
+
+void net_supervisor_t::on_store_ingnored_device(message::store_ignored_device_response_t &message) noexcept {
+    auto &peer = message.payload.req->payload.request_payload.device;
+    spdlog::trace("{}, on_store_ingnored_device, {}", identity, *peer);
+    assert(ignore_device_req);
+    auto &ee = message.payload.ee;
+    if (ee) {
+        reply_with_error(*ignore_device_req, ee);
+    } else {
+        spdlog::debug("{}, ignoring, {}", identity, *peer);
+        ignored_devices.put(peer);
+        reply_to(*ignore_device_req);
     }
-    devices.insert({device->device_id.get_value(), device});
+    ignore_device_req.reset();
+}
+
+void net_supervisor_t::on_store_device(message::store_device_response_t &message) noexcept {
+    auto &peer = message.payload.req->payload.request_payload.device;
+    spdlog::trace("{}, on_store_device, {}", identity, peer->device_id);
+    assert(update_peer_req);
+    auto &ee = message.payload.ee;
+    if (ee) {
+        reply_with_error(*update_peer_req, ee);
+    } else {
+        spdlog::debug("{}, updated, {}", identity, peer->device_id);
+        auto prev_peer = devices.by_id(peer->get_id());
+        bool updated = (bool)prev_peer;
+        devices.put(peer);
+        reply_to(*update_peer_req);
+        if (updated) {
+            send<payload::update_device_t>(address, prev_peer, peer);
+        } else {
+            send<payload::add_device_t>(address, peer);
+        }
+    }
+    update_peer_req.reset();
+}
+
+#if 0
+void net_supervisor_t::update_devices() noexcept {
+    model::devices_map_t copy = devices;
+    auto it_me = copy.find(device->device_id.get_value());
+    if (it_me != copy.end()) { copy.erase(it_me); }
+
+    for (auto &it : app_config.devices) {
+        auto& device_id = it.first;
+        auto& device_cfg = it.second;
+        auto device = model::device_ptr_t{new model::device_t(device_cfg)};
+        auto it_prev = devices.find(device_id);
+        if (it_prev == devices.end()) {
+            if (address) {
+                send<payload::add_device_t>(address, device);
+            }
+            devices.emplace(device_id, device);
+        } else {
+            if (!(it_prev->second->serialize() == device_cfg)) {
+                auto prev_device = it_prev->second;
+                if (address) {
+                    send<payload::update_device_t>(address, prev_device, device);
+                }
+                devices.erase(it_prev);
+                devices.emplace(device_id, device);
+            }
+            auto it_copy = copy.find(device_id);
+            copy.erase(it_copy);
+        }
+    }
+    for(auto it_copy = copy.begin(); it_copy != copy.end(); ) {
+        auto& device = it_copy->second;
+        if (address) {
+            send<payload::remove_device_t>(address, device);
+        }
+        auto it = devices.find(it_copy->first);
+        devices.erase(it);
+        it_copy = copy.erase(it_copy);
+    }
 }
 
 void net_supervisor_t::persist_data() noexcept {
@@ -410,3 +515,4 @@ void net_supervisor_t::persist_data() noexcept {
         }
     }
 }
+#endif

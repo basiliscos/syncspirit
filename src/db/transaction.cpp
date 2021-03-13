@@ -53,4 +53,22 @@ outcome::result<void> transaction_t::commit() noexcept {
     return outcome::failure(make_error_code(r));
 }
 
+outcome::result<cursor_t> transaction_t::cursor() noexcept {
+    MDBX_cursor *c;
+    auto r = mdbx_cursor_open(txn, dbi, &c);
+    if (r != MDBX_SUCCESS) {
+        return outcome::failure(make_error_code(r));
+    }
+    return cursor_t(c);
+}
+
+outcome::result<std::uint64_t> transaction_t::next_sequence() noexcept {
+    std::uint64_t s;
+    auto r = mdbx_dbi_sequence(txn, dbi, &s, 1);
+    if (r != MDBX_SUCCESS) {
+        return outcome::failure(make_error_code(r));
+    }
+    return s;
+}
+
 } // namespace syncspirit::db

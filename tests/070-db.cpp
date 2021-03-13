@@ -15,6 +15,7 @@ struct env_t {
         if (env) {
             mdbx_env_close(env);
         }
+        //std::cout << path.c_str() << "\n";
         fs::remove_all(path);
     }
 };
@@ -28,6 +29,7 @@ static env_t mk_env() {
         MDBX_EXCLUSIVE | MDBX_SAFE_NOSYNC | MDBX_WRITEMAP | MDBX_NOTLS | MDBX_COALESCE | MDBX_LIFORECLAIM;
     r = mdbx_env_open(env, path.c_str(), flags, 0664);
     assert(r == MDBX_SUCCESS);
+    //std::cout << path.c_str() << "\n";
     return env_t{env, std::move(path)};
 }
 
@@ -47,7 +49,166 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
     txn = mk_txn(env, transaction_type_t::RO);
     version = db::get_version(txn);
     CHECK(version.value() == 1);
+
+    SECTION("save & load device") {
+        db::Device db_d1;
+        db_d1.set_id(test::device_id2sha256("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
+        db_d1.set_name("d1");
+        auto d1 = model::device_ptr_t(new model::device_t(db_d1));
+
+        db::Device db_d2;
+        db_d2.set_id(test::device_id2sha256("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7"));
+        db_d2.set_name("d2");
+        auto d2 = model::device_ptr_t(new model::device_t(db_d2));
+
+        model::devices_map_t devices;
+        devices.put(d1);
+        devices.put(d2);
+
+        auto txn = mk_txn(env, transaction_type_t::RW);
+        auto r = db::store_device(d1, txn);
+        REQUIRE(r);
+        CHECK(d1->get_db_key() > 0);
+        r = db::store_device(d2, txn);
+        REQUIRE(txn.commit());
+        CHECK(d2->get_db_key() > 0);
+
+        txn = mk_txn(env, transaction_type_t::RO);
+        auto devices_opt = db::load_devices(txn);
+        REQUIRE(devices_opt);
+        auto& devices2 = devices_opt.value();
+        REQUIRE(devices2.size() == devices.size());
+        REQUIRE(devices2.by_id(d1->device_id.get_sha256()));
+        REQUIRE(devices2.by_id(d2->device_id.get_sha256()));
+
+        REQUIRE(*devices2.by_id(d1->device_id.get_sha256()) == *d1);
+        REQUIRE(*devices2.by_id(d2->device_id.get_sha256()) == *d2);
+
+    }
+
+    SECTION("save & load ignored device") {
+        auto d1 =  model::device_id_t::from_sha256(test::device_id2sha256("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD")).value();
+        auto ignored_device = model::ignored_device_ptr_t(new model::device_id_t(d1));
+        auto txn = mk_txn(env, transaction_type_t::RW);
+        auto r = db::store_ignored_device(ignored_device, txn);
+        REQUIRE(r);
+        REQUIRE(txn.commit());
+
+        txn = mk_txn(env, transaction_type_t::RO);
+        auto ignored_devices_opt = db::load_ignored_devices(txn);
+        CHECK(ignored_devices_opt);
+        auto& ignored_devices = ignored_devices_opt.value();
+        REQUIRE(ignored_devices.size() == 1);
+        CHECK(*ignored_devices.by_key(ignored_device->get_sha256()) == *ignored_device);
+    }
+
+    SECTION("save & load ignored folder") {
+        auto db_f = db::IgnoredFolder{};
+        db_f.set_id("123");
+        db_f.set_label("my-label");
+        auto ignored_folder = model::ignored_folder_ptr_t(new model::ignored_folder_t(db_f));
+        auto txn = mk_txn(env, transaction_type_t::RW);
+        auto r = db::store_ignored_folder(ignored_folder, txn);
+        REQUIRE(r);
+        REQUIRE(txn.commit());
+
+        txn = mk_txn(env, transaction_type_t::RO);
+        auto ignored_folders_opt = db::load_ignored_folders(txn);
+        CHECK(ignored_folders_opt);
+        auto& ignored_folders = ignored_folders_opt.value();
+        REQUIRE(ignored_folders.size() == 1);
+        CHECK(*ignored_folders.by_key(ignored_folder->id) == *ignored_folder);
+    }
+
+    SECTION("save & load folders") {
+        db::Folder db_f1;
+        db_f1.set_id("1111");
+        db_f1.set_label("1111-l");
+        auto f1 = model::folder_ptr_t(new model::folder_t(db_f1));
+
+        db::Folder db_f2;
+        db_f2.set_id("2222");
+        db_f2.set_label("2222-l");
+        auto f2 = model::folder_ptr_t(new model::folder_t(db_f2));
+
+        model::folders_map_t folders;
+        folders.put(f1);
+        folders.put(f2);
+
+        auto txn = mk_txn(env, transaction_type_t::RW);
+        auto r = db::store_folder(f1, txn);
+        REQUIRE(r);
+        CHECK(f1->get_db_key() > 0);
+
+        r = db::store_folder(f2, txn);
+        REQUIRE(txn.commit());
+        CHECK(f2->get_db_key() > 0);
+
+        txn = mk_txn(env, transaction_type_t::RO);
+        auto folders_opt = db::load_folders(txn);
+        REQUIRE(folders_opt);
+        auto& folders2 = folders_opt.value();
+        REQUIRE(folders2.size() == folders.size());
+        REQUIRE(folders2.by_id(f1->id()));
+        REQUIRE(folders2.by_id(f2->id()));
+
+        REQUIRE(*folders2.by_id(f1->id()) == *f1);
+        REQUIRE(*folders2.by_id(f2->id()) == *f2);
+    }
+
+    SECTION("save & load folder_infos") {
+        db::Device db_d1;
+        db_d1.set_id(test::device_id2sha256("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
+        db_d1.set_name("d1");
+        auto d1 = model::device_ptr_t(new model::device_t(db_d1));
+        auto devices = model::devices_map_t();
+        devices.put(d1);
+
+        db::Folder db_f1;
+        db_f1.set_id("1111");
+        db_f1.set_label("1111-l");
+        auto f1 = model::folder_ptr_t(new model::folder_t(db_f1));
+        auto folders = model::folders_map_t();
+        folders.put(f1);
+
+        auto txn = mk_txn(env, transaction_type_t::RW);
+        db::FolderInfo db_fi;
+        db_fi.set_index_id(1234);
+        //db_fi.set_max_sequence(1235);
+        auto fi = model::folder_info_ptr_t(new model::folder_info_t(db_fi, d1.get(), f1.get(), 12345));
+        auto r = db::store_folder_info(fi, txn);
+        REQUIRE(r);
+        REQUIRE(txn.commit());
+        CHECK(fi->get_db_key());
+
+        txn = mk_txn(env, transaction_type_t::RO);
+        auto infos = db::load_folder_infos(devices, folders, txn);
+        REQUIRE(infos);
+        auto fi_x = infos.value().by_key(fi->get_db_key());
+        CHECK(*fi_x == *fi);
+        CHECK(fi_x->get_device() == fi->get_device());
+        CHECK(fi_x->get_folder() == fi->get_folder());
+
+        SECTION("save & load file_infos") {
+            db::FileInfo db_fi1;
+            db_fi1.set_name("a/b/c.txt");
+            auto fi1 = model::file_info_ptr_t(new model::file_info_t(db_fi1, fi.get()));
+            auto txn = mk_txn(env, transaction_type_t::RW);
+            auto r = db::store_file_info(fi1, txn);
+            REQUIRE(r);
+            REQUIRE(txn.commit());
+
+            txn = mk_txn(env, transaction_type_t::RO);
+            auto fi_infos = db::load_file_infos(infos.value(), txn);
+            REQUIRE(fi_infos);
+            auto fi1_x = fi_infos.value().by_key(fi1->get_db_key());
+            CHECK(*fi1_x == *fi1);
+            CHECK(fi1_x->get_folder_info() == fi_x.get());
+        }
+    }
 }
+
+#if 0
 
 TEST_CASE("save & load folder", "[db]") {
     auto env = mk_env();
@@ -84,7 +245,7 @@ TEST_CASE("save & load folder", "[db]") {
     device_src_1.set_index_id(5);
     device_src_1.set_introducer(false);
 
-    *folder_src.add_devices() = device_src_1;
+    3*folder_src.add_devices() = device_src_1;
     *folder_src.add_devices() = device_src_2;
     REQUIRE(db::update_folder_info(folder_src, txn));
     REQUIRE(db::create_folder(folder_src, 123, d2, txn));
@@ -142,3 +303,4 @@ TEST_CASE("save & load folder", "[db]") {
     CHECK(fd2.index_id == 5);
     CHECK(fd2.max_sequence == 3);
 }
+#endif

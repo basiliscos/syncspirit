@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package syncspirit.db;
+
+import "bep.proto";
+
+message Device {
+    bytes           id                          = 1;
+    string          name                        = 2;
+    repeated string addresses                   = 3;
+    syncspirit.proto.Compression    compression = 4;
+    string          cert_name                   = 5;
+    bool            introducer                  = 6;
+    bool            skip_introduction_removals  = 7;
+    bool            auto_accept                 = 8;
+    bool            paused                      = 9;
+    // last_seen?
+}
+
+message IgnoredFolder {
+    string id    = 1;
+    string label = 2;
+}
+
+message Folder {
+    string      id                       = 1;
+    string      label                    = 2;
+    bool        read_only                = 3;
+    bool        ignore_permissions       = 4;
+    bool        ignore_delete            = 5;
+    bool        disable_temp_indexes     = 6;
+    bool        paused                   = 7;
+    bool        watched                  = 8;
+    string      path                     = 9;
+    FolderType  folder_type              = 10;
+    PullOrder   pull_order               = 11;
+    uint32      rescan_interval          = 12;
+}
+
+enum FolderType {
+    send             = 0;
+    receive          = 1;
+    send_and_receive = 2;
+}
+
+enum PullOrder {
+    random      = 0;
+    alphabetic  = 1;
+    smallest    = 2;
+    largest     = 3;
+    oldest      = 4;
+    newest      = 5;
+}
+
+message FolderInfo {
+    uint64 index_id     = 1;
+    uint64 device_key   = 2;
+    uint64 folder_key   = 3;
+}
+
+message FileInfo {
+    string       name                   = 1;
+    syncspirit.proto.FileInfoType type  = 2;
+    int64        size                   = 3;
+    uint32       permissions            = 4;
+    int64        modified_s             = 5;
+    int32        modified_ns            = 11;
+    uint64       modified_by            = 12;
+    bool         deleted                = 6;
+    bool         invalid                = 7;
+    bool         no_permissions         = 8;
+    syncspirit.proto.Vector version     = 9;
+    int64        sequence               = 10;
+    int32        block_size             = 13;
+    string       symlink_target         = 16;
+}
+
+message IngoredFolder {
+    string  id    = 1;
+    string  label = 2;
+}
+

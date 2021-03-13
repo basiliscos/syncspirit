@@ -16,21 +16,16 @@ find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(ZLIB REQUIRED)
 
+set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src)
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
-    src/proto/bep.proto
+    src/protobuf/bep.proto
+    src/protobuf/structs.proto
 )
 
 add_library(syncspirit_lib
     src/constants.cpp
     src/config/utils.cpp
-    src/console/activity.cpp
-    src/console/config_activity.cpp
-    src/console/default_activity.cpp
-    src/console/new_folder_activity.cpp
-    src/console/peer_activity.cpp
-    src/console/sink.cpp
-    src/console/tui_actor.cpp
-    src/console/utils.cpp
+    src/db/cursor.cpp
     src/db/error_code.cpp
     src/db/prefix.cpp
     src/db/transaction.cpp
@@ -38,7 +33,9 @@ add_library(syncspirit_lib
     src/model/cluster.cpp
     src/model/device.cpp
     src/model/device_id.cpp
+    src/model/file_info.cpp
     src/model/folder.cpp
+    src/model/folder_info.cpp
     src/net/acceptor_actor.cpp
     src/net/cluster_supervisor.cpp
     src/net/db_actor.cpp
@@ -68,6 +65,17 @@ add_library(syncspirit_lib
     src/utils/tls.cpp
     src/utils/uri.cpp
     ${PROTO_SRCS}
+)
+
+add_library(syncspirit_console
+    src/console/activity.cpp
+    src/console/config_activity.cpp
+    src/console/default_activity.cpp
+    src/console/new_folder_activity.cpp
+    src/console/peer_activity.cpp
+    src/console/sink.cpp
+    src/console/tui_actor.cpp
+    src/console/utils.cpp
 )
 
 add_executable(syncspirit
@@ -121,7 +129,10 @@ target_link_libraries(syncspirit_lib
     ZLIB::ZLIB
     mdbx-static
 )
-target_link_libraries(syncspirit syncspirit_lib)
+
+target_link_libraries(syncspirit_console syncspirit_lib)
+
+target_link_libraries(syncspirit syncspirit_lib syncspirit_console)
 
 enable_testing()
 add_subdirectory("tests")

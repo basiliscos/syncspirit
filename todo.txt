@@ -1,4 +1,6 @@
-- dialer
+- update_device_notificatiocation. Dialer: dial after short timeout
+- save self device in db
+
 - gracefully shutdown
 - why index is not received? because max_sequence is 0?
 

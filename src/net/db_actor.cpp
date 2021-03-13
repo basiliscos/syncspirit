@@ -37,8 +37,9 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::db, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         open();
-        p.subscribe_actor(&db_actor_t::on_make_index_id);
-        p.subscribe_actor(&db_actor_t::on_load_folder);
+        p.subscribe_actor(&db_actor_t::on_cluster_load);
+        p.subscribe_actor(&db_actor_t::on_store_ingnored_device);
+        p.subscribe_actor(&db_actor_t::on_store_device);
     });
 }
 
@@ -90,6 +91,7 @@ void db_actor_t::on_start() noexcept {
     spdlog::trace("{}, on_start", identity);
 }
 
+#if 0
 void db_actor_t::on_make_index_id(message::make_index_id_request_t &message) noexcept {
     auto txn = db::make_transaction(db::transaction_type_t::RW, env);
     if (!txn) {
@@ -113,19 +115,107 @@ void db_actor_t::on_make_index_id(message::make_index_id_request_t &message) noe
     spdlog::trace("{}, on_make_index_id, created index = {} for folder = {}", identity, index_id, orig.label());
     reply_to(message, index_id);
 }
+#endif
 
-void db_actor_t::on_load_folder(message::load_folder_request_t &message) noexcept {
-    auto txn = db::make_transaction(db::transaction_type_t::RO, env);
-    if (!txn) {
-        return reply_with_error(message, make_error(txn.error()));
+void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexcept {
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
+    if (!txn_opt) {
+        return reply_with_error(message, make_error(txn_opt.error()));
     }
-    auto &p = message.payload.request_payload;
-    auto r = db::load_folder(p.folder, device, *p.devices, txn.value());
+    auto &txn = txn_opt.value();
+
+    auto devices_opt = db::load_devices(txn);
+    if (!devices_opt) {
+        return reply_with_error(message, make_error(devices_opt.error()));
+    }
+    auto &devices = devices_opt.value();
+
+    auto ignored_devices_opt = db::load_ignored_devices(txn);
+    if (!ignored_devices_opt) {
+        return reply_with_error(message, make_error(ignored_devices_opt.error()));
+    }
+    auto &ignored_devices = ignored_devices_opt.value();
+
+    auto folders_opt = db::load_folders(txn_opt.value());
+    if (!folders_opt) {
+        return reply_with_error(message, make_error(folders_opt.error()));
+    }
+    auto &folders = folders_opt.value();
+
+    auto folder_infos_opt = db::load_folder_infos(devices, folders, txn);
+    if (!folder_infos_opt) {
+        return reply_with_error(message, make_error(folder_infos_opt.error()));
+    }
+    auto folder_infos = folder_infos_opt.value();
+
+    auto file_infos_opt = db::load_file_infos(folder_infos, txn);
+    if (!file_infos_opt) {
+        return reply_with_error(message, make_error(file_infos_opt.error()));
+    }
+    auto &file_infos = file_infos_opt.value();
+
+    // correctly link
+    for (auto &it : file_infos) {
+        auto &fi = it.second;
+        fi->get_folder_info()->add(fi);
+    }
+
+    for (auto &it : folder_infos) {
+        auto &fi = it.second;
+        fi->get_folder()->add(fi);
+    }
+
+    if (auto my_d = devices.by_id(device->get_id()); !my_d) {
+        devices.put(device);
+    }
+
+    auto cluster = model::cluster_ptr_t(new model::cluster_t(device));
+    cluster->assign_folders(std::move(folders));
+    reply_to(message, std::move(cluster), std::move(devices), std::move(ignored_devices));
+}
+
+void db_actor_t::on_store_ingnored_device(message::store_ignored_device_request_t &message) noexcept {
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return reply_with_error(message, make_error(txn_opt.error()));
+    }
+    auto &txn = txn_opt.value();
+    auto &peer_device = message.payload.request_payload.device;
+    auto r = db::store_ignored_device(peer_device, txn);
     if (!r) {
-        return reply_with_error(message, make_error(r.error()));
-    } else {
-        reply_to(message, r.value());
+        reply_with_error(message, make_error(r.error()));
+        return;
     }
+
+    r = txn.commit();
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    reply_to(message);
+}
+
+void db_actor_t::on_store_device(message::store_device_request_t &message) noexcept {
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return reply_with_error(message, make_error(txn_opt.error()));
+    }
+    auto &txn = txn_opt.value();
+    auto &peer_device = message.payload.request_payload.device;
+    auto r = db::store_device(peer_device, txn);
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    r = txn.commit();
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    reply_to(message);
 }
 
 } // namespace syncspirit::net

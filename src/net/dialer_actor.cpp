@@ -34,6 +34,9 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&dialer_actor_t::on_announce, coordinator);
+                plugin->subscribe_actor(&dialer_actor_t::on_add, coordinator);
+                plugin->subscribe_actor(&dialer_actor_t::on_remove, coordinator);
+                plugin->subscribe_actor(&dialer_actor_t::on_update, coordinator);
             }
         });
         p.discover_name(names::global_discovery, global_discovery, true).link(true);
@@ -88,8 +91,7 @@ void dialer_actor_t::schedule_redial(const model::device_ptr_t &peer_device) noe
     resources->acquire(resource::timer);
 }
 
-void dialer_actor_t::on_ready(const model::device_ptr_t &peer_device,
-                              const config::device_config_t::addresses_t &uris) noexcept {
+void dialer_actor_t::on_ready(const model::device_ptr_t &peer_device, const utils::uri_container_t &uris) noexcept {
     spdlog::trace("{}, on_ready to dial to {}, ", identity, peer_device->device_id);
     schedule_redial(peer_device);
     send<payload::dial_ready_notification_t>(coordinator, peer_device->device_id, uris);
@@ -99,7 +101,8 @@ void dialer_actor_t::on_discovery(message::discovery_response_t &res) noexcept {
     resources->release(resource::request);
     auto &ee = res.payload.ee;
     auto &peer_id = res.payload.req->payload.request_payload->device_id;
-    auto &peer = devices->at(peer_id.get_value());
+    auto peer = devices->by_id(peer_id.get_sha256());
+    assert(peer);
     auto it = discovery_map.find(peer);
     assert(it != discovery_map.end());
     auto &req = *res.payload.req->payload.request_payload;
@@ -135,7 +138,8 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
 void dialer_actor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
     auto &peer_id = message.payload.peer_device_id;
     spdlog::trace("{}, on_disconnect, peer = {}", identity, peer_id);
-    auto &peer = devices->at(peer_id.get_value());
+    auto peer = devices->by_id(peer_id.get_value());
+    assert(peer);
     discover(peer);
 }
 
@@ -143,7 +147,8 @@ void dialer_actor_t::on_connect(message::connect_notify_t &message) noexcept {
     auto &peer_id = message.payload.peer_device_id;
     spdlog::trace("{}, on_connect, peer = {}", identity, peer_id);
 
-    auto &peer = devices->at(peer_id.get_value());
+    auto peer = devices->by_id(peer_id.get_value());
+    assert(peer);
 
     auto it_redial = redial_map.find(peer);
     if (it_redial != redial_map.end()) {
@@ -154,6 +159,27 @@ void dialer_actor_t::on_connect(message::connect_notify_t &message) noexcept {
     if (it_discovery != discovery_map.end()) {
         send<message::discovery_cancel_t::payload_t>(global_discovery, it_discovery->second);
     }
+}
+
+void dialer_actor_t::on_add(message::add_device_t &message) noexcept {
+    auto &device = message.payload.device;
+    discover(device);
+}
+
+void dialer_actor_t::on_remove(message::remove_device_t &message) noexcept {
+    auto &peer = message.payload.device;
+    auto it_discovery = discovery_map.find(peer);
+    if (it_discovery != discovery_map.end()) {
+        send<message::discovery_cancel_t::payload_t>(global_discovery, it_discovery->second);
+    }
+    auto it_redial = redial_map.find(peer);
+    if (it_redial != redial_map.end()) {
+        cancel_timer(it_redial->second);
+    }
+}
+
+void dialer_actor_t::on_update(message::update_device_t &message) noexcept {
+    spdlog::warn("[TODO] {}, on_update", identity);
 }
 
 } // namespace syncspirit::net

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2019 Ivan Baidakou (basiliscos) (the dot dmol at gmail dot com)
+// Copyright (c) 2019-2021 Ivan Baidakou (basiliscos) (the dot dmol at gmail dot com)
 //
 // Distributed under the MIT Software License
 //
@@ -8,6 +8,7 @@
 #define CATCH_CONFIG_RUNNER
 #include "catch.hpp"
 #include "test-utils.h"
+#include "model/device_id.h"
 
 int main(int argc, char *argv[]) {
     return Catch::Session().run(argc, argv);
@@ -43,6 +44,11 @@ std::string read_file(const char* test_file) {
     fclose(in);
     return std::string(buffer.data(), filesize);
 }
+
+std::string device_id2sha256(const char* device_id) {
+    return model::device_id_t::from_string(device_id).value().get_sha256();
+}
+
 
 
 }

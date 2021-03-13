@@ -4,6 +4,7 @@
 #include "../utils/error_code.h"
 #include "../proto/bep_support.h"
 #include <spdlog/spdlog.h>
+#include <boost/core/demangle.hpp>
 
 using namespace syncspirit::net;
 using namespace syncspirit;
@@ -401,6 +402,7 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             namespace m = proto::message;
+            spdlog::debug("{}, read_controlled, {}", identity, boost::core::demangle(typeid(T).name()));
             const constexpr bool unexpected = std::is_same_v<T, m::Hello> || std::is_same_v<T, m::ClusterConfig>;
             if constexpr (unexpected) {
                 spdlog::warn("{}, hello, unexpected_message", identity);
@@ -411,8 +413,8 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
             } else if constexpr (std::is_same_v<T, m::Close>) {
                 handle_close(std::move(msg));
             } else {
-                auto fwd = payload::forwarted_message_t{std::move(msg)};
-                send<payload::forwarted_message_t>(controller, std::move(fwd));
+                auto fwd = payload::forwarded_message_t{std::move(msg)};
+                send<payload::forwarded_message_t>(controller, std::move(fwd));
                 reset_rx_timer();
             }
         },

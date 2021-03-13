@@ -16,7 +16,7 @@ namespace net {
 struct peer_actor_config_t : public r::actor_config_t {
     std::string_view device_name;
     model::device_id_t peer_device_id;
-    model::peer_contact_t::uri_container_t uris;
+    utils::uri_container_t uris;
     std::optional<tcp_socket_t> sock;
     std::optional<std::string> peer_identity;
     const utils::key_pair_t *ssl_pair;
@@ -34,7 +34,7 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&uris(const model::peer_contact_t::uri_container_t &value) &&noexcept {
+    builder_t &&uris(const utils::uri_container_t &value) &&noexcept {
         parent_t::config.uris = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -132,7 +132,7 @@ struct peer_actor_t : public r::actor_base_t {
     config::bep_config_t bep_config;
     r::address_ptr_t coordinator;
     model::device_id_t peer_device_id;
-    model::peer_contact_t::uri_container_t uris;
+    utils::uri_container_t uris;
     std::optional<tcp_socket_t> sock;
     const utils::key_pair_t &ssl_pair;
     r::address_ptr_t resolver;

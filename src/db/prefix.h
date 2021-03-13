@@ -9,9 +9,14 @@ using discr_t = std::byte;
 
 namespace prefix {
 static const constexpr discr_t misc{0x01};
-static const constexpr discr_t folder_info{0x02};
-static const constexpr discr_t folder_index{0x03};
-static const constexpr discr_t folder_local_device{0x04};
+static const constexpr discr_t device{0x10};
+static const constexpr discr_t folder{0x11};
+static const constexpr discr_t folder_info{0x12};
+static const constexpr discr_t file_info{0x13};
+static const constexpr discr_t ignored_device{0x14};
+static const constexpr discr_t ignored_folder{0x15};
+// static const constexpr discr_t folder_index{0x03};
+// static const constexpr discr_t folder_local_device{0x04};
 } // namespace prefix
 
 struct value_t {
@@ -30,10 +35,18 @@ struct value_t {
 template <discr_t> struct prefixer_t;
 
 template <> struct prefixer_t<prefix::misc> { static value_t make(std::string_view name) noexcept; };
-template <> struct prefixer_t<prefix::folder_info> { static value_t make(const std::string_view &id) noexcept; };
+template <> struct prefixer_t<prefix::device> { static value_t make(std::uint64_t db_key) noexcept; };
+template <> struct prefixer_t<prefix::folder> { static value_t make(std::uint64_t db_key) noexcept; };
+template <> struct prefixer_t<prefix::folder_info> { static value_t make(std::uint64_t db_key) noexcept; };
+template <> struct prefixer_t<prefix::file_info> { static value_t make(const std::string &db_key) noexcept; };
+template <> struct prefixer_t<prefix::ignored_device> { static value_t make(const std::string &db_key) noexcept; };
+template <> struct prefixer_t<prefix::ignored_folder> { static value_t make(const std::string &db_key) noexcept; };
+
+/*
 template <> struct prefixer_t<prefix::folder_index> { static value_t make(const std::string_view &id) noexcept; };
 template <> struct prefixer_t<prefix::folder_local_device> {
     static value_t make(const std::string_view &id) noexcept;
 };
+*/
 
 } // namespace syncspirit::db

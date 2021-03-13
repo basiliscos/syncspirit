@@ -2,6 +2,7 @@
 #include <boost/optional.hpp>
 #include <boost/utility/string_view.hpp>
 #include <string>
+#include <vector>
 
 namespace syncspirit::utils {
 
@@ -27,5 +28,7 @@ struct URI {
 
 boost::optional<URI> parse(const char *uri);
 boost::optional<URI> parse(const boost::string_view &uri);
+
+using uri_container_t = std::vector<URI>;
 
 } // namespace syncspirit::utils

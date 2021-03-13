@@ -53,9 +53,13 @@ struct dialer_actor_t : public r::actor_base_t {
     void on_connect(message::connect_notify_t &message) noexcept;
     void on_disconnect(message::disconnect_notify_t &message) noexcept;
     void on_discovery(message::discovery_response_t &req) noexcept;
+    void on_add(message::add_device_t &message) noexcept;
+    void on_remove(message::remove_device_t &message) noexcept;
+    void on_update(message::update_device_t &message) noexcept;
 
     void discover(const model::device_ptr_t &device) noexcept;
-    void on_ready(const model::device_ptr_t &device, const config::device_config_t::addresses_t &uris) noexcept;
+    void remove(const model::device_ptr_t &device) noexcept;
+    void on_ready(const model::device_ptr_t &device, const utils::uri_container_t &uris) noexcept;
     void schedule_redial(const model::device_ptr_t &device) noexcept;
     void on_timer(r::request_id_t request_id, bool cancelled) noexcept;
 

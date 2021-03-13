@@ -6,6 +6,8 @@
 #include <openssl/pem.h>
 #include <openssl/sha.h>
 #include <openssl/err.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
 namespace sys = boost::system;
 
@@ -100,7 +102,7 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     EC_KEY_set_group(ec_key, group);
 
     X509 *cert = X509_new();
-    cert->ex_kusage = X509v3_KU_KEY_ENCIPHERMENT | X509v3_KU_DIGITAL_SIGNATURE;
+    // cert->ex_kusage = X509v3_KU_KEY_ENCIPHERMENT | X509v3_KU_DIGITAL_SIGNATURE;
     auto cert_guard = make_guard(cert, [](auto *ptr) { X509_free(ptr); });
 
     std::random_device rd;

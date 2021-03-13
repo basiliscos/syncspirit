@@ -2,12 +2,13 @@
 
 #include <string>
 #include "../utils/tls.h"
+#include "arc.hpp"
 #include <spdlog/fmt/ostr.h>
 #include <optional>
 
 namespace syncspirit::model {
 
-struct device_id_t {
+struct device_id_t : arc_base_t<device_id_t> {
     static const constexpr std::size_t SHA256_B32_SIZE = 52;
     static const constexpr std::size_t CHECK_DIGIT_INT = 13;
     static const constexpr std::size_t LUHN_ITERATIONS = SHA256_B32_SIZE / 13;
@@ -16,8 +17,8 @@ struct device_id_t {
     static const constexpr std::size_t DASH_ITERATIONS = LUHNIZED_SIZE / DASH_INT;
     static const constexpr std::size_t DASHED_SIZE = LUHNIZED_SIZE + DASH_ITERATIONS - 1;
 
-    static std::optional<device_id_t> from_string(const std::string &value) noexcept;
-    static std::optional<device_id_t> from_sha256(const std::string &sha_256) noexcept;
+    static std::optional<device_id_t> from_string(std::string_view value) noexcept;
+    static std::optional<device_id_t> from_sha256(std::string_view sha_256) noexcept;
     static std::optional<device_id_t> from_cert(const utils::cert_data_t &cert) noexcept;
 
     device_id_t() noexcept {};

@@ -4,7 +4,31 @@
 using namespace syncspirit;
 using namespace syncspirit::model;
 
-cluster_t::cluster_t(device_ptr_t device_) noexcept : device(std::move(device_)) {}
+cluster_t::cluster_t(device_ptr_t device_) noexcept : device(device_) {}
+
+void cluster_t::assign_folders(folders_map_t &&folders_) noexcept {
+    folders = std::move(folders_);
+    for (auto it : folders) {
+        it.second->assign_device(device);
+    }
+}
+
+proto::ClusterConfig cluster_t::get() noexcept {
+    proto::ClusterConfig r;
+    for (auto &[id, folder] : folders) {
+        std::abort();
+        //*(r.add_folders()) = folder->get();
+    }
+    return r;
+}
+
+const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
+
+cluster_t::unknown_folders_t cluster_t::update(proto::ClusterConfig &config, const devices_map_t &devices) noexcept {
+    std::abort();
+}
+
+#if 0
 
 void cluster_t::add_folder(const folder_ptr_t &folder) noexcept { folders.emplace(folder->id(), folder); }
 
@@ -62,14 +86,7 @@ void cluster_t::sanitize(proto::Folder &folder, const devices_map_t &devices) no
     }
 }
 
-proto::ClusterConfig cluster_t::get() noexcept {
-    proto::ClusterConfig r;
-    for (auto &[id, folder] : folders) {
-        *(r.add_folders()) = folder->get();
-    }
-    return r;
-}
-
+#endif
 folder_ptr_t cluster_t::opt_for_synch(const device_ptr_t &peer_device) noexcept {
     assert(peer_device != device);
     std::int64_t max_score = 0;

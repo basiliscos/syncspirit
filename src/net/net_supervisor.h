@@ -43,7 +43,8 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_start() noexcept override;
 
   private:
-    using uris_t = config::device_config_t::addresses_t;
+    using ignore_device_req_t = r::intrusive_ptr_t<ui::message::ignore_device_request_t>;
+    using update_peer_req_t = r::intrusive_ptr_t<ui::message::update_peer_request_t>;
 
     void on_ssdp(message::ssdp_notification_t &message) noexcept;
     void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
@@ -55,16 +56,23 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_auth(message::auth_request_t &message) noexcept;
     void on_config_request(ui::message::config_request_t &message) noexcept;
     void on_config_save(ui::message::config_save_request_t &message) noexcept;
+    void on_load_cluster(message::load_cluster_response_t &message) noexcept;
+    void on_ingnore_device(ui::message::ignore_device_request_t &message) noexcept;
+    void on_update_peer(ui::message::update_peer_request_t &message) noexcept;
+    void on_store_ingnored_device(message::store_ignored_device_response_t &message) noexcept;
+    void on_store_device(message::store_device_response_t &message) noexcept;
 
-    void dial_peer(const model::device_id_t &peer_device_id, const uris_t &uris) noexcept;
-    void launch_children() noexcept;
+    void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
+    void launch_db() noexcept;
     void launch_cluster() noexcept;
     void launch_ssdp() noexcept;
-    void persist_data() noexcept;
-    void update_devices() noexcept;
+    void load_db() noexcept;
+    //    void persist_data() noexcept;
+    //    void update_devices() noexcept;
     outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
 
     config::main_t app_config;
+    r::address_ptr_t db_addr;
     r::address_ptr_t ssdp_addr;
     r::address_ptr_t upnp_addr;
     r::address_ptr_t peers_addr;
@@ -76,6 +84,9 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     model::cluster_ptr_t cluster;
     utils::key_pair_t ssl_pair;
     model::devices_map_t devices;
+    model::ignored_devices_map_t ignored_devices;
+    ignore_device_req_t ignore_device_req;
+    update_peer_req_t update_peer_req;
 };
 
 } // namespace net

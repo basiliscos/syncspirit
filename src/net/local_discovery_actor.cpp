@@ -149,7 +149,7 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
         auto device_id = model::device_id_t::from_sha256(sha);
         if (device_id) {
             if (device_id != device->device_id) { // skip "self" discovery via network
-                model::peer_contact_t::uri_container_t uris;
+                utils::uri_container_t uris;
                 for (int i = 0; i < msg->addresses_size(); ++i) {
                     auto uri = utils::parse(msg->addresses(i).c_str());
                     if (uri) {

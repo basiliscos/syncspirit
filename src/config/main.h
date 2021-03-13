@@ -2,9 +2,7 @@
 #include <cstdint>
 #include <map>
 #include "bep.h"
-#include "device.h"
 #include "dialer.h"
-#include "folder.h"
 #include "global_announce.h"
 #include "local_announce.h"
 #include "tui.h"
@@ -14,10 +12,6 @@
 namespace syncspirit::config {
 
 struct main_t {
-    using ignored_devices_t = std::set<std::string>;
-    using devices_t = std::map<std::string, device_config_t>;
-    using folders_t = std::map<std::string, folder_config_t>;
-
     boost::filesystem::path config_path;
     boost::filesystem::path default_location;
     local_announce_config_t local_announce_config;
@@ -29,9 +23,6 @@ struct main_t {
 
     std::uint32_t timeout;
     std::string device_name;
-    ignored_devices_t ignored_devices;
-    devices_t devices;
-    folders_t folders;
 };
 
 } // namespace syncspirit::config

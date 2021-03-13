@@ -70,12 +70,15 @@ bool peer_activity_t::handle_label(const char key) noexcept {
         return true;
     } else if (key == 0x0A) { /* ENTER */
         if (sz > 0) {
-            auto &devices = actor.app_config.devices;
-            auto &id = device_id.get_value();
-            auto new_device = config::device_config_t{
-                id, buff, config::compression_t::meta, cert_name, false, false, false, false, {}};
-            devices.emplace(id, std::move(new_device));
-            actor.save_config();
+            auto &id = device_id.get_sha256();
+            db::Device db_dev;
+            db_dev.set_id(id);
+            db_dev.set_name(buff);
+            if (cert_name) {
+                db_dev.set_cert_name(cert_name.value());
+            }
+            auto device = model::device_ptr_t(new model::device_t(db_dev));
+            actor.update_device(device);
             actor.discard_activity();
         } else {
             /* ignore, no-op */

@@ -113,7 +113,7 @@ outcome::result<model::peer_contact_option_t> parse_contact(http::response<http:
         return make_error_code(error_code::incorrect_json);
     }
 
-    model::peer_contact_t::uri_container_t urls;
+    uri_container_t urls;
     for (auto &it : addresses) {
         if (!it.is_string()) {
             return make_error_code(error_code::incorrect_json);

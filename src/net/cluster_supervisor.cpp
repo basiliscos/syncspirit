@@ -16,7 +16,7 @@ r::plugin::resource_id_t db = 0;
 
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
     : ra::supervisor_asio_t{config}, device{config.device}, cluster{config.cluster}, devices{config.devices},
-      folders{config.folders} {}
+      folders{cluster->get_folders()} {}
 
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     ra::supervisor_asio_t::configure(plugin);
@@ -28,16 +28,28 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&cluster_supervisor_t::on_create_folder);
-        p.subscribe_actor(&cluster_supervisor_t::on_load_folder);
-        p.subscribe_actor(&cluster_supervisor_t::on_make_index);
+        //        p.subscribe_actor(&cluster_supervisor_t::on_load_folder);
+        //        p.subscribe_actor(&cluster_supervisor_t::on_make_index);
         p.subscribe_actor(&cluster_supervisor_t::on_connect);
         p.subscribe_actor(&cluster_supervisor_t::on_disconnect);
-        load_db();
     });
 }
 
 void cluster_supervisor_t::on_start() noexcept {
     spdlog::trace("{}, on_start", identity);
+
+    for (auto &it : cluster->get_folders()) {
+        auto &folder = it.second;
+        auto addr = create_actor<folder_actor_t>()
+                        .timeout(init_timeout / 2)
+                        .device(device)
+                        .folder(folder)
+                        .finish()
+                        ->get_address();
+        actors_map.emplace(folder->id(), addr);
+        spdlog::trace("{}, create folder actor {}, complete", identity, folder->id());
+    }
+
     ra::supervisor_asio_t::on_start();
 }
 
@@ -53,37 +65,19 @@ void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     }
 }
 
-void cluster_supervisor_t::load_db() noexcept {
-    resources->acquire(resource::db);
-    spdlog::trace("{}, load_db, starting loading cluster...", identity);
-    load_cluster(folders->begin());
-}
-
-void cluster_supervisor_t::on_load_folder(message::load_folder_response_t &message) noexcept {
-    auto &folder_config = message.payload.req->payload.request_payload.folder;
-    auto predicate = [&](auto &it) { return it.first == folder_config.id; };
-    auto it = std::find_if(folders->begin(), folders->end(), predicate);
-    assert(it != folders->end());
-    auto &ee = message.payload.ee;
-    if (ee) {
-        spdlog::warn("{}, on_load_folder, cannot load folder {} / {} : {}", identity, folder_config.label,
-                     folder_config.id, ee->message());
-    } else {
-        auto &folder = message.payload.res.folder;
-        cluster->add_folder(folder);
-    }
-    load_cluster(++it);
-}
-
 void cluster_supervisor_t::on_create_folder(ui::message::create_folder_request_t &message) noexcept {
+    spdlog::warn("{}, on_create_folder", identity);
+    /*
     auto &folder = message.payload.request_payload.folder;
     spdlog::trace("{}, on_create_folder, {} / {} shared with {} devices", identity, folder.label(), folder.id(),
                   folder.devices_size());
     auto timeout = init_timeout / 2;
     auto request_id = request<payload::make_index_id_request_t>(db, folder).send(timeout);
     folder_requests.emplace(request_id, &message);
+    */
 }
 
+#if 0
 void cluster_supervisor_t::on_make_index(message::make_index_id_response_t &message) noexcept {
     auto &request_id = message.payload.req->payload.id;
     auto it = folder_requests.find(request_id);
@@ -110,12 +104,13 @@ void cluster_supervisor_t::on_make_index(message::make_index_id_response_t &mess
     reply_to(request, folder->serialize(device));
     folder_requests.erase(it);
 }
+#endif
 
 void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexcept {
     auto &payload = message.payload;
     auto &device_id = payload.peer_device_id;
     spdlog::trace("{}, on_connect, peer = ", payload.peer_device_id);
-    auto &device = devices->at(device_id.get_value());
+    auto device = devices->by_id(device_id.get_sha256());
     auto unknown = cluster->update(payload.cluster_config, *devices);
     for (auto &folder : unknown) {
         send<ui::payload::new_folder_notify_t>(address, folder, device);
@@ -139,26 +134,4 @@ void cluster_supervisor_t::on_disconnect(message::disconnect_notify_t &message) 
         send<payload::stop_sync_t>(folder_actor);
         syncing_map.erase(it);
     }
-}
-
-void cluster_supervisor_t::load_cluster(folder_iterator_t it) noexcept {
-    if (it != folders->end()) {
-        auto &[folder_id, folder_config] = *it;
-        auto timeout = init_timeout / 2;
-        request<payload::load_folder_request_t>(db, folder_config, devices).send(timeout);
-        return;
-    }
-    for (auto &it : cluster->folders) {
-        auto &folder = it.second;
-        auto addr = create_actor<folder_actor_t>()
-                        .timeout(init_timeout / 2)
-                        .device(device)
-                        .folder(folder)
-                        .finish()
-                        ->get_address();
-        actors_map.emplace(folder->id(), addr);
-        spdlog::trace("{}, create folder actor {}, complete", identity, folder->id());
-    }
-    spdlog::trace("{}, load_cluster, complete", identity);
-    resources->release(resource::db);
 }

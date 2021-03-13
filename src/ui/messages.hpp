@@ -35,19 +35,30 @@ struct config_save_request_t {
     config::main_t config;
 };
 
+struct ignore_device_response_t {};
+
+struct ignore_device_request_t {
+    using response_t = ignore_device_response_t;
+    model::ignored_device_ptr_t device;
+};
+
+struct update_peer_response_t {};
+
+struct update_peer_request_t {
+    using response_t = update_peer_response_t;
+    model::device_ptr_t peer;
+};
+
 struct new_folder_notify_t {
     proto::Folder folder;
     model::device_ptr_t source;
 };
 
-struct create_folder_response_t {
-    config::folder_config_t folder;
-};
+struct create_folder_response_t {};
 
 struct create_folder_request_t {
     using response_t = create_folder_response_t;
-    proto::Folder folder;
-    config::folder_config_t folder_config;
+    db::Folder folder;
     model::device_ptr_t source;
 };
 
@@ -67,6 +78,12 @@ using config_save_response_t = r::request_traits_t<payload::config_save_request_
 
 using create_folder_request_t = r::request_traits_t<payload::create_folder_request_t>::request::message_t;
 using create_folder_response_t = r::request_traits_t<payload::create_folder_request_t>::response::message_t;
+
+using ignore_device_request_t = r::request_traits_t<payload::ignore_device_request_t>::request::message_t;
+using ignore_device_response_t = r::request_traits_t<payload::ignore_device_request_t>::response::message_t;
+
+using update_peer_request_t = r::request_traits_t<payload::update_peer_request_t>::request::message_t;
+using update_peer_response_t = r::request_traits_t<payload::update_peer_request_t>::response::message_t;
 
 } // namespace message
 

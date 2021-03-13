@@ -3,73 +3,81 @@
 #include <cstdint>
 #include <set>
 #include <boost/filesystem.hpp>
+#include "../config/main.h"
 #include "device.h"
-#include "../config/folder.h"
 #include "bep.pb.h"
+#include "structs.pb.h"
+#include "folder_info.h"
 
 namespace syncspirit::model {
 
 namespace fs = boost::filesystem;
 
-using index_id_t = std::uint64_t;
-using sequence_id_t = std::int64_t;
-
-struct folder_device_t {
-    device_ptr_t device;
-    index_id_t index_id;
-    sequence_id_t max_sequence;
-};
-
-} // namespace syncspirit::model
-
-namespace std {
-template <> struct less<syncspirit::model::folder_device_t> {
-    using fd_t = syncspirit::model::folder_device_t;
-    bool operator()(const fd_t &lhs, const fd_t &rhs) const noexcept {
-        auto r = lhs.device->device_id.get_sha256().compare(rhs.device->device_id.get_sha256());
-        return r;
-    }
-};
-} // namespace std
-
-namespace syncspirit::model {
-
 struct folder_t : arc_base_t<folder_t> {
-    using devices_t = std::set<folder_device_t>;
 
-    folder_t(const config::folder_config_t &cfg, const device_ptr_t &device_) noexcept;
+    folder_t(const db::Folder &db_folder, std::uint64_t db_key_ = 0) noexcept;
+    void assign_device(model::device_ptr_t device_) noexcept;
+    /*
+        bool assign(const proto::Folder &source, const devices_map_t &devices) noexcept;
+        void assing_self(index_id_t index, sequence_id_t max_sequence) noexcept;
+    */
+    void add(const folder_info_ptr_t &folder_info) noexcept;
+    db::Folder serialize() noexcept;
 
-    bool assign(const proto::Folder &source, const devices_map_t &devices) noexcept;
-    void assing_self(index_id_t index, sequence_id_t max_sequence) noexcept;
-    config::folder_config_t serialize(device_ptr_t local_device) noexcept;
+    bool operator==(const folder_t &other) const noexcept { return other._id == _id; }
+    bool operator!=(const folder_t &other) const noexcept { return other._id != _id; }
 
     proto::Folder get() noexcept;
     std::int64_t score(const device_ptr_t &peer_device) noexcept;
 
     const std::string &id() noexcept { return _id; }
+    inline std::uint64_t get_db_key() const noexcept { return db_key; }
+    inline void set_db_key(std::uint64_t value) noexcept { db_key = value; }
+    inline auto &get_folder_infos() noexcept { return folder_infos; }
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
 
   private:
-    // from config
+    device_ptr_t device;
+    std::uint64_t db_key;
     std::string _id;
     std::string label;
     fs::path path;
-    devices_t devices;
-    config::folder_type_t folder_type;
+    db::FolderType folder_type;
     std::uint32_t rescan_interval;
-    config::pull_order_t pull_order;
+    db::PullOrder pull_order;
     bool watched;
     bool read_only;
     bool ignore_permissions;
     bool ignore_delete;
     bool disable_temp_indixes;
     bool paused;
-    //
-    device_ptr_t device;
+    folder_infos_map_t folder_infos;
 };
 
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
+
+inline const std::string &natural_key(const folder_ptr_t &folder) noexcept { return folder->id(); }
+inline std::uint64_t db_key(const folder_ptr_t &folder) noexcept { return folder->get_db_key(); }
+
+using folders_map_t = generic_map_t<folder_ptr_t, std::string>;
+
+struct ignored_folder_t : arc_base_t<ignored_folder_t> {
+    ignored_folder_t(const db::IgnoredFolder &folder) noexcept;
+
+    bool operator==(const ignored_folder_t &other) const noexcept { return other.id == id; }
+    bool operator!=(const ignored_folder_t &other) const noexcept { return other.id != id; }
+
+    db::IgnoredFolder serialize() const noexcept;
+
+    std::string id;
+    std::string label;
+};
+
+using ignored_folder_ptr_t = intrusive_ptr_t<ignored_folder_t>;
+inline const std::string &db_key(const ignored_folder_ptr_t &folder) noexcept { return folder->id; }
+
+using ignored_folders_map_t = generic_map_t<ignored_folder_ptr_t, void, std::string>;
 
 } // namespace syncspirit::model

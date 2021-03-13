@@ -4,12 +4,14 @@
 using namespace syncspirit;
 using namespace syncspirit::model;
 
-folder_t::folder_t(const config::folder_config_t &cfg, const device_ptr_t &device_) noexcept
-    : _id{cfg.id}, label{cfg.label}, path{cfg.path}, folder_type{cfg.folder_type}, rescan_interval{cfg.rescan_interval},
-      pull_order{cfg.pull_order}, watched{cfg.watched}, read_only{cfg.read_only},
-      ignore_permissions{cfg.ignore_permissions}, ignore_delete{cfg.ignore_delete},
-      disable_temp_indixes{cfg.disable_temp_indixes}, paused{cfg.paused}, device{device_} {}
+folder_t::folder_t(const db::Folder &db_folder, uint64_t db_key_) noexcept
+    : db_key{db_key_}, _id{db_folder.id()}, label{db_folder.label()}, path{db_folder.path()},
+      folder_type{db_folder.folder_type()}, rescan_interval{static_cast<uint32_t>(db_folder.rescan_interval())},
+      pull_order{db_folder.pull_order()}, watched{db_folder.watched()}, read_only{db_folder.read_only()},
+      ignore_permissions{db_folder.ignore_permissions()}, ignore_delete{db_folder.ignore_delete()},
+      disable_temp_indixes{db_folder.disable_temp_indexes()}, paused{db_folder.paused()} {}
 
+#if 0
 bool folder_t::assign(const proto::Folder &source, const devices_map_t &devices_map) noexcept {
     // remove outdated
     bool changed = false;
@@ -36,12 +38,12 @@ bool folder_t::assign(const proto::Folder &source, const devices_map_t &devices_
             continue;
         }
         auto &device_id = device_id_option.value().get_value();
-        auto it = devices_map.find(device_id);
-        if (it == devices_map.end()) {
+        auto device = devices_map.by_id(device_id);
+        if (!device) {
             spdlog::warn("load_folder, unknown device {}, ignoring", device_id);
             continue;
         }
-        auto r = devices.emplace(model::folder_device_t{it->second, d.index_id(), d.max_sequence()});
+        auto r = devices.emplace(model::folder_device_t{device, d.index_id(), d.max_sequence()});
         changed |= r.second;
     }
     return changed;
@@ -52,33 +54,40 @@ void folder_t::assing_self(index_id_t index, sequence_id_t max_sequence) noexcep
     assert(e_r.second);
     (void)e_r;
 }
+#endif
 
-config::folder_config_t folder_t::serialize(device_ptr_t local_device) noexcept {
-    config::folder_config_t::device_ids_t devices;
-    for (auto &fd : this->devices) {
-        auto &id = fd.device->device_id.get_value();
-        if (id != local_device->device_id.get_value()) {
-            devices.insert(id);
-        }
-    }
-    return config::folder_config_t{
-        _id,     label,     path.string(),      std::move(devices), folder_type,          rescan_interval, pull_order,
-        watched, read_only, ignore_permissions, ignore_delete,      disable_temp_indixes, paused};
+void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
+
+void folder_t::assign_device(model::device_ptr_t device_) noexcept { device = device_; }
+
+db::Folder folder_t::serialize() noexcept {
+    db::Folder r;
+    r.set_id(_id);
+    r.set_label(label);
+    r.set_read_only(read_only);
+    r.set_ignore_permissions(ignore_permissions);
+    r.set_ignore_delete(ignore_delete);
+    r.set_disable_temp_indexes(disable_temp_indixes);
+    r.set_paused(paused);
+    r.set_watched(watched);
+    r.set_path(path.string());
+    r.set_folder_type(folder_type);
+    r.set_pull_order(pull_order);
+    r.set_rescan_interval(rescan_interval);
+    return r;
 }
 
-static proto::Compression compression(model::device_ptr_t device) noexcept {
-    using C = proto::Compression;
-    switch (device->compression) {
-    case config::compression_t::none:
-        return C::NEVER;
-    case config::compression_t::meta:
-        return C::METADATA;
-    case config::compression_t::all:
-        return C::ALWAYS;
-    }
-    return C::NEVER;
+ignored_folder_t::ignored_folder_t(const db::IgnoredFolder &folder) noexcept : id{folder.id()}, label(folder.label()) {}
+
+db::IgnoredFolder ignored_folder_t::serialize() const noexcept {
+    db::IgnoredFolder r;
+    r.set_id(id);
+    r.set_label(label);
+    return r;
+    ;
 }
 
+#if 0
 proto::Folder folder_t::get() noexcept {
     proto::Folder r;
     r.set_id(_id);
@@ -89,6 +98,10 @@ proto::Folder folder_t::get() noexcept {
     r.set_disable_temp_indexes(disable_temp_indixes);
     r.set_paused(paused);
     for (auto &fd : this->devices) {
+        if (fd.device != this->device) {
+            // zzz ?
+            continue;
+        }
         auto &id = fd.device->device_id.get_sha256();
         proto::Device pd;
         auto &device = fd.device;
@@ -98,7 +111,9 @@ proto::Folder folder_t::get() noexcept {
         if (device->cert_name) {
             pd.set_cert_name(device->cert_name.value());
         }
-        pd.set_max_sequence(fd.max_sequence);
+        spdlog::warn("zzz, folder {} has {} for {}", label, fd.max_sequence, fd.device->device_id);
+        pd.set_max_sequence(0);
+        //pd.set_max_sequence(fd.max_sequence);
         pd.set_introducer(device->introducer);
         pd.set_index_id(fd.index_id);
         pd.set_skip_introduction_removals(device->skip_introduction_removals);
@@ -107,15 +122,18 @@ proto::Folder folder_t::get() noexcept {
     return r;
 }
 
+#endif
 int64_t folder_t::score(const device_ptr_t &peer_device) noexcept {
     std::int64_t r = 0;
-    sequence_id_t my_seq = 0;
-    sequence_id_t peer_seq = 0;
-    for (auto &fd : devices) {
-        if (fd.device == device) {
-            my_seq = fd.max_sequence;
-        } else if (fd.device == peer_device) {
-            peer_seq = fd.max_sequence;
+    std::int64_t my_seq = 0;
+    std::int64_t peer_seq = 0;
+    for (auto it : folder_infos) {
+        auto fi = it.second;
+        auto &d = *fi->get_device();
+        if (d == *device) {
+            my_seq = fi->get_max_sequence();
+        } else if (d == *peer_device) {
+            peer_seq = fi->get_max_sequence();
         }
         if (my_seq && peer_seq) {
             break;

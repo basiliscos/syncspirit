@@ -9,82 +9,72 @@ using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
 TEST_CASE("opt_for_synch", "[model]") {
+    std::uint64_t key = 0;
+    db::Device db_d1;
+    db_d1.set_id(test::device_id2sha256("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
+    db_d1.set_name("d1");
+    db_d1.set_cert_name("d1_cert_name");
+    auto d1 = model::device_ptr_t(new model::device_t(db_d1, ++key));
 
-    auto d1_id =
-        model::device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto d2_id =
-        model::device_id_t::from_string("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7").value();
+    db::Device db_d2;
+    db_d2.set_id(test::device_id2sha256("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7"));
+    db_d2.set_name("d2");
+    db_d2.set_cert_name("d2_cert_name");
+    auto d2 = model::device_ptr_t(new model::device_t(db_d2, ++key));
 
-    config::device_config_t d1_cfg{
-        d1_id.get_value(), "d1", config::compression_t::all, "d1-cert_name", false, false, false, false, {}, {}};
-    config::device_config_t d2_cfg{
-        d2_id.get_value(), "d2", config::compression_t::all, "d2-cert_name", false, false, false, false, {}, {}};
-    device_ptr_t d1 = new device_t(d1_cfg);
-    device_ptr_t d2 = new device_t(d2_cfg);
+    db::Folder db_f1;
+    db_f1.set_id("f1");
+    db_f1.set_label("f1-l");
+    db_f1.set_path("/some/path/d1");
+    auto f1 = model::folder_ptr_t(new model::folder_t(db_f1, ++key));
 
-    config::folder_config_t f1_cfg{
-        "f1",
-        "f1",
-        "/some/path/d1",
-        {d1_id.get_value(), d2_id.get_value()},
-        config::folder_type_t::send_and_receive,
-        3600,
-        config::pull_order_t::random,
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-    };
+    db::Folder db_f2;
+    db_f2.set_id("f2");
+    db_f2.set_label("f2-l");
+    db_f2.set_path("/some/path/d2");
+    auto f2 = model::folder_ptr_t(new model::folder_t(db_f2, ++key));
 
-    config::folder_config_t f2_cfg{
-        "f2",
-        "f2",
-        "/some/path/d1",
-        {d1_id.get_value(), d2_id.get_value()},
-        config::folder_type_t::send_and_receive,
-        3600,
-        config::pull_order_t::random,
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-    };
-
-    folder_ptr_t f1 = new folder_t(f1_cfg, d1);
-    folder_ptr_t f2 = new folder_t(f2_cfg, d1);
+    auto folders = model::folders_map_t();
+    folders.put(f1);
+    folders.put(f2);
 
     cluster_ptr_t cluster = new cluster_t(d1);
-    cluster->add_folder(f1);
-    cluster->add_folder(f2);
+    cluster->assign_folders(std::move(folders));
+
+    auto add_file = [&key](std::int64_t seq, model::device_ptr_t device, model::folder_ptr_t folder) mutable {
+      db::FolderInfo db_folder_info;
+      auto folder_info = model::folder_info_ptr_t(new model::folder_info_t(db_folder_info, device.get(), folder.get(), ++key));
+      db::FileInfo db_file_info;
+      db_file_info.set_sequence(seq);
+      auto file_info = model::file_info_ptr_t(new model::file_info_t(db_file_info, folder_info.get()));
+      folder_info->add(file_info);
+      folder->add(folder_info);
+    };
 
     SECTION("no need of update") {
-        f1->access<to::devices>().emplace(folder_device_t{d1, 0, 5});
-        f1->access<to::devices>().emplace(folder_device_t{d2, 0, 4});
-        f2->access<to::devices>().emplace(folder_device_t{d1, 0, 5});
-        f2->access<to::devices>().emplace(folder_device_t{d2, 0, 4});
+        add_file(5, d1, f1);
+        add_file(4, d2, f1);
+        add_file(5, d1, f2);
+        add_file(4, d2, f2);
         auto f = cluster->opt_for_synch(d2);
         CHECK(!f);
     }
 
     SECTION("f1 & f2 needs update, but f1 has higher score") {
-        f1->access<to::devices>().emplace(folder_device_t{d1, 0, 5});
-        f1->access<to::devices>().emplace(folder_device_t{d2, 0, 10});
-        f2->access<to::devices>().emplace(folder_device_t{d1, 0, 5});
-        f2->access<to::devices>().emplace(folder_device_t{d2, 0, 8});
+        add_file(5, d1, f1);
+        add_file(9, d2, f1);
+        add_file(5, d1, f2);
+        add_file(8, d2, f2);
         auto f = cluster->opt_for_synch(d2);
         CHECK(f == f1);
     }
 
     SECTION("f1 & f2 needs update, but f2 has higher score") {
-        f1->access<to::devices>().emplace(folder_device_t{d1, 0, 5});
-        f1->access<to::devices>().emplace(folder_device_t{d2, 0, 10});
-        f2->access<to::devices>().emplace(folder_device_t{d1, 0, 5});
-        f2->access<to::devices>().emplace(folder_device_t{d2, 0, 18});
+        add_file(5, d1, f1);
+        add_file(10, d2, f1);
+        add_file(5, d1, f2);
+        add_file(18, d2, f2);
         auto f = cluster->opt_for_synch(d2);
-        CHECK(f == f2);
+        CHECK(*f == *f2);
     }
 }

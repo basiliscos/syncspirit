@@ -43,7 +43,7 @@ struct folder_actor_t : public r::actor_base_t {
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     void on_start_sync(message::start_sync_t &message) noexcept;
     void on_stop_sync(message::stop_sync_t &message) noexcept;
-    void on_forward(message::forwarted_message_t &message) noexcept;
+    void on_forward(message::forwarded_message_t &message) noexcept;
 
     model::folder_ptr_t folder;
     model::device_ptr_t device;
