@@ -26,13 +26,15 @@ proto::ClusterConfig cluster_t::get(device_ptr_t target) noexcept {
 
 const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
 
-cluster_t::unknown_folders_t cluster_t::update(proto::ClusterConfig &config) noexcept {
+cluster_t::unknown_folders_t cluster_t::update(const proto::ClusterConfig &config) noexcept {
     unknown_folders_t r;
     for (int i = 0; i < config.folders_size(); ++i) {
         auto &f = config.folders(i);
         auto folder = folders.by_id(f.id());
         if (!folder) {
             r.push_back(f);
+        } else {
+            folder->update(f);
         }
     }
     return r;

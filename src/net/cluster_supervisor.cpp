@@ -123,7 +123,7 @@ void cluster_supervisor_t::on_make_index(message::make_index_id_response_t &mess
 void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexcept {
     auto &payload = message.payload;
     auto &device_id = payload.peer_device_id;
-    spdlog::trace("{}, on_connect, peer = ", payload.peer_device_id);
+    spdlog::trace("{}, on_connect, peer = {}", identity, payload.peer_device_id);
     auto device = devices->by_id(device_id.get_sha256());
     auto unknown_folders = cluster->update(payload.cluster_config);
     for (auto &folder : unknown_folders) {

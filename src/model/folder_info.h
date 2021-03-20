@@ -27,10 +27,13 @@ struct folder_info_t : arc_base_t<folder_info_t> {
     inline device_t *get_device() const noexcept { return device; }
     inline folder_t *get_folder() const noexcept { return folder; }
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
+    inline std::int64_t get_declared_max_sequence() const noexcept { return declared_max_sequence; }
+    void update_declared_max_sequence(std::int64_t value) noexcept { declared_max_sequence = value; }
 
   private:
     std::uint64_t index;
     std::int64_t max_sequence;
+    std::int64_t declared_max_sequence;
     device_t *device;
     folder_t *folder;
     std::uint64_t db_key;

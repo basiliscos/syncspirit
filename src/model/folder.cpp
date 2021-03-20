@@ -117,7 +117,9 @@ std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept 
         if (d.cert_name) {
             pd.set_cert_name(d.cert_name.value());
         }
-        pd.set_max_sequence(fi.get_max_sequence());
+        auto db_max_seq = fi.get_max_sequence();
+        std::int64_t max_seq = paused ? 0 : (db_max_seq == 0 ? 1 : db_max_seq);
+        pd.set_max_sequence(max_seq);
         pd.set_index_id(fi.get_index());
         pd.set_introducer(d.introducer);
         pd.set_skip_introduction_removals(d.skip_introduction_removals);
@@ -172,7 +174,7 @@ int64_t folder_t::score(const device_ptr_t &peer_device) noexcept {
         if (d == *device) {
             my_seq = fi->get_max_sequence();
         } else if (d == *peer_device) {
-            peer_seq = fi->get_max_sequence();
+            peer_seq = fi->get_declared_max_sequence();
         }
         if (my_seq && peer_seq) {
             break;
@@ -182,4 +184,16 @@ int64_t folder_t::score(const device_ptr_t &peer_device) noexcept {
         return peer_seq - my_seq;
     }
     return r;
+}
+
+void folder_t::update(const proto::Folder &remote) noexcept {
+    for (int i = 0; i < remote.devices_size(); ++i) {
+        auto &d = remote.devices(i);
+        for (auto it : folder_infos) {
+            auto &fi = it.second;
+            if (fi->get_device()->device_id.get_sha256() == d.id()) {
+                fi->update_declared_max_sequence(d.max_sequence());
+            }
+        }
+    }
 }

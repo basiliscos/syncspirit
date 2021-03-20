@@ -16,7 +16,7 @@ struct cluster_t : arc_base_t<cluster_t> {
 
     void assign_folders(folders_map_t &&folders) noexcept;
     proto::ClusterConfig get(model::device_ptr_t target) noexcept;
-    unknown_folders_t update(proto::ClusterConfig &config) noexcept;
+    unknown_folders_t update(const proto::ClusterConfig &config) noexcept;
     folder_ptr_t opt_for_synch(const device_ptr_t &peer_device) noexcept;
 
     const folders_map_t &get_folders() const noexcept;

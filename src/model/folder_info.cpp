@@ -27,6 +27,9 @@ void folder_info_t::add(file_info_ptr_t &file_info) noexcept {
     auto seq = file_info->get_sequence();
     if (max_sequence < seq) {
         max_sequence = seq;
+        if (declared_max_sequence < max_sequence) {
+            declared_max_sequence = max_sequence;
+        }
     }
 }
 
