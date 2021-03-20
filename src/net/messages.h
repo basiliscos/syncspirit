@@ -274,6 +274,17 @@ struct store_ignored_folder_request_t {
     model::ignored_folder_ptr_t folder;
 };
 
+struct store_new_folder_response_t {
+    model::folder_ptr_t folder;
+};
+
+struct store_new_folder_request_t {
+    using response_t = store_new_folder_response_t;
+    db::Folder folder;
+    model::device_ptr_t source;
+    std::int64_t source_index;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -316,6 +327,9 @@ using store_ignored_device_response_t =
 using store_ignored_folder_request_t = r::request_traits_t<payload::store_ignored_folder_request_t>::request::message_t;
 using store_ignored_folder_response_t =
     r::request_traits_t<payload::store_ignored_folder_request_t>::response::message_t;
+
+using store_new_folder_request_t = r::request_traits_t<payload::store_new_folder_request_t>::request::message_t;
+using store_new_folder_response_t = r::request_traits_t<payload::store_new_folder_request_t>::response::message_t;
 
 using store_device_request_t = r::request_traits_t<payload::store_device_request_t>::request::message_t;
 using store_device_response_t = r::request_traits_t<payload::store_device_request_t>::response::message_t;

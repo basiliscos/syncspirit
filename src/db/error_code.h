@@ -10,6 +10,7 @@ enum class error_code {
     db_version_size_mismatch,
     deserialization_falure,
     invalid_device_id,
+    local_device_not_found,
     /*
     folder_info_not_found,
     folder_info_deserialization_failure,

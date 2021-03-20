@@ -32,6 +32,7 @@ struct ssl_junction_t {
     model::device_id_t peer;
     const utils::key_pair_t *me;
     bool sni_extension;
+    std::string_view alpn = ""; /* application layer protocol names? */
 };
 
 using ssl_option_t = std::optional<ssl_junction_t>;

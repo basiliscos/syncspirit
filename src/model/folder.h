@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <set>
+#include <optional>
 #include <boost/filesystem.hpp>
 #include "../config/main.h"
 #include "device.h"
@@ -17,20 +18,17 @@ struct folder_t : arc_base_t<folder_t> {
 
     folder_t(const db::Folder &db_folder, std::uint64_t db_key_ = 0) noexcept;
     void assign_device(model::device_ptr_t device_) noexcept;
-    /*
-        bool assign(const proto::Folder &source, const devices_map_t &devices) noexcept;
-        void assing_self(index_id_t index, sequence_id_t max_sequence) noexcept;
-    */
     void add(const folder_info_ptr_t &folder_info) noexcept;
     db::Folder serialize() noexcept;
 
     bool operator==(const folder_t &other) const noexcept { return other._id == _id; }
     bool operator!=(const folder_t &other) const noexcept { return other._id != _id; }
 
-    proto::Folder get() noexcept;
+    std::optional<proto::Folder> get(model::device_ptr_t device) noexcept;
     std::int64_t score(const device_ptr_t &peer_device) noexcept;
 
     const std::string &id() noexcept { return _id; }
+    const std::string &label() noexcept { return _label; }
     inline std::uint64_t get_db_key() const noexcept { return db_key; }
     inline void set_db_key(std::uint64_t value) noexcept { db_key = value; }
     inline auto &get_folder_infos() noexcept { return folder_infos; }
@@ -42,7 +40,7 @@ struct folder_t : arc_base_t<folder_t> {
     device_ptr_t device;
     std::uint64_t db_key;
     std::string _id;
-    std::string label;
+    std::string _label;
     fs::path path;
     db::FolderType folder_type;
     std::uint32_t rescan_interval;

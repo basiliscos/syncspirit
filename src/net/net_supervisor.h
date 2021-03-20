@@ -65,6 +65,8 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_store_ignored_device(message::store_ignored_device_response_t &message) noexcept;
     void on_store_device(message::store_device_response_t &message) noexcept;
     void on_store_ignored_folder(message::store_ignored_folder_response_t &message) noexcept;
+    void on_store_new_folder(message::store_new_folder_response_t &message) noexcept;
+    void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
     void launch_db() noexcept;

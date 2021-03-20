@@ -20,6 +20,7 @@ struct folder_info_t : arc_base_t<folder_info_t> {
 
     db::FolderInfo serialize() noexcept;
 
+    inline std::uint64_t get_index() const noexcept { return index; }
     inline std::uint64_t get_db_key() const noexcept { return db_key; }
     inline void set_db_key(std::uint64_t value) noexcept { db_key = value; }
 

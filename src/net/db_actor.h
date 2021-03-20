@@ -45,10 +45,12 @@ struct db_actor_t : public r::actor_base_t {
     void on_store_ignored_device(message::store_ignored_device_request_t &message) noexcept;
     void on_store_device(message::store_device_request_t &message) noexcept;
     void on_store_ignored_folder(message::store_ignored_folder_request_t &message) noexcept;
+    void on_store_new_folder(message::store_new_folder_request_t &message) noexcept;
 
     void open() noexcept;
     std::random_device rd;
     std::uniform_int_distribution<std::int64_t> distribution;
+    std::mt19937 generator;
     MDBX_env *env;
     std::string db_dir;
     model::device_ptr_t device;

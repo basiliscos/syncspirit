@@ -279,18 +279,14 @@ void tui_actor_t::on_ignrore_folder(ui::message::ignore_folder_response_t &messa
 }
 
 void tui_actor_t::on_create_folder(ui::message::create_folder_response_t &message) noexcept {
-    /*
-        auto &folder_orig = message.payload.req->payload.request_payload.folder_config;
-        spdlog::debug("{}, on_create_folder, '{}'", identity, folder_orig.label);
-        auto &ee = message.payload.ee;
-        if (ee) {
-            spdlog::warn("{}, on_create_folder, '{}' error: {}q", identity, folder_orig.label, ee->message());
-        } else {
-            auto &folder = message.payload.res.folder;
-            app_config.folders.emplace(folder.id, folder);
-        }
-    */
-    assert(0 && "TODO");
+    auto &ee = message.payload.ee;
+    auto &f = message.payload.req->payload.request_payload.folder;
+    if (ee) {
+        spdlog::error("{}, cannot create folder {}: {}", identity, f.id(), ee->message());
+        return;
+    }
+    auto &folder = message.payload.res.folder;
+    spdlog::info("{}, folder '{}/{}' has been created", identity, folder->id(), folder->label());
 }
 
 void tui_actor_t::ignore_device(const model::device_id_t &device_id) noexcept {
@@ -308,29 +304,19 @@ void tui_actor_t::ignore_folder(const proto::Folder &folder, model::device_ptr_t
 }
 
 void tui_actor_t::create_folder(const proto::Folder &folder, model::device_ptr_t &source) noexcept {
-    /*
-        config::folder_config_t::device_ids_t device_ids;
-        for (int i = 0; i < folder.devices_size(); ++i) {
-            device_ids.emplace(folder.devices(i).id());
-        }
-        auto path = app_config.default_location / folder.label();
-        config::folder_config_t folder_cfg{folder.id(),
-                                           folder.label(),
-                                           path.string(),
-                                           std::move(device_ids),
-                                           config::folder_type_t::send_and_receive,
-                                           constants::rescan_interval,
-                                           config::pull_order_t::random,
-                                           true,
-                                           false,
-                                           false,
-                                           false,
-                                           false,
-                                           false};
-        auto timeout = init_timeout / 2;
-        request<ui::payload::create_folder_request_t>(cluster, folder, std::move(folder_cfg), source).send(timeout);
-    */
-    assert(0 && "TODO");
+    db::Folder f;
+    f.set_id(folder.id());
+    f.set_label(folder.label());
+    f.set_read_only(folder.read_only());
+    f.set_ignore_permissions(folder.ignore_permissions());
+    f.set_ignore_delete(folder.ignore_delete());
+    f.set_disable_temp_indexes(folder.disable_temp_indexes());
+    f.set_paused(false);
+    f.set_watched(true);
+    f.set_folder_type(db::FolderType::send_and_receive);
+    f.set_pull_order(db::PullOrder::random);
+    f.set_rescan_interval(3600);
+    request<ui::payload::create_folder_request_t>(cluster, f, source).send(init_timeout);
 }
 
 void tui_actor_t::update_device(model::device_ptr_t device) noexcept {

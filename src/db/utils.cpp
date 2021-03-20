@@ -39,7 +39,7 @@ outcome::result<uint32_t> get_version(transaction_t &txn) noexcept {
     return version;
 }
 
-static outcome::result<void> migrate0(transaction_t &txn) noexcept {
+static outcome::result<void> migrate0(model::device_ptr_t &device, transaction_t &txn) noexcept {
     using prefixes_t = std::vector<discr_t>;
     auto key = prefixer_t<prefix::misc>::make(misc::db_version);
     MDBX_val value;
@@ -72,22 +72,24 @@ static outcome::result<void> migrate0(transaction_t &txn) noexcept {
         return outcome::failure(seq.error());
     }
 
+    return store_device(device, txn);
+
     return outcome::success();
 }
 
-static outcome::result<void> do_migrate(uint32_t from, transaction_t &txn) noexcept {
+static outcome::result<void> do_migrate(uint32_t from, model::device_ptr_t &device, transaction_t &txn) noexcept {
     switch (from) {
     case 0:
-        return migrate0(txn);
+        return migrate0(device, txn);
     default:
         assert(0 && "impossibe migration to future version");
         std::terminate();
     }
 }
 
-outcome::result<void> migrate(uint32_t from, transaction_t &txn) noexcept {
+outcome::result<void> migrate(uint32_t from, model::device_ptr_t device, transaction_t &txn) noexcept {
     while (from != version) {
-        auto r = do_migrate(from, txn);
+        auto r = do_migrate(from, device, txn);
         if (!r)
             return r;
         r = txn.commit();

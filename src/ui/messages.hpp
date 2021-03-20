@@ -61,12 +61,15 @@ struct new_folder_notify_t {
     model::device_ptr_t source;
 };
 
-struct create_folder_response_t {};
+struct create_folder_response_t {
+    model::folder_ptr_t folder;
+};
 
 struct create_folder_request_t {
     using response_t = create_folder_response_t;
     db::Folder folder;
     model::device_ptr_t source;
+    std::int64_t source_index;
 };
 
 } // namespace payload

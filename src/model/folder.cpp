@@ -5,7 +5,7 @@ using namespace syncspirit;
 using namespace syncspirit::model;
 
 folder_t::folder_t(const db::Folder &db_folder, uint64_t db_key_) noexcept
-    : db_key{db_key_}, _id{db_folder.id()}, label{db_folder.label()}, path{db_folder.path()},
+    : db_key{db_key_}, _id{db_folder.id()}, _label{db_folder.label()}, path{db_folder.path()},
       folder_type{db_folder.folder_type()}, rescan_interval{static_cast<uint32_t>(db_folder.rescan_interval())},
       pull_order{db_folder.pull_order()}, watched{db_folder.watched()}, read_only{db_folder.read_only()},
       ignore_permissions{db_folder.ignore_permissions()}, ignore_delete{db_folder.ignore_delete()},
@@ -63,7 +63,7 @@ void folder_t::assign_device(model::device_ptr_t device_) noexcept { device = de
 db::Folder folder_t::serialize() noexcept {
     db::Folder r;
     r.set_id(_id);
-    r.set_label(label);
+    r.set_label(_label);
     r.set_read_only(read_only);
     r.set_ignore_permissions(ignore_permissions);
     r.set_ignore_delete(ignore_delete);
@@ -85,6 +85,45 @@ db::IgnoredFolder ignored_folder_t::serialize() const noexcept {
     r.set_label(label);
     return r;
     ;
+}
+
+std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept {
+    bool has = false;
+    for (auto &it : folder_infos) {
+        if (it.second->get_device() == device.get()) {
+            has = true;
+            break;
+        }
+    }
+    if (!has) {
+        return {};
+    }
+
+    proto::Folder r;
+    r.set_id(_id);
+    r.set_label(_label);
+    r.set_read_only(read_only);
+    r.set_ignore_permissions(ignore_permissions);
+    r.set_ignore_delete(ignore_delete);
+    r.set_disable_temp_indexes(disable_temp_indixes);
+    r.set_paused(paused);
+    for (auto &it : folder_infos) {
+        auto &fi = *it.second;
+        auto &d = *fi.get_device();
+        proto::Device pd;
+        pd.set_id(d.device_id.get_sha256());
+        pd.set_name(d.name);
+        pd.set_compression(d.compression);
+        if (d.cert_name) {
+            pd.set_cert_name(d.cert_name.value());
+        }
+        pd.set_max_sequence(fi.get_max_sequence());
+        pd.set_index_id(fi.get_index());
+        pd.set_introducer(d.introducer);
+        pd.set_skip_introduction_removals(d.skip_introduction_removals);
+        *r.add_devices() = pd;
+    }
+    return r;
 }
 
 #if 0
@@ -121,8 +160,8 @@ proto::Folder folder_t::get() noexcept {
     }
     return r;
 }
-
 #endif
+
 int64_t folder_t::score(const device_ptr_t &peer_device) noexcept {
     std::int64_t r = 0;
     std::int64_t my_seq = 0;

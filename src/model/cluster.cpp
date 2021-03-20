@@ -13,33 +13,34 @@ void cluster_t::assign_folders(folders_map_t &&folders_) noexcept {
     }
 }
 
-proto::ClusterConfig cluster_t::get() noexcept {
+proto::ClusterConfig cluster_t::get(device_ptr_t target) noexcept {
     proto::ClusterConfig r;
     for (auto &[id, folder] : folders) {
-        std::abort();
-        //*(r.add_folders()) = folder->get();
+        auto folder_opt = folder->get(target);
+        if (folder_opt) {
+            *(r.add_folders()) = folder_opt.value();
+        }
     }
     return r;
 }
 
 const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
 
-cluster_t::update_info_t cluster_t::update(proto::ClusterConfig &config, const devices_map_t &devices) noexcept {
-    update_info_t r;
+cluster_t::unknown_folders_t cluster_t::update(proto::ClusterConfig &config) noexcept {
+    unknown_folders_t r;
     for (int i = 0; i < config.folders_size(); ++i) {
         auto &f = config.folders(i);
         auto folder = folders.by_id(f.id());
         if (!folder) {
-            r.unknown_folders.push_back(f);
+            r.push_back(f);
         }
     }
     return r;
 }
 
+void cluster_t::add_folder(const folder_ptr_t &folder) noexcept { folders.put(folder); }
+
 #if 0
-
-void cluster_t::add_folder(const folder_ptr_t &folder) noexcept { folders.emplace(folder->id(), folder); }
-
 cluster_t::folders_config_t cluster_t::serialize() noexcept {
     folders_config_t r;
     for (auto &[id, folder] : folders) {

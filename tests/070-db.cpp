@@ -44,7 +44,12 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
     auto txn = mk_txn(env, transaction_type_t::RW);
     auto version = db::get_version(txn);
     REQUIRE(version.value() == 0);
-    CHECK(db::migrate(version.value(), txn));
+    db::Device db_d0;
+    db_d0.set_id(test::device_id2sha256("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ"));
+    db_d0.set_name("d1");
+    auto d0 = model::device_ptr_t(new model::local_device_t(db_d0));
+
+    CHECK(db::migrate(version.value(), d0, txn));
 
     txn = mk_txn(env, transaction_type_t::RO);
     version = db::get_version(txn);
@@ -77,13 +82,16 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
         auto devices_opt = db::load_devices(txn);
         REQUIRE(devices_opt);
         auto& devices2 = devices_opt.value();
-        REQUIRE(devices2.size() == devices.size());
+        REQUIRE(devices2.size() == devices.size() + 1);
         REQUIRE(devices2.by_id(d1->device_id.get_sha256()));
         REQUIRE(devices2.by_id(d2->device_id.get_sha256()));
 
         REQUIRE(*devices2.by_id(d1->device_id.get_sha256()) == *d1);
         REQUIRE(*devices2.by_id(d2->device_id.get_sha256()) == *d2);
-
+        auto& ld1 = *devices2.by_id(d1->device_id.get_sha256());
+        auto& ld2 = *devices2.by_id(d2->device_id.get_sha256());
+        CHECK(ld1.get_db_key() != 0);
+        CHECK(ld2.get_db_key() != 0);
     }
 
     SECTION("save & load ignored device") {

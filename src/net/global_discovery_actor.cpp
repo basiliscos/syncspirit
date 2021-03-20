@@ -164,7 +164,7 @@ void global_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcep
 void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri,
                                             fmt::memory_buffer &&tx_buff) noexcept {
     auto timeout = r::pt::millisec{io_timeout};
-    transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true};
+    transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true, ""};
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
                                                         rx_buff_size, std::move(ssl))
                        .send(timeout);

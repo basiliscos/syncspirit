@@ -58,12 +58,12 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
   private:
     using actors_map_t = std::unordered_map<std::string, r::address_ptr_t>;     // folder_id: folder_actor
     using syncing_map_t = std::unordered_map<std::string, model::folder_ptr_t>; // device_id: folder
+    using create_folder_req_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
 
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
     void on_connect(message::connect_notify_t &message) noexcept;
     void on_disconnect(message::disconnect_notify_t &message) noexcept;
-
-    //    void on_make_index(message::make_index_id_response_t &message) noexcept;
+    void on_store_new_folder(message::store_new_folder_response_t &message) noexcept;
 
     r::address_ptr_t coordinator;
     r::address_ptr_t db;
@@ -74,6 +74,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     model::ignored_folders_map_t *ignored_folders;
     actors_map_t actors_map;
     syncing_map_t syncing_map;
+    create_folder_req_t create_folder_req;
 };
 
 } // namespace net

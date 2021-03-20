@@ -17,7 +17,7 @@ r::plugin::resource_id_t db = 0;
 } // namespace
 
 db_actor_t::db_actor_t(config_t &config)
-    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, device{config.device} {
+    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, device{config.device}, generator(rd()) {
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
         spdlog::critical("{}, mbdx environment creation error ({}): {}", r, mdbx_strerror(r), names::db);
@@ -41,6 +41,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&db_actor_t::on_store_ignored_device);
         p.subscribe_actor(&db_actor_t::on_store_device);
         p.subscribe_actor(&db_actor_t::on_store_ignored_folder);
+        p.subscribe_actor(&db_actor_t::on_store_new_folder);
     });
 }
 
@@ -76,7 +77,7 @@ void db_actor_t::open() noexcept {
         return do_shutdown(make_error(db::make_error_code(r)));
     }
     if (db_ver.value() != db::version) {
-        auto r = db::migrate(version, txn.value());
+        auto r = db::migrate(version, device, txn.value());
         if (!r) {
             spdlog::error("{}, open, cannot migrate db {}", identity, r.error().message());
             resources->release(resource::db);
@@ -129,7 +130,23 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
     if (!devices_opt) {
         return reply_with_error(message, make_error(devices_opt.error()));
     }
+
+    bool local_fix = false;
     auto &devices = devices_opt.value();
+    for (auto &it : devices) {
+        auto &d = it.second;
+        if (d->get_id() == device->get_id()) {
+            local_fix = true;
+            device->set_db_key(d->get_db_key());
+            devices.remove(d);
+            devices.put(device);
+            break;
+        }
+    }
+    if (!local_fix) {
+        auto ec = db::make_error_code(db::error_code::local_device_not_found);
+        return reply_with_error(message, make_error(ec));
+    }
 
     auto ignored_devices_opt = db::load_ignored_devices(txn);
     if (!ignored_devices_opt) {
@@ -245,6 +262,69 @@ void db_actor_t::on_store_ignored_folder(message::store_ignored_folder_request_t
     }
 
     reply_to(message);
+}
+
+void db_actor_t::on_store_new_folder(message::store_new_folder_request_t &message) noexcept {
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return reply_with_error(message, make_error(txn_opt.error()));
+    }
+    auto &txn = txn_opt.value();
+    auto &db_folder = message.payload.request_payload.folder;
+    auto folder = model::folder_ptr_t(new model::folder_t(db_folder));
+
+    auto r = db::store_folder(folder, txn);
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    db::FolderInfo db_fi_source;
+    auto &src_index = message.payload.request_payload.source_index;
+    db_fi_source.set_index_id(src_index);
+    auto src = message.payload.request_payload.source.get();
+
+    auto key_option = txn.next_sequence();
+    if (!key_option) {
+        reply_with_error(message, make_error(key_option.error()));
+        return;
+    }
+    auto key_source = key_option.value();
+    auto fi_source = model::folder_info_ptr_t(new model::folder_info_t(db_fi_source, src, folder.get(), key_source));
+
+    r = db::store_folder_info(fi_source, txn);
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    key_option = txn.next_sequence();
+    if (!key_option) {
+        reply_with_error(message, make_error(key_option.error()));
+        return;
+    }
+    auto key_local = key_option.value();
+    db::FolderInfo db_fi_local;
+    db_fi_source.set_index_id(src_index);
+    auto src_local = device.get();
+    auto fi_local = model::folder_info_ptr_t(new model::folder_info_t(db_fi_local, src_local, folder.get(), key_local));
+
+    r = db::store_folder_info(fi_local, txn);
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    r = txn.commit();
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    folder->add(fi_local);
+    folder->add(fi_source);
+
+    reply_to(message, std::move(folder));
 }
 
 } // namespace syncspirit::net

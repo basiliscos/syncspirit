@@ -1,5 +1,6 @@
 #include "peer_actor.h"
 #include "names.h"
+#include "../constants.h"
 #include "../utils/tls.h"
 #include "../utils/error_code.h"
 #include "../proto/bep_support.h"
@@ -69,7 +70,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void peer_actor_t::instantiate_transport() noexcept {
     if (sock) {
-        transport::ssl_junction_t ssl{peer_device_id, &ssl_pair, false};
+        transport::ssl_junction_t ssl{peer_device_id, &ssl_pair, false, ""};
         auto uri = utils::parse("tcp://0.0.0.0/").value();
         auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
         transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup, std::move(sock)};
@@ -83,7 +84,7 @@ void peer_actor_t::instantiate_transport() noexcept {
 }
 
 void peer_actor_t::try_next_uri() noexcept {
-    transport::ssl_junction_t ssl{peer_device_id, &ssl_pair, false};
+    transport::ssl_junction_t ssl{peer_device_id, &ssl_pair, false, constants::protocol_name};
     while (++uri_idx < (std::int32_t)uris.size()) {
         auto &uri = uris[uri_idx];
         auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);

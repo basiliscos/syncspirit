@@ -14,7 +14,7 @@ namespace db {
 extern std::uint32_t version;
 
 outcome::result<std::uint32_t> get_version(transaction_t &txn) noexcept;
-outcome::result<void> migrate(std::uint32_t from, transaction_t &txn) noexcept;
+outcome::result<void> migrate(std::uint32_t from, model::device_ptr_t device, transaction_t &txn) noexcept;
 
 outcome::result<void> store_device(model::device_ptr_t &device, transaction_t &txn) noexcept;
 outcome::result<model::devices_map_t> load_devices(transaction_t &txn) noexcept;

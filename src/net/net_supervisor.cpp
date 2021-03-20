@@ -140,9 +140,9 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
     devices = std::move(p.devices);
     ignored_devices = std::move(p.ignored_devices);
     ignored_folders = std::move(p.ignored_folders);
-    spdlog::debug("{}, load cluster. devices = {}, ignored devices = {}, ignored folders = {}", identity,
-                  devices.size(), ignored_devices.size(), ignored_folders.size());
-    cluster = new model::cluster_t(device);
+    cluster = std::move(p.cluster);
+    spdlog::debug("{}, load cluster. devices = {}, ignored devices = {}, ignored folders = {}, folders = {}", identity,
+                  devices.size(), ignored_devices.size(), ignored_folders.size(), cluster->get_folders().size());
 
     auto timeout = shutdown_timeout * 9 / 10;
     auto io_timeout = shutdown_timeout * 8 / 10;
@@ -385,7 +385,7 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
                          device->device_id);
         } else {
             auto &cert_name = device->cert_name;
-            if (cert_name) {
+            if (cert_name && !cert_name.value().empty()) {
                 bool ok = cert_name.value() == payload->cert_name;
                 if (!ok) {
                     device.reset();
@@ -398,7 +398,8 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
     using cluster_config_ptr_t = typename payload::auth_response_t::cluster_config_ptr_t;
     if (device) {
         device->mark_online(true);
-        auto cluster_message = std::make_unique<cluster_config_ptr_t::element_type>(cluster->get());
+        auto cluster_config = cluster->get(device);
+        auto cluster_message = std::make_unique<cluster_config_ptr_t::element_type>(std::move(cluster_config));
         reply_to(message, std::move(cluster_message));
     } else {
         reply_to(message, cluster_config_ptr_t{});
@@ -482,6 +483,25 @@ void net_supervisor_t::on_store_ignored_folder(message::store_ignored_folder_res
     }
     ingored_folder_requests.erase(it);
 }
+
+#if 0
+void net_supervisor_t::on_store_new_folder(message::store_new_folder_response_t &message) noexcept {
+    auto &f_src = message.payload.req->payload.request_payload.folder;
+    spdlog::trace("{}, on_store_new_folder, {}", identity, f_src.label());
+    assert(create_folder_req);
+    auto &ee = message.payload.ee;
+    if (ee) {
+        reply_with_error(*create_folder_req, ee);
+    } else {
+        auto& folder = message.payload.res.folder;
+        spdlog::debug("{}, created_folder {}/{}", identity, folder->id(), folder->label());
+        ignored_folders.put(folder);
+        reply_to(**it);
+    }
+    create_folder_req.reset();
+
+}
+#endif
 
 #if 0
 void net_supervisor_t::update_devices() noexcept {

@@ -114,6 +114,14 @@ template <> struct base_impl_t<ssl_socket_t> {
                 spdlog::error("http_actor_t:: Set SNI Hostname : {}", ec.message());
             }
         }
+        auto alpn = config.ssl_junction->alpn;
+        std::byte wire_alpn[alpn.size() + 1];
+        if (!alpn.empty()) {
+            assert(alpn.size() < 255);
+            auto b = reinterpret_cast<const std::byte *>(alpn.data());
+            std::copy(b, b + alpn.size(), wire_alpn + 1);
+            SSL_CTX_set_alpn_protos(ctx.native_handle(), (const unsigned char *)wire_alpn, alpn.size() + 1);
+        }
         auto mode = ssl::verify_peer | ssl::verify_fail_if_no_peer_cert | ssl::verify_client_once;
         sock.set_verify_depth(1);
         sock.set_verify_mode(mode);
