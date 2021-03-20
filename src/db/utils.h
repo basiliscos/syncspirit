@@ -36,14 +36,5 @@ outcome::result<model::ignored_devices_map_t> load_ignored_devices(transaction_t
 outcome::result<void> store_ignored_folder(model::ignored_folder_ptr_t &info, transaction_t &txn) noexcept;
 outcome::result<model::ignored_folders_map_t> load_ignored_folders(transaction_t &txn) noexcept;
 
-/*
-outcome::result<void> update_folder_info(const proto::Folder &folder, transaction_t &txn) noexcept;
-
-outcome::result<void> create_folder(const proto::Folder &folder, const model::index_id_t &index_id,
-                                    const model::device_id_t &device_id, transaction_t &txn) noexcept;
-outcome::result<model::folder_ptr_t> load_folder(config::folder_config_t &folder, const model::device_ptr_t &device,
-                                                 const model::devices_map_t &devices, transaction_t &txn) noexcept;
-*/
-
 } // namespace db
 } // namespace syncspirit

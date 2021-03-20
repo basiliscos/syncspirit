@@ -91,35 +91,6 @@ void cluster_supervisor_t::on_store_new_folder(message::store_new_folder_respons
     create_folder_req.reset();
 }
 
-#if 0
-void cluster_supervisor_t::on_make_index(message::make_index_id_response_t &message) noexcept {
-    auto &request_id = message.payload.req->payload.id;
-    auto it = folder_requests.find(request_id);
-    auto &request = *it->second;
-    auto &ee = message.payload.ee;
-    if (ee) {
-        reply_with_error(request, ee);
-        return;
-    }
-    auto &payload = request.payload.request_payload;
-    auto &cfg = payload.folder_config;
-    sys::error_code fs_ec;
-    fs::create_directories(cfg.path, fs_ec);
-    if (fs_ec) {
-        reply_with_error(request, ee);
-        return;
-    }
-    auto folder = model::folder_ptr_t(new model::folder_t(cfg, device));
-    auto &index_id = message.payload.res.index_id;
-    folder->assign(payload.folder, *devices);
-    folder->assing_self(index_id, {});
-    cluster->add_folder(folder);
-
-    reply_to(request, folder->serialize(device));
-    folder_requests.erase(it);
-}
-#endif
-
 void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexcept {
     auto &payload = message.payload;
     auto &device_id = payload.peer_device_id;

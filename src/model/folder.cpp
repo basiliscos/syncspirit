@@ -128,42 +128,6 @@ std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept 
     return r;
 }
 
-#if 0
-proto::Folder folder_t::get() noexcept {
-    proto::Folder r;
-    r.set_id(_id);
-    r.set_label(label);
-    r.set_read_only(read_only);
-    r.set_ignore_permissions(ignore_permissions);
-    r.set_ignore_delete(ignore_delete);
-    r.set_disable_temp_indexes(disable_temp_indixes);
-    r.set_paused(paused);
-    for (auto &fd : this->devices) {
-        if (fd.device != this->device) {
-            // zzz ?
-            continue;
-        }
-        auto &id = fd.device->device_id.get_sha256();
-        proto::Device pd;
-        auto &device = fd.device;
-        pd.set_id(id);
-        pd.set_name(device->name);
-        pd.set_compression(compression(device));
-        if (device->cert_name) {
-            pd.set_cert_name(device->cert_name.value());
-        }
-        spdlog::warn("zzz, folder {} has {} for {}", label, fd.max_sequence, fd.device->device_id);
-        pd.set_max_sequence(0);
-        //pd.set_max_sequence(fd.max_sequence);
-        pd.set_introducer(device->introducer);
-        pd.set_index_id(fd.index_id);
-        pd.set_skip_introduction_removals(device->skip_introduction_removals);
-        *r.add_devices() = pd;
-    }
-    return r;
-}
-#endif
-
 int64_t folder_t::score(const device_ptr_t &peer_device) noexcept {
     std::int64_t r = 0;
     std::int64_t my_seq = 0;
