@@ -82,7 +82,7 @@ template <> struct base_impl_t<ssl_socket_t> {
     bool validation_passed = false;
     bool cancelling = false;
 
-    static ssl::context get_context(self_t &source) noexcept {
+    static ssl::context get_context(self_t &source, const std::string_view &alpn) noexcept {
         ssl::context ctx(ssl::context::tls);
         ctx.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2);
 
@@ -90,6 +90,17 @@ template <> struct base_impl_t<ssl_socket_t> {
         auto &key_data = source.me.key_data.bytes;
         ctx.use_certificate(asio::const_buffer(cert_data.c_str(), cert_data.size()), ssl::context::asn1);
         ctx.use_private_key(asio::const_buffer(key_data.c_str(), key_data.size()), ssl::context::asn1);
+
+        if (alpn.size()) {
+            std::byte wire_alpn[alpn.size() + 1];
+            wire_alpn[0] = (std::byte)(alpn.size());
+            auto b = reinterpret_cast<const std::byte *>(alpn.data());
+            std::copy(b, b + alpn.size(), wire_alpn + 1);
+            auto r = SSL_CTX_set_alpn_protos(ctx.native_handle(), (const unsigned char *)wire_alpn, alpn.size() + 1);
+            assert(r == 0 && "SSL_CTX_set_alpn_protos");
+            (void)r;
+        }
+
         return ctx;
     }
 
@@ -105,7 +116,7 @@ template <> struct base_impl_t<ssl_socket_t> {
 
     base_impl_t(transport_config_t &config) noexcept
         : supervisor{config.supervisor}, strand{supervisor.get_strand()}, expected_peer{config.ssl_junction->peer},
-          me(*config.ssl_junction->me), ctx(get_context(*this)),
+          me(*config.ssl_junction->me), ctx(get_context(*this, config.ssl_junction->alpn)),
           role(config.sock ? ssl::stream_base::server : ssl::stream_base::client), sock(mk_sock(config, ctx, strand)) {
         if (config.ssl_junction->sni_extension) {
             auto &host = config.uri.host;
@@ -113,14 +124,6 @@ template <> struct base_impl_t<ssl_socket_t> {
                 sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
                 spdlog::error("http_actor_t:: Set SNI Hostname : {}", ec.message());
             }
-        }
-        auto alpn = config.ssl_junction->alpn;
-        std::byte wire_alpn[alpn.size() + 1];
-        if (!alpn.empty()) {
-            assert(alpn.size() < 255);
-            auto b = reinterpret_cast<const std::byte *>(alpn.data());
-            std::copy(b, b + alpn.size(), wire_alpn + 1);
-            SSL_CTX_set_alpn_protos(ctx.native_handle(), (const unsigned char *)wire_alpn, alpn.size() + 1);
         }
         auto mode = ssl::verify_peer | ssl::verify_fail_if_no_peer_cert | ssl::verify_client_once;
         sock.set_verify_depth(1);
