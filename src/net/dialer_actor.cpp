@@ -49,7 +49,13 @@ void dialer_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
 }
 
+void dialer_actor_t::shutdown_finish() noexcept {
+    spdlog::trace("{}, shutdown_finish", identity);
+    r::actor_base_t::shutdown_finish();
+}
+
 void dialer_actor_t::shutdown_start() noexcept {
+    spdlog::trace("{}, shutdown_start", identity);
     r::actor_base_t::shutdown_start();
     for (auto &it : discovery_map) {
         send<message::discovery_cancel_t::payload_t>(global_discovery, it.second);
