@@ -42,6 +42,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&db_actor_t::on_store_device);
         p.subscribe_actor(&db_actor_t::on_store_ignored_folder);
         p.subscribe_actor(&db_actor_t::on_store_new_folder);
+        p.subscribe_actor(&db_actor_t::on_store_folder_info);
     });
 }
 
@@ -325,6 +326,36 @@ void db_actor_t::on_store_new_folder(message::store_new_folder_request_t &messag
     folder->add(fi_source);
 
     reply_to(message, std::move(folder));
+}
+
+void db_actor_t::on_store_folder_info(message::store_folder_info_request_t &message) noexcept {
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return reply_with_error(message, make_error(txn_opt.error()));
+    }
+    auto &txn = txn_opt.value();
+    auto &fi = message.payload.request_payload.folder_info;
+    auto r = db::store_folder_info(fi, txn);
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    for (auto &it : fi->get_file_infos()) {
+        r = db::store_file_info(it.second, txn);
+        if (!r) {
+            reply_with_error(message, make_error(r.error()));
+            return;
+        }
+    }
+
+    r = txn.commit();
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    reply_to(message);
 }
 
 } // namespace syncspirit::net

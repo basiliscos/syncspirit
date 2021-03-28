@@ -111,19 +111,24 @@ void dialer_actor_t::on_discovery(message::discovery_response_t &res) noexcept {
     assert(peer);
     auto it = discovery_map.find(peer);
     assert(it != discovery_map.end());
-    auto &req = *res.payload.req->payload.request_payload;
-    if (!ee) {
-        auto &contact = res.payload.res->peer;
-        if (contact) {
-            auto &urls = contact.value().uris;
-            on_ready(peer, urls);
+    if (!peer->is_online()) {
+        auto &req = *res.payload.req->payload.request_payload;
+        if (!ee) {
+            auto &contact = res.payload.res->peer;
+            if (contact) {
+                auto &urls = contact.value().uris;
+                on_ready(peer, urls);
+            } else {
+                spdlog::trace("{}, on_discovery, no contact for {} has been discovered", identity, peer_id);
+                schedule_redial(peer);
+            }
         } else {
-            spdlog::trace("{}, on_discovery, no contact for {} has been discovered", identity, peer_id);
+            spdlog::debug("{}, on_discovery, can't discover contacts for {} :: {}", identity, req.device_id,
+                          ee->message());
             schedule_redial(peer);
         }
     } else {
-        spdlog::debug("{}, on_discovery, can't discover contacts for {} :: {}", identity, req.device_id, ee->message());
-        schedule_redial(peer);
+        spdlog::trace("{}, on_discovery, peer {} is already online, noop", identity, peer_id);
     }
     discovery_map.erase(it);
 }

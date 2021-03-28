@@ -48,7 +48,7 @@ static outcome::result<message::wrapped_message_t> parse_hello(const asio::const
 
     auto msg = std::make_unique<proto::Hello>();
     if (!msg->ParseFromArray(ptr, msg_sz)) {
-        return make_error_code(utils::bep_error_code::protobuf_err);
+        return make_error_code(utils::bep_error_code_t::protobuf_err);
     }
     return wrap(message::Hello{std::move(msg)}, static_cast<size_t>(msg_sz + 6));
 }
@@ -86,7 +86,7 @@ outcome::result<message::wrapped_message_t> parse(const asio::const_buffer &buff
 
     auto msg = std::make_unique<ProtoType>();
     if (!msg->ParseFromArray(ptr, buff.size())) {
-        return make_error_code(utils::bep_error_code::protobuf_err);
+        return make_error_code(utils::bep_error_code_t::protobuf_err);
     }
     return wrap(MessageType{std::move(msg)}, static_cast<size_t>(consumed + buff.size()));
 }
@@ -106,7 +106,7 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
             return wrap(message::message_t(), 0u);
         proto::Header header;
         if (!header.ParseFromArray(ptr_16, header_sz)) {
-            return make_error_code(utils::bep_error_code::protobuf_err);
+            return make_error_code(utils::bep_error_code_t::protobuf_err);
         }
         auto type = header.type();
         ptr_32 = reinterpret_cast<const std::uint32_t *>(((const char *)ptr_16) + header_sz);
@@ -152,7 +152,7 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
             auto dec =
                 LZ4_decompress_safe(reinterpret_cast<const char *>(ptr_32), uncompressed.data(), block_sz, uncompr_sz);
             if (dec < 0) {
-                return make_error_code(utils::bep_error_code::lz4_decoding);
+                return make_error_code(utils::bep_error_code_t::lz4_decoding);
             }
             msg_buff = asio::buffer(uncompressed.data(), uncompr_sz);
             auto &&r = parse_msg(msg_buff, 0); // consumed is ignored anyway
@@ -191,17 +191,17 @@ std::size_t make_announce_message(fmt::memory_buffer &buff, const std::string_vi
 outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff) noexcept {
     auto sz = buff.size();
     if (sz <= 4) {
-        return utils::make_error_code(utils::error_code::wrong_magic);
+        return utils::make_error_code(utils::error_code_t::wrong_magic);
     }
 
     const std::uint32_t *ptr_32 = reinterpret_cast<const std::uint32_t *>(buff.data());
     if (be::big_to_native(*ptr_32++) != constants::bep_magic) {
-        return utils::make_error_code(utils::error_code::wrong_magic);
+        return utils::make_error_code(utils::error_code_t::wrong_magic);
     }
 
     auto msg = std::make_unique<proto::Announce>();
     if (!msg->ParseFromArray(ptr_32, sz - 4)) {
-        return make_error_code(utils::bep_error_code::protobuf_err);
+        return make_error_code(utils::bep_error_code_t::protobuf_err);
     }
     return std::move(msg);
 }

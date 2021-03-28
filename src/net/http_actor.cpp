@@ -65,7 +65,7 @@ void http_actor_t::on_cancel(message::http_cancel_t &req) noexcept {
 
 void http_actor_t::process() noexcept {
     if (stop_io) {
-        auto ec = utils::make_error_code(utils::error_code::service_not_available);
+        auto ec = utils::make_error_code(utils::error_code_t::service_not_available);
         for (auto req : queue) {
             reply_with_error(*req, make_error(ec));
         }
@@ -129,7 +129,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup, {}};
     transport = transport::initiate_http(cfg);
     if (!transport) {
-        auto ec = utils::make_error_code(utils::error_code::transport_not_available);
+        auto ec = utils::make_error_code(utils::error_code_t::transport_not_available);
         reply_with_error(*queue.front(), make_error(ec));
         queue.pop_front();
         need_response = false;

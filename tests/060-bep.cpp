@@ -134,7 +134,7 @@ TEST_CASE("cluster config", "[bep]") {
         auto buff = boost::asio::buffer(buff_raw, buff_sz);
         auto r = parse_bep(buff);
         REQUIRE(!r);
-        CHECK(r.error() == utils::make_error_code(utils::bep_error_code::lz4_decoding));
+        CHECK(r.error() == utils::make_error_code(utils::bep_error_code_t::lz4_decoding));
     }
 
     SECTION("serialize, round-trip") {

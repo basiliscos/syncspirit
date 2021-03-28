@@ -62,7 +62,7 @@ outcome::result<URI> make_discovery_request(fmt::memory_buffer &buff, const URI 
 outcome::result<std::uint32_t> parse_announce(http::response<http::string_body> &res) noexcept {
     auto code = res.result_int();
     if (code != 204 && code != 429) {
-        auto ec = make_error_code(error_code::unexpected_response_code);
+        auto ec = make_error_code(error_code_t::unexpected_response_code);
         return ec;
     }
 
@@ -83,7 +83,7 @@ outcome::result<std::uint32_t> parse_announce(http::response<http::string_body> 
         reannounce = convert(res.find("Retry-After"));
     }
     if (reannounce < 1) {
-        auto ec = make_error_code(error_code::negative_reannounce_interval);
+        auto ec = make_error_code(error_code_t::negative_reannounce_interval);
         return ec;
     }
     return static_cast<std::uint32_t>(reannounce);
@@ -95,28 +95,28 @@ outcome::result<model::peer_contact_option_t> parse_contact(http::response<http:
         return model::peer_contact_option_t{};
     };
     if (code != 200) {
-        return make_error_code(error_code::unexpected_response_code);
+        return make_error_code(error_code_t::unexpected_response_code);
     };
 
     auto &body = res.body();
     auto ptr = body.data();
     auto data = json::parse(ptr, ptr + body.size(), nullptr, false);
     if (data.is_discarded()) {
-        return make_error_code(error_code::malformed_json);
+        return make_error_code(error_code_t::malformed_json);
     }
     if (!data.is_object()) {
-        return make_error_code(error_code::incorrect_json);
+        return make_error_code(error_code_t::incorrect_json);
     }
 
     auto &addresses = data["addresses"];
     if (!addresses.is_array()) {
-        return make_error_code(error_code::incorrect_json);
+        return make_error_code(error_code_t::incorrect_json);
     }
 
     uri_container_t urls;
     for (auto &it : addresses) {
         if (!it.is_string()) {
-            return make_error_code(error_code::incorrect_json);
+            return make_error_code(error_code_t::incorrect_json);
         }
         auto uri_str = it.get<std::string>();
         auto uri_option = utils::parse(uri_str.c_str());
@@ -126,18 +126,18 @@ outcome::result<model::peer_contact_option_t> parse_contact(http::response<http:
         urls.emplace_back(std::move(uri_option.value()));
     }
     if (urls.empty()) {
-        return make_error_code(error_code::malformed_url);
+        return make_error_code(error_code_t::malformed_url);
     }
 
     auto &seen = data["seen"];
     if (!seen.is_string()) {
-        return make_error_code(error_code::incorrect_json);
+        return make_error_code(error_code_t::incorrect_json);
     }
     try {
         auto date = boost::posix_time::from_iso_extended_string(seen.get<std::string>());
         return model::peer_contact_t{std::move(date), std::move(urls)};
     } catch (...) {
-        return make_error_code(error_code::malformed_date);
+        return make_error_code(error_code_t::malformed_date);
     }
 }
 

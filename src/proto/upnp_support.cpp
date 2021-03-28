@@ -67,29 +67,29 @@ outcome::result<discovery_result> parse(const char *data, std::size_t bytes) noe
     }
 
     if (!parser.is_done()) {
-        return error_code::incomplete_discovery_reply;
+        return error_code_t::incomplete_discovery_reply;
     }
 
     auto &message = parser.get();
     auto it_location = message.find(http::field::location);
     if (it_location == message.end()) {
-        return error_code::no_location;
+        return error_code_t::no_location;
     }
     auto location_option = utils::parse(it_location->value());
 
     auto it_st = message.find(upnp_fields::st);
     if (it_st == message.end()) {
-        return error_code::no_st;
+        return error_code_t::no_st;
     }
 
     auto it_usn = message.find(upnp_fields::usn);
     if (it_usn == message.end()) {
-        return error_code::no_usn;
+        return error_code_t::no_usn;
     }
 
     auto st = it_st->value();
     if (st != igd_v1_st_v) {
-        return error_code::igd_mismatch;
+        return error_code_t::igd_mismatch;
     }
 
     auto usn = it_usn->value();
@@ -114,11 +114,11 @@ outcome::result<igd_result> parse_igd(const char *data, std::size_t bytes) noexc
     pugi::xml_document doc;
     auto result = doc.load_buffer(data, bytes);
     if (!result) {
-        return error_code::xml_parse_error;
+        return error_code_t::xml_parse_error;
     }
     auto node = doc.select_node(igd_wan_xpath);
     if (!node) {
-        return error_code::wan_notfound;
+        return error_code_t::wan_notfound;
     }
 
     auto control_url = node.node().child_value("controlURL");
@@ -126,7 +126,7 @@ outcome::result<igd_result> parse_igd(const char *data, std::size_t bytes) noexc
     if (control_url && description_url) {
         return igd_result{control_url, description_url};
     }
-    return error_code::wan_notfound;
+    return error_code_t::wan_notfound;
 }
 
 outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const URI &uri) noexcept {
@@ -155,11 +155,11 @@ outcome::result<std::string> parse_external_ip(const char *data, std::size_t byt
     pugi::xml_document doc;
     auto result = doc.load_buffer(data, bytes);
     if (!result) {
-        return error_code::xml_parse_error;
+        return error_code_t::xml_parse_error;
     }
     auto node = doc.select_node(external_ip_xpath);
     if (!node) {
-        return error_code::xml_parse_error;
+        return error_code_t::xml_parse_error;
     }
 
     return node.node().child_value();
@@ -230,7 +230,7 @@ outcome::result<bool> parse_mapping(const char *data, std::size_t bytes) noexcep
     pugi::xml_document doc;
     auto result = doc.load_buffer(data, bytes);
     if (!result) {
-        return error_code::xml_parse_error;
+        return error_code_t::xml_parse_error;
     }
     auto node = doc.select_node(port_mapping_succes_xpath);
     return static_cast<bool>(node);
@@ -240,7 +240,7 @@ outcome::result<bool> parse_unmapping(const char *data, std::size_t bytes) noexc
     pugi::xml_document doc;
     auto result = doc.load_buffer(data, bytes);
     if (!result) {
-        return error_code::xml_parse_error;
+        return error_code_t::xml_parse_error;
     }
     auto node = doc.select_node(port_unmapping_succes_xpath);
     return static_cast<bool>(node);

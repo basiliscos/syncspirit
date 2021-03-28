@@ -124,6 +124,7 @@ std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept 
         pd.set_introducer(d.introducer);
         pd.set_skip_introduction_removals(d.skip_introduction_removals);
         *r.add_devices() = pd;
+        spdlog::trace("folder_t::get, folder = {}, device = {}, max_seq = {}", _label, d.device_id, max_seq);
     }
     return r;
 }
@@ -160,4 +161,16 @@ void folder_t::update(const proto::Folder &remote) noexcept {
             }
         }
     }
+}
+
+folder_info_ptr_t folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept {
+    folder_info_t *folder_info = nullptr;
+    for (auto it : folder_infos) {
+        auto &fi = it.second;
+        if (*fi->get_device() == *peer) {
+            folder_info = it.second.get();
+        }
+    }
+    bool updated = folder_info->update(data);
+    return updated ? folder_info : nullptr;
 }

@@ -120,7 +120,7 @@ outcome::result<std::string> base32::decode(const std::string_view &input) noexc
         std::uint32_t in_value = static_cast<std::uint32_t>(in_byte);
         auto quartet = out_alphabet[in_value];
         if (quartet == -1) {
-            return error_code::base32_decoding_failure;
+            return error_code_t::base32_decoding_failure;
         }
         out = out | static_cast<std::uint32_t>(quartet);
         out_bits += 5;

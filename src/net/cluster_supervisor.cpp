@@ -14,7 +14,7 @@ cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
 
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     ra::supervisor_asio_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::cluster, true); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::cluster, false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::cluster, get_address());
         p.discover_name(names::coordinator, coordinator, false).link(false);
@@ -37,11 +37,14 @@ void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     spdlog::trace("{}, on_child_shutdown", identity);
     ra::supervisor_asio_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
-    if (state == r::state_t::OPERATIONAL && reason->ec != r::shutdown_code_t::normal) {
-        spdlog::debug("{}, on_child_shutdown, child {} abnormal termination: {}, will shut self down", identity,
-                      actor->get_identity(), reason->message());
-        auto error = r::make_error(identity, r::error_code_t::failure_escalation, reason);
-        do_shutdown(error);
+    if (state == r::state_t::OPERATIONAL) {
+        spdlog::debug("{}, on_child_shutdown, child {} termination: {}", identity, actor->get_identity(),
+                      reason->message());
+        auto &addr = actor->get_address();
+        auto it = addr2device_map.find(addr);
+        auto it_r = device2addr_map.find(it->second);
+        addr2device_map.erase(it);
+        device2addr_map.erase(it_r);
     }
 }
 
@@ -90,14 +93,17 @@ void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexce
                     .cluster(cluster)
                     .finish()
                     ->get_address();
-    controller_map.emplace(peer->device_id.get_sha256(), std::move(addr));
+    auto &id = peer->device_id.get_sha256();
+    device2addr_map.emplace(id, addr);
+    addr2device_map.emplace(addr, id);
 }
 
 void cluster_supervisor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
     auto &device_id = message.payload.peer_device_id;
-    auto it = controller_map.find(device_id.get_sha256());
-    if (it != controller_map.end()) {
-        send<payload::stop_sync_t>(it->second);
-        controller_map.erase(it);
+    auto it = device2addr_map.find(device_id.get_sha256());
+    if (it != device2addr_map.end()) {
+        device2addr_map.erase(it);
+        auto it_r = addr2device_map.find(it->second);
+        addr2device_map.erase(it_r);
     }
 }

@@ -16,6 +16,7 @@ struct file_info_t : arc_base_t<file_info_t> {
     bool operator==(const file_info_t &other) const noexcept { return other.db_key == db_key; }
 
     db::FileInfo serialize() noexcept;
+    bool update(const db::FileInfo &db_info) noexcept;
 
     inline const std::string &get_db_key() const noexcept { return db_key; }
 

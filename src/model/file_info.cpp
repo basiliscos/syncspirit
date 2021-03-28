@@ -33,4 +33,6 @@ db::FileInfo file_info_t::serialize() noexcept {
     return r;
 }
 
+bool file_info_t::update(const db::FileInfo &db_info) noexcept { std::abort(); }
+
 } // namespace syncspirit::model

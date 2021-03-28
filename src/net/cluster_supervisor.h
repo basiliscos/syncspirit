@@ -56,7 +56,8 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     void on_start() noexcept override;
 
   private:
-    using controller_map_t = std::unordered_map<std::string, r::address_ptr_t>; // device_id: controller
+    using device2addr_map_t = std::unordered_map<std::string, r::address_ptr_t>; // device_id: controller
+    using addr2device_map_t = std::unordered_map<r::address_ptr_t, std::string>; // reverse
     using create_folder_req_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
 
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
@@ -71,7 +72,8 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     model::devices_map_t *devices;
     model::folders_map_t folders;
     model::ignored_folders_map_t *ignored_folders;
-    controller_map_t controller_map;
+    device2addr_map_t device2addr_map;
+    addr2device_map_t addr2device_map;
     create_folder_req_t create_folder_req;
 };
 

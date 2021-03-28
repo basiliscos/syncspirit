@@ -1,5 +1,6 @@
 #include "folder_info.h"
 #include "folder.h"
+#include "../db/utils.h"
 
 namespace syncspirit::model {
 
@@ -31,6 +32,23 @@ void folder_info_t::add(file_info_ptr_t &file_info) noexcept {
             declared_max_sequence = max_sequence;
         }
     }
+}
+
+bool folder_info_t::update(const proto::Index &data) noexcept {
+    bool updated = false;
+    for (int i = 0; i < data.files_size(); ++i) {
+        auto &file = data.files(i);
+        auto fi = file_infos.by_key(file.name());
+        auto db_info = db::convert(file);
+        if (fi) {
+            updated |= fi->update(db_info);
+        } else {
+            auto file_info = file_info_ptr_t(new file_info_t(db_info, this));
+            add(file_info);
+            updated = true;
+        }
+    }
+    return updated;
 }
 
 } // namespace syncspirit::model

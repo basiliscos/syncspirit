@@ -33,6 +33,7 @@ struct folder_t : arc_base_t<folder_t> {
     inline void set_db_key(std::uint64_t value) noexcept { db_key = value; }
     inline auto &get_folder_infos() noexcept { return folder_infos; }
     void update(const proto::Folder &remote) noexcept;
+    folder_info_ptr_t update(const proto::Index &data, const device_ptr_t &peer) noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;

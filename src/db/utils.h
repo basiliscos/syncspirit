@@ -36,5 +36,7 @@ outcome::result<model::ignored_devices_map_t> load_ignored_devices(transaction_t
 outcome::result<void> store_ignored_folder(model::ignored_folder_ptr_t &info, transaction_t &txn) noexcept;
 outcome::result<model::ignored_folders_map_t> load_ignored_folders(transaction_t &txn) noexcept;
 
+db::FileInfo convert(const proto::FileInfo &file_info) noexcept;
+
 } // namespace db
 } // namespace syncspirit

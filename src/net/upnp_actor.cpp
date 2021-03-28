@@ -89,7 +89,7 @@ void upnp_actor_t::on_endpoint(message::endpoint_response_t &res) noexcept {
     resources->release(resource::req_acceptor);
     auto &ee = res.payload.ee;
     if (ee) {
-        auto inner = utils::make_error_code(utils::error_code::endpoint_failed);
+        auto inner = utils::make_error_code(utils::error_code_t::endpoint_failed);
         spdlog::warn("{}, on_endpoint, cannot get acceptor endpoint :: {}", identity, ee->message());
         return do_shutdown(make_error(inner, ee));
     }
@@ -103,7 +103,7 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
 
     auto &ee = msg.payload.ee;
     if (ee) {
-        auto inner = utils::make_error_code(utils::error_code::igd_description_failed);
+        auto inner = utils::make_error_code(utils::error_code_t::igd_description_failed);
         spdlog::warn("{}, get IGD description: {}", identity, ee->message());
         return do_shutdown(make_error(inner, ee));
     }
@@ -128,7 +128,7 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
     auto url_option = utils::parse(control_url.c_str());
     if (!url_option) {
         spdlog::error("{}, can't parse IGD url {}", identity, control_url);
-        auto ec = utils::make_error_code(utils::error_code::unparseable_control_url);
+        auto ec = utils::make_error_code(utils::error_code_t::unparseable_control_url);
         return do_shutdown(make_error(ec));
     }
     igd_control_url = url_option.value();
@@ -150,7 +150,7 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
     auto &ee = msg.payload.ee;
     if (ee) {
         spdlog::warn("{}, get external IP address: {}", identity, ee->message());
-        auto inner = utils::make_error_code(utils::error_code::external_ip_failed);
+        auto inner = utils::make_error_code(utils::error_code_t::external_ip_failed);
         return do_shutdown(make_error(inner, ee));
     }
     auto &body = msg.payload.res->response.body();

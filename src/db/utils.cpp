@@ -359,4 +359,22 @@ outcome::result<model::ignored_folders_map_t> load_ignored_folders(transaction_t
     return load<model::ignored_folder_t>(std::move(instantiator), txn);
 }
 
+db::FileInfo convert(const proto::FileInfo &file_info) noexcept {
+    db::FileInfo r;
+    r.set_name(file_info.name());
+    r.set_type(file_info.type());
+    r.set_size(file_info.size());
+    r.set_permissions(file_info.permissions());
+    r.set_modified_s(file_info.modified_s());
+    r.set_modified_ns(file_info.modified_ns());
+    r.set_modified_by(file_info.modified_by());
+    r.set_deleted(file_info.deleted());
+    r.set_no_permissions(file_info.no_permissions());
+    r.set_sequence(file_info.sequence());
+    r.set_block_size(file_info.block_size());
+    r.set_symlink_target(file_info.symlink_target());
+    *r.mutable_version() = file_info.version();
+    return r;
+}
+
 } // namespace syncspirit::db

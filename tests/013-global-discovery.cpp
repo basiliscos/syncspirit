@@ -49,31 +49,31 @@ TEST_CASE("malformed url", "[support]") {
     SECTION("malformed url") {
         res.body() = R""( {"seen":"2020-10-13T18:41:37.02287354Z", "addresses":["q uic://192.168.100.15:22000" ]})"";
         auto r = parse_contact(res);
-        CHECK(r.error() == make_error_code(error_code::malformed_url));
+        CHECK(r.error() == make_error_code(error_code_t::malformed_url));
     }
 
     SECTION("malformed json") {
         res.body() = R""( {"seen":"2020-10-13T18:41:37.02287354Z" "addresses":["qic://192.168.100.15:22000" ]})"";
         auto r = parse_contact(res);
-        CHECK(r.error() == make_error_code(error_code::malformed_json));
+        CHECK(r.error() == make_error_code(error_code_t::malformed_json));
     }
 
     SECTION("incorrect json") {
         res.body() = R""( {"seen":"2020-10-13T18:41:37.02287354Z", "Addresses":["quic://192.168.100.15:22000" ]})"";
         auto r = parse_contact(res);
-        CHECK(r.error() == make_error_code(error_code::incorrect_json));
+        CHECK(r.error() == make_error_code(error_code_t::incorrect_json));
     }
 
     SECTION("malformed date") {
         res.body() = R""( {"seen":"2020-99-13T18:41:37.02287354Z", "addresses":["qic://192.168.100.15:22000" ]})"";
         auto r = parse_contact(res);
-        CHECK(r.error() == make_error_code(error_code::malformed_date));
+        CHECK(r.error() == make_error_code(error_code_t::malformed_date));
     }
 
     SECTION("wrong code") {
         res.result(500);
         auto r = parse_contact(res);
-        CHECK(r.error() == make_error_code(error_code::unexpected_response_code));
+        CHECK(r.error() == make_error_code(error_code_t::unexpected_response_code));
     }
 
     SECTION("not found") {

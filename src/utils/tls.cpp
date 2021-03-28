@@ -33,12 +33,12 @@ template <typename Key, typename Fn> static outcome::result<std::string> as_der_
     BIO *bio = BIO_new(BIO_s_mem());
     auto bio_guard = make_guard(bio, [](auto *ptr) { BIO_free(ptr); });
     if (fn(bio, cert) < 0) {
-        return error_code::tls_cert_save_failure;
+        return error_code_t::tls_cert_save_failure;
     }
     char *cert_buff;
     auto cert_sz = BIO_get_mem_data(bio, &cert_buff);
     if (cert_sz < 0) {
-        return error_code::tls_cert_save_failure;
+        return error_code_t::tls_cert_save_failure;
     }
     std::string cert_container(static_cast<std::size_t>(cert_sz), 0);
     std::memcpy(cert_container.data(), cert_buff, cert_container.size());
@@ -60,21 +60,21 @@ outcome::result<std::string> as_serialized_der(X509 *cert) noexcept { return as_
 outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     auto ev_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);
     if (ev_ctx == nullptr) {
-        return error_code::tls_context_init_failure;
+        return error_code_t::tls_context_init_failure;
     }
     auto ev_ctx_guard = make_guard(ev_ctx, [](auto *ptr) { EVP_PKEY_CTX_free(ptr); });
 
     if (1 != EVP_PKEY_paramgen_init(ev_ctx)) {
-        return error_code::tls_param_init_failure;
+        return error_code_t::tls_param_init_failure;
     }
 
     if (1 != EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ev_ctx, NID_secp384r1)) {
-        return error_code::tls_ec_curve_failure;
+        return error_code_t::tls_ec_curve_failure;
     }
 
     EVP_PKEY *params = nullptr;
     if (!EVP_PKEY_paramgen(ev_ctx, &params)) {
-        return error_code::tls_param_gen_failure;
+        return error_code_t::tls_param_gen_failure;
     }
     auto params_guard = make_guard(params, [](auto *ptr) { EVP_PKEY_free(ptr); });
 
@@ -82,19 +82,19 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     auto key_ctx_guard = make_guard(key_ctx, [](auto *ptr) { EVP_PKEY_CTX_free(ptr); });
     /* Generate the key */
     if (1 != EVP_PKEY_keygen_init(key_ctx)) {
-        return error_code::tls_key_gen_init_failure;
+        return error_code_t::tls_key_gen_init_failure;
     }
 
     EVP_PKEY *pkey = nullptr;
     if (1 != EVP_PKEY_keygen(key_ctx, &pkey)) {
-        return error_code::tls_key_gen_failure;
+        return error_code_t::tls_key_gen_failure;
     }
     auto pkey_quard = make_guard(pkey, [](auto *ptr) { EVP_PKEY_free(ptr); });
 
     EC_GROUP *group = EC_GROUP_new_by_curve_name(NID_secp384r1);
     EC_GROUP_set_asn1_flag(group, OPENSSL_EC_NAMED_CURVE);
     if (group == nullptr) {
-        return error_code::tls_ec_group_failure;
+        return error_code_t::tls_ec_group_failure;
     }
     auto group_guard = make_guard(group, [](auto *ptr) { EC_GROUP_free(ptr); });
 
@@ -115,28 +115,28 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     long end_epoch = 2524568399;
 
     if (1 != X509_set_version(cert, version)) {
-        return error_code::tls_cert_set_failure;
+        return error_code_t::tls_cert_set_failure;
     }
 
     if (-1 == ASN1_INTEGER_set(X509_get_serialNumber(cert), serial)) {
-        return error_code::tls_cert_set_failure;
+        return error_code_t::tls_cert_set_failure;
     }
 
     X509_gmtime_adj(X509_get_notBefore(cert), start_epoch);
     X509_gmtime_adj(X509_get_notAfter(cert), end_epoch);
 
     if (1 != X509_set_pubkey(cert, pkey)) {
-        return error_code::tls_cert_set_failure;
+        return error_code_t::tls_cert_set_failure;
     }
 
     auto name = X509_get_subject_name(cert);
     if (1 != X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, reinterpret_cast<const unsigned char *>(issuer_name),
                                         -1, -1, 0)) {
-        return error_code::tls_cert_set_failure;
+        return error_code_t::tls_cert_set_failure;
     }
 
     if (1 != X509_set_issuer_name(cert, name)) {
-        return error_code::tls_cert_set_failure;
+        return error_code_t::tls_cert_set_failure;
     }
 
     X509V3_CTX ctx;
@@ -144,20 +144,20 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     X509V3_set_ctx(&ctx, cert, cert, nullptr, nullptr, 0);
 
     if (!add_extension(ctx, cert, NID_basic_constraints, "critical, CA:false")) {
-        return error_code::tls_cert_ext_failure;
+        return error_code_t::tls_cert_ext_failure;
     }
 
     if (!add_extension(ctx, cert, NID_key_usage, "critical, Digital Signature, Key Encipherment")) {
-        return error_code::tls_cert_ext_failure;
+        return error_code_t::tls_cert_ext_failure;
     }
 
     if (!add_extension(ctx, cert, NID_ext_key_usage, "TLS Web Server Authentication, TLS Web Client Authentication")) {
-        return error_code::tls_cert_ext_failure;
+        return error_code_t::tls_cert_ext_failure;
     }
 
     auto bytes = X509_sign(cert, pkey, EVP_sha256());
     if (!bytes) {
-        return error_code::tls_cert_sign_failure;
+        return error_code_t::tls_cert_sign_failure;
     }
 
     auto cert_container = as_der(cert);
@@ -183,7 +183,7 @@ outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_k
         auto cert_file_guard = make_guard(cert_file, [](auto *ptr) { fclose(ptr); });
 
         if (1 != PEM_write_X509(cert_file, cert.get())) {
-            return error_code::tls_cert_save_failure;
+            return error_code_t::tls_cert_save_failure;
         }
     } while (0);
 
@@ -197,7 +197,7 @@ outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_k
         auto ec_key = EVP_PKEY_get1_EC_KEY(private_key.get());
         auto ec_key_guard = make_guard(ec_key, [](auto *ptr) { EC_KEY_free(ptr); });
         if (1 != PEM_write_ECPrivateKey(pk_file, ec_key, nullptr, nullptr, 0, nullptr, nullptr)) {
-            return error_code::tls_key_save_failure;
+            return error_code_t::tls_key_save_failure;
         }
     } while (0);
 
@@ -224,7 +224,7 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
     X509 *cert = X509_new();
     auto cert_guard = make_guard(cert, [](auto *ptr) { X509_free(ptr); });
     if (!PEM_read_X509(cert_file, &cert, nullptr, nullptr)) {
-        return error_code::tls_cert_load_failure;
+        return error_code_t::tls_cert_load_failure;
     }
 
     /* read private key */
@@ -236,7 +236,7 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
     EVP_PKEY *pkey = EVP_PKEY_new();
     auto pkey_quard = make_guard(pkey, [](auto *ptr) { EVP_PKEY_free(ptr); });
     if (!PEM_read_PrivateKey(pk_file, &pkey, nullptr, nullptr)) {
-        return error_code::tls_cert_load_failure;
+        return error_code_t::tls_cert_load_failure;
     }
 
     auto cert_container = as_der(cert);
@@ -257,11 +257,11 @@ outcome::result<std::string> sha256_digest(const std::string &data) noexcept {
     unsigned char buff[SHA256_DIGEST_LENGTH];
     SHA256_CTX sha256;
     if (1 != SHA256_Init(&sha256)) {
-        return error_code::tls_sha256_init_failure;
+        return error_code_t::tls_sha256_init_failure;
     }
 
     if (1 != SHA256_Update(&sha256, data.c_str(), data.size())) {
-        return error_code::tls_sha256_failure;
+        return error_code_t::tls_sha256_failure;
     }
 
     SHA256_Final(buff, &sha256);
@@ -274,7 +274,7 @@ outcome::result<std::string> get_common_name(X509 *cert) noexcept {
     char buff[256] = {};
     int r = X509_NAME_get_text_by_NID(name, NID_commonName, buff, 256);
     if (r == -1) {
-        return error_code::tls_cn_missing;
+        return error_code_t::tls_cn_missing;
     }
     return std::string(buff, r);
 }

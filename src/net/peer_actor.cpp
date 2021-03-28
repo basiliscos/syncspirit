@@ -18,6 +18,7 @@ r::plugin::resource_id_t io = 2;
 r::plugin::resource_id_t io_timer = 3;
 r::plugin::resource_id_t tx_timer = 4;
 r::plugin::resource_id_t rx_timer = 5;
+r::plugin::resource_id_t controller = 6;
 } // namespace resource
 } // namespace
 
@@ -62,6 +63,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&peer_actor_t::on_resolve);
         p.subscribe_actor(&peer_actor_t::on_auth);
         p.subscribe_actor(&peer_actor_t::on_start_reading);
+        p.subscribe_actor(&peer_actor_t::on_termination);
         instantiate_transport();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
@@ -100,7 +102,7 @@ void peer_actor_t::try_next_uri() noexcept {
 
     spdlog::trace("{}, try_next_uri, no way to conenct found, shut down", identity);
     resources->release(resource::uris);
-    auto ec = utils::make_error_code(utils::error_code::connection_impossible);
+    auto ec = utils::make_error_code(utils::error_code_t::connection_impossible);
     do_shutdown(make_error(ec));
 }
 
@@ -199,7 +201,7 @@ void peer_actor_t::on_handshake(bool valid_peer, X509 *cert, const tcp::endpoint
     resources->release(resource::io);
     if (!peer_device) {
         spdlog::warn("{}, on_handshake,  missing peer device id", identity);
-        auto ec = utils::make_error_code(utils::error_code::missing_device_id);
+        auto ec = utils::make_error_code(utils::error_code_t::missing_device_id);
         return do_shutdown(make_error(ec));
     }
 
@@ -211,7 +213,7 @@ void peer_actor_t::on_handshake(bool valid_peer, X509 *cert, const tcp::endpoint
     auto cert_name = utils::get_common_name(cert);
     if (!cert_name) {
         spdlog::warn("{}, on_handshake, can't get certificate name: {}", identity, cert_name.error().message());
-        auto ec = utils::make_error_code(utils::error_code::missing_cn);
+        auto ec = utils::make_error_code(utils::error_code_t::missing_cn);
         return do_shutdown(make_error(ec));
     }
     spdlog::trace("{}, on_handshake, valid = {}, issued by {}", identity, valid_peer, cert_name.value());
@@ -239,7 +241,7 @@ void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
 void peer_actor_t::read_more() noexcept {
     if (rx_idx >= rx_buff.size()) {
         spdlog::warn("{}, read_more, rx buffer limit reached, {}", identity, rx_buff.size());
-        auto ec = utils::make_error_code(utils::error_code::rx_limit_reached);
+        auto ec = utils::make_error_code(utils::error_code_t::rx_limit_reached);
         return do_shutdown(make_error(ec));
     }
 
@@ -256,8 +258,12 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
     assert(tx_item);
     if (tx_item->final) {
         spdlog::trace("{}, process_tx_queue, final message has been sent, shutting down", identity);
-        auto ec = r::make_error_code(r::shutdown_code_t::normal);
-        do_shutdown(make_error(ec));
+        if (resources->has(resource::controller)) {
+            resources->release(resource::controller);
+        } else {
+            auto ec = r::make_error_code(r::shutdown_code_t::normal);
+            do_shutdown(make_error(ec));
+        }
     } else {
         tx_item.reset();
         process_tx_queue();
@@ -312,6 +318,10 @@ void peer_actor_t::shutdown_start() noexcept {
     if (rx_timer_request) {
         r::actor_base_t::cancel_timer(*rx_timer_request);
     }
+    if (controller) {
+        // wait termination
+        resources->acquire(resource::controller);
+    }
 }
 
 void peer_actor_t::cancel_timer() noexcept {
@@ -327,7 +337,7 @@ void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
     spdlog::trace("{}, on_auth, value = {}", identity, ok);
     if (!ok) {
         spdlog::debug("{}, on_auth, peer has been rejected in authorization, disconnecting");
-        auto ec = utils::make_error_code(utils::error_code::non_authorized);
+        auto ec = utils::make_error_code(utils::error_code_t::non_authorized);
         return do_shutdown(make_error(ec));
     }
 
@@ -357,6 +367,17 @@ void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept 
     read_more();
 }
 
+void peer_actor_t::on_termination(message::termination_signal_t &message) noexcept {
+    auto reason = message.payload.ee->message();
+    spdlog::trace("{}, on_termination: {}", identity, reason);
+    fmt::memory_buffer buff;
+    proto::Close close;
+    close.set_reason(reason);
+    proto::serialize(buff, close);
+    push_write(std::move(buff), true);
+    controller.reset();
+}
+
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
     spdlog::trace("{}, read_hello", identity);
     std::visit(
@@ -370,7 +391,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
                     .send(init_timeout / 2);
             } else {
                 spdlog::warn("{}, hello, unexpected_message", identity);
-                auto ec = utils::make_error_code(utils::bep_error_code::unexpected_message);
+                auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 do_shutdown(make_error(ec));
             }
         },
@@ -390,7 +411,7 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
                 reset_rx_timer();
             } else {
                 spdlog::warn("{}, read_cluster_config: unexpected_message", identity);
-                auto ec = utils::make_error_code(utils::bep_error_code::unexpected_message);
+                auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 do_shutdown(make_error(ec));
             }
         },
@@ -407,7 +428,7 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
             const constexpr bool unexpected = std::is_same_v<T, m::Hello> || std::is_same_v<T, m::ClusterConfig>;
             if constexpr (unexpected) {
                 spdlog::warn("{}, hello, unexpected_message", identity);
-                auto ec = utils::make_error_code(utils::bep_error_code::unexpected_message);
+                auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 do_shutdown(make_error(ec));
             } else if constexpr (std::is_same_v<T, m::Ping>) {
                 handle_ping(std::move(msg));
@@ -473,7 +494,7 @@ void peer_actor_t::on_rx_timeout(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::rx_timer);
     rx_timer_request.reset();
     if (!cancelled) {
-        auto ec = utils::make_error_code(utils::error_code::rx_timeout);
+        auto ec = utils::make_error_code(utils::error_code_t::rx_timeout);
         auto reason = make_error(ec);
         do_shutdown(reason);
     }

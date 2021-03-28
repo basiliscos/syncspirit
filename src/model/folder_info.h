@@ -28,7 +28,9 @@ struct folder_info_t : arc_base_t<folder_info_t> {
     inline folder_t *get_folder() const noexcept { return folder; }
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
     inline std::int64_t get_declared_max_sequence() const noexcept { return declared_max_sequence; }
+    inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
     void update_declared_max_sequence(std::int64_t value) noexcept { declared_max_sequence = value; }
+    bool update(const proto::Index &data) noexcept;
 
   private:
     std::uint64_t index;

@@ -99,6 +99,7 @@ struct peer_actor_t : public r::actor_base_t {
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_auth(message::auth_response_t &res) noexcept;
     void on_start_reading(message::start_reading_t &) noexcept;
+    void on_termination(message::termination_signal_t &) noexcept;
 
     void on_connect(resolve_it_t) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;

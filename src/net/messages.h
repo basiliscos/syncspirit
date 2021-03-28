@@ -226,15 +226,12 @@ struct load_cluster_request_t {
     using response_t = load_cluster_response_t;
 };
 
-struct start_sync_t {
-    model::device_ptr_t device;
-    r::address_ptr_t peer;
-};
-
-struct stop_sync_t {};
-
 struct start_reading_t {
     r::address_ptr_t controller;
+};
+
+struct termination_t {
+    r::extended_error_ptr_t ee;
 };
 
 using forwarded_message_t = std::variant<proto::message::Index, proto::message::IndexUpdate, proto::message::Request,
@@ -283,6 +280,13 @@ struct store_new_folder_request_t {
     db::Folder folder;
     model::device_ptr_t source;
     std::int64_t source_index;
+};
+
+struct store_folder_info_response_t {};
+
+struct store_folder_info_request_t {
+    using response_t = store_folder_info_response_t;
+    model::folder_info_ptr_t folder_info;
 };
 
 } // end of namespace payload
@@ -334,13 +338,15 @@ using store_new_folder_response_t = r::request_traits_t<payload::store_new_folde
 using store_device_request_t = r::request_traits_t<payload::store_device_request_t>::request::message_t;
 using store_device_response_t = r::request_traits_t<payload::store_device_request_t>::response::message_t;
 
+using store_folder_info_request_t = r::request_traits_t<payload::store_folder_info_request_t>::request::message_t;
+using store_folder_info_response_t = r::request_traits_t<payload::store_folder_info_request_t>::response::message_t;
+
 using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
 
-using start_sync_t = r::message_t<payload::start_sync_t>;
-using stop_sync_t = r::message_t<payload::stop_sync_t>;
 using start_reading_t = r::message_t<payload::start_reading_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
+using termination_signal_t = r::message_t<payload::termination_t>;
 
 using add_device_t = r::message_t<payload::add_device_t>;
 using update_device_t = r::message_t<payload::update_device_t>;

@@ -30,7 +30,7 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     spdlog::trace("{}, on_child_shutdown, {} due to {} ", identity, actor->get_identity(), reason->message());
     auto it_req = addr2req.find(peer_addr);
     if (it_req != addr2req.end()) {
-        auto inner = utils::make_error_code(utils::error_code::cannot_connect_to_peer);
+        auto inner = utils::make_error_code(utils::error_code_t::cannot_connect_to_peer);
         reply_with_error(*it_req->second, make_error(inner, reason));
         addr2req.erase(it_req);
     } else {

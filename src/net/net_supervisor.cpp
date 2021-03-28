@@ -224,7 +224,7 @@ void net_supervisor_t::launch_ssdp() noexcept {
 void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &message) noexcept {
     if (!message.payload.success) {
         spdlog::debug("{}, on_port_mapping shutting down self, unsuccesful port mapping", identity);
-        auto ec = utils::make_error_code(utils::error_code::portmapping_failed);
+        auto ec = utils::make_error_code(utils::error_code_t::portmapping_failed);
         return do_shutdown(make_error(ec));
     }
 
@@ -267,7 +267,7 @@ void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message)
         auto &id = device_id.get_sha256();
         auto target_device = devices.by_id(id);
         if (target_device) {
-            if (!target_device->online) {
+            if (!target_device->is_online()) {
                 dial_peer(device_id, peer.uris);
             }
         } else {
@@ -359,7 +359,9 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
 void net_supervisor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
     auto &device_id = message.payload.peer_device_id;
     spdlog::info("{}, disconnected peer: {}", identity, device_id);
-    send<payload::disconnect_notify_t>(cluster_addr, device_id, message.payload.peer_addr);
+    if (cluster_addr) {
+        send<payload::disconnect_notify_t>(cluster_addr, device_id, message.payload.peer_addr);
+    }
 }
 
 void net_supervisor_t::on_connection(message::connection_notify_t &message) noexcept {
@@ -380,7 +382,7 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
         }
 
     } else {
-        if (device->online) {
+        if (device->is_online()) {
             spdlog::warn("{}, on_auth, {} requested authtorization, but there is already active connection?", identity,
                          device->device_id);
         } else {

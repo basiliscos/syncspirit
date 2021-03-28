@@ -24,7 +24,6 @@ struct device_t : arc_base_t<device_t> {
     bool auto_accept;
     bool paused;
     bool skip_introduction_removals;
-    bool online = false;
 
     bool operator==(const device_t &other) const noexcept { return other.device_id == device_id; }
     bool operator!=(const device_t &other) const noexcept { return other.device_id != device_id; }
@@ -32,12 +31,14 @@ struct device_t : arc_base_t<device_t> {
     db::Device serialize() noexcept;
     inline bool is_dynamic() const noexcept { return static_addresses.empty(); }
     void mark_online(bool value) noexcept;
+    inline bool is_online() const noexcept { return online; }
 
     virtual const std::string &get_id() const noexcept;
     inline std::uint64_t get_db_key() const noexcept { return db_key; }
     inline void set_db_key(std::uint64_t value) noexcept { db_key = value; }
 
   private:
+    bool online = false;
     std::uint64_t db_key;
 };
 

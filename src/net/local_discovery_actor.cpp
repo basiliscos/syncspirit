@@ -73,7 +73,7 @@ void local_discovery_actor_t::on_endpoint(message::endpoint_response_t &res) noe
     auto &ee = res.payload.ee;
     if (ee) {
         spdlog::warn("{}, on_endpoint, cannot get acceptor endpoint :: {}", identity, ee->message());
-        auto inner = utils::make_error_code(utils::error_code::endpoint_failed);
+        auto inner = utils::make_error_code(utils::error_code_t::endpoint_failed);
         return do_shutdown(make_error(inner, ee));
     }
     auto &ep = res.payload.res.local_endpoint;
