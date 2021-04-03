@@ -27,8 +27,20 @@ struct file_info_t : arc_base_t<file_info_t> {
 
   private:
     folder_info_t *folder_info;
-    std::string db_key; /* folder_info db key + name */
+    proto::FileInfoType type;
+    std::int64_t size;
+    std::uint32_t permissions;
+    std::int64_t modified_s;
+    std::uint32_t modified_ns;
+    std::uint64_t modified_by;
+    bool deleted;
+    bool invalid;
+    bool no_permissions;
+    proto::Vector version;
     std::int64_t sequence;
+    std::int32_t block_size;
+    std::string symlink_target;
+    std::string db_key; /* folder_info db key + name */
 };
 
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;

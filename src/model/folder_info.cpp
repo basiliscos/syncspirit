@@ -1,6 +1,7 @@
 #include "folder_info.h"
 #include "folder.h"
 #include "../db/utils.h"
+#include <spdlog.h>
 
 namespace syncspirit::model {
 
@@ -38,6 +39,9 @@ bool folder_info_t::update(const proto::Index &data) noexcept {
     bool updated = false;
     for (int i = 0; i < data.files_size(); ++i) {
         auto &file = data.files(i);
+        spdlog::trace("folder_info_t::update, folder = {}, device = {}, file = {}, seq = {}",
+                      folder->label(), device->device_id, file.name(), file.sequence());
+
         auto fi = file_infos.by_key(file.name());
         auto db_info = db::convert(file);
         if (fi) {

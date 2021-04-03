@@ -169,6 +169,7 @@ folder_info_ptr_t folder_t::update(const proto::Index &data, const device_ptr_t 
         auto &fi = it.second;
         if (*fi->get_device() == *peer) {
             folder_info = it.second.get();
+            break;
         }
     }
     bool updated = folder_info->update(data);

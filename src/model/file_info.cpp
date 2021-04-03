@@ -16,6 +16,19 @@ file_info_t::file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_)
 
     db_key = std::move(dbk);
     sequence = info_.sequence();
+
+    type = info_.type();
+    size = info_.size();
+    permissions = info_.permissions();
+    modified_s = info_.modified_s();
+    modified_ns = info_.modified_ns();
+    modified_by = info_.modified_by();
+    deleted = info_.deleted();
+    invalid = info_.invalid();
+    no_permissions = info_.no_permissions();
+    version = info_.version();
+    block_size = info_.block_size();
+    symlink_target = info_.symlink_target();
 }
 
 file_info_t::~file_info_t() {}
@@ -30,6 +43,19 @@ db::FileInfo file_info_t::serialize() noexcept {
     db::FileInfo r;
     auto name = get_name();
     r.set_name(name.data(), name.size());
+    r.set_sequence(sequence);
+    r.set_type(type);
+    r.set_size(size);
+    r.set_permissions(permissions);
+    r.set_modified_s(modified_s);
+    r.set_modified_ns(modified_ns);
+    r.set_modified_by(modified_by);
+    r.set_deleted(deleted);
+    r.set_invalid(invalid);
+    r.set_no_permissions(no_permissions);
+    *r.mutable_version() = version;
+    r.set_block_size(block_size);
+    r.set_symlink_target(symlink_target);
     return r;
 }
 
