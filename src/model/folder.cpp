@@ -1,4 +1,5 @@
 #include "folder.h"
+#include "../db/utils.h"
 #include <spdlog.h>
 
 using namespace syncspirit;
@@ -57,6 +58,9 @@ void folder_t::assing_self(index_id_t index, sequence_id_t max_sequence) noexcep
 #endif
 
 void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
+
+void folder_t::add(const file_info_ptr_t &file_info) noexcept { file_infos.put(file_info); }
+
 
 void folder_t::assign_device(model::device_ptr_t device_) noexcept { device = device_; }
 
@@ -139,7 +143,7 @@ int64_t folder_t::score(const device_ptr_t &peer_device) noexcept {
         if (d == *device) {
             my_seq = fi->get_max_sequence();
         } else if (d == *peer_device) {
-            peer_seq = fi->get_declared_max_sequence();
+            peer_seq = fi->get_max_sequence();
         }
         if (my_seq && peer_seq) {
             break;
@@ -157,21 +161,45 @@ void folder_t::update(const proto::Folder &remote) noexcept {
         for (auto it : folder_infos) {
             auto &fi = it.second;
             if (fi->get_device()->device_id.get_sha256() == d.id()) {
-                fi->update_declared_max_sequence(d.max_sequence());
+                auto max = d.max_sequence();
+                if (fi->get_max_sequence() < max) {
+                    fi->set_max_sequence(max);
+                }
             }
         }
     }
 }
 
-folder_info_ptr_t folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept {
-    folder_info_t *folder_info = nullptr;
-    for (auto it : folder_infos) {
-        auto &fi = it.second;
-        if (*fi->get_device() == *peer) {
-            folder_info = it.second.get();
-            break;
+bool folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept {
+
+    bool updated = false;
+    for (int i = 0; i < data.files_size(); ++i) {
+        auto &file = data.files(i);
+        spdlog::trace("folder_info_t::update, folder = {}, device = {}, file = {}, seq = {}",
+                      label(), device->device_id, file.name(), file.sequence());
+
+        auto fi = file_infos.by_key(file.name());
+        auto db_info = db::convert(file);
+        if (fi) {
+            updated |= fi->update(db_info);
+        } else {
+            auto file_info = file_info_ptr_t(new file_info_t(db_info, this));
+            add(file_info);
+            updated = true;
         }
     }
-    bool updated = folder_info->update(data);
-    return updated ? folder_info : nullptr;
+    return updated;
 }
+
+/*
+void folder_info_t::add(file_info_ptr_t &file_info) noexcept {
+    file_infos.put(file_info);
+    auto seq = file_info->get_sequence();
+    if (max_sequence < seq) {
+        max_sequence = seq;
+        if (declared_max_sequence < max_sequence) {
+            declared_max_sequence = max_sequence;
+        }
+    }
+}
+*/

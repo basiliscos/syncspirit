@@ -42,7 +42,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&db_actor_t::on_store_device);
         p.subscribe_actor(&db_actor_t::on_store_ignored_folder);
         p.subscribe_actor(&db_actor_t::on_store_new_folder);
-        p.subscribe_actor(&db_actor_t::on_store_folder_info);
+        p.subscribe_actor(&db_actor_t::on_store_folder);
     });
 }
 
@@ -173,7 +173,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
     }
     auto folder_infos = folder_infos_opt.value();
 
-    auto file_infos_opt = db::load_file_infos(folder_infos, txn);
+    auto file_infos_opt = db::load_file_infos(folders, txn);
     if (!file_infos_opt) {
         return reply_with_error(message, make_error(file_infos_opt.error()));
     }
@@ -182,12 +182,16 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
     // correctly link
     for (auto &it : file_infos) {
         auto &fi = it.second;
-        fi->get_folder_info()->add(fi);
+        auto folder = fi->get_folder();
+        spdlog::trace("{}, on_cluster_load: {}/{}, seq = {}", identity, folder->label(), fi->get_name(), fi->get_sequence());
+        folder->add(fi);
     }
 
     for (auto &it : folder_infos) {
         auto &fi = it.second;
-        fi->get_folder()->add(fi);
+        auto folder = fi->get_folder();
+        spdlog::trace("{}, on_cluster_load: {} on {}, max seq = {}", identity, folder->label(), fi->get_device()->device_id, fi->get_max_sequence());
+        folder->add(fi);
     }
 
     if (auto my_d = devices.by_id(device->get_id()); !my_d) {
@@ -328,20 +332,28 @@ void db_actor_t::on_store_new_folder(message::store_new_folder_request_t &messag
     reply_to(message, std::move(folder));
 }
 
-void db_actor_t::on_store_folder_info(message::store_folder_info_request_t &message) noexcept {
+void db_actor_t::on_store_folder(message::store_folder_request_t &message) noexcept {
     auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
     if (!txn_opt) {
         return reply_with_error(message, make_error(txn_opt.error()));
     }
     auto &txn = txn_opt.value();
-    auto &fi = message.payload.request_payload.folder_info;
-    auto r = db::store_folder_info(fi, txn);
+    auto &folder = message.payload.request_payload.folder;
+    auto r = db::store_folder(folder, txn);
     if (!r) {
         reply_with_error(message, make_error(r.error()));
         return;
     }
 
-    for (auto &it : fi->get_file_infos()) {
+    for (auto &it : folder->get_folder_infos()) {
+        r = db::store_folder_info(it.second, txn);
+        if (!r) {
+            reply_with_error(message, make_error(r.error()));
+            return;
+        }
+    }
+
+    for (auto &it : folder->get_file_infos()) {
         r = db::store_file_info(it.second, txn);
         if (!r) {
             reply_with_error(message, make_error(r.error()));

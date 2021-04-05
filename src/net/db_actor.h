@@ -46,7 +46,7 @@ struct db_actor_t : public r::actor_base_t {
     void on_store_device(message::store_device_request_t &message) noexcept;
     void on_store_ignored_folder(message::store_ignored_folder_request_t &message) noexcept;
     void on_store_new_folder(message::store_new_folder_request_t &message) noexcept;
-    void on_store_folder_info(message::store_folder_info_request_t &message) noexcept;
+    void on_store_folder(message::store_folder_request_t &message) noexcept;
 
     void open() noexcept;
     std::random_device rd;

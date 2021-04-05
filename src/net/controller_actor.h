@@ -54,7 +54,7 @@ struct controller_actor_t : public r::actor_base_t {
   private:
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     void on_forward(message::forwarded_message_t &message) noexcept;
-    void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
+    void on_store_folder(message::store_folder_response_t &message) noexcept;
 
     void on_message(proto::message::Index &message) noexcept;
     void on_message(proto::message::IndexUpdate &message) noexcept;

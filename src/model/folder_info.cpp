@@ -1,6 +1,5 @@
 #include "folder_info.h"
 #include "folder.h"
-#include "../db/utils.h"
 #include <spdlog.h>
 
 namespace syncspirit::model {
@@ -22,37 +21,6 @@ db::FolderInfo folder_info_t::serialize() noexcept {
     r.set_device_key(device_key);
     r.set_folder_key(folder_key);
     return r;
-}
-
-void folder_info_t::add(file_info_ptr_t &file_info) noexcept {
-    file_infos.put(file_info);
-    auto seq = file_info->get_sequence();
-    if (max_sequence < seq) {
-        max_sequence = seq;
-        if (declared_max_sequence < max_sequence) {
-            declared_max_sequence = max_sequence;
-        }
-    }
-}
-
-bool folder_info_t::update(const proto::Index &data) noexcept {
-    bool updated = false;
-    for (int i = 0; i < data.files_size(); ++i) {
-        auto &file = data.files(i);
-        spdlog::trace("folder_info_t::update, folder = {}, device = {}, file = {}, seq = {}",
-                      folder->label(), device->device_id, file.name(), file.sequence());
-
-        auto fi = file_infos.by_key(file.name());
-        auto db_info = db::convert(file);
-        if (fi) {
-            updated |= fi->update(db_info);
-        } else {
-            auto file_info = file_info_ptr_t(new file_info_t(db_info, this));
-            add(file_info);
-            updated = true;
-        }
-    }
-    return updated;
 }
 
 } // namespace syncspirit::model

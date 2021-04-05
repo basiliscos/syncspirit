@@ -30,7 +30,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(peer_addr, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
-        p.subscribe_actor(&controller_actor_t::on_store_folder_info);
+        p.subscribe_actor(&controller_actor_t::on_store_folder);
     });
 }
 
@@ -69,16 +69,15 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
     std::visit([this](auto &msg) { on_message(msg); }, message.payload);
 }
 
-void controller_actor_t::on_store_folder_info(message::store_folder_info_response_t &message) noexcept {
+void controller_actor_t::on_store_folder(message::store_folder_response_t &message) noexcept {
     auto &ee = message.payload.ee;
-    auto &fi = message.payload.req->payload.request_payload.folder_info;
-    auto &label = fi->get_folder()->label();
-    auto &device_id = fi->get_device()->device_id;
+    auto &folder = message.payload.req->payload.request_payload.folder;
+    auto &label = folder->label();
     if (ee) {
-        spdlog::warn("{}, on_store_folder_info {} / {} failed : {}", identity, label, device_id, ee->message());
+        spdlog::warn("{}, on_store_folder {} failed : {}", identity, label, ee->message());
         return do_shutdown(ee);
     }
-    spdlog::trace("{}, on_store_folder_info {} / {} ", identity, label, device_id);
+    spdlog::trace("{}, on_store_folder_info {}", identity, label);
 }
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
@@ -91,10 +90,10 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
         auto ee = r::make_error(context, ec);
         return do_shutdown(ee);
     }
-    auto folder_info = folder->update(*message, peer);
-    if (folder_info) {
+    bool updated = folder->update(*message, peer);
+    if (updated) {
         auto timeout = init_timeout / 2;
-        request<payload::store_folder_info_request_t>(db, std::move(folder_info)).send(timeout);
+        request<payload::store_folder_request_t>(db, std::move(folder)).send(timeout);
     }
 }
 

@@ -321,11 +321,11 @@ outcome::result<void> store_file_info(model::file_info_ptr_t &info, transaction_
     return store<model::file_info_t>(info, txn);
 }
 
-outcome::result<model::file_infos_map_t> load_file_infos(model::folder_infos_map_t folder_infos,
+outcome::result<model::file_infos_map_t> load_file_infos(model::folders_map_t folders,
                                                          transaction_t &txn) noexcept {
     auto instantiator = [&](const std::string_view &key, db::FileInfo &&db_item) -> model::file_info_ptr_t {
-        auto db_folder_info_key = key_helper_t<std::uint64_t>::extract_key(key);
-        auto folder_info = folder_infos.by_key(db_folder_info_key);
+        auto db_folder_key = key_helper_t<std::uint64_t>::extract_key(key);
+        auto folder_info = folders.by_key(db_folder_key);
         return new model::file_info_t(db_item, folder_info.get());
     };
     return load<model::file_info_t>(std::move(instantiator), txn);

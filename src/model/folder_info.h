@@ -27,10 +27,10 @@ struct folder_info_t : arc_base_t<folder_info_t> {
     inline device_t *get_device() const noexcept { return device; }
     inline folder_t *get_folder() const noexcept { return folder; }
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
-    inline std::int64_t get_declared_max_sequence() const noexcept { return declared_max_sequence; }
-    inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
-    void update_declared_max_sequence(std::int64_t value) noexcept { declared_max_sequence = value; }
-    bool update(const proto::Index &data) noexcept;
+    inline std::int64_t set_max_sequence(std::int64_t value) const noexcept {
+        assert(value > max_sequence);
+        return max_sequence;
+    }
 
   private:
     std::uint64_t index;
@@ -39,7 +39,6 @@ struct folder_info_t : arc_base_t<folder_info_t> {
     device_t *device;
     folder_t *folder;
     std::uint64_t db_key;
-    file_infos_map_t file_infos;
 };
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;

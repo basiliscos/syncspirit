@@ -27,7 +27,7 @@ outcome::result<model::folder_infos_map_t>
 load_folder_infos(model::devices_map_t &devices, model::folders_map_t &folders, transaction_t &txn) noexcept;
 
 outcome::result<void> store_file_info(model::file_info_ptr_t &info, transaction_t &txn) noexcept;
-outcome::result<model::file_infos_map_t> load_file_infos(model::folder_infos_map_t folder_infos,
+outcome::result<model::file_infos_map_t> load_file_infos(model::folders_map_t folders,
                                                          transaction_t &txn) noexcept;
 
 outcome::result<void> store_ignored_device(model::ignored_device_ptr_t &info, transaction_t &txn) noexcept;

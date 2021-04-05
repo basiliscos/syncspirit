@@ -7,10 +7,10 @@
 
 namespace syncspirit::model {
 
-struct folder_info_t;
+struct folder_t;
 
 struct file_info_t : arc_base_t<file_info_t> {
-    file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_) noexcept;
+    file_info_t(const db::FileInfo &info_, folder_t *folder_) noexcept;
     ~file_info_t();
 
     bool operator==(const file_info_t &other) const noexcept { return other.db_key == db_key; }
@@ -20,13 +20,13 @@ struct file_info_t : arc_base_t<file_info_t> {
 
     inline const std::string &get_db_key() const noexcept { return db_key; }
 
-    inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
+    inline folder_t *get_folder() const noexcept { return folder; }
     std::string_view get_name() const noexcept;
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
 
   private:
-    folder_info_t *folder_info;
+    folder_t *folder;
     proto::FileInfoType type;
     std::int64_t size;
     std::uint32_t permissions;

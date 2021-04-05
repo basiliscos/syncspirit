@@ -1,13 +1,13 @@
-#include "folder_info.h"
+#include "folder.h"
 #include "file_info.h"
 #include <algorithm>
 
 namespace syncspirit::model {
 
-file_info_t::file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_) noexcept : folder_info{folder_info_} {
+file_info_t::file_info_t(const db::FileInfo &info_, folder_t *folder_) noexcept : folder{folder_} {
     std::string dbk;
     auto &name = info_.name();
-    auto fi_key = folder_info->get_db_key();
+    auto fi_key = folder->get_db_key();
     dbk.resize(sizeof(fi_key) + name.size());
     char *ptr = dbk.data();
     std::copy(reinterpret_cast<char *>(&fi_key), reinterpret_cast<char *>(&fi_key) + sizeof(fi_key), ptr);
