@@ -1,17 +1,5 @@
 - update_device_notificatiocation. Dialer: dial after short timeout
 
-- gracefully shutdown
-- why index is not received? because max_sequence is 0?
-
-- save config
-- devices & folders  config should be stored in DB?
-
-model: cluster/folder
-2. update_folder(proto::folder) (index/max_sequence)
-3. do not allow multiple connections from the same peer
-
-#${index_id_prefix}{$seq} = file
-
 
 device:
  max_sequence

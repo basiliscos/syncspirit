@@ -173,21 +173,35 @@ void folder_t::update(const proto::Folder &remote) noexcept {
 bool folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept {
 
     bool updated = false;
+    auto fi = folder_infos.by_id(peer->device_id.get_sha256());
+    std::int64_t max_sequence = fi->get_max_sequence();
     for (int i = 0; i < data.files_size(); ++i) {
         auto &file = data.files(i);
-        spdlog::trace("folder_info_t::update, folder = {}, device = {}, file = {}, seq = {}",
-                      label(), device->device_id, file.name(), file.sequence());
+        auto seq = file.sequence();
+        spdlog::trace("folder_t::update, folder = {}, device = {}, file = {}, seq = {}",
+                      label(), device->device_id, file.name(), seq);
 
         auto fi = file_infos.by_key(file.name());
         auto db_info = db::convert(file);
+        auto fi_updated = false;
         if (fi) {
-            updated |= fi->update(db_info);
+            fi_updated = fi->update(db_info);
         } else {
             auto file_info = file_info_ptr_t(new file_info_t(db_info, this));
             add(file_info);
-            updated = true;
+            fi_updated = true;
         }
+        if (fi_updated) {
+            if (seq > max_sequence) {
+                max_sequence = seq;
+            }
+        }
+        updated |= fi_updated;
     }
+
+    fi->set_max_sequence(max_sequence);
+    spdlog::trace("folder_t::update, file_info {} max seq = {}, device = {}", fi->get_db_key(), max_sequence, peer->device_id);
+
     return updated;
 }
 

@@ -20,6 +20,7 @@ db::FolderInfo folder_info_t::serialize() noexcept {
     auto folder_key = folder->get_db_key();
     r.set_device_key(device_key);
     r.set_folder_key(folder_key);
+    r.set_max_sequence(max_sequence);
     return r;
 }
 

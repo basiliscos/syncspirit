@@ -56,6 +56,7 @@ message FolderInfo {
     uint64 index_id     = 1;
     uint64 device_key   = 2;
     uint64 folder_key   = 3;
+    int64  max_sequence = 4;
 }
 
 message FileInfo {

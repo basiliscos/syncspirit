@@ -346,7 +346,9 @@ void db_actor_t::on_store_folder(message::store_folder_request_t &message) noexc
     }
 
     for (auto &it : folder->get_folder_infos()) {
-        r = db::store_folder_info(it.second, txn);
+        auto& fi = it.second;
+        r = db::store_folder_info(fi, txn);
+        spdlog::trace("{}, on_store_folder folder_info = {} max seq = {}", identity, fi->get_db_key(), fi->get_max_sequence());
         if (!r) {
             reply_with_error(message, make_error(r.error()));
             return;

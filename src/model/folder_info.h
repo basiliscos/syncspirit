@@ -16,8 +16,6 @@ struct folder_info_t : arc_base_t<folder_info_t> {
     bool operator==(const folder_info_t &other) const noexcept { return other.db_key == db_key; }
     bool operator!=(const folder_info_t &other) const noexcept { return other.db_key != db_key; }
 
-    void add(file_info_ptr_t &file_info) noexcept;
-
     db::FolderInfo serialize() noexcept;
 
     inline std::uint64_t get_index() const noexcept { return index; }
@@ -27,9 +25,10 @@ struct folder_info_t : arc_base_t<folder_info_t> {
     inline device_t *get_device() const noexcept { return device; }
     inline folder_t *get_folder() const noexcept { return folder; }
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
-    inline std::int64_t set_max_sequence(std::int64_t value) const noexcept {
-        assert(value > max_sequence);
-        return max_sequence;
+    inline void set_max_sequence(std::int64_t value) noexcept {
+        if (value > max_sequence) {
+            max_sequence = value;
+        }
     }
 
   private:
@@ -43,8 +42,9 @@ struct folder_info_t : arc_base_t<folder_info_t> {
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
+inline const std::string &natural_key(const folder_info_ptr_t &item) noexcept { return item->get_device()->device_id.get_sha256(); }
 inline std::uint64_t db_key(const folder_info_ptr_t &item) noexcept { return item->get_db_key(); }
 
-using folder_infos_map_t = generic_map_t<folder_info_ptr_t, void>;
+using folder_infos_map_t = generic_map_t<folder_info_ptr_t, std::string>;
 
 }; // namespace syncspirit::model
