@@ -6,12 +6,29 @@ namespace syncspirit::model {
 
 folder_info_t::folder_info_t(const db::FolderInfo &info_, device_t *device_, folder_t *folder_,
                              uint64_t db_key_) noexcept
-    : index{info_.index_id()}, max_sequence{0}, device{device_}, folder{folder_}, db_key{db_key_} {
+    : index{info_.index_id()}, max_sequence{info_.max_sequence()}, device{device_}, folder{folder_}, db_key{db_key_} {
     assert(device);
     assert(folder);
 }
 
 folder_info_t::~folder_info_t() {}
+
+void folder_info_t::update(const proto::Device &device) noexcept {
+    bool changed = false;
+    if (max_sequence < device.max_sequence()) {
+        max_sequence = device.max_sequence();
+        changed = true;
+    }
+    if (index != device.index_id()) {
+        index = device.index_id();
+        changed = true;
+    }
+    if (changed) {
+        spdlog::trace("folder_info_t::update, folder = {}, index = {}, max seq = {}", folder->label(), index,
+                      max_sequence);
+        mark_dirty();
+    }
+}
 
 db::FolderInfo folder_info_t::serialize() noexcept {
     db::FolderInfo r;

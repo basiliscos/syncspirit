@@ -8,4 +8,4 @@ enum class error_code {
     db_version_size_mismatch,
 };
 }
-};
+}; // namespace syncspirit

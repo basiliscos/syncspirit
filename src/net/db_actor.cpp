@@ -94,32 +94,6 @@ void db_actor_t::on_start() noexcept {
     spdlog::trace("{}, on_start", identity);
 }
 
-#if 0
-void db_actor_t::on_make_index_id(message::make_index_id_request_t &message) noexcept {
-    auto txn = db::make_transaction(db::transaction_type_t::RW, env);
-    if (!txn) {
-        return reply_with_error(message, make_error(txn.error()));
-    }
-    auto &payload = message.payload.request_payload;
-    auto &orig = payload->folder;
-    model::index_id_t index_id{distribution(rd)};
-    auto r = db::update_folder_info(orig, txn.value());
-    if (!r) {
-        return reply_with_error(message, make_error(r.error()));
-    }
-    r = db::create_folder(orig, index_id, device->device_id, txn.value());
-    if (!r) {
-        return reply_with_error(message, make_error(r.error()));
-    }
-    r = txn.value().commit();
-    if (!r) {
-        return reply_with_error(message, make_error(r.error()));
-    }
-    spdlog::trace("{}, on_make_index_id, created index = {} for folder = {}", identity, index_id, orig.label());
-    reply_to(message, index_id);
-}
-#endif
-
 void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexcept {
     auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn_opt) {
@@ -149,6 +123,13 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
         return reply_with_error(message, make_error(ec));
     }
 
+    auto blocks_opt = db::load_block_infos(txn);
+    if (!blocks_opt) {
+        return reply_with_error(message, make_error(blocks_opt.error()));
+    }
+    auto &blocks = blocks_opt.value();
+    spdlog::trace("{}, on_cluster_load, blocks count =  {}", identity, blocks.size());
+
     auto ignored_devices_opt = db::load_ignored_devices(txn);
     if (!ignored_devices_opt) {
         return reply_with_error(message, make_error(ignored_devices_opt.error()));
@@ -173,6 +154,11 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
     }
     auto folder_infos = folder_infos_opt.value();
 
+    /* should be assigned earlier before file_infos are loaded */
+    auto cluster = model::cluster_ptr_t(new model::cluster_t(device));
+    cluster->assign_folders(folders);
+    cluster->assign_blocks(std::move(blocks));
+
     auto file_infos_opt = db::load_file_infos(folders, txn);
     if (!file_infos_opt) {
         return reply_with_error(message, make_error(file_infos_opt.error()));
@@ -183,14 +169,16 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
     for (auto &it : file_infos) {
         auto &fi = it.second;
         auto folder = fi->get_folder();
-        spdlog::trace("{}, on_cluster_load: {}/{}, seq = {}", identity, folder->label(), fi->get_name(), fi->get_sequence());
+        spdlog::trace("{}, on_cluster_load: {}/{}, seq = {}", identity, folder->label(), fi->get_name(),
+                      fi->get_sequence());
         folder->add(fi);
     }
 
     for (auto &it : folder_infos) {
         auto &fi = it.second;
         auto folder = fi->get_folder();
-        spdlog::trace("{}, on_cluster_load: {} on {}, max seq = {}", identity, folder->label(), fi->get_device()->device_id, fi->get_max_sequence());
+        spdlog::trace("{}, on_cluster_load: {} on {}, max seq = {}", identity, folder->label(),
+                      fi->get_device()->device_id, fi->get_max_sequence());
         folder->add(fi);
     }
 
@@ -198,8 +186,6 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
         devices.put(device);
     }
 
-    auto cluster = model::cluster_ptr_t(new model::cluster_t(device));
-    cluster->assign_folders(std::move(folders));
     reply_to(message, std::move(cluster), std::move(devices), std::move(ignored_devices), std::move(ignored_folders));
 }
 
@@ -344,23 +330,53 @@ void db_actor_t::on_store_folder(message::store_folder_request_t &message) noexc
         reply_with_error(message, make_error(r.error()));
         return;
     }
+    folder->unmark_dirty();
 
     for (auto &it : folder->get_folder_infos()) {
-        auto& fi = it.second;
+        auto &fi = it.second;
+        if (!fi->is_dirty()) {
+            continue;
+        }
         r = db::store_folder_info(fi, txn);
-        spdlog::trace("{}, on_store_folder folder_info = {} max seq = {}", identity, fi->get_db_key(), fi->get_max_sequence());
+        spdlog::trace("{}, on_store_folder folder_info = {} max seq = {}", identity, fi->get_db_key(),
+                      fi->get_max_sequence());
         if (!r) {
             reply_with_error(message, make_error(r.error()));
             return;
         }
+        fi->unmark_dirty();
+    }
+
+    model::block_infos_map_t dirty_blocks;
+    for (auto &it : folder->get_file_infos()) {
+        auto &fi = it.second;
+        if (!fi->is_dirty()) {
+            continue;
+        }
+        for (auto &bit : fi->get_blocks()) {
+            if (!bit->is_dirty()) {
+                continue;
+            }
+            r = db::store_block_info(bit, txn);
+            if (!r) {
+                reply_with_error(message, make_error(r.error()));
+                return;
+            }
+            bit->unmark_dirty();
+        }
     }
 
     for (auto &it : folder->get_file_infos()) {
+        auto &fi = it.second;
+        if (!fi->is_dirty()) {
+            continue;
+        }
         r = db::store_file_info(it.second, txn);
         if (!r) {
             reply_with_error(message, make_error(r.error()));
             return;
         }
+        fi->unmark_dirty();
     }
 
     r = txn.commit();

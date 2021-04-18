@@ -39,6 +39,8 @@ value_t prefixer_t<prefix::ignored_folder>::make(const std::string &db_key) noex
     return mk(prefix::ignored_folder, db_key);
 }
 
+value_t prefixer_t<prefix::block_info>::make(std::uint64_t db_key) noexcept { return mk(prefix::block_info, db_key); }
+
 /*
 static value_t mk_folder_prefix(char prefix, const std::string_view &id) noexcept {
     std::string r;

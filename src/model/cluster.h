@@ -1,11 +1,11 @@
 #pragma once
 
-#include "../config/main.h"
-#include "folder.h"
-#include "device.h"
-#include "arc.hpp"
 #include <vector>
 #include <unordered_map>
+#include "arc.hpp"
+#include "device.h"
+#include "folder.h"
+#include "block_info.h"
 
 namespace syncspirit::model {
 
@@ -14,17 +14,20 @@ struct cluster_t : arc_base_t<cluster_t> {
 
     cluster_t(device_ptr_t device_) noexcept;
 
-    void assign_folders(folders_map_t &&folders) noexcept;
+    void assign_folders(const folders_map_t &folders) noexcept;
+    void assign_blocks(block_infos_map_t &&blocks) noexcept;
     proto::ClusterConfig get(model::device_ptr_t target) noexcept;
     unknown_folders_t update(const proto::ClusterConfig &config) noexcept;
     folder_ptr_t opt_for_synch(const device_ptr_t &peer_device) noexcept;
 
+    block_infos_map_t &get_blocks() noexcept;
     const folders_map_t &get_folders() const noexcept;
     void add_folder(const folder_ptr_t &folder) noexcept;
 
   private:
     device_ptr_t device;
     folders_map_t folders;
+    block_infos_map_t blocks;
 };
 
 using cluster_ptr_t = intrusive_ptr_t<cluster_t>;

@@ -52,8 +52,8 @@ static outcome::result<void> migrate0(model::device_ptr_t &device, transaction_t
     }
 
     // make anchors
-    prefixes_t prefixes{prefix::device,    prefix::folder,         prefix::folder_info,
-                        prefix::file_info, prefix::ignored_device, prefix::ignored_folder};
+    prefixes_t prefixes{prefix::device,         prefix::folder,         prefix::folder_info, prefix::file_info,
+                        prefix::ignored_device, prefix::ignored_folder, prefix::block_info};
     for (auto &prefix : prefixes) {
         MDBX_val key, value;
         key.iov_base = &prefix;
@@ -197,6 +197,22 @@ template <> struct persister_helper_t<model::ignored_folder_t> {
     static auto serialize(const ptr_t &item) noexcept { return item->serialize().SerializeAsString(); }
 };
 
+template <> struct persister_helper_t<model::block_info_t> {
+    static const constexpr discr_t prefix = prefix::block_info;
+    static const constexpr bool need_synt_key{true};
+    using type = model::block_info_t;
+    using my_prefix = prefixer_t<prefix>;
+    using ptr_t = model::intrusive_ptr_t<type>;
+    using collection_t = model::block_infos_map_t;
+    using db_type = db::BlockInfo;
+
+    static void append(collection_t &dest, ptr_t &&item) noexcept { dest.put(std::move(item)); }
+
+    static value_t get_db_key(const ptr_t &item) noexcept { return my_prefix::make(item->get_db_key()); }
+
+    static auto serialize(const ptr_t &item) noexcept { return item->serialize().SerializeAsString(); }
+};
+
 template <typename T, typename P = persister_helper_t<T>>
 inline static outcome::result<void> store(typename P::ptr_t &item, transaction_t &txn) noexcept {
     auto data = P::serialize(item);
@@ -321,8 +337,7 @@ outcome::result<void> store_file_info(model::file_info_ptr_t &info, transaction_
     return store<model::file_info_t>(info, txn);
 }
 
-outcome::result<model::file_infos_map_t> load_file_infos(model::folders_map_t folders,
-                                                         transaction_t &txn) noexcept {
+outcome::result<model::file_infos_map_t> load_file_infos(model::folders_map_t folders, transaction_t &txn) noexcept {
     auto instantiator = [&](const std::string_view &key, db::FileInfo &&db_item) -> model::file_info_ptr_t {
         auto db_folder_key = key_helper_t<std::uint64_t>::extract_key(key);
         auto folder_info = folders.by_key(db_folder_key);
@@ -359,22 +374,12 @@ outcome::result<model::ignored_folders_map_t> load_ignored_folders(transaction_t
     return load<model::ignored_folder_t>(std::move(instantiator), txn);
 }
 
-db::FileInfo convert(const proto::FileInfo &file_info) noexcept {
-    db::FileInfo r;
-    r.set_name(file_info.name());
-    r.set_type(file_info.type());
-    r.set_size(file_info.size());
-    r.set_permissions(file_info.permissions());
-    r.set_modified_s(file_info.modified_s());
-    r.set_modified_ns(file_info.modified_ns());
-    r.set_modified_by(file_info.modified_by());
-    r.set_deleted(file_info.deleted());
-    r.set_no_permissions(file_info.no_permissions());
-    r.set_sequence(file_info.sequence());
-    r.set_block_size(file_info.block_size());
-    r.set_symlink_target(file_info.symlink_target());
-    *r.mutable_version() = file_info.version();
-    return r;
+outcome::result<void> store_block_info(model::block_info_ptr_t &info, transaction_t &txn) noexcept {
+    return store<model::block_info_t>(info, txn);
 }
 
+outcome::result<model::block_infos_map_t> load_block_infos(transaction_t &txn) noexcept {
+    auto instantiator = generic_instantiator<db::BlockInfo, model::block_info_t>;
+    return load<model::block_info_t>(std::move(instantiator), txn);
+}
 } // namespace syncspirit::db

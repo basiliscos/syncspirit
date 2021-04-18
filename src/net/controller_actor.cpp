@@ -90,7 +90,9 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
         auto ee = r::make_error(context, ec);
         return do_shutdown(ee);
     }
-    bool updated = folder->update(*message, peer);
+    folder->update(*message, peer);
+    auto updated = folder->is_dirty();
+    spdlog::warn("{}, folder {}/{} has been updated = {}", identity, folder_id, folder->label(), updated);
     if (updated) {
         auto timeout = init_timeout / 2;
         request<payload::store_folder_request_t>(db, std::move(folder)).send(timeout);

@@ -158,12 +158,18 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
         spdlog::warn("{}, on_io_error: {}", identity, ec.message());
     }
     cancel_timer();
-    if (!connected && state < r::state_t::SHUTTING_DOWN) {
-        // transport.reset();
-        resources->acquire(resource::uris);
-        try_next_uri();
+    if (state < r::state_t::SHUTTING_DOWN) {
+        if (!connected) {
+            resources->acquire(resource::uris);
+            try_next_uri();
+        } else {
+            do_shutdown(make_error(ec));
+        }
     } else {
-        do_shutdown(make_error(ec));
+        // forsing shutdown
+        if (resources->has(resource::controller)) {
+            resources->release(resource::controller);
+        }
     }
 }
 
@@ -193,7 +199,9 @@ void peer_actor_t::process_tx_queue() noexcept {
 void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
     tx_item_t item = new confidential::payload::tx_item_t{std::move(buff), final};
     tx_queue.emplace_back(std::move(item));
-    process_tx_queue();
+    if (!tx_item) {
+        process_tx_queue();
+    }
 }
 
 void peer_actor_t::on_handshake(bool valid_peer, X509 *cert, const tcp::endpoint &peer_endpoint,

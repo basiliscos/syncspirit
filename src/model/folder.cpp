@@ -61,8 +61,9 @@ void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos
 
 void folder_t::add(const file_info_ptr_t &file_info) noexcept { file_infos.put(file_info); }
 
-
 void folder_t::assign_device(model::device_ptr_t device_) noexcept { device = device_; }
+
+void folder_t::assign_cluster(cluster_t *cluster_) noexcept { cluster = cluster_; }
 
 db::Folder folder_t::serialize() noexcept {
     db::Folder r;
@@ -128,7 +129,8 @@ std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept 
         pd.set_introducer(d.introducer);
         pd.set_skip_introduction_removals(d.skip_introduction_removals);
         *r.add_devices() = pd;
-        spdlog::trace("folder_t::get, folder = {}, device = {}, max_seq = {}", _label, d.device_id, max_seq);
+        spdlog::trace("folder_t::get (==>), folder = {}/{}, device = {}, max_seq = {}", _label, fi.get_index(),
+                      d.device_id, max_seq);
     }
     return r;
 }
@@ -161,59 +163,43 @@ void folder_t::update(const proto::Folder &remote) noexcept {
         for (auto it : folder_infos) {
             auto &fi = it.second;
             if (fi->get_device()->device_id.get_sha256() == d.id()) {
-                auto max = d.max_sequence();
-                if (fi->get_max_sequence() < max) {
-                    fi->set_max_sequence(max);
-                }
+                fi->update(d);
             }
         }
     }
 }
 
-bool folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept {
-
-    bool updated = false;
+void folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept {
     auto fi = folder_infos.by_id(peer->device_id.get_sha256());
     std::int64_t max_sequence = fi->get_max_sequence();
     for (int i = 0; i < data.files_size(); ++i) {
         auto &file = data.files(i);
         auto seq = file.sequence();
-        spdlog::trace("folder_t::update, folder = {}, device = {}, file = {}, seq = {}",
-                      label(), device->device_id, file.name(), seq);
+        spdlog::trace("folder_t::update, folder = {}, device = {}, file = {}, seq = {}", label(), device->device_id,
+                      file.name(), seq);
 
-        auto fi = file_infos.by_key(file.name());
-        auto db_info = db::convert(file);
-        auto fi_updated = false;
+        auto file_key = file_info_t::generate_db_key(file.name(), *this);
+        auto fi = file_infos.by_key(file_key);
         if (fi) {
-            fi_updated = fi->update(db_info);
+            fi->update(file);
         } else {
-            auto file_info = file_info_ptr_t(new file_info_t(db_info, this));
-            add(file_info);
-            fi_updated = true;
+            fi = file_info_ptr_t(new file_info_t(file, this));
+            add(fi);
+            mark_dirty();
         }
-        if (fi_updated) {
-            if (seq > max_sequence) {
-                max_sequence = seq;
-            }
+        if (seq > max_sequence) {
+            max_sequence = seq;
+            mark_dirty();
         }
-        updated |= fi_updated;
     }
 
     fi->set_max_sequence(max_sequence);
-    spdlog::trace("folder_t::update, file_info {} max seq = {}, device = {}", fi->get_db_key(), max_sequence, peer->device_id);
-
-    return updated;
-}
-
-/*
-void folder_info_t::add(file_info_ptr_t &file_info) noexcept {
-    file_infos.put(file_info);
-    auto seq = file_info->get_sequence();
-    if (max_sequence < seq) {
-        max_sequence = seq;
-        if (declared_max_sequence < max_sequence) {
-            declared_max_sequence = max_sequence;
-        }
+    spdlog::trace("folder_t::update, folder_info = {} max seq = {}, device = {}", fi->get_db_key(), max_sequence,
+                  peer->device_id);
+    auto local_folder_info = folder_infos.by_id(device->device_id.get_sha256());
+    if (local_folder_info->get_max_sequence() < max_sequence) {
+        local_folder_info->set_max_sequence(max_sequence);
+        spdlog::trace("folder_t::update, folder_info = {} max seq = {}, device = {} (local)",
+                      local_folder_info->get_db_key(), max_sequence, device->device_id);
     }
 }
-*/

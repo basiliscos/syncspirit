@@ -141,8 +141,10 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
     ignored_devices = std::move(p.ignored_devices);
     ignored_folders = std::move(p.ignored_folders);
     cluster = std::move(p.cluster);
-    spdlog::debug("{}, load cluster. devices = {}, ignored devices = {}, ignored folders = {}, folders = {}", identity,
-                  devices.size(), ignored_devices.size(), ignored_folders.size(), cluster->get_folders().size());
+    spdlog::debug(
+        "{}, load cluster. devices = {}, ignored devices = {}, ignored folders = {}, folders = {}, blocks = {}",
+        identity, devices.size(), ignored_devices.size(), ignored_folders.size(), cluster->get_folders().size(),
+        cluster->get_blocks().size());
 
     auto timeout = shutdown_timeout * 9 / 10;
     auto io_timeout = shutdown_timeout * 8 / 10;

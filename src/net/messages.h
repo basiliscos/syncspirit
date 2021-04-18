@@ -279,7 +279,7 @@ struct store_new_folder_request_t {
     using response_t = store_new_folder_response_t;
     db::Folder folder;
     model::device_ptr_t source;
-    std::int64_t source_index;
+    std::uint64_t source_index;
 };
 
 struct store_folder_response_t {};

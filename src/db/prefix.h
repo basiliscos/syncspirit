@@ -15,6 +15,7 @@ static const constexpr discr_t folder_info{0x12};
 static const constexpr discr_t file_info{0x13};
 static const constexpr discr_t ignored_device{0x14};
 static const constexpr discr_t ignored_folder{0x15};
+static const constexpr discr_t block_info{0x16};
 // static const constexpr discr_t folder_index{0x03};
 // static const constexpr discr_t folder_local_device{0x04};
 } // namespace prefix
@@ -41,6 +42,7 @@ template <> struct prefixer_t<prefix::folder_info> { static value_t make(std::ui
 template <> struct prefixer_t<prefix::file_info> { static value_t make(const std::string &db_key) noexcept; };
 template <> struct prefixer_t<prefix::ignored_device> { static value_t make(const std::string &db_key) noexcept; };
 template <> struct prefixer_t<prefix::ignored_folder> { static value_t make(const std::string &db_key) noexcept; };
+template <> struct prefixer_t<prefix::block_info> { static value_t make(std::uint64_t db_key) noexcept; };
 
 /*
 template <> struct prefixer_t<prefix::folder_index> { static value_t make(const std::string_view &id) noexcept; };

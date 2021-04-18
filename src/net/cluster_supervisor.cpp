@@ -53,7 +53,7 @@ void cluster_supervisor_t::on_create_folder(ui::message::create_folder_request_t
     auto &p = message.payload.request_payload;
     auto &folder = p.folder;
     auto &source = p.source;
-    auto source_index = p.source_index;
+    auto source_index = std::uint64_t{0}; // does not matter, will be updated
     spdlog::trace("{}, on_create_folder, {} (from {})", identity, folder.label(), source->device_id);
     request<payload::store_new_folder_request_t>(db, folder, source, source_index).send(init_timeout);
 }

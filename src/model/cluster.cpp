@@ -6,12 +6,16 @@ using namespace syncspirit::model;
 
 cluster_t::cluster_t(device_ptr_t device_) noexcept : device(device_) {}
 
-void cluster_t::assign_folders(folders_map_t &&folders_) noexcept {
-    folders = std::move(folders_);
+void cluster_t::assign_folders(const folders_map_t &folders_) noexcept {
+    folders = folders_;
     for (auto it : folders) {
-        it.second->assign_device(device);
+        auto &folder = it.second;
+        folder->assign_device(device);
+        folder->assign_cluster(this);
     }
 }
+
+void cluster_t::assign_blocks(block_infos_map_t &&blocks_) noexcept { blocks = std::move(blocks_); }
 
 proto::ClusterConfig cluster_t::get(device_ptr_t target) noexcept {
     proto::ClusterConfig r;
@@ -25,6 +29,8 @@ proto::ClusterConfig cluster_t::get(device_ptr_t target) noexcept {
 }
 
 const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
+
+block_infos_map_t &cluster_t::get_blocks() noexcept { return blocks; }
 
 cluster_t::unknown_folders_t cluster_t::update(const proto::ClusterConfig &config) noexcept {
     unknown_folders_t r;

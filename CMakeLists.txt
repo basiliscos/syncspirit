@@ -30,12 +30,14 @@ add_library(syncspirit_lib
     src/db/prefix.cpp
     src/db/transaction.cpp
     src/db/utils.cpp
+    src/model/block_info.cpp
     src/model/cluster.cpp
     src/model/device.cpp
     src/model/device_id.cpp
     src/model/file_info.cpp
     src/model/folder.cpp
     src/model/folder_info.cpp
+    src/model/storeable.cpp
     src/net/acceptor_actor.cpp
     src/net/cluster_supervisor.cpp
     src/net/controller_actor.cpp

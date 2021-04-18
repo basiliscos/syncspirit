@@ -1,3 +1,5 @@
+- почему нету списка всех файлов?
+
 - update_device_notificatiocation. Dialer: dial after short timeout
 
 

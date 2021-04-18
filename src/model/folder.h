@@ -10,16 +10,20 @@
 #include "bep.pb.h"
 #include "structs.pb.h"
 #include "folder_info.h"
+#include "storeable.h"
 
 namespace syncspirit::model {
 
 namespace fs = boost::filesystem;
 namespace outcome = boost::outcome_v2;
 
-struct folder_t : arc_base_t<folder_t> {
+struct cluster_t;
+
+struct folder_t : arc_base_t<folder_t>, storeable_t {
 
     folder_t(const db::Folder &db_folder, std::uint64_t db_key_ = 0) noexcept;
     void assign_device(model::device_ptr_t device_) noexcept;
+    void assign_cluster(cluster_t *cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
     void add(const file_info_ptr_t &file_info) noexcept;
     db::Folder serialize() noexcept;
@@ -35,9 +39,10 @@ struct folder_t : arc_base_t<folder_t> {
     inline std::uint64_t get_db_key() const noexcept { return db_key; }
     inline void set_db_key(std::uint64_t value) noexcept { db_key = value; }
     inline auto &get_folder_infos() noexcept { return folder_infos; }
+    inline cluster_t *&get_cluster() noexcept { return cluster; }
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
     void update(const proto::Folder &remote) noexcept;
-    bool update(const proto::Index &data, const device_ptr_t &peer) noexcept;
+    void update(const proto::Index &data, const device_ptr_t &peer) noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
@@ -59,6 +64,7 @@ struct folder_t : arc_base_t<folder_t> {
     bool paused;
     folder_infos_map_t folder_infos;
     file_infos_map_t file_infos;
+    cluster_t *cluster = nullptr;
 };
 
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
