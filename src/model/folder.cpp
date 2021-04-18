@@ -129,7 +129,7 @@ std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept 
         pd.set_introducer(d.introducer);
         pd.set_skip_introduction_removals(d.skip_introduction_removals);
         *r.add_devices() = pd;
-        spdlog::trace("folder_t::get (==>), folder = {}/{}, device = {}, max_seq = {}", _label, fi.get_index(),
+        spdlog::trace("folder_t::get (==>), folder = {}/{:#x}, device = {}, max_seq = {}", _label, fi.get_index(),
                       d.device_id, max_seq);
     }
     return r;
@@ -193,13 +193,15 @@ void folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexce
         }
     }
 
-    fi->set_max_sequence(max_sequence);
+    //fi->set_max_sequence(max_sequence);
     spdlog::trace("folder_t::update, folder_info = {} max seq = {}, device = {}", fi->get_db_key(), max_sequence,
                   peer->device_id);
+    /*
     auto local_folder_info = folder_infos.by_id(device->device_id.get_sha256());
     if (local_folder_info->get_max_sequence() < max_sequence) {
         local_folder_info->set_max_sequence(max_sequence);
         spdlog::trace("folder_t::update, folder_info = {} max seq = {}, device = {} (local)",
                       local_folder_info->get_db_key(), max_sequence, device->device_id);
     }
+    */
 }

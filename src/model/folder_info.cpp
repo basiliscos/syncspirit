@@ -24,7 +24,7 @@ void folder_info_t::update(const proto::Device &device) noexcept {
         changed = true;
     }
     if (changed) {
-        spdlog::trace("folder_info_t::update, folder = {}, index = {}, max seq = {}", folder->label(), index,
+        spdlog::trace("folder_info_t::update, folder = {}, index = {:#x}, max seq = {}", folder->label(), index,
                       max_sequence);
         mark_dirty();
     }
