@@ -27,6 +27,7 @@ struct folder_info_t : arc_base_t<folder_info_t>, storeable_t {
     inline folder_t *get_folder() const noexcept { return folder; }
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
     void update(const proto::Device &device) noexcept;
+    void update_max_sequence(std::int64_t value) noexcept;
 
   private:
     std::uint64_t index;

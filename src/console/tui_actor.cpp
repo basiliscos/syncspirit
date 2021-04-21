@@ -303,7 +303,8 @@ void tui_actor_t::ignore_folder(const proto::Folder &folder, model::device_ptr_t
     request<ui::payload::ignore_folder_request_t>(coordinator, f).send(init_timeout);
 }
 
-void tui_actor_t::create_folder(const proto::Folder &folder, model::device_ptr_t &source) noexcept {
+void tui_actor_t::create_folder(const proto::Folder &folder, model::device_ptr_t &source,
+                                std::uint64_t source_index) noexcept {
     db::Folder f;
     f.set_id(folder.id());
     f.set_label(folder.label());
@@ -316,7 +317,7 @@ void tui_actor_t::create_folder(const proto::Folder &folder, model::device_ptr_t
     f.set_folder_type(db::FolderType::send_and_receive);
     f.set_pull_order(db::PullOrder::random);
     f.set_rescan_interval(3600);
-    request<ui::payload::create_folder_request_t>(cluster, f, source).send(init_timeout);
+    request<ui::payload::create_folder_request_t>(cluster, f, source, source_index).send(init_timeout);
 }
 
 void tui_actor_t::update_device(model::device_ptr_t device) noexcept {

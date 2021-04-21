@@ -273,6 +273,7 @@ void db_actor_t::on_store_new_folder(message::store_new_folder_request_t &messag
     db::FolderInfo db_fi_source;
     auto &src_index = message.payload.request_payload.source_index;
     db_fi_source.set_index_id(src_index);
+    db_fi_source.set_max_sequence(0); // always start afresh
     auto src = message.payload.request_payload.source.get();
 
     auto key_option = txn.next_sequence();
@@ -296,7 +297,8 @@ void db_actor_t::on_store_new_folder(message::store_new_folder_request_t &messag
     }
     auto key_local = key_option.value();
     db::FolderInfo db_fi_local;
-    db_fi_source.set_index_id(src_index);
+    db_fi_local.set_index_id(distribution(generator));
+    db_fi_local.set_max_sequence(0);
     auto src_local = device.get();
     auto fi_local = model::folder_info_ptr_t(new model::folder_info_t(db_fi_local, src_local, folder.get(), key_local));
 

@@ -15,10 +15,6 @@ folder_info_t::~folder_info_t() {}
 
 void folder_info_t::update(const proto::Device &device) noexcept {
     bool changed = false;
-    if (max_sequence < device.max_sequence()) {
-        max_sequence = device.max_sequence();
-        changed = true;
-    }
     if (index != device.index_id()) {
         index = device.index_id();
         changed = true;
@@ -28,6 +24,11 @@ void folder_info_t::update(const proto::Device &device) noexcept {
                       max_sequence);
         mark_dirty();
     }
+}
+
+void folder_info_t::update_max_sequence(std::int64_t value) noexcept {
+    max_sequence = value;
+    mark_dirty();
 }
 
 db::FolderInfo folder_info_t::serialize() noexcept {

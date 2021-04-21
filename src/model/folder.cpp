@@ -123,7 +123,7 @@ std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept 
             pd.set_cert_name(d.cert_name.value());
         }
         auto db_max_seq = fi.get_max_sequence();
-        std::int64_t max_seq = paused ? 0 : (db_max_seq == 0 ? 1 : db_max_seq);
+        std::int64_t max_seq = db_max_seq;
         pd.set_max_sequence(max_seq);
         pd.set_index_id(fi.get_index());
         pd.set_introducer(d.introducer);
@@ -189,11 +189,14 @@ void folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexce
         }
         if (seq > max_sequence) {
             max_sequence = seq;
-            mark_dirty();
         }
     }
+    if (fi->get_max_sequence() < max_sequence) {
+        fi->update_max_sequence(max_sequence);
+        mark_dirty();
+    }
 
-    //fi->set_max_sequence(max_sequence);
+    // fi->set_max_sequence(max_sequence);
     spdlog::trace("folder_t::update, folder_info = {} max seq = {}, device = {}", fi->get_db_key(), max_sequence,
                   peer->device_id);
     /*

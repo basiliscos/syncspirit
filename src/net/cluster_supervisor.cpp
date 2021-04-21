@@ -53,7 +53,7 @@ void cluster_supervisor_t::on_create_folder(ui::message::create_folder_request_t
     auto &p = message.payload.request_payload;
     auto &folder = p.folder;
     auto &source = p.source;
-    auto source_index = std::uint64_t{0}; // does not matter, will be updated
+    auto source_index = p.source_index;
     spdlog::trace("{}, on_create_folder, {} (from {})", identity, folder.label(), source->device_id);
     request<payload::store_new_folder_request_t>(db, folder, source, source_index).send(init_timeout);
 }
@@ -82,7 +82,12 @@ void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexce
     auto unknown_folders = cluster->update(payload.cluster_config);
     for (auto &folder : unknown_folders) {
         if (!ignored_folders->by_key(folder.id())) {
-            send<ui::payload::new_folder_notify_t>(address, folder, peer);
+            for (int i = 0; i < folder.devices_size(); ++i) {
+                auto &d = folder.devices(i);
+                if (d.id() == device_id.get_sha256()) {
+                    send<ui::payload::new_folder_notify_t>(address, folder, peer, d.index_id());
+                }
+            }
         }
     }
     auto addr = create_actor<controller_actor_t>()

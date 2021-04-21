@@ -1,8 +1,5 @@
 - почему нету списка всех файлов?
-
-- локальный index = 0?
-[2021-04-18 23:49:28.262] [trace] folder_t::get (==>), folder = sample-folder/5726924266782029188, device = KUEQE66, max_seq = 1
-[2021-04-18 23:49:28.262] [trace] folder_t::get (==>), folder = sample-folder/0, device = RF7ZHME, max_seq = 1
+[2021-04-20 00:15:23.387] [trace] folder_t::get (==>), folder = sample-folder/0x0, device = RF7ZHME, max_seq = 1
 
 - update_device_notificatiocation. Dialer: dial after short timeout ... или нужно посылать cluster_update/index_update?
 

@@ -428,6 +428,7 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
 
 void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
     spdlog::trace("{}, read_controlled", identity);
+    bool continue_reading = true;
     std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
@@ -442,6 +443,7 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
                 handle_ping(std::move(msg));
             } else if constexpr (std::is_same_v<T, m::Close>) {
                 handle_close(std::move(msg));
+                continue_reading = false;
             } else {
                 auto fwd = payload::forwarded_message_t{std::move(msg)};
                 send<payload::forwarded_message_t>(controller, std::move(fwd));
@@ -449,6 +451,10 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
             }
         },
         msg);
+    if (continue_reading) {
+        read_action = [this](auto &&msg) { read_controlled(std::move(msg)); };
+        read_more();
+    }
 }
 
 void peer_actor_t::handle_ping(proto::message::Ping &&) noexcept { spdlog::trace("{}, handle_ping", identity); }

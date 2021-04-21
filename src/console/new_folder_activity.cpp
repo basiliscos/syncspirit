@@ -7,7 +7,8 @@
 
 using namespace syncspirit::console;
 new_folder_activity_t::new_folder_activity_t(tui_actor_t &actor_, ui::message::new_folder_notify_t &message) noexcept
-    : activity_t{actor_, activity_type_t::NEW_FOLDER}, folder{message.payload.folder}, source{message.payload.source} {}
+    : activity_t{actor_, activity_type_t::NEW_FOLDER}, folder{message.payload.folder}, source{message.payload.source},
+      source_index{message.payload.source_index} {}
 
 bool new_folder_activity_t::operator==(const activity_t &other) const noexcept {
     if (type != other.type) {
@@ -35,7 +36,7 @@ bool new_folder_activity_t::handle(const char key) noexcept {
         actor.discard_activity();
         return true;
     } else if (key == 'a') {
-        actor.create_folder(folder, source);
+        actor.create_folder(folder, source, source_index);
         actor.discard_activity();
         return true;
     }

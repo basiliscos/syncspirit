@@ -14,6 +14,7 @@ struct new_folder_activity_t : activity_t {
     bool operator==(const activity_t &other) const noexcept override;
     proto::Folder folder;
     model::device_ptr_t source;
+    std::uint64_t source_index;
 };
 
 } // namespace syncspirit::console
