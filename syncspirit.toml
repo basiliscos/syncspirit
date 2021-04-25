@@ -8,6 +8,10 @@ tx_timeout = 10000
 enabled = true
 redial_timeout = 300000
 
+[fs]
+batch_block_size = 16777216
+batch_dirs_count = 10
+
 [global_discovery]
 announce_url = 'https://discovery.syncthing.net/'
 cert_file = '/home/b/.config/syncthing/cert.pem'

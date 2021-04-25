@@ -9,6 +9,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <rotor/asio.hpp>
+#include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
 
 #include "constants.h"
@@ -18,11 +19,13 @@
 #include "console/sink.h"
 #include "console/tui_actor.h"
 #include "console/utils.h"
+#include "fs/fs_actor.h"
 
-namespace fs = boost::filesystem;
+namespace bfs = boost::filesystem;
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 namespace ra = rotor::asio;
+namespace rth = rotor::thread;
 namespace asio = boost::asio;
 
 using namespace syncspirit;
@@ -80,10 +83,10 @@ int main(int argc, char **argv) {
         spdlog::set_default_logger(std::make_shared<spdlog::logger>("", console_sink));
         spdlog::set_level(log_level);
 
-        fs::path config_file_path;
+        bfs::path config_file_path;
         if (vm.count("config_dir")) {
             auto path = vm["config_dir"].as<std::string>();
-            config_file_path = fs::path{path.c_str()};
+            config_file_path = bfs::path{path.c_str()};
         } else {
             auto config_default = utils::get_default_config_dir();
             if (config_default) {
@@ -95,7 +98,7 @@ int main(int argc, char **argv) {
         }
 
         config_file_path.append("syncspirit.toml");
-        bool populate = !fs::exists(config_file_path);
+        bool populate = !bfs::exists(config_file_path);
         if (populate) {
             spdlog::info("Config {} seems does not exit, creating default one...", config_file_path.c_str());
             auto cfg = config::generate_config(config_file_path);
@@ -156,11 +159,29 @@ int main(int argc, char **argv) {
                            .finish();
         sup_net->start();
 
+        rth::system_context_thread_t fs_context;
+        auto fs_sup = fs_context.create_supervisor<rth::supervisor_thread_t>()
+                .timeout(timeout)
+                .registry_address(sup_net->get_registry_address())
+                .finish();
+
+        fs_sup->create_actor<syncspirit::fs::fs_actor_t>()
+                .fs_config(cfg.fs_config)
+                .timeout(timeout)
+                .finish();
+
+
         /* launch actors */
         auto net_thread = std::thread([&]() {
             io_context.run();
             console::shutdown_flag = true;
             spdlog::trace("net thread has been terminated");
+        });
+
+        auto fs_thread = std::thread([&]() {
+            fs_context.run();
+            console::shutdown_flag = true;
+            spdlog::trace("fs thread has been terminated");
         });
 
         asio::io_context console_context;
@@ -180,6 +201,10 @@ int main(int argc, char **argv) {
             .timeout(timeout)
             .finish();
         console_context.run();
+
+        spdlog::trace("waiting fs thread termination");
+        fs_thread.join();
+
         spdlog::trace("waiting net thread termination");
         net_thread.join();
 

@@ -30,6 +30,7 @@ add_library(syncspirit_lib
     src/db/prefix.cpp
     src/db/transaction.cpp
     src/db/utils.cpp
+    src/fs/fs_actor.cpp
     src/model/block_info.cpp
     src/model/cluster.cpp
     src/model/device.cpp
@@ -121,6 +122,7 @@ target_include_directories(syncspirit_lib PUBLIC
 
 target_link_libraries(syncspirit_lib
     rotor_asio
+    rotor_thread
     pugixml
     ${Boost_LIBRARIES}
     OpenSSL::SSL

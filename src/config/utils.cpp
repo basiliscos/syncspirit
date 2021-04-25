@@ -25,6 +25,10 @@ bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept
     return lhs.enabled == rhs.enabled && lhs.redial_timeout == rhs.redial_timeout;
 }
 
+bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
+    return lhs.batch_block_size == rhs.batch_block_size && lhs.batch_dirs_count == rhs.batch_block_size;
+}
+
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
     return lhs.enabled == rhs.enabled && lhs.announce_url == rhs.announce_url && lhs.device_id == rhs.device_id &&
            lhs.cert_file == rhs.cert_file && lhs.key_file == rhs.key_file && lhs.rx_buff_size == rhs.rx_buff_size &&
@@ -268,6 +272,25 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         c.redial_timeout = redial_timeout.value();
     }
 
+    // fs
+    {
+        auto t = root_tbl["fs"];
+        auto &c = cfg.fs_config;
+
+        auto batch_block_size = t["batch_block_size"].value<std::uint32_t>();
+        if (!batch_block_size) {
+            return "fs/batch_block_size is incorrect or missing";
+        }
+        c.batch_block_size = batch_block_size.value();
+
+
+        auto batch_dirs_count = t["batch_dirs_count"].value<std::uint32_t>();
+        if (!batch_dirs_count) {
+            return "fs/batch_dirs_count is incorrect or missing";
+        }
+        c.batch_dirs_count = batch_dirs_count.value();
+    }
+
     // tui
     {
         auto t = root_tbl["tui"];
@@ -350,6 +373,10 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                        {"enabled", cfg.dialer_config.enabled},
                        {"redial_timeout", cfg.dialer_config.redial_timeout},
                    }}},
+        {"fs", toml::table{{
+                       {"batch_block_size", cfg.fs_config.batch_block_size},
+                       {"batch_dirs_count", cfg.fs_config.batch_dirs_count},
+                   }}},
         {"tui", toml::table{{
                     {"refresh_interval", cfg.tui_config.refresh_interval},
                     {"key_quit", std::string_view(&cfg.tui_config.key_quit, 1)},
@@ -430,6 +457,10 @@ main_t generate_config(const boost::filesystem::path &config_path) {
     cfg.dialer_config = dialer_config_t {
         true,       /* enabled */
         5 * 60000   /* redial timeout */
+    };
+    cfg.fs_config = fs_config_t {
+        16777216,   /* 16MB, batch_block_size */
+        10,         /* batch_dirs_count */
     };
     return cfg;
 }

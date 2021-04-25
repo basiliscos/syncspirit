@@ -11,6 +11,7 @@ namespace outcome = boost::outcome_v2;
 
 bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept;
 bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept;
+bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept;
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept;
 bool operator==(const local_announce_config_t &lhs, const local_announce_config_t &rhs) noexcept;
 bool operator==(const main_t &lhs, const main_t &rhs) noexcept;

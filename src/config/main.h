@@ -3,6 +3,7 @@
 #include <map>
 #include "bep.h"
 #include "dialer.h"
+#include "fs.h"
 #include "global_announce.h"
 #include "local_announce.h"
 #include "tui.h"
@@ -19,6 +20,7 @@ struct main_t {
     global_announce_config_t global_announce_config;
     bep_config_t bep_config;
     dialer_config_t dialer_config;
+    fs_config_t fs_config;
     tui_config_t tui_config;
 
     std::uint32_t timeout;
