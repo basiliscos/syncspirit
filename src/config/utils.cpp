@@ -10,7 +10,7 @@
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.h>
 
-namespace fs = boost::filesystem;
+namespace bfs = boost::filesystem;
 
 static const std::string home_path = "~/.config/syncspirit";
 
@@ -283,7 +283,6 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.batch_block_size = batch_block_size.value();
 
-
         auto batch_dirs_count = t["batch_dirs_count"].value<std::uint32_t>();
         if (!batch_dirs_count) {
             return "fs/batch_dirs_count is incorrect or missing";
@@ -374,9 +373,9 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                        {"redial_timeout", cfg.dialer_config.redial_timeout},
                    }}},
         {"fs", toml::table{{
-                       {"batch_block_size", cfg.fs_config.batch_block_size},
-                       {"batch_dirs_count", cfg.fs_config.batch_dirs_count},
-                   }}},
+                   {"batch_block_size", cfg.fs_config.batch_block_size},
+                   {"batch_dirs_count", cfg.fs_config.batch_dirs_count},
+               }}},
         {"tui", toml::table{{
                     {"refresh_interval", cfg.tui_config.refresh_interval},
                     {"key_quit", std::string_view(&cfg.tui_config.key_quit, 1)},
@@ -393,16 +392,16 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
 
 main_t generate_config(const boost::filesystem::path &config_path) {
     auto dir = config_path.parent_path();
-    if (!fs::exists(dir)) {
+    if (!bfs::exists(dir)) {
         spdlog::info("creating directory {}", dir.c_str());
-        fs::create_directories(dir);
+        bfs::create_directories(dir);
     }
 
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
     auto home = std::getenv("HOME");
-    auto config_dir = fs::path(home).append(".config").append("syncthing");
-    bool is_home = dir == fs::path(config_dir);
+    auto config_dir = bfs::path(home).append(".config").append("syncthing");
+    bool is_home = dir == bfs::path(config_dir);
     if (!is_home) {
         using boost::algorithm::replace_all_copy;
         cert_file = replace_all_copy(cert_file, home_path, dir.string());
@@ -415,7 +414,7 @@ main_t generate_config(const boost::filesystem::path &config_path) {
     // clang-format off
     main_t cfg;
     cfg.config_path = config_path;
-    cfg.default_location = fs::path(home);
+    cfg.default_location = bfs::path(home);
     cfg.timeout = 5000;
     cfg.device_name = device;
     cfg.local_announce_config = local_announce_config_t {

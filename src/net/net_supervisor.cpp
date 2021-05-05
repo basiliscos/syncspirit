@@ -17,7 +17,7 @@
 #include <boost/filesystem.hpp>
 #include <algorithm>
 
-namespace fs = boost::filesystem;
+namespace bfs = boost::filesystem;
 using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{cfg}, app_config{cfg.app_config} {
@@ -119,7 +119,7 @@ void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_erro
 
 void net_supervisor_t::launch_db() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
-    fs::path path(app_config.config_path);
+    bfs::path path(app_config.config_path);
     auto db_dir = path.append("mbdx-db");
     db_addr =
         create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
@@ -322,7 +322,7 @@ outcome::result<void> net_supervisor_t::save_config(const config::main_t &new_cf
     auto path = new_cfg.config_path;
     path.append("syncspirit.toml");
     sys::error_code ec;
-    fs::rename(path_tmp, path, ec);
+    bfs::rename(path_tmp, path, ec);
     if (ec) {
         return ec;
     }

@@ -20,6 +20,7 @@ struct block_info_t : arc_base_t<block_info_t>, storeable_t {
     inline void set_db_key(std::uint64_t value) noexcept { db_key = value; }
 
     inline const std::string &get_hash() const noexcept { return hash; }
+    inline std::uint32_t get_weak_hash() const noexcept { return weak_hash; }
     inline std::uint64_t get_size() const noexcept { return size; }
 
     db::BlockInfo serialize() noexcept;

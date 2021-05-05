@@ -32,7 +32,6 @@ struct folder_info_t : arc_base_t<folder_info_t>, storeable_t {
   private:
     std::uint64_t index;
     std::int64_t max_sequence;
-    std::int64_t declared_max_sequence;
     device_t *device;
     folder_t *folder;
     std::uint64_t db_key;

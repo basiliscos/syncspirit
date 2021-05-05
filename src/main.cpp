@@ -161,15 +161,11 @@ int main(int argc, char **argv) {
 
         rth::system_context_thread_t fs_context;
         auto fs_sup = fs_context.create_supervisor<rth::supervisor_thread_t>()
-                .timeout(timeout)
-                .registry_address(sup_net->get_registry_address())
-                .finish();
+                          .timeout(timeout)
+                          .registry_address(sup_net->get_registry_address())
+                          .finish();
 
-        fs_sup->create_actor<syncspirit::fs::fs_actor_t>()
-                .fs_config(cfg.fs_config)
-                .timeout(timeout)
-                .finish();
-
+        fs_sup->create_actor<syncspirit::fs::fs_actor_t>().fs_config(cfg.fs_config).timeout(timeout).finish();
 
         /* launch actors */
         auto net_thread = std::thread([&]() {

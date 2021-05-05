@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(
     Boost
     COMPONENTS
+        iostreams
         filesystem
         program_options
         system
@@ -31,6 +32,7 @@ add_library(syncspirit_lib
     src/db/transaction.cpp
     src/db/utils.cpp
     src/fs/fs_actor.cpp
+    src/fs/utils.cpp
     src/model/block_info.cpp
     src/model/cluster.cpp
     src/model/device.cpp

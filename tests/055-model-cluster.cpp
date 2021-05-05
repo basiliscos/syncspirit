@@ -43,11 +43,11 @@ TEST_CASE("opt_for_synch", "[model]") {
 
     auto add_file = [&key](std::int64_t seq, model::device_ptr_t device, model::folder_ptr_t folder) mutable {
       db::FolderInfo db_folder_info;
+      db_folder_info.set_max_sequence(seq);
       auto folder_info = model::folder_info_ptr_t(new model::folder_info_t(db_folder_info, device.get(), folder.get(), ++key));
       db::FileInfo db_file_info;
       db_file_info.set_sequence(seq);
       auto file_info = model::file_info_ptr_t(new model::file_info_t(db_file_info, folder.get()));
-      folder_info->set_max_sequence(seq);
       folder->add(folder_info);
     };
 
