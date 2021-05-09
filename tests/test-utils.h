@@ -11,7 +11,7 @@ struct path_guard_t {
     fs::path& path;
     path_guard_t(fs::path& path_): path{path_}{}
     ~path_guard_t() {
-        fs::remove(path);
+        fs::remove_all(path);
     }
 };
 

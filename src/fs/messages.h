@@ -50,6 +50,7 @@ namespace message {
 
 using scan_request_t = r::message_t<payload::scan_request_t>;
 using scan_response_t = r::message_t<payload::scan_response_t>;
+using scan_error_t = r::message_t<payload::scan_error_t>;
 
 } // namespace message
 

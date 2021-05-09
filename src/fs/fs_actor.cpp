@@ -12,7 +12,6 @@ void fs_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(net::names::fs, false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(net::names::fs, get_address());
-        p.discover_name(net::names::coordinator, coordinator, true).link();
     });
 
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -64,6 +63,9 @@ void fs_actor_t::on_scan(message::scan_t &req) noexcept {
         send<payload::scan_t>(address, std::move(p));
         return;
     }
+    if (p.scan_dirs.empty()) {
+        send<payload::scan_response_t>(p.reply_to, std::move(p.root), std::move(p.file_map));
+    }
 }
 
 void fs_actor_t::scan_dir(bfs::path& dir, payload::scan_t &payload) noexcept {
@@ -73,7 +75,9 @@ void fs_actor_t::scan_dir(bfs::path& dir, payload::scan_t &payload) noexcept {
     if (!bfs::is_directory(dir)) {
         return;
     }
-    for(auto& child: dir) {
+
+    for(auto it = bfs::directory_iterator(dir); it != bfs::directory_iterator(); ++it) {
+        auto& child = *it;
         if (bfs::is_directory(child)) {
             payload.scan_dirs.push_back(child);
         } else if (bfs::is_regular_file(child)) {
@@ -88,7 +92,7 @@ void fs_actor_t::scan_dir(bfs::path& dir, payload::scan_t &payload) noexcept {
 std::uint32_t fs_actor_t::calc_block(payload::scan_t& payload) noexcept {
     if (payload.next_block) {
         auto& block = payload.next_block.value();
-        auto file = payload.file_map[block.path];
+        auto& file = payload.file_map[block.path];
         auto block_info = compute(block);
         auto recorded_info = payload.blocks_map.by_id(block_info->get_hash());
         if (recorded_info) {
@@ -100,7 +104,7 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t& payload) noexcept {
 
         // if it is the last block, reset the current block
         auto next_bytes = block.block_size * (block.block_index + 1);
-        if (next_bytes > block.file_size) {
+        if (next_bytes >= block.file_size) {
             payload.next_block.reset();
         } else {
             block.block_index++;
