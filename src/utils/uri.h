@@ -21,6 +21,7 @@ struct URI {
     std::string relative() const noexcept;
 
     inline bool operator==(const URI &other) const noexcept { return full == other.full; }
+    inline operator bool() const noexcept { return !full.empty(); }
 
   private:
     void reconstruct() noexcept;

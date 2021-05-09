@@ -59,6 +59,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_config_request(ui::message::config_request_t &message) noexcept;
     void on_config_save(ui::message::config_save_request_t &message) noexcept;
     void on_load_cluster(message::load_cluster_response_t &message) noexcept;
+    void on_cluster_ready(message::cluster_ready_notify_t &message) noexcept;
     void on_ignore_device(ui::message::ignore_device_request_t &message) noexcept;
     void on_update_peer(ui::message::update_peer_request_t &message) noexcept;
     void on_ignore_folder(ui::message::ignore_folder_request_t &message) noexcept;
@@ -72,9 +73,8 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void launch_db() noexcept;
     void launch_cluster() noexcept;
     void launch_ssdp() noexcept;
+    void launch_net() noexcept;
     void load_db() noexcept;
-    //    void persist_data() noexcept;
-    //    void update_devices() noexcept;
     outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
 
     config::main_t app_config;
@@ -89,12 +89,14 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     model::device_ptr_t device;
     model::cluster_ptr_t cluster;
     utils::key_pair_t ssl_pair;
+    utils::URI igd_location;
     model::devices_map_t devices;
     model::ignored_devices_map_t ignored_devices;
     model::ignored_folders_map_t ignored_folders;
     ignore_device_req_t ignore_device_req;
     ingored_folder_requests_t ingored_folder_requests;
     update_peer_req_t update_peer_req;
+    bool cluster_ready = false;
 };
 
 } // namespace net

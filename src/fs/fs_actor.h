@@ -38,8 +38,8 @@ struct fs_actor_t : public r::actor_base_t {
   private:
     void on_scan_request(message::scan_request_t &req) noexcept;
     void on_scan(message::scan_t &req) noexcept;
-    void scan_dir(bfs::path& dir, payload::scan_t& payload) noexcept;
-    uint32_t calc_block(payload::scan_t& payload) noexcept;
+    void scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept;
+    uint32_t calc_block(payload::scan_t &payload) noexcept;
 
     r::address_ptr_t coordinator;
     config::fs_config_t fs_config;

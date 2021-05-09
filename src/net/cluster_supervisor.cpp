@@ -18,6 +18,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::cluster, get_address());
         p.discover_name(names::coordinator, coordinator, false).link(false);
+        // p.discover_name(names::fs, fs, true).link(false);
         p.discover_name(names::db, db, true).link(true);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -31,6 +32,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
 void cluster_supervisor_t::on_start() noexcept {
     spdlog::trace("{}, on_start", identity);
     ra::supervisor_asio_t::on_start();
+    send<payload::cluster_ready_notify_t>(coordinator);
 }
 
 void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {

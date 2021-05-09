@@ -66,6 +66,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     void on_store_new_folder(message::store_new_folder_response_t &message) noexcept;
 
     r::address_ptr_t coordinator;
+    r::address_ptr_t fs;
     r::address_ptr_t db;
     model::device_ptr_t device;
     model::cluster_ptr_t cluster;

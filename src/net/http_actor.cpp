@@ -27,7 +27,7 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(registry_name, get_address());
-        p.discover_name(names::resolver, resolver).link(false);
+        p.discover_name(names::resolver, resolver, true).link(false);
     });
 }
 

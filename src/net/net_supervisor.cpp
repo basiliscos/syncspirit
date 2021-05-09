@@ -73,6 +73,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_update_peer);
         p.subscribe_actor(&net_supervisor_t::on_store_device);
         p.subscribe_actor(&net_supervisor_t::on_store_ignored_folder);
+        p.subscribe_actor(&net_supervisor_t::on_cluster_ready);
         launch_db();
     });
 }
@@ -146,11 +147,8 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
         identity, devices.size(), ignored_devices.size(), ignored_folders.size(), cluster->get_folders().size(),
         cluster->get_blocks().size());
 
-    auto timeout = shutdown_timeout * 9 / 10;
-    auto io_timeout = shutdown_timeout * 8 / 10;
-
     cluster_addr = create_actor<cluster_supervisor_t>()
-                       .timeout(timeout)
+                       .timeout(shutdown_timeout * 9 / 10)
                        .strand(strand)
                        .device(device)
                        .devices(&devices)
@@ -158,17 +156,36 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
                        .cluster(cluster)
                        .finish()
                        ->get_address();
+}
+
+void net_supervisor_t::on_cluster_ready(message::cluster_ready_notify_t &message) noexcept {
+    spdlog::trace("{}, on_cluster_ready", identity);
+    auto &ee = message.payload.ee;
+    if (ee) {
+        spdlog::critical("{}, cluster is not ready: {}, ", ee->message());
+        return do_shutdown(ee);
+    }
+    cluster_ready = true;
+    launch_net();
+}
+
+void net_supervisor_t::launch_net() noexcept {
+    if (!cluster_ready || !igd_location) {
+        return;
+    }
+
+    spdlog::info("{}, launching network services", identity);
+    auto timeout = shutdown_timeout * 9 / 10;
+
+    upnp_addr = create_actor<upnp_actor_t>()
+                    .timeout(timeout)
+                    .descr_url(igd_location)
+                    .rx_buff_size(app_config.upnp_config.rx_buff_size)
+                    .external_port(app_config.upnp_config.external_port)
+                    .finish()
+                    ->get_address();
 
     create_actor<acceptor_actor_t>().timeout(timeout).finish();
-    create_actor<resolver_actor_t>().timeout(timeout).resolve_timeout(io_timeout).finish();
-    create_actor<http_actor_t>()
-        .timeout(timeout)
-        .request_timeout(io_timeout)
-        .resolve_timeout(io_timeout)
-        .registry_name(names::http10)
-        .keep_alive(false)
-        .finish();
-
     peers_addr = create_actor<peer_supervisor_t>()
                      .ssl_pair(&ssl_pair)
                      .device_name(app_config.device_name)
@@ -193,6 +210,19 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
 void net_supervisor_t::on_start() noexcept {
     spdlog::trace("{}, on_start", identity);
     parent_t::on_start();
+
+    auto timeout = shutdown_timeout * 9 / 10;
+    auto io_timeout = shutdown_timeout * 8 / 10;
+
+    create_actor<resolver_actor_t>().timeout(timeout).resolve_timeout(io_timeout).finish();
+    create_actor<http_actor_t>()
+        .timeout(timeout)
+        .request_timeout(io_timeout)
+        .resolve_timeout(io_timeout)
+        .registry_name(names::http10)
+        .keep_alive(false)
+        .finish();
+
     launch_ssdp();
 }
 
@@ -202,15 +232,8 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
     auto ec = r::make_error_code(r::shutdown_code_t::normal);
     send<r::payload::shutdown_trigger_t>(get_address(), ssdp_addr, make_error(ec));
 
-    auto &igd_url = message.payload.igd.location;
-    auto timeout = shutdown_timeout * 9 / 10;
-    upnp_addr = create_actor<upnp_actor_t>()
-                    .timeout(timeout)
-                    .descr_url(igd_url)
-                    .rx_buff_size(app_config.upnp_config.rx_buff_size)
-                    .external_port(app_config.upnp_config.external_port)
-                    .finish()
-                    ->get_address();
+    igd_location = message.payload.igd.location;
+    launch_net();
 }
 
 void net_supervisor_t::launch_ssdp() noexcept {

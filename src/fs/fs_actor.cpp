@@ -10,9 +10,7 @@ fs_actor_t::fs_actor_t(config_t &cfg) : r::actor_base_t{cfg}, fs_config{cfg.fs_c
 void fs_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(net::names::fs, false); });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(net::names::fs, get_address());
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(net::names::fs, get_address()); });
 
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&fs_actor_t::on_scan_request);
@@ -33,16 +31,16 @@ void fs_actor_t::shutdown_finish() noexcept {
 
 void fs_actor_t::on_scan_request(message::scan_request_t &req) noexcept {
     auto &root = req.payload.root;
-    auto task  = payload::scan_t{root, req.payload.reply_to, {}, {root}, {}, {}, {}};
+    auto task = payload::scan_t{root, req.payload.reply_to, {}, {root}, {}, {}, {}};
     send<payload::scan_t>(address, std::move(task));
 }
 
 void fs_actor_t::on_scan(message::scan_t &req) noexcept {
     auto dirs_counter = fs_config.batch_dirs_count;
-    auto& p = req.payload;
+    auto &p = req.payload;
     while ((dirs_counter > 0) && (!p.scan_dirs.empty())) {
         --dirs_counter;
-        auto& dir = p.scan_dirs.front();
+        auto &dir = p.scan_dirs.front();
         scan_dir(dir, p);
         p.scan_dirs.pop_front();
     }
@@ -52,9 +50,7 @@ void fs_actor_t::on_scan(message::scan_t &req) noexcept {
     }
 
     auto blocks_size = fs_config.batch_block_size;
-    auto bs_condition = [&]() {
-        return (blocks_size > 0) && (p.next_block|| !p.files_queue.empty());
-    };
+    auto bs_condition = [&]() { return (blocks_size > 0) && (p.next_block || !p.files_queue.empty()); };
     while (bs_condition()) {
         auto bytes = calc_block(p);
         blocks_size -= std::min(bytes, blocks_size);
@@ -68,7 +64,7 @@ void fs_actor_t::on_scan(message::scan_t &req) noexcept {
     }
 }
 
-void fs_actor_t::scan_dir(bfs::path& dir, payload::scan_t &payload) noexcept {
+void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
     if (!bfs::exists(dir)) {
         return;
     }
@@ -76,8 +72,8 @@ void fs_actor_t::scan_dir(bfs::path& dir, payload::scan_t &payload) noexcept {
         return;
     }
 
-    for(auto it = bfs::directory_iterator(dir); it != bfs::directory_iterator(); ++it) {
-        auto& child = *it;
+    for (auto it = bfs::directory_iterator(dir); it != bfs::directory_iterator(); ++it) {
+        auto &child = *it;
         if (bfs::is_directory(child)) {
             payload.scan_dirs.push_back(child);
         } else if (bfs::is_regular_file(child)) {
@@ -88,11 +84,10 @@ void fs_actor_t::scan_dir(bfs::path& dir, payload::scan_t &payload) noexcept {
     }
 }
 
-
-std::uint32_t fs_actor_t::calc_block(payload::scan_t& payload) noexcept {
+std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
     if (payload.next_block) {
-        auto& block = payload.next_block.value();
-        auto& file = payload.file_map[block.path];
+        auto &block = payload.next_block.value();
+        auto &file = payload.file_map[block.path];
         auto block_info = compute(block);
         auto recorded_info = payload.blocks_map.by_id(block_info->get_hash());
         if (recorded_info) {
@@ -111,8 +106,7 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t& payload) noexcept {
         }
 
         return block_info->get_size();
-    }
-    else  {
+    } else {
         assert(!payload.files_queue.empty());
         auto file = payload.files_queue.front();
         payload.files_queue.pop_front();

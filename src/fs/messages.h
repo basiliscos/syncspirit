@@ -43,7 +43,6 @@ struct scan_error_t {
     sys::error_code error;
 };
 
-
 } // namespace payload
 
 namespace message {

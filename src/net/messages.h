@@ -226,6 +226,10 @@ struct load_cluster_request_t {
     using response_t = load_cluster_response_t;
 };
 
+struct cluster_ready_notify_t {
+    r::extended_error_ptr_t ee;
+};
+
 struct start_reading_t {
     r::address_ptr_t controller;
 };
@@ -343,6 +347,7 @@ using store_folder_response_t = r::request_traits_t<payload::store_folder_reques
 
 using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
+using cluster_ready_notify_t = r::message_t<payload::cluster_ready_notify_t>;
 
 using start_reading_t = r::message_t<payload::start_reading_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
