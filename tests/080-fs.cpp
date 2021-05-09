@@ -229,6 +229,29 @@ TEST_CASE("fs-actor", "[fs]") {
         CHECK(b->get_weak_hash() == 0x21700dc);
     }
 
+    SECTION("file with 2 identical blocks") {
+        static const constexpr size_t SZ = (1 << 7) * 1024;
+        auto act = sup->create_actor<consumer_actor_t>().timeout(timeout).root_path(root_path).finish();
+        auto file = root_path / "my-file";
+        std::string data;
+        data.resize(SZ*2);
+        std::fill(data.begin(), data.end(), 1);
+        write(file, data);
+        sup->do_process();
+        CHECK(act->errors.empty());
+        REQUIRE(act->response);
+        auto& r = act->response->payload;
+        REQUIRE(!r.file_map.empty());
+        auto it = r.file_map.begin();
+        CHECK(it->first == file);
+        auto& blocks = it->second;
+        REQUIRE(blocks.size() == 2);
+        auto& b1 = blocks[0];
+        auto& b2 = blocks[1];
+        CHECK(*b1 == *b2);
+        CHECK(b1 == b2);
+    }
+
     sup->shutdown();
     sup->do_process();
 }
