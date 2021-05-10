@@ -18,7 +18,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::cluster, get_address());
         p.discover_name(names::coordinator, coordinator, false).link(false);
-        // p.discover_name(names::fs, fs, true).link(false);
+        p.discover_name(names::fs, fs, true).link(false);
         p.discover_name(names::db, db, true).link(true);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {

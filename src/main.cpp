@@ -19,7 +19,7 @@
 #include "console/sink.h"
 #include "console/tui_actor.h"
 #include "console/utils.h"
-#include "fs/fs_actor.h"
+#include "fs/fs_supervisor.h"
 
 namespace bfs = boost::filesystem;
 namespace po = boost::program_options;
@@ -160,12 +160,10 @@ int main(int argc, char **argv) {
         sup_net->start();
 
         rth::system_context_thread_t fs_context;
-        auto fs_sup = fs_context.create_supervisor<rth::supervisor_thread_t>()
+        auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                           .timeout(timeout)
                           .registry_address(sup_net->get_registry_address())
                           .finish();
-
-        fs_sup->create_actor<syncspirit::fs::fs_actor_t>().fs_config(cfg.fs_config).timeout(timeout).finish();
 
         /* launch actors */
         auto net_thread = std::thread([&]() {

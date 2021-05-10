@@ -105,6 +105,10 @@ void dialer_actor_t::on_ready(const model::device_ptr_t &peer_device, const util
 
 void dialer_actor_t::on_discovery(message::discovery_response_t &res) noexcept {
     resources->release(resource::request);
+    if (state != r::state_t::OPERATIONAL) {
+        return;
+    }
+
     auto &ee = res.payload.ee;
     auto &peer_id = res.payload.req->payload.request_payload->device_id;
     auto peer = devices->by_id(peer_id.get_sha256());
