@@ -63,9 +63,6 @@ void tui_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&tui_actor_t::on_discovery, coordinator);
                 plugin->subscribe_actor(&tui_actor_t::on_auth, coordinator);
-
-                auto timeout = init_timeout / 2;
-                request<ui::payload::config_request_t>(coordinator).send(timeout);
             }
         });
         p.discover_name(net::names::cluster, cluster, true).link().callback([&](auto phase, auto &ec) {
@@ -83,6 +80,9 @@ void tui_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&tui_actor_t::on_ignrore_device);
         p.subscribe_actor(&tui_actor_t::on_update_peer);
         p.subscribe_actor(&tui_actor_t::on_ignrore_folder);
+        assert(coordinator);
+        auto timeout = init_timeout / 2;
+        request<ui::payload::config_request_t>(coordinator).send(timeout);
     });
 }
 
@@ -303,9 +303,10 @@ void tui_actor_t::ignore_folder(const proto::Folder &folder, model::device_ptr_t
     request<ui::payload::ignore_folder_request_t>(coordinator, f).send(init_timeout);
 }
 
-void tui_actor_t::create_folder(const proto::Folder &folder, model::device_ptr_t &source,
-                                std::uint64_t source_index) noexcept {
+void tui_actor_t::create_folder(const proto::Folder &folder, model::device_ptr_t &source, std::uint64_t source_index,
+                                const std::string &path) noexcept {
     db::Folder f;
+    f.set_path(path);
     f.set_id(folder.id());
     f.set_label(folder.label());
     f.set_read_only(folder.read_only());

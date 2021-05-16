@@ -14,7 +14,7 @@
 
 namespace syncspirit::model {
 
-namespace fs = boost::filesystem;
+namespace bfs = boost::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct cluster_t;
@@ -41,6 +41,7 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     inline auto &get_folder_infos() noexcept { return folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
+    inline const bfs::path &get_path() noexcept { return path; }
     void update(const proto::Folder &remote) noexcept;
     void update(const proto::Index &data, const device_ptr_t &peer) noexcept;
 
@@ -52,7 +53,7 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     std::uint64_t db_key;
     std::string _id;
     std::string _label;
-    fs::path path;
+    bfs::path path;
     db::FolderType folder_type;
     std::uint32_t rescan_interval;
     db::PullOrder pull_order;

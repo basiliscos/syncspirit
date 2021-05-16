@@ -14,6 +14,8 @@ namespace fs {
 
 namespace bio = boost::iostreams;
 
+using request_ptr_t = r::intrusive_ptr_t<message::scan_request_t>;
+
 namespace payload {
 
 struct scan_t {
@@ -31,8 +33,7 @@ struct scan_t {
 
     using next_block_option_t = std::optional<next_block_t>;
 
-    bfs::path root;
-    r::address_ptr_t reply_to;
+    request_ptr_t request;
     model::block_infos_map_t blocks_map;
     std::deque<bfs::path> scan_dirs;
     std::deque<bfs::path> files_queue;

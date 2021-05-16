@@ -26,13 +26,32 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
         p.subscribe_actor(&cluster_supervisor_t::on_store_new_folder);
         p.subscribe_actor(&cluster_supervisor_t::on_connect);
         p.subscribe_actor(&cluster_supervisor_t::on_disconnect);
+        p.subscribe_actor(&cluster_supervisor_t::on_scan_complete);
     });
 }
 
 void cluster_supervisor_t::on_start() noexcept {
-    spdlog::trace("{}, on_start", identity);
+    spdlog::trace("{}, on_start, folders count = {}", identity, folders.size());
     ra::supervisor_asio_t::on_start();
-    send<payload::cluster_ready_notify_t>(coordinator);
+    initial_scan = true;
+    for (auto &it : folders) {
+        auto &root = it.second->get_path();
+        send<fs::payload::scan_request_t>(fs, root, get_address());
+        scan_folders.emplace(root);
+    }
+}
+
+void cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &message) noexcept {
+    auto &path = message.payload.root;
+    spdlog::trace("{}, on_scan_complete for {}", identity, path.c_str());
+    auto it = scan_folders.find(path);
+    assert(it != scan_folders.end());
+    scan_folders.erase(it);
+    if (scan_folders.empty() && initial_scan) {
+        spdlog::debug("{}, completed intiial scan", identity, path.c_str());
+        send<payload::cluster_ready_notify_t>(coordinator);
+        initial_scan = false;
+    }
 }
 
 void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {

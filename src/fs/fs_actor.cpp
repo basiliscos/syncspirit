@@ -31,8 +31,32 @@ void fs_actor_t::shutdown_finish() noexcept {
 
 void fs_actor_t::on_scan_request(message::scan_request_t &req) noexcept {
     auto &root = req.payload.root;
-    auto task = payload::scan_t{root, req.payload.reply_to, {}, {root}, {}, {}, {}};
+    spdlog::debug("{}, on_scan_request, root = {}", identity, root.c_str());
+
+    queue.emplace_back(&req);
+    if (queue.size() == 1) {
+        process_queue();
+    }
+}
+
+void fs_actor_t::process_queue() noexcept {
+    if (queue.empty()) {
+        spdlog::trace("{} empty queue, nothing to process", identity);
+        return;
+    }
+    auto &req = queue.front();
+    auto task = payload::scan_t{req, {}, {req->payload.root}, {}, {}, {}};
     send<payload::scan_t>(address, std::move(task));
+}
+
+void fs_actor_t::reply(message::scan_t &scan) noexcept {
+    auto &p = scan.payload;
+    auto &payload = p.request->payload;
+    auto &requestee = payload.reply_to;
+    auto &root = payload.root;
+    send<payload::scan_response_t>(requestee, std::move(root), std::move(p.file_map));
+    queue.pop_front();
+    process_queue();
 }
 
 void fs_actor_t::on_scan(message::scan_t &req) noexcept {
@@ -60,7 +84,7 @@ void fs_actor_t::on_scan(message::scan_t &req) noexcept {
         return;
     }
     if (p.scan_dirs.empty()) {
-        send<payload::scan_response_t>(p.reply_to, std::move(p.root), std::move(p.file_map));
+        reply(req);
     }
 }
 
@@ -112,7 +136,10 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
         payload.files_queue.pop_front();
         auto r = prepare(file);
         if (!r) {
-            send<payload::scan_error_t>(payload.reply_to, payload.root, file, r.error());
+            auto &p = payload.request->payload;
+            auto &requestee = p.reply_to;
+            auto &root = p.root;
+            send<payload::scan_error_t>(requestee, root, file, r.error());
         } else {
             payload.next_block = std::move(r.value());
         }

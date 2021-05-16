@@ -12,9 +12,11 @@
 
 namespace syncspirit::config {
 
+namespace bfs = boost::filesystem;
+
 struct main_t {
-    boost::filesystem::path config_path;
-    boost::filesystem::path default_location;
+    bfs::path config_path;
+    bfs::path default_location;
     local_announce_config_t local_announce_config;
     upnp_config_t upnp_config;
     global_announce_config_t global_announce_config;

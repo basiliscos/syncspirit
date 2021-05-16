@@ -90,7 +90,8 @@ struct tui_actor_t : public r::actor_base_t {
     void discard_activity() noexcept;
     void ignore_device(const model::device_id_t &) noexcept;
     void ignore_folder(const proto::Folder &folder, model::device_ptr_t &source) noexcept;
-    void create_folder(const proto::Folder &folder, model::device_ptr_t &source, uint64_t source_index) noexcept;
+    void create_folder(const proto::Folder &folder, model::device_ptr_t &source, uint64_t source_index,
+                       const std::string &path) noexcept;
 
     asio::io_context::strand &strand;
     model::devices_map_t devices;

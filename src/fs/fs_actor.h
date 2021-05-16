@@ -4,6 +4,7 @@
 #include "messages.h"
 #include "continuation.h"
 #include <rotor/thread.hpp>
+#include <deque>
 
 namespace syncspirit {
 namespace fs {
@@ -36,11 +37,16 @@ struct fs_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:
+    using requests_t = std::deque<request_ptr_t>;
+
     void on_scan_request(message::scan_request_t &req) noexcept;
     void on_scan(message::scan_t &req) noexcept;
     void scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept;
+    void process_queue() noexcept;
+    void reply(message::scan_t &req) noexcept;
     uint32_t calc_block(payload::scan_t &payload) noexcept;
 
+    requests_t queue;
     r::address_ptr_t coordinator;
     config::fs_config_t fs_config;
 };

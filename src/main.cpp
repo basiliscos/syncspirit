@@ -163,6 +163,7 @@ int main(int argc, char **argv) {
         auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                           .timeout(timeout)
                           .registry_address(sup_net->get_registry_address())
+                          .fs_config(cfg.fs_config)
                           .finish();
 
         /* launch actors */
