@@ -8,22 +8,11 @@
 #include <boost/system/error_code.hpp>
 #include <rotor.hpp>
 #include "../model/block_info.h"
-
-namespace std {
-template <> struct hash<boost::filesystem::path> {
-    size_t operator()(const boost::filesystem::path &p) const { return boost::filesystem::hash_value(p); }
-};
-} // namespace std
+#include "../model/local_file.h"
 
 namespace syncspirit {
 
 namespace fs {
-
-using blocks_t = std::vector<model::block_info_ptr_t>;
-
-struct local_file_info_t {
-    blocks_t blocks;
-};
 
 namespace r = rotor;
 namespace bfs = boost::filesystem;
@@ -36,12 +25,7 @@ struct scan_request_t {
     r::address_ptr_t reply_to;
 };
 
-struct scan_response_t {
-    using file_map_t = std::unordered_map<bfs::path, local_file_info_t>;
-    using file_map_ptr_t = std::unique_ptr<file_map_t>;
-    bfs::path root;
-    file_map_ptr_t file_map;
-};
+using scan_response_t = model::local_file_map_ptr_t;
 
 struct scan_error_t {
     bfs::path root;

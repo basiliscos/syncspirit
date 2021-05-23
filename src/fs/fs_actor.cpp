@@ -45,8 +45,9 @@ void fs_actor_t::process_queue() noexcept {
         return;
     }
     auto &req = queue.front();
-    auto file_map = std::make_unique<payload::scan_response_t::file_map_t>();
-    auto task = payload::scan_t{req, {}, {req->payload.root}, {}, std::move(file_map), {}};
+    auto &root = req->payload.root;
+    auto file_map = std::make_unique<model::local_file_map_t>(root);
+    auto task = payload::scan_t{req, {}, {root}, {}, std::move(file_map), {}};
     send<payload::scan_t>(address, std::move(task));
 }
 
@@ -55,7 +56,7 @@ void fs_actor_t::reply(message::scan_t &scan) noexcept {
     auto &payload = p.request->payload;
     auto &requestee = payload.reply_to;
     auto &root = payload.root;
-    send<payload::scan_response_t>(requestee, std::move(root), std::move(p.file_map));
+    send<payload::scan_response_t>(requestee, std::move(p.file_map));
     queue.pop_front();
     process_queue();
 }
@@ -112,7 +113,8 @@ void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
 std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
     if (payload.next_block) {
         auto &block = payload.next_block.value();
-        auto &local_info = (*payload.file_map)[block.path];
+        auto &container = payload.file_map->map;
+        auto &local_info = container[block.path];
         auto block_info = compute(block);
         auto recorded_info = payload.blocks_map.by_id(block_info->get_hash());
         if (recorded_info) {

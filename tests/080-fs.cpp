@@ -195,8 +195,8 @@ TEST_CASE("fs-actor", "[fs]") {
         CHECK(act->errors.empty());
         REQUIRE(act->response);
         auto& r = act->response->payload;
-        CHECK(r.root == root_path);
-        CHECK(r.file_map->empty());
+        CHECK(r->root == root_path);
+        CHECK(r->map.empty());
     }
 
     SECTION("non-existing root path") {
@@ -205,8 +205,8 @@ TEST_CASE("fs-actor", "[fs]") {
         CHECK(act->errors.empty());
         REQUIRE(act->response);
         auto& r = act->response->payload;
-        CHECK(r.root == (root_path / "bla-bla"));
-        CHECK(r.file_map->empty());
+        CHECK(r->root == (root_path / "bla-bla"));
+        CHECK(r->map.empty());
     }
 
     SECTION("path with dummy file, in root folder and in subfolder") {
@@ -220,8 +220,8 @@ TEST_CASE("fs-actor", "[fs]") {
         CHECK(act->errors.empty());
         REQUIRE(act->response);
         auto& r = act->response->payload;
-        REQUIRE(!r.file_map->empty());
-        auto it = r.file_map->begin();
+        REQUIRE(!r->map.empty());
+        auto it = r->map.begin();
         CHECK(it->first == file);
         auto& local = it->second;
         auto& blocks = local.blocks;
@@ -243,8 +243,8 @@ TEST_CASE("fs-actor", "[fs]") {
         CHECK(act->errors.empty());
         REQUIRE(act->response);
         auto& r = act->response->payload;
-        REQUIRE(!r.file_map->empty());
-        auto it = r.file_map->begin();
+        REQUIRE(!r->map.empty());
+        auto it = r->map.begin();
         CHECK(it->first == file);
         auto& local = it->second;
         auto& blocks = local.blocks;
