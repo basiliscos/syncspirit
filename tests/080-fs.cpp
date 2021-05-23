@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <rotor/thread.hpp>
 #include <net/names.h>
+#include <boost/mpl/size.hpp>
 
 
 namespace rth = rotor::thread;
@@ -195,7 +196,7 @@ TEST_CASE("fs-actor", "[fs]") {
         REQUIRE(act->response);
         auto& r = act->response->payload;
         CHECK(r.root == root_path);
-        CHECK(r.file_map.empty());
+        CHECK(r.file_map->empty());
     }
 
     SECTION("non-existing root path") {
@@ -205,7 +206,7 @@ TEST_CASE("fs-actor", "[fs]") {
         REQUIRE(act->response);
         auto& r = act->response->payload;
         CHECK(r.root == (root_path / "bla-bla"));
-        CHECK(r.file_map.empty());
+        CHECK(r.file_map->empty());
     }
 
     SECTION("path with dummy file, in root folder and in subfolder") {
@@ -219,10 +220,11 @@ TEST_CASE("fs-actor", "[fs]") {
         CHECK(act->errors.empty());
         REQUIRE(act->response);
         auto& r = act->response->payload;
-        REQUIRE(!r.file_map.empty());
-        auto it = r.file_map.begin();
+        REQUIRE(!r.file_map->empty());
+        auto it = r.file_map->begin();
         CHECK(it->first == file);
-        auto& blocks = it->second;
+        auto& local = it->second;
+        auto& blocks = local.blocks;
         REQUIRE(blocks.size() == 1);
         auto& b = blocks.front();
         CHECK(hash_string(b->get_hash()) == "98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4");
@@ -241,10 +243,11 @@ TEST_CASE("fs-actor", "[fs]") {
         CHECK(act->errors.empty());
         REQUIRE(act->response);
         auto& r = act->response->payload;
-        REQUIRE(!r.file_map.empty());
-        auto it = r.file_map.begin();
+        REQUIRE(!r.file_map->empty());
+        auto it = r.file_map->begin();
         CHECK(it->first == file);
-        auto& blocks = it->second;
+        auto& local = it->second;
+        auto& blocks = local.blocks;
         REQUIRE(blocks.size() == 2);
         auto& b1 = blocks[0];
         auto& b2 = blocks[1];

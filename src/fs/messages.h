@@ -19,6 +19,12 @@ namespace syncspirit {
 
 namespace fs {
 
+using blocks_t = std::vector<model::block_info_ptr_t>;
+
+struct local_file_info_t {
+    blocks_t blocks;
+};
+
 namespace r = rotor;
 namespace bfs = boost::filesystem;
 namespace sys = boost::system;
@@ -31,10 +37,10 @@ struct scan_request_t {
 };
 
 struct scan_response_t {
-    using blocks_t = std::vector<model::block_info_ptr_t>;
-    using file_map_t = std::unordered_map<bfs::path, blocks_t>;
+    using file_map_t = std::unordered_map<bfs::path, local_file_info_t>;
+    using file_map_ptr_t = std::unique_ptr<file_map_t>;
     bfs::path root;
-    file_map_t file_map;
+    file_map_ptr_t file_map;
 };
 
 struct scan_error_t {

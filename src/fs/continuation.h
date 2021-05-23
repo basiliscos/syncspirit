@@ -19,7 +19,7 @@ using request_ptr_t = r::intrusive_ptr_t<message::scan_request_t>;
 namespace payload {
 
 struct scan_t {
-    using file_map_t = payload::scan_response_t::file_map_t;
+    using file_map_ptr_t = payload::scan_response_t::file_map_ptr_t;
     using file_t = bio::mapped_file_source;
     using file_ptr_t = std::unique_ptr<file_t>;
 
@@ -37,7 +37,7 @@ struct scan_t {
     model::block_infos_map_t blocks_map;
     std::deque<bfs::path> scan_dirs;
     std::deque<bfs::path> files_queue;
-    file_map_t file_map;
+    file_map_ptr_t file_map;
     std::optional<next_block_t> next_block;
 };
 
