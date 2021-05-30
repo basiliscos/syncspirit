@@ -114,7 +114,9 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
     if (payload.next_block) {
         auto &block = payload.next_block.value();
         auto &container = payload.file_map->map;
-        auto &local_info = container[block.path];
+        auto& root = payload.request->payload.root;
+        auto rel_path = bfs::relative(block.path, root);
+        auto &local_info = container[rel_path];
         auto block_info = compute(block);
         auto recorded_info = payload.blocks_map.by_id(block_info->get_hash());
         if (recorded_info) {

@@ -35,19 +35,23 @@ void cluster_supervisor_t::on_start() noexcept {
     ra::supervisor_asio_t::on_start();
     initial_scan = true;
     for (auto &it : folders) {
-        auto &root = it.second->get_path();
+        auto& folder = it.second;
+        auto &root = folder->get_path();
         send<fs::payload::scan_request_t>(fs, root, get_address());
-        scan_folders.emplace(root);
+        scan_folders_map.emplace(root, folder);
     }
 }
 
 void cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &message) noexcept {
-    auto &path = message.payload->root;
+    auto &payload = *message.payload;;
+    auto &path = payload.root;
     spdlog::trace("{}, on_scan_complete for {}", identity, path.c_str());
-    auto it = scan_folders.find(path);
-    assert(it != scan_folders.end());
-    scan_folders.erase(it);
-    if (scan_folders.empty() && initial_scan) {
+    auto it = scan_folders_map.find(path);
+    assert(it != scan_folders_map.end());
+    auto& folder = it->second;
+    folder->update(payload);
+    scan_folders_map.erase(it);
+    if (scan_folders_map.empty() && initial_scan) {
         spdlog::debug("{}, completed intiial scan", identity, path.c_str());
         send<payload::cluster_ready_notify_t>(coordinator);
         initial_scan = false;

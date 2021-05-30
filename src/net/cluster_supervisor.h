@@ -62,7 +62,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     using device2addr_map_t = std::unordered_map<std::string, r::address_ptr_t>; // device_id: controller
     using addr2device_map_t = std::unordered_map<r::address_ptr_t, std::string>; // reverse
     using create_folder_req_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
-    using scan_folders_t = std::unordered_set<bfs::path>;
+    using scan_folders_map_t = std::unordered_map<bfs::path, model::folder_ptr_t>;
 
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
     void on_connect(message::connect_notify_t &message) noexcept;
@@ -81,7 +81,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     device2addr_map_t device2addr_map;
     addr2device_map_t addr2device_map;
     create_folder_req_t create_folder_req;
-    scan_folders_t scan_folders;
+    scan_folders_map_t scan_folders_map;
     bool initial_scan;
 };
 

@@ -222,7 +222,7 @@ TEST_CASE("fs-actor", "[fs]") {
         auto& r = act->response->payload;
         REQUIRE(!r->map.empty());
         auto it = r->map.begin();
-        CHECK(it->first == file);
+        CHECK(it->first.string() == bfs::path(sub) / "my-file");
         auto& local = it->second;
         auto& blocks = local.blocks;
         REQUIRE(blocks.size() == 1);
@@ -245,7 +245,7 @@ TEST_CASE("fs-actor", "[fs]") {
         auto& r = act->response->payload;
         REQUIRE(!r->map.empty());
         auto it = r->map.begin();
-        CHECK(it->first == file);
+        CHECK(it->first == "my-file");
         auto& local = it->second;
         auto& blocks = local.blocks;
         REQUIRE(blocks.size() == 2);

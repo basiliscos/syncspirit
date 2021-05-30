@@ -11,6 +11,7 @@
 #include "structs.pb.h"
 #include "folder_info.h"
 #include "storeable.h"
+#include "local_file.h"
 
 namespace syncspirit::model {
 
@@ -44,6 +45,7 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     inline const bfs::path &get_path() noexcept { return path; }
     void update(const proto::Folder &remote) noexcept;
     void update(const proto::Index &data, const device_ptr_t &peer) noexcept;
+    void update(local_file_map_t& local_files) noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;

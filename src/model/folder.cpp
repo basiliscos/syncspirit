@@ -208,3 +208,11 @@ void folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexce
     }
     */
 }
+
+
+void folder_t::update(local_file_map_t& local_files) noexcept {
+    std::abort();
+    for(auto it: file_infos) {
+
+    }
+}
