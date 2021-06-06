@@ -104,7 +104,7 @@ void cluster_t::sanitize(proto::Folder &folder, const devices_map_t &devices) no
 }
 
 #endif
-folder_ptr_t cluster_t::opt_for_synch(const device_ptr_t &peer_device) noexcept {
+folder_ptr_t cluster_t::folder_for_synch(const device_ptr_t &peer_device) noexcept {
     assert(peer_device != device);
     std::int64_t max_score = 0;
     folder_ptr_t best_folder;
@@ -117,4 +117,23 @@ folder_ptr_t cluster_t::opt_for_synch(const device_ptr_t &peer_device) noexcept 
         }
     }
     return best_folder;
+}
+
+file_info_ptr_t cluster_t::file_for_synch(const device_ptr_t &peer_device) noexcept {
+    // find local outdated files, which present on peer device
+    assert(peer_device != device);
+    for (auto &it_f : folders) {
+        auto &folder = it_f.second;
+        for (auto& it_file : folder->get_file_infos()) {
+            auto& file_info = it_file.second;
+            if (file_info->is_outdated()) {
+                auto& folder_infos_map = folder->get_folder_infos();
+                auto folder_info = folder_infos_map.by_id(peer_device->device_id.get_sha256());
+                if (folder_info) {
+                    return file_info;
+                }
+            }
+        }
+    }
+    return {};
 }

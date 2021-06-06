@@ -18,7 +18,8 @@ struct cluster_t : arc_base_t<cluster_t> {
     void assign_blocks(block_infos_map_t &&blocks) noexcept;
     proto::ClusterConfig get(model::device_ptr_t target) noexcept;
     unknown_folders_t update(const proto::ClusterConfig &config) noexcept;
-    folder_ptr_t opt_for_synch(const device_ptr_t &peer_device) noexcept;
+    folder_ptr_t folder_for_synch(const device_ptr_t &peer_device) noexcept;
+    file_info_ptr_t file_for_synch(const device_ptr_t &peer_device) noexcept;
 
     block_infos_map_t &get_blocks() noexcept;
     const folders_map_t &get_folders() const noexcept;
