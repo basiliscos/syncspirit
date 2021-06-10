@@ -33,7 +33,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     inline blocks_t &get_blocks() noexcept { return blocks; }
 
     inline void mark_outdated() noexcept { outdated = true; }
-    inline bool is_outdated() const noexcept { return outdated;}
+    inline bool is_outdated() const noexcept { return outdated; }
 
     static std::string generate_db_key(const std::string &name, const folder_t &folder) noexcept;
 

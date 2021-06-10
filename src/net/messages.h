@@ -234,6 +234,8 @@ struct start_reading_t {
     r::address_ptr_t controller;
 };
 
+struct ready_signal_t {};
+
 struct termination_t {
     r::extended_error_ptr_t ee;
 };
@@ -352,6 +354,7 @@ using cluster_ready_notify_t = r::message_t<payload::cluster_ready_notify_t>;
 using start_reading_t = r::message_t<payload::start_reading_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
 using termination_signal_t = r::message_t<payload::termination_t>;
+using ready_signal_t = r::message_t<payload::ready_signal_t>;
 
 using add_device_t = r::message_t<payload::add_device_t>;
 using update_device_t = r::message_t<payload::update_device_t>;

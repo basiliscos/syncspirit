@@ -31,6 +31,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_store_folder);
+        p.subscribe_actor(&controller_actor_t::on_ready);
     });
 }
 
@@ -38,6 +39,7 @@ void controller_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     spdlog::trace("{}, on_start", identity);
     send<payload::start_reading_t>(peer_addr, get_address());
+    send<payload::ready_signal_t>(get_address());
 }
 
 void controller_actor_t::shutdown_start() noexcept {
@@ -48,6 +50,16 @@ void controller_actor_t::shutdown_start() noexcept {
     */
     send<payload::termination_t>(peer_addr, shutdown_reason);
     r::actor_base_t::shutdown_start();
+}
+
+void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
+    spdlog::trace("{}, on_ready", identity);
+    auto file = cluster->file_for_synch(peer);
+    if (!file) {
+        return;
+    }
+    spdlog::debug("{}, will request {}/{} ({} block(s) in total)", identity, file->get_folder()->label(),
+                  file->get_name(), file->get_blocks().size());
 }
 
 bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {

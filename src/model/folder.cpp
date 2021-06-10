@@ -209,16 +209,15 @@ void folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexce
     */
 }
 
-
-void folder_t::update(local_file_map_t& local_files) noexcept {
+void folder_t::update(local_file_map_t &local_files) noexcept {
     auto file_infos_copy = file_infos;
-    for(auto it: local_files.map) {
+    for (auto it : local_files.map) {
         auto cluster_file = file_infos_copy.by_key(it.first.string());
         if (cluster_file) {
             file_infos_copy.remove(cluster_file);
         }
     }
-    for(auto it: file_infos_copy) {
+    for (auto it : file_infos_copy) {
         it.second->mark_outdated();
     }
 }
