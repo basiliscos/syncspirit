@@ -22,7 +22,14 @@ db::BlockInfo block_info_t::serialize() noexcept {
 }
 
 void block_info_t::link(file_info_t *file_info, size_t block_index) noexcept {
-    file_blocks.emplace_back(file_info, block_index);
+    file_blocks.emplace_back(file_info, block_index, false);
+}
+
+void block_info_t::mark_local_available(file_info_t *file_info) noexcept {
+    auto predicate = [&](file_block_t &it) { return it.file_info == file_info; };
+    auto it = std::find_if(file_blocks.begin(), file_blocks.end(), predicate);
+    assert(it != file_blocks.end());
+    it->local_available = true;
 }
 
 } // namespace syncspirit::model

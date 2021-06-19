@@ -91,6 +91,30 @@ void file_info_t::update(const proto::FileInfo &remote_info) noexcept {
     }
 }
 
+file_status_t file_info_t::update(const local_file_t &local_file) noexcept {
+    bool matched = local_file.blocks.size() == blocks.size();
+    size_t i = 0;
+    for (; matched && i < local_file.blocks.size(); ++i) {
+        if (i < blocks.size()) {
+            auto &lb = local_file.blocks[i];
+            auto &sb = blocks[i];
+            if (*lb == *sb) {
+                lb->mark_local_available(this);
+            } else {
+                matched = false;
+            }
+        }
+    }
+    if (matched) {
+        local_blocks = blocks;
+        status = file_status_t::sync;
+    } else {
+        local_blocks = local_file.blocks;
+        status = file_status_t::newer;
+    }
+    return status;
+}
+
 void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
     auto &blocks_map = folder->get_cluster()->get_blocks();
     for (int i = 0; i < remote_info.blocks_size(); ++i) {
@@ -103,6 +127,22 @@ void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
         }
         blocks.emplace_back(std::move(block));
     }
+}
+
+block_location_t file_info_t::next_block() noexcept {
+    size_t i = 0;
+    for (; i < blocks.size(); ++i) {
+        auto &b = blocks[i];
+        if (i < local_blocks.size()) {
+            auto &lb = local_blocks[i];
+            if (*lb != *b) {
+                return { b.get(), i };
+            }
+        } else {
+            return { b.get(), i };
+        }
+    }
+    return { nullptr, 0};
 }
 
 } // namespace syncspirit::model

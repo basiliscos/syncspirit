@@ -36,10 +36,6 @@ static void write(const bfs::path& path, const std::string_view& data) {
     f.write(data.data(), data.size());
 }
 
-bool operator==(const block_info_t& l, const block_info_t& r) noexcept {
-    return l.get_hash() == r.get_hash() && l.get_size() == r.get_size() && l.get_weak_hash() == r.get_weak_hash();
-}
-
 TEST_CASE("utils", "[fs]") {
     auto sample_file = bfs::unique_path();
     auto sample_file_guard = path_guard_t(sample_file);

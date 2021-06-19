@@ -12,6 +12,16 @@ namespace syncspirit::model {
 
 struct folder_t;
 struct block_info_t;
+struct local_file_t;
+struct file_info_t;
+
+enum class file_status_t { sync, older, newer };
+
+struct block_location_t {
+    block_info_t *block;
+    std::size_t block_index;
+    inline operator bool() const noexcept { return (bool)block; }
+};
 
 struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     using blocks_t = std::vector<block_info_ptr_t>;
@@ -23,6 +33,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
 
     db::FileInfo serialize() noexcept;
     void update(const proto::FileInfo &remote_info) noexcept;
+    file_status_t update(const local_file_t &local_file) noexcept;
 
     inline const std::string &get_db_key() const noexcept { return db_key; }
 
@@ -32,10 +43,15 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     inline blocks_t &get_blocks() noexcept { return blocks; }
 
-    inline void mark_outdated() noexcept { outdated = true; }
-    inline bool is_outdated() const noexcept { return outdated; }
+    inline void mark_outdated() noexcept { status = file_status_t::older; }
+    inline file_status_t get_status() const noexcept { return status; }
 
     static std::string generate_db_key(const std::string &name, const folder_t &folder) noexcept;
+
+    block_location_t next_block() noexcept;
+    inline std::int64_t get_size() const noexcept { return size; }
+
+    void clone_block(file_info_t &source, std::size_t src_block_index, std::size_t dst_block_index) noexcept;
 
   private:
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
@@ -58,10 +74,9 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     std::string symlink_target;
     std::string db_key; /* folder_info db key + name */
     blocks_t blocks;
-    bool outdated = false;
+    blocks_t local_blocks;
+    file_status_t status = file_status_t::older;
 };
-
-using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
 inline const std::string db_key(const file_info_ptr_t &item) noexcept { return item->get_db_key(); }
 

@@ -234,7 +234,9 @@ struct start_reading_t {
     r::address_ptr_t controller;
 };
 
-struct ready_signal_t {};
+struct ready_signal_t {
+    model::file_info_ptr_t file;
+};
 
 struct termination_t {
     r::extended_error_ptr_t ee;

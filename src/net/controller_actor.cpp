@@ -54,12 +54,30 @@ void controller_actor_t::shutdown_start() noexcept {
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     spdlog::trace("{}, on_ready", identity);
-    auto file = cluster->file_for_synch(peer);
+    model::file_info_ptr_t file = message.payload.file;
+    if (!file) {
+        file = cluster->file_for_synch(peer);
+    }
     if (!file) {
         return;
     }
-    spdlog::debug("{}, will request {}/{} ({} block(s) in total)", identity, file->get_folder()->label(),
+    spdlog::debug("{}, will try to update {}/{} ({} block(s) in total)", identity, file->get_folder()->label(),
                   file->get_name(), file->get_blocks().size());
+    auto cluster_block = file->next_block();
+    if (!cluster_block) {
+        spdlog::trace("{}, no more blocks are needed for {}", identity, file->get_name());
+        send<payload::ready_signal_t>(get_address());
+        return;
+    }
+
+    auto existing_block = cluster_block.block->local_file();
+    if (existing_block) {
+        spdlog::trace("{}, cloning block {} from {} to {} as block {}", identity, existing_block.file_info->get_name(),
+                      existing_block.block_index, file->get_name(), cluster_block.block_index);
+        file->clone_block(*existing_block.file_info, existing_block.block_index, cluster_block.block_index);
+        send<payload::ready_signal_t>(get_address(), file);
+        return;
+    }
 }
 
 bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {

@@ -214,7 +214,11 @@ void folder_t::update(local_file_map_t &local_files) noexcept {
     for (auto it : local_files.map) {
         auto cluster_file = file_infos_copy.by_key(it.first.string());
         if (cluster_file) {
+            auto status = cluster_file->update(it.second);
             file_infos_copy.remove(cluster_file);
+            if (status == file_status_t::newer) {
+                std::abort();
+            }
         }
     }
     for (auto it : file_infos_copy) {
