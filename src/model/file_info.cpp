@@ -13,6 +13,7 @@ file_info_t::file_info_t(const db::FileInfo &info_, folder_t *folder_) noexcept 
         auto key = info_.blocks_keys(i);
         auto block = blocks_map.by_key(key);
         assert(block);
+        block->link(this, i);
         blocks.emplace_back(std::move(block));
     }
 }
@@ -166,7 +167,11 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
 
 void file_info_t::mark_local_available(size_t block_index) noexcept {
     blocks[block_index]->mark_local_available(this);
-    local_blocks[block_index] = blocks[block_index];
+    assert(local_blocks.size() == block_index);
+    local_blocks.emplace_back(blocks[block_index]);
+    if (local_blocks.size() == blocks.size()) {
+        status = file_status_t::sync;
+    }
 }
 
 bfs::path file_info_t::get_path() const noexcept { return folder->get_path() / std::string(get_name()); }
