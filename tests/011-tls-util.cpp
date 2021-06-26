@@ -25,10 +25,10 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     PEM_write_X509(stdout, value.cert.get());
     X509_print_fp(stdout, value.cert.get());
 
-    auto cert_file = fs::unique_path();
+    auto cert_file = bfs::unique_path();
     auto cert_file_guard = path_guard_t(cert_file);
 
-    auto key_file = fs::unique_path();
+    auto key_file = bfs::unique_path();
     auto key_file_guard = path_guard_t(key_file);
     auto save_result = value.save(cert_file.c_str(), key_file.c_str());
     REQUIRE((bool)save_result);

@@ -57,6 +57,7 @@ enum class error_code_t {
     unparseable_control_url,
     external_ip_failed,
     rx_timeout,
+    fs_error,
 };
 
 enum class bep_error_code_t {
@@ -64,11 +65,21 @@ enum class bep_error_code_t {
     protobuf_err,
     lz4_decoding,
     unexpected_message,
+    unexpected_response,
+    response_mismatch,
+    response_missize,
 };
 
 enum class protocol_error_code_t {
     success = 0,
     unknown_folder,
+};
+
+enum class request_error_code_t {
+    success = 0,
+    generic = 1,
+    no_such_file = 2,
+    invalid_file = 3,
 };
 
 namespace detail {
@@ -88,6 +99,11 @@ class protocol_error_code_category : public boost::system::error_category {
     virtual std::string message(int c) const override;
 };
 
+class request_error_code_category : public boost::system::error_category {
+    virtual const char *name() const noexcept override;
+    virtual std::string message(int c) const override;
+};
+
 } // namespace detail
 
 const detail::error_code_category &error_code_category();
@@ -95,6 +111,8 @@ const detail::error_code_category &error_code_category();
 const detail::bep_error_code_category &bep_error_code_category();
 
 const detail::protocol_error_code_category &protocol_error_code_category();
+
+const detail::request_error_code_category &request_error_code_category();
 
 inline boost::system::error_code make_error_code(error_code_t e) {
     return {static_cast<int>(e), error_code_category()};
@@ -105,6 +123,10 @@ inline boost::system::error_code make_error_code(bep_error_code_t e) {
 
 inline boost::system::error_code make_error_code(protocol_error_code_t e) {
     return {static_cast<int>(e), protocol_error_code_category()};
+}
+
+inline boost::system::error_code make_error_code(request_error_code_t e) {
+    return {static_cast<int>(e), request_error_code_category()};
 }
 
 } // namespace syncspirit::utils
@@ -128,6 +150,10 @@ template <> struct is_error_code_enum<syncspirit::utils::bep_error_code_t> : std
 };
 
 template <> struct is_error_code_enum<syncspirit::utils::protocol_error_code_t> : std::true_type {
+    static const bool value = true;
+};
+
+template <> struct is_error_code_enum<syncspirit::utils::request_error_code_t> : std::true_type {
     static const bool value = true;
 };
 

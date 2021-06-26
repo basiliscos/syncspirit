@@ -17,20 +17,17 @@ int main(int argc, char *argv[]) {
 
 namespace syncspirit::test {
 
-std::string file_path(const char* test_file) {
+boost::filesystem::path file_path(const char* test_file) {
     auto self_file = __FILE__;
-    fs::path self(self_file);
+    bfs::path self(self_file);
     self.remove_filename();
-    auto str_path = self.string() + test_file;
-    return str_path;
+    return self /  test_file;
 }
 
-
-std::string read_file(const char* test_file) {
-    auto fp = file_path(test_file);
+std::string read_file(const bfs::path& path) {
     sys::error_code ec;
-    auto filesize = fs::file_size(fs::path(fp), ec);
-    auto file_path_c = fp.c_str();
+    auto filesize = bfs::file_size(path, ec);
+    auto file_path_c = path.c_str();
     auto in = fopen(file_path_c, "rb");
     if (!in) {
         auto ec = sys::error_code{errno, sys::generic_category()};
@@ -43,6 +40,10 @@ std::string read_file(const char* test_file) {
     assert(r == 1);
     fclose(in);
     return std::string(buffer.data(), filesize);
+}
+
+std::string read_file(const char* test_file) {
+    return read_file(file_path(test_file));
 }
 
 std::string device_id2sha256(const char* device_id) {

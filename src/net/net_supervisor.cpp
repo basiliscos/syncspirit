@@ -154,6 +154,7 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
                        .devices(&devices)
                        .ignored_folders(&ignored_folders)
                        .cluster(cluster)
+                       .bep_config(app_config.bep_config)
                        .finish()
                        ->get_address();
 }

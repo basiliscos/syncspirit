@@ -33,6 +33,15 @@ struct scan_error_t {
     sys::error_code error;
 };
 
+struct write_response_t {};
+
+struct write_request_t {
+    using response_t = write_response_t;
+    bfs::path path;
+    std::string data;
+    bool final;
+};
+
 } // namespace payload
 
 namespace message {
@@ -40,6 +49,9 @@ namespace message {
 using scan_request_t = r::message_t<payload::scan_request_t>;
 using scan_response_t = r::message_t<payload::scan_response_t>;
 using scan_error_t = r::message_t<payload::scan_error_t>;
+
+using write_request_t = r::request_traits_t<payload::write_request_t>::request::message_t;
+using write_response_t = r::request_traits_t<payload::write_request_t>::response::message_t;
 
 } // namespace message
 

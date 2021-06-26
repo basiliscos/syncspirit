@@ -40,6 +40,7 @@ struct fs_actor_t : public r::actor_base_t {
     using requests_t = std::deque<request_ptr_t>;
 
     void on_scan_request(message::scan_request_t &req) noexcept;
+    void on_write_request(message::write_request_t &req) noexcept;
     void on_scan(message::scan_t &req) noexcept;
     void scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept;
     void process_queue() noexcept;

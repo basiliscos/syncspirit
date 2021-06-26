@@ -51,7 +51,17 @@ std::string file_info_t::generate_db_key(const std::string &name, const folder_t
     return dbk;
 }
 
-file_info_t::~file_info_t() {}
+file_info_t::~file_info_t() {
+    for (auto &b : blocks) {
+        b->unlink(this);
+    }
+    blocks.clear();
+
+    for (auto &b : local_blocks) {
+        b->unlink(this);
+    }
+    local_blocks.clear();
+}
 
 std::string_view file_info_t::get_name() const noexcept {
     const char *ptr = db_key.data();
@@ -136,13 +146,29 @@ block_location_t file_info_t::next_block() noexcept {
         if (i < local_blocks.size()) {
             auto &lb = local_blocks[i];
             if (*lb != *b) {
-                return { b.get(), i };
+                return {b.get(), i};
             }
         } else {
-            return { b.get(), i };
+            return {b.get(), i};
         }
     }
-    return { nullptr, 0};
+    return {nullptr, 0};
 }
+
+void file_info_t::clone_block(file_info_t &source, std::size_t src_block_index, std::size_t dst_block_index) noexcept {
+    std::abort();
+}
+
+std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
+    assert(!blocks.empty());
+    return block_size * block_index;
+}
+
+void file_info_t::mark_local_available(size_t block_index) noexcept {
+    blocks[block_index]->mark_local_available(this);
+    local_blocks[block_index] = blocks[block_index];
+}
+
+bfs::path file_info_t::get_path() const noexcept { return folder->get_path() / std::string(get_name()); }
 
 } // namespace syncspirit::model

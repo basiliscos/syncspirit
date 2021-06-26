@@ -18,7 +18,8 @@ namespace syncspirit::config {
 
 bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
     return lhs.rx_buff_size == rhs.rx_buff_size && lhs.connect_timeout == rhs.connect_timeout &&
-           lhs.tx_timeout == rhs.tx_timeout && lhs.rx_timeout == rhs.rx_timeout;
+           lhs.request_timeout == rhs.request_timeout && lhs.tx_timeout == rhs.tx_timeout &&
+           lhs.rx_timeout == rhs.rx_timeout;
 }
 
 bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept {
@@ -241,6 +242,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.connect_timeout = connect_timeout.value();
 
+        auto request_timeout = t["request_timeout"].value<std::uint32_t>();
+        if (!request_timeout) {
+            return "bep/request_timeout is incorrect or missing";
+        }
+        c.request_timeout = request_timeout.value();
+
         auto tx_timeout = t["tx_timeout"].value<std::uint32_t>();
         if (!tx_timeout) {
             return "bep/tx_timeout is incorrect or missing";
@@ -365,6 +372,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"bep", toml::table{{
                     {"rx_buff_size", cfg.bep_config.rx_buff_size},
                     {"connect_timeout", cfg.bep_config.connect_timeout},
+                    {"request_timeout", cfg.bep_config.request_timeout},
                     {"tx_timeout", cfg.bep_config.tx_timeout},
                     {"rx_timeout", cfg.bep_config.rx_timeout},
                 }}},
@@ -442,6 +450,7 @@ main_t generate_config(const boost::filesystem::path &config_path) {
     cfg.bep_config = bep_config_t {
         16 * 1024 * 1024,   /* rx_buff */
         5000,               /* connect_timeout */
+        60000,              /* request_timeout */
         90000,              /* tx_timeout */
         300000,             /* rx_timeout */
     };

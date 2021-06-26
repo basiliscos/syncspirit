@@ -1,7 +1,8 @@
+- bep.request_timeout, introduce into config
+
 - Canonicalize, TempNameWithPrefix, TempName
 - локальные таймстемпы?
 - auto-remove temporaries
-- как отличить вновь созданную папку от удалённой?
 
 
 - config & tui
@@ -47,3 +48,6 @@ https://wiki.lyrasis.org/display/FEDORA471/How+to+inspect+LevelDB
 https://softwarerecs.stackexchange.com/questions/14409/leveldb-database-client
 
 [RF7ZH] 2020/12/10 10:25:13.662765 logfs.go:61: DEBUG: casefs.go:152 basic /home/b/Desktop/finances Lstat invoices/samples/Rechnung_Nr._B2020128.pdf {0xc000a14f70} <nil>
+
+
+https://forum.syncthing.net/t/a-few-questions-about-quic-hole-punching-and-stun/16490

@@ -15,6 +15,7 @@ namespace net {
 namespace bfs = boost::filesystem;
 
 struct cluster_supervisor_config_t : ra::supervisor_config_asio_t {
+    config::bep_config_t bep_config;
     model::device_ptr_t device;
     model::cluster_ptr_t cluster;
     model::devices_map_t *devices;
@@ -29,6 +30,11 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
 
     builder_t &&device(const model::device_ptr_t &value) &&noexcept {
         parent_t::config.device = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
+        parent_t::config.bep_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -73,6 +79,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     r::address_ptr_t coordinator;
     r::address_ptr_t fs;
     r::address_ptr_t db;
+    config::bep_config_t bep_config;
     model::device_ptr_t device;
     model::cluster_ptr_t cluster;
     model::devices_map_t *devices;

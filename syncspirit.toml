@@ -1,6 +1,7 @@
 [bep]
-connect_timeout = 5000
 rx_buff_size = 33554432
+connect_timeout = 5000
+request_timeout = 60000
 rx_timeout = 300000
 tx_timeout = 10000
 

@@ -243,7 +243,7 @@ struct termination_t {
 };
 
 using forwarded_message_t = std::variant<proto::message::Index, proto::message::IndexUpdate, proto::message::Request,
-                                         proto::message::Response, proto::message::DownloadProgress>;
+                                         proto::message::DownloadProgress>;
 
 struct add_device_t {
     model::device_ptr_t device;
@@ -295,6 +295,17 @@ struct store_folder_response_t {};
 struct store_folder_request_t {
     using response_t = store_folder_response_t;
     model::folder_ptr_t folder;
+};
+
+struct block_response_t {
+    std::string data;
+};
+
+struct block_request_t {
+    using response_t = block_response_t;
+    model::file_info_ptr_t file;
+    model::block_info_ptr_t block;
+    std::size_t block_index;
 };
 
 } // end of namespace payload
@@ -361,6 +372,9 @@ using ready_signal_t = r::message_t<payload::ready_signal_t>;
 using add_device_t = r::message_t<payload::add_device_t>;
 using update_device_t = r::message_t<payload::update_device_t>;
 using remove_device_t = r::message_t<payload::remove_device_t>;
+
+using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
+using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;
 
 } // end of namespace message
 

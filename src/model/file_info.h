@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <boost/filesystem.hpp>
 #include "arc.hpp"
 #include "map.hpp"
 #include "structs.pb.h"
@@ -9,6 +10,8 @@
 #include "storeable.h"
 
 namespace syncspirit::model {
+
+namespace bfs = boost::filesystem;
 
 struct folder_t;
 struct block_info_t;
@@ -51,7 +54,12 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     block_location_t next_block() noexcept;
     inline std::int64_t get_size() const noexcept { return size; }
 
+    std::uint64_t get_block_offset(size_t block_index) const noexcept;
+
     void clone_block(file_info_t &source, std::size_t src_block_index, std::size_t dst_block_index) noexcept;
+    void mark_local_available(size_t block_index) noexcept;
+
+    bfs::path get_path() const noexcept;
 
   private:
     void update_blocks(const proto::FileInfo &remote_info) noexcept;

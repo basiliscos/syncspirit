@@ -1,9 +1,14 @@
 #include "fs_actor.h"
 #include "../net/names.h"
+#include "../utils/error_code.h"
 #include "utils.h"
 #include <spdlog/spdlog.h>
+#include <fstream>
 
+namespace sys = boost::system;
 using namespace syncspirit::fs;
+
+static const char *tmp_suffix = ".syncspirit-tmp";
 
 fs_actor_t::fs_actor_t(config_t &cfg) : r::actor_base_t{cfg}, fs_config{cfg.fs_config} {}
 
@@ -15,6 +20,7 @@ void fs_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&fs_actor_t::on_scan_request);
         p.subscribe_actor(&fs_actor_t::on_scan);
+        p.subscribe_actor(&fs_actor_t::on_write_request);
     });
 }
 
@@ -150,4 +156,41 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
         }
     }
     return 0;
+}
+
+void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
+    spdlog::trace("{}, on_write_request", identity);
+
+    auto &payload = req.payload.request_payload;
+    auto path = payload.path;
+    auto parent = path.parent_path();
+    path += tmp_suffix;
+    auto &data = payload.data;
+
+    if (!bfs::exists(parent)) {
+        sys::error_code ec;
+        bfs::create_directories(parent, ec);
+        if (ec) {
+            return reply_with_error(req, make_error(ec));
+        }
+    }
+
+    std::ofstream out(path.c_str(), out.out | out.app);
+    out.write(data.c_str(), data.size());
+    out.flush();
+    if (out.fail()) {
+        spdlog::warn("{}, failed to write to {}", identity, path.c_str());
+        auto ec = utils::make_error_code(utils::error_code_t::fs_error);
+        auto ee = make_error(ec);
+        return reply_with_error(req, ee);
+    }
+
+    if (payload.final) {
+        sys::error_code ec;
+        bfs::rename(path, payload.path, ec);
+        if (ec) {
+            return reply_with_error(req, make_error(ec));
+        }
+    }
+    reply_to(req);
 }

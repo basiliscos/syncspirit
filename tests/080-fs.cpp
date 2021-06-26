@@ -132,7 +132,7 @@ template <typename Actor> struct consumer_actor_config_builder_t : r::actor_conf
 };
 
 
-struct consumer_actor_t: r::actor_base_t {
+struct scan_consumer_t: r::actor_base_t {
     using config_t = consumer_actor_config_t;
     using res_ptr_t = r::intrusive_ptr_t<message::scan_response_t>;
     using err_ptr_t = r::intrusive_ptr_t<message::scan_error_t>;
@@ -144,7 +144,7 @@ struct consumer_actor_t: r::actor_base_t {
     res_ptr_t response;
     errors_t errors;
 
-    explicit consumer_actor_t(config_t &cfg): r::actor_base_t{cfg}, root_path{cfg.root_path} {
+    explicit scan_consumer_t(config_t &cfg): r::actor_base_t{cfg}, root_path{cfg.root_path} {
     }
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -154,8 +154,8 @@ struct consumer_actor_t: r::actor_base_t {
         });
 
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-            p.subscribe_actor(&consumer_actor_t::on_response);
-            p.subscribe_actor(&consumer_actor_t::on_error);
+            p.subscribe_actor(&scan_consumer_t::on_response);
+            p.subscribe_actor(&scan_consumer_t::on_error);
         });
     }
 
@@ -174,6 +174,32 @@ struct consumer_actor_t: r::actor_base_t {
     }
 };
 
+struct write_consumer_t: r::actor_base_t {
+    using res_ptr_t = r::intrusive_ptr_t<message::write_response_t>;
+    using r::actor_base_t::actor_base_t;
+
+    r::address_ptr_t fs_actor;
+    res_ptr_t response;
+
+    void configure(r::plugin::plugin_base_t &plugin) noexcept {
+        r::actor_base_t::configure(plugin);
+        plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+            p.discover_name(net::names::fs, fs_actor, true).link();
+        });
+
+        plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+            p.subscribe_actor(&write_consumer_t::on_response);
+        });
+    }
+
+    void on_response(message::write_response_t& res) noexcept {
+        response = &res;
+    }
+
+    void make_request(bfs::path path,  const std::string& data, bool final) noexcept {
+        request<payload::write_request_t>(fs_actor, path, data, final).send(init_timeout);
+    }
+};
 
 TEST_CASE("fs-actor", "[fs]") {
     auto root_path = bfs::unique_path();
@@ -185,70 +211,112 @@ TEST_CASE("fs-actor", "[fs]") {
     sup->create_actor<fs_actor_t>().fs_config({1024, 5}).timeout(timeout).finish();
     sup->start();
 
-    SECTION("empty path") {
-        auto act = sup->create_actor<consumer_actor_t>().timeout(timeout).root_path(root_path).finish();
-        sup->do_process();
-        CHECK(act->errors.empty());
-        REQUIRE(act->response);
-        auto& r = act->response->payload;
-        CHECK(r->root == root_path);
-        CHECK(r->map.empty());
-    }
+    SECTION("scan") {
+        SECTION("empty path") {
+            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+            sup->do_process();
+            CHECK(act->errors.empty());
+            REQUIRE(act->response);
+            auto& r = act->response->payload;
+            CHECK(r->root == root_path);
+            CHECK(r->map.empty());
+        }
 
-    SECTION("non-existing root path") {
-        auto act = sup->create_actor<consumer_actor_t>().timeout(timeout).root_path(root_path / "bla-bla").finish();
-        sup->do_process();
-        CHECK(act->errors.empty());
-        REQUIRE(act->response);
-        auto& r = act->response->payload;
-        CHECK(r->root == (root_path / "bla-bla"));
-        CHECK(r->map.empty());
-    }
+        SECTION("non-existing root path") {
+            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path / "bla-bla").finish();
+            sup->do_process();
+            CHECK(act->errors.empty());
+            REQUIRE(act->response);
+            auto& r = act->response->payload;
+            CHECK(r->root == (root_path / "bla-bla"));
+            CHECK(r->map.empty());
+        }
 
-    SECTION("path with dummy file, in root folder and in subfolder") {
-        auto act = sup->create_actor<consumer_actor_t>().timeout(timeout).root_path(root_path).finish();
-        auto sub = GENERATE(as<std::string>{}, "", "a/b/");
-        auto dir = root_path / sub;
-        bfs::create_directories(dir);
-        auto file = dir / "my-file";
-        write(file, "hi\n");
-        sup->do_process();
-        CHECK(act->errors.empty());
-        REQUIRE(act->response);
-        auto& r = act->response->payload;
-        REQUIRE(!r->map.empty());
-        auto it = r->map.begin();
-        CHECK(it->first.string() == bfs::path(sub) / "my-file");
-        auto& local = it->second;
-        auto& blocks = local.blocks;
-        REQUIRE(blocks.size() == 1);
-        auto& b = blocks.front();
-        CHECK(hash_string(b->get_hash()) == "98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4");
-        CHECK(b->get_weak_hash() == 0x21700dc);
-    }
+        SECTION("path with dummy file, in root folder and in subfolder") {
+            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+            auto sub = GENERATE(as<std::string>{}, "", "a/b/");
+            auto dir = root_path / sub;
+            bfs::create_directories(dir);
+            auto file = dir / "my-file";
+            write(file, "hi\n");
+            sup->do_process();
+            CHECK(act->errors.empty());
+            REQUIRE(act->response);
+            auto& r = act->response->payload;
+            REQUIRE(!r->map.empty());
+            auto it = r->map.begin();
+            CHECK(it->first.string() == bfs::path(sub) / "my-file");
+            auto& local = it->second;
+            auto& blocks = local.blocks;
+            REQUIRE(blocks.size() == 1);
+            auto& b = blocks.front();
+            CHECK(hash_string(b->get_hash()) == "98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4");
+            CHECK(b->get_weak_hash() == 0x21700dc);
+        }
 
-    SECTION("file with 2 identical blocks") {
-        static const constexpr size_t SZ = (1 << 7) * 1024;
-        auto act = sup->create_actor<consumer_actor_t>().timeout(timeout).root_path(root_path).finish();
-        auto file = root_path / "my-file";
-        std::string data;
-        data.resize(SZ*2);
-        std::fill(data.begin(), data.end(), 1);
-        write(file, data);
+        SECTION("file with 2 identical blocks") {
+            static const constexpr size_t SZ = (1 << 7) * 1024;
+            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+            auto file = root_path / "my-file";
+            std::string data;
+            data.resize(SZ*2);
+            std::fill(data.begin(), data.end(), 1);
+            write(file, data);
+            sup->do_process();
+            CHECK(act->errors.empty());
+            REQUIRE(act->response);
+            auto& r = act->response->payload;
+            REQUIRE(!r->map.empty());
+            auto it = r->map.begin();
+            CHECK(it->first == "my-file");
+            auto& local = it->second;
+            auto& blocks = local.blocks;
+            REQUIRE(blocks.size() == 2);
+            auto& b1 = blocks[0];
+            auto& b2 = blocks[1];
+            CHECK(*b1 == *b2);
+            CHECK(b1 == b2);
+        }
+    };
+
+    SECTION("write") {
+        auto act = sup->create_actor<write_consumer_t>().timeout(timeout).finish();
         sup->do_process();
-        CHECK(act->errors.empty());
-        REQUIRE(act->response);
-        auto& r = act->response->payload;
-        REQUIRE(!r->map.empty());
-        auto it = r->map.begin();
-        CHECK(it->first == "my-file");
-        auto& local = it->second;
-        auto& blocks = local.blocks;
-        REQUIRE(blocks.size() == 2);
-        auto& b1 = blocks[0];
-        auto& b2 = blocks[1];
-        CHECK(*b1 == *b2);
-        CHECK(b1 == b2);
+
+        SECTION("success case") {
+            auto path = root_path / "my-file";
+            const std::string data = "123456980";
+            act->make_request(path, data, false);
+            sup->do_process();
+
+            REQUIRE(act->response);
+            auto& r = act->response->payload;
+            CHECK(!r.ee);
+            CHECK(read_file(root_path / "my-file.syncspirit-tmp") == data);
+
+            SECTION("append/final") {
+                act->response.reset();
+                const std::string tail = "abcdefg";
+                act->make_request(path,  tail, true);
+                sup->do_process();
+                REQUIRE(act->response);
+                auto& r = act->response->payload;
+                CHECK(!r.ee);
+                CHECK(read_file(path) == data + tail);
+            }
+        }
+
+        SECTION("success case in subfolder") {
+            auto path = root_path / "dir" / "my-file";
+            const std::string data = "123456980";
+            act->make_request(path, data, false);
+            sup->do_process();
+
+            REQUIRE(act->response);
+            auto& r = act->response->payload;
+            CHECK(!r.ee);
+            CHECK(read_file(root_path / "dir" / "my-file.syncspirit-tmp") == data);
+        }
     }
 
     sup->shutdown();

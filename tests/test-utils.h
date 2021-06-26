@@ -4,19 +4,20 @@
 
 namespace syncspirit::test {
 
-namespace fs = boost::filesystem;
+namespace bfs = boost::filesystem;
 namespace sys = boost::system;
 
 struct path_guard_t {
-    fs::path& path;
-    path_guard_t(fs::path& path_): path{path_}{}
+    bfs::path& path;
+    path_guard_t(bfs::path& path_): path{path_}{}
     ~path_guard_t() {
-        fs::remove_all(path);
+        bfs::remove_all(path);
     }
 };
 
-std::string file_path(const char* test_file);
+bfs::path file_path(const char* test_file);
 std::string read_file(const char* test_file);
+std::string read_file(const bfs::path& path);
 std::string device_id2sha256(const char* device_id);
 
 }

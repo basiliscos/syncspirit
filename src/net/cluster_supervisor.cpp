@@ -9,8 +9,8 @@ namespace fs = boost::filesystem;
 using namespace syncspirit::net;
 
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
-    : ra::supervisor_asio_t{config}, device{config.device}, cluster{config.cluster}, devices{config.devices},
-      folders{cluster->get_folders()}, ignored_folders(config.ignored_folders) {}
+    : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, device{config.device}, cluster{config.cluster},
+      devices{config.devices}, folders{cluster->get_folders()}, ignored_folders(config.ignored_folders) {}
 
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     ra::supervisor_asio_t::configure(plugin);
@@ -18,7 +18,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::cluster, get_address());
         p.discover_name(names::coordinator, coordinator, false).link(false);
-        p.discover_name(names::fs, fs, true).link(false);
+        p.discover_name(names::fs, fs, true).link(true);
         p.discover_name(names::db, db, true).link(true);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -33,12 +33,17 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
 void cluster_supervisor_t::on_start() noexcept {
     spdlog::trace("{}, on_start, folders count = {}", identity, folders.size());
     ra::supervisor_asio_t::on_start();
-    initial_scan = true;
-    for (auto &it : folders) {
-        auto &folder = it.second;
-        auto &root = folder->get_path();
-        send<fs::payload::scan_request_t>(fs, root, get_address());
-        scan_folders_map.emplace(root, folder);
+    if (folders.size()) {
+        initial_scan = true;
+        for (auto &it : folders) {
+            auto &folder = it.second;
+            auto &root = folder->get_path();
+            send<fs::payload::scan_request_t>(fs, root, get_address());
+            scan_folders_map.emplace(root, folder);
+        }
+    } else {
+        initial_scan = false;
+        send<payload::cluster_ready_notify_t>(coordinator);
     }
 }
 
@@ -120,6 +125,7 @@ void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexce
                     .device(device)
                     .peer(peer)
                     .peer_addr(payload.peer_addr)
+                    .request_timeout(pt::milliseconds(bep_config.request_timeout))
                     .cluster(cluster)
                     .finish()
                     ->get_address();

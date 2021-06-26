@@ -22,7 +22,14 @@ db::BlockInfo block_info_t::serialize() noexcept {
 }
 
 void block_info_t::link(file_info_t *file_info, size_t block_index) noexcept {
-    file_blocks.emplace_back(file_info, block_index, false);
+    file_blocks.emplace_back(file_block_t{file_info, block_index, false});
+}
+
+void block_info_t::unlink(file_info_t *file_info) noexcept {
+    auto predicate = [&](file_block_t &it) { return it.file_info == file_info; };
+    auto it = std::find_if(file_blocks.begin(), file_blocks.end(), predicate);
+    assert(it != file_blocks.end());
+    file_blocks.erase(it);
 }
 
 void block_info_t::mark_local_available(file_info_t *file_info) noexcept {
@@ -30,6 +37,15 @@ void block_info_t::mark_local_available(file_info_t *file_info) noexcept {
     auto it = std::find_if(file_blocks.begin(), file_blocks.end(), predicate);
     assert(it != file_blocks.end());
     it->local_available = true;
+}
+
+block_info_t::local_availability_t block_info_t::local_file() noexcept {
+    for (auto &b : file_blocks) {
+        if (b.local_available) {
+            return b;
+        }
+    }
+    return {nullptr, false};
 }
 
 } // namespace syncspirit::model

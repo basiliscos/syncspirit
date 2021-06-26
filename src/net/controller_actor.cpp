@@ -16,7 +16,7 @@ r::plugin::resource_id_t peer = 0;
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device{config.device}, peer{config.peer},
-      peer_addr{config.peer_addr}, sync_state{sync_state_t::none} {}
+      peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, sync_state{sync_state_t::none} {}
 
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -25,13 +25,17 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         id += peer->device_id.get_short();
         p.set_identity(id, false);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.discover_name(names::db, db, false).link(true); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.discover_name(names::db, db, false).link(true);
+        p.discover_name(names::fs, fs, false).link(true);
+    });
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(peer_addr, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_store_folder);
         p.subscribe_actor(&controller_actor_t::on_ready);
+        p.subscribe_actor(&controller_actor_t::on_block);
+        p.subscribe_actor(&controller_actor_t::on_write);
     });
 }
 
@@ -43,11 +47,6 @@ void controller_actor_t::on_start() noexcept {
 }
 
 void controller_actor_t::shutdown_start() noexcept {
-    /*
-    if (sync_state != sync_state_t::none) {
-        resources->acquire(resource::peer);
-    }
-    */
     send<payload::termination_t>(peer_addr, shutdown_reason);
     r::actor_base_t::shutdown_start();
 }
@@ -78,6 +77,14 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         send<payload::ready_signal_t>(get_address(), file);
         return;
     }
+    request_block(file, cluster_block);
+}
+
+void controller_actor_t::request_block(const model::file_info_ptr_t &file,
+                                       const model::block_location_t &block) noexcept {
+    spdlog::trace("{} request_block, file = {}, block index = {}", identity, file->get_name(), block.block_index);
+    request<payload::block_request_t>(peer_addr, file, model::block_info_ptr_t{block.block}, block.block_index)
+        .send(request_timeout);
 }
 
 bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {
@@ -133,6 +140,37 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
 
 void controller_actor_t::on_message(proto::message::Request &message) noexcept { std::abort(); }
 
-void controller_actor_t::on_message(proto::message::Response &message) noexcept { std::abort(); }
-
 void controller_actor_t::on_message(proto::message::DownloadProgress &message) noexcept { std::abort(); }
+
+void controller_actor_t::on_block(message::block_response_t &message) noexcept {
+    using request_t = fs::payload::write_request_t;
+    auto ee = message.payload.ee;
+    if (ee) {
+        spdlog::warn("{}, can't receive block : {}", identity, ee->message());
+        return do_shutdown(ee);
+    }
+    auto &payload = message.payload.req->payload.request_payload;
+    auto &file = payload.file;
+    auto &data = message.payload.res.data;
+    bool final = file->get_blocks().size() == payload.block_index + 1;
+    auto path = file->get_path();
+    auto request_id = request<request_t>(fs, path, std::move(data), final).send(init_timeout);
+    responses_map.emplace(request_id, &message);
+}
+
+void controller_actor_t::on_write(fs::message::write_response_t &message) noexcept {
+    auto &ee = message.payload.ee;
+    if (ee) {
+        spdlog::warn("{}, on_write failed : {}", identity, ee->message());
+        return do_shutdown(ee);
+    }
+    auto it = responses_map.find(message.payload.request_id());
+    assert(it != responses_map.end());
+    auto block_res = it->second;
+    responses_map.erase(it);
+    auto &p = block_res->payload.req->payload.request_payload;
+    auto &file = p.file;
+    file->mark_local_available(p.block_index);
+    send<payload::ready_signal_t>(get_address(), file);
+    return;
+}

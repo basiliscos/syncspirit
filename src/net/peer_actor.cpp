@@ -64,6 +64,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&peer_actor_t::on_auth);
         p.subscribe_actor(&peer_actor_t::on_start_reading);
         p.subscribe_actor(&peer_actor_t::on_termination);
+        p.subscribe_actor(&peer_actor_t::on_block_request);
         instantiate_transport();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
@@ -386,6 +387,27 @@ void peer_actor_t::on_termination(message::termination_signal_t &message) noexce
     controller.reset();
 }
 
+void peer_actor_t::on_block_request(message::block_request_t &message) noexcept {
+    spdlog::trace("{}, on_block_request", identity);
+    assert(!block_request);
+    proto::Request req;
+    auto &p = message.payload.request_payload;
+    auto &file = p.file;
+    auto &block = p.block;
+    req.set_id((std::int32_t)message.payload.id);
+    *req.mutable_folder() = file->get_folder()->id();
+    *req.mutable_name() = file->get_name();
+
+    req.set_offset(file->get_block_offset(p.block_index));
+    req.set_size(block->get_size());
+    *req.mutable_hash() = block->get_hash();
+
+    fmt::memory_buffer buff;
+    proto::serialize(buff, req);
+    push_write(std::move(buff), false);
+    block_request.reset(&message);
+}
+
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
     spdlog::trace("{}, read_hello", identity);
     std::visit(
@@ -444,6 +466,8 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
             } else if constexpr (std::is_same_v<T, m::Close>) {
                 handle_close(std::move(msg));
                 continue_reading = false;
+            } else if constexpr (std::is_same_v<T, m::Response>) {
+                handle_response(std::move(msg));
             } else {
                 auto fwd = payload::forwarded_message_t{std::move(msg)};
                 send<payload::forwarded_message_t>(controller, std::move(fwd));
@@ -468,6 +492,39 @@ void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
     }
     auto ee = r::make_error(str, r::shutdown_code_t::normal);
     do_shutdown(ee);
+}
+
+void peer_actor_t::handle_response(proto::message::Response &&message) noexcept {
+    if (!block_request) {
+        spdlog::warn("{}, got response but nothing was requested", identity);
+        auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_response);
+        return do_shutdown(make_error(ec));
+    }
+
+    auto id = message->id();
+    auto expected_id = block_request->payload.id;
+    if (id != expected_id) {
+        spdlog::warn("{}, got response {}, but requested {}", identity, id, expected_id);
+        auto ec = utils::make_error_code(utils::bep_error_code_t::response_mismatch);
+        return do_shutdown(make_error(ec));
+    }
+
+    auto error = message->code();
+    if (error) {
+        auto ec = utils::make_error_code((utils::request_error_code_t)error);
+        spdlog::warn("{}, block request error: {}", identity, ec.message());
+        reply_with_error(*block_request, make_error(ec));
+    } else {
+        auto &data = message->data();
+        auto request_sz = block_request->payload.request_payload.block->get_size();
+        if (data.size() != request_sz) {
+            spdlog::warn("{}, got {} bytes, but requested {}", identity, data.size(), request_sz);
+            auto ec = utils::make_error_code(utils::bep_error_code_t::response_missize);
+            return do_shutdown(make_error(ec));
+        }
+        reply_to(*block_request, std::move(data));
+    }
+    block_request.reset();
 }
 
 void peer_actor_t::reset_tx_timer() noexcept {
