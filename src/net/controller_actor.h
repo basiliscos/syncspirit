@@ -87,6 +87,7 @@ struct controller_actor_t : public r::actor_base_t {
     sync_state_t sync_state;
     peers_map_t peers_map;
     responses_map_t responses_map;
+    std::uint32_t blocks_requested = 0;
 };
 
 } // namespace net

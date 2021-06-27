@@ -1,8 +1,7 @@
-- bep.request_timeout, introduce into config
-
+- start syncing folder when new folder has been added
 - Canonicalize, TempNameWithPrefix, TempName
 - локальные таймстемпы?
-- auto-remove temporaries
+- auto-remove temporaries (on timeout)
 
 
 - config & tui

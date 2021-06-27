@@ -53,6 +53,10 @@ void controller_actor_t::shutdown_start() noexcept {
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     spdlog::trace("{}, on_ready", identity);
+    if (blocks_requested) {
+        return;
+    }
+
     model::file_info_ptr_t file = message.payload.file;
     if (!file) {
         file = cluster->file_for_synch(peer);
@@ -85,6 +89,7 @@ void controller_actor_t::request_block(const model::file_info_ptr_t &file,
     spdlog::trace("{} request_block, file = {}, block index = {}", identity, file->get_name(), block.block_index);
     request<payload::block_request_t>(peer_addr, file, model::block_info_ptr_t{block.block}, block.block_index)
         .send(request_timeout);
+    ++blocks_requested;
 }
 
 bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {
@@ -143,6 +148,7 @@ void controller_actor_t::on_message(proto::message::Request &message) noexcept {
 void controller_actor_t::on_message(proto::message::DownloadProgress &message) noexcept { std::abort(); }
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
+    --blocks_requested;
     using request_t = fs::payload::write_request_t;
     auto ee = message.payload.ee;
     if (ee) {
@@ -154,7 +160,10 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto &data = message.payload.res.data;
     bool final = file->get_blocks().size() == payload.block_index + 1;
     auto path = file->get_path();
+    // request another block while the current is going to be flushed to disk
     auto request_id = request<request_t>(fs, path, std::move(data), final).send(init_timeout);
+    file->mark_local_available(payload.block_index);
+    send<payload::ready_signal_t>(get_address(), file);
     responses_map.emplace(request_id, &message);
 }
 
@@ -170,7 +179,6 @@ void controller_actor_t::on_write(fs::message::write_response_t &message) noexce
     responses_map.erase(it);
     auto &p = block_res->payload.req->payload.request_payload;
     auto &file = p.file;
-    file->mark_local_available(p.block_index);
+
     send<payload::ready_signal_t>(get_address(), file);
-    return;
 }

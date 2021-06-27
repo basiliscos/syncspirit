@@ -58,9 +58,7 @@ file_info_t::~file_info_t() {
     }
     blocks.clear();
 
-    for (auto &b : local_blocks) {
-        b->unlink(this);
-    }
+    // no need to clean local blocks
     local_blocks.clear();
 }
 

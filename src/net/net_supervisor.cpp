@@ -166,25 +166,12 @@ void net_supervisor_t::on_cluster_ready(message::cluster_ready_notify_t &message
         spdlog::critical("{}, cluster is not ready: {}, ", ee->message());
         return do_shutdown(ee);
     }
-    cluster_ready = true;
     launch_net();
 }
 
 void net_supervisor_t::launch_net() noexcept {
-    if (!cluster_ready || !igd_location) {
-        return;
-    }
-
-    spdlog::info("{}, launching network services", identity);
     auto timeout = shutdown_timeout * 9 / 10;
-
-    upnp_addr = create_actor<upnp_actor_t>()
-                    .timeout(timeout)
-                    .descr_url(igd_location)
-                    .rx_buff_size(app_config.upnp_config.rx_buff_size)
-                    .external_port(app_config.upnp_config.external_port)
-                    .finish()
-                    ->get_address();
+    spdlog::info("{}, launching network services", identity);
 
     create_actor<acceptor_actor_t>().timeout(timeout).finish();
     peers_addr = create_actor<peer_supervisor_t>()
@@ -206,6 +193,20 @@ void net_supervisor_t::launch_net() noexcept {
                                    .finish()
                                    ->get_address();
     }
+}
+
+void net_supervisor_t::launch_upnp() noexcept {
+    spdlog::debug("{}, launching upnp", identity);
+    assert(igd_location);
+    auto timeout = shutdown_timeout * 9 / 10;
+
+    upnp_addr = create_actor<upnp_actor_t>()
+                    .timeout(timeout)
+                    .descr_url(igd_location)
+                    .rx_buff_size(app_config.upnp_config.rx_buff_size)
+                    .external_port(app_config.upnp_config.external_port)
+                    .finish()
+                    ->get_address();
 }
 
 void net_supervisor_t::on_start() noexcept {
@@ -234,7 +235,7 @@ void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
     send<r::payload::shutdown_trigger_t>(get_address(), ssdp_addr, make_error(ec));
 
     igd_location = message.payload.igd.location;
-    launch_net();
+    launch_upnp();
 }
 
 void net_supervisor_t::launch_ssdp() noexcept {

@@ -74,6 +74,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void launch_cluster() noexcept;
     void launch_ssdp() noexcept;
     void launch_net() noexcept;
+    void launch_upnp() noexcept;
     void load_db() noexcept;
     outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
 
@@ -96,7 +97,6 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     ignore_device_req_t ignore_device_req;
     ingored_folder_requests_t ingored_folder_requests;
     update_peer_req_t update_peer_req;
-    bool cluster_ready = false;
 };
 
 } // namespace net
