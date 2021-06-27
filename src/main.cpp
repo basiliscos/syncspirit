@@ -21,6 +21,10 @@
 #include "console/utils.h"
 #include "fs/fs_supervisor.h"
 
+#if defined(__linux__)
+#include <pthread.h>
+#endif
+
 namespace bfs = boost::filesystem;
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
@@ -55,6 +59,9 @@ int main(int argc, char **argv) {
 
     console::term_prepare();
     try {
+#if defined(__linux__)
+        pthread_setname_np(pthread_self(), "synspirit/main");
+#endif
         // clang-format off
         /* parse command-line & config options */
         po::options_description cmdline_descr("Allowed options");
@@ -168,16 +175,23 @@ int main(int argc, char **argv) {
 
         /* launch actors */
         auto net_thread = std::thread([&]() {
+#if defined(__linux__)
+            pthread_setname_np(pthread_self(), "synspirit/net");
+#endif
             io_context.run();
             console::shutdown_flag = true;
             spdlog::trace("net thread has been terminated");
         });
 
         auto fs_thread = std::thread([&]() {
+#if defined(__linux__)
+            pthread_setname_np(pthread_self(), "synspirit/fs");
+#endif
             fs_context.run();
             console::shutdown_flag = true;
             spdlog::trace("fs thread has been terminated");
         });
+        fs_thread.native_handle();
 
         asio::io_context console_context;
         ra::system_context_asio_t con_context{console_context};
@@ -195,6 +209,7 @@ int main(int argc, char **argv) {
             .tui_config(cfg.tui_config)
             .timeout(timeout)
             .finish();
+
         console_context.run();
 
         spdlog::trace("waiting fs thread termination");
