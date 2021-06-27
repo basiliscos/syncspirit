@@ -346,6 +346,8 @@ template <typename T, typename Sock, typename P> struct interface_t : P {
         }
         return {};
     }
+
+    ~interface_t() { get_self().get_physical_layer().close(); }
 };
 
 } // namespace syncspirit::transport
