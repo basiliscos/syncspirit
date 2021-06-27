@@ -30,8 +30,8 @@ TEST_CASE("base32 encode/decode", "[support]") {
     }
 
     SECTION("binary string") {
-        unsigned char in[] = {0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6};
-        std::string orig(reinterpret_cast<char *>(in));
+        unsigned char in[] = {0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0x00};
+        std::string orig(reinterpret_cast<const char *>(in));
         auto e = b32::encode(orig);
         auto d = b32::decode(e);
         REQUIRE((bool)d);
