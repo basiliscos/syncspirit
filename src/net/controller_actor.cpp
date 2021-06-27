@@ -86,10 +86,11 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
 
 void controller_actor_t::request_block(const model::file_info_ptr_t &file,
                                        const model::block_location_t &block) noexcept {
-    spdlog::trace("{} request_block, file = {}, block index = {}", identity, file->get_name(), block.block_index);
+    spdlog::trace("{} request_block, file = {}, block index = {}, sz = {}", identity, file->get_name(), block.block_index, block.block->get_size());
     request<payload::block_request_t>(peer_addr, file, model::block_info_ptr_t{block.block}, block.block_index)
         .send(request_timeout);
     ++blocks_requested;
+
 }
 
 bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {

@@ -2,6 +2,7 @@
 #include "file_info.h"
 #include "cluster.h"
 #include <algorithm>
+#include <spdlog/spdlog.h>
 
 namespace syncspirit::model {
 
@@ -168,6 +169,7 @@ void file_info_t::mark_local_available(size_t block_index) noexcept {
     assert(local_blocks.size() == block_index);
     local_blocks.emplace_back(blocks[block_index]);
     if (local_blocks.size() == blocks.size()) {
+        spdlog::info("file {} is sync", get_name());
         status = file_status_t::sync;
     }
 }

@@ -282,23 +282,29 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
 void peer_actor_t::on_read(std::size_t bytes) noexcept {
     assert(read_action);
     resources->release(resource::io);
-    spdlog::trace("{}, on_read, {} bytes", identity, bytes);
-    auto buff = asio::buffer(rx_buff.data(), bytes);
+    rx_idx += bytes;
+    spdlog::trace("{}, on_read, {} bytes, total = {}", identity, bytes, rx_idx);
+    auto buff = asio::buffer(rx_buff.data(), rx_idx);
     auto result = proto::parse_bep(buff);
-    if (!result) {
+    if (result.has_error()) {
         auto &ec = result.error();
         spdlog::warn("{}, on_read, error parsing message: {}", identity, ec.message());
-        do_shutdown(make_error(ec));
+        return do_shutdown(make_error(ec));
     }
     auto &value = result.value();
     if (!value.consumed) {
-        spdlog::trace("{}, on_read, {} :: incomplete message", identity);
+        spdlog::trace("{}, on_read :: incomplete message", identity);
         return read_more();
     }
 
     cancel_timer();
+    rx_idx -= value.consumed;
+    if (value.consumed < rx_idx) {
+        auto tail = rx_idx - value.consumed;
+        rx_idx -= tail;
+        std::memcpy(rx_buff.data(), rx_buff.data() + value.consumed, tail);
+    }
     read_action(std::move(value.message));
-    rx_idx += bytes - value.consumed;
     spdlog::trace("{}, on_read,  rx_idx = {} ", identity, rx_idx);
 }
 
@@ -388,13 +394,14 @@ void peer_actor_t::on_termination(message::termination_signal_t &message) noexce
 }
 
 void peer_actor_t::on_block_request(message::block_request_t &message) noexcept {
-    spdlog::trace("{}, on_block_request", identity);
+    auto req_id = message.payload.id;
+    spdlog::trace("{}, on_block_request, request_id = {}", identity, req_id);
     assert(!block_request);
     proto::Request req;
     auto &p = message.payload.request_payload;
     auto &file = p.file;
     auto &block = p.block;
-    req.set_id((std::int32_t)message.payload.id);
+    req.set_id((std::int32_t)req_id);
     *req.mutable_folder() = file->get_folder()->id();
     *req.mutable_name() = file->get_name();
 
@@ -503,6 +510,7 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
 
     auto id = message->id();
     auto expected_id = block_request->payload.id;
+    spdlog::trace("{}, handle_response, message id = {}", identity, id);
     if (id != expected_id) {
         spdlog::warn("{}, got response {}, but requested {}", identity, id, expected_id);
         auto ec = utils::make_error_code(utils::bep_error_code_t::response_mismatch);
