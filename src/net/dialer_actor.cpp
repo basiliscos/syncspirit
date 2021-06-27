@@ -78,12 +78,16 @@ void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
 void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
     if (peer_device->is_dynamic()) {
         if (global_discovery) {
-            assert(global_discovery);
-            auto timeout = shutdown_timeout / 2;
-            auto &device_id = peer_device->device_id;
-            auto req_id = request<payload::discovery_request_t>(global_discovery, device_id).send(timeout);
-            discovery_map.insert_or_assign(peer_device, req_id);
-            resources->acquire(resource::request);
+            if (!discovery_map.count(peer_device)) {
+                auto timeout = shutdown_timeout / 2;
+                auto &device_id = peer_device->device_id;
+                auto req_id = request<payload::discovery_request_t>(global_discovery, device_id).send(timeout);
+                discovery_map.insert_or_assign(peer_device, req_id);
+                resources->acquire(resource::request);
+            } else {
+                spdlog::trace("{}, ignoring discovery request for {}, as one seems already in progress", identity,
+                              peer_device->device_id);
+            }
         }
     } else {
         on_ready(peer_device, peer_device->static_addresses);

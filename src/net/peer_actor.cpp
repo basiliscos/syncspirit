@@ -237,7 +237,7 @@ void peer_actor_t::on_handshake(bool valid_peer, X509 *cert, const tcp::endpoint
     push_write(std::move(buff), false);
 
     read_more();
-    read_action = [this](auto &&msg) { read_hello(std::move(msg)); };
+    read_action = &peer_actor_t::read_hello;
 }
 
 void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
@@ -304,7 +304,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         rx_idx -= tail;
         std::memcpy(rx_buff.data(), rx_buff.data() + value.consumed, tail);
     }
-    read_action(std::move(value.message));
+    (this->*read_action)(std::move(value.message));
     spdlog::trace("{}, on_read,  rx_idx = {} ", identity, rx_idx);
 }
 
@@ -371,14 +371,14 @@ void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
     serialize(buff, *cluster);
     push_write(std::move(buff), false);
 
-    read_action = [this](auto &&msg) { read_cluster_config(std::move(msg)); };
+    read_action = &peer_actor_t::read_cluster_config;
     read_more();
 }
 
 void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept {
     spdlog::trace("{}, on_start_reading", identity);
     controller = message.payload.controller;
-    read_action = [this](auto &&msg) { read_controlled(std::move(msg)); };
+    read_action = &peer_actor_t::read_controlled;
     read_more();
 }
 
@@ -483,7 +483,7 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
         },
         msg);
     if (continue_reading) {
-        read_action = [this](auto &&msg) { read_controlled(std::move(msg)); };
+        read_action = &peer_actor_t::read_controlled;
         read_more();
     }
 }
