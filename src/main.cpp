@@ -227,6 +227,7 @@ int main(int argc, char **argv) {
 
     google::protobuf::ShutdownProtobufLibrary();
     /* exit */
+
     spdlog::info("normal exit");
     spdlog::drop_all();
     return 0;

@@ -238,8 +238,10 @@ template <> struct impl<tcp_socket_t> {
             strand.post([ec = ec, owner = std::move(owner)]() mutable { owner->error(ec); });
             return;
         } else {
-            strand.post(
-                [endpoint, owner = std::move(owner)]() mutable { owner->success(true, nullptr, endpoint, nullptr); });
+            strand.post([endpoint, owner = std::move(owner)]() mutable {
+                X509Container x509{nullptr, X509_free};
+                owner->success(true, x509, endpoint, nullptr);
+            });
         }
     }
 
@@ -293,7 +295,8 @@ template <> struct impl<ssl_socket_t> {
                 auto &backend = owner->backend;
                 auto &sock = backend->sock;
                 auto peer_cert = SSL_get_peer_certificate(sock.native_handle());
-                owner->success(true, peer_cert, endpoint, &backend->actual_peer);
+                auto x509 = X509Container(peer_cert, X509_free);
+                owner->success(true, x509, endpoint, &backend->actual_peer);
             });
         });
     }

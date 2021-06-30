@@ -205,7 +205,7 @@ void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
     }
 }
 
-void peer_actor_t::on_handshake(bool valid_peer, X509 *cert, const tcp::endpoint &peer_endpoint,
+void peer_actor_t::on_handshake(bool valid_peer, transport::X509Container &cert, const tcp::endpoint &peer_endpoint,
                                 const model::device_id_t *peer_device) noexcept {
     resources->release(resource::io);
     if (!peer_device) {
@@ -219,7 +219,7 @@ void peer_actor_t::on_handshake(bool valid_peer, X509 *cert, const tcp::endpoint
     identity = new_id;
 
     identity = new_id;
-    auto cert_name = utils::get_common_name(cert);
+    auto cert_name = utils::get_common_name(cert.get());
     if (!cert_name) {
         spdlog::warn("{}, on_handshake, can't get certificate name: {}", identity, cert_name.error().message());
         auto ec = utils::make_error_code(utils::error_code_t::missing_cn);
