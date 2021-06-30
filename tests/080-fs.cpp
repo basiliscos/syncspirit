@@ -1,5 +1,6 @@
 #include "catch.hpp"
 #include "test-utils.h"
+#include "test_supervisor.h"
 #include "access.h"
 #include "db/utils.h"
 #include "fs/utils.h"
@@ -12,7 +13,7 @@
 #include <boost/mpl/size.hpp>
 
 
-namespace rth = rotor::thread;
+namespace st = syncspirit::test;
 
 using namespace syncspirit;
 using namespace syncspirit::fs;
@@ -175,8 +176,8 @@ struct scan_consumer_t: r::actor_base_t {
 };
 
 struct write_consumer_t: r::actor_base_t {
-    using res_ptr_t = r::intrusive_ptr_t<message::write_response_t>;
     using r::actor_base_t::actor_base_t;
+    using res_ptr_t = r::intrusive_ptr_t<message::write_response_t>;
 
     r::address_ptr_t fs_actor;
     res_ptr_t response;
@@ -205,9 +206,9 @@ TEST_CASE("fs-actor", "[fs]") {
     auto root_path = bfs::unique_path();
     bfs::create_directory(root_path);
     auto root_path_guard = path_guard_t(root_path);
-    rth::system_context_thread_t ctx;
+    r::system_context_t ctx;
     auto timeout = r::pt::milliseconds{10};
-    auto sup = ctx.create_supervisor<rth::supervisor_thread_t>().timeout(timeout).create_registry().finish();
+    auto sup = ctx.create_supervisor<st::supervisor_t>().timeout(timeout).create_registry().finish();
     sup->create_actor<fs_actor_t>().fs_config({1024, 5}).timeout(timeout).finish();
     sup->start();
 

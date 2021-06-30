@@ -29,6 +29,16 @@ struct key_pair_t {
     outcome::result<void> save(const char *cert, const char *priv_key) const noexcept;
 };
 
+struct x509_t {
+    x509_t() noexcept: cert{nullptr} {}
+    x509_t(X509* cert_) noexcept: cert{cert_} {}
+    ~x509_t();
+
+    inline operator X509* () noexcept { return  cert;}
+
+    X509 *cert;
+};
+
 outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept;
 
 outcome::result<key_pair_t> load_pair(const char *cert, const char *priv_key) noexcept;

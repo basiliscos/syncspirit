@@ -22,12 +22,10 @@ using resolver_t = tcp::resolver;
 using resolved_hosts_t = resolver_t::results_type;
 using resolved_item_t = resolved_hosts_t::iterator;
 
-using X509Container = std::unique_ptr<X509, void (*)(X509 *)>;
-
 using connect_fn_t = std::function<void(resolved_item_t)>;
 using error_fn_t = std::function<void(const sys::error_code &)>;
 using handshake_fn_t =
-    std::function<void(bool valid, X509Container &peer, const tcp::endpoint &, const model::device_id_t *peer_device)>;
+    std::function<void(bool valid, utils::x509_t &peer, const tcp::endpoint &, const model::device_id_t *peer_device)>;
 using io_fn_t = std::function<void(std::size_t)>;
 
 struct ssl_junction_t {

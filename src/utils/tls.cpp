@@ -13,6 +13,12 @@ namespace sys = boost::system;
 
 namespace syncspirit::utils {
 
+x509_t::~x509_t() {
+    if (cert) {
+        X509_free(cert);
+    }
+}
+
 template <typename T, typename G> guard_t<T> make_guard(T *ptr, G &&fn) {
     return guard_t<T>{ptr, [fn = std::move(fn)](T *it) { fn(it); }};
 }

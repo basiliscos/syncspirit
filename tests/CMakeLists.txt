@@ -11,6 +11,7 @@ find_package(
 find_package(OpenSSL REQUIRED)
 
 add_library(syncspirit_test_lib
+    test_supervisor.cpp
     test-main.cpp
 )
 target_link_libraries(syncspirit_test_lib syncspirit_lib)

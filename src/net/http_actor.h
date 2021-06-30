@@ -77,7 +77,7 @@ struct http_actor_t : public r::actor_base_t {
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;
     void on_shutdown_timer(r::request_id_t, bool cancelled) noexcept;
-    void on_handshake(bool valid_peer, transport::X509Container &, const tcp::endpoint &,
+    void on_handshake(bool valid_peer, utils::x509_t &, const tcp::endpoint &,
                       const model::device_id_t *) noexcept;
     void on_handshake_error(sys::error_code ec) noexcept;
     void cancel_io() noexcept;
