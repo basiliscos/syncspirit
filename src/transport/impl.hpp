@@ -13,6 +13,7 @@ using ssl_socket_t = ssl::stream<tcp::socket>;
 template <typename T> struct error_curry_t : model::arc_base_t<error_curry_t<T>> {
     using backend_ptr_t = model::intrusive_ptr_t<T>;
     error_curry_t(T &owner, error_fn_t &on_error) noexcept : backend{&owner}, on_error_fn{std::move(on_error)} {}
+    virtual ~error_curry_t(){};
 
     void error(const sys::error_code &ec) noexcept {
         on_error_fn(ec);
@@ -66,10 +67,12 @@ template <> struct base_impl_t<tcp_socket_t> {
         : supervisor{config.supervisor}, strand{supervisor.get_strand()}, sock(strand.context()) {}
 
     tcp_socket_t &get_physical_layer() noexcept { return sock; }
+    // virtual ~base_impl_t(){}
 };
 
 template <> struct base_impl_t<ssl_socket_t> {
     using self_t = base_impl_t<ssl_socket_t>;
+    // virtual ~base_impl_t(){}
 
     rotor::asio::supervisor_asio_t &supervisor;
     strand_t &strand;

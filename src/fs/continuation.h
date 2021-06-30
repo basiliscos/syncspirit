@@ -40,13 +40,16 @@ struct scan_t {
     std::optional<next_block_t> next_block;
 };
 
+struct process_signal_t {};
+
 } // namespace payload
 
 namespace message {
 
 using scan_t = r::message_t<payload::scan_t>;
+using process_signal_t = r::message_t<payload::process_signal_t>;
 
-}
+} // namespace message
 
 } // namespace fs
 } // namespace syncspirit

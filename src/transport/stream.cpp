@@ -3,6 +3,8 @@
 
 namespace syncspirit::transport {
 
+stream_base_t::~stream_base_t() {}
+
 template <typename Sock> struct steam_impl_t : base_impl_t<Sock>, interface_t<steam_impl_t<Sock>, Sock, stream_base_t> {
     using self_t = steam_impl_t;
     using socket_t = Sock;

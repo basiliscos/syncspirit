@@ -5,13 +5,10 @@
 
 using namespace syncspirit::net;
 
-// auto folder = cluster->opt_for_synch(device);
-
 namespace {
 namespace resource {
 r::plugin::resource_id_t peer = 0;
 }
-
 } // namespace
 
 controller_actor_t::controller_actor_t(config_t &config)

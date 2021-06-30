@@ -19,31 +19,62 @@ void fs_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&fs_actor_t::on_scan_request);
+        p.subscribe_actor(&fs_actor_t::on_scan_cancel);
         p.subscribe_actor(&fs_actor_t::on_scan);
+        p.subscribe_actor(&fs_actor_t::on_process);
         p.subscribe_actor(&fs_actor_t::on_write_request);
     });
 }
 
 void fs_actor_t::on_start() noexcept {
-    spdlog::debug("{}, on_start", identity);
+    spdlog::trace("{}, on_start", identity);
     r::actor_base_t::on_start();
 }
 
 void fs_actor_t::shutdown_finish() noexcept {
-    spdlog::debug("{}, shutdown_finish", identity);
+    spdlog::trace("{}, shutdown_finish", identity);
     get_supervisor().shutdown();
     r::actor_base_t::shutdown_finish();
 }
 
 void fs_actor_t::on_scan_request(message::scan_request_t &req) noexcept {
     auto &root = req.payload.root;
-    spdlog::debug("{}, on_scan_request, root = {}", identity, root.c_str());
+    spdlog::trace("{}, on_scan_request, root = {}", identity, root.c_str());
 
     queue.emplace_back(&req);
     if (queue.size() == 1) {
         process_queue();
     }
 }
+
+void fs_actor_t::on_scan_cancel(message::scan_cancel_t &req) noexcept {
+    spdlog::trace("{}, on_scan_cancel", identity);
+    auto req_id = req.payload.request_id;
+    if (queue.size()) {
+        auto it = queue.begin();
+        if ((*it)->payload.request_id == req_id) {
+            spdlog::debug("{}, on_scan_cancel, cancelling ongoing scan for {}", identity,
+                          queue.front()->payload.root.c_str());
+            scan_cancelled = true;
+            return;
+        }
+        for (auto it = queue.begin(); it != queue.end(); ++it) {
+            if ((*it)->payload.request_id == req_id) {
+                auto &payload = (*it)->payload;
+                auto &root = payload.root;
+                spdlog::debug("{}, on_scan_cancel, cancelling pending scan for {}", root.c_str());
+                auto &requestee = payload.reply_to;
+                auto file_map = model::local_file_map_ptr_t(new model::local_file_map_t(root));
+                file_map->ec = utils::make_error_code(utils::error_code_t::scan_aborted);
+                send<payload::scan_response_t>(requestee, std::move(file_map));
+                queue.erase(it);
+                break;
+            }
+        }
+    }
+}
+
+void fs_actor_t::on_process(message::process_signal_t &) noexcept { process_queue(); }
 
 void fs_actor_t::process_queue() noexcept {
     if (queue.empty()) {
@@ -64,12 +95,17 @@ void fs_actor_t::reply(message::scan_t &scan) noexcept {
     auto &root = payload.root;
     send<payload::scan_response_t>(requestee, std::move(p.file_map));
     queue.pop_front();
-    process_queue();
+    send<payload::process_signal_t>(address);
 }
 
 void fs_actor_t::on_scan(message::scan_t &req) noexcept {
-    auto dirs_counter = fs_config.batch_dirs_count;
     auto &p = req.payload;
+    if (scan_cancelled) {
+        scan_cancelled = true;
+        p.file_map->ec = utils::make_error_code(utils::error_code_t::scan_aborted);
+        return reply(req);
+    }
+    auto dirs_counter = fs_config.batch_dirs_count;
     while ((dirs_counter > 0) && (!p.scan_dirs.empty())) {
         --dirs_counter;
         auto &dir = p.scan_dirs.front();

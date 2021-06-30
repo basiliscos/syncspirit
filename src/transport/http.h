@@ -12,10 +12,11 @@ struct http_interface_t {
     using response_t = http::response<http::string_body>;
     virtual void async_read(rx_buff_t &rx_buff, response_t &response, io_fn_t &on_read,
                             error_fn_t &on_error) noexcept = 0;
-    inline virtual ~http_interface_t() {}
 };
 
-struct http_base_t : model::arc_base_t<http_base_t>, http_interface_t, stream_interface_t {};
+struct http_base_t : model::arc_base_t<http_base_t>, http_interface_t, stream_interface_t {
+    virtual ~http_base_t();
+};
 
 using http_sp_t = model::intrusive_ptr_t<http_base_t>;
 

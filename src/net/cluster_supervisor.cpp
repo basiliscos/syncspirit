@@ -8,6 +8,25 @@ namespace fs = boost::filesystem;
 
 using namespace syncspirit::net;
 
+namespace {
+namespace resource {
+r::plugin::resource_id_t fs_scan = 0;
+}
+
+namespace to {
+struct next_request_id {};
+} // namespace to
+
+} // namespace
+
+namespace rotor {
+
+template <>
+inline auto supervisor_t::access<to::next_request_id, to::next_request_id>(const to::next_request_id) noexcept {
+    return next_request_id();
+}
+} // namespace rotor
+
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
     : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, device{config.device}, cluster{config.cluster},
       devices{config.devices}, folders{cluster->get_folders()}, ignored_folders(config.ignored_folders) {}
@@ -27,6 +46,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
         p.subscribe_actor(&cluster_supervisor_t::on_connect);
         p.subscribe_actor(&cluster_supervisor_t::on_disconnect);
         p.subscribe_actor(&cluster_supervisor_t::on_scan_complete);
+        p.subscribe_actor(&cluster_supervisor_t::on_scan_error);
     });
 }
 
@@ -37,9 +57,7 @@ void cluster_supervisor_t::on_start() noexcept {
         initial_scan = true;
         for (auto &it : folders) {
             auto &folder = it.second;
-            auto &root = folder->get_path();
-            send<fs::payload::scan_request_t>(fs, root, get_address());
-            scan_folders_map.emplace(root, folder);
+            scan(folder);
         }
     } else {
         initial_scan = false;
@@ -47,20 +65,51 @@ void cluster_supervisor_t::on_start() noexcept {
     }
 }
 
+void cluster_supervisor_t::shutdown_start() noexcept {
+    spdlog::trace("{}, shutdown_start", identity);
+
+    for (auto &it : scan_folders_map) {
+        send<fs::payload::scan_cancel_t>(fs, it.second.request_id);
+    }
+    ra::supervisor_asio_t::shutdown_start();
+}
+
+void cluster_supervisor_t::scan(const model::folder_ptr_t &folder) noexcept {
+    auto path = folder->get_path();
+    auto req_id = access<to::next_request_id>(to::next_request_id{});
+    send<fs::payload::scan_request_t>(fs, path, get_address(), req_id);
+    scan_folders_map.emplace(path, scan_info_t{folder, req_id});
+    resources->acquire(resource::fs_scan);
+}
+
 void cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &message) noexcept {
-    auto &payload = *message.payload;
-    auto &path = payload.root;
+    auto &file_map = *message.payload;
+    auto &path = file_map.root;
+    auto &ec = file_map.ec;
     spdlog::trace("{}, on_scan_complete for {}", identity, path.c_str());
+    resources->release(resource::fs_scan);
     auto it = scan_folders_map.find(path);
     assert(it != scan_folders_map.end());
-    auto &folder = it->second;
-    folder->update(payload);
+    auto &folder = it->second.folder;
+    if (!ec) {
+        folder->update(file_map);
+    } else {
+        spdlog::warn("{}, scanning {} error: {}", identity, path.c_str(), ec.message());
+    }
+
     scan_folders_map.erase(it);
     if (scan_folders_map.empty() && initial_scan) {
         spdlog::debug("{}, completed intiial scan", identity, path.c_str());
         send<payload::cluster_ready_notify_t>(coordinator);
         initial_scan = false;
     }
+}
+
+void cluster_supervisor_t::on_scan_error(fs::message::scan_error_t &message) noexcept {
+    // multiple messages might arrive
+    auto &ec = message.payload.error;
+    auto &path = message.payload.path;
+    spdlog::warn("{}, on_scan_error on '{}': {} ", identity, path.c_str(), ec.message());
 }
 
 void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {

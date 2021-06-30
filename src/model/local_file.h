@@ -2,6 +2,7 @@
 #include <vector>
 #include <memory>
 #include <boost/filesystem.hpp>
+#include <boost/system/error_code.hpp>
 #include "block_info.h"
 
 namespace std {
@@ -13,6 +14,7 @@ template <> struct hash<boost::filesystem::path> {
 namespace syncspirit::model {
 
 namespace bfs = boost::filesystem;
+namespace sys = boost::system;
 
 struct local_file_t {
     using blocks_t = std::vector<model::block_info_ptr_t>;
@@ -24,6 +26,7 @@ struct local_file_map_t {
 
     local_file_map_t(const bfs::path &root_) noexcept : root{root_} {}
     bfs::path root;
+    sys::error_code ec;
     container_t map;
 };
 

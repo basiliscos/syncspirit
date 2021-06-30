@@ -63,18 +63,26 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_child_shutdown(actor_base_t *actor) noexcept override;
     void on_start() noexcept override;
+    void shutdown_start() noexcept override;
 
   private:
+    struct scan_info_t {
+        model::folder_ptr_t folder;
+        r::request_id_t request_id;
+    };
+
     using device2addr_map_t = std::unordered_map<std::string, r::address_ptr_t>; // device_id: controller
     using addr2device_map_t = std::unordered_map<r::address_ptr_t, std::string>; // reverse
     using create_folder_req_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
-    using scan_folders_map_t = std::unordered_map<bfs::path, model::folder_ptr_t>;
+    using scan_folders_map_t = std::unordered_map<bfs::path, scan_info_t>;
 
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
     void on_connect(message::connect_notify_t &message) noexcept;
     void on_disconnect(message::disconnect_notify_t &message) noexcept;
     void on_store_new_folder(message::store_new_folder_response_t &message) noexcept;
     void on_scan_complete(fs::message::scan_response_t &message) noexcept;
+    void on_scan_error(fs::message::scan_error_t &message) noexcept;
+    void scan(const model::folder_ptr_t &folder) noexcept;
 
     r::address_ptr_t coordinator;
     r::address_ptr_t fs;

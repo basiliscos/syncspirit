@@ -58,6 +58,7 @@ enum class error_code_t {
     external_ip_failed,
     rx_timeout,
     fs_error,
+    scan_aborted,
 };
 
 enum class bep_error_code_t {
