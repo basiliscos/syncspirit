@@ -56,6 +56,7 @@ spdlog::level::level_enum get_log_level(const std::string &log_level) {
 
 int main(int argc, char **argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
+    std::string prompt = "> ";
 
     console::term_prepare();
     try {
@@ -84,7 +85,6 @@ int main(int argc, char **argv) {
         auto log_level_str = vm["log_level"].as<std::string>();
         auto log_level = get_log_level(log_level_str);
         std::mutex std_out_mutex;
-        std::string prompt = "> ";
         auto console_sink =
             std::make_shared<console::sink_t>(stdout, spdlog::color_mode::automatic, std_out_mutex, prompt);
         spdlog::set_default_logger(std::make_shared<spdlog::logger>("", console_sink));
