@@ -133,21 +133,31 @@ void fs_actor_t::on_scan(message::scan_t &req) noexcept {
 }
 
 void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
-    if (!bfs::exists(dir)) {
+    sys::error_code ec;
+    bool ok = bfs::exists(dir, ec);
+    if (ec || !ok) {
         return;
     }
-    if (!bfs::is_directory(dir)) {
+    ok = bfs::is_directory(dir, ec);
+    if (ec || !ok) {
         return;
     }
 
     for (auto it = bfs::directory_iterator(dir); it != bfs::directory_iterator(); ++it) {
         auto &child = *it;
-        if (bfs::is_directory(child)) {
+        bool is_dir = bfs::is_directory(child, ec);
+        if (!ec && is_dir) {
             payload.scan_dirs.push_back(child);
-        } else if (bfs::is_regular_file(child)) {
-            payload.files_queue.push_back(child);
-        } else if (bfs::is_symlink(child)) {
-            std::abort();
+        } else {
+            bool is_reg = bfs::is_regular_file(child, ec);
+            if (!ec && is_reg) {
+                payload.files_queue.push_back(child);
+            } else {
+                bool is_sim = bfs::is_symlink(child, ec);
+                if (!ec && is_sim) {
+                    std::abort();
+                }
+            }
         }
     }
 }
@@ -202,9 +212,13 @@ void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
     auto parent = path.parent_path();
     path += tmp_suffix;
     auto &data = payload.data;
+    sys::error_code ec;
+    bool exists = bfs::exists(parent, ec);
 
-    if (!bfs::exists(parent)) {
-        sys::error_code ec;
+    if (ec) {
+        return reply_with_error(req, make_error(ec));
+    }
+    if (!exists) {
         bfs::create_directories(parent, ec);
         if (ec) {
             return reply_with_error(req, make_error(ec));

@@ -38,13 +38,14 @@ static void write(const bfs::path& path, const std::string_view& data) {
 }
 
 TEST_CASE("utils", "[fs]") {
+    auto dir = bfs::current_path() / bfs::unique_path();
+    bfs::create_directory(dir);
+    auto dir_guard = st::path_guard_t(dir);
     auto sample_file = bfs::unique_path();
-    auto sample_file_guard = path_guard_t(sample_file);
 
     SECTION("file does not exists") {
         auto opt = prepare(sample_file);
         CHECK(!opt);
-        CHECK(opt.error() == sys::errc::no_such_file_or_directory);
     }
 
     SECTION("empty file") {
@@ -283,7 +284,6 @@ TEST_CASE("fs-actor", "[fs]") {
     SECTION("write") {
         auto act = sup->create_actor<write_consumer_t>().timeout(timeout).finish();
         sup->do_process();
-
         SECTION("success case") {
             auto path = root_path / "my-file";
             const std::string data = "123456980";
