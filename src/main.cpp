@@ -108,7 +108,12 @@ int main(int argc, char **argv) {
         bool populate = !bfs::exists(config_file_path);
         if (populate) {
             spdlog::info("Config {} seems does not exit, creating default one...", config_file_path.c_str());
-            auto cfg = config::generate_config(config_file_path);
+            auto cfg_opt = config::generate_config(config_file_path);
+            if (!cfg_opt) {
+                spdlog::error("cannot generate default config: {}", cfg_opt.error().message());
+                return -1;
+            }
+            auto& cfg = cfg_opt.value();
             std::fstream f_cfg(config_file_path.string(), f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
             auto r = config::serialize(cfg, f_cfg);
             if (!r) {

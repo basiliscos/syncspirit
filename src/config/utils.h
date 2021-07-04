@@ -24,7 +24,7 @@ using config_result_t = outcome::outcome<main_t, std::string>;
 
 config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path);
 
-main_t generate_config(const boost::filesystem::path &config_path);
+outcome::result<main_t> generate_config(const boost::filesystem::path &config_path);
 
 outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept;
 

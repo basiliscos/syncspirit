@@ -11,6 +11,7 @@
 #include <toml++/toml.h>
 
 namespace bfs = boost::filesystem;
+namespace sys = boost::system;
 
 static const std::string home_path = "~/.config/syncspirit";
 
@@ -70,7 +71,7 @@ static std::string expand_home(const std::string &path, const char *home) {
 }
 
 static device_name_t get_device_name() noexcept {
-    boost::system::error_code ec;
+    sys::error_code ec;
     auto device_name = boost::asio::ip::host_name(ec);
     if (ec) {
         return ec;
@@ -398,13 +399,22 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
     return outcome::success();
 }
 
-main_t generate_config(const boost::filesystem::path &config_path) {
+outcome::result<main_t> generate_config(const boost::filesystem::path &config_path) {
     auto dir = config_path.parent_path();
-    if (!bfs::exists(dir)) {
-        spdlog::info("creating directory {}", dir.c_str());
-        bfs::create_directories(dir);
+    sys::error_code ec;
+    bool exists = bfs::exists(dir, ec);
+    if (ec) {
+        spdlog::error("cannot check dir {}: {}", dir.c_str(), ec.message());
+        return ec;
     }
-
+    if (!exists) {
+        spdlog::info("creating directory {}", dir.c_str());
+        bfs::create_directories(dir, ec);
+        if (ec) {
+            spdlog::error("cannot create dirs: {}", ec);
+            return ec;
+        }
+    }
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
     auto home = std::getenv("HOME");
