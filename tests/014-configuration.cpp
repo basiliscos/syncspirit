@@ -7,12 +7,14 @@
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
+namespace st = syncspirit::test;
 
 using namespace syncspirit;
 
 TEST_CASE("default config is OK", "[config]") {
     auto dir = fs::current_path() / fs::unique_path();
     fs::create_directory(dir);
+    auto dir_guard = st::path_guard_t(dir);
     auto cfg_path = dir / "syncspirit.toml";
     auto cfg_opt = config::generate_config(cfg_path);
     REQUIRE(cfg_opt);
@@ -28,5 +30,4 @@ TEST_CASE("default config is OK", "[config]") {
         auto cfg2 = cfg_opt.value();
         CHECK(cfg == cfg2);
     }
-    fs::remove_all(dir);
 }
