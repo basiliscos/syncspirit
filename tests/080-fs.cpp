@@ -284,6 +284,7 @@ TEST_CASE("fs-actor", "[fs]") {
     SECTION("write") {
         auto act = sup->create_actor<write_consumer_t>().timeout(timeout).finish();
         sup->do_process();
+
         SECTION("success case") {
             auto path = root_path / "my-file";
             const std::string data = "123456980";

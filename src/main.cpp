@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
                 spdlog::error("cannot generate default config: {}", cfg_opt.error().message());
                 return -1;
             }
-            auto& cfg = cfg_opt.value();
+            auto &cfg = cfg_opt.value();
             std::fstream f_cfg(config_file_path.string(), f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
             auto r = config::serialize(cfg, f_cfg);
             if (!r) {

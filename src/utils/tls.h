@@ -30,11 +30,11 @@ struct key_pair_t {
 };
 
 struct x509_t {
-    x509_t() noexcept: cert{nullptr} {}
-    x509_t(X509* cert_) noexcept: cert{cert_} {}
+    x509_t() noexcept : cert{nullptr} {}
+    x509_t(X509 *cert_) noexcept : cert{cert_} {}
     ~x509_t();
 
-    inline operator X509* () noexcept { return  cert;}
+    inline operator X509 *() noexcept { return cert; }
 
     X509 *cert;
 };

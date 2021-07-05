@@ -240,8 +240,7 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     need_response = false;
 }
 
-void http_actor_t::on_handshake(bool, utils::x509_t &, const tcp::endpoint &,
-                                const model::device_id_t *) noexcept {
+void http_actor_t::on_handshake(bool, utils::x509_t &, const tcp::endpoint &, const model::device_id_t *) noexcept {
     resources->release(resource::io);
     if (!need_response || stop_io) {
         resources->release(resource::io);

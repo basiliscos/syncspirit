@@ -215,9 +215,6 @@ void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
     sys::error_code ec;
     bool exists = bfs::exists(parent, ec);
 
-    if (ec) {
-        return reply_with_error(req, make_error(ec));
-    }
     if (!exists) {
         bfs::create_directories(parent, ec);
         if (ec) {
