@@ -41,7 +41,7 @@ TEST_CASE("utils", "[fs]") {
     auto dir = bfs::current_path() / bfs::unique_path();
     bfs::create_directory(dir);
     auto dir_guard = st::path_guard_t(dir);
-    auto sample_file = bfs::unique_path();
+    auto sample_file = dir / bfs::unique_path();
 
     SECTION("file does not exists") {
         auto opt = prepare(sample_file);
