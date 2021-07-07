@@ -10,7 +10,9 @@ device_t::device_t(const db::Device &d, uint64_t db_key_) noexcept
       skip_introduction_removals{d.skip_introduction_removals()}, db_key{db_key_} {
 
     for (int i = 0; i < d.addresses_size(); ++i) {
-        static_addresses.emplace_back(d.addresses(i));
+        auto uri = utils::parse(d.addresses(i));
+        assert(uri);
+        static_addresses.emplace_back(std::move(uri.value()));
     }
 }
 

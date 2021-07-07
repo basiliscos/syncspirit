@@ -38,7 +38,8 @@ struct block_info_t : arc_base_t<block_info_t>, storeable_t {
     void mark_local_available(file_info_t *file_info) noexcept;
     local_availability_t local_file() noexcept;
 
-    bool operator==(const block_info_t &right) const noexcept { return hash == right.hash; }
+    inline bool operator==(const block_info_t &right) const noexcept { return hash == right.hash; }
+    inline bool operator!=(const block_info_t &right) const noexcept { return !(hash == right.hash); }
 
   private:
     struct file_block_t : local_availability_t {
