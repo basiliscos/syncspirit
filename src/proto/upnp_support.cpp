@@ -178,20 +178,21 @@ outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &
     req.set(http::field::cache_control, "no-cache");
     req.set(http::field::content_type, "text/xml");
 
-    std::string body = fmt::format("<?xml version='1.0'?>"
-                                   "<s:Envelope xmlns:s='http://schemas.xmlsoap.org/soap/envelope/' "
-                                   "s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'>"
-                                   "<s:Body><u:{0} xmlns:u='{1}'>"
-                                   "<NewRemoteHost/>"
-                                   "<NewExternalPort>{2}</NewExternalPort>"
-                                   "<NewProtocol>TCP</NewProtocol>"
-                                   "<NewInternalPort>{3}</NewInternalPort>"
-                                   "<NewInternalClient>{4}</NewInternalClient>"
-                                   "<NewEnabled>1</NewEnabled>"
-                                   "<NewPortMappingDescription>syncspirit at {2}</NewPortMappingDescription>"
-                                   "<NewLeaseDuration>0</NewLeaseDuration>"
-                                   "</u:{0}></s:Body></s:Envelope>",
-                                   soap_AddPortMapping, igd_wan_service, external_port, internal_port, internal_ip);
+    std::string body =
+        fmt::format("<?xml version='1.0'?>"
+                    "<s:Envelope xmlns:s='http://schemas.xmlsoap.org/soap/envelope/' "
+                    "s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'>"
+                    "<s:Body><u:{0} xmlns:u='{1}'>"
+                    "<NewRemoteHost></NewRemoteHost>" // should not be collapsed for Wireless Router TL-WR841N
+                    "<NewExternalPort>{2}</NewExternalPort>"
+                    "<NewProtocol>TCP</NewProtocol>"
+                    "<NewInternalPort>{3}</NewInternalPort>"
+                    "<NewInternalClient>{4}</NewInternalClient>"
+                    "<NewEnabled>1</NewEnabled>"
+                    "<NewPortMappingDescription>syncspirit at {2}</NewPortMappingDescription>"
+                    "<NewLeaseDuration>0</NewLeaseDuration>"
+                    "</u:{0}></s:Body></s:Envelope>",
+                    soap_AddPortMapping, igd_wan_service, external_port, internal_port, internal_ip);
     req.body() = body;
     req.prepare_payload();
 
