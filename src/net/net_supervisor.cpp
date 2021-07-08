@@ -85,13 +85,18 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     auto &child_addr = actor->get_address();
     if (ssdp_addr && child_addr == ssdp_addr) {
         ssdp_addr.reset();
-        if (reason->ec != r::shutdown_code_t::normal && state == r::state_t::OPERATIONAL) {
+        auto ssdp = (reason->ec != r::shutdown_code_t::normal && state == r::state_t::OPERATIONAL);
+        if (ssdp) {
             launch_ssdp();
             return;
         }
     }
     if (local_discovery_addr && child_addr == local_discovery_addr) {
-        // ignore
+        local_discovery_addr.reset();
+        return;
+    }
+    if (upnp_addr && upnp_addr == child_addr) {
+        upnp_addr.reset();
         return;
     }
     if (peers_addr && peers_addr == child_addr) {
@@ -249,10 +254,13 @@ void net_supervisor_t::launch_ssdp() noexcept {
 }
 
 void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &message) noexcept {
+    asio::ip::address ip;
     if (!message.payload.success) {
-        spdlog::debug("{}, on_port_mapping shutting down self, unsuccesful port mapping", identity);
-        auto ec = utils::make_error_code(utils::error_code_t::portmapping_failed);
-        return do_shutdown(make_error(ec));
+        spdlog::info("{}, on_port_mapping, unsuccesful port mapping", identity);
+        // auto ec = utils::make_error_code(utils::error_code_t::portmapping_failed);
+        // Return do_shutdown(make_error(ec));
+    } else {
+        ip = message.payload.external_ip;
     }
 
     auto &gcfg = app_config.global_announce_config;
@@ -264,7 +272,8 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
             return;
         }
         auto timeout = shutdown_timeout * 9 / 10;
-        tcp::endpoint external_ep(message.payload.external_ip, app_config.upnp_config.external_port);
+        auto port = app_config.upnp_config.external_port;
+        tcp::endpoint external_ep(ip, port);
         create_actor<global_discovery_actor_t>()
             .timeout(timeout)
             .endpoint(external_ep)

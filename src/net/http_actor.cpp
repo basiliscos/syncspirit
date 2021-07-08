@@ -178,6 +178,8 @@ void http_actor_t::write_request() noexcept {
     auto &data = payload.data;
     spdlog::trace("{} :: sending {} bytes to {} ", identity, data.size(), url.full);
     auto buff = asio::buffer(data.data(), data.size());
+    std::string write_data{(const char *)buff.data(), data.size()};
+    spdlog::debug("{} :: write_request: \n{}", identity, write_data);
     transport::io_fn_t on_write = [&](auto arg) { this->on_request_sent(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     transport->async_send(buff, on_write, on_error);
@@ -203,11 +205,9 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     resources->release(resource::io);
     response_size = bytes;
 
-    /*
     auto &rx_buff = *queue.front()->payload.request_payload->rx_buff;
     std::string data{(const char *)rx_buff.data().data(), bytes};
     spdlog::debug("http_actor_t::on_request_read ({}): \n{}", registry_name, data);
-    */
 
     if (keep_alive && http_response.keep_alive()) {
         kept_alive = true;

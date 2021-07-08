@@ -159,7 +159,7 @@ void dialer_actor_t::on_disconnect(message::disconnect_notify_t &message) noexce
     spdlog::trace("{}, on_disconnect, peer = {}", identity, peer_id);
     auto peer = devices->by_id(peer_id.get_sha256());
     assert(peer);
-    discover(peer);
+    schedule_redial(peer);
 }
 
 void dialer_actor_t::on_connect(message::connect_notify_t &message) noexcept {
