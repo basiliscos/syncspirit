@@ -89,7 +89,7 @@ outcome::result<discovery_result> parse(const char *data, std::size_t bytes) noe
     }
     auto st = it_st->value();
     if (st != igd_v1_st_v) {
-        std::string v((const char*) st.data(), st.size());
+        std::string v((const char *)st.data(), st.size());
         spdlog::warn("upnp_support, igd version {}", v);
         return error_code_t::igd_mismatch;
     }
