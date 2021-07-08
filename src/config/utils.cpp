@@ -28,7 +28,7 @@ bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept
 }
 
 bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
-    return lhs.batch_block_size == rhs.batch_block_size && lhs.batch_dirs_count == rhs.batch_block_size;
+    return lhs.batch_block_size == rhs.batch_block_size && lhs.batch_dirs_count == rhs.batch_block_size && lhs.temporally_timeout == rhs.temporally_timeout;
 }
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
@@ -296,7 +296,13 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "fs/batch_dirs_count is incorrect or missing";
         }
         c.batch_dirs_count = batch_dirs_count.value();
-    }
+
+        auto temporally_timeout = t["temporally_timeout"].value<std::uint32_t>();
+        if (!temporally_timeout) {
+            return "fs/temporally_timeout is incorrect or missing";
+        }
+        c.temporally_timeout = temporally_timeout.value();
+     }
 
     // tui
     {
@@ -384,6 +390,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"fs", toml::table{{
                    {"batch_block_size", cfg.fs_config.batch_block_size},
                    {"batch_dirs_count", cfg.fs_config.batch_dirs_count},
+                   {"temporally_timeout", cfg.fs_config.temporally_timeout},
                }}},
         {"tui", toml::table{{
                     {"refresh_interval", cfg.tui_config.refresh_interval},
@@ -403,10 +410,6 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     auto dir = config_path.parent_path();
     sys::error_code ec;
     bool exists = bfs::exists(dir, ec);
-    if (ec) {
-        spdlog::error("cannot check dir {}: {}", dir.c_str(), ec.message());
-        return ec;
-    }
     if (!exists) {
         spdlog::info("creating directory {}", dir.c_str());
         bfs::create_directories(dir, ec);
@@ -479,6 +482,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     cfg.fs_config = fs_config_t {
         16777216,   /* 16MB, batch_block_size */
         10,         /* batch_dirs_count */
+        86400000    /* temporally_timeout, 24h default */ 
     };
     return cfg;
 }
