@@ -221,9 +221,10 @@ void serialize(fmt::memory_buffer &buff, const Message &message, proto::MessageC
     header.SerializeToArray(ptr_16, header_sz);
     char *ptr = reinterpret_cast<char *>(ptr_16) + header_sz;
 
-    std::uint32_t *ptr_32 = reinterpret_cast<std::uint32_t *>(ptr);
-    *ptr_32++ = be::native_to_big(message_sz);
-    message.SerializeToArray(ptr_32, message_sz);
+    std::uint32_t big_message_sz = be::native_to_big(message_sz);
+    std::memcpy(ptr, &big_message_sz, sizeof (big_message_sz));
+    ptr += sizeof (big_message_sz);
+    message.SerializeToArray(ptr, message_sz);
 }
 
 template void serialize(fmt::memory_buffer &buff, const proto::ClusterConfig &message,
