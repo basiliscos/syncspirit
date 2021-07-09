@@ -9,7 +9,7 @@ block_info_t::block_info_t(const db::BlockInfo &db_block, uint64_t db_key_) noex
 }
 
 block_info_t::block_info_t(const proto::BlockInfo &block) noexcept
-    : hash{block.hash()}, weak_hash{block.weak_hash()}, size{block.size()} {
+    : hash{block.hash()}, weak_hash{block.weak_hash()}, size{block.size()}, db_key{0} {
     mark_dirty();
 }
 
