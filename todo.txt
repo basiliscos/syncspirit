@@ -1,4 +1,3 @@
-- redial after some timeout...
 - start syncing folder when new folder has been added, нужно слать cancel{}
 - Canonicalize, TempNameWithPrefix, TempName
 - локальные таймстемпы?

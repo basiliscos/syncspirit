@@ -6,6 +6,7 @@
 
 #include <google/protobuf/stubs/common.h>
 #include <lz4.h>
+#include <openssl/crypto.h>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <rotor/asio.hpp>
@@ -153,9 +154,9 @@ int main(int argc, char **argv) {
             }
         }
 
-        spdlog::info("starting {} {}, libraries: protobuf v{}, lz4: v{}", constants::client_name,
+        spdlog::info("starting {} {}, libraries: protobuf v{}, lz4: v{}, OpenSSL {}", constants::client_name,
                      constants::client_version, google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION),
-                     LZ4_versionString());
+                     LZ4_versionString(), OpenSSL_version(0));
 
         /* pre-init actors */
         asio::io_context io_context;
