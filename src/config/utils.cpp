@@ -28,7 +28,8 @@ bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept
 }
 
 bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
-    return lhs.batch_block_size == rhs.batch_block_size && lhs.batch_dirs_count == rhs.batch_block_size && lhs.temporally_timeout == rhs.temporally_timeout;
+    return lhs.batch_block_size == rhs.batch_block_size && lhs.batch_dirs_count == rhs.batch_block_size &&
+           lhs.temporally_timeout == rhs.temporally_timeout;
 }
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
@@ -302,7 +303,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "fs/temporally_timeout is incorrect or missing";
         }
         c.temporally_timeout = temporally_timeout.value();
-     }
+    }
 
     // tui
     {

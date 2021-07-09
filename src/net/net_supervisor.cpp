@@ -254,6 +254,10 @@ void net_supervisor_t::launch_ssdp() noexcept {
 }
 
 void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &message) noexcept {
+    if (state != r::state_t::OPERATIONAL) {
+        return;
+    }
+
     asio::ip::address ip;
     if (!message.payload.success) {
         spdlog::info("{}, on_port_mapping, unsuccesful port mapping", identity);
