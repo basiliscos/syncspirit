@@ -41,6 +41,7 @@ void controller_actor_t::on_start() noexcept {
     spdlog::trace("{}, on_start", identity);
     send<payload::start_reading_t>(peer_addr, get_address());
     send<payload::ready_signal_t>(get_address());
+    spdlog::info("{} is ready/online", identity);
 }
 
 void controller_actor_t::shutdown_start() noexcept {

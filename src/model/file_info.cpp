@@ -109,6 +109,7 @@ file_status_t file_info_t::update(const local_file_t &local_file) noexcept {
             auto &lb = local_file.blocks[i];
             auto &sb = blocks[i];
             if (*lb == *sb) {
+                lb->link(this, i);
                 lb->mark_local_available(this);
             } else {
                 matched = false;
@@ -169,7 +170,7 @@ void file_info_t::mark_local_available(size_t block_index) noexcept {
     assert(local_blocks.size() == block_index);
     local_blocks.emplace_back(blocks[block_index]);
     if (local_blocks.size() == blocks.size()) {
-        spdlog::info("file {} is sync", get_name());
+        spdlog::info("{}/{} is sync", folder->label(), get_name());
         status = file_status_t::sync;
     }
 }

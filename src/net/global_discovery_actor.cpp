@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
 #include "../proto/discovery_support.h"
+#include "../utils/beast_support.h"
 #include "../utils/error_code.h"
 #include "http_actor.h"
 
@@ -122,9 +123,12 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
         return reply_with_error(*orig_req, make_error(inner, ee));
     }
 
-    auto res = proto::parse_contact(message.payload.res->response);
+    auto& http_res = message.payload.res->response;
+    auto res = proto::parse_contact(http_res);
     if (!res) {
-        spdlog::warn("{}, parsing discovery error = {}", identity, res.error().message());
+        auto reason = res.error().message();
+        auto& body = http_res.body();
+        spdlog::warn("{}, parsing discovery error = {}, body:\n {}", identity, reason, body);
         return reply_with_error(*orig_req, make_error(res.error()));
     }
 
