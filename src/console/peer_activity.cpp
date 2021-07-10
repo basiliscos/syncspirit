@@ -2,10 +2,11 @@
 
 #include "default_activity.h"
 #include "tui_actor.h"
-#include "sink.h"
+#include "../utils/sink.h"
 #include <fmt/fmt.h>
 
 using namespace syncspirit::console;
+using sink_t = syncspirit::utils::sink_t;
 
 peer_activity_t::peer_activity_t(tui_actor_t &actor_, ui::message::discovery_notify_t &message) noexcept
     : activity_t{actor_, activity_type_t::PEER}, sub_activity{sub_activity_t::main} {

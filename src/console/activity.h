@@ -14,6 +14,7 @@ enum class activity_type_t {
 
 struct activity_t {
     activity_t(tui_actor_t &actor_, activity_type_t type_) noexcept : actor{actor_}, type{type_} {}
+    virtual ~activity_t();
     virtual void display() noexcept = 0;
     virtual bool handle(const char key) noexcept = 0;
     virtual void forget() noexcept;

@@ -23,6 +23,7 @@ TEST_CASE("default config is OK", "[config]") {
     SECTION("serialize default") {
         auto r = config::serialize(cfg, out);
         CHECK(r);
+        INFO(out.str());
         CHECK(out.str().find("~") == std::string::npos);
         auto cfg_opt = config::get_config(out, cfg_path);
         CHECK(cfg_opt);

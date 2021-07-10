@@ -1,9 +1,10 @@
 #include "default_activity.h"
 #include "tui_actor.h"
-#include "sink.h"
+#include "../utils/sink.h"
 #include <fmt/fmt.h>
 
 using namespace syncspirit::console;
+using sink_t = syncspirit::utils::sink_t;
 
 default_activity_t::default_activity_t(tui_actor_t &actor_) noexcept : activity_t{actor_, activity_type_t::DEFAULT} {}
 

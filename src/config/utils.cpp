@@ -438,7 +438,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                      {"device_name", cfg.device_name},
                      {"default_location", cfg.default_location.c_str()},
                  }}},
-        {"logs", logs},
+        {"log", logs},
         {"local_discovery", toml::table{{
                                 {"enabled", cfg.local_announce_config.enabled},
                                 {"port", cfg.local_announce_config.port},

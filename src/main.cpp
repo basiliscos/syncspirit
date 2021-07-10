@@ -39,7 +39,6 @@ int main(int argc, char **argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
     std::string prompt = "> ";
 
-    console::term_prepare();
     try {
 #if defined(__linux__)
         pthread_setname_np(pthread_self(), "synspirit/main");
@@ -50,7 +49,8 @@ int main(int argc, char **argv) {
         cmdline_descr.add_options()
                 ("help", "show this help message")
                 ("log_level", po::value<std::string>()->default_value("info"), "initial log level")
-                ("config_dir", po::value<std::string>(), "configuration directory path");
+                ("config_dir", po::value<std::string>(), "configuration directory path")
+                ("interactive", po::value<bool>()->default_value(true), "allow interactions with user via stdin");
         // clang-format on
 
         po::variables_map vm;
@@ -63,8 +63,13 @@ int main(int argc, char **argv) {
             return 1;
         }
 
+        bool interactive = vm["interactive"].as<bool>();
+        if (interactive) {
+            console::term_prepare();
+        }
+
         std::mutex std_out_mutex;
-        utils::set_default(vm["log_level"].as<std::string>(), prompt, std_out_mutex);
+        utils::set_default(vm["log_level"].as<std::string>(), prompt, std_out_mutex, interactive);
 
         bfs::path config_file_path;
         if (vm.count("config_dir")) {
@@ -113,7 +118,7 @@ int main(int argc, char **argv) {
         spdlog::trace("configuration seems OK");
 
         bool overwrite_default = vm.count("log_level");
-        auto init_result = utils::init_loggers(cfg.log_configs, prompt, std_out_mutex, overwrite_default);
+        auto init_result = utils::init_loggers(cfg.log_configs, prompt, std_out_mutex, overwrite_default, interactive);
         if (!init_result) {
             spdlog::error("Loggers initialization failed :: {}", init_result.error());
             return 1;
@@ -192,6 +197,7 @@ int main(int argc, char **argv) {
                            .finish();
         sup_con->start();
         sup_con->create_actor<console::tui_actor_t>()
+            .interactive(interactive)
             .mutex(&std_out_mutex)
             .prompt(&prompt)
             .tui_config(cfg.tui_config)

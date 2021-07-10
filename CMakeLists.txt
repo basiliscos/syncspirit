@@ -69,6 +69,7 @@ add_library(syncspirit_lib
     src/utils/error_code.cpp
     src/utils/location.cpp
     src/utils/log.cpp
+    src/utils/sink.cpp
     src/utils/tls.cpp
     src/utils/uri.cpp
     ${PROTO_SRCS}
@@ -80,7 +81,6 @@ add_library(syncspirit_console
     src/console/default_activity.cpp
     src/console/new_folder_activity.cpp
     src/console/peer_activity.cpp
-    src/console/sink.cpp
     src/console/tui_actor.cpp
     src/console/utils.cpp
 )

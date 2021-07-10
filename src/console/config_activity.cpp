@@ -1,11 +1,12 @@
 #include "config_activity.h"
 #include "tui_actor.h"
 #include "../config/utils.h"
-#include "sink.h"
+#include "../utils/sink.h"
 #include <fmt/fmt.h>
 #include <cctype>
 
 using namespace syncspirit::console;
+using sink_t = syncspirit::utils::sink_t;
 
 config_activity_t::config_activity_t(tui_actor_t &actor_, config::main_t &config_,
                                      config::main_t &config_orig_) noexcept

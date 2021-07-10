@@ -24,6 +24,7 @@ struct tui_actor_config_t : r::actor_config_t {
     std::mutex *mutex;
     std::string *prompt;
     config::tui_config_t tui_config;
+    bool interactive;
 };
 
 template <typename Actor> struct tui_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -43,6 +44,11 @@ template <typename Actor> struct tui_actor_config_builder_t : r::actor_config_bu
 
     builder_t &&tui_config(const config::tui_config_t &value) &&noexcept {
         parent_t::config.tui_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&interactive(bool value) &&noexcept {
+        parent_t::config.interactive = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -102,6 +108,7 @@ struct tui_actor_t : public r::actor_base_t {
     size_t progress_last;
     static const char *progress;
     std::optional<r::request_id_t> timer_id;
+    bool interactive;
     std::mutex *mutex;
     std::string *prompt;
     std::string prompt_buff;

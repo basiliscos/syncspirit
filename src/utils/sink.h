@@ -2,8 +2,7 @@
 #include <spdlog/sinks/sink.h>
 #include <mutex>
 
-namespace syncspirit {
-namespace console {
+namespace syncspirit::utils {
 
 struct sink_t : spdlog::sinks::sink {
     sink_t(FILE *target_file, spdlog::color_mode mode, std::mutex &mutex_, std::string &prompt_) noexcept;
@@ -67,5 +66,4 @@ struct sink_t : spdlog::sinks::sink {
     static std::string to_string_(const spdlog::string_view_t &sv);
 };
 
-} // namespace console
-} // namespace syncspirit
+} // namespace syncspirit::utils

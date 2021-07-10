@@ -1,15 +1,15 @@
 #include "tui_actor.h"
-#include "sink.h"
 #include "utils.h"
-#include <spdlog/spdlog.h>
 #include "../net/names.h"
 #include "../constants.h"
+#include "../utils/sink.h"
 #include "config_activity.h"
 #include "default_activity.h"
 #include "new_folder_activity.h"
 #include "peer_activity.h"
 
 using namespace syncspirit::console;
+using sink_t = syncspirit::utils::sink_t;
 
 namespace {
 namespace resource {
@@ -22,22 +22,27 @@ const char *tui_actor_t::progress = "|/-\\";
 
 tui_actor_t::tui_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()},
-      mutex{cfg.mutex}, prompt{cfg.prompt}, tui_config{cfg.tui_config} {
+      interactive{cfg.interactive}, mutex{cfg.mutex}, prompt{cfg.prompt}, tui_config{cfg.tui_config} {
+
     if (!console::install_signal_handlers()) {
         spdlog::critical("signal handlers cannot be installed");
         throw std::runtime_error("signal handlers cannot be installed");
     }
 
-    progress_last = strlen(progress);
-    tty = std::make_unique<tty_t::element_type>(strand.context(), STDIN_FILENO);
-    push_activity(std::make_unique<default_activity_t>(*this));
+    if (interactive) {
+        progress_last = strlen(progress);
+        tty = std::make_unique<tty_t::element_type>(strand.context(), STDIN_FILENO);
+        push_activity(std::make_unique<default_activity_t>(*this));
+    }
 }
 
 void tui_actor_t::on_start() noexcept {
     spdlog::debug("{}, on_start", identity);
     r::actor_base_t::on_start();
     start_timer();
-    do_read();
+    if (interactive) {
+        do_read();
+    }
 }
 
 void tui_actor_t::shutdown_start() noexcept {
@@ -133,13 +138,15 @@ void tui_actor_t::on_timer(r::request_id_t, bool) noexcept {
         auto ec = r::make_error_code(r::shutdown_code_t::normal);
         return do_shutdown(make_error(ec));
     }
-    if (console::reset_term_flag) {
-        console::term_prepare();
-        tty->non_blocking(true);
-        console::reset_term_flag = false;
-    }
+    if (interactive) {
+        if (console::reset_term_flag) {
+            console::term_prepare();
+            tty->non_blocking(true);
+            console::reset_term_flag = false;
+        }
 
-    flush_prompt();
+        flush_prompt();
+    }
     start_timer();
 }
 
@@ -149,6 +156,10 @@ void tui_actor_t::set_prompt(const std::string &value) noexcept {
 }
 
 void tui_actor_t::push_activity(activity_ptr_t &&activity) noexcept {
+    if (!interactive) {
+        return;
+    }
+
     auto predicate = [&](auto &it) { return *it == *activity; };
     auto count = std::count_if(activities.begin(), activities.end(), predicate);
     // skip duplicates
@@ -173,6 +184,9 @@ void tui_actor_t::push_activity(activity_ptr_t &&activity) noexcept {
 }
 
 void tui_actor_t::postpone_activity() noexcept {
+    if (!interactive) {
+        return;
+    }
     if (activities_count > 1) {
         auto a = std::move(activities.front());
         activities.pop_front();
@@ -182,6 +196,9 @@ void tui_actor_t::postpone_activity() noexcept {
 }
 
 void tui_actor_t::discard_activity() noexcept {
+    if (!interactive) {
+        return;
+    }
     --activities_count;
     activities.pop_front();
     activities.front()->display();
@@ -327,6 +344,10 @@ void tui_actor_t::update_device(model::device_ptr_t device) noexcept {
 }
 
 void tui_actor_t::flush_prompt() noexcept {
+    if (!interactive) {
+        return;
+    }
+
     char c;
     if (progress_idx < progress_last) {
         c = progress[progress_idx];

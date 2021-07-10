@@ -2,7 +2,7 @@
 #include "spdlog/pattern_formatter.h"
 
 using namespace spdlog;
-using namespace syncspirit::console;
+using namespace syncspirit::utils;
 
 using mutex_t = std::mutex;
 

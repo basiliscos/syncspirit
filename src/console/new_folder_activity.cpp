@@ -2,10 +2,12 @@
 
 #include "default_activity.h"
 #include "tui_actor.h"
-#include "sink.h"
+#include "../utils/sink.h"
 #include <fmt/fmt.h>
 
 using namespace syncspirit::console;
+using sink_t = syncspirit::utils::sink_t;
+
 new_folder_activity_t::new_folder_activity_t(tui_actor_t &actor_, ui::message::new_folder_notify_t &message) noexcept
     : activity_t{actor_, activity_type_t::NEW_FOLDER}, folder{message.payload.folder}, source{message.payload.source},
       source_index{message.payload.source_index} {}
