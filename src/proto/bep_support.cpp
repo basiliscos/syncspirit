@@ -110,7 +110,11 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
         }
         auto type = header.type();
         ptr_32 = reinterpret_cast<const std::uint32_t *>(((const char *)ptr_16) + header_sz);
-        auto message_sz = be::big_to_native(*ptr_32++);
+        std::uint32_t message_sz;
+        std::memcpy(&message_sz, ptr_32, sizeof(message_sz));
+        be::big_to_native_inplace(message_sz);
+        ++ptr_32;
+
         auto tail = static_cast<const std::uint32_t *>(buff.data()) + sz;
         if (ptr_32 + message_sz > tail) {
             return wrap(message::message_t(), 0u);
@@ -146,7 +150,10 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
             auto msg_buff = asio::buffer(reinterpret_cast<const char *>(ptr_32), message_sz);
             return parse_msg(msg_buff, consumed);
         } else {
-            auto uncompr_sz = be::big_to_native(*ptr_32++);
+            std::uint32_t uncompr_sz;
+            std::memcpy(&uncompr_sz, ptr_32, sizeof(uncompr_sz));
+            be::big_to_native_inplace(uncompr_sz);
+            ++ptr_32;
             auto block_sz = sz - (header_sz + sizeof(std::uint16_t) + sizeof(std::uint32_t) * 2);
             uncompressed.resize(uncompr_sz);
             auto dec =

@@ -97,8 +97,7 @@ void cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &messag
         spdlog::warn("{}, scanning {} error: {}", identity, path.c_str(), ec.message());
     }
 
-    scan_folders_map.erase(it);
-    if (scan_folders_map.empty() && initial_scan) {
+    if (scan_folders_map.size() == 1 && initial_scan) {
         spdlog::debug("{}, completed intiial scan", identity, path.c_str());
         send<payload::cluster_ready_notify_t>(coordinator);
         initial_scan = false;
@@ -111,6 +110,7 @@ void cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &messag
             }
         }
     }
+    scan_folders_map.erase(it);
 }
 
 void cluster_supervisor_t::on_scan_error(fs::message::scan_error_t &message) noexcept {
