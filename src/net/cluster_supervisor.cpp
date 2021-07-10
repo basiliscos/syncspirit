@@ -104,7 +104,7 @@ void cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &messag
         initial_scan = false;
     }
     if (!initial_scan) {
-        for(auto& it: addr2device_map) {
+        for (auto &it : addr2device_map) {
             auto device = devices->by_id(it.second);
             if (device->is_online() && folder->is_shared_with(device)) {
                 send<payload::ready_signal_t>(it.first);

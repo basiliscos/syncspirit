@@ -6,6 +6,7 @@
 #include <boost/algorithm/string.hpp>
 #include <spdlog/spdlog.h>
 #include "../model/device_id.h"
+#include "../utils/log.h"
 
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.h>
@@ -42,11 +43,15 @@ bool operator==(const local_announce_config_t &lhs, const local_announce_config_
     return lhs.enabled == rhs.enabled && lhs.port == rhs.port && lhs.frequency == rhs.frequency;
 }
 
+bool operator==(const log_config_t &lhs, const log_config_t &rhs) noexcept {
+    return lhs.name == rhs.name && lhs.level == rhs.level && lhs.sinks == rhs.sinks;
+}
+
 bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
     return lhs.local_announce_config == rhs.local_announce_config && lhs.upnp_config == rhs.upnp_config &&
            lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
            lhs.tui_config == rhs.tui_config && lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
-           lhs.config_path == rhs.config_path;
+           lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs;
 }
 
 bool operator==(const tui_config_t &lhs, const tui_config_t &rhs) noexcept {
@@ -116,6 +121,46 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.default_location = default_location.value();
     };
+
+    // log
+    {
+        auto t = root_tbl["log"];
+        auto &c = cfg.log_configs;
+        if (t.is_array_of_tables()) {
+            auto arr = t.as_array();
+            for (size_t i = 0; i < arr->size(); ++i) {
+                auto node = arr->get(i);
+                if (node->is_table()) {
+                    auto t = *node->as_table();
+                    auto level = t["level"].value<std::string>();
+                    if (!level) {
+                        return "log/level is incorrect or missing (" + std::to_string(i + 1) + ")";
+                    }
+                    auto name = t["name"].value<std::string>();
+                    if (!name) {
+                        return "log/name is incorrect or missing (" + std::to_string(i + 1) + ")";
+                    }
+                    log_config_t log_config;
+                    log_config.level = utils::get_log_level(level.value());
+                    log_config.name = name.value();
+
+                    auto sinks = t["sinks"];
+                    if (sinks) {
+                        auto s_arr = sinks.as_array();
+                        for (size_t j = 0; j < s_arr->size(); ++j) {
+                            auto sink = s_arr->get(j)->value<std::string>();
+                            if (!sink) {
+                                return "log/sinks " + std::to_string(j + 1) + " is incorrect or missing (" +
+                                       std::to_string(i + 1) + ")";
+                            }
+                            log_config.sinks.emplace_back(sink.value());
+                        }
+                    }
+                    c.emplace_back(std::move(log_config));
+                }
+            }
+        }
+    }
 
     // local_discovery
     {
@@ -349,13 +394,51 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
     return std::move(cfg);
 }
 
+static std::string_view get_level(spdlog::level::level_enum level) noexcept {
+    using L = spdlog::level::level_enum;
+    switch (level) {
+    case L::critical:
+        return "critical";
+    case L::debug:
+        return "debug";
+    case L::err:
+        return "error";
+    case L::info:
+        return "info";
+    case L::trace:
+        return "trace";
+    case L::warn:
+        return "warn";
+    case L::off:
+        return "off";
+    case L::n_levels:
+        return "off";
+    }
+    return "unknown";
+}
+
 outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
+    auto logs = toml::array{};
+    for (auto &c : cfg.log_configs) {
+        auto sinks = toml::array{};
+        for (auto &sink : c.sinks) {
+            sinks.emplace_back<std::string>(sink);
+        }
+        auto log_table = toml::table{{
+            {"name", c.name},
+            {"level", get_level(c.level)},
+            {"sinks", sinks},
+        }};
+        logs.push_back(log_table);
+    }
+
     auto tbl = toml::table{{
         {"main", toml::table{{
                      {"timeout", cfg.timeout},
                      {"device_name", cfg.device_name},
                      {"default_location", cfg.default_location.c_str()},
                  }}},
+        {"logs", logs},
         {"local_discovery", toml::table{{
                                 {"enabled", cfg.local_announce_config.enabled},
                                 {"port", cfg.local_announce_config.port},
@@ -439,6 +522,11 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     cfg.default_location = bfs::path(home);
     cfg.timeout = 5000;
     cfg.device_name = device;
+    cfg.log_configs = {
+        log_config_t {
+            "default", spdlog::level::level_enum::info, {"interactive"}
+        }
+    };
     cfg.local_announce_config = local_announce_config_t {
         true,
         21027,

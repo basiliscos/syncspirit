@@ -67,6 +67,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::rx_timeout:
         r = "rx timeout";
         break;
+    case error_code_t::unknown_sink:
+        r = "unknown sink";
+        break;
     default:
         r = "unknown";
     }

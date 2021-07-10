@@ -6,6 +6,7 @@
 #include "fs.h"
 #include "global_announce.h"
 #include "local_announce.h"
+#include "log.h"
 #include "tui.h"
 #include "upnp.h"
 #include <boost/filesystem.hpp>
@@ -15,9 +16,12 @@ namespace syncspirit::config {
 namespace bfs = boost::filesystem;
 
 struct main_t {
+
     bfs::path config_path;
     bfs::path default_location;
+
     local_announce_config_t local_announce_config;
+    log_configs_t log_configs;
     upnp_config_t upnp_config;
     global_announce_config_t global_announce_config;
     bep_config_t bep_config;

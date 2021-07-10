@@ -59,6 +59,7 @@ enum class error_code_t {
     rx_timeout,
     fs_error,
     scan_aborted,
+    unknown_sink,
 };
 
 enum class bep_error_code_t {

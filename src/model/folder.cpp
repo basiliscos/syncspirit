@@ -92,7 +92,7 @@ db::IgnoredFolder ignored_folder_t::serialize() const noexcept {
     ;
 }
 
-bool folder_t::is_shared_with(const model::device_ptr_t& device) noexcept {
+bool folder_t::is_shared_with(const model::device_ptr_t &device) noexcept {
     for (auto &it : folder_infos) {
         if (it.second->get_device() == device.get()) {
             return true;
@@ -100,7 +100,6 @@ bool folder_t::is_shared_with(const model::device_ptr_t& device) noexcept {
     }
     return false;
 }
-
 
 std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept {
     if (!is_shared_with(device)) {

@@ -68,6 +68,7 @@ add_library(syncspirit_lib
     src/utils/beast_support.cpp
     src/utils/error_code.cpp
     src/utils/location.cpp
+    src/utils/log.cpp
     src/utils/tls.cpp
     src/utils/uri.cpp
     ${PROTO_SRCS}

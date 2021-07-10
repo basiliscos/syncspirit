@@ -28,6 +28,15 @@ enabled = true
 frequency = 10
 port = 21026
 
+[[log]]
+name = 'default'
+level = 'info'
+sinks = ['interactive']
+
+[[log]]
+name = 'peer_actor'
+level = 'trace'
+
 [main]
 default_location = '/tmp/syncspirit'
 device_name = 'hp-note'

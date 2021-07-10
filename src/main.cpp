@@ -16,8 +16,8 @@
 #include "constants.h"
 #include "config/utils.h"
 #include "utils/location.h"
+#include "utils/log.h"
 #include "net/net_supervisor.h"
-#include "console/sink.h"
 #include "console/tui_actor.h"
 #include "console/utils.h"
 #include "fs/fs_supervisor.h"
@@ -34,26 +34,6 @@ namespace rth = rotor::thread;
 namespace asio = boost::asio;
 
 using namespace syncspirit;
-
-spdlog::level::level_enum get_log_level(const std::string &log_level) {
-    using namespace spdlog::level;
-    level_enum value = info;
-    if (log_level == "trace")
-        value = trace;
-    if (log_level == "debug")
-        value = debug;
-    if (log_level == "info")
-        value = info;
-    if (log_level == "warn")
-        value = warn;
-    if (log_level == "error")
-        value = err;
-    if (log_level == "crit")
-        value = critical;
-    if (log_level == "off")
-        value = off;
-    return value;
-}
 
 int main(int argc, char **argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -83,13 +63,8 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        auto log_level_str = vm["log_level"].as<std::string>();
-        auto log_level = get_log_level(log_level_str);
         std::mutex std_out_mutex;
-        auto console_sink =
-            std::make_shared<console::sink_t>(stdout, spdlog::color_mode::automatic, std_out_mutex, prompt);
-        spdlog::set_default_logger(std::make_shared<spdlog::logger>("", console_sink));
-        spdlog::set_level(log_level);
+        utils::set_default(vm["log_level"].as<std::string>(), prompt, std_out_mutex);
 
         bfs::path config_file_path;
         if (vm.count("config_dir")) {
@@ -136,6 +111,13 @@ int main(int argc, char **argv) {
         }
         auto &cfg = cfg_option.value();
         spdlog::trace("configuration seems OK");
+
+        bool overwrite_default = vm.count("log_level");
+        auto init_result = utils::init_loggers(cfg.log_configs, prompt, std_out_mutex, overwrite_default);
+        if (!init_result) {
+            spdlog::error("Loggers initialization failed :: {}", init_result.error());
+            return 1;
+        }
 
         if (populate) {
             spdlog::info("Generating cryptographical keys...");
