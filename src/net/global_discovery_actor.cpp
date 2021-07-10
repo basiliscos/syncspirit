@@ -123,12 +123,12 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
         return reply_with_error(*orig_req, make_error(inner, ee));
     }
 
-    auto& http_res = message.payload.res->response;
+    auto &http_res = message.payload.res->response;
     auto res = proto::parse_contact(http_res);
     if (!res) {
         auto reason = res.error().message();
-        auto& body = http_res.body();
-        spdlog::warn("{}, parsing discovery error = {}, body:\n {}", identity, reason, body);
+        auto &body = http_res.body();
+        spdlog::warn("{}, parsing discovery error = {}, body({}):\n {}", identity, reason, body.size(), body);
         return reply_with_error(*orig_req, make_error(res.error()));
     }
 

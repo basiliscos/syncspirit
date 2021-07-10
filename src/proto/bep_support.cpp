@@ -222,8 +222,8 @@ void serialize(fmt::memory_buffer &buff, const Message &message, proto::MessageC
     char *ptr = reinterpret_cast<char *>(ptr_16) + header_sz;
 
     std::uint32_t big_message_sz = be::native_to_big(message_sz);
-    std::memcpy(ptr, &big_message_sz, sizeof (big_message_sz));
-    ptr += sizeof (big_message_sz);
+    std::memcpy(ptr, &big_message_sz, sizeof(big_message_sz));
+    ptr += sizeof(big_message_sz);
     message.SerializeToArray(ptr, message_sz);
 }
 
