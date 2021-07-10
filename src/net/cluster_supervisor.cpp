@@ -103,6 +103,14 @@ void cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &messag
         send<payload::cluster_ready_notify_t>(coordinator);
         initial_scan = false;
     }
+    if (!initial_scan) {
+        for(auto& it: addr2device_map) {
+            auto device = devices->by_id(it.second);
+            if (device->is_online() && folder->is_shared_with(device)) {
+                send<payload::ready_signal_t>(it.first);
+            }
+        }
+    }
 }
 
 void cluster_supervisor_t::on_scan_error(fs::message::scan_error_t &message) noexcept {
@@ -148,6 +156,7 @@ void cluster_supervisor_t::on_store_new_folder(message::store_new_folder_respons
         auto &folder = message.payload.res.folder;
         spdlog::debug("{}, created_folder {}/{}", identity, folder->id(), folder->label());
         folders.put(folder);
+        scan(folder);
         reply_to(*create_folder_req, std::move(folder));
     }
     create_folder_req.reset();
