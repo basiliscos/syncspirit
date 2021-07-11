@@ -282,7 +282,7 @@ void tui_actor_t::on_update_peer(ui::message::update_peer_response_t &message) n
         spdlog::error("{}, cannot update peer {}: {}", identity, peer->device_id, ee->message());
         return;
     }
-    spdlog::info("{}, peerd device '{}' has been added", identity, peer->device_id);
+    spdlog::info("{}, peer device '{}' has been added", identity, peer->device_id);
 }
 
 void tui_actor_t::on_ignrore_folder(ui::message::ignore_folder_response_t &message) noexcept {

@@ -3,6 +3,7 @@
 #include "../config/bep.h"
 #include "../transport/stream.h"
 #include "../proto/bep_support.h"
+#include "../utils/log.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>
@@ -132,6 +133,7 @@ struct peer_actor_t : public r::actor_base_t {
     void handle_close(proto::message::Close &&) noexcept;
     void handle_response(proto::message::Response &&) noexcept;
 
+    utils::logger_t log;
     std::string_view device_name;
     config::bep_config_t bep_config;
     r::address_ptr_t coordinator;

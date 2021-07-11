@@ -129,6 +129,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, std::st
             spdlog::register_logger(logger);
         }
     }
+    spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%L/%t%$] %v");
 
     return outcome::success();
 }

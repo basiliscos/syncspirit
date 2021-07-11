@@ -34,7 +34,7 @@ level = 'info'
 sinks = ['interactive']
 
 [[log]]
-name = 'peer_actor'
+name = 'net.peer_actor'
 level = 'trace'
 
 [main]
