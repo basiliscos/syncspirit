@@ -43,6 +43,10 @@ add_executable(014-configuration 014-configuration.cpp)
 target_link_libraries(014-configuration syncspirit_test_lib)
 add_test(014-configuration "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/014-configuration")
 
+add_executable(015-logger 015-logger.cpp)
+target_link_libraries(015-logger syncspirit_test_lib)
+add_test(015-logger "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/015-logger")
+
 add_executable(050-model-device_id 050-model-device_id.cpp)
 target_link_libraries(050-model-device_id syncspirit_test_lib)
 add_test(050-model-device_id "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-model-device_id")

@@ -70,6 +70,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::unknown_sink:
         r = "unknown sink";
         break;
+    case error_code_t::misconfigured_default_logger:
+        r = "default logger is missing or has no sinks";
+        break;
     default:
         r = "unknown";
     }

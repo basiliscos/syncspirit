@@ -60,6 +60,7 @@ enum class error_code_t {
     fs_error,
     scan_aborted,
     unknown_sink,
+    misconfigured_default_logger,
 };
 
 enum class bep_error_code_t {

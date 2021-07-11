@@ -60,7 +60,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, std::st
 
     // init sinks
     auto prev = spdlog::default_logger();
-    // spdlog::drop_all();
+    spdlog::drop_all();
     sink_map_t sink_map;
     for (auto &cfg : configs) {
         for (auto &sink : cfg.sinks) {
@@ -90,6 +90,10 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, std::st
         logger_map[name] = logger;
     }
 
+    if (default_sinks.empty()) {
+        return make_error_code(error_code_t::misconfigured_default_logger);
+    }
+
     // init others
     for (auto &cfg : configs) {
         auto &name = cfg.name;
@@ -117,7 +121,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, std::st
         auto &name = it.first;
         auto &logger = it.second;
         if (name == "default") {
-            if (overwrite_default) {
+            if (overwrite_default && prev) {
                 logger->set_level(prev->level());
             }
             spdlog::set_default_logger(logger);
@@ -127,6 +131,22 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, std::st
     }
 
     return outcome::success();
+}
+
+logger_t get_logger(std::string_view initial_name) noexcept {
+    std::string name(initial_name);
+    do {
+        auto l = spdlog::get(name);
+        if (l) {
+            return l;
+        }
+        auto p = name.find_last_of(".");
+        if (p != name.npos && p) {
+            name = name.substr(0, p);
+        } else {
+            return spdlog::default_logger();
+        }
+    } while (1);
 }
 
 } // namespace syncspirit::utils

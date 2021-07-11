@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <string_view>
 #include <mutex>
 #include <boost/outcome.hpp>
 #include <spdlog/spdlog.h>
@@ -18,5 +19,7 @@ void set_default(const std::string &level, std::string &prompt, std::mutex &mute
 
 outcome::result<void> init_loggers(const config::log_configs_t &configs, std::string &prompt, std::mutex &mutex,
                                    bool overwrite_default, bool interactive) noexcept;
+
+logger_t get_logger(std::string_view name) noexcept;
 
 } // namespace syncspirit::utils
