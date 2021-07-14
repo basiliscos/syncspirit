@@ -297,6 +297,13 @@ struct store_folder_request_t {
     model::folder_ptr_t folder;
 };
 
+struct store_folder_info_response_t {};
+
+struct store_folder_info_request_t {
+    using response_t = store_folder_info_response_t;
+    model::folder_info_ptr_t folder_info;
+};
+
 struct block_response_t {
     std::string data;
 };
@@ -359,6 +366,9 @@ using store_device_response_t = r::request_traits_t<payload::store_device_reques
 
 using store_folder_request_t = r::request_traits_t<payload::store_folder_request_t>::request::message_t;
 using store_folder_response_t = r::request_traits_t<payload::store_folder_request_t>::response::message_t;
+
+using store_folder_info_request_t = r::request_traits_t<payload::store_folder_info_request_t>::request::message_t;
+using store_folder_info_response_t = r::request_traits_t<payload::store_folder_info_request_t>::response::message_t;
 
 using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;

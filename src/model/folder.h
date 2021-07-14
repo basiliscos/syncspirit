@@ -35,6 +35,7 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     std::optional<proto::Folder> get(model::device_ptr_t device) noexcept;
     bool is_shared_with(const model::device_ptr_t &device) noexcept;
     std::int64_t score(const device_ptr_t &peer_device) noexcept;
+    folder_info_ptr_t get_folder_info(const device_ptr_t &device) noexcept;
 
     const std::string &id() noexcept { return _id; }
     const std::string &label() noexcept { return _label; }

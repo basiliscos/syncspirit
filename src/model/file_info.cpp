@@ -172,6 +172,7 @@ void file_info_t::mark_local_available(size_t block_index) noexcept {
     if (local_blocks.size() == blocks.size()) {
         spdlog::info("{}/{} is sync", folder->label(), get_name());
         status = file_status_t::sync;
+        mark_dirty();
     }
 }
 

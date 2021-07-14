@@ -43,6 +43,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&db_actor_t::on_store_ignored_folder);
         p.subscribe_actor(&db_actor_t::on_store_new_folder);
         p.subscribe_actor(&db_actor_t::on_store_folder);
+        p.subscribe_actor(&db_actor_t::on_store_folder_info);
     });
 }
 
@@ -387,6 +388,30 @@ void db_actor_t::on_store_folder(message::store_folder_request_t &message) noexc
         return;
     }
 
+    reply_to(message);
+}
+
+void db_actor_t::on_store_folder_info(message::store_folder_info_request_t &message) noexcept {
+    auto &fi = message.payload.request_payload.folder_info;
+    spdlog::trace("{}, on_store_folder_info folder_info = {}", identity, fi->get_db_key());
+    if (!fi->is_dirty()) {
+        spdlog::warn("{}, folder_info = {}  (from {}) is not dirty, no need to save", identity, fi->get_db_key(),
+                     fi->get_folder()->label());
+        reply_to(message);
+        return;
+    }
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return reply_with_error(message, make_error(txn_opt.error()));
+    }
+    auto &txn = txn_opt.value();
+    auto r = db::store_folder_info(fi, txn);
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+    fi->unmark_dirty();
     reply_to(message);
 }
 

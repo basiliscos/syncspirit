@@ -30,6 +30,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_store_folder);
+        p.subscribe_actor(&controller_actor_t::on_store_folder_info);
         p.subscribe_actor(&controller_actor_t::on_ready);
         p.subscribe_actor(&controller_actor_t::on_block);
         p.subscribe_actor(&controller_actor_t::on_write);
@@ -40,8 +41,15 @@ void controller_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     spdlog::trace("{}, on_start", identity);
     send<payload::start_reading_t>(peer_addr, get_address());
-    send<payload::ready_signal_t>(get_address());
+    ready();
     spdlog::info("{} is ready/online", identity);
+}
+
+void controller_actor_t::ready(model::file_info_ptr_t file) noexcept {
+    if (!(substate & READY)) {
+        send<payload::ready_signal_t>(get_address(), file);
+        substate = substate | READY;
+    }
 }
 
 void controller_actor_t::shutdown_start() noexcept {
@@ -51,7 +59,8 @@ void controller_actor_t::shutdown_start() noexcept {
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     spdlog::trace("{}, on_ready", identity);
-    if (blocks_requested) {
+    substate = substate & ~READY;
+    if (substate & BLOCK) {
         return;
     }
 
@@ -67,8 +76,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     auto cluster_block = file->next_block();
     if (!cluster_block) {
         spdlog::trace("{}, no more blocks are needed for {}", identity, file->get_name());
-        send<payload::ready_signal_t>(get_address());
-        return;
+        return ready();
     }
 
     auto existing_block = cluster_block.block->local_file();
@@ -76,8 +84,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         spdlog::trace("{}, cloning block {} from {} to {} as block {}", identity, existing_block.file_info->get_name(),
                       existing_block.block_index, file->get_name(), cluster_block.block_index);
         file->clone_block(*existing_block.file_info, existing_block.block_index, cluster_block.block_index);
-        send<payload::ready_signal_t>(get_address(), file);
-        return;
+        return ready(file);
     }
     request_block(file, cluster_block);
 }
@@ -88,7 +95,7 @@ void controller_actor_t::request_block(const model::file_info_ptr_t &file,
                   block.block_index, block.block->get_size());
     request<payload::block_request_t>(peer_addr, file, model::block_info_ptr_t{block.block}, block.block_index)
         .send(request_timeout);
-    ++blocks_requested;
+    substate = substate | BLOCK;
 }
 
 bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {
@@ -121,6 +128,18 @@ void controller_actor_t::on_store_folder(message::store_folder_response_t &messa
     spdlog::trace("{}, on_store_folder_info {}", identity, label);
 }
 
+void controller_actor_t::on_store_folder_info(message::store_folder_info_response_t &message) noexcept {
+    auto &ee = message.payload.ee;
+    auto &fi = message.payload.req->payload.request_payload.folder_info;
+    auto label = fi->get_folder()->label();
+    spdlog::trace("{}, on_store_folder_info (max seq = {}) {}/{}", identity, fi->get_max_sequence(), label,
+                  fi->get_db_key());
+    if (ee) {
+        spdlog::warn("{}, on_store_folder_info {} failed : {}", identity, label, ee->message());
+        return do_shutdown(ee);
+    }
+}
+
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
     auto &folder_id = message->folder();
     auto folder = cluster->get_folders().by_id(folder_id);
@@ -147,8 +166,8 @@ void controller_actor_t::on_message(proto::message::Request &message) noexcept {
 void controller_actor_t::on_message(proto::message::DownloadProgress &message) noexcept { std::abort(); }
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
-    --blocks_requested;
     using request_t = fs::payload::write_request_t;
+    substate = substate & ~BLOCK;
     auto ee = message.payload.ee;
     if (ee) {
         spdlog::warn("{}, can't receive block : {}", identity, ee->message());
@@ -162,7 +181,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     // request another block while the current is going to be flushed to disk
     auto request_id = request<request_t>(fs, path, std::move(data), final).send(init_timeout);
     file->mark_local_available(payload.block_index);
-    send<payload::ready_signal_t>(get_address(), file);
+    ready(file);
     responses_map.emplace(request_id, &message);
 }
 
@@ -178,6 +197,20 @@ void controller_actor_t::on_write(fs::message::write_response_t &message) noexce
     responses_map.erase(it);
     auto &p = block_res->payload.req->payload.request_payload;
     auto &file = p.file;
-
-    send<payload::ready_signal_t>(get_address(), file);
+    if (file->get_status() == model::file_status_t::sync) {
+        ready(nullptr);
+        auto folder = file->get_folder();
+        auto fi = folder->get_folder_info(device);
+        // seq should be file seq
+        auto seq = fi->get_max_sequence();
+        auto new_seq = file->get_sequence();
+        if (new_seq > seq) {
+            spdlog::trace("{}, updated max sequence '{}' on local device: {} -> {}", identity, folder->label(), seq,
+                          new_seq);
+            fi->update_max_sequence(new_seq);
+            request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
+        }
+    } else {
+        ready(file);
+    }
 }

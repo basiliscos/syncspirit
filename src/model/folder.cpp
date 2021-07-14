@@ -228,3 +228,7 @@ void folder_t::update(local_file_map_t &local_files) noexcept {
         it.second->mark_outdated();
     }
 }
+
+folder_info_ptr_t folder_t::get_folder_info(const device_ptr_t &device) noexcept {
+    return folder_infos.by_id(device->get_id());
+}

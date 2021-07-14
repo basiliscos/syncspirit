@@ -63,11 +63,14 @@ struct controller_actor_t : public r::actor_base_t {
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     using responses_map_t = std::unordered_map<r::request_id_t, block_response_ptr_t>;
 
+    enum SubState { READY = 1 << 0, BLOCK = 1 << 1 };
+
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_ready(message::ready_signal_t &message) noexcept;
     void on_store_folder(message::store_folder_response_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
     void on_write(fs::message::write_response_t &message) noexcept;
+    void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
 
     void on_message(proto::message::Index &message) noexcept;
     void on_message(proto::message::IndexUpdate &message) noexcept;
@@ -75,6 +78,7 @@ struct controller_actor_t : public r::actor_base_t {
     void on_message(proto::message::DownloadProgress &message) noexcept;
 
     void request_block(const model::file_info_ptr_t &file, const model::block_location_t &block) noexcept;
+    void ready(model::file_info_ptr_t = nullptr) noexcept;
 
     model::cluster_ptr_t cluster;
     model::folder_ptr_t folder;
@@ -87,7 +91,7 @@ struct controller_actor_t : public r::actor_base_t {
     sync_state_t sync_state;
     peers_map_t peers_map;
     responses_map_t responses_map;
-    std::uint32_t blocks_requested = 0;
+    int substate = 0;
 };
 
 } // namespace net

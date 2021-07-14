@@ -39,9 +39,7 @@ struct folder_info_t : arc_base_t<folder_info_t>, storeable_t {
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
-inline const std::string &natural_key(const folder_info_ptr_t &item) noexcept {
-    return item->get_device()->device_id.get_sha256();
-}
+inline const std::string &natural_key(const folder_info_ptr_t &item) noexcept { return item->get_device()->get_id(); }
 inline std::uint64_t db_key(const folder_info_ptr_t &item) noexcept { return item->get_db_key(); }
 
 using folder_infos_map_t = generic_map_t<folder_info_ptr_t, std::string>;
