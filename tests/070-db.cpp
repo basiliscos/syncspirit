@@ -15,7 +15,7 @@ struct env_t {
         if (env) {
             mdbx_env_close(env);
         }
-        //std::cout << path.c_str() << "\n";
+        // std::cout << path.c_str() << "\n";
         fs::remove_all(path);
     }
 };
@@ -29,7 +29,7 @@ static env_t mk_env() {
         MDBX_EXCLUSIVE | MDBX_SAFE_NOSYNC | MDBX_WRITEMAP | MDBX_NOTLS | MDBX_COALESCE | MDBX_LIFORECLAIM;
     r = mdbx_env_open(env, path.c_str(), flags, 0664);
     assert(r == MDBX_SUCCESS);
-    //std::cout << path.c_str() << "\n";
+    // std::cout << path.c_str() << "\n";
     return env_t{env, std::move(path)};
 }
 
@@ -81,21 +81,23 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
         txn = mk_txn(env, transaction_type_t::RO);
         auto devices_opt = db::load_devices(txn);
         REQUIRE(devices_opt);
-        auto& devices2 = devices_opt.value();
+        auto &devices2 = devices_opt.value();
         REQUIRE(devices2.size() == devices.size() + 1);
         REQUIRE(devices2.by_id(d1->device_id.get_sha256()));
         REQUIRE(devices2.by_id(d2->device_id.get_sha256()));
 
         REQUIRE(*devices2.by_id(d1->device_id.get_sha256()) == *d1);
         REQUIRE(*devices2.by_id(d2->device_id.get_sha256()) == *d2);
-        auto& ld1 = *devices2.by_id(d1->device_id.get_sha256());
-        auto& ld2 = *devices2.by_id(d2->device_id.get_sha256());
+        auto &ld1 = *devices2.by_id(d1->device_id.get_sha256());
+        auto &ld2 = *devices2.by_id(d2->device_id.get_sha256());
         CHECK(ld1.get_db_key() != 0);
         CHECK(ld2.get_db_key() != 0);
     }
 
     SECTION("save & load ignored device") {
-        auto d1 =  model::device_id_t::from_sha256(test::device_id2sha256("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD")).value();
+        auto d1 = model::device_id_t::from_sha256(
+                      test::device_id2sha256("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"))
+                      .value();
         auto ignored_device = model::ignored_device_ptr_t(new model::device_id_t(d1));
         auto txn = mk_txn(env, transaction_type_t::RW);
         auto r = db::store_ignored_device(ignored_device, txn);
@@ -105,7 +107,7 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
         txn = mk_txn(env, transaction_type_t::RO);
         auto ignored_devices_opt = db::load_ignored_devices(txn);
         CHECK(ignored_devices_opt);
-        auto& ignored_devices = ignored_devices_opt.value();
+        auto &ignored_devices = ignored_devices_opt.value();
         REQUIRE(ignored_devices.size() == 1);
         CHECK(*ignored_devices.by_key(ignored_device->get_sha256()) == *ignored_device);
     }
@@ -123,7 +125,7 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
         txn = mk_txn(env, transaction_type_t::RO);
         auto ignored_folders_opt = db::load_ignored_folders(txn);
         CHECK(ignored_folders_opt);
-        auto& ignored_folders = ignored_folders_opt.value();
+        auto &ignored_folders = ignored_folders_opt.value();
         REQUIRE(ignored_folders.size() == 1);
         CHECK(*ignored_folders.by_key(ignored_folder->id) == *ignored_folder);
     }
@@ -155,7 +157,7 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
         txn = mk_txn(env, transaction_type_t::RO);
         auto folders_opt = db::load_folders(txn);
         REQUIRE(folders_opt);
-        auto& folders2 = folders_opt.value();
+        auto &folders2 = folders_opt.value();
         REQUIRE(folders2.size() == folders.size());
         REQUIRE(folders2.by_id(f1->id()));
         REQUIRE(folders2.by_id(f2->id()));
@@ -182,7 +184,7 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
         auto txn = mk_txn(env, transaction_type_t::RW);
         db::FolderInfo db_fi;
         db_fi.set_index_id(1234);
-        //db_fi.set_max_sequence(1235);
+        // db_fi.set_max_sequence(1235);
         auto fi = model::folder_info_ptr_t(new model::folder_info_t(db_fi, d1.get(), f1.get(), 12345));
         auto r = db::store_folder_info(fi, txn);
         REQUIRE(r);

@@ -67,3 +67,7 @@ add_executable(080-fs 080-fs.cpp)
 target_link_libraries(080-fs syncspirit_test_lib)
 add_test(080-fs "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/080-fs")
 
+add_executable(130-controller 130-controller.cpp)
+target_link_libraries(130-controller syncspirit_test_lib)
+add_test(130-controller "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/130-controller")
+

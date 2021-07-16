@@ -18,7 +18,7 @@ TEST_CASE("default config is OK", "[config]") {
     auto cfg_path = dir / "syncspirit.toml";
     auto cfg_opt = config::generate_config(cfg_path);
     REQUIRE(cfg_opt);
-    auto& cfg = cfg_opt.value();
+    auto &cfg = cfg_opt.value();
     std::stringstream out;
     SECTION("serialize default") {
         auto r = config::serialize(cfg, out);
