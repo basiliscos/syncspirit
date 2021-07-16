@@ -119,8 +119,8 @@ TEST_CASE("utils", "[fs]") {
     }
 
     SECTION("relative") {
-        CHECK(fs::relative(bfs::path("a/b/c"), bfs::path("a")) == bfs::path("b/c"));
-        CHECK(fs::relative(bfs::path("a/b/c.syncspirit-tmp"), bfs::path("a")) == bfs::path("b/c"));
+        CHECK(fs::relative(bfs::path("a/b/c"), bfs::path("a")).path == bfs::path("b/c"));
+        CHECK(fs::relative(bfs::path("a/b/c.syncspirit-tmp"), bfs::path("a")).path == bfs::path("b/c"));
     }
 }
 
@@ -216,10 +216,10 @@ TEST_CASE("fs-actor", "[fs]") {
     r::system_context_t ctx;
     auto timeout = r::pt::milliseconds{10};
     auto sup = ctx.create_supervisor<st::supervisor_t>().timeout(timeout).create_registry().finish();
-    sup->create_actor<fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
     sup->start();
 
     SECTION("scan") {
+        sup->create_actor<fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
         SECTION("empty path") {
             auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
             sup->do_process();
@@ -288,6 +288,7 @@ TEST_CASE("fs-actor", "[fs]") {
     };
 
     SECTION("write") {
+        sup->create_actor<fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
         auto act = sup->create_actor<write_consumer_t>().timeout(timeout).finish();
         sup->do_process();
 
@@ -335,6 +336,32 @@ TEST_CASE("fs-actor", "[fs]") {
             CHECK(!r.ee);
             CHECK(read_file(root_path / "dir" / "my-file.syncspirit-tmp") == data);
         }
+    }
+
+    SECTION("scan temporaries") {
+        sup->create_actor<fs_actor_t>().fs_config({1024, 5, 10}).timeout(timeout).finish();
+        auto writer = sup->create_actor<write_consumer_t>().timeout(timeout).finish();
+        sup->do_process();
+
+        auto path = root_path / "my-file";
+        const std::string data = "123456980";
+        writer->make_request(path, data, false);
+        sup->do_process();
+        REQUIRE(writer->response);
+        CHECK(!writer->response->payload.ee);
+        CHECK(read_file(root_path / "my-file.syncspirit-tmp") == data);
+
+        auto scaner = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+        sup->do_process();
+        CHECK(scaner->errors.empty());
+        REQUIRE(scaner->response);
+        auto& r = scaner->response->payload;
+        CHECK(r->root == root_path);
+        CHECK(!r->map.empty());
+        auto it = r->map.begin();
+        auto& file = it->second;
+        CHECK(file.temp);
+        CHECK(it->first == "my-file");
     }
 
     sup->shutdown();

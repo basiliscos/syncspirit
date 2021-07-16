@@ -1,8 +1,8 @@
 - file_for_synch - выбирать также удалённые файлы
 - when file downloading complete, update in DB it's sequence
-- calc hashes from temporaries
 - start syncing folder when new folder has been added, нужно слать cancel{}
 - void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept { std::abort(); }
+- continue downloading temporaries
 - Canonicalize, TempNameWithPrefix, TempName
 - локальные таймстемпы?
 - symlinks
