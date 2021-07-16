@@ -1,17 +1,10 @@
+- file_for_synch - выбирать также удалённые файлы
 - when file downloading complete, update in DB it's sequence
+- calc hashes from temporaries
 - start syncing folder when new folder has been added, нужно слать cancel{}
 - void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept { std::abort(); }
 - Canonicalize, TempNameWithPrefix, TempName
 - локальные таймстемпы?
-- auto-remove temporaries (on timeout)
-    if fs.IsTemporary(path) {
-            l.Debugln("temporary:", path, "err:", err)
-            if err == nil && info.IsRegular() && info.ModTime().Add(w.TempLifetime).Before(now) {
-                    w.Filesystem.Remove(path)
-                    l.Debugln("removing temporary:", path, info.ModTime())
-            }
-            return nil
-    }
 - symlinks
 - folders
 - metadata (timestamp, etc.)

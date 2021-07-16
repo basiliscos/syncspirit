@@ -210,7 +210,7 @@ TEST_CASE("fs-actor", "[fs]") {
     r::system_context_t ctx;
     auto timeout = r::pt::milliseconds{10};
     auto sup = ctx.create_supervisor<st::supervisor_t>().timeout(timeout).create_registry().finish();
-    sup->create_actor<fs_actor_t>().fs_config({1024, 5}).timeout(timeout).finish();
+    sup->create_actor<fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
     sup->start();
 
     SECTION("scan") {
@@ -295,6 +295,16 @@ TEST_CASE("fs-actor", "[fs]") {
             auto& r = act->response->payload;
             CHECK(!r.ee);
             CHECK(read_file(root_path / "my-file.syncspirit-tmp") == data);
+
+            SECTION("tmp file is missing") {
+                auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+                sup->do_process();
+                CHECK(act->errors.empty());
+                REQUIRE(act->response);
+                auto& r = act->response->payload;
+                CHECK(r->root == root_path);
+                CHECK(r->map.empty());
+            }
 
             SECTION("append/final") {
                 act->response.reset();

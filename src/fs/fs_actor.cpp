@@ -8,8 +8,6 @@
 namespace sys = boost::system;
 using namespace syncspirit::fs;
 
-static const char *tmp_suffix = ".syncspirit-tmp";
-
 fs_actor_t::fs_actor_t(config_t &cfg) : r::actor_base_t{cfg}, fs_config{cfg.fs_config} {}
 
 void fs_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -143,6 +141,7 @@ void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
         return;
     }
 
+    auto &p = payload.request->payload;
     for (auto it = bfs::directory_iterator(dir); it != bfs::directory_iterator(); ++it) {
         auto &child = *it;
         bool is_dir = bfs::is_directory(child, ec);
@@ -151,7 +150,26 @@ void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
         } else {
             bool is_reg = bfs::is_regular_file(child, ec);
             if (!ec && is_reg) {
-                payload.files_queue.push_back(child);
+                auto &child_path = child.path();
+                if (!is_temporal(child_path)) {
+                    payload.files_queue.push_back(child_path);
+                } else {
+                    auto modified_at = bfs::last_write_time(child_path, ec);
+                    if (ec) {
+                        send<payload::scan_error_t>(p.reply_to, p.root, child_path, ec);
+                    } else {
+                        auto now = std::time(nullptr);
+                        if (modified_at + fs_config.temporally_timeout <= now) {
+                            spdlog::debug("{}, removing outdated temporally {}", child_path.string());
+                            bfs::remove(child_path, ec);
+                            if (ec) {
+                                send<payload::scan_error_t>(p.reply_to, p.root, child_path, ec);
+                            }
+                        } else {
+                            std::abort();
+                        }
+                    }
+                }
             } else {
                 bool is_sim = bfs::is_symlink(child, ec);
                 if (!ec && is_sim) {
@@ -208,9 +226,8 @@ void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
     spdlog::trace("{}, on_write_request", identity);
 
     auto &payload = req.payload.request_payload;
-    auto path = payload.path;
+    auto path = make_temporal(payload.path);
     auto parent = path.parent_path();
-    path += tmp_suffix;
     auto &data = payload.data;
     sys::error_code ec;
     bool exists = bfs::exists(parent, ec);

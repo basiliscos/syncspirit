@@ -201,7 +201,6 @@ void controller_actor_t::on_write(fs::message::write_response_t &message) noexce
         ready(nullptr);
         auto folder = file->get_folder();
         auto fi = folder->get_folder_info(device);
-        // seq should be file seq
         auto seq = fi->get_max_sequence();
         auto new_seq = file->get_sequence();
         if (new_seq > seq) {

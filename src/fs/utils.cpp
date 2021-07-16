@@ -4,6 +4,8 @@
 
 namespace syncspirit::fs {
 
+static const std::string_view tmp_suffix = ".syncspirit-tmp";
+
 static std::size_t block_sizes[] = {
     (1 << 7) * 1024,  (1 << 8) * 1024,  (1 << 9) * 1024,  (1 << 10) * 1024,
     (1 << 11) * 1024, (1 << 12) * 1024, (1 << 13) * 1024, (1 << 14) * 1024,
@@ -68,6 +70,21 @@ outcome::result<payload::scan_t::next_block_option_t> prepare(const bfs::path &f
 
     auto file = std::make_unique<file_t>(params);
     return result_t({file_path, bs, sz, 0, std::move(file)});
+}
+
+bfs::path make_temporal(const bfs::path &path) noexcept {
+    auto copy = path;
+    copy += tmp_suffix.data();
+    return copy;
+}
+
+bool is_temporal(const bfs::path &path) noexcept {
+    auto &name = path.string();
+    if (name.length() < tmp_suffix.length()) {
+        return false;
+    }
+    auto pos = name.find(tmp_suffix, name.length() - tmp_suffix.length());
+    return (pos != name.npos);
 }
 
 } // namespace syncspirit::fs
