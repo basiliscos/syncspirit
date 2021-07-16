@@ -14,6 +14,7 @@
 
 
 namespace st = syncspirit::test;
+namespace fs = syncspirit::fs;
 
 using namespace syncspirit;
 using namespace syncspirit::fs;
@@ -115,6 +116,11 @@ TEST_CASE("utils", "[fs]") {
             CHECK(!(*b4 == *b1));
             CHECK(b4->get_size() == (400 - 128 * 3) * 1024);
         }
+    }
+
+    SECTION("relative") {
+        CHECK(fs::relative(bfs::path("a/b/c"), bfs::path("a")) == bfs::path("b/c"));
+        CHECK(fs::relative(bfs::path("a/b/c.syncspirit-tmp"), bfs::path("a")) == bfs::path("b/c"));
     }
 }
 

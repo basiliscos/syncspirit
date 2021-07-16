@@ -14,5 +14,12 @@ outcome::result<payload::scan_t::next_block_option_t> prepare(const bfs::path &f
 bfs::path make_temporal(const bfs::path &path) noexcept;
 bool is_temporal(const bfs::path &path) noexcept;
 
+struct relative_result_t {
+    bfs::path path;
+    bool temp;
+};
+
+relative_result_t relative(const bfs::path &path, const bfs::path &root) noexcept;
+
 } // namespace fs
 } // namespace syncspirit

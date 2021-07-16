@@ -166,7 +166,7 @@ void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
                                 send<payload::scan_error_t>(p.reply_to, p.root, child_path, ec);
                             }
                         } else {
-                            std::abort();
+                            payload.files_queue.push_back(child_path);
                         }
                     }
                 }
@@ -185,8 +185,8 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
         auto &block = payload.next_block.value();
         auto &container = payload.file_map->map;
         auto &root = payload.request->payload.root;
-        auto rel_path = bfs::relative(block.path, root);
-        auto &local_info = container[rel_path];
+        auto rel_path = syncspirit::fs::relative(block.path, root);
+        auto &local_info = container[rel_path.path];
         auto block_info = compute(block);
         auto recorded_info = payload.blocks_map.by_id(block_info->get_hash());
         if (recorded_info) {
@@ -199,6 +199,7 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
         // if it is the last block, reset the current block
         auto next_bytes = block.block_size * (block.block_index + 1);
         if (next_bytes >= block.file_size) {
+            local_info.temp = rel_path.temp;
             payload.next_block.reset();
         } else {
             block.block_index++;

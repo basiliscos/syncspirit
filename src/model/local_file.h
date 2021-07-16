@@ -19,6 +19,7 @@ namespace sys = boost::system;
 struct local_file_t {
     using blocks_t = std::vector<model::block_info_ptr_t>;
     blocks_t blocks;
+    bool temp;
 };
 
 struct local_file_map_t {
