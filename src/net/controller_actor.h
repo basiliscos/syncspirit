@@ -13,6 +13,8 @@ struct controller_actor_config_t : r::actor_config_t {
     model::device_ptr_t peer;
     r::address_ptr_t peer_addr;
     pt::time_duration request_timeout;
+    payload::cluster_config_ptr_t peer_cluster_config;
+    model::ignored_folders_map_t *ignored_folders;
 };
 
 template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -42,6 +44,16 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
 
     builder_t &&request_timeout(const pt::time_duration &value) &&noexcept {
         parent_t::config.request_timeout = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&peer_cluster_config(payload::cluster_config_ptr_t &&value) &&noexcept {
+        parent_t::config.peer_cluster_config = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&ignored_folders(model::ignored_folders_map_t *value) &&noexcept {
+        parent_t::config.ignored_folders = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -88,6 +100,8 @@ struct controller_actor_t : public r::actor_base_t {
     r::address_ptr_t db;
     r::address_ptr_t fs;
     pt::time_duration request_timeout;
+    payload::cluster_config_ptr_t peer_cluster_config;
+    model::ignored_folders_map_t *ignored_folders;
     sync_state_t sync_state;
     peers_map_t peers_map;
     responses_map_t responses_map;

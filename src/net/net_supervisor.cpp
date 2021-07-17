@@ -376,7 +376,7 @@ void net_supervisor_t::on_connect(message::connect_response_t &message) noexcept
     auto &ee = message.payload.ee;
     if (!ee) {
         auto &p = message.payload.res;
-        send<payload::connect_notify_t>(cluster_addr, p->peer_addr, p->peer_device_id, p->cluster_config);
+        send<payload::connect_notify_t>(cluster_addr, p->peer_addr, p->peer_device_id, std::move(p->cluster_config));
     } else {
         auto &payload = message.payload.req->payload.request_payload->payload;
         std::visit(
@@ -437,14 +437,14 @@ void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
             }
         }
     }
-    using cluster_config_ptr_t = typename payload::auth_response_t::cluster_config_ptr_t;
+    using cluster_config_t = std::decay_t<decltype(cluster->get(device))>;
     if (device) {
         device->mark_online(true);
         auto cluster_config = cluster->get(device);
-        auto cluster_message = std::make_unique<cluster_config_ptr_t::element_type>(std::move(cluster_config));
+        auto cluster_message = std::make_unique<cluster_config_t>(std::move(cluster_config));
         reply_to(message, std::move(cluster_message));
     } else {
-        reply_to(message, cluster_config_ptr_t{});
+        reply_to(message, std::unique_ptr<cluster_config_t>{});
     }
     spdlog::debug("{}, on_auth, {} requested authtorization. Result : {}", identity, device_id, (bool)device);
 }

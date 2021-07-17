@@ -443,8 +443,9 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::message::ClusterConfig>) {
                 proto::ClusterConfig &config = *msg;
+                auto config_ptr = payload::cluster_config_ptr_t{new proto::ClusterConfig(std::move(config))};
                 send<payload::connect_notify_t>(supervisor->get_address(), get_address(), peer_device_id,
-                                                std::move(config));
+                                                std::move(config_ptr));
                 reset_tx_timer();
                 reset_rx_timer();
             } else {

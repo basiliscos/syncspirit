@@ -167,17 +167,7 @@ void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexce
     auto &device_id = payload.peer_device_id;
     spdlog::trace("{}, on_connect, peer = {}", identity, payload.peer_device_id);
     auto peer = devices->by_id(device_id.get_sha256());
-    auto unknown_folders = cluster->update(payload.cluster_config);
-    for (auto &folder : unknown_folders) {
-        if (!ignored_folders->by_key(folder.id())) {
-            for (int i = 0; i < folder.devices_size(); ++i) {
-                auto &d = folder.devices(i);
-                if (d.id() == device_id.get_sha256()) {
-                    send<ui::payload::new_folder_notify_t>(address, folder, peer, d.index_id());
-                }
-            }
-        }
-    }
+    auto &cluster_config = payload.cluster_config;
     auto addr = create_actor<controller_actor_t>()
                     .timeout(init_timeout * 7 / 9)
                     .device(device)
@@ -185,6 +175,8 @@ void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexce
                     .peer_addr(payload.peer_addr)
                     .request_timeout(pt::milliseconds(bep_config.request_timeout))
                     .cluster(cluster)
+                    .peer_cluster_config(std::move(cluster_config))
+                    .ignored_folders(ignored_folders)
                     .finish()
                     ->get_address();
     auto &id = peer->device_id.get_sha256();

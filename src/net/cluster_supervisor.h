@@ -3,9 +3,8 @@
 #include "../config/bep.h"
 #include "../model/cluster.h"
 #include "../model/folder.h"
-#include "../ui/messages.hpp"
-#include "messages.h"
 #include "../fs/messages.h"
+#include "../ui/messages.hpp"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 

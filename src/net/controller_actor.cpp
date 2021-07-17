@@ -1,6 +1,7 @@
 #include "controller_actor.h"
 #include "names.h"
 #include "../utils/error_code.h"
+#include "../ui/messages.hpp"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::net;
@@ -13,7 +14,9 @@ r::plugin::resource_id_t peer = 0;
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device{config.device}, peer{config.peer},
-      peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, sync_state{sync_state_t::none} {}
+      peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, peer_cluster_config{std::move(
+                                                                                config.peer_cluster_config)},
+      ignored_folders{config.ignored_folders}, sync_state{sync_state_t::none} {}
 
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -40,6 +43,19 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void controller_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     spdlog::trace("{}, on_start", identity);
+    auto unknown_folders = cluster->update(*peer_cluster_config);
+    for (auto &folder : unknown_folders) {
+        if (!ignored_folders->by_key(folder.id())) {
+            for (int i = 0; i < folder.devices_size(); ++i) {
+                auto &d = folder.devices(i);
+                if (d.id() == peer->get_id()) {
+                    auto &dest = supervisor->get_address();
+                    send<ui::payload::new_folder_notify_t>(dest, folder, peer, d.index_id());
+                }
+            }
+        }
+    }
+
     send<payload::start_reading_t>(peer_addr, get_address());
     ready();
     spdlog::info("{} is ready/online", identity);

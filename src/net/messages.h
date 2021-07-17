@@ -39,6 +39,8 @@ extern r::pt::time_duration default_timeout;
 
 namespace payload {
 
+using cluster_config_ptr_t = std::unique_ptr<proto::ClusterConfig>;
+
 struct address_response_t : public r::arc_base_t<address_response_t> {
     using resolve_results_t = tcp::resolver::results_type;
 
@@ -145,11 +147,11 @@ struct dial_ready_notification_t {
 struct connect_response_t : r::arc_base_t<connect_response_t> {
     r::address_ptr_t peer_addr;
     model::device_id_t peer_device_id;
-    proto::ClusterConfig cluster_config;
+    cluster_config_ptr_t cluster_config;
 
     connect_response_t(const r::address_ptr_t &peer_addr_, model::device_id_t &peer_device_id_,
-                       proto::ClusterConfig &&cluster_config_) noexcept
-        : peer_addr{peer_addr_}, peer_device_id{peer_device_id_}, cluster_config{cluster_config_} {}
+                       cluster_config_ptr_t cluster_config_) noexcept
+        : peer_addr{peer_addr_}, peer_device_id{peer_device_id_}, cluster_config{std::move(cluster_config_)} {}
 };
 
 struct connect_request_t : r::arc_base_t<connect_request_t> {
@@ -177,7 +179,6 @@ struct connect_request_t : r::arc_base_t<connect_request_t> {
 };
 
 struct auth_response_t : r::arc_base_t<auth_response_t> {
-    using cluster_config_ptr_t = std::unique_ptr<proto::ClusterConfig>;
     cluster_config_ptr_t cluster_config;
 
     auth_response_t(cluster_config_ptr_t &&cluster_config_) noexcept : cluster_config{std::move(cluster_config_)} {}
@@ -202,7 +203,7 @@ struct auth_request_t : r::arc_base_t<auth_request_t> {
 struct connect_notify_t {
     r::address_ptr_t peer_addr;
     model::device_id_t peer_device_id;
-    proto::ClusterConfig cluster_config;
+    cluster_config_ptr_t cluster_config;
 };
 
 struct disconnect_notify_t {
