@@ -64,7 +64,7 @@ void fs_actor_t::on_scan_cancel(message::scan_cancel_t &req) noexcept {
                 auto &requestee = payload.reply_to;
                 auto file_map = model::local_file_map_ptr_t(new model::local_file_map_t(root));
                 file_map->ec = utils::make_error_code(utils::error_code_t::scan_aborted);
-                send<payload::scan_response_t>(requestee, std::move(file_map));
+                send<payload::scan_response_t>(requestee, std::move(file_map), payload.custom_payload);
                 queue.erase(it);
                 break;
             }
@@ -91,7 +91,7 @@ void fs_actor_t::reply(message::scan_t &scan) noexcept {
     auto &payload = p.request->payload;
     auto &requestee = payload.reply_to;
     auto &root = payload.root;
-    send<payload::scan_response_t>(requestee, std::move(p.file_map));
+    send<payload::scan_response_t>(requestee, std::move(p.file_map), payload.custom_payload);
     queue.pop_front();
     send<payload::process_signal_t>(address);
 }

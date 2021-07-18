@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vector>
 #include <memory>
 #include <unordered_map>
 #include <boost/filesystem.hpp>
@@ -24,9 +23,13 @@ struct scan_request_t {
     bfs::path root;
     r::address_ptr_t reply_to;
     r::request_id_t request_id;
+    void *custom_payload;
 };
 
-using scan_response_t = model::local_file_map_ptr_t;
+struct scan_response_t {
+    model::local_file_map_ptr_t map_info;
+    void *custom_payload;
+};
 
 struct scan_error_t {
     bfs::path root;

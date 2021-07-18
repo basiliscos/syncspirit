@@ -170,5 +170,5 @@ void test_new_folder() {
     f.run();
 }
 
-REGISTER_TEST_CASE( test_start_reading, "test_start_reading", "[controller]" );
+REGISTER_TEST_CASE(test_start_reading, "test_start_reading", "[controller]");
 REGISTER_TEST_CASE(test_new_folder, "test_new_folder", "[controller]");

@@ -81,7 +81,9 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     void on_store_new_folder(message::store_new_folder_response_t &message) noexcept;
     void on_scan_complete(fs::message::scan_response_t &message) noexcept;
     void on_scan_error(fs::message::scan_error_t &message) noexcept;
-    void scan(const model::folder_ptr_t &folder) noexcept;
+    void scan(const model::folder_ptr_t &folder, void *scan_handler) noexcept;
+    void handle_scan_initial(model::folder_ptr_t &folder) noexcept;
+    void handle_scan_new(model::folder_ptr_t &folder) noexcept;
 
     r::address_ptr_t coordinator;
     r::address_ptr_t fs;
@@ -96,7 +98,6 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     addr2device_map_t addr2device_map;
     create_folder_req_t create_folder_req;
     scan_folders_map_t scan_folders_map;
-    bool initial_scan;
 };
 
 } // namespace net

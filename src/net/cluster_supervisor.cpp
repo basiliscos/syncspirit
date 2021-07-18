@@ -27,6 +27,8 @@ inline auto supervisor_t::access<to::next_request_id, to::next_request_id>(const
 }
 } // namespace rotor
 
+typedef void (*callback_t)(cluster_supervisor_t *, syncspirit::model::folder_ptr_t &);
+
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
     : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, device{config.device}, cluster{config.cluster},
       devices{config.devices}, folders{cluster->get_folders()}, ignored_folders(config.ignored_folders) {}
@@ -54,13 +56,14 @@ void cluster_supervisor_t::on_start() noexcept {
     spdlog::trace("{}, on_start, folders count = {}", identity, folders.size());
     ra::supervisor_asio_t::on_start();
     if (folders.size()) {
-        initial_scan = true;
         for (auto &it : folders) {
             auto &folder = it.second;
-            scan(folder);
+            callback_t hanlder = [](cluster_supervisor_t *self, model::folder_ptr_t &folder) {
+                self->handle_scan_initial(folder);
+            };
+            scan(folder, reinterpret_cast<void *>(hanlder));
         }
     } else {
-        initial_scan = false;
         send<payload::cluster_ready_notify_t>(coordinator);
     }
 }
@@ -74,16 +77,32 @@ void cluster_supervisor_t::shutdown_start() noexcept {
     ra::supervisor_asio_t::shutdown_start();
 }
 
-void cluster_supervisor_t::scan(const model::folder_ptr_t &folder) noexcept {
+void cluster_supervisor_t::handle_scan_initial(model::folder_ptr_t &folder) noexcept {
+    if (scan_folders_map.size() == 1) {
+        spdlog::debug("{}, completed intiial scan for {}", identity, folder->label());
+        send<payload::cluster_ready_notify_t>(coordinator);
+    }
+}
+
+void cluster_supervisor_t::handle_scan_new(model::folder_ptr_t &folder) noexcept {
+    for (auto &it : addr2device_map) {
+        auto device = devices->by_id(it.second);
+        if (device->is_online() && folder->is_shared_with(device)) {
+            send<payload::ready_signal_t>(it.first);
+        }
+    }
+}
+
+void cluster_supervisor_t::scan(const model::folder_ptr_t &folder, void *scan_handler) noexcept {
     auto path = folder->get_path();
     auto req_id = access<to::next_request_id>(to::next_request_id{});
-    send<fs::payload::scan_request_t>(fs, path, get_address(), req_id);
+    send<fs::payload::scan_request_t>(fs, path, get_address(), req_id, scan_handler);
     scan_folders_map.emplace(path, scan_info_t{folder, req_id});
     resources->acquire(resource::fs_scan);
 }
 
 void cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &message) noexcept {
-    auto &file_map = *message.payload;
+    auto &file_map = *message.payload.map_info;
     auto &path = file_map.root;
     auto &ec = file_map.ec;
     spdlog::trace("{}, on_scan_complete for {}", identity, path.c_str());
@@ -97,19 +116,8 @@ void cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &messag
         spdlog::warn("{}, scanning {} error: {}", identity, path.c_str(), ec.message());
     }
 
-    if (scan_folders_map.size() == 1 && initial_scan) {
-        spdlog::debug("{}, completed intiial scan", identity, path.c_str());
-        send<payload::cluster_ready_notify_t>(coordinator);
-        initial_scan = false;
-    }
-    if (!initial_scan) {
-        for (auto &it : addr2device_map) {
-            auto device = devices->by_id(it.second);
-            if (device->is_online() && folder->is_shared_with(device)) {
-                send<payload::ready_signal_t>(it.first);
-            }
-        }
-    }
+    callback_t handler = reinterpret_cast<callback_t>(message.payload.custom_payload);
+    handler(this, folder);
     scan_folders_map.erase(it);
 }
 
@@ -156,8 +164,11 @@ void cluster_supervisor_t::on_store_new_folder(message::store_new_folder_respons
         auto &folder = message.payload.res.folder;
         spdlog::debug("{}, created_folder {}/{}", identity, folder->id(), folder->label());
         folders.put(folder);
-        scan(folder);
-        reply_to(*create_folder_req, std::move(folder));
+        callback_t hanlder = [](cluster_supervisor_t *self, model::folder_ptr_t &folder) {
+            self->handle_scan_new(folder);
+        };
+        reply_to(*create_folder_req, folder);
+        scan(folder, reinterpret_cast<void *>(hanlder));
     }
     create_folder_req.reset();
 }

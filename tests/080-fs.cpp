@@ -162,8 +162,11 @@ struct scan_consumer_t : r::actor_base_t {
 
     void on_start() noexcept {
         r::actor_base_t::on_start();
-        send<payload::scan_request_t>(fs_actor, root_path, get_address());
+        void *ptr = (void *)&scan_consumer_t::some_function;
+        send<payload::scan_request_t>(fs_actor, root_path, get_address(), 0UL, ptr);
     }
+
+    static void some_function() noexcept {}
 
     void on_response(message::scan_response_t &msg) noexcept {
         response = &msg;
@@ -212,17 +215,20 @@ TEST_CASE("fs-actor", "[fs]") {
             sup->do_process();
             CHECK(act->errors.empty());
             REQUIRE(act->response);
-            auto &r = act->response->payload;
+            auto &r = act->response->payload.map_info;
             CHECK(r->root == root_path);
             CHECK(r->map.empty());
-        }
 
+            // custom payload is preserved
+            void *ptr_orig = (void *)&scan_consumer_t::some_function;
+            CHECK(act->response->payload.custom_payload == ptr_orig);
+        }
         SECTION("non-existing root path") {
             auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path / "bla-bla").finish();
             sup->do_process();
             CHECK(act->errors.empty());
             REQUIRE(act->response);
-            auto &r = act->response->payload;
+            auto &r = act->response->payload.map_info;
             CHECK(r->root == (root_path / "bla-bla"));
             CHECK(r->map.empty());
         }
@@ -237,7 +243,7 @@ TEST_CASE("fs-actor", "[fs]") {
             sup->do_process();
             CHECK(act->errors.empty());
             REQUIRE(act->response);
-            auto &r = act->response->payload;
+            auto &r = act->response->payload.map_info;
             REQUIRE(!r->map.empty());
             auto it = r->map.begin();
             CHECK(it->first.string() == bfs::path(sub) / "my-file");
@@ -260,7 +266,7 @@ TEST_CASE("fs-actor", "[fs]") {
             sup->do_process();
             CHECK(act->errors.empty());
             REQUIRE(act->response);
-            auto &r = act->response->payload;
+            auto &r = act->response->payload.map_info;
             REQUIRE(!r->map.empty());
             auto it = r->map.begin();
             CHECK(it->first == "my-file");
@@ -295,7 +301,7 @@ TEST_CASE("fs-actor", "[fs]") {
                 sup->do_process();
                 CHECK(act->errors.empty());
                 REQUIRE(act->response);
-                auto &r = act->response->payload;
+                auto &r = act->response->payload.map_info;
                 CHECK(r->root == root_path);
                 CHECK(r->map.empty());
             }
@@ -342,7 +348,7 @@ TEST_CASE("fs-actor", "[fs]") {
         sup->do_process();
         CHECK(scaner->errors.empty());
         REQUIRE(scaner->response);
-        auto &r = scaner->response->payload;
+        auto &r = scaner->response->payload.map_info;
         CHECK(r->root == root_path);
         CHECK(!r->map.empty());
         auto it = r->map.begin();
@@ -350,7 +356,6 @@ TEST_CASE("fs-actor", "[fs]") {
         CHECK(file.temp);
         CHECK(it->first == "my-file");
     }
-
     sup->shutdown();
     sup->do_process();
 }
