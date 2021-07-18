@@ -2,6 +2,7 @@
 #include "sink.h"
 #include "error_code.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <memory>
 #include <unordered_map>
 #include <string_view>
 #include <vector>
@@ -43,7 +44,7 @@ static sink_option_t make_sink(std::string_view name, std::string &prompt, std::
     } else if (name == "stderr") {
         return std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     }
-    return make_error_code(error_code_t::unknown_sink);
+    return utils::make_error_code(error_code_t::unknown_sink);
 }
 
 void set_default(const std::string &level, std::string &prompt, std::mutex &mutex, bool interactive) noexcept {
@@ -60,6 +61,10 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, std::st
 
     // init sinks
     auto prev = spdlog::default_logger();
+    using log_t = decltype(prev);
+    using guard_t = std::unique_ptr<log_t, std::function<void(log_t *)>>;
+    guard_t guard(&prev, [](log_t *logger) { spdlog::set_default_logger(*logger); });
+
     spdlog::drop_all();
     sink_map_t sink_map;
     for (auto &cfg : configs) {
@@ -91,7 +96,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, std::st
     }
 
     if (default_sinks.empty()) {
-        return make_error_code(error_code_t::misconfigured_default_logger);
+        return utils::make_error_code(error_code_t::misconfigured_default_logger);
     }
 
     // init others
@@ -131,6 +136,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, std::st
     }
     spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%L/%t%$] %v");
 
+    guard.release();
     return outcome::success();
 }
 

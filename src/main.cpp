@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
         bool overwrite_default = vm.count("log_level");
         auto init_result = utils::init_loggers(cfg.log_configs, prompt, std_out_mutex, overwrite_default, interactive);
         if (!init_result) {
-            spdlog::error("Loggers initialization failed :: {}", init_result.error());
+            spdlog::error("Loggers initialization failed :: {}", init_result.error().message());
             return 1;
         }
 
