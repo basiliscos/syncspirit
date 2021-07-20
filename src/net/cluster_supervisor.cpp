@@ -88,7 +88,7 @@ void cluster_supervisor_t::handle_scan_new(model::folder_ptr_t &folder) noexcept
     for (auto &it : addr2device_map) {
         auto device = devices->by_id(it.second);
         if (device->is_online() && folder->is_shared_with(device)) {
-            send<payload::ready_signal_t>(it.first);
+            send<payload::store_new_folder_notify_t>(it.first, folder);
         }
     }
 }
@@ -164,6 +164,9 @@ void cluster_supervisor_t::on_store_new_folder(message::store_new_folder_respons
         auto &folder = message.payload.res.folder;
         spdlog::debug("{}, created_folder {}/{}", identity, folder->id(), folder->label());
         folders.put(folder);
+        folder->assign_device(device);
+        folder->assign_cluster(cluster.get());
+
         callback_t hanlder = [](cluster_supervisor_t *self, model::folder_ptr_t &folder) {
             self->handle_scan_new(folder);
         };

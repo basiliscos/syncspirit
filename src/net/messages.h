@@ -243,8 +243,9 @@ struct termination_t {
     r::extended_error_ptr_t ee;
 };
 
-using forwarded_message_t = std::variant<proto::message::Index, proto::message::IndexUpdate, proto::message::Request,
-                                         proto::message::DownloadProgress>;
+using forwarded_message_t =
+    std::variant<proto::message::ClusterConfig, proto::message::Index, proto::message::IndexUpdate,
+                 proto::message::Request, proto::message::DownloadProgress>;
 
 struct add_device_t {
     model::device_ptr_t device;
@@ -320,6 +321,10 @@ struct block_request_t {
     std::size_t block_index;
 };
 
+struct cluster_config_t {
+    proto::message::ClusterConfig config;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -391,6 +396,8 @@ using remove_device_t = r::message_t<payload::remove_device_t>;
 
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;
+
+using cluster_config_t = r::message_t<payload::cluster_config_t>;
 
 } // end of namespace message
 

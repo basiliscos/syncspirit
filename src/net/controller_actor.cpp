@@ -34,6 +34,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_store_folder);
         p.subscribe_actor(&controller_actor_t::on_store_folder_info);
+        p.subscribe_actor(&controller_actor_t::on_new_folder);
         p.subscribe_actor(&controller_actor_t::on_ready);
         p.subscribe_actor(&controller_actor_t::on_block);
         p.subscribe_actor(&controller_actor_t::on_write);
@@ -43,7 +44,16 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void controller_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     spdlog::trace("{}, on_start", identity);
-    auto unknown_folders = cluster->update(*peer_cluster_config);
+    send<payload::start_reading_t>(peer_addr, get_address());
+    update(*peer_cluster_config);
+    peer_cluster_config.reset();
+    ready();
+    spdlog::info("{} is ready/online", identity);
+}
+
+void controller_actor_t::update(proto::ClusterConfig &config) noexcept {
+    spdlog::trace("{}, update", identity);
+    auto unknown_folders = cluster->update(config);
     for (auto &folder : unknown_folders) {
         if (!ignored_folders->by_key(folder.id())) {
             for (int i = 0; i < folder.devices_size(); ++i) {
@@ -55,10 +65,6 @@ void controller_actor_t::on_start() noexcept {
             }
         }
     }
-
-    send<payload::start_reading_t>(peer_addr, get_address());
-    ready();
-    spdlog::info("{} is ready/online", identity);
 }
 
 void controller_actor_t::ready(model::file_info_ptr_t file) noexcept {
@@ -141,7 +147,16 @@ void controller_actor_t::on_store_folder(message::store_folder_response_t &messa
         spdlog::warn("{}, on_store_folder {} failed : {}", identity, label, ee->message());
         return do_shutdown(ee);
     }
-    spdlog::trace("{}, on_store_folder_info {}", identity, label);
+    spdlog::trace("{}, on_store_folder_info, folder = '{}'", identity, label);
+    ready();
+}
+
+void controller_actor_t::on_new_folder(message::store_new_folder_notify_t &message) noexcept {
+    auto &folder = message.payload.folder;
+    auto cluster_update = cluster->get(peer);
+    using payload_t = std::decay_t<decltype(cluster_update)>;
+    auto update = std::make_unique<payload_t>(std::move(cluster_update));
+    send<payload::cluster_config_t>(peer_addr, std::move(update));
 }
 
 void controller_actor_t::on_store_folder_info(message::store_folder_info_response_t &message) noexcept {
@@ -155,6 +170,8 @@ void controller_actor_t::on_store_folder_info(message::store_folder_info_respons
         return do_shutdown(ee);
     }
 }
+
+void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept { update(*message); }
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
     auto &folder_id = message->folder();

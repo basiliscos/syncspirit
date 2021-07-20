@@ -28,7 +28,7 @@ proto::ClusterConfig cluster_t::get(device_ptr_t target) noexcept {
     return r;
 }
 
-const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
+folders_map_t &cluster_t::get_folders() noexcept { return folders; }
 
 block_infos_map_t &cluster_t::get_blocks() noexcept { return blocks; }
 

@@ -19,6 +19,10 @@ void folder_info_t::update(const proto::Device &device) noexcept {
         index = device.index_id();
         changed = true;
     }
+    if (max_sequence != device.max_sequence()) {
+        max_sequence = device.max_sequence();
+        changed = true;
+    }
     if (changed) {
         spdlog::trace("folder_info_t::update, folder = {}, index = {:#x}, max seq = {}", folder->label(), index,
                       max_sequence);

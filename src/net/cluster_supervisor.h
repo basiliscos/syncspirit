@@ -92,7 +92,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     model::device_ptr_t device;
     model::cluster_ptr_t cluster;
     model::devices_map_t *devices;
-    model::folders_map_t folders;
+    model::folders_map_t &folders;
     model::ignored_folders_map_t *ignored_folders;
     device2addr_map_t device2addr_map;
     addr2device_map_t addr2device_map;

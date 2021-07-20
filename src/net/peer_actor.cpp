@@ -66,6 +66,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&peer_actor_t::on_start_reading);
         p.subscribe_actor(&peer_actor_t::on_termination);
         p.subscribe_actor(&peer_actor_t::on_block_request);
+        p.subscribe_actor(&peer_actor_t::on_cluster_config);
         instantiate_transport();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
@@ -416,6 +417,13 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     block_request.reset(&message);
 }
 
+void peer_actor_t::on_cluster_config(message::cluster_config_t &msg) noexcept {
+    log->trace("{}, on_cluster_config", identity);
+    fmt::memory_buffer buff;
+    proto::serialize(buff, *msg.payload.config);
+    push_write(std::move(buff), false);
+}
+
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
     log->trace("{}, read_hello", identity);
     std::visit(
@@ -428,7 +436,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
                                                  std::move(*msg))
                     .send(init_timeout / 2);
             } else {
-                log->warn("{}, hello, unexpected_message", identity);
+                log->warn("{}, read_hello, unexpected_message", identity);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 do_shutdown(make_error(ec));
             }
@@ -465,7 +473,7 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
             using T = std::decay_t<decltype(msg)>;
             namespace m = proto::message;
             log->debug("{}, read_controlled, {}", identity, boost::core::demangle(typeid(T).name()));
-            const constexpr bool unexpected = std::is_same_v<T, m::Hello> || std::is_same_v<T, m::ClusterConfig>;
+            const constexpr bool unexpected = std::is_same_v<T, m::Hello>;
             if constexpr (unexpected) {
                 log->warn("{}, hello, unexpected_message", identity);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);

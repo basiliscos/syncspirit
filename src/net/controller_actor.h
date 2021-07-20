@@ -83,13 +83,16 @@ struct controller_actor_t : public r::actor_base_t {
     void on_block(message::block_response_t &message) noexcept;
     void on_write(fs::message::write_response_t &message) noexcept;
     void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
+    void on_new_folder(message::store_new_folder_notify_t &message) noexcept;
 
+    void on_message(proto::message::ClusterConfig &message) noexcept;
     void on_message(proto::message::Index &message) noexcept;
     void on_message(proto::message::IndexUpdate &message) noexcept;
     void on_message(proto::message::Request &message) noexcept;
     void on_message(proto::message::DownloadProgress &message) noexcept;
 
     void request_block(const model::file_info_ptr_t &file, const model::block_location_t &block) noexcept;
+    void update(proto::ClusterConfig &config) noexcept;
     void ready(model::file_info_ptr_t = nullptr) noexcept;
 
     model::cluster_ptr_t cluster;
