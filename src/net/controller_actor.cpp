@@ -153,6 +153,7 @@ void controller_actor_t::on_store_folder(message::store_folder_response_t &messa
 
 void controller_actor_t::on_new_folder(message::store_new_folder_notify_t &message) noexcept {
     auto &folder = message.payload.folder;
+    spdlog::trace("{}, on_new_folder, folder = '{}'", identity, folder->label());
     auto cluster_update = cluster->get(peer);
     using payload_t = std::decay_t<decltype(cluster_update)>;
     auto update = std::make_unique<payload_t>(std::move(cluster_update));

@@ -50,7 +50,9 @@ struct Fixture {
     model::ignored_folders_map_t ignored_folders;
     r::intrusive_ptr_t<sample_peer_t> peer;
     r::intrusive_ptr_t<st::supervisor_t> sup;
+    r::intrusive_ptr_t<net::controller_actor_t> controller;
     payload::cluster_config_ptr_t peer_cluster_config;
+    bfs::path root_path;
 
     callback_t setup_cb;
     callback_t prerun_cb;
@@ -61,7 +63,7 @@ struct Fixture {
         std::mutex std_out_mutex;
         utils::set_default("trace", prompt, std_out_mutex, false);
 
-        auto root_path = bfs::unique_path();
+        root_path = bfs::unique_path();
         bfs::create_directory(root_path);
         auto root_path_guard = path_guard_t(root_path);
 
@@ -95,15 +97,15 @@ struct Fixture {
         }
         sup->do_process();
 
-        auto controller = sup->create_actor<controller_actor_t>()
-                              .cluster(cluster)
-                              .peer_addr(peer->get_address())
-                              .peer(device_peer)
-                              .request_timeout(timeout)
-                              .peer_cluster_config(std::move(peer_cluster_config))
-                              .ignored_folders(&ignored_folders)
-                              .timeout(timeout)
-                              .finish();
+        controller = sup->create_actor<controller_actor_t>()
+                         .cluster(cluster)
+                         .peer_addr(peer->get_address())
+                         .peer(device_peer)
+                         .request_timeout(timeout)
+                         .peer_cluster_config(std::move(peer_cluster_config))
+                         .ignored_folders(&ignored_folders)
+                         .timeout(timeout)
+                         .finish();
         sup->do_process();
         auto reason = controller->get_shutdown_reason();
         if (reason) {
@@ -127,10 +129,15 @@ void test_start_reading() {
 void test_new_folder() {
     using notify_t = ui::message::new_folder_notify_t;
     using notify_ptr_t = r::intrusive_ptr_t<notify_t>;
+    using cluster_msg_t = r::intrusive_ptr_t<message::cluster_config_t>;
 
     notify_ptr_t notify;
+    cluster_msg_t cluster_msg;
     Fixture f;
-    f.setup_cb = [](Fixture &f) {
+    auto p_folder = proto::Folder();
+
+    f.setup_cb = [&](Fixture &f) {
+        auto config = proto::ClusterConfig();
         auto folder = proto::Folder();
         folder.set_label("my-folder");
         folder.set_id("123");
@@ -147,15 +154,16 @@ void test_new_folder() {
 
         *folder.add_devices() = d_my;
         *folder.add_devices() = d_peer;
-
-        auto config = proto::ClusterConfig();
         *config.add_folders() = folder;
         f.peer_cluster_config = payload::cluster_config_ptr_t(new proto::ClusterConfig(config));
+        p_folder = folder;
     };
     f.prerun_cb = [&](Fixture &f) {
         f.peer->configure_callback = [&](auto &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<notify_t>([&](notify_t &msg) { notify = &msg; }), f.sup->get_address());
+                p.subscribe_actor(
+                    r::lambda<message::cluster_config_t>([&](message::cluster_config_t &msg) { cluster_msg = &msg; }));
             });
         };
     };
@@ -166,6 +174,22 @@ void test_new_folder() {
         CHECK(notify->payload.folder.id() == "123");
         CHECK(notify->payload.source == f.device_peer);
         CHECK(notify->payload.source_index == 22);
+
+        auto path = f.root_path / "my-folder";
+        auto db_folder = db::Folder();
+        db_folder.set_id(p_folder.id());
+        db_folder.set_label(p_folder.label());
+        db_folder.set_path(path.string());
+
+        auto folder = model::folder_ptr_t(new model::folder_t(db_folder));
+        f.cluster->get_folders().put(folder);
+        folder->assign_device(f.device_my);
+        folder->assign_cluster(f.cluster.get());
+
+        f.peer->send<payload::store_new_folder_notify_t>(f.controller->get_address(), folder);
+        f.sup->do_process();
+
+        REQUIRE(cluster_msg);
     };
     f.run();
 }
