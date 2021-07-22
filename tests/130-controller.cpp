@@ -7,6 +7,7 @@
 #include "fs/fs_actor.h"
 #include "ui/messages.hpp"
 #include "utils/log.h"
+#include "utils/tls.h"
 #include "net/controller_actor.h"
 #include "net/db_actor.h"
 #include <net/names.h>
@@ -29,8 +30,10 @@ struct sample_peer_t : r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept {
         r::actor_base_t::configure(plugin);
 
-        plugin.with_casted<r::plugin::starter_plugin_t>(
-            [&](auto &p) { p.subscribe_actor(&sample_peer_t::on_start_reading); });
+        plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+            p.subscribe_actor(&sample_peer_t::on_start_reading);
+            p.subscribe_actor(&sample_peer_t::on_block_request);
+        });
         if (configure_callback) {
             configure_callback(plugin);
         }
@@ -38,6 +41,15 @@ struct sample_peer_t : r::actor_base_t {
 
     void on_start_reading(message::start_reading_t &) noexcept { ++start_reading; }
 
+    void on_block_request(message::block_request_t &req) noexcept {
+        assert(responses.size());
+        reply_to(req, responses.front());
+        responses.pop_front();
+    }
+
+    using Responses = std::list<std::string>;
+
+    Responses responses;
     size_t start_reading = 0;
     configure_callback_t configure_callback;
 };
@@ -99,6 +111,7 @@ struct Fixture {
 
         controller = sup->create_actor<controller_actor_t>()
                          .cluster(cluster)
+                         .device(device_my)
                          .peer_addr(peer->get_address())
                          .peer(device_peer)
                          .request_timeout(timeout)
@@ -186,10 +199,47 @@ void test_new_folder() {
         folder->assign_device(f.device_my);
         folder->assign_cluster(f.cluster.get());
 
+        auto db_fi_local = db::FolderInfo();
+        db_fi_local.set_index_id(234);
+        auto fi_local =
+            model::folder_info_ptr_t(new model::folder_info_t(db_fi_local, f.device_my.get(), folder.get(), 2));
+
+        auto db_fi_source = db::FolderInfo();
+        db_fi_source.set_index_id(345);
+        db_fi_source.set_max_sequence(5);
+        auto fi_source =
+            model::folder_info_ptr_t(new model::folder_info_t(db_fi_source, f.device_peer.get(), folder.get(), 3));
+
+        folder->add(fi_local);
+        folder->add(fi_source);
+
         f.peer->send<payload::store_new_folder_notify_t>(f.controller->get_address(), folder);
         f.sup->do_process();
 
         REQUIRE(cluster_msg);
+
+        // TODO: test for wrong block hash
+        auto block_info = proto::BlockInfo();
+        block_info.set_size(5);
+        block_info.set_hash(utils::sha256_digest("12345").value());
+
+        auto fi = proto::FileInfo();
+        fi.set_name("a.txt");
+        fi.set_type(proto::FileInfoType::FILE);
+        fi.set_sequence(5);
+        fi.set_block_size(5);
+        fi.set_size(5);
+        *fi.add_blocks() = block_info;
+
+        proto::Index index;
+        index.set_folder(folder->id());
+        *index.add_files() = fi;
+
+        auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+        f.peer->send<payload::forwarded_message_t>(f.controller->get_address(), std::move(index_ptr));
+        f.peer->responses.push_back("12345");
+        f.sup->do_process();
+        CHECK(st::read_file(path / "a.txt") == "12345");
     };
     f.run();
 }
