@@ -62,6 +62,7 @@ TEST_CASE("opt_for_synch", "[model]") {
         return std::tuple(folder_info, file_info);
     };
 
+#if 0
     SECTION("no need of update") {
         add_file(5, d1, f1);
         add_file(4, d2, f1);
@@ -88,6 +89,7 @@ TEST_CASE("opt_for_synch", "[model]") {
         auto f = cluster->folder_for_synch(d2);
         CHECK(*f == *f2);
     }
+#endif
 
     SECTION("local updates") {
         auto [folder_info, file_info] = add_file(5, d1, f1, 1);
