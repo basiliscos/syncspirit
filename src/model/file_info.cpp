@@ -178,4 +178,8 @@ void file_info_t::mark_local_available(size_t block_index) noexcept {
 
 bfs::path file_info_t::get_path() const noexcept { return folder->get_path() / std::string(get_name()); }
 
+std::string file_info_t::get_full_name() const noexcept {
+    return fmt::format("{}/{}", get_folder()->label(), get_name());
+}
+
 } // namespace syncspirit::model

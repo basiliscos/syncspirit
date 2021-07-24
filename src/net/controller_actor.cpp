@@ -217,11 +217,11 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     utils::digest(data.data(), data.size(), digest_buff);
     std::string_view digest(digest_buff, SZ);
     if (digest != message.payload.req->payload.request_payload.block->get_hash()) {
-        auto ec = utils::make_error_code(utils::protocol_error_code_t::unknown_folder);
-        auto name = file->get_name();
-        std::string context = fmt::format("get from {} block {}", name, block_index);
+        auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
+        auto name = file->get_full_name();
+        std::string context = fmt::format("block {} from {}", block_index, name);
         auto ee = r::make_error(context, ec);
-        spdlog::warn("{}, on block, digest mismatch for {} for block {}", identity, name, block_index);
+        spdlog::warn("{}, on block, digest mismatch: {}", identity, name, context);
         return do_shutdown(ee);
     }
 

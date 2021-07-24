@@ -248,7 +248,8 @@ void test_new_folder() {
             f.peer->responses.push_back("1234");
             f.sup->do_process();
             CHECK(!bfs::exists(path / "a.txt"));
-            CHECK(f.controller->get_shutdown_reason()->ec.message() == "digest mismatch");
+            auto ec = f.controller->get_shutdown_reason()->next->ec;
+            CHECK(ec.value() == (int)utils::protocol_error_code_t::digest_mismatch);
         }
     };
     f.run();

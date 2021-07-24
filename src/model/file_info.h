@@ -42,6 +42,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
 
     inline folder_t *get_folder() const noexcept { return folder; }
     std::string_view get_name() const noexcept;
+    std::string get_full_name() const noexcept;
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     inline blocks_t &get_blocks() noexcept { return blocks; }

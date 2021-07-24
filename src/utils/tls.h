@@ -49,8 +49,7 @@ outcome::result<std::string> as_serialized_der(X509 *cert) noexcept;
 
 outcome::result<std::string> get_common_name(X509 *cert) noexcept;
 
-void digest(const char* src, size_t length, char* storage) noexcept;
-
+void digest(const char *src, size_t length, char *storage) noexcept;
 
 } // namespace utils
 } // namespace syncspirit
