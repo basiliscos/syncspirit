@@ -76,6 +76,7 @@ enum class bep_error_code_t {
 enum class protocol_error_code_t {
     success = 0,
     unknown_folder,
+    digest_mismatch,
 };
 
 enum class request_error_code_t {

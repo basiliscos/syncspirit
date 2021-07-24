@@ -113,6 +113,9 @@ std::string protocol_error_code_category::message(int c) const {
     case protocol_error_code_t::unknown_folder:
         r = "unknown folder";
         break;
+    case protocol_error_code_t::digest_mismatch:
+        r = "digest mismatch";
+        break;
     default:
         r = "unknown";
     }

@@ -21,5 +21,6 @@ struct relative_result_t {
 
 relative_result_t relative(const bfs::path &path, const bfs::path &root) noexcept;
 
+
 } // namespace fs
 } // namespace syncspirit

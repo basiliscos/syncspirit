@@ -8,6 +8,7 @@
 #include "ui/messages.hpp"
 #include "utils/log.h"
 #include "utils/tls.h"
+#include "utils/error_code.h"
 #include "net/controller_actor.h"
 #include "net/db_actor.h"
 #include <net/names.h>
@@ -218,7 +219,6 @@ void test_new_folder() {
 
         REQUIRE(cluster_msg);
 
-        // TODO: test for wrong block hash
         auto block_info = proto::BlockInfo();
         block_info.set_size(5);
         block_info.set_hash(utils::sha256_digest("12345").value());
@@ -237,9 +237,19 @@ void test_new_folder() {
 
         auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
         f.peer->send<payload::forwarded_message_t>(f.controller->get_address(), std::move(index_ptr));
-        f.peer->responses.push_back("12345");
-        f.sup->do_process();
-        CHECK(st::read_file(path / "a.txt") == "12345");
+
+        SECTION("correct small block") {
+            f.peer->responses.push_back("12345");
+            f.sup->do_process();
+            CHECK(st::read_file(path / "a.txt") == "12345");
+        }
+
+        SECTION("block hash mismatches") {
+            f.peer->responses.push_back("1234");
+            f.sup->do_process();
+            CHECK(!bfs::exists(path / "a.txt"));
+            CHECK(f.controller->get_shutdown_reason()->ec.message() == "digest mismatch");
+        }
     };
     f.run();
 }

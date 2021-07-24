@@ -1,6 +1,6 @@
 #include "utils.h"
-#include <openssl/sha.h>
 #include <zlib.h>
+#include "../utils/tls.h"
 
 namespace syncspirit::fs {
 
@@ -16,19 +16,19 @@ static const constexpr size_t max_blocks_count = 2000;
 model::block_info_ptr_t compute(payload::scan_t::next_block_t &block) noexcept {
     // sha256
     static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
-    unsigned char digest[SZ];
-    auto ptr = (const unsigned char *)block.file->data();
+    char digest[SZ];
+    auto ptr = block.file->data();
     auto end = ptr + block.file_size;
     ptr += block.block_index * block.block_size;
     auto length = block.block_size;
     if (ptr + length > end) {
         length = end - ptr;
     }
-    SHA256(ptr, length, digest);
+    utils::digest(ptr, length, digest);
 
     // alder32
     auto weak_hash = adler32(0L, Z_NULL, 0);
-    weak_hash = adler32(weak_hash, ptr, length);
+    weak_hash = adler32(weak_hash, (const unsigned char *)ptr, length);
 
     db::BlockInfo info;
     info.set_hash((const char *)digest, SZ);

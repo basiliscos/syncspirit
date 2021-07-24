@@ -210,7 +210,22 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto &payload = message.payload.req->payload.request_payload;
     auto &file = payload.file;
     auto &data = message.payload.res.data;
-    bool final = file->get_blocks().size() == payload.block_index + 1;
+    auto block_index = payload.block_index;
+
+    static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
+    char digest_buff[SZ];
+    utils::digest(data.data(), data.size(), digest_buff);
+    std::string_view digest(digest_buff, SZ);
+    if (digest != message.payload.req->payload.request_payload.block->get_hash()) {
+        auto ec = utils::make_error_code(utils::protocol_error_code_t::unknown_folder);
+        auto name = file->get_name();
+        std::string context = fmt::format("get from {} block {}", name, block_index);
+        auto ee = r::make_error(context, ec);
+        spdlog::warn("{}, on block, digest mismatch for {} for block {}", identity, name, block_index);
+        return do_shutdown(ee);
+    }
+
+    bool final = file->get_blocks().size() == block_index + 1;
     auto path = file->get_path();
     // request another block while the current is going to be flushed to disk
     auto request_id = request<request_t>(fs, path, std::move(data), final).send(init_timeout);

@@ -1,6 +1,4 @@
-new_folder_save -> cluster-config
-                <- Index
-
+- test: zero width file
 - inactivity-shutdowner
 - fs_actor: fsync/fsync_data on file end?
 - file_for_synch - выбирать также удалённые файлы
