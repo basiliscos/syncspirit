@@ -3,6 +3,7 @@
 #include "messages.h"
 #include "../fs/messages.h"
 #include <unordered_set>
+#include <optional>
 
 namespace syncspirit {
 namespace net {
@@ -91,9 +92,9 @@ struct controller_actor_t : public r::actor_base_t {
     void on_message(proto::message::Request &message) noexcept;
     void on_message(proto::message::DownloadProgress &message) noexcept;
 
-    void request_block(const model::file_info_ptr_t &file, const model::block_location_t &block) noexcept;
+    void request_block(const model::block_location_t &block) noexcept;
     void update(proto::ClusterConfig &config) noexcept;
-    void ready(model::file_info_ptr_t = nullptr) noexcept;
+    void ready() noexcept;
 
     model::cluster_ptr_t cluster;
     model::folder_ptr_t folder;
@@ -108,6 +109,10 @@ struct controller_actor_t : public r::actor_base_t {
     sync_state_t sync_state;
     peers_map_t peers_map;
     responses_map_t responses_map;
+
+    model::file_interator_t file_iterator;
+    model::file_info_ptr_t current_file;
+    model::blocks_interator_t block_iterator;
     int substate = 0;
 };
 

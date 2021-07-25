@@ -26,6 +26,31 @@ struct block_location_t {
     inline operator bool() const noexcept { return (bool)block; }
 };
 
+struct blocks_interator_t {
+    using blocks_t = std::vector<block_info_ptr_t>;
+
+    blocks_interator_t() noexcept;
+    blocks_interator_t(blocks_t &blocks, blocks_t &local_blocks) noexcept;
+
+    template <typename T> blocks_interator_t &operator=(T &other) noexcept {
+        blocks = other.blocks;
+        local_blocks = other.local_blocks;
+        i = other.i;
+        return *this;
+    }
+
+    inline operator bool() noexcept { return blocks != nullptr; }
+
+    block_location_t next() noexcept;
+    void reset() noexcept;
+
+  private:
+    void prepare() noexcept;
+    blocks_t *blocks;
+    blocks_t *local_blocks;
+    size_t i;
+};
+
 struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     using blocks_t = std::vector<block_info_ptr_t>;
     file_info_t(const db::FileInfo &info_, folder_t *folder_) noexcept;
@@ -48,11 +73,14 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     inline blocks_t &get_blocks() noexcept { return blocks; }
 
     inline void mark_outdated() noexcept { status = file_status_t::older; }
+    inline void mark_newver() noexcept { status = file_status_t::newer; }
+    inline void mark_sync() noexcept { status = file_status_t::sync; }
+
     inline file_status_t get_status() const noexcept { return status; }
 
     static std::string generate_db_key(const std::string &name, const folder_t &folder) noexcept;
 
-    block_location_t next_block() noexcept;
+    blocks_interator_t iterate_blocks() noexcept;
     inline std::int64_t get_size() const noexcept { return size; }
 
     std::uint64_t get_block_offset(size_t block_index) const noexcept;

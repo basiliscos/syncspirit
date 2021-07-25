@@ -6,6 +6,37 @@
 
 namespace syncspirit::model {
 
+blocks_interator_t::blocks_interator_t() noexcept : blocks{nullptr}, local_blocks{nullptr}, i{0} {}
+blocks_interator_t::blocks_interator_t(blocks_t &blocks_, blocks_t &local_blocks_) noexcept
+    : blocks{&blocks_}, local_blocks{&local_blocks_}, i{0} {
+    prepare();
+}
+
+void blocks_interator_t::prepare() noexcept {
+    if (blocks) {
+        if (i >= blocks->size()) {
+            blocks = nullptr;
+        }
+    }
+}
+
+void blocks_interator_t::reset() noexcept { blocks = nullptr; }
+
+block_location_t blocks_interator_t::next() noexcept {
+    assert(blocks);
+    auto b = (*blocks)[i].get();
+    block_info_t *result_block = b;
+    if (i < local_blocks->size()) {
+        auto lb = (*local_blocks)[i].get();
+        if (*lb != *b) {
+            result_block = lb;
+        }
+    }
+    auto index = i++;
+    prepare();
+    return {b, index};
+}
+
 file_info_t::file_info_t(const db::FileInfo &info_, folder_t *folder_) noexcept : folder{folder_} {
     db_key = generate_db_key(info_.name(), *folder);
     fields_update(info_);
@@ -140,21 +171,7 @@ void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
     }
 }
 
-block_location_t file_info_t::next_block() noexcept {
-    size_t i = 0;
-    for (; i < blocks.size(); ++i) {
-        auto &b = blocks[i];
-        if (i < local_blocks.size()) {
-            auto &lb = local_blocks[i];
-            if (*lb != *b) {
-                return {b.get(), i};
-            }
-        } else {
-            return {b.get(), i};
-        }
-    }
-    return {nullptr, 0};
-}
+blocks_interator_t file_info_t::iterate_blocks() noexcept { return blocks_interator_t(blocks, local_blocks); }
 
 void file_info_t::clone_block(file_info_t &source, std::size_t src_block_index, std::size_t dst_block_index) noexcept {
     std::abort();

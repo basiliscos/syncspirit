@@ -67,9 +67,9 @@ void controller_actor_t::update(proto::ClusterConfig &config) noexcept {
     }
 }
 
-void controller_actor_t::ready(model::file_info_ptr_t file) noexcept {
+void controller_actor_t::ready() noexcept {
     if (!(substate & READY)) {
-        send<payload::ready_signal_t>(get_address(), file);
+        send<payload::ready_signal_t>(get_address());
         substate = substate | READY;
     }
 }
@@ -86,36 +86,44 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         return;
     }
 
-    model::file_info_ptr_t file = message.payload.file;
-    if (!file) {
-        file = cluster->file_for_synch(peer);
+    if (!file_iterator && !block_iterator) {
+        file_iterator = cluster->iterate_files(peer);
+        if (!file_iterator) {
+            spdlog::trace("{}, nothing more to sync", identity);
+            return;
+        }
     }
-    if (!file) {
+
+    if (block_iterator) {
+        assert(current_file);
+        auto cluster_block = block_iterator.next();
+        auto existing_block = cluster_block.block->local_file();
+        if (existing_block) {
+            spdlog::trace("{}, cloning block {} from {} to {} as block {}", identity,
+                          existing_block.file_info->get_name(), existing_block.block_index, current_file->get_name(),
+                          cluster_block.block_index);
+            current_file->clone_block(*existing_block.file_info, existing_block.block_index, cluster_block.block_index);
+            ready();
+        } else {
+            request_block(cluster_block);
+        }
+        if (!block_iterator) {
+            spdlog::trace("{}, there are no more blocks for {}", identity, current_file->get_full_name());
+            current_file.reset();
+        }
         return;
     }
-    spdlog::debug("{}, will try to update {}/{} ({} block(s) in total)", identity, file->get_folder()->label(),
-                  file->get_name(), file->get_blocks().size());
-    auto cluster_block = file->next_block();
-    if (!cluster_block) {
-        spdlog::trace("{}, no more blocks are needed for {}", identity, file->get_name());
-        return ready();
-    }
 
-    auto existing_block = cluster_block.block->local_file();
-    if (existing_block) {
-        spdlog::trace("{}, cloning block {} from {} to {} as block {}", identity, existing_block.file_info->get_name(),
-                      existing_block.block_index, file->get_name(), cluster_block.block_index);
-        file->clone_block(*existing_block.file_info, existing_block.block_index, cluster_block.block_index);
-        return ready(file);
-    }
-    request_block(file, cluster_block);
+    current_file = file_iterator.next();
+    spdlog::trace("{}, going to sync {}", identity, current_file->get_full_name());
+    block_iterator = current_file->iterate_blocks();
+    ready();
 }
 
-void controller_actor_t::request_block(const model::file_info_ptr_t &file,
-                                       const model::block_location_t &block) noexcept {
-    spdlog::trace("{} request_block, file = {}, block index = {}, sz = {}", identity, file->get_name(),
+void controller_actor_t::request_block(const model::block_location_t &block) noexcept {
+    spdlog::trace("{} request_block, file = {}, block index = {}, sz = {}", identity, current_file->get_full_name(),
                   block.block_index, block.block->get_size());
-    request<payload::block_request_t>(peer_addr, file, model::block_info_ptr_t{block.block}, block.block_index)
+    request<payload::block_request_t>(peer_addr, current_file, model::block_info_ptr_t{block.block}, block.block_index)
         .send(request_timeout);
     substate = substate | BLOCK;
 }
@@ -230,7 +238,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     // request another block while the current is going to be flushed to disk
     auto request_id = request<request_t>(fs, path, std::move(data), final).send(init_timeout);
     file->mark_local_available(payload.block_index);
-    ready(file);
+    ready();
     responses_map.emplace(request_id, &message);
 }
 
@@ -247,18 +255,15 @@ void controller_actor_t::on_write(fs::message::write_response_t &message) noexce
     auto &p = block_res->payload.req->payload.request_payload;
     auto &file = p.file;
     if (file->get_status() == model::file_status_t::sync) {
-        ready(nullptr);
         auto folder = file->get_folder();
         auto fi = folder->get_folder_info(device);
         auto seq = fi->get_max_sequence();
         auto new_seq = file->get_sequence();
-        if (new_seq > seq) {
-            spdlog::trace("{}, updated max sequence '{}' on local device: {} -> {}", identity, folder->label(), seq,
-                          new_seq);
-            fi->update_max_sequence(new_seq);
-            request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
-        }
-    } else {
-        ready(file);
+        assert(new_seq > seq);
+        spdlog::trace("{}, updated max sequence '{}' on local device: {} -> {}", identity, folder->label(), seq,
+                      new_seq);
+        fi->update_max_sequence(new_seq);
+        request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
     }
+    ready();
 }

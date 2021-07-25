@@ -10,7 +10,7 @@ using namespace syncspirit::test;
 
 namespace bfs = boost::filesystem;
 
-TEST_CASE("opt_for_synch", "[model]") {
+TEST_CASE("iterate_files", "[model]") {
     std::uint64_t key = 0;
     db::Device db_d1;
     db_d1.set_id(test::device_id2sha256("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
@@ -62,47 +62,31 @@ TEST_CASE("opt_for_synch", "[model]") {
         return std::tuple(folder_info, file_info);
     };
 
-#if 0
-    SECTION("no need of update") {
-        add_file(5, d1, f1);
-        add_file(4, d2, f1);
-        add_file(5, d1, f2);
-        add_file(4, d2, f2);
-        auto f = cluster->folder_for_synch(d2);
-        CHECK(!f);
+    SECTION("no files at all") {
+        auto it = cluster->iterate_files(d2);
+        CHECK(!it);
     }
 
-    SECTION("f1 & f2 needs update, but f1 has higher score") {
-        add_file(5, d1, f1);
-        add_file(9, d2, f1);
-        add_file(5, d1, f2);
-        add_file(8, d2, f2);
-        auto f = cluster->folder_for_synch(d2);
-        CHECK(f == f1);
+    SECTION("no files at peer") {
+        auto it = cluster->iterate_files(d2);
+        add_file(4, d1, f1);
+        CHECK(!it);
     }
 
-    SECTION("f1 & f2 needs update, but f2 has higher score") {
-        add_file(5, d1, f1);
-        add_file(10, d2, f1);
-        add_file(5, d1, f2);
-        add_file(18, d2, f2);
-        auto f = cluster->folder_for_synch(d2);
-        CHECK(*f == *f2);
+    SECTION("one file") {
+        auto [folder_info, file_info] = add_file(4, d1, f1);
+        add_file(5, d2, f1);
+        auto it = cluster->iterate_files(d2);
+        CHECK((bool)it);
+        CHECK(*it.next() == *file_info);
+        CHECK(!it);
     }
-#endif
 
-    SECTION("local updates") {
-        auto [folder_info, file_info] = add_file(5, d1, f1, 1);
-        add_file(5, d2, f1, 1);
-        SECTION("empty emtpy local file map") {
-            local_file_map_t lfm(root);
-            SECTION("emtpy local file map") {
-                f1->update(lfm);
-                CHECK(file_info->get_status() == file_status_t::older);
-                auto r = cluster->file_for_synch(d2);
-                REQUIRE(r);
-                CHECK(*r == *file_info);
-            }
-        }
+    SECTION("when file is in sync, it is not returned") {
+        auto [folder_info, file_info] = add_file(4, d1, f1);
+        file_info->mark_sync();
+        add_file(5, d2, f1);
+        auto it = cluster->iterate_files(d2);
+        CHECK(!it);
     }
 }

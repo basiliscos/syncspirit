@@ -4,6 +4,64 @@
 using namespace syncspirit;
 using namespace syncspirit::model;
 
+file_interator_t::file_interator_t() noexcept : cluster{nullptr} {}
+
+file_interator_t::file_interator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
+    : cluster{&cluster_}, peer{peer_} {
+    it_folder = cluster->folders.begin();
+    if (it_folder == cluster->folders.end()) {
+        cluster = nullptr;
+        return;
+    }
+    prepare();
+}
+
+void file_interator_t::prepare() noexcept {
+    folder_info_ptr_t my_folder_info;
+TRY_ANEW:
+    if (f_begin == f_end) {
+        for (;; ++it_folder) {
+            if (it_folder == cluster->folders.end()) {
+                cluster = nullptr;
+                return;
+            }
+            auto &folder = it_folder->second;
+            auto &folder_infos_map = folder->get_folder_infos();
+
+            auto peer_folder_info = folder_infos_map.by_id(peer->device_id.get_sha256());
+            if (!peer_folder_info)
+                continue;
+            ;
+
+            auto &file_infos = folder->get_file_infos();
+            f_begin = file_infos.begin();
+            f_end = file_infos.end();
+
+            my_folder_info = folder_infos_map.by_id(cluster->device->device_id.get_sha256());
+            assert(my_folder_info);
+            ++it_folder;
+            break;
+        }
+    }
+
+    while (f_begin != f_end) {
+        file = f_begin->second;
+        ++f_begin;
+        if (file->get_status() == file_status_t::older) {
+            return;
+        }
+    }
+    goto TRY_ANEW;
+}
+
+void file_interator_t::reset() noexcept { cluster = nullptr; }
+
+file_info_ptr_t file_interator_t::next() noexcept {
+    file_info_ptr_t r = file;
+    prepare();
+    return r;
+}
+
 cluster_t::cluster_t(device_ptr_t device_) noexcept : device(device_) {}
 
 void cluster_t::assign_folders(const folders_map_t &folders_) noexcept {
@@ -48,21 +106,8 @@ cluster_t::unknown_folders_t cluster_t::update(const proto::ClusterConfig &confi
 
 void cluster_t::add_folder(const folder_ptr_t &folder) noexcept { folders.put(folder); }
 
-file_info_ptr_t cluster_t::file_for_synch(const device_ptr_t &peer_device) noexcept {
+file_interator_t cluster_t::iterate_files(const device_ptr_t &peer_device) noexcept {
     // find local outdated files, which present on peer device
     assert(peer_device != device);
-    for (auto &it_f : folders) {
-        auto &folder = it_f.second;
-        for (auto &it_file : folder->get_file_infos()) {
-            auto &file_info = it_file.second;
-            if (file_info->get_size() && file_info->get_status() == file_status_t::older) {
-                auto &folder_infos_map = folder->get_folder_infos();
-                auto folder_info = folder_infos_map.by_id(peer_device->device_id.get_sha256());
-                if (folder_info) {
-                    return file_info;
-                }
-            }
-        }
-    }
-    return {};
+    return file_interator_t(*this, peer_device);
 }
