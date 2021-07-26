@@ -219,37 +219,65 @@ void test_new_folder() {
 
         REQUIRE(cluster_msg);
 
-        auto block_info = proto::BlockInfo();
-        block_info.set_size(5);
-        block_info.set_hash(utils::sha256_digest("12345").value());
-
-        auto fi = proto::FileInfo();
-        fi.set_name("a.txt");
-        fi.set_type(proto::FileInfoType::FILE);
-        fi.set_sequence(5);
-        fi.set_block_size(5);
-        fi.set_size(5);
-        *fi.add_blocks() = block_info;
-
         proto::Index index;
         index.set_folder(folder->id());
-        *index.add_files() = fi;
 
-        auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
-        f.peer->send<payload::forwarded_message_t>(f.controller->get_address(), std::move(index_ptr));
+        SECTION("file with content") {
+            auto block_info = proto::BlockInfo();
+            block_info.set_size(5);
+            block_info.set_hash(utils::sha256_digest("12345").value());
 
-        SECTION("correct small block") {
-            f.peer->responses.push_back("12345");
-            f.sup->do_process();
-            CHECK(st::read_file(path / "a.txt") == "12345");
+            auto fi = proto::FileInfo();
+            fi.set_name("a.txt");
+            fi.set_type(proto::FileInfoType::FILE);
+            fi.set_sequence(5);
+            fi.set_block_size(5);
+            fi.set_size(5);
+            *fi.add_blocks() = block_info;
+            *index.add_files() = fi;
+
+            auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+            f.peer->send<payload::forwarded_message_t>(f.controller->get_address(), std::move(index_ptr));
+
+            SECTION("correct small block") {
+                f.peer->responses.push_back("12345");
+                f.sup->do_process();
+                CHECK(st::read_file(path / "a.txt") == "12345");
+            }
+
+            SECTION("block hash mismatches") {
+                f.peer->responses.push_back("1234");
+                f.sup->do_process();
+                CHECK(!bfs::exists(path / "a.txt"));
+                auto ec = f.controller->get_shutdown_reason()->next->ec;
+                CHECK(ec.value() == (int)utils::protocol_error_code_t::digest_mismatch);
+            }
         }
 
-        SECTION("block hash mismatches") {
-            f.peer->responses.push_back("1234");
-            f.sup->do_process();
-            CHECK(!bfs::exists(path / "a.txt"));
-            auto ec = f.controller->get_shutdown_reason()->next->ec;
-            CHECK(ec.value() == (int)utils::protocol_error_code_t::digest_mismatch);
+        SECTION("sync deleted file") {
+            auto fi = proto::FileInfo();
+            fi.set_name("b.txt");
+            fi.set_type(proto::FileInfoType::FILE);
+            fi.set_sequence(4);
+            fi.set_deleted(true);
+            *index.add_files() = fi;
+
+            SECTION("file does not exist") {
+                auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                f.peer->send<payload::forwarded_message_t>(f.controller->get_address(), std::move(index_ptr));
+                f.sup->do_process();
+                CHECK(!f.controller->get_shutdown_reason());
+            }
+
+            SECTION("file does exist, and then it is deleted") {
+                auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                f.peer->send<payload::forwarded_message_t>(f.controller->get_address(), std::move(index_ptr));
+                auto p = path / "b.txt";
+                st::write_file(p, "");
+                f.sup->do_process();
+                CHECK(!f.controller->get_shutdown_reason());
+                CHECK(!bfs::exists(p));
+            }
         }
     };
     f.run();

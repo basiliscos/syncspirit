@@ -1,21 +1,18 @@
 - [controller] reset iterartos on cluster/index updates
 - test: block_iterator
 - test: zero width file
+- test: fs_actor, deleted file from index
+- test: continue downloading temporaries
 - inactivity-shutdowner
 - fs_actor: fsync/fsync_data on file end?
-- file_for_synch - выбирать также удалённые файлы
 - when file downloading complete, update in DB it's sequence
 - start syncing folder when new folder has been added, нужно слать cancel{}
 - void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept { std::abort(); }
-- continue downloading temporaries
 - Canonicalize, TempNameWithPrefix, TempName
 - локальные таймстемпы?
 - symlinks
 - folders
 - metadata (timestamp, etc.)
-
-
-
 
 - config & tui
  - игнорированные девайсы: показать, удалить

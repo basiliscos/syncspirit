@@ -77,6 +77,7 @@ struct controller_actor_t : public r::actor_base_t {
     using responses_map_t = std::unordered_map<r::request_id_t, block_response_ptr_t>;
 
     enum SubState { READY = 1 << 0, BLOCK = 1 << 1 };
+    enum class ImmediateResult { DONE, NON_IMMEDIATE, ERROR };
 
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_ready(message::ready_signal_t &message) noexcept;
@@ -94,6 +95,8 @@ struct controller_actor_t : public r::actor_base_t {
 
     void request_block(const model::block_location_t &block) noexcept;
     void update(proto::ClusterConfig &config) noexcept;
+    ImmediateResult process_immediately() noexcept;
+
     void ready() noexcept;
 
     model::cluster_ptr_t cluster;

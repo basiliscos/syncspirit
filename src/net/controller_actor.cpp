@@ -5,6 +5,7 @@
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::net;
+namespace bfs = boost::filesystem;
 
 namespace {
 namespace resource {
@@ -79,6 +80,27 @@ void controller_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
+controller_actor_t::ImmediateResult controller_actor_t::process_immediately() noexcept {
+    assert(current_file);
+    if (current_file->is_deleted()) {
+        auto path = current_file->get_path();
+        sys::error_code ec;
+        if (bfs::exists(path, ec)) {
+            spdlog::debug("{} removing {}", identity, path.string());
+            auto ok = bfs::remove_all(path);
+            if (!ok) {
+                spdlog::warn("{}, error removing {} : {}", identity, path.string(), ec.message());
+                do_shutdown(make_error(ec));
+                return ImmediateResult::ERROR;
+            }
+        }
+        spdlog::trace("{}, {} already abscent, noop", identity, path.string());
+        current_file->mark_sync();
+        return ImmediateResult::DONE;
+    }
+    return ImmediateResult::NON_IMMEDIATE;
+}
+
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     spdlog::trace("{}, on_ready", identity);
     substate = substate & ~READY;
@@ -115,8 +137,14 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     }
 
     current_file = file_iterator.next();
-    spdlog::trace("{}, going to sync {}", identity, current_file->get_full_name());
-    block_iterator = current_file->iterate_blocks();
+    auto ir = process_immediately();
+    if (ir == ImmediateResult::ERROR) {
+        return;
+    }
+    if (ir == ImmediateResult::NON_IMMEDIATE) {
+        spdlog::trace("{}, going to sync {}", identity, current_file->get_full_name());
+        block_iterator = current_file->iterate_blocks();
+    }
     ready();
 }
 

@@ -46,6 +46,22 @@ std::string read_file(const char* test_file) {
     return read_file(file_path(test_file));
 }
 
+void write_file(const bfs::path& path, std::string_view content) {
+    bfs::create_directories(path.parent_path());
+    auto file_path_c = path.c_str();
+    auto out = fopen(file_path_c, "wb");
+    if (!out) {
+        auto ec = sys::error_code{errno, sys::generic_category()};
+        std::cout << "can't open " << file_path_c << " : " << ec.message() << "\n";
+        std::abort();
+    }
+    if (content.size()) {
+        auto r = fwrite(content.data(), content.size(), 1, out);
+        assert(r);
+    }
+    fclose(out);
+}
+
 std::string device_id2sha256(const char* device_id) {
     return model::device_id_t::from_string(device_id).value().get_sha256();
 }

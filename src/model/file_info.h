@@ -76,6 +76,11 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     inline void mark_newver() noexcept { status = file_status_t::newer; }
     inline void mark_sync() noexcept { status = file_status_t::sync; }
 
+    inline bool is_file() noexcept { return type == proto::FileInfoType::FILE; }
+    inline bool is_dir() noexcept { return type == proto::FileInfoType::DIRECTORY; }
+    inline bool is_link() noexcept { return type == proto::FileInfoType::SYMLINK; }
+    inline bool is_deleted() noexcept { return deleted; }
+
     inline file_status_t get_status() const noexcept { return status; }
 
     static std::string generate_db_key(const std::string &name, const folder_t &folder) noexcept;
