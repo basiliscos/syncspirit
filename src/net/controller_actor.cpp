@@ -259,10 +259,11 @@ void controller_actor_t::on_write(fs::message::write_response_t &message) noexce
         auto fi = folder->get_folder_info(device);
         auto seq = fi->get_max_sequence();
         auto new_seq = file->get_sequence();
-        assert(new_seq > seq);
-        spdlog::trace("{}, updated max sequence '{}' on local device: {} -> {}", identity, folder->label(), seq,
-                      new_seq);
-        fi->update_max_sequence(new_seq);
+        if (new_seq > seq) {
+            spdlog::trace("{}, updated max sequence '{}' on local device: {} -> {}", identity, folder->label(), seq,
+                          new_seq);
+            fi->update_max_sequence(new_seq);
+        }
         request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
     }
     ready();

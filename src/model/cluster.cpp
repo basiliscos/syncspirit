@@ -17,7 +17,6 @@ file_interator_t::file_interator_t(cluster_t &cluster_, const device_ptr_t &peer
 }
 
 void file_interator_t::prepare() noexcept {
-    folder_info_ptr_t my_folder_info;
 TRY_ANEW:
     if (f_begin == f_end) {
         for (;; ++it_folder) {
@@ -37,8 +36,6 @@ TRY_ANEW:
             f_begin = file_infos.begin();
             f_end = file_infos.end();
 
-            my_folder_info = folder_infos_map.by_id(cluster->device->device_id.get_sha256());
-            assert(my_folder_info);
             ++it_folder;
             break;
         }
