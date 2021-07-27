@@ -2,6 +2,7 @@
 
 #include "messages.h"
 #include "../fs/messages.h"
+#include "../utils/log.h"
 #include <unordered_set>
 #include <optional>
 
@@ -117,6 +118,7 @@ struct controller_actor_t : public r::actor_base_t {
     model::file_info_ptr_t current_file;
     model::blocks_interator_t block_iterator;
     int substate = 0;
+    utils::logger_t log;
 };
 
 } // namespace net

@@ -189,11 +189,11 @@ void test_new_folder() {
         CHECK(notify->payload.source == f.device_peer);
         CHECK(notify->payload.source_index == 22);
 
-        auto path = f.root_path / "my-folder";
+        auto dir = f.root_path / "my-folder";
         auto db_folder = db::Folder();
         db_folder.set_id(p_folder.id());
         db_folder.set_label(p_folder.label());
-        db_folder.set_path(path.string());
+        db_folder.set_path(dir.string());
 
         auto folder = model::folder_ptr_t(new model::folder_t(db_folder));
         f.cluster->get_folders().put(folder);
@@ -232,25 +232,40 @@ void test_new_folder() {
             fi.set_type(proto::FileInfoType::FILE);
             fi.set_sequence(5);
             fi.set_block_size(5);
-            fi.set_size(5);
-            *fi.add_blocks() = block_info;
-            *index.add_files() = fi;
 
-            auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
-            f.peer->send<payload::forwarded_message_t>(f.controller->get_address(), std::move(index_ptr));
+            auto path = dir / "a.txt";
 
-            SECTION("correct small block") {
-                f.peer->responses.push_back("12345");
-                f.sup->do_process();
-                CHECK(st::read_file(path / "a.txt") == "12345");
+            SECTION("non-empty") {
+                fi.set_size(5);
+                *fi.add_blocks() = block_info;
+                *index.add_files() = fi;
+
+                auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                f.peer->send<payload::forwarded_message_t>(f.controller->get_address(), std::move(index_ptr));
+
+                SECTION("correct small block") {
+                    f.peer->responses.push_back("12345");
+                    f.sup->do_process();
+                    CHECK(st::read_file(path) == "12345");
+                }
+
+                SECTION("block hash mismatches") {
+                    f.peer->responses.push_back("1234");
+                    f.sup->do_process();
+                    CHECK(!bfs::exists(path));
+                    auto ec = f.controller->get_shutdown_reason()->next->ec;
+                    CHECK(ec.value() == (int)utils::protocol_error_code_t::digest_mismatch);
+                }
             }
 
-            SECTION("block hash mismatches") {
-                f.peer->responses.push_back("1234");
+            SECTION("empty") {
+                *index.add_files() = fi;
+
+                auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                f.peer->send<payload::forwarded_message_t>(f.controller->get_address(), std::move(index_ptr));
                 f.sup->do_process();
-                CHECK(!bfs::exists(path / "a.txt"));
-                auto ec = f.controller->get_shutdown_reason()->next->ec;
-                CHECK(ec.value() == (int)utils::protocol_error_code_t::digest_mismatch);
+                REQUIRE(bfs::exists(path));
+                CHECK(bfs::file_size(path) == 0);
             }
         }
 
@@ -272,7 +287,7 @@ void test_new_folder() {
             SECTION("file does exist, and then it is deleted") {
                 auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
                 f.peer->send<payload::forwarded_message_t>(f.controller->get_address(), std::move(index_ptr));
-                auto p = path / "b.txt";
+                auto p = dir / "b.txt";
                 st::write_file(p, "");
                 f.sup->do_process();
                 CHECK(!f.controller->get_shutdown_reason());

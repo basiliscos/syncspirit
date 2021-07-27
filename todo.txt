@@ -1,6 +1,5 @@
 - [controller] reset iterartos on cluster/index updates
 - test: block_iterator
-- test: zero width file
 - test: fs_actor, deleted file from index
 - test: continue downloading temporaries
 - inactivity-shutdowner
