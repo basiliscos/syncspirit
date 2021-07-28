@@ -51,6 +51,10 @@ add_executable(050-model-device_id 050-model-device_id.cpp)
 target_link_libraries(050-model-device_id syncspirit_test_lib)
 add_test(050-model-device_id "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-model-device_id")
 
+add_executable(051-model-file_info 051-model-file_info.cpp)
+target_link_libraries(051-model-file_info syncspirit_test_lib)
+add_test(051-model-file_info "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/051-model-file_info")
+
 add_executable(055-model-cluster 055-model-cluster.cpp)
 target_link_libraries(055-model-cluster syncspirit_test_lib)
 add_test(055-model-cluster "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/055-model-cluster")

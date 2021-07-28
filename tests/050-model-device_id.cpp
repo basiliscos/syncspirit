@@ -12,7 +12,7 @@ using namespace syncspirit::proto;
 namespace fs = boost::filesystem;
 using l32 = luhn32;
 
-TEST_CASE("luhn32", "[protocol]") {
+TEST_CASE("luhn32", "[model]") {
     REQUIRE(l32::calculate("WG2IWWALPC2HZ") == 'H');
     REQUIRE(l32::calculate("KHQNO2S5QSILR") == 'K');
     REQUIRE(l32::validate("KHQNO2S5QSILRK"));
@@ -23,7 +23,7 @@ TEST_CASE("luhn32", "[protocol]") {
     REQUIRE(!l32::validate("MFZWI3DBONSGY"));
 }
 
-TEST_CASE("device_id", "[protocol]") {
+TEST_CASE("device_id", "[model]") {
     auto cert_path = file_path("/data/sample-cert.pem");
     auto key_path = file_path("/data/sample-key.pem");
     auto load_result = load_pair(cert_path.c_str(), key_path.c_str());

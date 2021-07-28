@@ -69,6 +69,8 @@ void controller_actor_t::update(proto::ClusterConfig &config) noexcept {
             }
         }
     }
+    file_iterator.reset();
+    block_iterator.reset();
 }
 
 void controller_actor_t::ready() noexcept {
@@ -235,6 +237,8 @@ void controller_actor_t::on_store_folder_info(message::store_folder_info_respons
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept { update(*message); }
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
+    file_iterator.reset();
+    block_iterator.reset();
     auto &folder_id = message->folder();
     auto folder = cluster->get_folders().by_id(folder_id);
     if (!folder) {

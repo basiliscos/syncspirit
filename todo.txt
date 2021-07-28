@@ -1,4 +1,3 @@
-- [controller] reset iterartos on cluster/index updates
 - test: block_iterator
 - test: fs_actor, deleted file from index
 - test: continue downloading temporaries
@@ -12,6 +11,7 @@
 - symlinks
 - folders
 - metadata (timestamp, etc.)
+- cluster is update by 3rd party
 
 - config & tui
  - игнорированные девайсы: показать, удалить
