@@ -1,8 +1,8 @@
-- test: block_iterator
+- test: controller: message_update
 - test: fs_actor, deleted file from index
 - test: continue downloading temporaries
-- inactivity-shutdowner
 - fs_actor: fsync/fsync_data on file end?
+- inactivity-shutdowner
 - when file downloading complete, update in DB it's sequence
 - start syncing folder when new folder has been added, нужно слать cancel{}
 - void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept { std::abort(); }
