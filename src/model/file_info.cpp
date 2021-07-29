@@ -171,7 +171,12 @@ void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
     }
 }
 
-blocks_interator_t file_info_t::iterate_blocks() noexcept { return blocks_interator_t(blocks, local_blocks); }
+blocks_interator_t file_info_t::iterate_blocks() noexcept {
+    if (status == file_status_t::older) {
+        return blocks_interator_t(blocks, local_blocks);
+    }
+    return blocks_interator_t();
+}
 
 void file_info_t::clone_block(file_info_t &source, std::size_t src_block_index, std::size_t dst_block_index) noexcept {
     std::abort();

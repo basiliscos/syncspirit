@@ -50,10 +50,11 @@ TEST_CASE("block iterator", "[model]") {
         *info.add_blocks() = b2;
 
         auto file = file_info_t(info, folder.get());
-        auto bi = file.iterate_blocks();
-        REQUIRE((bool)bi);
 
         SECTION("normal iteration") {
+            auto bi = file.iterate_blocks();
+            REQUIRE((bool)bi);
+
             auto r1 = bi.next();
             REQUIRE((bool)bi);
             CHECK(r1.block_index == 0);
@@ -63,15 +64,51 @@ TEST_CASE("block iterator", "[model]") {
             REQUIRE(!bi);
             CHECK(r2.block_index == 1);
             CHECK(r2.block->get_hash() == "h2");
+
+            REQUIRE(!bi);
+        }
+
+        SECTION("a block is locally available") {
+            file.mark_local_available(0);
+            auto bi = file.iterate_blocks();
+            REQUIRE((bool)bi);
+
+            auto r1 = bi.next();
+            REQUIRE((bool)bi);
+            CHECK(r1.block_index == 0);
+            CHECK(r1.block->get_hash() == "h1");
+            CHECK(r1.block->local_file().file_info == &file);
+
+            auto r2 = bi.next();
+            REQUIRE(!bi);
+            CHECK(r2.block_index == 1);
+            CHECK(r2.block->get_hash() == "h2");
+
+            REQUIRE(!bi);
         }
 
         SECTION("iteration, then reset") {
+            auto bi = file.iterate_blocks();
+            REQUIRE((bool)bi);
+
             auto r1 = bi.next();
             REQUIRE((bool)bi);
             CHECK(r1.block_index == 0);
             CHECK(r1.block->get_hash() == "h1");
 
             bi.reset();
+            REQUIRE(!bi);
+        }
+
+        SECTION("no iteration on sync") {
+            file.mark_sync();
+            auto bi = file.iterate_blocks();
+            REQUIRE(!bi);
+        }
+
+        SECTION("no iteration on newer") {
+            file.mark_newver();
+            auto bi = file.iterate_blocks();
             REQUIRE(!bi);
         }
     }
