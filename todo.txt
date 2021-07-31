@@ -1,6 +1,5 @@
-- test: controller: message_update
-- test: fs_actor, deleted file from index
 - test: continue downloading temporaries
+- test: fs_actor, deleted file from index
 - fs_actor: fsync/fsync_data on file end?
 - inactivity-shutdowner
 - when file downloading complete, update in DB it's sequence
@@ -8,8 +7,6 @@
 - void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept { std::abort(); }
 - Canonicalize, TempNameWithPrefix, TempName
 - локальные таймстемпы?
-- symlinks
-- folders
 - metadata (timestamp, etc.)
 - cluster is update by 3rd party: регать итераторы в cluster'е и инвалидировать, если надо.
 

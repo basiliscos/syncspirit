@@ -149,6 +149,27 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
         }
         current_file->mark_sync();
         return ImmediateResult::DONE;
+    } else if (current_file->is_link()) {
+        auto target = bfs::path(current_file->get_link_target());
+        log->trace("{}, creating symlink {} -> {}", identity, path.string(), target.string());
+        if (!bfs::exists(parent)) {
+            bfs::create_directories(parent, ec);
+            if (ec) {
+                log->warn("{}, error creating parent path {} : {}", identity, parent.string(), ec.message());
+                do_shutdown(make_error(ec));
+                return ImmediateResult::ERROR;
+            }
+        }
+        bfs::create_symlink(target, path, ec);
+        if (ec) {
+            log->warn("{}, error symlinking {} -> {} {} : {}", identity, path.string(), target.string(), ec.message());
+            do_shutdown(make_error(ec));
+            return ImmediateResult::ERROR;
+        }
+        current_file->mark_sync();
+        return ImmediateResult::DONE;
+        current_file->mark_sync();
+        return ImmediateResult::DONE;
     }
     return ImmediateResult::NON_IMMEDIATE;
 }

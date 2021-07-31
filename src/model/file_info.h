@@ -93,6 +93,8 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     void clone_block(file_info_t &source, std::size_t src_block_index, std::size_t dst_block_index) noexcept;
     void mark_local_available(size_t block_index) noexcept;
 
+    const std::string &get_link_target() const noexcept { return symlink_target; }
+
     bfs::path get_path() const noexcept;
 
   private:

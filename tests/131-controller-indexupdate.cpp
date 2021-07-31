@@ -62,20 +62,41 @@ void test_indexupdate_new_dirs() {
             proto::IndexUpdate iu;
             iu.set_folder(folder->id());
 
-            auto fi1 = proto::FileInfo();
-            fi1.set_name("some_dir");
-            fi1.set_type(proto::FileInfoType::DIRECTORY);
-            fi1.set_sequence(3);
+            auto fi = proto::FileInfo();
 
-            *iu.add_files() = fi1;
+            SECTION("send a folder") {
+                fi.set_name("some_dir");
+                fi.set_type(proto::FileInfoType::DIRECTORY);
+                fi.set_sequence(3);
 
-            auto iu_ptr = proto::message::IndexUpdate(std::make_unique<proto::IndexUpdate>(std::move(iu)));
-            peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(iu_ptr));
-            sup->do_process();
+                *iu.add_files() = fi;
 
-            auto path = bfs::path(root_path / "some_dir");
-            CHECK(bfs::exists(path));
-            CHECK(bfs::is_directory(path));
+                auto iu_ptr = proto::message::IndexUpdate(std::make_unique<proto::IndexUpdate>(std::move(iu)));
+                peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(iu_ptr));
+                sup->do_process();
+
+                auto path = bfs::path(root_path / "some_dir");
+                CHECK(bfs::exists(path));
+                CHECK(bfs::is_directory(path));
+            }
+
+            SECTION("send a symlink") {
+                fi.set_name("link");
+                fi.set_type(proto::FileInfoType::SYMLINK);
+                fi.set_sequence(4);
+                bfs::path target = root_path / "not-existing";
+                fi.set_symlink_target(target.string());
+
+                *iu.add_files() = fi;
+
+                auto iu_ptr = proto::message::IndexUpdate(std::make_unique<proto::IndexUpdate>(std::move(iu)));
+                peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(iu_ptr));
+                sup->do_process();
+
+                auto path = bfs::path(root_path / "link");
+                CHECK(bfs::is_symlink(path));
+                CHECK(bfs::read_symlink(path) == target);
+            }
         }
     };
     F().run();
