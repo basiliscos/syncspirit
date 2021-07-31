@@ -77,3 +77,7 @@ add_executable(130-controller-cluster 130-controller-cluster.cpp)
 target_link_libraries(130-controller-cluster syncspirit_test_lib)
 add_test(130-controller-cluster "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/130-controller-cluster")
 
+add_executable(131-controller-indexupdate 131-controller-indexupdate.cpp)
+target_link_libraries(131-controller-indexupdate syncspirit_test_lib)
+add_test(131-controller-indexupdate "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/131-controller-indexupdate")
+

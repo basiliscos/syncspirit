@@ -171,7 +171,7 @@ void folder_t::update(const proto::Folder &remote) noexcept {
     }
 }
 
-void folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept {
+template <typename Message> void folder_t::update_generic(const Message &data, const device_ptr_t &peer) noexcept {
     auto fi = folder_infos.by_id(peer->device_id.get_sha256());
     std::int64_t max_sequence = fi->get_max_sequence();
     for (int i = 0; i < data.files_size(); ++i) {
@@ -198,7 +198,6 @@ void folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexce
         mark_dirty();
     }
 
-    // fi->set_max_sequence(max_sequence);
     spdlog::trace("folder_t::update, folder_info = {} max seq = {}, device = {}", fi->get_db_key(), max_sequence,
                   peer->device_id);
     /*
@@ -210,6 +209,10 @@ void folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexce
     }
     */
 }
+
+void folder_t::update(const proto::IndexUpdate &data, const device_ptr_t &peer) noexcept { update_generic(data, peer); }
+
+void folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept { update_generic(data, peer); }
 
 void folder_t::update(local_file_map_t &local_files) noexcept {
     auto file_infos_copy = file_infos;

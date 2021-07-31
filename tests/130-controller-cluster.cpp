@@ -10,16 +10,12 @@ using namespace syncspirit::utils;
 
 void test_start_reading() {
     struct F : Fixture {
-        void setup() override {
-            peer_cluster_config = payload::cluster_config_ptr_t(new proto::ClusterConfig());
-        }
-        void main() override {
-            CHECK(peer->start_reading == 1);
-        }
+        void setup() override { peer_cluster_config = payload::cluster_config_ptr_t(new proto::ClusterConfig()); }
+        void main() override { CHECK(peer->start_reading == 1); }
     };
     F().run();
-
 }
+
 void test_new_folder() {
     using notify_t = ui::message::new_folder_notify_t;
     using notify_ptr_t = r::intrusive_ptr_t<notify_t>;
@@ -57,9 +53,9 @@ void test_new_folder() {
             peer->configure_callback = [&](auto &plugin) {
                 plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                     p.subscribe_actor(r::lambda<notify_t>([&](notify_t &msg) { notify = &msg; }), sup->get_address());
-                    p.subscribe_actor(
-                        r::lambda<message::cluster_config_t>([&](message::cluster_config_t &msg) { cluster_msg = &msg; }));
-                    });
+                    p.subscribe_actor(r::lambda<message::cluster_config_t>(
+                        [&](message::cluster_config_t &msg) { cluster_msg = &msg; }));
+                });
             };
         }
         void main() override {

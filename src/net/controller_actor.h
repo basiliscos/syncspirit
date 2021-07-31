@@ -72,6 +72,12 @@ struct controller_actor_t : public r::actor_base_t {
     void shutdown_start() noexcept override;
     bool on_unlink(const r::address_ptr_t &peer_addr) noexcept override;
 
+    struct folder_updater_t {
+        model::device_ptr_t peer;
+        virtual const std::string &id() noexcept = 0;
+        virtual void update(model::folder_t &folder) noexcept = 0;
+    };
+
   private:
     using block_response_ptr_t = r::intrusive_ptr_t<message::block_response_t>;
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
@@ -96,6 +102,7 @@ struct controller_actor_t : public r::actor_base_t {
 
     void request_block(const model::block_location_t &block) noexcept;
     void update(proto::ClusterConfig &config) noexcept;
+    void update(folder_updater_t &&updater) noexcept;
     ImmediateResult process_immediately() noexcept;
 
     void ready() noexcept;

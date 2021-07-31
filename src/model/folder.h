@@ -47,12 +47,15 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     inline const bfs::path &get_path() noexcept { return path; }
     void update(const proto::Folder &remote) noexcept;
     void update(const proto::Index &data, const device_ptr_t &peer) noexcept;
+    void update(const proto::IndexUpdate &data, const device_ptr_t &peer) noexcept;
     void update(local_file_map_t &local_files) noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
 
   private:
+    template <typename Message> void update_generic(const Message &data, const device_ptr_t &peer) noexcept;
+
     device_ptr_t device;
     std::uint64_t db_key;
     std::string _id;

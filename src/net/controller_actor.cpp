@@ -5,8 +5,21 @@
 #include <spdlog/spdlog.h>
 #include <fstream>
 
+using namespace syncspirit;
 using namespace syncspirit::net;
 namespace bfs = boost::filesystem;
+
+template <typename Message> struct typed_folder_updater_t final : controller_actor_t::folder_updater_t {
+    Message msg;
+
+    typed_folder_updater_t(model::device_ptr_t &peer_, Message &&message_) {
+        peer = peer_;
+        msg = std::move(message_);
+    }
+    const std::string &id() noexcept override { return (*msg).folder(); }
+
+    void update(model::folder_t &folder) noexcept override { return folder.update(*msg, peer); };
+};
 
 namespace {
 namespace resource {
@@ -124,6 +137,18 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
         }
         current_file->mark_sync();
         return ImmediateResult::DONE;
+    } else if (current_file->is_dir()) {
+        log->trace("{}, creating dir {}", identity, path.string());
+        if (!bfs::exists(path)) {
+            bfs::create_directories(path, ec);
+            if (ec) {
+                log->warn("{}, error creating path {} : {}", identity, parent.string(), ec.message());
+                do_shutdown(make_error(ec));
+                return ImmediateResult::ERROR;
+            }
+        }
+        current_file->mark_sync();
+        return ImmediateResult::DONE;
     }
     return ImmediateResult::NON_IMMEDIATE;
 }
@@ -237,10 +262,25 @@ void controller_actor_t::on_store_folder_info(message::store_folder_info_respons
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept { update(*message); }
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
-    file_iterator.reset();
-    block_iterator.reset();
-    auto &folder_id = message->folder();
+    update(typed_folder_updater_t(peer, std::move(message)));
+}
+
+void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
+    update(typed_folder_updater_t(peer, std::move(message)));
+}
+
+void controller_actor_t::on_message(proto::message::Request &message) noexcept { std::abort(); }
+
+void controller_actor_t::on_message(proto::message::DownloadProgress &message) noexcept { std::abort(); }
+
+void controller_actor_t::update(folder_updater_t &&updater) noexcept {
+    auto &folder_id = updater.id();
     auto folder = cluster->get_folders().by_id(folder_id);
+    if (current_file && current_file->get_folder()->id() == folder_id) {
+        log->trace("{}, resetting iterators on folder {}", identity, folder->label());
+        file_iterator.reset();
+        block_iterator.reset();
+    }
     if (!folder) {
         log->warn("{}, unknown folder {}", identity, folder_id);
         auto ec = utils::make_error_code(utils::protocol_error_code_t::unknown_folder);
@@ -248,7 +288,7 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
         auto ee = r::make_error(context, ec);
         return do_shutdown(ee);
     }
-    folder->update(*message, peer);
+    updater.update(*folder);
     auto updated = folder->is_dirty();
     log->debug("{}, folder {}/{} has been updated = {}", identity, folder_id, folder->label(), updated);
     if (updated) {
@@ -256,12 +296,6 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
         request<payload::store_folder_request_t>(db, std::move(folder)).send(timeout);
     }
 }
-
-void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept { std::abort(); }
-
-void controller_actor_t::on_message(proto::message::Request &message) noexcept { std::abort(); }
-
-void controller_actor_t::on_message(proto::message::DownloadProgress &message) noexcept { std::abort(); }
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     using request_t = fs::payload::write_request_t;

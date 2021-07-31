@@ -11,7 +11,14 @@
 - symlinks
 - folders
 - metadata (timestamp, etc.)
-- cluster is update by 3rd party
+- cluster is update by 3rd party: регать итераторы в cluster'е и инвалидировать, если надо.
+
+GUI
+1. drop tui
+2. add cli-ui, commands:
+ --add_peer KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD
+ --share_with KHQNO2 --folder "folder-id" path
+3. use wxWidgets
 
 - config & tui
  - игнорированные девайсы: показать, удалить
