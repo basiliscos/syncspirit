@@ -228,6 +228,8 @@ struct load_cluster_request_t {
 };
 
 struct cluster_ready_notify_t {
+    model::cluster_ptr_t cluster;
+    model::devices_map_t devices;
     r::extended_error_ptr_t ee;
 };
 

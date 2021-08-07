@@ -64,7 +64,7 @@ void cluster_supervisor_t::on_start() noexcept {
             scan(folder, reinterpret_cast<void *>(hanlder));
         }
     } else {
-        send<payload::cluster_ready_notify_t>(coordinator);
+        send<payload::cluster_ready_notify_t>(coordinator, cluster, *devices);
     }
 }
 
@@ -79,8 +79,8 @@ void cluster_supervisor_t::shutdown_start() noexcept {
 
 void cluster_supervisor_t::handle_scan_initial(model::folder_ptr_t &folder) noexcept {
     if (scan_folders_map.size() == 1) {
-        spdlog::debug("{}, completed intiial scan for {}", identity, folder->label());
-        send<payload::cluster_ready_notify_t>(coordinator);
+        spdlog::debug("{}, completed initial scan for {}", identity, folder->label());
+        send<payload::cluster_ready_notify_t>(coordinator, cluster, *devices);
     }
 }
 
@@ -149,7 +149,8 @@ void cluster_supervisor_t::on_create_folder(ui::message::create_folder_request_t
     auto &folder = p.folder;
     auto &source = p.source;
     auto source_index = p.source_index;
-    spdlog::trace("{}, on_create_folder, {} (from {})", identity, folder.label(), source->device_id);
+    spdlog::trace("{}, on_create_folder, {} ({})", identity, folder.label(),
+                  (source ? source->device_id.get_short() : ""));
     request<payload::store_new_folder_request_t>(db, folder, source, source_index).send(init_timeout);
 }
 

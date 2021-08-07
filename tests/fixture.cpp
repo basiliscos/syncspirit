@@ -8,10 +8,7 @@ using namespace syncspirit::model;
 using namespace syncspirit::net;
 
 Fixture::Fixture() {
-    std::string prompt = "> ";
-    std::mutex std_out_mutex;
-    utils::set_default("trace", prompt, std_out_mutex, false);
-
+    utils::set_default("trace");
 }
 
 void Fixture::run() {
