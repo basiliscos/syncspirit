@@ -18,7 +18,7 @@ using supervisor_t = rotor::asio::supervisor_asio_t;
 
 namespace {
 
-using configure_callback_t = std::function<void(r::plugin::plugin_base_t&)>;
+using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
 
 struct sample_coordinator_t : r::actor_base_t {
     using message_t = message::cluster_ready_notify_t;
@@ -119,9 +119,7 @@ struct Fixture {
 
 void test_start_empty_cluster() {
     struct F : Fixture {
-        void main() override {
-            REQUIRE(coord->cluster_ready);
-        }
+        void main() override { REQUIRE(coord->cluster_ready); }
     };
     F().run();
 }
@@ -134,10 +132,9 @@ void test_add_new_folder() {
         response_ptr_t res;
 
         void pre_run() override {
-            coord->configure_callback = [&](r::plugin::plugin_base_t& plugin) {
-                plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                    p.subscribe_actor(r::lambda<response_t>([&](response_t &msg) { res = &msg; }));
-                });
+            coord->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
+                plugin.template with_casted<r::plugin::starter_plugin_t>(
+                    [&](auto &p) { p.subscribe_actor(r::lambda<response_t>([&](response_t &msg) { res = &msg; })); });
             };
         }
         void main() override {
