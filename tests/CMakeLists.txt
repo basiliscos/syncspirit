@@ -73,6 +73,10 @@ add_executable(080-fs 080-fs.cpp)
 target_link_libraries(080-fs syncspirit_test_lib)
 add_test(080-fs "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/080-fs")
 
+add_executable(125-cluster-supervisor 125-cluster-supervisor.cpp)
+target_link_libraries(125-cluster-supervisor syncspirit_test_lib)
+add_test(125-cluster-supervisor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/125-cluster-supervisor")
+
 add_executable(130-controller-cluster 130-controller-cluster.cpp)
 target_link_libraries(130-controller-cluster syncspirit_test_lib)
 add_test(130-controller-cluster "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/130-controller-cluster")

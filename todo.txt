@@ -1,4 +1,6 @@
 - test: cluster_supervisor, create new folder
+- test: cluster_supervisor, share folder
+
 -- syncspirit-daemon --share folder_id_or_folder_label:device_id_or_short_device_id_or_device_label
 
 - test: continue downloading temporaries

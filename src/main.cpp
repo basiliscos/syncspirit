@@ -148,11 +148,11 @@ int main(int argc, char **argv) {
         /* pre-init actors */
         asio::io_context io_context;
         ra::system_context_ptr_t sys_context{new ra::system_context_asio_t{io_context}};
-        auto stand = std::make_shared<asio::io_context::strand>(io_context);
+        auto strand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                            .app_config(cfg)
-                           .strand(stand)
+                           .strand(strand)
                            .timeout(timeout)
                            .create_registry()
                            .guard_context(true)
