@@ -11,6 +11,8 @@ enum class error_code_t {
     invalid_device_id,
     missing_device_label,
     missing_folder_label,
+    missing_folder,
+    missing_device,
     missing_folder_path,
 };
 

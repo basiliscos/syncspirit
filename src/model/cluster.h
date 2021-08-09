@@ -57,6 +57,7 @@ struct cluster_t : arc_base_t<cluster_t> {
     block_infos_map_t &get_blocks() noexcept;
     folders_map_t &get_folders() noexcept;
     void add_folder(const folder_ptr_t &folder) noexcept;
+    inline const device_ptr_t &get_device() const noexcept { return device; }
 
   private:
     device_ptr_t device;

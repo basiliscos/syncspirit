@@ -22,6 +22,12 @@ std::string error_code_category::message(int c) const {
     case error_code_t::missing_folder_label:
         r = "folder label is missing";
         break;
+    case error_code_t::missing_folder:
+        r = "folder is missing";
+        break;
+    case error_code_t::missing_device:
+        r = "device is is missing";
+        break;
     case error_code_t::missing_folder_path:
         r = "folder path is missing";
         break;

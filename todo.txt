@@ -1,12 +1,10 @@
-- test: cluster_supervisor, create new folder
+-- syncspirit-daemon --share folder=id_or_folder_label:device=id_or_short_device_id_or_device_label
 - test: cluster_supervisor, share folder
-
--- syncspirit-daemon --share folder_id_or_folder_label:device_id_or_short_device_id_or_device_label
+- store_new_folder_request_t: выкинуть peer, peer_source
 
 - test: continue downloading temporaries
 - test: fs_actor, deleted file from index
-- test: add new folder  -> scan
-- test: share folder -> index is sent
+- test: controlle, share folder -> index is sent
 - fs_actor: fsync/fsync_data on file end?
 - inactivity-shutdowner
 - when file downloading complete, update in DB it's sequence

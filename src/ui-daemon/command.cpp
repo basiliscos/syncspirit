@@ -2,6 +2,7 @@
 #include "error_code.h"
 #include "command/add_peer.h"
 #include "command/add_folder.h"
+#include "command/share_folder.h"
 
 namespace syncspirit::daemon {
 
@@ -15,6 +16,8 @@ outcome::result<command_ptr_t> command_t::parse(const std::string_view &in) noex
         return command::add_peer_t::construct(in.substr(colon + 1));
     } else if (cmd == "add_folder") {
         return command::add_folder_t::construct(in.substr(colon + 1));
+    } else if (cmd == "share") {
+        return command::share_folder_t::construct(in.substr(colon + 1));
     }
     return make_error_code(error_code_t::unknown_command);
 }

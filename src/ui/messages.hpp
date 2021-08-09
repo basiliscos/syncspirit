@@ -73,6 +73,14 @@ struct create_folder_request_t {
     std::uint64_t source_index;
 };
 
+struct share_folder_response_t {};
+
+struct share_folder_request_t {
+    using response_t = share_folder_response_t;
+    model::folder_ptr_t folder;
+    model::device_ptr_t peer;
+};
+
 } // namespace payload
 
 namespace message {
@@ -98,6 +106,9 @@ using ignore_folder_response_t = r::request_traits_t<payload::ignore_folder_requ
 
 using update_peer_request_t = r::request_traits_t<payload::update_peer_request_t>::request::message_t;
 using update_peer_response_t = r::request_traits_t<payload::update_peer_request_t>::response::message_t;
+
+using share_folder_request_t = r::request_traits_t<payload::share_folder_request_t>::request::message_t;
+using share_folder_response_t = r::request_traits_t<payload::share_folder_request_t>::response::message_t;
 
 } // namespace message
 

@@ -2,40 +2,10 @@
 #include "../governor_actor.h"
 #include "../error_code.h"
 #include "../../utils/base32.h"
-#include <optional>
+#include "pair_iterator.h"
 #include <random>
 
 namespace bfs = boost::filesystem;
-
-struct pair_iterator_t {
-    using pair_t = std::pair<std::string_view, std::string_view>;
-
-    pair_iterator_t(const std::string_view &in_) noexcept : in(in_) {}
-
-    std::optional<pair_t> next() noexcept {
-        auto colon = in.find(":");
-        if (colon == in.npos) {
-            colon = in.size();
-        }
-
-        auto it = in.substr(0, colon);
-        auto eq = it.find("=");
-        if (eq == it.npos) {
-            return {};
-        }
-
-        auto f = in.substr(0, eq);
-        auto s = in.substr(eq + 1, colon - (eq + 1));
-        if (colon < in.size()) {
-            in = in.substr(colon + 1);
-        } else {
-            in = "";
-        }
-        return pair_t{f, s};
-    }
-
-    std::string_view in;
-};
 
 namespace syncspirit::daemon::command {
 

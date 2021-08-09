@@ -38,6 +38,7 @@ struct governor_actor_t : public r::actor_base_t {
 
     void cmd_add_peer(const model::device_ptr_t &peer) noexcept;
     void cmd_add_folder(const db::Folder &folder) noexcept;
+    void cmd_share_folder(const model::folder_ptr_t &folder, const model::device_ptr_t &device) noexcept;
 
     r::address_ptr_t coordinator;
     r::address_ptr_t cluster;
@@ -51,6 +52,7 @@ struct governor_actor_t : public r::actor_base_t {
     void on_cluster_ready(net::message::cluster_ready_notify_t &message) noexcept;
     void on_update_peer(ui::message::update_peer_response_t &message) noexcept;
     void on_folder_create(ui::message::create_folder_response_t &message) noexcept;
+    void on_folder_share(ui::message::share_folder_response_t &message) noexcept;
 };
 
 } // namespace syncspirit::daemon
