@@ -127,9 +127,9 @@ void ssdp_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::timer);
     if (!cancelled) {
         spdlog::debug("{}, on_timer_trigger", identity);
-        auto ec = r::make_error_code(r::shutdown_code_t::normal);
-        return do_shutdown(make_error(ec));
     }
+    auto ec = r::make_error_code(r::shutdown_code_t::normal);
+    return do_shutdown(make_error(ec));
 }
 
 void ssdp_actor_t::timer_cancel() noexcept {

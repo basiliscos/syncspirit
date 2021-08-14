@@ -187,7 +187,7 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     return block_size * block_index;
 }
 
-void file_info_t::mark_local_available(size_t block_index) noexcept {
+bool file_info_t::mark_local_available(size_t block_index) noexcept {
     blocks[block_index]->mark_local_available(this);
     assert(local_blocks.size() == block_index);
     local_blocks.emplace_back(blocks[block_index]);
@@ -195,7 +195,9 @@ void file_info_t::mark_local_available(size_t block_index) noexcept {
         spdlog::info("{}/{} is sync", folder->label(), get_name());
         status = file_status_t::sync;
         mark_dirty();
+        return true;
     }
+    return false;
 }
 
 bfs::path file_info_t::get_path() const noexcept { return folder->get_path() / std::string(get_name()); }

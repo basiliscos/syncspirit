@@ -1,5 +1,4 @@
 - controller: параллельно запрашивать блоки, так чтобы размер был прибл. равен размеру входящего буфера
-- fs_actor: offload received block hash validatation
 - model: когда добавляется symlink, папка
 - store_new_folder_request_t: выкинуть peer, peer_source
 - test: continue downloading temporaries

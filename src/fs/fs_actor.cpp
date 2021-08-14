@@ -1,6 +1,7 @@
 #include "fs_actor.h"
 #include "../net/names.h"
 #include "../utils/error_code.h"
+#include "../utils/tls.h"
 #include "utils.h"
 #include <spdlog/spdlog.h>
 #include <fstream>
@@ -243,9 +244,20 @@ void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
     auto path = make_temporal(payload.path);
     auto parent = path.parent_path();
     auto &data = payload.data;
+
+    char digest_buff[SHA256_DIGEST_LENGTH];
+    utils::digest(data.data(), data.size(), digest_buff);
+    std::string_view digest(digest_buff, SHA256_DIGEST_LENGTH);
+    if (digest != payload.hash) {
+        auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
+        std::string context = fmt::format("digest mismatch for {}", path.string());
+        auto ee = r::make_error(context, ec);
+        spdlog::warn("{}, on_write_request, digest mismatch: {}", identity, context);
+        return reply_with_error(req, ee);
+    }
+
     sys::error_code ec;
     bool exists = bfs::exists(parent, ec);
-
     if (!exists) {
         bfs::create_directories(parent, ec);
         if (ec) {

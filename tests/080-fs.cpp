@@ -5,6 +5,7 @@
 #include "db/utils.h"
 #include "fs/utils.h"
 #include "fs/fs_actor.h"
+#include "utils/error_code.h"
 #include <ostream>
 #include <fstream>
 #include <stdio.h>
@@ -194,8 +195,8 @@ struct write_consumer_t : r::actor_base_t {
 
     void on_response(message::write_response_t &res) noexcept { response = &res; }
 
-    void make_request(bfs::path path, const std::string &data, bool final) noexcept {
-        request<payload::write_request_t>(fs_actor, path, data, final).send(init_timeout);
+    void make_request(bfs::path path, const std::string &data, const std::string &hash, bool final) noexcept {
+        request<payload::write_request_t>(fs_actor, path, data, hash, final).send(init_timeout);
     }
 };
 
@@ -318,10 +319,15 @@ TEST_CASE("fs-actor", "[fs]") {
         auto act = sup->create_actor<write_consumer_t>().timeout(timeout).finish();
         sup->do_process();
 
+        const std::string data = "123456980";
+        std::string hash;
+        hash.resize(SHA256_DIGEST_LENGTH);
+        utils::digest(data.data(), data.size(), hash.data());
+
         SECTION("success case") {
             auto path = root_path / "my-file";
-            const std::string data = "123456980";
-            act->make_request(path, data, false);
+
+            act->make_request(path, data, hash, false);
             sup->do_process();
 
             REQUIRE(act->response);
@@ -342,7 +348,8 @@ TEST_CASE("fs-actor", "[fs]") {
             SECTION("append/final") {
                 act->response.reset();
                 const std::string tail = "abcdefg";
-                act->make_request(path, tail, true);
+                utils::digest(tail.data(), tail.size(), hash.data());
+                act->make_request(path, tail, hash, true);
                 sup->do_process();
                 REQUIRE(act->response);
                 auto &r = act->response->payload;
@@ -353,14 +360,27 @@ TEST_CASE("fs-actor", "[fs]") {
 
         SECTION("success case in subfolder") {
             auto path = root_path / "dir" / "my-file";
-            const std::string data = "123456980";
-            act->make_request(path, data, false);
+            act->make_request(path, data, hash, false);
             sup->do_process();
 
             REQUIRE(act->response);
             auto &r = act->response->payload;
             CHECK(!r.ee);
             CHECK(read_file(root_path / "dir" / "my-file.syncspirit-tmp") == data);
+        }
+
+        SECTION("wrong hash") {
+            auto path = root_path / "my-file-with-wrong-hash";
+            hash[0] = hash[0] * -1;
+            act->make_request(path, data, hash, false);
+            sup->do_process();
+
+            REQUIRE(act->response);
+            auto &r = act->response->payload;
+            CHECK(!bfs::exists(path));
+            CHECK(r.ee);
+            auto ec = r.ee->ec;
+            CHECK(ec.value() == (int)utils::protocol_error_code_t::digest_mismatch);
         }
     }
 
@@ -371,7 +391,11 @@ TEST_CASE("fs-actor", "[fs]") {
 
         auto path = root_path / "my-file";
         const std::string data = "123456980";
-        writer->make_request(path, data, false);
+        std::string hash;
+        hash.resize(SHA256_DIGEST_LENGTH);
+        utils::digest(data.data(), data.size(), hash.data());
+
+        writer->make_request(path, data, hash, false);
         sup->do_process();
         REQUIRE(writer->response);
         CHECK(!writer->response->payload.ee);

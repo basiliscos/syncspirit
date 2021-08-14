@@ -346,11 +346,12 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     }
 #endif
 
-    bool final = file->get_blocks().size() == block_index + 1;
+    auto &blocks = file->get_blocks();
+    bool final = file->mark_local_available(payload.block_index);
     auto path = file->get_path();
-    // request another block while the current is going to be flushed to disk
-    auto request_id = request<request_t>(fs, path, std::move(data), final).send(init_timeout);
-    file->mark_local_available(payload.block_index);
+    auto &hash = payload.block->get_hash();
+    auto request_id = request<request_t>(fs, path, std::move(data), hash, final).send(init_timeout);
+    // request more blocks while the current is going to be flushed to disk
     ready();
     responses_map.emplace(request_id, &message);
 }

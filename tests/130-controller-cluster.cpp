@@ -131,7 +131,7 @@ void test_new_folder() {
                         sup->do_process();
                         CHECK(!bfs::exists(path));
                         auto ec = controller->get_shutdown_reason()->next->ec;
-                        CHECK(ec.value() == (int)protocol_error_code_t::digest_mismatch);
+                        CHECK(ec.value() == (int)utils::protocol_error_code_t::digest_mismatch);
                     }
                 }
 

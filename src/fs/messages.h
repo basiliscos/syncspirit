@@ -47,6 +47,7 @@ struct write_request_t {
     using response_t = write_response_t;
     bfs::path path;
     std::string data;
+    std::string hash;
     bool final;
 };
 

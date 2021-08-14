@@ -81,15 +81,16 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
-    spdlog::trace("{}, on_child_shutdown, {} due to {} ", identity, actor->get_identity(), reason->message());
+    spdlog::trace("{}, on_child_shutdown, '{}' due to {} ", identity, actor->get_identity(), reason->message());
     auto &child_addr = actor->get_address();
     if (ssdp_addr && child_addr == ssdp_addr) {
         ssdp_addr.reset();
-        auto ssdp = (reason->ec != r::shutdown_code_t::normal && state == r::state_t::OPERATIONAL);
+        auto &ec = reason->root()->ec;
+        auto ssdp = (ec != r::shutdown_code_t::normal && state == r::state_t::OPERATIONAL);
         if (ssdp) {
             launch_ssdp();
-            return;
         }
+        return;
     }
     if (local_discovery_addr && child_addr == local_discovery_addr) {
         local_discovery_addr.reset();
