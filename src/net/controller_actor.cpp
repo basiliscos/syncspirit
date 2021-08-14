@@ -331,6 +331,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto &data = message.payload.res.data;
     auto block_index = payload.block_index;
 
+#if 0
     static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
     char digest_buff[SZ];
     utils::digest(data.data(), data.size(), digest_buff);
@@ -343,6 +344,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
         log->warn("{}, on block, digest mismatch: {}", identity, name, context);
         return do_shutdown(ee);
     }
+#endif
 
     bool final = file->get_blocks().size() == block_index + 1;
     auto path = file->get_path();

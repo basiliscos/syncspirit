@@ -285,7 +285,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     assert(read_action);
     resources->release(resource::io);
     rx_idx += bytes;
-    log->trace("{}, on_read, {} bytes, total = {}", identity, bytes, rx_idx);
+    // log->trace("{}, on_read, {} bytes, total = {}", identity, bytes, rx_idx);
     auto buff = asio::buffer(rx_buff.data(), rx_idx);
     auto result = proto::parse_bep(buff);
     if (result.has_error()) {
@@ -295,7 +295,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     }
     auto &value = result.value();
     if (!value.consumed) {
-        log->trace("{}, on_read :: incomplete message", identity);
+        // log->trace("{}, on_read :: incomplete message", identity);
         return read_more();
     }
 

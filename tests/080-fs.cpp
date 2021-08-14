@@ -278,6 +278,39 @@ TEST_CASE("fs-actor", "[fs]") {
             CHECK(*b1 == *b2);
             CHECK(b1 == b2);
         }
+
+        SECTION("symlink") {
+            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+            auto file = root_path / "my-file";
+            bfs::create_symlink("to-some-where", file);
+            sup->do_process();
+            CHECK(act->errors.empty());
+            REQUIRE(act->response);
+            auto &r = act->response->payload.map_info;
+            REQUIRE(!r->map.empty());
+            auto it = r->map.begin();
+            CHECK(it->first == "my-file");
+            auto &local = it->second;
+            CHECK(local.blocks.size() == 0);
+            CHECK(local.file_type == model::local_file_t::symlink);
+            CHECK(local.symlink_target == "to-some-where");
+        }
+
+        SECTION("dir") {
+            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+            auto dir = root_path / "my-dir";
+            bfs::create_directory(dir);
+            sup->do_process();
+            CHECK(act->errors.empty());
+            REQUIRE(act->response);
+            auto &r = act->response->payload.map_info;
+            REQUIRE(!r->map.empty());
+            auto it = r->map.begin();
+            CHECK(it->first == "my-dir");
+            auto &local = it->second;
+            CHECK(local.blocks.size() == 0);
+            CHECK(local.file_type == model::local_file_t::dir);
+        }
     };
 
     SECTION("write") {

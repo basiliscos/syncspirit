@@ -33,9 +33,9 @@ name = 'default'
 level = 'trace'
 sinks = ['stdout']
 
-[[log]]
-name = 'net.peer_actor'
-level = 'trace'
+# [[log]]
+# name = 'net.peer_actor'
+# level = 'trace'
 
 [main]
 default_location = '/tmp/syncspirit'

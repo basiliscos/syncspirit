@@ -1,10 +1,11 @@
--- syncspirit-daemon --share folder=id_or_folder_label:device=id_or_short_device_id_or_device_label
-- test: cluster_supervisor, share folder
+- controller: параллельно запрашивать блоки, так чтобы размер был прибл. равен размеру входящего буфера
+- fs_actor: offload received block hash validatation
+- model: когда добавляется symlink, папка
 - store_new_folder_request_t: выкинуть peer, peer_source
-
 - test: continue downloading temporaries
 - test: fs_actor, deleted file from index
-- test: controlle, share folder -> index is sent
+- test: controller, share folder -> index is sent
+- test: wrong digest
 - fs_actor: fsync/fsync_data on file end?
 - inactivity-shutdowner
 - when file downloading complete, update in DB it's sequence

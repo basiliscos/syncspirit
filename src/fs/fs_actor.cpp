@@ -142,6 +142,12 @@ void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
     }
 
     auto &p = payload.request->payload;
+    auto &container = payload.file_map->map;
+    if (dir != p.root) {
+        auto rel_path = syncspirit::fs::relative(dir, p.root);
+        container[rel_path.path].file_type = model::local_file_t::file_type_t::dir;
+    }
+
     for (auto it = bfs::directory_iterator(dir); it != bfs::directory_iterator(); ++it) {
         auto &child = *it;
         bool is_dir = bfs::is_directory(child, ec);
@@ -171,9 +177,16 @@ void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
                     }
                 }
             } else {
+                auto rel_path = syncspirit::fs::relative(child, p.root);
                 bool is_sim = bfs::is_symlink(child, ec);
                 if (!ec && is_sim) {
-                    std::abort();
+                    auto target = bfs::read_symlink(child, ec);
+                    if (!ec) {
+                        auto &local_info = container[rel_path.path];
+                        local_info.file_type = model::local_file_t::file_type_t::symlink;
+                        local_info.symlink_target = target;
+                    }
+                    continue;
                 }
             }
         }
