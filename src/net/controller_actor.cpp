@@ -330,22 +330,6 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto &file = payload.file;
     auto &data = message.payload.res.data;
     auto block_index = payload.block_index;
-
-#if 0
-    static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
-    char digest_buff[SZ];
-    utils::digest(data.data(), data.size(), digest_buff);
-    std::string_view digest(digest_buff, SZ);
-    if (digest != message.payload.req->payload.request_payload.block->get_hash()) {
-        auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-        auto name = file->get_full_name();
-        std::string context = fmt::format("block {} from {}", block_index, name);
-        auto ee = r::make_error(context, ec);
-        log->warn("{}, on block, digest mismatch: {}", identity, name, context);
-        return do_shutdown(ee);
-    }
-#endif
-
     auto &blocks = file->get_blocks();
     bool final = file->mark_local_available(payload.block_index);
     auto path = file->get_path();
