@@ -31,7 +31,7 @@ controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device{config.device}, peer{config.peer},
       peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, peer_cluster_config{std::move(
                                                                                 config.peer_cluster_config)},
-      ignored_folders{config.ignored_folders}, sync_state{sync_state_t::none} {
+      ignored_folders{config.ignored_folders}, request_pool{config.bep_config.rx_buff_size} {
     log = utils::get_logger("net.controller_actor");
 }
 
@@ -86,12 +86,7 @@ void controller_actor_t::update(proto::ClusterConfig &config) noexcept {
     block_iterator.reset();
 }
 
-void controller_actor_t::ready() noexcept {
-    if (!(substate & READY)) {
-        send<payload::ready_signal_t>(get_address());
-        substate = substate | READY;
-    }
-}
+void controller_actor_t::ready() noexcept { send<payload::ready_signal_t>(get_address()); }
 
 void controller_actor_t::shutdown_start() noexcept {
     send<payload::termination_t>(peer_addr, shutdown_reason);
@@ -176,8 +171,11 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     log->trace("{}, on_ready", identity);
-    substate = substate & ~READY;
-    if ((substate & BLOCK) || (state != r::state_t::OPERATIONAL)) {
+    if ((blocks_requested > 2 && request_pool < 0) || (state != r::state_t::OPERATIONAL)) {
+        return;
+    }
+
+    if (!file_iterator && !block_iterator && blocks_requested) {
         return;
     }
 
@@ -200,6 +198,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
             ready();
         } else {
             request_block(cluster_block);
+            ready();
         }
         if (!block_iterator) {
             log->trace("{}, there are no more blocks for {}", identity, current_file->get_full_name());
@@ -221,11 +220,13 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
 }
 
 void controller_actor_t::request_block(const model::block_location_t &block) noexcept {
+    auto sz = block.block->get_size();
     log->trace("{} request_block, file = {}, block index = {}, sz = {}", identity, current_file->get_full_name(),
-               block.block_index, block.block->get_size());
+               block.block_index, sz);
     request<payload::block_request_t>(peer_addr, current_file, model::block_info_ptr_t{block.block}, block.block_index)
         .send(request_timeout);
-    substate = substate | BLOCK;
+    ++blocks_requested;
+    request_pool -= sz;
 }
 
 bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {
@@ -234,9 +235,6 @@ bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {
         auto &device = it->second;
         log->debug("{}, on_unlink with {}", identity, device->device_id);
         peers_map.erase(it);
-        if (peers_map.empty()) {
-            sync_state = sync_state_t::none;
-        }
         resources->release(resource::peer);
         return false;
     }
@@ -320,12 +318,13 @@ void controller_actor_t::update(folder_updater_t &&updater) noexcept {
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     using request_t = fs::payload::write_request_t;
-    substate = substate & ~BLOCK;
+    --blocks_requested;
     auto ee = message.payload.ee;
     if (ee) {
         log->warn("{}, can't receive block : {}", identity, ee->message());
         return do_shutdown(ee);
     }
+
     auto &payload = message.payload.req->payload.request_payload;
     auto &file = payload.file;
     auto &data = message.payload.res.data;
@@ -333,7 +332,10 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto &blocks = file->get_blocks();
     bool final = file->mark_local_available(payload.block_index);
     auto path = file->get_path();
-    auto &hash = payload.block->get_hash();
+    auto &block = *payload.block;
+    auto &hash = block.get_hash();
+    request_pool += block.get_size();
+
     auto request_id = request<request_t>(fs, path, std::move(data), hash, final).send(init_timeout);
     // request more blocks while the current is going to be flushed to disk
     ready();
@@ -341,18 +343,20 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
 }
 
 void controller_actor_t::on_write(fs::message::write_response_t &message) noexcept {
-    auto &ee = message.payload.ee;
+    auto &payload = message.payload;
+    auto &ee = payload.ee;
     if (ee) {
         log->warn("{}, on_write failed : {}", identity, ee->message());
         return do_shutdown(ee);
     }
-    auto it = responses_map.find(message.payload.request_id());
+    auto it = responses_map.find(payload.request_id());
     assert(it != responses_map.end());
     auto block_res = it->second;
     responses_map.erase(it);
     auto &p = block_res->payload.req->payload.request_payload;
     auto &file = p.file;
-    if (file->get_status() == model::file_status_t::sync) {
+    auto final = payload.req->payload.request_payload.final;
+    if (file->get_status() == model::file_status_t::sync && final) {
         auto folder = file->get_folder();
         auto fi = folder->get_folder_info(device);
         auto seq = fi->get_max_sequence();
@@ -361,8 +365,8 @@ void controller_actor_t::on_write(fs::message::write_response_t &message) noexce
             log->trace("{}, updated max sequence '{}' on local device: {} -> {}", identity, folder->label(), seq,
                        new_seq);
             fi->update_max_sequence(new_seq);
+            request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
         }
-        request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
     }
     ready();
 }

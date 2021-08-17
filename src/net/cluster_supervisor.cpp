@@ -217,6 +217,7 @@ void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexce
     auto peer = devices->by_id(device_id.get_sha256());
     auto &cluster_config = payload.cluster_config;
     auto addr = create_actor<controller_actor_t>()
+                    .bep_config(bep_config)
                     .timeout(init_timeout * 7 / 9)
                     .device(device)
                     .peer(peer)

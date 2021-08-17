@@ -119,6 +119,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     std::string db_key; /* folder_info db key + name */
     blocks_t blocks;
     blocks_t local_blocks;
+    size_t local_blocks_count = 0;
     file_status_t status = file_status_t::older;
 };
 

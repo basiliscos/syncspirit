@@ -10,6 +10,7 @@ namespace syncspirit {
 namespace net {
 
 struct controller_actor_config_t : r::actor_config_t {
+    config::bep_config_t bep_config;
     model::cluster_ptr_t cluster;
     model::device_ptr_t device;
     model::device_ptr_t peer;
@@ -23,6 +24,11 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
     using builder_t = typename Actor::template config_builder_t<Actor>;
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
+
+    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
+        parent_t::config.bep_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 
     builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
         parent_t::config.cluster = value;
@@ -60,8 +66,6 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
     }
 };
 
-enum class sync_state_t { none, syncing, paused };
-
 struct controller_actor_t : public r::actor_base_t {
     using config_t = controller_actor_config_t;
     template <typename Actor> using config_builder_t = controller_actor_config_builder_t<Actor>;
@@ -83,7 +87,6 @@ struct controller_actor_t : public r::actor_base_t {
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     using responses_map_t = std::unordered_map<r::request_id_t, block_response_ptr_t>;
 
-    enum SubState { READY = 1 << 0, BLOCK = 1 << 1 };
     enum class ImmediateResult { DONE, NON_IMMEDIATE, ERROR };
 
     void on_forward(message::forwarded_message_t &message) noexcept;
@@ -117,14 +120,14 @@ struct controller_actor_t : public r::actor_base_t {
     pt::time_duration request_timeout;
     payload::cluster_config_ptr_t peer_cluster_config;
     model::ignored_folders_map_t *ignored_folders;
-    sync_state_t sync_state;
     peers_map_t peers_map;
     responses_map_t responses_map;
 
     model::file_interator_t file_iterator;
     model::file_info_ptr_t current_file;
     model::blocks_interator_t block_iterator;
-    int substate = 0;
+    std::uint_fast32_t blocks_requested = 0;
+    ino64_t request_pool;
     utils::logger_t log;
 };
 

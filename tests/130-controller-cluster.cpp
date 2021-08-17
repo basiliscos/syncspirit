@@ -99,7 +99,7 @@ void test_new_folder() {
             proto::Index index;
             index.set_folder(folder->id());
 
-            SECTION("file with content") {
+            SECTION("file with content (1 and 0 blocks)") {
                 auto block_info = proto::BlockInfo();
                 block_info.set_size(5);
                 block_info.set_hash(utils::sha256_digest("12345").value());
@@ -121,13 +121,13 @@ void test_new_folder() {
                     peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
 
                     SECTION("correct small block") {
-                        peer->responses.push_back("12345");
+                        peer->push_response("12345");
                         sup->do_process();
                         CHECK(read_file(path) == "12345");
                     }
 
                     SECTION("block hash mismatches") {
-                        peer->responses.push_back("1234");
+                        peer->push_response("1234");
                         sup->do_process();
                         CHECK(!bfs::exists(path));
                         auto ec = controller->get_shutdown_reason()->next->ec;
@@ -143,6 +143,53 @@ void test_new_folder() {
                     sup->do_process();
                     REQUIRE(bfs::exists(path));
                     CHECK(bfs::file_size(path) == 0);
+                }
+            }
+
+            SECTION("file with content (2 blocks)") {
+                auto bi1 = proto::BlockInfo();
+                bi1.set_size(5);
+                bi1.set_hash(utils::sha256_digest("12345").value());
+
+                auto bi2 = proto::BlockInfo();
+                bi2.set_size(5);
+                bi2.set_hash(utils::sha256_digest("67890").value());
+
+                auto fi = proto::FileInfo();
+                fi.set_name("a.txt");
+                fi.set_type(proto::FileInfoType::FILE);
+                fi.set_sequence(5);
+                fi.set_block_size(5);
+
+                auto path = dir / "a.txt";
+                SECTION("direct order") {
+                    fi.set_size(5);
+                    *fi.add_blocks() = bi1;
+                    *fi.add_blocks() = bi2;
+                    *index.add_files() = fi;
+
+                    auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                    peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
+
+                    peer->push_response("12345");
+                    peer->push_response("67890");
+                    sup->do_process();
+                    CHECK(read_file(path) == "1234567890");
+                }
+
+                SECTION("indirect order") {
+                    fi.set_size(5);
+                    *fi.add_blocks() = bi1;
+                    *fi.add_blocks() = bi2;
+                    *index.add_files() = fi;
+
+                    auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                    peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
+
+                    peer->push_response("67890", 1);
+                    peer->push_response("12345", 0);
+                    sup->do_process();
+                    CHECK(read_file(path) == "1234567890");
                 }
             }
 
