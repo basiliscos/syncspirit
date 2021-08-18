@@ -516,9 +516,7 @@ void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
 void peer_actor_t::handle_response(proto::message::Response &&message) noexcept {
     auto id = message->id();
     log->trace("{}, handle_response, message id = {}", identity, id);
-    auto predicate = [id = id](const block_request_ptr_t& it) {
-        return ((std::int32_t)it->payload.id) == id;
-    };
+    auto predicate = [id = id](const block_request_ptr_t &it) { return ((std::int32_t)it->payload.id) == id; };
     auto it = std::find_if(block_requests.begin(), block_requests.end(), predicate);
     if (it == block_requests.end()) {
         log->warn("{}, response for unexpected request id {}", identity, id);

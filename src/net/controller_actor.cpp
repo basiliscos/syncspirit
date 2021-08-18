@@ -335,11 +335,13 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto &block = *payload.block;
     auto &hash = block.get_hash();
     request_pool += block.get_size();
-    if (final) { ++final_blocks; }
+    if (final) {
+        ++final_blocks;
+    }
     auto offset = file->get_block_offset(block_index);
 
     intrusive_ptr_add_ref(&message);
-    auto ptr = (void*)&message;
+    auto ptr = (void *)&message;
     auto request_id = request<request_t>(fs, path, offset, std::move(data), hash, ptr, final).send(init_timeout);
     ready();
 }
@@ -352,7 +354,7 @@ void controller_actor_t::on_write(fs::message::write_response_t &message) noexce
         return do_shutdown(ee);
     }
 
-    auto block_res = reinterpret_cast<message::block_response_t*>(payload.req->payload.request_payload.custom);
+    auto block_res = reinterpret_cast<message::block_response_t *>(payload.req->payload.request_payload.custom);
     auto &p = block_res->payload.req->payload.request_payload;
     auto &file = p.file;
     auto final = payload.req->payload.request_payload.final;

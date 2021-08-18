@@ -195,7 +195,8 @@ struct write_consumer_t : r::actor_base_t {
 
     void on_response(message::write_response_t &res) noexcept { response = &res; }
 
-    void make_request(bfs::path path, const std::string &data, const std::string &hash, bool final, size_t offset = 0) noexcept {
+    void make_request(bfs::path path, const std::string &data, const std::string &hash, bool final,
+                      size_t offset = 0) noexcept {
         request<payload::write_request_t>(fs_actor, path, offset, data, hash, nullptr, final).send(init_timeout);
     }
 };

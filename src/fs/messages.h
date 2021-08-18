@@ -49,7 +49,7 @@ struct write_request_t {
     size_t offset;
     std::string data;
     std::string hash;
-    void* custom;
+    void *custom;
     bool final;
 };
 
