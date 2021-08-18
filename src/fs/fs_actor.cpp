@@ -265,7 +265,19 @@ void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
         }
     }
 
-    std::ofstream out(path.c_str(), out.out | out.app);
+    auto flags = std::ofstream::binary | std::ofstream::out;
+    if (bfs::exists(path)) {
+        flags |= std::ofstream::in;
+    }
+    std::ofstream out(path.c_str(), flags);
+    out.seekp(payload.offset, out.beg);
+    if (out.fail()) {
+        spdlog::warn("{}, failed to seek {} on position {}", identity, path.c_str(), payload.offset);
+        auto ec = utils::make_error_code(utils::error_code_t::fs_error);
+        auto ee = make_error(ec);
+        return reply_with_error(req, ee);
+    }
+
     out.write(data.c_str(), data.size());
     out.flush();
     if (out.fail()) {

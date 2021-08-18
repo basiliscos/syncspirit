@@ -330,13 +330,14 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto &data = message.payload.res.data;
     auto block_index = payload.block_index;
     auto &blocks = file->get_blocks();
-    bool final = file->mark_local_available(payload.block_index);
+    bool final = file->mark_local_available(block_index);
     auto path = file->get_path();
     auto &block = *payload.block;
     auto &hash = block.get_hash();
     request_pool += block.get_size();
+    auto offset = file->get_block_offset(block_index);
 
-    auto request_id = request<request_t>(fs, path, std::move(data), hash, final).send(init_timeout);
+    auto request_id = request<request_t>(fs, path, offset, std::move(data), hash, final).send(init_timeout);
     // request more blocks while the current is going to be flushed to disk
     ready();
     responses_map.emplace(request_id, &message);

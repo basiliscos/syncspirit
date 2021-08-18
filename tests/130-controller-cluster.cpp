@@ -162,15 +162,15 @@ void test_new_folder() {
                 fi.set_block_size(5);
 
                 auto path = dir / "a.txt";
+                fi.set_size(5);
+                *fi.add_blocks() = bi1;
+                *fi.add_blocks() = bi2;
+                *index.add_files() = fi;
+
+                auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
+
                 SECTION("direct order") {
-                    fi.set_size(5);
-                    *fi.add_blocks() = bi1;
-                    *fi.add_blocks() = bi2;
-                    *index.add_files() = fi;
-
-                    auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
-                    peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
-
                     peer->push_response("12345");
                     peer->push_response("67890");
                     sup->do_process();
@@ -178,14 +178,6 @@ void test_new_folder() {
                 }
 
                 SECTION("indirect order") {
-                    fi.set_size(5);
-                    *fi.add_blocks() = bi1;
-                    *fi.add_blocks() = bi2;
-                    *index.add_files() = fi;
-
-                    auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
-                    peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
-
                     peer->push_response("67890", 1);
                     peer->push_response("12345", 0);
                     sup->do_process();

@@ -1,6 +1,5 @@
-- fs_actor: write data to disk more correctly
-- LOG_MACROS();
 - model: когда добавляется symlink, папка
+- LOG_MACROS();
 - store_new_folder_request_t: выкинуть peer, peer_source
 - test: continue downloading temporaries
 - test: fs_actor, deleted file from index

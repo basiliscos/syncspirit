@@ -195,8 +195,8 @@ struct write_consumer_t : r::actor_base_t {
 
     void on_response(message::write_response_t &res) noexcept { response = &res; }
 
-    void make_request(bfs::path path, const std::string &data, const std::string &hash, bool final) noexcept {
-        request<payload::write_request_t>(fs_actor, path, data, hash, final).send(init_timeout);
+    void make_request(bfs::path path, const std::string &data, const std::string &hash, bool final, size_t offset = 0) noexcept {
+        request<payload::write_request_t>(fs_actor, path, offset, data, hash, final).send(init_timeout);
     }
 };
 
@@ -349,7 +349,7 @@ TEST_CASE("fs-actor", "[fs]") {
                 act->response.reset();
                 const std::string tail = "abcdefg";
                 utils::digest(tail.data(), tail.size(), hash.data());
-                act->make_request(path, tail, hash, true);
+                act->make_request(path, tail, hash, true, data.size());
                 sup->do_process();
                 REQUIRE(act->response);
                 auto &r = act->response->payload;
