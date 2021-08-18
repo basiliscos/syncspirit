@@ -155,6 +155,7 @@ struct peer_actor_t : public r::actor_base_t {
     std::size_t rx_idx = 0;
     bool connected = false;
     bool valid_peer = false;
+    bool finished = false;
     std::string cert_name;
     tcp::endpoint peer_endpoint;
     read_action_t read_action;

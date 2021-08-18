@@ -178,7 +178,7 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
 
 void peer_actor_t::process_tx_queue() noexcept {
     assert(!tx_item);
-    if (!tx_queue.empty()) {
+    if (!tx_queue.empty() && !finished) {
         auto &item = tx_queue.front();
         tx_item = std::move(item);
         tx_queue.pop_front();
@@ -195,6 +195,7 @@ void peer_actor_t::process_tx_queue() noexcept {
             assert(tx_item->final);
             auto ec = r::make_error_code(r::shutdown_code_t::normal);
             do_shutdown(make_error(ec));
+            finished = true;
         }
     }
 }
@@ -250,6 +251,9 @@ void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
 }
 
 void peer_actor_t::read_more() noexcept {
+    if (state > r::state_t::OPERATIONAL) {
+        return;
+    }
     if (rx_idx >= rx_buff.size()) {
         log->warn("{}, read_more, rx buffer limit reached, {}", identity, rx_buff.size());
         auto ec = utils::make_error_code(utils::error_code_t::rx_limit_reached);
