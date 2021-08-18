@@ -412,7 +412,7 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     fmt::memory_buffer buff;
     proto::serialize(buff, req);
     push_write(std::move(buff), false);
-    block_requests.emplace(req_id, &message);
+    block_requests.emplace_back(&message);
 }
 
 void peer_actor_t::on_cluster_config(message::cluster_config_t &msg) noexcept {
@@ -512,7 +512,10 @@ void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
 void peer_actor_t::handle_response(proto::message::Response &&message) noexcept {
     auto id = message->id();
     log->trace("{}, handle_response, message id = {}", identity, id);
-    auto it = block_requests.find(id);
+    auto predicate = [id = id](const block_request_ptr_t& it) {
+        return ((std::int32_t)it->payload.id) == id;
+    };
+    auto it = std::find_if(block_requests.begin(), block_requests.end(), predicate);
     if (it == block_requests.end()) {
         log->warn("{}, response for unexpected request id {}", identity, id);
         auto ec = utils::make_error_code(utils::bep_error_code_t::response_mismatch);
@@ -520,7 +523,7 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
     }
 
     auto error = message->code();
-    auto &block_request = it->second;
+    auto &block_request = *it;
     if (error) {
         auto ec = utils::make_error_code((utils::request_error_code_t)error);
         log->warn("{}, block request error: {}", identity, ec.message());

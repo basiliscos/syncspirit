@@ -170,7 +170,7 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
 }
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
-    log->trace("{}, on_ready", identity);
+    log->trace("{}, on_ready, blocks requested = {}", identity, blocks_requested);
     if ((blocks_requested > 2 && request_pool < 0) || (state != r::state_t::OPERATIONAL)) {
         return;
     }
@@ -335,12 +335,13 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto &block = *payload.block;
     auto &hash = block.get_hash();
     request_pool += block.get_size();
+    if (final) { ++final_blocks; }
     auto offset = file->get_block_offset(block_index);
 
-    auto request_id = request<request_t>(fs, path, offset, std::move(data), hash, final).send(init_timeout);
-    // request more blocks while the current is going to be flushed to disk
+    intrusive_ptr_add_ref(&message);
+    auto ptr = (void*)&message;
+    auto request_id = request<request_t>(fs, path, offset, std::move(data), hash, ptr, final).send(init_timeout);
     ready();
-    responses_map.emplace(request_id, &message);
 }
 
 void controller_actor_t::on_write(fs::message::write_response_t &message) noexcept {
@@ -350,14 +351,15 @@ void controller_actor_t::on_write(fs::message::write_response_t &message) noexce
         log->warn("{}, on_write failed : {}", identity, ee->message());
         return do_shutdown(ee);
     }
-    auto it = responses_map.find(payload.request_id());
-    assert(it != responses_map.end());
-    auto block_res = it->second;
-    responses_map.erase(it);
+
+    auto block_res = reinterpret_cast<message::block_response_t*>(payload.req->payload.request_payload.custom);
     auto &p = block_res->payload.req->payload.request_payload;
     auto &file = p.file;
     auto final = payload.req->payload.request_payload.final;
-    if (file->get_status() == model::file_status_t::sync && final) {
+    if (final) {
+        --final_blocks;
+    }
+    if (file->get_status() == model::file_status_t::sync && final && !final_blocks) {
         auto folder = file->get_folder();
         auto fi = folder->get_folder_info(device);
         auto seq = fi->get_max_sequence();
@@ -369,5 +371,5 @@ void controller_actor_t::on_write(fs::message::write_response_t &message) noexce
             request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
         }
     }
-    ready();
+    intrusive_ptr_release(block_res);
 }

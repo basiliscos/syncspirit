@@ -239,7 +239,6 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
 
 void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
     spdlog::trace("{}, on_write_request", identity);
-
     auto &payload = req.payload.request_payload;
     auto path = make_temporal(payload.path);
     auto parent = path.parent_path();

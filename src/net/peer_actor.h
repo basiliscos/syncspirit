@@ -97,7 +97,7 @@ struct peer_actor_t : public r::actor_base_t {
     using tx_queue_t = std::list<tx_item_t>;
     using read_action_t = void (peer_actor_t::*)(proto::message::message_t &&msg);
     using block_request_ptr_t = r::intrusive_ptr_t<message::block_request_t>;
-    using block_requests_t = std::unordered_map<int32_t, block_request_ptr_t>;
+    using block_requests_t = std::list<block_request_ptr_t>;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_auth(message::auth_response_t &res) noexcept;

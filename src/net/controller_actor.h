@@ -85,7 +85,6 @@ struct controller_actor_t : public r::actor_base_t {
   private:
     using block_response_ptr_t = r::intrusive_ptr_t<message::block_response_t>;
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
-    using responses_map_t = std::unordered_map<r::request_id_t, block_response_ptr_t>;
 
     enum class ImmediateResult { DONE, NON_IMMEDIATE, ERROR };
 
@@ -121,12 +120,12 @@ struct controller_actor_t : public r::actor_base_t {
     payload::cluster_config_ptr_t peer_cluster_config;
     model::ignored_folders_map_t *ignored_folders;
     peers_map_t peers_map;
-    responses_map_t responses_map;
 
     model::file_interator_t file_iterator;
     model::file_info_ptr_t current_file;
     model::blocks_interator_t block_iterator;
     std::uint_fast32_t blocks_requested = 0;
+    std::uint_fast32_t final_blocks = 0;
     ino64_t request_pool;
     utils::logger_t log;
 };

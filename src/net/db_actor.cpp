@@ -420,6 +420,13 @@ void db_actor_t::on_store_folder_info(message::store_folder_info_request_t &mess
         reply_with_error(message, make_error(r.error()));
         return;
     }
+
+    r = txn.commit();
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
     fi->unmark_dirty();
     reply_to(message);
 }
