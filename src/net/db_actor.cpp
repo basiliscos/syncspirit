@@ -271,27 +271,8 @@ void db_actor_t::on_store_new_folder(message::store_new_folder_request_t &messag
         return;
     }
 
-    db::FolderInfo db_fi_source;
-    auto &src_index = message.payload.request_payload.source_index;
-    db_fi_source.set_index_id(src_index);
-    db_fi_source.set_max_sequence(0); // always start afresh
-    auto src = message.payload.request_payload.source.get();
-
+    // local
     auto key_option = txn.next_sequence();
-    if (!key_option) {
-        reply_with_error(message, make_error(key_option.error()));
-        return;
-    }
-    auto key_source = key_option.value();
-    auto fi_source = model::folder_info_ptr_t(new model::folder_info_t(db_fi_source, src, folder.get(), key_source));
-
-    r = db::store_folder_info(fi_source, txn);
-    if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
-    }
-
-    key_option = txn.next_sequence();
     if (!key_option) {
         reply_with_error(message, make_error(key_option.error()));
         return;
@@ -309,6 +290,32 @@ void db_actor_t::on_store_new_folder(message::store_new_folder_request_t &messag
         return;
     }
 
+    // remote
+    auto fi_source = model::folder_info_ptr_t{};
+    auto &src_index = message.payload.request_payload.source_index;
+    auto &source = message.payload.request_payload.source;
+    if (src_index) {
+        assert(source);
+        db::FolderInfo db_fi_source;
+        db_fi_source.set_index_id(src_index);
+        db_fi_source.set_max_sequence(0); // always start afresh
+        auto src = message.payload.request_payload.source.get();
+
+        key_option = txn.next_sequence();
+        if (!key_option) {
+            reply_with_error(message, make_error(key_option.error()));
+            return;
+        }
+        auto key_source = key_option.value();
+        fi_source = model::folder_info_ptr_t(new model::folder_info_t(db_fi_source, src, folder.get(), key_source));
+
+        r = db::store_folder_info(fi_source, txn);
+        if (!r) {
+            reply_with_error(message, make_error(r.error()));
+            return;
+        }
+    }
+
     r = txn.commit();
     if (!r) {
         reply_with_error(message, make_error(r.error()));
@@ -316,7 +323,9 @@ void db_actor_t::on_store_new_folder(message::store_new_folder_request_t &messag
     }
 
     folder->add(fi_local);
-    folder->add(fi_source);
+    if (fi_source) {
+        folder->add(fi_source);
+    }
 
     reply_to(message, std::move(folder));
 }

@@ -44,7 +44,9 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&cluster_supervisor_t::on_create_folder);
+        p.subscribe_actor(&cluster_supervisor_t::on_share_folder);
         p.subscribe_actor(&cluster_supervisor_t::on_store_new_folder);
+        p.subscribe_actor(&cluster_supervisor_t::on_store_folder_info);
         p.subscribe_actor(&cluster_supervisor_t::on_connect);
         p.subscribe_actor(&cluster_supervisor_t::on_disconnect);
         p.subscribe_actor(&cluster_supervisor_t::on_scan_complete);
@@ -64,7 +66,7 @@ void cluster_supervisor_t::on_start() noexcept {
             scan(folder, reinterpret_cast<void *>(hanlder));
         }
     } else {
-        send<payload::cluster_ready_notify_t>(coordinator);
+        send<payload::cluster_ready_notify_t>(coordinator, cluster, *devices);
     }
 }
 
@@ -79,8 +81,8 @@ void cluster_supervisor_t::shutdown_start() noexcept {
 
 void cluster_supervisor_t::handle_scan_initial(model::folder_ptr_t &folder) noexcept {
     if (scan_folders_map.size() == 1) {
-        spdlog::debug("{}, completed intiial scan for {}", identity, folder->label());
-        send<payload::cluster_ready_notify_t>(coordinator);
+        spdlog::debug("{}, completed initial scan for {}", identity, folder->label());
+        send<payload::cluster_ready_notify_t>(coordinator, cluster, *devices);
     }
 }
 
@@ -149,8 +151,21 @@ void cluster_supervisor_t::on_create_folder(ui::message::create_folder_request_t
     auto &folder = p.folder;
     auto &source = p.source;
     auto source_index = p.source_index;
-    spdlog::trace("{}, on_create_folder, {} (from {})", identity, folder.label(), source->device_id);
+    spdlog::trace("{}, on_create_folder, {} ({})", identity, folder.label(),
+                  (source ? source->device_id.get_short() : ""));
     request<payload::store_new_folder_request_t>(db, folder, source, source_index).send(init_timeout);
+}
+
+void cluster_supervisor_t::on_share_folder(ui::message::share_folder_request_t &message) noexcept {
+    share_folder_req.reset(&message);
+    auto &p = message.payload.request_payload;
+    auto &folder = p.folder;
+    auto &peer = p.peer;
+    spdlog::trace("{}, on_share_folder, {} with ", identity, folder->label(), peer->device_id);
+    db::FolderInfo db_fi;
+    auto fi = model::folder_info_ptr_t(new model::folder_info_t(db_fi, peer.get(), folder.get(), 0));
+    fi->mark_dirty();
+    request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
 }
 
 void cluster_supervisor_t::on_store_new_folder(message::store_new_folder_response_t &message) noexcept {
@@ -176,6 +191,25 @@ void cluster_supervisor_t::on_store_new_folder(message::store_new_folder_respons
     create_folder_req.reset();
 }
 
+void cluster_supervisor_t::on_store_folder_info(message::store_folder_info_response_t &message) noexcept {
+    assert(share_folder_req);
+    auto &fi = message.payload.req->payload.request_payload.folder_info;
+    auto device = fi->get_device();
+    auto folder = fi->get_folder();
+    spdlog::trace("{}, on_store_folder_info (i.e. sharing), folder = {}, device = {}", identity, folder->label(),
+                  device->device_id);
+    auto ee = message.payload.ee;
+    if (ee) {
+        spdlog::warn("{}, cannot share folder = {} with device = {}: {}", identity, folder->label(), device->device_id,
+                     ee->message());
+        reply_with_error(*share_folder_req, ee);
+        return;
+    }
+    folder->add(fi);
+    reply_to(*share_folder_req);
+    share_folder_req.reset();
+}
+
 void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexcept {
     auto &payload = message.payload;
     auto &device_id = payload.peer_device_id;
@@ -183,6 +217,7 @@ void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexce
     auto peer = devices->by_id(device_id.get_sha256());
     auto &cluster_config = payload.cluster_config;
     auto addr = create_actor<controller_actor_t>()
+                    .bep_config(bep_config)
                     .timeout(init_timeout * 7 / 9)
                     .device(device)
                     .peer(peer)

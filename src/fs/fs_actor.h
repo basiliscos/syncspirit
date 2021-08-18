@@ -3,13 +3,11 @@
 #include "../config/main.h"
 #include "messages.h"
 #include "continuation.h"
-#include <rotor/thread.hpp>
+#include <rotor.hpp>
 #include <deque>
 
 namespace syncspirit {
 namespace fs {
-
-namespace rth = rotor::thread;
 
 struct fs_actor_config_t : r::actor_config_t {
     config::fs_config_t fs_config;

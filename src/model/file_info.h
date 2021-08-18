@@ -91,7 +91,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 
     void clone_block(file_info_t &source, std::size_t src_block_index, std::size_t dst_block_index) noexcept;
-    void mark_local_available(size_t block_index) noexcept;
+    bool mark_local_available(size_t block_index) noexcept;
 
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
@@ -119,6 +119,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     std::string db_key; /* folder_info db key + name */
     blocks_t blocks;
     blocks_t local_blocks;
+    size_t local_blocks_count = 0;
     file_status_t status = file_status_t::older;
 };
 

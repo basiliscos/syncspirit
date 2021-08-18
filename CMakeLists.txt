@@ -75,19 +75,19 @@ add_library(syncspirit_lib
     ${PROTO_SRCS}
 )
 
-add_library(syncspirit_console
-    src/console/activity.cpp
-    src/console/config_activity.cpp
-    src/console/default_activity.cpp
-    src/console/new_folder_activity.cpp
-    src/console/peer_activity.cpp
-    src/console/tui_actor.cpp
-    src/console/utils.cpp
-)
+#add_library(syncspirit_console
+#    src/console/activity.cpp
+#    src/console/config_activity.cpp
+#    src/console/default_activity.cpp
+#    src/console/new_folder_activity.cpp
+#    src/console/peer_activity.cpp
+#    src/console/tui_actor.cpp
+#    src/console/utils.cpp
+#)
 
-add_executable(syncspirit
-    src/main.cpp
-)
+#add_executable(syncspirit
+#    src/main.cpp
+#)
 
 set(BUILD_BOOST_ASIO true CACHE BOOL "BUILD_BOOST_ASIO")
 set(URIPARSER_BUILD_WCHAR_T false CACHE BOOL "URIPARSER_BUILD_WCHAR_T")
@@ -138,9 +138,9 @@ target_link_libraries(syncspirit_lib
     mdbx-static
 )
 
-target_link_libraries(syncspirit_console syncspirit_lib)
-
-target_link_libraries(syncspirit syncspirit_lib syncspirit_console)
+#target_link_libraries(syncspirit_console syncspirit_lib)
+#target_link_libraries(syncspirit syncspirit_lib syncspirit_console)
 
 enable_testing()
 add_subdirectory("tests")
+add_subdirectory("src/ui-daemon")

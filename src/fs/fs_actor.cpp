@@ -1,6 +1,7 @@
 #include "fs_actor.h"
 #include "../net/names.h"
 #include "../utils/error_code.h"
+#include "../utils/tls.h"
 #include "utils.h"
 #include <spdlog/spdlog.h>
 #include <fstream>
@@ -142,6 +143,12 @@ void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
     }
 
     auto &p = payload.request->payload;
+    auto &container = payload.file_map->map;
+    if (dir != p.root) {
+        auto rel_path = syncspirit::fs::relative(dir, p.root);
+        container[rel_path.path].file_type = model::local_file_t::file_type_t::dir;
+    }
+
     for (auto it = bfs::directory_iterator(dir); it != bfs::directory_iterator(); ++it) {
         auto &child = *it;
         bool is_dir = bfs::is_directory(child, ec);
@@ -171,9 +178,16 @@ void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
                     }
                 }
             } else {
+                auto rel_path = syncspirit::fs::relative(child, p.root);
                 bool is_sim = bfs::is_symlink(child, ec);
                 if (!ec && is_sim) {
-                    std::abort();
+                    auto target = bfs::read_symlink(child, ec);
+                    if (!ec) {
+                        auto &local_info = container[rel_path.path];
+                        local_info.file_type = model::local_file_t::file_type_t::symlink;
+                        local_info.symlink_target = target;
+                    }
+                    continue;
                 }
             }
         }
@@ -230,9 +244,20 @@ void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
     auto path = make_temporal(payload.path);
     auto parent = path.parent_path();
     auto &data = payload.data;
+
+    char digest_buff[SHA256_DIGEST_LENGTH];
+    utils::digest(data.data(), data.size(), digest_buff);
+    std::string_view digest(digest_buff, SHA256_DIGEST_LENGTH);
+    if (digest != payload.hash) {
+        auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
+        std::string context = fmt::format("digest mismatch for {}", path.string());
+        auto ee = r::make_error(context, ec);
+        spdlog::warn("{}, on_write_request, digest mismatch: {}", identity, context);
+        return reply_with_error(req, ee);
+    }
+
     sys::error_code ec;
     bool exists = bfs::exists(parent, ec);
-
     if (!exists) {
         bfs::create_directories(parent, ec);
         if (ec) {
@@ -240,7 +265,19 @@ void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
         }
     }
 
-    std::ofstream out(path.c_str(), out.out | out.app);
+    auto flags = std::ofstream::binary | std::ofstream::out;
+    if (bfs::exists(path)) {
+        flags |= std::ofstream::in;
+    }
+    std::ofstream out(path.c_str(), flags);
+    out.seekp(payload.offset, out.beg);
+    if (out.fail()) {
+        spdlog::warn("{}, failed to seek {} on position {}", identity, path.c_str(), payload.offset);
+        auto ec = utils::make_error_code(utils::error_code_t::fs_error);
+        auto ee = make_error(ec);
+        return reply_with_error(req, ee);
+    }
+
     out.write(data.c_str(), data.size());
     out.flush();
     if (out.fail()) {

@@ -2,6 +2,7 @@
 
 #include "../config/main.h"
 #include <rotor/thread.hpp>
+#include "fs_actor.h"
 
 namespace syncspirit {
 namespace fs {
@@ -34,9 +35,13 @@ struct fs_supervisor_t : rth::supervisor_thread_t {
     void on_start() noexcept override;
 
   private:
+    using fs_actor_ptr_t = r::intrusive_ptr_t<fs_actor_t>;
+
     void launch() noexcept;
+
     config::fs_config_t fs_config;
     r::address_ptr_t coordinator;
+    fs_actor_ptr_t fs_actor;
 };
 
 } // namespace fs

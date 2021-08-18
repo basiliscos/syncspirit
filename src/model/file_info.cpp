@@ -28,7 +28,7 @@ block_location_t blocks_interator_t::next() noexcept {
     block_info_t *result_block = b;
     if (i < local_blocks->size()) {
         auto lb = (*local_blocks)[i].get();
-        if (*lb != *b) {
+        if (!lb || *lb != *b) {
             result_block = lb;
         }
     }
@@ -48,6 +48,7 @@ file_info_t::file_info_t(const db::FileInfo &info_, folder_t *folder_) noexcept 
         block->link(this, i);
         blocks.emplace_back(std::move(block));
     }
+    local_blocks.resize(blocks.size());
 }
 
 file_info_t::file_info_t(const proto::FileInfo &info_, folder_t *folder_) noexcept : folder{folder_} {
@@ -152,8 +153,10 @@ file_status_t file_info_t::update(const local_file_t &local_file) noexcept {
         status = file_status_t::sync;
     } else {
         local_blocks = local_file.blocks;
+        blocks.resize(0);
         status = file_status_t::newer;
     }
+    local_blocks_count = local_blocks.size();
     return status;
 }
 
@@ -169,6 +172,7 @@ void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
         }
         blocks.emplace_back(std::move(block));
     }
+    local_blocks.resize(blocks.size());
 }
 
 blocks_interator_t file_info_t::iterate_blocks() noexcept {
@@ -187,15 +191,17 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     return block_size * block_index;
 }
 
-void file_info_t::mark_local_available(size_t block_index) noexcept {
+bool file_info_t::mark_local_available(size_t block_index) noexcept {
     blocks[block_index]->mark_local_available(this);
-    assert(local_blocks.size() == block_index);
-    local_blocks.emplace_back(blocks[block_index]);
-    if (local_blocks.size() == blocks.size()) {
+    local_blocks[block_index] = blocks[block_index];
+    ++local_blocks_count;
+    if (local_blocks_count == local_blocks.size()) {
         spdlog::info("{}/{} is sync", folder->label(), get_name());
         status = file_status_t::sync;
         mark_dirty();
+        return true;
     }
+    return false;
 }
 
 bfs::path file_info_t::get_path() const noexcept { return folder->get_path() / std::string(get_name()); }

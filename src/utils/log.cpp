@@ -31,15 +31,8 @@ spdlog::level::level_enum get_log_level(const std::string &log_level) noexcept {
 
 using sink_option_t = outcome::result<spdlog::sink_ptr>;
 
-static sink_option_t make_sink(std::string_view name, std::string &prompt, std::mutex &mutex,
-                               bool interactive) noexcept {
-    if (name == "interactive") {
-        if (interactive) {
-            return std::make_shared<sink_t>(stdout, spdlog::color_mode::automatic, mutex, prompt);
-        } else {
-            return std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        }
-    } else if (name == "stdout") {
+static sink_option_t make_sink(std::string_view name) noexcept {
+    if (name == "stdout") {
         return std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     } else if (name == "stderr") {
         return std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
@@ -47,15 +40,14 @@ static sink_option_t make_sink(std::string_view name, std::string &prompt, std::
     return utils::make_error_code(error_code_t::unknown_sink);
 }
 
-void set_default(const std::string &level, std::string &prompt, std::mutex &mutex, bool interactive) noexcept {
-    auto sink = make_sink("interactive", prompt, mutex, interactive);
+void set_default(const std::string &level) noexcept {
+    auto sink = make_sink("stdout");
     auto logger = std::make_shared<spdlog::logger>("", sink.value());
     logger->set_level(get_log_level(level));
     spdlog::set_default_logger(logger);
 }
 
-outcome::result<void> init_loggers(const config::log_configs_t &configs, std::string &prompt, std::mutex &mutex,
-                                   bool overwrite_default, bool interactive) noexcept {
+outcome::result<void> init_loggers(const config::log_configs_t &configs, bool overwrite_default) noexcept {
     using sink_map_t = std::unordered_map<std::string, spdlog::sink_ptr>;
     using logger_map_t = std::unordered_map<std::string, std::shared_ptr<spdlog::logger>>;
 
@@ -69,7 +61,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, std::st
     sink_map_t sink_map;
     for (auto &cfg : configs) {
         for (auto &sink : cfg.sinks) {
-            auto sink_option = make_sink(sink, prompt, mutex, interactive);
+            auto sink_option = make_sink(sink);
             if (!sink_option) {
                 return sink_option.error();
             }

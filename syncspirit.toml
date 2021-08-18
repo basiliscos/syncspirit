@@ -31,11 +31,11 @@ port = 21026
 [[log]]
 name = 'default'
 level = 'trace'
-sinks = ['interactive']
+sinks = ['stdout']
 
-[[log]]
-name = 'net.peer_actor'
-level = 'trace'
+# [[log]]
+# name = 'net.peer_actor'
+# level = 'trace'
 
 [main]
 default_location = '/tmp/syncspirit'

@@ -1,9 +1,3 @@
-#include <chrono>
-#include <fstream>
-#include <iostream>
-#include <thread>
-#include <vector>
-
 #include <google/protobuf/stubs/common.h>
 #include <lz4.h>
 #include <openssl/crypto.h>
@@ -18,9 +12,9 @@
 #include "utils/location.h"
 #include "utils/log.h"
 #include "net/net_supervisor.h"
-#include "console/tui_actor.h"
-#include "console/utils.h"
 #include "fs/fs_supervisor.h"
+#include "command.h"
+#include "governor_actor.h"
 
 #if defined(__linux__)
 #include <pthread.h>
@@ -29,28 +23,41 @@
 namespace bfs = boost::filesystem;
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
-namespace ra = rotor::asio;
-namespace rth = rotor::thread;
+namespace r = rotor;
+namespace ra = r::asio;
+namespace rth = r::thread;
 namespace asio = boost::asio;
 
 using namespace syncspirit;
+using namespace syncspirit::daemon;
+
+static std::atomic_bool shutdown_flag = false;
 
 int main(int argc, char **argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
-    std::string prompt = "> ";
+
+    struct sigaction act;
+    act.sa_handler = [](int) { shutdown_flag = true; };
+    if (sigaction(SIGINT, &act, nullptr) != 0) {
+        spdlog::critical("cannot set signal handler");
+        return 1;
+    }
 
     try {
+
 #if defined(__linux__)
         pthread_setname_np(pthread_self(), "synspirit/main");
 #endif
+
         // clang-format off
         /* parse command-line & config options */
         po::options_description cmdline_descr("Allowed options");
+        using CommandStrings = std::vector<std::string>;
         cmdline_descr.add_options()
-                ("help", "show this help message")
-                ("log_level", po::value<std::string>()->default_value("info"), "initial log level")
-                ("config_dir", po::value<std::string>(), "configuration directory path")
-                ("interactive", po::value<bool>()->default_value(true), "allow interactions with user via stdin");
+            ("help", "show this help message")
+            ("log_level", po::value<std::string>()->default_value("info"), "initial log level")
+            ("config_dir", po::value<std::string>(), "configuration directory path")
+            ("command", po::value<CommandStrings>(), "configuration directory path");
         // clang-format on
 
         po::variables_map vm;
@@ -63,13 +70,7 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        bool interactive = vm["interactive"].as<bool>();
-        if (interactive) {
-            console::term_prepare();
-        }
-
-        std::mutex std_out_mutex;
-        utils::set_default(vm["log_level"].as<std::string>(), prompt, std_out_mutex, interactive);
+        utils::set_default(vm["log_level"].as<std::string>());
 
         bfs::path config_file_path;
         if (vm.count("config_dir")) {
@@ -92,14 +93,14 @@ int main(int argc, char **argv) {
             auto cfg_opt = config::generate_config(config_file_path);
             if (!cfg_opt) {
                 spdlog::error("cannot generate default config: {}", cfg_opt.error().message());
-                return -1;
+                return 1;
             }
             auto &cfg = cfg_opt.value();
             std::fstream f_cfg(config_file_path.string(), f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
             auto r = config::serialize(cfg, f_cfg);
             if (!r) {
                 spdlog::error("cannot save default config at :: {}", r.error().message());
-                return -1;
+                return 1;
             }
         }
         auto config_file_path_c = config_file_path.c_str();
@@ -118,10 +119,23 @@ int main(int argc, char **argv) {
         spdlog::trace("configuration seems OK");
 
         bool overwrite_default = vm.count("log_level");
-        auto init_result = utils::init_loggers(cfg.log_configs, prompt, std_out_mutex, overwrite_default, interactive);
+        auto init_result = utils::init_loggers(cfg.log_configs, overwrite_default);
         if (!init_result) {
             spdlog::error("Loggers initialization failed :: {}", init_result.error().message());
             return 1;
+        }
+
+        Commands commands;
+        if (vm.count("command")) {
+            auto cmds = vm["command"].as<CommandStrings>();
+            for (auto &cmd : cmds) {
+                auto r = command_t::parse(cmd);
+                if (!r) {
+                    spdlog::error("error parsing {} : {}", cmd, r.assume_error().message());
+                    return 1;
+                }
+                commands.emplace_back(std::move(r.assume_value()));
+            }
         }
 
         if (populate) {
@@ -129,7 +143,7 @@ int main(int argc, char **argv) {
             auto pair = utils::generate_pair(constants::issuer_name);
             if (!pair) {
                 spdlog::error("cannot generate cryptographical keys :: {}", pair.error().message());
-                return -1;
+                return 1;
             }
             auto &keys = pair.value();
             auto &cert_path = cfg.global_announce_config.cert_file;
@@ -137,7 +151,7 @@ int main(int argc, char **argv) {
             auto save_result = keys.save(cert_path.c_str(), key_path.c_str());
             if (!save_result) {
                 spdlog::error("cannot store cryptographical keys :: {}", save_result.error().message());
-                return -1;
+                return 1;
             }
         }
 
@@ -157,6 +171,7 @@ int main(int argc, char **argv) {
                            .create_registry()
                            .guard_context(true)
                            .finish();
+        // auxiliary payload
         sup_net->start();
 
         rth::system_context_thread_t fs_context;
@@ -165,6 +180,7 @@ int main(int argc, char **argv) {
                           .registry_address(sup_net->get_registry_address())
                           .fs_config(cfg.fs_config)
                           .finish();
+        fs_sup->create_actor<governor_actor_t>().commands(std::move(commands)).timeout(timeout).finish();
 
         /* launch actors */
         auto net_thread = std::thread([&]() {
@@ -172,7 +188,7 @@ int main(int argc, char **argv) {
             pthread_setname_np(pthread_self(), "synspirit/net");
 #endif
             io_context.run();
-            console::shutdown_flag = true;
+            shutdown_flag = true;
             spdlog::trace("net thread has been terminated");
         });
 
@@ -181,30 +197,23 @@ int main(int argc, char **argv) {
             pthread_setname_np(pthread_self(), "synspirit/fs");
 #endif
             fs_context.run();
-            console::shutdown_flag = true;
+            shutdown_flag = true;
             spdlog::trace("fs thread has been terminated");
         });
-        fs_thread.native_handle();
 
-        asio::io_context console_context;
-        ra::system_context_asio_t con_context{console_context};
-        auto con_stand = std::make_shared<asio::io_context::strand>(console_context);
-        auto sup_con = con_context.create_supervisor<ra::supervisor_asio_t>()
-                           .strand(con_stand)
-                           .timeout(timeout)
-                           .registry_address(sup_net->get_registry_address())
-                           .guard_context(true)
-                           .finish();
-        sup_con->start();
-        sup_con->create_actor<console::tui_actor_t>()
-            .interactive(interactive)
-            .mutex(&std_out_mutex)
-            .prompt(&prompt)
-            .tui_config(cfg.tui_config)
-            .timeout(timeout)
-            .finish();
+        // main loop;
+        while (!shutdown_flag) {
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(10ms);
+        }
 
-        console_context.run();
+        // initiate shutdown
+        spdlog::trace("sending shutdown signal...");
+        auto ec = r::make_error_code(r::shutdown_code_t::normal);
+        auto coordinator = sup_net->get_address();
+        auto ee = r::make_error("syncspirit-daemon is terminating", ec);
+        auto msg = r::make_message<r::payload::shutdown_trigger_t>(coordinator, coordinator, ee);
+        sup_net->enqueue(msg);
 
         spdlog::trace("waiting fs thread termination");
         fs_thread.join();

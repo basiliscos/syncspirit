@@ -17,8 +17,11 @@ namespace bfs = boost::filesystem;
 namespace sys = boost::system;
 
 struct local_file_t {
+    enum file_type_t { regular, dir, symlink };
     using blocks_t = std::vector<model::block_info_ptr_t>;
     blocks_t blocks;
+    bfs::path symlink_target;
+    file_type_t file_type;
     bool temp;
 };
 

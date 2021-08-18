@@ -285,7 +285,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     assert(read_action);
     resources->release(resource::io);
     rx_idx += bytes;
-    log->trace("{}, on_read, {} bytes, total = {}", identity, bytes, rx_idx);
+    // log->trace("{}, on_read, {} bytes, total = {}", identity, bytes, rx_idx);
     auto buff = asio::buffer(rx_buff.data(), rx_idx);
     auto result = proto::parse_bep(buff);
     if (result.has_error()) {
@@ -295,7 +295,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     }
     auto &value = result.value();
     if (!value.consumed) {
-        log->trace("{}, on_read :: incomplete message", identity);
+        // log->trace("{}, on_read :: incomplete message", identity);
         return read_more();
     }
 
@@ -396,14 +396,12 @@ void peer_actor_t::on_termination(message::termination_signal_t &message) noexce
 }
 
 void peer_actor_t::on_block_request(message::block_request_t &message) noexcept {
-    auto req_id = message.payload.id;
-    log->trace("{}, on_block_request, request_id = {}", identity, req_id);
-    assert(!block_request);
+    auto req_id = (std::int32_t)message.payload.id;
     proto::Request req;
     auto &p = message.payload.request_payload;
     auto &file = p.file;
     auto &block = p.block;
-    req.set_id((std::int32_t)req_id);
+    req.set_id(req_id);
     *req.mutable_folder() = file->get_folder()->id();
     *req.mutable_name() = file->get_name();
 
@@ -414,7 +412,7 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     fmt::memory_buffer buff;
     proto::serialize(buff, req);
     push_write(std::move(buff), false);
-    block_request.reset(&message);
+    block_requests.emplace(req_id, &message);
 }
 
 void peer_actor_t::on_cluster_config(message::cluster_config_t &msg) noexcept {
@@ -512,22 +510,17 @@ void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
 }
 
 void peer_actor_t::handle_response(proto::message::Response &&message) noexcept {
-    if (!block_request) {
-        log->warn("{}, got response but nothing was requested", identity);
-        auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_response);
-        return do_shutdown(make_error(ec));
-    }
-
     auto id = message->id();
-    auto expected_id = block_request->payload.id;
     log->trace("{}, handle_response, message id = {}", identity, id);
-    if (id != expected_id) {
-        log->warn("{}, got response {}, but requested {}", identity, id, expected_id);
+    auto it = block_requests.find(id);
+    if (it == block_requests.end()) {
+        log->warn("{}, response for unexpected request id {}", identity, id);
         auto ec = utils::make_error_code(utils::bep_error_code_t::response_mismatch);
         return do_shutdown(make_error(ec));
     }
 
     auto error = message->code();
+    auto &block_request = it->second;
     if (error) {
         auto ec = utils::make_error_code((utils::request_error_code_t)error);
         log->warn("{}, block request error: {}", identity, ec.message());
@@ -542,7 +535,7 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
         }
         reply_to(*block_request, std::move(data));
     }
-    block_request.reset();
+    block_requests.erase(it);
 }
 
 void peer_actor_t::reset_tx_timer() noexcept {

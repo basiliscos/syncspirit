@@ -20,6 +20,17 @@ void sample_peer_t::on_start_reading(message::start_reading_t &) noexcept {
 
 void sample_peer_t::on_block_request(message::block_request_t &req) noexcept {
     assert(responses.size());
-    reply_to(req, responses.front());
-    responses.pop_front();
+    requests.push_front(&req);
+    while (requests.size() && requests.front()->payload.request_payload.block_index == responses.front().block_index) {
+        reply_to(*requests.front(), responses.front().data);
+        responses.pop_front();
+        requests.pop_front();
+    }
+}
+
+void sample_peer_t::push_response(const std::string& data, size_t index) noexcept {
+    if (index == next_block) {
+        index = responses.size();
+    }
+    responses.push_back(response_t{index, data});
 }
