@@ -126,7 +126,7 @@ struct controller_actor_t : public r::actor_base_t {
     model::blocks_interator_t block_iterator;
     std::uint_fast32_t blocks_requested = 0;
     std::uint_fast32_t final_blocks = 0;
-    ino64_t request_pool;
+    int64_t request_pool;
     utils::logger_t log;
 };
 

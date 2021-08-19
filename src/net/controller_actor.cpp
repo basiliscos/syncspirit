@@ -221,12 +221,12 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
 
 void controller_actor_t::request_block(const model::block_location_t &block) noexcept {
     auto sz = block.block->get_size();
-    log->trace("{} request_block, file = {}, block index = {}, sz = {}", identity, current_file->get_full_name(),
-               block.block_index, sz);
+    log->trace("{} request_block, file = {}, block index = {}, sz = {}, request pool sz = {}", identity, current_file->get_full_name(),
+               block.block_index, sz, request_pool);
     request<payload::block_request_t>(peer_addr, current_file, model::block_info_ptr_t{block.block}, block.block_index)
         .send(request_timeout);
     ++blocks_requested;
-    request_pool -= sz;
+    request_pool -= (int64_t)sz;
 }
 
 bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {

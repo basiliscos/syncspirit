@@ -29,7 +29,7 @@ struct block_info_t : arc_base_t<block_info_t>, storeable_t {
 
     inline const std::string &get_hash() const noexcept { return hash; }
     inline std::uint32_t get_weak_hash() const noexcept { return weak_hash; }
-    inline std::uint64_t get_size() const noexcept { return size; }
+    inline std::uint32_t get_size() const noexcept { return size; }
 
     db::BlockInfo serialize() noexcept;
     void link(file_info_t *file_info, size_t block_index) noexcept;
