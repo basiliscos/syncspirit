@@ -1,4 +1,5 @@
 - model: когда добавляется symlink, папка
+- controller: защитить от перегрузки fs_actor?
 - LOG_MACROS();
 - store_new_folder_request_t: выкинуть peer, peer_source
 - test: continue downloading temporaries

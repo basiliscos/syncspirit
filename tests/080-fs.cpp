@@ -179,25 +179,37 @@ struct scan_consumer_t : r::actor_base_t {
 
 struct write_consumer_t : r::actor_base_t {
     using r::actor_base_t::actor_base_t;
-    using res_ptr_t = r::intrusive_ptr_t<message::write_response_t>;
+    using intial_write_ptr_t = r::intrusive_ptr_t<message::initial_write_response_t>;
+    using write_ptr_t = r::intrusive_ptr_t<message::write_response_t>;
 
     r::address_ptr_t fs_actor;
-    res_ptr_t response;
+    write_ptr_t write_response;
+    intial_write_ptr_t initial_write_response;
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept {
         r::actor_base_t::configure(plugin);
         plugin.with_casted<r::plugin::registry_plugin_t>(
             [&](auto &p) { p.discover_name(net::names::fs, fs_actor, true).link(); });
 
-        plugin.with_casted<r::plugin::starter_plugin_t>(
-            [&](auto &p) { p.subscribe_actor(&write_consumer_t::on_response); });
+        plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+            p.subscribe_actor(&write_consumer_t::on_write_response);
+            p.subscribe_actor(&write_consumer_t::on_iwrite_response);
+        });
     }
 
-    void on_response(message::write_response_t &res) noexcept { response = &res; }
+    void on_write_response(message::write_response_t &res) noexcept { write_response = &res; }
+    void on_iwrite_response(message::initial_write_response_t &res) noexcept { initial_write_response = &res; }
 
-    void make_request(bfs::path path, const std::string &data, const std::string &hash, bool final,
-                      size_t offset = 0) noexcept {
-        request<payload::write_request_t>(fs_actor, path, offset, data, hash, nullptr, final).send(init_timeout);
+    void mk_initial_request(const bfs::path &path, size_t file_size, const std::string &data, const std::string &hash,
+                            bool final, size_t offset = 0) noexcept {
+        request<payload::initial_write_request_t>(fs_actor, path, file_size, offset, data, hash, final)
+            .send(init_timeout);
+    }
+
+    void mk_request(const bfs::path &path, fs::opened_file_t file, const std::string &data, size_t offset,
+                    const std::string &hash, bool final = true) noexcept {
+        request<payload::write_request_t>(fs_actor, path, std::move(file), offset, data, hash, final)
+            .send(init_timeout);
     }
 };
 
@@ -325,16 +337,19 @@ TEST_CASE("fs-actor", "[fs]") {
         hash.resize(SHA256_DIGEST_LENGTH);
         utils::digest(data.data(), data.size(), hash.data());
 
-        SECTION("success case") {
+        SECTION("success case, file of 2 pieces") {
             auto path = root_path / "my-file";
+            const std::string tail = "abcdefg";
+            auto file_size = data.size() + tail.size();
 
-            act->make_request(path, data, hash, false);
+            act->mk_initial_request(path, file_size, data, hash, false);
             sup->do_process();
 
-            REQUIRE(act->response);
-            auto &r = act->response->payload;
+            REQUIRE(act->initial_write_response);
+            auto &r = act->initial_write_response->payload;
             CHECK(!r.ee);
-            CHECK(read_file(root_path / "my-file.syncspirit-tmp") == data);
+            auto &file = r.res->file;
+            CHECK(file);
 
             SECTION("tmp file is missing") {
                 auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
@@ -347,37 +362,37 @@ TEST_CASE("fs-actor", "[fs]") {
             }
 
             SECTION("append/final") {
-                act->response.reset();
-                const std::string tail = "abcdefg";
                 utils::digest(tail.data(), tail.size(), hash.data());
-                act->make_request(path, tail, hash, true, data.size());
+                act->mk_request(path, std::move(file), tail, data.size(), hash, true);
                 sup->do_process();
-                REQUIRE(act->response);
-                auto &r = act->response->payload;
+                REQUIRE(act->write_response);
+                auto &r = act->write_response->payload;
                 CHECK(!r.ee);
+                CHECK(!r.res->file);
                 CHECK(read_file(path) == data + tail);
             }
         }
 
-        SECTION("success case in subfolder") {
+        SECTION("success case in subfolder, and 1 block file") {
             auto path = root_path / "dir" / "my-file";
-            act->make_request(path, data, hash, false);
+            act->mk_initial_request(path, data.size(), data, hash, true);
             sup->do_process();
 
-            REQUIRE(act->response);
-            auto &r = act->response->payload;
+            REQUIRE(act->initial_write_response);
+            auto &r = act->initial_write_response->payload;
             CHECK(!r.ee);
-            CHECK(read_file(root_path / "dir" / "my-file.syncspirit-tmp") == data);
+            CHECK(!r.res->file);
+            CHECK(read_file(root_path / "dir" / "my-file") == data);
         }
 
         SECTION("wrong hash") {
             auto path = root_path / "my-file-with-wrong-hash";
             hash[0] = hash[0] * -1;
-            act->make_request(path, data, hash, false);
+            act->mk_initial_request(path, data.size(), data, hash, true);
             sup->do_process();
 
-            REQUIRE(act->response);
-            auto &r = act->response->payload;
+            REQUIRE(act->initial_write_response);
+            auto &r = act->initial_write_response->payload;
             CHECK(!bfs::exists(path));
             CHECK(r.ee);
             auto ec = r.ee->ec;
@@ -396,10 +411,11 @@ TEST_CASE("fs-actor", "[fs]") {
         hash.resize(SHA256_DIGEST_LENGTH);
         utils::digest(data.data(), data.size(), hash.data());
 
-        writer->make_request(path, data, hash, false);
+        writer->mk_initial_request(path, data.size(), data, hash, false);
         sup->do_process();
-        REQUIRE(writer->response);
-        CHECK(!writer->response->payload.ee);
+        REQUIRE(writer->initial_write_response);
+        CHECK(!writer->initial_write_response->payload.ee);
+        writer->initial_write_response.reset(); // should cause flush
         CHECK(read_file(root_path / "my-file.syncspirit-tmp") == data);
 
         auto scaner = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
@@ -414,6 +430,7 @@ TEST_CASE("fs-actor", "[fs]") {
         CHECK(file.temp);
         CHECK(it->first == "my-file");
     }
+
     sup->shutdown();
     sup->do_process();
 }

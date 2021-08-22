@@ -31,7 +31,8 @@ controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device{config.device}, peer{config.peer},
       peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, peer_cluster_config{std::move(
                                                                                 config.peer_cluster_config)},
-      ignored_folders{config.ignored_folders}, request_pool{config.bep_config.rx_buff_size} {
+      ignored_folders{config.ignored_folders}, request_pool{config.bep_config.rx_buff_size},
+      blocks_max_kept{config.blocks_max_kept}, blocks_max_requested{config.blocks_max_requested} {
     log = utils::get_logger("net.controller_actor");
 }
 
@@ -54,6 +55,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&controller_actor_t::on_new_folder);
         p.subscribe_actor(&controller_actor_t::on_ready);
         p.subscribe_actor(&controller_actor_t::on_block);
+        p.subscribe_actor(&controller_actor_t::on_initial_write);
         p.subscribe_actor(&controller_actor_t::on_write);
     });
 }
@@ -170,12 +172,14 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
 }
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
-    log->trace("{}, on_ready, blocks requested = {}", identity, blocks_requested);
-    if ((blocks_requested > 2 && request_pool < 0) || (state != r::state_t::OPERATIONAL)) {
-        return;
-    }
+    log->trace("{}, on_ready, blocks requested = {}, kept = {}", identity, blocks_requested, blocks_kept);
+    bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0)  // rx buff is going to be full
+                  || (blocks_kept > blocks_max_kept)                             // don't overload hasher / fs-writer
+                  || (state != r::state_t::OPERATIONAL)                          // we are shutting down
+                  || (!file_iterator && !block_iterator && blocks_requested)     // done
+        ;
 
-    if (!file_iterator && !block_iterator && blocks_requested) {
+    if (ignore) {
         return;
     }
 
@@ -221,8 +225,8 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
 
 void controller_actor_t::request_block(const model::block_location_t &block) noexcept {
     auto sz = block.block->get_size();
-    log->trace("{} request_block, file = {}, block index = {}, sz = {}, request pool sz = {}", identity, current_file->get_full_name(),
-               block.block_index, sz, request_pool);
+    log->trace("{} request_block, file = {}, block index = {}, sz = {}, request pool sz = {}, blocks_kept = {}",
+               identity, current_file->get_full_name(), block.block_index, sz, request_pool, blocks_kept);
     request<payload::block_request_t>(peer_addr, current_file, model::block_info_ptr_t{block.block}, block.block_index)
         .send(request_timeout);
     ++blocks_requested;
@@ -317,13 +321,13 @@ void controller_actor_t::update(folder_updater_t &&updater) noexcept {
 }
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
-    using request_t = fs::payload::write_request_t;
     --blocks_requested;
     auto ee = message.payload.ee;
     if (ee) {
         log->warn("{}, can't receive block : {}", identity, ee->message());
         return do_shutdown(ee);
     }
+    ++blocks_kept;
 
     auto &payload = message.payload.req->payload.request_payload;
     auto &file = payload.file;
@@ -340,13 +344,27 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     }
     auto offset = file->get_block_offset(block_index);
 
-    intrusive_ptr_add_ref(&message);
-    auto ptr = (void *)&message;
-    auto request_id = request<request_t>(fs, path, offset, std::move(data), hash, ptr, final).send(init_timeout);
-    ready();
+    auto &path_str = path.string();
+    if (write_map.count(path_str) == 0) {
+        using request_t = fs::payload::initial_write_request_t;
+        write_map[path_str].file = file;
+        write_map[path_str].final = final;
+        auto file_sz = static_cast<size_t>(file->get_size());
+        request<request_t>(fs, path, file_sz, offset, std::move(data), std::move(hash), final).send(init_timeout);
+        return ready();
+    }
+
+    auto &info = write_map.at(path_str);
+    info.final = final;
+    info.write_queue.emplace_back(raw_block_t{std::move(data), std::move(hash), offset});
+    if (info.file_desc) {
+        write_next_block(info.file_desc, path, info);
+    }
+    return ready();
 }
 
-void controller_actor_t::on_write(fs::message::write_response_t &message) noexcept {
+void controller_actor_t::on_initial_write(fs::message::initial_write_response_t &message) noexcept {
+    --blocks_kept;
     auto &payload = message.payload;
     auto &ee = payload.ee;
     if (ee) {
@@ -354,24 +372,83 @@ void controller_actor_t::on_write(fs::message::write_response_t &message) noexce
         return do_shutdown(ee);
     }
 
-    auto block_res = reinterpret_cast<message::block_response_t *>(payload.req->payload.request_payload.custom);
-    auto &p = block_res->payload.req->payload.request_payload;
-    auto &file = p.file;
-    auto final = payload.req->payload.request_payload.final;
+    auto &rp = *payload.req->payload.request_payload;
+    auto it = write_map.find(rp.path.string());
+    assert(it != write_map.end());
+    bool final = rp.final;
+
+    auto &info = it->second;
+    auto &file = it->second.file;
+    auto &opened_file = payload.res->file;
     if (final) {
         --final_blocks;
-    }
-    if (file->get_status() == model::file_status_t::sync && final && !final_blocks) {
-        auto folder = file->get_folder();
-        auto fi = folder->get_folder_info(device);
-        auto seq = fi->get_max_sequence();
-        auto new_seq = file->get_sequence();
-        if (new_seq > seq) {
-            log->trace("{}, updated max sequence '{}' on local device: {} -> {}", identity, folder->label(), seq,
-                       new_seq);
-            fi->update_max_sequence(new_seq);
-            request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
+        if (file->get_status() == model::file_status_t::sync && !final_blocks) {
+            on_final_block(file);
         }
+        write_map.erase(it);
+    } else if (!info.write_queue.empty()) {
+        write_next_block(payload.res->file, rp.path, info);
+    } else {
+        assert(opened_file);
+        info.file_desc = std::move(opened_file);
     }
-    intrusive_ptr_release(block_res);
+    ready();
+}
+
+void controller_actor_t::on_write(fs::message::write_response_t &message) noexcept {
+    --blocks_kept;
+    auto &payload = message.payload;
+    auto &ee = payload.ee;
+    if (ee) {
+        log->warn("{}, on_write failed : {}", identity, ee->message());
+        return do_shutdown(ee);
+    }
+
+    auto &rp = *payload.req->payload.request_payload;
+    auto it = write_map.find(rp.path.string());
+    assert(it != write_map.end());
+    bool final = rp.final;
+
+    auto &info = it->second;
+    auto &file = it->second.file;
+    auto &opened_file = payload.res->file;
+    if (final) {
+        --final_blocks;
+        if (file->get_status() == model::file_status_t::sync && !final_blocks) {
+            on_final_block(file);
+        }
+        write_map.erase(it);
+    } else if (!info.write_queue.empty()) {
+        write_next_block(opened_file, rp.path, info);
+    } else {
+        assert(opened_file);
+        info.file_desc = std::move(opened_file);
+    }
+    ready();
+}
+
+void controller_actor_t::on_final_block(const model::file_info_ptr_t &file) noexcept {
+    log->trace("{}, wrote final block for {}", identity, file->get_path());
+    auto folder = file->get_folder();
+    auto fi = folder->get_folder_info(device);
+    auto seq = fi->get_max_sequence();
+    auto new_seq = file->get_sequence();
+    if (new_seq > seq) {
+        log->trace("{}, updated max sequence '{}' on local device: {} -> {}", identity, folder->label(), seq, new_seq);
+        fi->update_max_sequence(new_seq);
+        request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
+    }
+}
+
+void controller_actor_t::write_next_block(fs::opened_file_t &fd, const bfs::path &path, write_info_t &info) noexcept {
+    using request_t = fs::payload::write_request_t;
+
+    auto &queue = info.write_queue;
+    assert(fd && "non-final block should return opened file");
+    assert(queue.size());
+    auto &next = queue.front();
+    bool final = info.final && queue.size() == 1;
+    request<request_t>(fs, path, std::move(fd), next.offset, std::move(next.data), std::move(next.hash), final)
+        .send(init_timeout);
+    queue.pop_front();
 }

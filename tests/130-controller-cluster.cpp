@@ -98,7 +98,6 @@ void test_new_folder() {
 
             proto::Index index;
             index.set_folder(folder->id());
-
             SECTION("file with content (1 and 0 blocks)") {
                 auto block_info = proto::BlockInfo();
                 block_info.set_size(5);
@@ -162,7 +161,7 @@ void test_new_folder() {
                 fi.set_block_size(5);
 
                 auto path = dir / "a.txt";
-                fi.set_size(5);
+                fi.set_size(10);
                 *fi.add_blocks() = bi1;
                 *fi.add_blocks() = bi2;
                 *index.add_files() = fi;

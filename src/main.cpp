@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
 
     try {
 #if defined(__linux__)
-        pthread_setname_np(pthread_self(), "synspirit/main");
+        pthread_setname_np(pthread_self(), "syncspirit/main");
 #endif
         // clang-format off
         /* parse command-line & config options */
@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
         /* launch actors */
         auto net_thread = std::thread([&]() {
 #if defined(__linux__)
-            pthread_setname_np(pthread_self(), "synspirit/net");
+            pthread_setname_np(pthread_self(), "syncspirit/net");
 #endif
             io_context.run();
             console::shutdown_flag = true;
@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
 
         auto fs_thread = std::thread([&]() {
 #if defined(__linux__)
-            pthread_setname_np(pthread_self(), "synspirit/fs");
+            pthread_setname_np(pthread_self(), "synscpirit/fs");
 #endif
             fs_context.run();
             console::shutdown_flag = true;

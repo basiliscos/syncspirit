@@ -43,6 +43,9 @@ void Fixture::run() {
     pre_run();
     sup->do_process();
 
+    auto bep_config = config::bep_config_t();
+    bep_config.rx_buff_size = 1024;
+
     controller = sup->create_actor<controller_actor_t>()
                      .cluster(cluster)
                      .device(device_my)
@@ -51,6 +54,7 @@ void Fixture::run() {
                      .request_timeout(timeout)
                      .peer_cluster_config(std::move(peer_cluster_config))
                      .ignored_folders(&ignored_folders)
+                     .bep_config(bep_config)
                      .timeout(timeout)
                      .finish();
     sup->do_process();

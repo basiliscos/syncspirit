@@ -4,15 +4,12 @@
 #include <deque>
 #include <optional>
 #include <boost/outcome.hpp>
-#include <boost/iostreams/device/mapped_file.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <memory>
 #include <fstream>
 
 namespace syncspirit {
 namespace fs {
-
-namespace bio = boost::iostreams;
 
 using request_ptr_t = r::intrusive_ptr_t<message::scan_request_t>;
 

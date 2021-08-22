@@ -9,7 +9,9 @@
 namespace sys = boost::system;
 using namespace syncspirit::fs;
 
-fs_actor_t::fs_actor_t(config_t &cfg) : r::actor_base_t{cfg}, fs_config{cfg.fs_config} {}
+fs_actor_t::fs_actor_t(config_t &cfg) : r::actor_base_t{cfg}, fs_config{cfg.fs_config} {
+    log = utils::get_logger("fs.actor");
+}
 
 void fs_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -22,23 +24,24 @@ void fs_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&fs_actor_t::on_scan);
         p.subscribe_actor(&fs_actor_t::on_process);
         p.subscribe_actor(&fs_actor_t::on_write_request);
+        p.subscribe_actor(&fs_actor_t::on_initial_write_request);
     });
 }
 
 void fs_actor_t::on_start() noexcept {
-    spdlog::trace("{}, on_start", identity);
+    log->trace("{}, on_start", identity);
     r::actor_base_t::on_start();
 }
 
 void fs_actor_t::shutdown_finish() noexcept {
-    spdlog::trace("{}, shutdown_finish", identity);
+    log->trace("{}, shutdown_finish", identity);
     get_supervisor().shutdown();
     r::actor_base_t::shutdown_finish();
 }
 
 void fs_actor_t::on_scan_request(message::scan_request_t &req) noexcept {
     auto &root = req.payload.root;
-    spdlog::trace("{}, on_scan_request, root = {}", identity, root.c_str());
+    log->trace("{}, on_scan_request, root = {}", identity, root.c_str());
 
     queue.emplace_back(&req);
     if (queue.size() == 1) {
@@ -47,13 +50,13 @@ void fs_actor_t::on_scan_request(message::scan_request_t &req) noexcept {
 }
 
 void fs_actor_t::on_scan_cancel(message::scan_cancel_t &req) noexcept {
-    spdlog::trace("{}, on_scan_cancel", identity);
+    log->trace("{}, on_scan_cancel", identity);
     auto req_id = req.payload.request_id;
     if (queue.size()) {
         auto it = queue.begin();
         if ((*it)->payload.request_id == req_id) {
-            spdlog::debug("{}, on_scan_cancel, cancelling ongoing scan for {}", identity,
-                          queue.front()->payload.root.c_str());
+            log->debug("{}, on_scan_cancel, cancelling ongoing scan for {}", identity,
+                       queue.front()->payload.root.c_str());
             scan_cancelled = true;
             return;
         }
@@ -61,7 +64,7 @@ void fs_actor_t::on_scan_cancel(message::scan_cancel_t &req) noexcept {
             if ((*it)->payload.request_id == req_id) {
                 auto &payload = (*it)->payload;
                 auto &root = payload.root;
-                spdlog::debug("{}, on_scan_cancel, cancelling pending scan for {}", root.c_str());
+                log->debug("{}, on_scan_cancel, cancelling pending scan for {}", root.c_str());
                 auto &requestee = payload.reply_to;
                 auto file_map = model::local_file_map_ptr_t(new model::local_file_map_t(root));
                 file_map->ec = utils::make_error_code(utils::error_code_t::scan_aborted);
@@ -77,7 +80,7 @@ void fs_actor_t::on_process(message::process_signal_t &) noexcept { process_queu
 
 void fs_actor_t::process_queue() noexcept {
     if (queue.empty()) {
-        spdlog::trace("{} empty queue, nothing to process", identity);
+        log->trace("{} empty queue, nothing to process", identity);
         return;
     }
     auto &req = queue.front();
@@ -167,7 +170,7 @@ void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
                     } else {
                         auto now = std::time(nullptr);
                         if (modified_at + fs_config.temporally_timeout <= now) {
-                            spdlog::debug("{}, removing outdated temporally {}", child_path.string());
+                            log->debug("{}, removing outdated temporally {}", child_path.string());
                             bfs::remove(child_path, ec);
                             if (ec) {
                                 send<payload::scan_error_t>(p.reply_to, p.root, child_path, ec);
@@ -237,25 +240,34 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
     return 0;
 }
 
-void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
-    spdlog::trace("{}, on_write_request", identity);
-    auto &payload = req.payload.request_payload;
-    auto path = make_temporal(payload.path);
-    auto parent = path.parent_path();
-    auto &data = payload.data;
-
+fs_actor_t::error_ptr_t fs_actor_t::check_digest(const std::string &data, const std::string &hash,
+                                                 const bfs::path &path) noexcept {
     char digest_buff[SHA256_DIGEST_LENGTH];
     utils::digest(data.data(), data.size(), digest_buff);
     std::string_view digest(digest_buff, SHA256_DIGEST_LENGTH);
-    if (digest != payload.hash) {
-        auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
+    if (digest != hash) {
         std::string context = fmt::format("digest mismatch for {}", path.string());
-        auto ee = r::make_error(context, ec);
-        spdlog::warn("{}, on_write_request, digest mismatch: {}", identity, context);
-        return reply_with_error(req, ee);
+        auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
+        log->warn("{}, check_digest, digest mismatch: {}", identity, context);
+        return r::make_error(context, ec);
+    }
+    return {};
+}
+
+void fs_actor_t::on_initial_write_request(message::initial_write_request_t &req) noexcept {
+    log->trace("{}, on_initial_write_request", identity);
+    auto &payload = *req.payload.request_payload;
+    auto &data = payload.data;
+
+    auto digest_err = check_digest(data, payload.hash, payload.path);
+    if (digest_err) {
+        return reply_with_error(req, digest_err);
     }
 
+    auto path = make_temporal(payload.path);
+    auto parent = path.parent_path();
     sys::error_code ec;
+
     bool exists = bfs::exists(parent, ec);
     if (!exists) {
         bfs::create_directories(parent, ec);
@@ -264,34 +276,54 @@ void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
         }
     }
 
-    auto flags = std::ofstream::binary | std::ofstream::out;
-    if (bfs::exists(path)) {
-        flags |= std::ofstream::in;
+    bio::mapped_file_params params;
+    params.path = path.string();
+    params.flags = bio::mapped_file::mapmode::readwrite;
+    if (!bfs::exists(path)) {
+        params.new_file_size = payload.file_size;
     }
-    std::ofstream out(path.c_str(), flags);
-    out.seekp(payload.offset, out.beg);
-    if (out.fail()) {
-        spdlog::warn("{}, failed to seek {} on position {}", identity, path.c_str(), payload.offset);
-        auto ec = utils::make_error_code(utils::error_code_t::fs_error);
-        auto ee = make_error(ec);
-        return reply_with_error(req, ee);
-    }
+    auto file = std::make_unique<typename opened_file_t::element_type>();
+    file->open(params);
 
-    out.write(data.c_str(), data.size());
-    out.flush();
-    if (out.fail()) {
-        spdlog::warn("{}, failed to write to {}", identity, path.c_str());
-        auto ec = utils::make_error_code(utils::error_code_t::fs_error);
-        auto ee = make_error(ec);
-        return reply_with_error(req, ee);
-    }
+    auto disk_view = file->data();
+    std::copy(data.begin(), data.end(), disk_view + payload.offset);
 
     if (payload.final) {
+        file->close();
+        file.reset();
         sys::error_code ec;
         bfs::rename(path, payload.path, ec);
         if (ec) {
             return reply_with_error(req, make_error(ec));
         }
     }
-    reply_to(req);
+    reply_to(req, std::move(file));
+}
+
+void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
+    log->trace("{}, on_write_request", identity);
+    auto &payload = *req.payload.request_payload;
+    auto &file = payload.file;
+    auto &path = payload.path;
+    auto &data = payload.data;
+
+    auto digest_err = check_digest(data, payload.hash, payload.path);
+    if (digest_err) {
+        return reply_with_error(req, digest_err);
+    }
+
+    auto disk_view = file->data();
+    std::copy(data.begin(), data.end(), disk_view + payload.offset);
+
+    if (payload.final) {
+        file->close();
+        file.reset();
+        sys::error_code ec;
+        auto tmp_path = make_temporal(payload.path);
+        bfs::rename(tmp_path, path, ec);
+        if (ec) {
+            return reply_with_error(req, make_error(ec));
+        }
+    }
+    reply_to(req, std::move(file));
 }

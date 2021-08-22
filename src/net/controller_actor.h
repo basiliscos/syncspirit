@@ -9,6 +9,8 @@
 namespace syncspirit {
 namespace net {
 
+namespace bfs = boost::filesystem;
+
 struct controller_actor_config_t : r::actor_config_t {
     config::bep_config_t bep_config;
     model::cluster_ptr_t cluster;
@@ -18,6 +20,8 @@ struct controller_actor_config_t : r::actor_config_t {
     pt::time_duration request_timeout;
     payload::cluster_config_ptr_t peer_cluster_config;
     model::ignored_folders_map_t *ignored_folders;
+    size_t blocks_max_kept = 3;
+    size_t blocks_max_requested = 2;
 };
 
 template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -64,6 +68,16 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
         parent_t::config.ignored_folders = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&blocks_max_kept(size_t value) &&noexcept {
+        parent_t::config.blocks_max_kept = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&blocks_max_requested(size_t value) &&noexcept {
+        parent_t::config.blocks_max_requested = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct controller_actor_t : public r::actor_base_t {
@@ -83,8 +97,22 @@ struct controller_actor_t : public r::actor_base_t {
     };
 
   private:
-    using block_response_ptr_t = r::intrusive_ptr_t<message::block_response_t>;
+    struct raw_block_t {
+        std::string data;
+        std::string hash;
+        size_t offset;
+    };
+    using blocks_queue_t = std::list<raw_block_t>;
+    struct write_info_t {
+        using opened_file_t = fs::opened_file_t;
+        blocks_queue_t write_queue;
+        fs::opened_file_t file_desc;
+        model::file_info_ptr_t file;
+        bool final = false;
+    };
+
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
+    using write_map_t = std::unordered_map<std::string, write_info_t>;
 
     enum class ImmediateResult { DONE, NON_IMMEDIATE, ERROR };
 
@@ -92,6 +120,7 @@ struct controller_actor_t : public r::actor_base_t {
     void on_ready(message::ready_signal_t &message) noexcept;
     void on_store_folder(message::store_folder_response_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
+    void on_initial_write(fs::message::initial_write_response_t &message) noexcept;
     void on_write(fs::message::write_response_t &message) noexcept;
     void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
     void on_new_folder(message::store_new_folder_notify_t &message) noexcept;
@@ -107,7 +136,9 @@ struct controller_actor_t : public r::actor_base_t {
     void update(folder_updater_t &&updater) noexcept;
     ImmediateResult process_immediately() noexcept;
 
+    void on_final_block(const model::file_info_ptr_t &file) noexcept;
     void ready() noexcept;
+    void write_next_block(fs::opened_file_t &fd, const bfs::path &path, write_info_t &info) noexcept;
 
     model::cluster_ptr_t cluster;
     model::folder_ptr_t folder;
@@ -120,13 +151,17 @@ struct controller_actor_t : public r::actor_base_t {
     payload::cluster_config_ptr_t peer_cluster_config;
     model::ignored_folders_map_t *ignored_folders;
     peers_map_t peers_map;
+    write_map_t write_map;
 
     model::file_interator_t file_iterator;
     model::file_info_ptr_t current_file;
     model::blocks_interator_t block_iterator;
     std::uint_fast32_t blocks_requested = 0;
+    std::uint_fast32_t blocks_kept = 0;
     std::uint_fast32_t final_blocks = 0;
     int64_t request_pool;
+    size_t blocks_max_kept;
+    size_t blocks_max_requested;
     utils::logger_t log;
 };
 
