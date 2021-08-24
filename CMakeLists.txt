@@ -34,6 +34,8 @@ add_library(syncspirit_lib
     src/fs/fs_actor.cpp
     src/fs/fs_supervisor.cpp
     src/fs/utils.cpp
+    src/hasher/hasher_actor.cpp
+    src/hasher/hasher_supervisor.cpp
     src/model/block_info.cpp
     src/model/cluster.cpp
     src/model/device.cpp

@@ -173,10 +173,10 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     log->trace("{}, on_ready, blocks requested = {}, kept = {}", identity, blocks_requested, blocks_kept);
-    bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0)  // rx buff is going to be full
-                  || (blocks_kept > blocks_max_kept)                             // don't overload hasher / fs-writer
-                  || (state != r::state_t::OPERATIONAL)                          // we are shutting down
-                  || (!file_iterator && !block_iterator && blocks_requested)     // done
+    bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
+                  || (blocks_kept > blocks_max_kept)                            // don't overload hasher / fs-writer
+                  || (state != r::state_t::OPERATIONAL)                         // we are shutting down
+                  || (!file_iterator && !block_iterator && blocks_requested)    // done
         ;
 
     if (ignore) {
