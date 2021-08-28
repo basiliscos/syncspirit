@@ -2,6 +2,7 @@
 
 #include "../config/bep.h"
 #include "messages.h"
+#include "../utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 #include <map>
@@ -56,6 +57,7 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
     void on_connect_request(message::connect_request_t &msg) noexcept;
     void on_connect_notify(message::connect_notify_t &msg) noexcept;
 
+    utils::logger_t log;
     r::address_ptr_t coordinator;
     std::string_view device_name;
     const utils::key_pair_t &ssl_pair;

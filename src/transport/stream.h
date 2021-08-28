@@ -1,6 +1,5 @@
 #pragma once
 #include "base.h"
-#include <spdlog/spdlog.h>
 
 namespace syncspirit::transport {
 

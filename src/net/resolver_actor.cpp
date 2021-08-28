@@ -1,5 +1,4 @@
 #include "resolver_actor.h"
-#include "spdlog/spdlog.h"
 #include "names.h"
 
 using namespace syncspirit::net;
@@ -15,7 +14,9 @@ r::plugin::resource_id_t timer = 1;
 resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
     : r::actor_base_t{config}, io_timeout{config.resolve_timeout},
       strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, backend{strand.context()},
-      timer(strand.context()) {}
+      timer(strand.context()) {
+    log = utils::get_logger("net.resolver");
+}
 
 void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -28,7 +29,7 @@ void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void resolver_actor_t::on_start() noexcept {
-    spdlog::trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
     r::actor_base_t::on_start();
 }
 
@@ -158,7 +159,7 @@ void resolver_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
             return;
         }
     } else {
-        spdlog::warn("{}, on_timer_error :: {}", identity, ec.message());
+        LOG_WARN(log, "{}, on_timer_error :: {}", identity, ec.message());
     }
     process();
 }

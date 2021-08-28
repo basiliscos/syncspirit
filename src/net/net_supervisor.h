@@ -3,6 +3,7 @@
 #include "../model/device.h"
 #include "../model/cluster.h"
 #include "../ui/messages.hpp"
+#include "../utils/log.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
@@ -78,6 +79,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void load_db() noexcept;
     outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
 
+    utils::logger_t log;
     config::main_t app_config;
     r::address_ptr_t db_addr;
     r::address_ptr_t ssdp_addr;

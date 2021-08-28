@@ -4,7 +4,6 @@
 #include "../utils/tls.h"
 #include "../utils/error_code.h"
 #include "../proto/bep_support.h"
-#include <spdlog/spdlog.h>
 #include <boost/core/demangle.hpp>
 
 using namespace syncspirit::net;
@@ -294,7 +293,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     auto result = proto::parse_bep(buff);
     if (result.has_error()) {
         auto &ec = result.error();
-        log->warn("{}, on_read, error parsing message: {}", identity, ec.message());
+        LOG_WARN(log, "{}, on_read, error parsing message: {}", identity, ec.message());
         return do_shutdown(make_error(ec));
     }
     auto &value = result.value();
@@ -427,7 +426,7 @@ void peer_actor_t::on_cluster_config(message::cluster_config_t &msg) noexcept {
 }
 
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
-    log->trace("{}, read_hello", identity);
+    LOG_TRACE(log, "{}, read_hello", identity);
     std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;

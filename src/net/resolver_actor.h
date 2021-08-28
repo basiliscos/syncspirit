@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages.h"
+#include "../utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor.hpp>
 
@@ -89,6 +90,7 @@ struct resolver_actor_t : public r::actor_base_t {
         }
     }
 
+    utils::logger_t log;
     pt::time_duration io_timeout;
     asio::io_context::strand &strand;
     tcp::resolver backend;

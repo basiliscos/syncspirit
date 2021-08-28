@@ -178,7 +178,7 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
 void local_discovery_actor_t::on_read_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        spdlog::error("{}, on_read_error, error = {}", identity, ec.message());
+        LOG_ERROR(log, "{}, on_read_error, error = {}", identity, ec.message());
         do_shutdown(make_error(ec));
     }
 }

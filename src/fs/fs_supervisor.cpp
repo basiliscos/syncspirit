@@ -1,7 +1,6 @@
 #include "fs_supervisor.h"
 #include "../net/names.h"
 #include "fs_actor.h"
-#include <spdlog/spdlog.h>
 
 using namespace syncspirit::fs;
 

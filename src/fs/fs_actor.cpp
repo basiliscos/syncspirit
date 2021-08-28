@@ -3,7 +3,6 @@
 #include "../utils/error_code.h"
 #include "../utils/tls.h"
 #include "utils.h"
-#include <spdlog/spdlog.h>
 #include <fstream>
 
 namespace sys = boost::system;

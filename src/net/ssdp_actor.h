@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages.h"
+#include "../utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>
 #include <optional>
@@ -41,6 +42,7 @@ struct ssdp_actor_t : public r::actor_base_t {
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void timer_cancel() noexcept;
 
+    utils::logger_t log;
     asio::io_context::strand &strand;
     std::optional<r::request_id_t> timer_request;
     std::uint32_t max_wait;

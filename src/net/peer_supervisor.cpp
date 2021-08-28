@@ -2,14 +2,15 @@
 #include "peer_actor.h"
 #include "names.h"
 #include "../utils/error_code.h"
-#include <spdlog/spdlog.h>
 
 using namespace syncspirit::net;
 
 template <class> inline constexpr bool always_false_v = false;
 
 peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
-    : parent_t{cfg}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair}, bep_config(cfg.bep_config) {}
+    : parent_t{cfg}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair}, bep_config(cfg.bep_config) {
+    log = utils::get_logger("net.peer_supervisor");
+}
 
 void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -27,7 +28,7 @@ void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     auto &peer_addr = actor->get_address();
     auto &reason = actor->get_shutdown_reason();
-    spdlog::trace("{}, on_child_shutdown, {} due to {} ", identity, actor->get_identity(), reason->message());
+    LOG_TRACE(log, "{}, on_child_shutdown, {} due to {} ", identity, actor->get_identity(), reason->message());
     auto it_req = addr2req.find(peer_addr);
     if (it_req != addr2req.end()) {
         auto inner = utils::make_error_code(utils::error_code_t::cannot_connect_to_peer);
@@ -46,7 +47,7 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
 }
 
 void peer_supervisor_t::on_start() noexcept {
-    spdlog::trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
     parent_t::on_start();
 }
 
@@ -68,7 +69,7 @@ void peer_supervisor_t::on_connect_request(message::connect_request_t &msg) noex
                 auto &peer_id = arg.device_id;
                 auto &uris = arg.uris;
                 timeout *= uris.size();
-                spdlog::trace("{}, on_connect, initiating connection with {}", identity, peer_id);
+                LOG_TRACE(log, "{}, on_connect, initiating connection with {}", identity, peer_id);
                 return std::move(builder).peer_device_id(peer_id).uris(uris).finish()->get_address();
             } else if constexpr (std::is_same_v<T, P::connected_info_t>) {
                 return std::move(builder)

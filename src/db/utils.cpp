@@ -3,7 +3,6 @@
 #include "error_code.h"
 #include "prefix.h"
 #include <boost/endian/conversion.hpp>
-#include <spdlog.h>
 
 namespace syncspirit::db {
 

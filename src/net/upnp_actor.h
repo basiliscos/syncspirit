@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages.h"
+#include "../utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>
 #include <optional>
@@ -59,6 +60,7 @@ struct upnp_actor_t : public r::actor_base_t {
                       bool get_local_address = false) noexcept;
     void request_finish() noexcept;
 
+    utils::logger_t log;
     asio::ip::address local_address;
     utils::URI main_url;
     utils::URI igd_control_url;
