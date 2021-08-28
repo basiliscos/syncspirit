@@ -441,6 +441,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
 
     auto tbl = toml::table{{
         {"main", toml::table{{
+                     {"hasher_threads", cfg.hasher_threads},
                      {"timeout", cfg.timeout},
                      {"device_name", cfg.device_name},
                      {"default_location", cfg.default_location.c_str()},

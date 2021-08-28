@@ -31,7 +31,9 @@ typedef void (*callback_t)(cluster_supervisor_t *, syncspirit::model::folder_ptr
 
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
     : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, device{config.device}, cluster{config.cluster},
-      devices{config.devices}, folders{cluster->get_folders()}, ignored_folders(config.ignored_folders) {}
+      devices{config.devices}, folders{cluster->get_folders()}, ignored_folders(config.ignored_folders) {
+    log = utils::get_logger("net.cluster_supervisor");
+}
 
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     ra::supervisor_asio_t::configure(plugin);
@@ -55,7 +57,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
 }
 
 void cluster_supervisor_t::on_start() noexcept {
-    spdlog::trace("{}, on_start, folders count = {}", identity, folders.size());
+    log->trace("{}, on_start, folders count = {}", identity, folders.size());
     ra::supervisor_asio_t::on_start();
     if (folders.size()) {
         for (auto &it : folders) {
@@ -71,7 +73,7 @@ void cluster_supervisor_t::on_start() noexcept {
 }
 
 void cluster_supervisor_t::shutdown_start() noexcept {
-    spdlog::trace("{}, shutdown_start", identity);
+    log->trace("{}, shutdown_start", identity);
 
     for (auto &it : scan_folders_map) {
         send<fs::payload::scan_cancel_t>(fs, it.second.request_id);
@@ -81,7 +83,7 @@ void cluster_supervisor_t::shutdown_start() noexcept {
 
 void cluster_supervisor_t::handle_scan_initial(model::folder_ptr_t &folder) noexcept {
     if (scan_folders_map.size() == 1) {
-        spdlog::debug("{}, completed initial scan for {}", identity, folder->label());
+        log->debug("{}, completed initial scan for {}", identity, folder->label());
         send<payload::cluster_ready_notify_t>(coordinator, cluster, *devices);
     }
 }
@@ -96,7 +98,7 @@ void cluster_supervisor_t::handle_scan_new(model::folder_ptr_t &folder) noexcept
 }
 
 void cluster_supervisor_t::scan(const model::folder_ptr_t &folder, void *scan_handler) noexcept {
-    auto path = folder->get_path();
+    auto &path = folder->get_path();
     auto req_id = access<to::next_request_id>(to::next_request_id{});
     send<fs::payload::scan_request_t>(fs, path, get_address(), req_id, scan_handler);
     scan_folders_map.emplace(path, scan_info_t{folder, req_id});
@@ -107,7 +109,7 @@ void cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &messag
     auto &file_map = *message.payload.map_info;
     auto &path = file_map.root;
     auto &ec = file_map.ec;
-    spdlog::trace("{}, on_scan_complete for {}", identity, path.c_str());
+    log->trace("{}, on_scan_complete for {}", identity, path.c_str());
     resources->release(resource::fs_scan);
     auto it = scan_folders_map.find(path);
     assert(it != scan_folders_map.end());
@@ -115,7 +117,7 @@ void cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &messag
     if (!ec) {
         folder->update(file_map);
     } else {
-        spdlog::warn("{}, scanning {} error: {}", identity, path.c_str(), ec.message());
+        log->warn("{}, scanning {} error: {}", identity, path.c_str(), ec.message());
     }
 
     callback_t handler = reinterpret_cast<callback_t>(message.payload.custom_payload);
@@ -127,16 +129,16 @@ void cluster_supervisor_t::on_scan_error(fs::message::scan_error_t &message) noe
     // multiple messages might arrive
     auto &ec = message.payload.error;
     auto &path = message.payload.path;
-    spdlog::warn("{}, on_scan_error on '{}': {} ", identity, path.c_str(), ec.message());
+    log->warn("{}, on_scan_error on '{}': {} ", identity, path.c_str(), ec.message());
 }
 
 void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
-    spdlog::trace("{}, on_child_shutdown", identity);
+    log->trace("{}, on_child_shutdown", identity);
     ra::supervisor_asio_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
     if (state == r::state_t::OPERATIONAL) {
-        spdlog::debug("{}, on_child_shutdown, child {} termination: {}", identity, actor->get_identity(),
-                      reason->message());
+        log->debug("{}, on_child_shutdown, child {} termination: {}", identity, actor->get_identity(),
+                   reason->message());
         auto &addr = actor->get_address();
         auto it = addr2device_map.find(addr);
         auto it_r = device2addr_map.find(it->second);
@@ -151,8 +153,8 @@ void cluster_supervisor_t::on_create_folder(ui::message::create_folder_request_t
     auto &folder = p.folder;
     auto &source = p.source;
     auto source_index = p.source_index;
-    spdlog::trace("{}, on_create_folder, {} ({})", identity, folder.label(),
-                  (source ? source->device_id.get_short() : ""));
+    log->trace("{}, on_create_folder, {} ({})", identity, folder.label(),
+               (source ? source->device_id.get_short() : ""));
     request<payload::store_new_folder_request_t>(db, folder, source, source_index).send(init_timeout);
 }
 
@@ -161,7 +163,7 @@ void cluster_supervisor_t::on_share_folder(ui::message::share_folder_request_t &
     auto &p = message.payload.request_payload;
     auto &folder = p.folder;
     auto &peer = p.peer;
-    spdlog::trace("{}, on_share_folder, {} with ", identity, folder->label(), peer->device_id);
+    log->trace("{}, on_share_folder, {} with ", identity, folder->label(), peer->device_id);
     db::FolderInfo db_fi;
     auto fi = model::folder_info_ptr_t(new model::folder_info_t(db_fi, peer.get(), folder.get(), 0));
     fi->mark_dirty();
@@ -170,14 +172,14 @@ void cluster_supervisor_t::on_share_folder(ui::message::share_folder_request_t &
 
 void cluster_supervisor_t::on_store_new_folder(message::store_new_folder_response_t &message) noexcept {
     auto &f_src = message.payload.req->payload.request_payload.folder;
-    spdlog::trace("{}, on_store_new_folder, {}", identity, f_src.label());
+    log->trace("{}, on_store_new_folder, {}", identity, f_src.label());
     assert(create_folder_req);
     auto &ee = message.payload.ee;
     if (ee) {
         reply_with_error(*create_folder_req, ee);
     } else {
         auto &folder = message.payload.res.folder;
-        spdlog::debug("{}, created_folder {}/{}", identity, folder->id(), folder->label());
+        log->debug("{}, created_folder {}/{}", identity, folder->id(), folder->label());
         folders.put(folder);
         folder->assign_device(device);
         folder->assign_cluster(cluster.get());
@@ -196,12 +198,12 @@ void cluster_supervisor_t::on_store_folder_info(message::store_folder_info_respo
     auto &fi = message.payload.req->payload.request_payload.folder_info;
     auto device = fi->get_device();
     auto folder = fi->get_folder();
-    spdlog::trace("{}, on_store_folder_info (i.e. sharing), folder = {}, device = {}", identity, folder->label(),
-                  device->device_id);
+    log->trace("{}, on_store_folder_info (i.e. sharing), folder = {}, device = {}", identity, folder->label(),
+               device->device_id);
     auto ee = message.payload.ee;
     if (ee) {
-        spdlog::warn("{}, cannot share folder = {} with device = {}: {}", identity, folder->label(), device->device_id,
-                     ee->message());
+        log->warn("{}, cannot share folder = {} with device = {}: {}", identity, folder->label(), device->device_id,
+                  ee->message());
         reply_with_error(*share_folder_req, ee);
         return;
     }
@@ -213,7 +215,7 @@ void cluster_supervisor_t::on_store_folder_info(message::store_folder_info_respo
 void cluster_supervisor_t::on_connect(message::connect_notify_t &message) noexcept {
     auto &payload = message.payload;
     auto &device_id = payload.peer_device_id;
-    spdlog::trace("{}, on_connect, peer = {}", identity, payload.peer_device_id);
+    log->trace("{}, on_connect, peer = {}", identity, payload.peer_device_id);
     auto peer = devices->by_id(device_id.get_sha256());
     auto &cluster_config = payload.cluster_config;
     auto addr = create_actor<controller_actor_t>()

@@ -13,7 +13,7 @@ peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
 
 void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("peer_superivsor", false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("peer_supervisor", false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::peers, get_address());
         p.discover_name(names::coordinator, coordinator, true).link(false);

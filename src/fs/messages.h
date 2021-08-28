@@ -45,37 +45,25 @@ struct scan_cancel_t {
     r::request_id_t request_id;
 };
 
-struct write_response_t : r::arc_base_t<write_response_t> {
+struct open_response_t : r::arc_base_t<open_response_t> {
     opened_file_t file;
-    write_response_t(opened_file_t &&f) noexcept : file{std::move(f)} {}
+    open_response_t(opened_file_t &&f) noexcept : file{std::move(f)} {}
 };
 
-struct initial_write_request_t : r::arc_base_t<initial_write_request_t> {
-    using response_t = r::intrusive_ptr_t<write_response_t>;
+struct open_request_t {
+    using response_t = r::intrusive_ptr_t<open_response_t>;
     bfs::path path;
     size_t file_size;
-    size_t offset;
-    std::string data;
-    std::string hash;
-    bool final;
-
-    initial_write_request_t(const bfs::path &path_, size_t file_size_, size_t offset_, const std::string &data_,
-                            const std::string &hash_, bool final_) noexcept
-        : path{path_}, file_size{file_size_}, offset{offset_}, data{data_}, hash{hash_}, final{final_} {}
+    const void *custom;
 };
 
-struct write_request_t : r::arc_base_t<write_request_t> {
-    using response_t = r::intrusive_ptr_t<write_response_t>;
-    bfs::path path;
-    opened_file_t file;
-    size_t offset;
-    std::string data;
-    std::string hash;
-    bool final;
+struct close_response_t {};
 
-    write_request_t(const bfs::path &path_, opened_file_t file_, size_t offset_, const std::string &data_,
-                    const std::string &hash_, bool final_) noexcept
-        : path(path_), file{std::move(file_)}, offset{offset_}, data{data_}, hash{hash_}, final{final_} {}
+struct close_request_t : r::arc_base_t<close_request_t> {
+    using response_t = close_response_t;
+    opened_file_t file;
+    bfs::path path;
+    close_request_t(opened_file_t &&f, const bfs::path &path_) noexcept : file{std::move(f)}, path{path_} {}
 };
 
 } // namespace payload
@@ -87,11 +75,11 @@ using scan_response_t = r::message_t<payload::scan_response_t>;
 using scan_error_t = r::message_t<payload::scan_error_t>;
 using scan_cancel_t = r::message_t<payload::scan_cancel_t>;
 
-using initial_write_request_t = r::request_traits_t<payload::initial_write_request_t>::request::message_t;
-using initial_write_response_t = r::request_traits_t<payload::initial_write_request_t>::response::message_t;
+using open_request_t = r::request_traits_t<payload::open_request_t>::request::message_t;
+using open_response_t = r::request_traits_t<payload::open_request_t>::response::message_t;
 
-using write_request_t = r::request_traits_t<payload::write_request_t>::request::message_t;
-using write_response_t = r::request_traits_t<payload::write_request_t>::response::message_t;
+using close_request_t = r::request_traits_t<payload::close_request_t>::request::message_t;
+using close_response_t = r::request_traits_t<payload::close_request_t>::response::message_t;
 
 } // namespace message
 

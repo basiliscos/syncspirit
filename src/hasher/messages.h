@@ -28,7 +28,7 @@ struct validation_response_t {
 
 struct validation_request_t : r::arc_base_t<validation_request_t> {
     using response_t = validation_response_t;
-    std::string data;
+    std::string_view data;
     std::string hash;
     const void *custom;
 

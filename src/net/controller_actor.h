@@ -2,6 +2,7 @@
 
 #include "messages.h"
 #include "../fs/messages.h"
+#include "../hasher/messages.h"
 #include "../utils/log.h"
 #include <unordered_set>
 #include <optional>
@@ -20,8 +21,8 @@ struct controller_actor_config_t : r::actor_config_t {
     pt::time_duration request_timeout;
     payload::cluster_config_ptr_t peer_cluster_config;
     model::ignored_folders_map_t *ignored_folders;
-    size_t blocks_max_kept = 3;
-    size_t blocks_max_requested = 2;
+    size_t blocks_max_kept = 50;
+    size_t blocks_max_requested = 10;
 };
 
 template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -97,22 +98,19 @@ struct controller_actor_t : public r::actor_base_t {
     };
 
   private:
-    struct raw_block_t {
-        std::string data;
-        std::string hash;
-        size_t offset;
-    };
-    using blocks_queue_t = std::list<raw_block_t>;
+    using blocks_queue_t = std::list<r::intrusive_ptr_t<message::block_response_t>>;
     struct write_info_t {
         using opened_file_t = fs::opened_file_t;
-        blocks_queue_t write_queue;
+        blocks_queue_t validated_blocks;
         fs::opened_file_t file_desc;
         model::file_info_ptr_t file;
+        std::uint_fast32_t pending_blocks;
         bool final = false;
     };
 
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     using write_map_t = std::unordered_map<std::string, write_info_t>;
+    using write_it_t = typename write_map_t::iterator;
 
     enum class ImmediateResult { DONE, NON_IMMEDIATE, ERROR };
 
@@ -120,8 +118,9 @@ struct controller_actor_t : public r::actor_base_t {
     void on_ready(message::ready_signal_t &message) noexcept;
     void on_store_folder(message::store_folder_response_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
-    void on_initial_write(fs::message::initial_write_response_t &message) noexcept;
-    void on_write(fs::message::write_response_t &message) noexcept;
+    void on_validation(hasher::message::validation_response_t &res) noexcept;
+    void on_open(fs::message::open_response_t &res) noexcept;
+    void on_close(fs::message::close_response_t &res) noexcept;
     void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
     void on_new_folder(message::store_new_folder_notify_t &message) noexcept;
 
@@ -136,9 +135,8 @@ struct controller_actor_t : public r::actor_base_t {
     void update(folder_updater_t &&updater) noexcept;
     ImmediateResult process_immediately() noexcept;
 
-    void on_final_block(const model::file_info_ptr_t &file) noexcept;
     void ready() noexcept;
-    void write_next_block(fs::opened_file_t &fd, const bfs::path &path, write_info_t &info) noexcept;
+    void write_blocks(write_it_t) noexcept;
 
     model::cluster_ptr_t cluster;
     model::folder_ptr_t folder;
@@ -147,6 +145,7 @@ struct controller_actor_t : public r::actor_base_t {
     r::address_ptr_t peer_addr;
     r::address_ptr_t db;
     r::address_ptr_t fs;
+    r::address_ptr_t hasher_proxy;
     pt::time_duration request_timeout;
     payload::cluster_config_ptr_t peer_cluster_config;
     model::ignored_folders_map_t *ignored_folders;
@@ -156,9 +155,10 @@ struct controller_actor_t : public r::actor_base_t {
     model::file_interator_t file_iterator;
     model::file_info_ptr_t current_file;
     model::blocks_interator_t block_iterator;
+    // generic
     std::uint_fast32_t blocks_requested = 0;
     std::uint_fast32_t blocks_kept = 0;
-    std::uint_fast32_t final_blocks = 0;
+
     int64_t request_pool;
     size_t blocks_max_kept;
     size_t blocks_max_requested;

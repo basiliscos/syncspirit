@@ -1,6 +1,8 @@
 #include "fixture.h"
 #include "test-utils.h"
 #include "net/db_actor.h"
+#include "net/hasher_proxy_actor.h"
+#include "hasher/hasher_actor.h"
 #include "catch.hpp"
 
 using namespace syncspirit::test;
@@ -37,6 +39,8 @@ void Fixture::run() {
     sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
     sup->start();
     sup->create_actor<fs::fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
+    sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
+    sup->create_actor<net::hasher_proxy_actor_t>().hasher_threads(1).timeout(timeout).finish();
     sup->create_actor<db_actor_t>().db_dir((root_path / "db").string()).device(device_my).timeout(timeout).finish();
     peer = sup->create_actor<sample_peer_t>().timeout(timeout).finish();
 

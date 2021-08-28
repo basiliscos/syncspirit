@@ -5,6 +5,7 @@
 #include "../model/folder.h"
 #include "../fs/messages.h"
 #include "../ui/messages.hpp"
+#include "../utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 
@@ -88,6 +89,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     void handle_scan_initial(model::folder_ptr_t &folder) noexcept;
     void handle_scan_new(model::folder_ptr_t &folder) noexcept;
 
+    utils::logger_t log;
     r::address_ptr_t coordinator;
     r::address_ptr_t fs;
     r::address_ptr_t db;

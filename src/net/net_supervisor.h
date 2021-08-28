@@ -70,7 +70,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
-    void launch_db() noexcept;
+    void launch_early() noexcept;
     void launch_cluster() noexcept;
     void launch_ssdp() noexcept;
     void launch_net() noexcept;

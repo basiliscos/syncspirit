@@ -5,7 +5,6 @@
 #include "hasher/hasher_actor.h"
 #include <ostream>
 #include <fstream>
-#include <stdio.h>
 #include <net/names.h>
 
 namespace r = rotor;
@@ -36,7 +35,7 @@ struct hash_consumer_t : r::actor_base_t {
     }
 
     void request_validation(const std::string_view &data, const std::string_view &hash) {
-        request<payload::validation_request_t>(hasher, std::string(data), std::string(hash), nullptr)
+        request<payload::validation_request_t>(hasher, data, std::string(hash), nullptr)
             .send(init_timeout);
     }
 
@@ -54,14 +53,15 @@ TEST_CASE("hasher-actor", "[hasher]") {
     auto consumer = sup->create_actor<hash_consumer_t>().timeout(timeout).finish();
     sup->do_process();
 
-    consumer->request_digest("abcdef");
+    std::string data = "abcdef";
+    consumer->request_digest(data);
     sup->do_process();
     REQUIRE(consumer->digest_res);
     CHECK(consumer->digest_res->payload.res.weak == 136184406u);
-    auto &digest = consumer->digest_res->payload.res.digest;
+    auto digest = consumer->digest_res->payload.res.digest;
     CHECK(digest[2] == 126);
 
-    consumer->request_validation("abcdef", digest);
+    consumer->request_validation(data, digest);
     sup->do_process();
     REQUIRE(consumer->digest_res);
     CHECK(consumer->digest_res->payload.res.weak == 136184406u);

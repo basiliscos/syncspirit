@@ -41,8 +41,9 @@ struct fs_actor_t : public r::actor_base_t {
 
     void on_scan_request(message::scan_request_t &req) noexcept;
     void on_scan_cancel(message::scan_cancel_t &req) noexcept;
-    void on_initial_write_request(message::initial_write_request_t &req) noexcept;
-    void on_write_request(message::write_request_t &req) noexcept;
+
+    void on_open(message::open_request_t &req) noexcept;
+    void on_close(message::close_request_t &req) noexcept;
     void on_scan(message::scan_t &req) noexcept;
     void on_process(message::process_signal_t &) noexcept;
     void scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept;

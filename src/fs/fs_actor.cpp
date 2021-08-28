@@ -23,8 +23,8 @@ void fs_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&fs_actor_t::on_scan_cancel);
         p.subscribe_actor(&fs_actor_t::on_scan);
         p.subscribe_actor(&fs_actor_t::on_process);
-        p.subscribe_actor(&fs_actor_t::on_write_request);
-        p.subscribe_actor(&fs_actor_t::on_initial_write_request);
+        p.subscribe_actor(&fs_actor_t::on_open);
+        p.subscribe_actor(&fs_actor_t::on_close);
     });
 }
 
@@ -240,30 +240,9 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
     return 0;
 }
 
-fs_actor_t::error_ptr_t fs_actor_t::check_digest(const std::string &data, const std::string &hash,
-                                                 const bfs::path &path) noexcept {
-    char digest_buff[SHA256_DIGEST_LENGTH];
-    utils::digest(data.data(), data.size(), digest_buff);
-    std::string_view digest(digest_buff, SHA256_DIGEST_LENGTH);
-    if (digest != hash) {
-        std::string context = fmt::format("digest mismatch for {}", path.string());
-        auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-        log->warn("{}, check_digest, digest mismatch: {}", identity, context);
-        return r::make_error(context, ec);
-    }
-    return {};
-}
-
-void fs_actor_t::on_initial_write_request(message::initial_write_request_t &req) noexcept {
-    log->trace("{}, on_initial_write_request", identity);
-    auto &payload = *req.payload.request_payload;
-    auto &data = payload.data;
-
-    auto digest_err = check_digest(data, payload.hash, payload.path);
-    if (digest_err) {
-        return reply_with_error(req, digest_err);
-    }
-
+void fs_actor_t::on_open(message::open_request_t &req) noexcept {
+    log->trace("{}, on_open", identity);
+    auto &payload = req.payload.request_payload;
     auto path = make_temporal(payload.path);
     auto parent = path.parent_path();
     sys::error_code ec;
@@ -282,48 +261,41 @@ void fs_actor_t::on_initial_write_request(message::initial_write_request_t &req)
     if (!bfs::exists(path)) {
         params.new_file_size = payload.file_size;
     }
+
     auto file = std::make_unique<typename opened_file_t::element_type>();
-    file->open(params);
-
-    auto disk_view = file->data();
-    std::copy(data.begin(), data.end(), disk_view + payload.offset);
-
-    if (payload.final) {
-        file->close();
-        file.reset();
-        sys::error_code ec;
-        bfs::rename(path, payload.path, ec);
-        if (ec) {
-            return reply_with_error(req, make_error(ec));
-        }
+    try {
+        file->open(params);
+    } catch (const std::exception &ex) {
+        log->error("{}, error opening file {}: {}", identity, params.path, ex.what());
+        auto ec = sys::errc::make_error_code(sys::errc::io_error);
+        auto ee = make_error(ec);
+        reply_with_error(req, ee);
+        return;
     }
     reply_to(req, std::move(file));
 }
 
-void fs_actor_t::on_write_request(message::write_request_t &req) noexcept {
-    log->trace("{}, on_write_request", identity);
+void fs_actor_t::on_close(message::close_request_t &req) noexcept {
+    log->trace("{}, on_close", identity);
     auto &payload = *req.payload.request_payload;
     auto &file = payload.file;
     auto &path = payload.path;
-    auto &data = payload.data;
 
-    auto digest_err = check_digest(data, payload.hash, payload.path);
-    if (digest_err) {
-        return reply_with_error(req, digest_err);
-    }
-
-    auto disk_view = file->data();
-    std::copy(data.begin(), data.end(), disk_view + payload.offset);
-
-    if (payload.final) {
+    try {
         file->close();
-        file.reset();
-        sys::error_code ec;
-        auto tmp_path = make_temporal(payload.path);
-        bfs::rename(tmp_path, path, ec);
-        if (ec) {
-            return reply_with_error(req, make_error(ec));
-        }
+    } catch (const std::exception &ex) {
+        log->error("{}, error closing file {}: {}", identity, path.string(), ex.what());
+        auto ec = sys::errc::make_error_code(sys::errc::io_error);
+        auto ee = make_error(ec);
+        reply_with_error(req, ee);
+        return;
     }
-    reply_to(req, std::move(file));
+
+    sys::error_code ec;
+    auto tmp_path = make_temporal(payload.path);
+    bfs::rename(tmp_path, path, ec);
+    if (ec) {
+        return reply_with_error(req, make_error(ec));
+    }
+    reply_to(req);
 }
