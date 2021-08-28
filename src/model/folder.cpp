@@ -198,7 +198,7 @@ template <typename Message> void folder_t::update_generic(const Message &data, c
         mark_dirty();
     }
 
-    spdlog::trace("folder_t::update, folder_info = {} max seq = {}, device = {}", fi->get_db_key(), max_sequence,
+    spdlog::debug("folder_t::update, folder_info = {} max seq = {}, device = {}", fi->get_db_key(), max_sequence,
                   peer->device_id);
     /*
     auto local_folder_info = folder_infos.by_id(device->device_id.get_sha256());
