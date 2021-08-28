@@ -31,6 +31,7 @@ struct main_t {
 
     std::uint32_t timeout;
     std::string device_name;
+    std::uint32_t hasher_threads;
 };
 
 } // namespace syncspirit::config

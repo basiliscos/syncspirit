@@ -12,6 +12,7 @@
 #include "peer_supervisor.h"
 #include "dialer_actor.h"
 #include "db_actor.h"
+#include "hasher_proxy_actor.h"
 #include "names.h"
 #include <spdlog/spdlog.h>
 #include <boost/filesystem.hpp>
@@ -74,7 +75,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_store_device);
         p.subscribe_actor(&net_supervisor_t::on_store_ignored_folder);
         p.subscribe_actor(&net_supervisor_t::on_cluster_ready);
-        launch_db();
+        launch_early();
     });
 }
 
@@ -124,12 +125,14 @@ void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_erro
     }
 }
 
-void net_supervisor_t::launch_db() noexcept {
+void net_supervisor_t::launch_early() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     bfs::path path(app_config.config_path);
     auto db_dir = path.append("mbdx-db");
     db_addr =
         create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
+    auto threads = app_config.hasher_threads;
+    create_actor<hasher_proxy_actor_t>().timeout(timeout).hasher_threads(threads).finish();
 }
 
 void net_supervisor_t::load_db() noexcept {

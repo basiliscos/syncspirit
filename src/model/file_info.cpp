@@ -204,7 +204,12 @@ bool file_info_t::mark_local_available(size_t block_index) noexcept {
     return false;
 }
 
-bfs::path file_info_t::get_path() const noexcept { return folder->get_path() / std::string(get_name()); }
+const boost::filesystem::path &file_info_t::get_path() noexcept {
+    if (!path) {
+        path = folder->get_path() / std::string(get_name());
+    }
+    return path.value();
+}
 
 std::string file_info_t::get_full_name() const noexcept {
     return fmt::format("{}/{}", get_folder()->label(), get_name());

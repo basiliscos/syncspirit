@@ -34,6 +34,8 @@ add_library(syncspirit_lib
     src/fs/fs_actor.cpp
     src/fs/fs_supervisor.cpp
     src/fs/utils.cpp
+    src/hasher/hasher_actor.cpp
+    src/hasher/hasher_supervisor.cpp
     src/model/block_info.cpp
     src/model/cluster.cpp
     src/model/device.cpp
@@ -48,6 +50,7 @@ add_library(syncspirit_lib
     src/net/db_actor.cpp
     src/net/dialer_actor.cpp
     src/net/global_discovery_actor.cpp
+    src/net/hasher_proxy_actor.cpp
     src/net/http_actor.cpp
     src/net/local_discovery_actor.cpp
     src/net/net_supervisor.cpp

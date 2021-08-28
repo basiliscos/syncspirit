@@ -51,7 +51,8 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
     return lhs.local_announce_config == rhs.local_announce_config && lhs.upnp_config == rhs.upnp_config &&
            lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
            lhs.tui_config == rhs.tui_config && lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
-           lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs;
+           lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs &&
+           lhs.hasher_threads == rhs.hasher_threads;
 }
 
 bool operator==(const tui_config_t &lhs, const tui_config_t &rhs) noexcept {
@@ -120,6 +121,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "main/default_location is incorrect or missing";
         }
         c.default_location = default_location.value();
+
+        auto hasher_threads = t["hasher_threads"].value<std::uint32_t>();
+        if (!hasher_threads) {
+            return "main/hasher_threads is incorrect or missing";
+        }
+        c.hasher_threads = hasher_threads.value();
     };
 
     // log
@@ -434,6 +441,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
 
     auto tbl = toml::table{{
         {"main", toml::table{{
+                     {"hasher_threads", cfg.hasher_threads},
                      {"timeout", cfg.timeout},
                      {"device_name", cfg.device_name},
                      {"default_location", cfg.default_location.c_str()},
@@ -522,9 +530,10 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     cfg.default_location = bfs::path(home);
     cfg.timeout = 5000;
     cfg.device_name = device;
+    cfg.hasher_threads = 3;
     cfg.log_configs = {
         log_config_t {
-            "default", spdlog::level::level_enum::info, {"interactive"}
+            "default", spdlog::level::level_enum::info, {"stdout"}
         }
     };
     cfg.local_announce_config = local_announce_config_t {

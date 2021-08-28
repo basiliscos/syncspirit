@@ -5,43 +5,43 @@
 #include <rotor/thread.hpp>
 
 namespace syncspirit {
-namespace fs {
+namespace hasher {
 
 namespace r = rotor;
 namespace rth = rotor::thread;
 
-struct fs_supervisor_config_t : r::supervisor_config_t {
-    config::fs_config_t fs_config;
+struct hasher_supervisor_config_t : r::supervisor_config_t {
+    uint32_t index;
 };
 
-template <typename Supervisor> struct fs_supervisor_config_builder_t : r::supervisor_config_builder_t<Supervisor> {
+template <typename Supervisor> struct hasher_supervisor_config_builder_t : r::supervisor_config_builder_t<Supervisor> {
     using builder_t = typename Supervisor::template config_builder_t<Supervisor>;
     using parent_t = r::supervisor_config_builder_t<Supervisor>;
     using parent_t::parent_t;
 
-    builder_t &&fs_config(const config::fs_config_t &value) &&noexcept {
-        parent_t::config.fs_config = value;
+    builder_t &&index(uint32_t value) &&noexcept {
+        parent_t::config.index = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
 
-struct fs_supervisor_t : rth::supervisor_thread_t {
+struct hasher_supervisor_t : rth::supervisor_thread_t {
     using parent_t = rth::supervisor_thread_t;
-    using config_t = fs_supervisor_config_t;
-    template <typename Supervisor> using config_builder_t = fs_supervisor_config_builder_t<Supervisor>;
+    using config_t = hasher_supervisor_config_t;
+    template <typename Supervisor> using config_builder_t = hasher_supervisor_config_builder_t<Supervisor>;
 
-    explicit fs_supervisor_t(config_t &cfg);
+    hasher_supervisor_t(config_t &config);
+
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
 
   private:
     void launch() noexcept;
 
+    uint32_t index;
     utils::logger_t log;
-    config::fs_config_t fs_config;
     r::address_ptr_t coordinator;
-    r::actor_ptr_t fs_actor;
 };
 
-} // namespace fs
+} // namespace hasher
 } // namespace syncspirit

@@ -11,6 +11,7 @@ struct names {
     static const char *acceptor;
     static const char *db;
     static const char *fs;
+    static const char *hasher_proxy;
     static const char *global_discovery;
     static const char *local_discovery;
     static const char *peers;

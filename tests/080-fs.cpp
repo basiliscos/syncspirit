@@ -177,14 +177,14 @@ struct scan_consumer_t : r::actor_base_t {
     void on_error(message::scan_error_t &msg) noexcept { errors.emplace_back(&msg); }
 };
 
-struct write_consumer_t : r::actor_base_t {
+struct file_consumer_t : r::actor_base_t {
     using r::actor_base_t::actor_base_t;
-    using intial_write_ptr_t = r::intrusive_ptr_t<message::initial_write_response_t>;
-    using write_ptr_t = r::intrusive_ptr_t<message::write_response_t>;
+    using open_file_ptr_t = r::intrusive_ptr_t<message::open_response_t>;
+    using close_file_ptr_t = r::intrusive_ptr_t<message::close_response_t>;
 
     r::address_ptr_t fs_actor;
-    write_ptr_t write_response;
-    intial_write_ptr_t initial_write_response;
+    open_file_ptr_t open_response;
+    close_file_ptr_t close_response;
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept {
         r::actor_base_t::configure(plugin);
@@ -192,24 +192,20 @@ struct write_consumer_t : r::actor_base_t {
             [&](auto &p) { p.discover_name(net::names::fs, fs_actor, true).link(); });
 
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-            p.subscribe_actor(&write_consumer_t::on_write_response);
-            p.subscribe_actor(&write_consumer_t::on_iwrite_response);
+            p.subscribe_actor(&file_consumer_t::on_open);
+            p.subscribe_actor(&file_consumer_t::on_close);
         });
     }
 
-    void on_write_response(message::write_response_t &res) noexcept { write_response = &res; }
-    void on_iwrite_response(message::initial_write_response_t &res) noexcept { initial_write_response = &res; }
+    void on_open(message::open_response_t &res) noexcept { open_response = &res; }
+    void on_close(message::close_response_t &res) noexcept { close_response = &res; }
 
-    void mk_initial_request(const bfs::path &path, size_t file_size, const std::string &data, const std::string &hash,
-                            bool final, size_t offset = 0) noexcept {
-        request<payload::initial_write_request_t>(fs_actor, path, file_size, offset, data, hash, final)
-            .send(init_timeout);
+    void open_request(const bfs::path &path, size_t file_size) noexcept {
+        request<payload::open_request_t>(fs_actor, path, file_size, nullptr).send(init_timeout);
     }
 
-    void mk_request(const bfs::path &path, fs::opened_file_t file, const std::string &data, size_t offset,
-                    const std::string &hash, bool final = true) noexcept {
-        request<payload::write_request_t>(fs_actor, path, std::move(file), offset, data, hash, final)
-            .send(init_timeout);
+    void close_request(fs::opened_file_t file, const bfs::path &path) noexcept {
+        request<payload::close_request_t>(fs_actor, std::move(file), path).send(init_timeout);
     }
 };
 
@@ -327,82 +323,65 @@ TEST_CASE("fs-actor", "[fs]") {
         }
     };
 
-    SECTION("write") {
-        sup->create_actor<fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
-        auto act = sup->create_actor<write_consumer_t>().timeout(timeout).finish();
+    SECTION("open/close") {
+        auto fs_actor = sup->create_actor<fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
+        auto act = sup->create_actor<file_consumer_t>().timeout(timeout).finish();
         sup->do_process();
 
         const std::string data = "123456980";
-        std::string hash;
-        hash.resize(SHA256_DIGEST_LENGTH);
-        utils::digest(data.data(), data.size(), hash.data());
+        auto path = root_path / "my-dir" / "my-file";
+        act->open_request(path, data.size());
 
-        SECTION("success case, file of 2 pieces") {
-            auto path = root_path / "my-file";
-            const std::string tail = "abcdefg";
-            auto file_size = data.size() + tail.size();
-
-            act->mk_initial_request(path, file_size, data, hash, false);
+        SECTION("success case") {
             sup->do_process();
 
-            REQUIRE(act->initial_write_response);
-            auto &r = act->initial_write_response->payload;
+            REQUIRE(act->open_response);
+            auto &r = act->open_response->payload;
             CHECK(!r.ee);
             auto &file = r.res->file;
             CHECK(file);
 
-            SECTION("tmp file is missing") {
-                auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
-                sup->do_process();
-                CHECK(act->errors.empty());
-                REQUIRE(act->response);
-                auto &r = act->response->payload.map_info;
-                CHECK(r->root == root_path);
-                CHECK(r->map.empty());
-            }
+            std::copy(data.begin(), data.end(), file->data());
 
-            SECTION("append/final") {
-                utils::digest(tail.data(), tail.size(), hash.data());
-                act->mk_request(path, std::move(file), tail, data.size(), hash, true);
-                sup->do_process();
-                REQUIRE(act->write_response);
-                auto &r = act->write_response->payload;
-                CHECK(!r.ee);
-                CHECK(!r.res->file);
-                CHECK(read_file(path) == data + tail);
-            }
-        }
-
-        SECTION("success case in subfolder, and 1 block file") {
-            auto path = root_path / "dir" / "my-file";
-            act->mk_initial_request(path, data.size(), data, hash, true);
+            act->close_request(std::move(file), path);
             sup->do_process();
 
-            REQUIRE(act->initial_write_response);
-            auto &r = act->initial_write_response->payload;
-            CHECK(!r.ee);
-            CHECK(!r.res->file);
-            CHECK(read_file(root_path / "dir" / "my-file") == data);
+            REQUIRE(act->close_response);
+            CHECK(!act->close_response->payload.ee);
+            CHECK(read_file(path) == data);
         }
 
-        SECTION("wrong hash") {
-            auto path = root_path / "my-file-with-wrong-hash";
-            hash[0] = hash[0] * -1;
-            act->mk_initial_request(path, data.size(), data, hash, true);
+        SECTION("fail to open") {
+            bfs::create_directories(path.parent_path() / "my-file.syncspirit-tmp");
             sup->do_process();
 
-            REQUIRE(act->initial_write_response);
-            auto &r = act->initial_write_response->payload;
-            CHECK(!bfs::exists(path));
-            CHECK(r.ee);
-            auto ec = r.ee->ec;
-            CHECK(ec.value() == (int)utils::protocol_error_code_t::digest_mismatch);
+            REQUIRE(act->open_response);
+            auto &ee = act->open_response->payload.ee;
+            CHECK(ee);
+            CHECK(ee->root()->ec.value() == sys::errc::io_error);
+        }
+
+        SECTION("fail to close") {
+            sup->do_process();
+
+            REQUIRE(act->open_response);
+            auto &file = act->open_response->payload.res->file;
+            std::copy(data.begin(), data.end(), file->data());
+
+            act->close_request(std::move(file), path);
+            bfs::create_directories(path);
+            sup->do_process();
+
+            REQUIRE(act->close_response);
+            auto &ee = act->close_response->payload.ee;
+            CHECK(ee);
+            CHECK(ee->root()->ec.value());
         }
     }
 
     SECTION("scan temporaries") {
         sup->create_actor<fs_actor_t>().fs_config({1024, 5, 10}).timeout(timeout).finish();
-        auto writer = sup->create_actor<write_consumer_t>().timeout(timeout).finish();
+        auto writer = sup->create_actor<file_consumer_t>().timeout(timeout).finish();
         sup->do_process();
 
         auto path = root_path / "my-file";
@@ -411,12 +390,7 @@ TEST_CASE("fs-actor", "[fs]") {
         hash.resize(SHA256_DIGEST_LENGTH);
         utils::digest(data.data(), data.size(), hash.data());
 
-        writer->mk_initial_request(path, data.size(), data, hash, false);
-        sup->do_process();
-        REQUIRE(writer->initial_write_response);
-        CHECK(!writer->initial_write_response->payload.ee);
-        writer->initial_write_response.reset(); // should cause flush
-        CHECK(read_file(root_path / "my-file.syncspirit-tmp") == data);
+        write_file(root_path / "my-file.syncspirit-tmp", data);
 
         auto scaner = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
         sup->do_process();
@@ -426,6 +400,7 @@ TEST_CASE("fs-actor", "[fs]") {
         CHECK(r->root == root_path);
         CHECK(!r->map.empty());
         auto it = r->map.begin();
+        CHECK(it->first == path.filename());
         auto &file = it->second;
         CHECK(file.temp);
         CHECK(it->first == "my-file");

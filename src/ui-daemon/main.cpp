@@ -13,6 +13,7 @@
 #include "utils/log.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"
+#include "hasher/hasher_supervisor.h"
 #include "command.h"
 #include "governor_actor.h"
 
@@ -46,7 +47,7 @@ int main(int argc, char **argv) {
     try {
 
 #if defined(__linux__)
-        pthread_setname_np(pthread_self(), "syncspirit/main");
+        pthread_setname_np(pthread_self(), "ss/main");
 #endif
 
         // clang-format off
@@ -171,7 +172,6 @@ int main(int argc, char **argv) {
                            .create_registry()
                            .guard_context(true)
                            .finish();
-        // auxiliary payload
         sup_net->start();
 
         rth::system_context_thread_t fs_context;
@@ -180,12 +180,26 @@ int main(int argc, char **argv) {
                           .registry_address(sup_net->get_registry_address())
                           .fs_config(cfg.fs_config)
                           .finish();
+        // auxiliary payload
         fs_sup->create_actor<governor_actor_t>().commands(std::move(commands)).timeout(timeout).finish();
+
+        auto hasher_count = cfg.hasher_threads;
+        using sys_thread_context_ptr_t = r::intrusive_ptr_t<rth::system_context_thread_t>;
+        std::vector<sys_thread_context_ptr_t> hasher_ctxs;
+        for (uint32_t i = 1; i <= hasher_count; ++i) {
+            hasher_ctxs.push_back(new rth::system_context_thread_t{});
+            auto &ctx = hasher_ctxs.back();
+            ctx->create_supervisor<hasher::hasher_supervisor_t>()
+                .timeout(timeout)
+                .registry_address(sup_net->get_registry_address())
+                .index(i)
+                .finish();
+        }
 
         /* launch actors */
         auto net_thread = std::thread([&]() {
 #if defined(__linux__)
-            pthread_setname_np(pthread_self(), "syncspirit/net");
+            pthread_setname_np(pthread_self(), "ss/net");
 #endif
             io_context.run();
             shutdown_flag = true;
@@ -194,12 +208,27 @@ int main(int argc, char **argv) {
 
         auto fs_thread = std::thread([&]() {
 #if defined(__linux__)
-            pthread_setname_np(pthread_self(), "syncspirit/fs");
+            pthread_setname_np(pthread_self(), "ss/fs");
 #endif
             fs_context.run();
             shutdown_flag = true;
             spdlog::trace("fs thread has been terminated");
         });
+
+        auto hasher_threads = std::vector<std::thread>();
+        for (uint32_t i = 0; i < hasher_count; ++i) {
+            auto &ctx = hasher_ctxs.at(i);
+            auto thread = std::thread([ctx = ctx, i = i]() {
+#if defined(__linux__)
+                std::string name = "ss/hasher-" + std::to_string(i + 1);
+                pthread_setname_np(pthread_self(), name.c_str());
+#endif
+                ctx->run();
+                shutdown_flag = true;
+                spdlog::trace("{} thread has been terminated", name);
+            });
+            hasher_threads.emplace_back(std::move(thread));
+        }
 
         // main loop;
         while (!shutdown_flag) {
@@ -217,6 +246,11 @@ int main(int argc, char **argv) {
 
         spdlog::trace("waiting fs thread termination");
         fs_thread.join();
+
+        spdlog::trace("waiting hasher threads termination");
+        for (auto &thread : hasher_threads) {
+            thread.join();
+        }
 
         spdlog::trace("waiting net thread termination");
         net_thread.join();

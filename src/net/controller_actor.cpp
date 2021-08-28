@@ -46,6 +46,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::db, db, false).link(true);
         p.discover_name(names::fs, fs, false).link(true);
+        p.discover_name(names::hasher_proxy, hasher_proxy, false).link();
     });
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(peer_addr, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -55,8 +56,9 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&controller_actor_t::on_new_folder);
         p.subscribe_actor(&controller_actor_t::on_ready);
         p.subscribe_actor(&controller_actor_t::on_block);
-        p.subscribe_actor(&controller_actor_t::on_initial_write);
-        p.subscribe_actor(&controller_actor_t::on_write);
+        p.subscribe_actor(&controller_actor_t::on_validation);
+        p.subscribe_actor(&controller_actor_t::on_open);
+        p.subscribe_actor(&controller_actor_t::on_close);
     });
 }
 
@@ -97,7 +99,7 @@ void controller_actor_t::shutdown_start() noexcept {
 
 controller_actor_t::ImmediateResult controller_actor_t::process_immediately() noexcept {
     assert(current_file);
-    auto path = current_file->get_path();
+    auto &path = current_file->get_path();
     auto parent = path.parent_path();
     sys::error_code ec;
     if (current_file->is_deleted()) {
@@ -173,10 +175,10 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     log->trace("{}, on_ready, blocks requested = {}, kept = {}", identity, blocks_requested, blocks_kept);
-    bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0)  // rx buff is going to be full
-                  || (blocks_kept > blocks_max_kept)                             // don't overload hasher / fs-writer
-                  || (state != r::state_t::OPERATIONAL)                          // we are shutting down
-                  || (!file_iterator && !block_iterator && blocks_requested)     // done
+    bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
+                  || (blocks_kept > blocks_max_kept)                            // don't overload hasher / fs-writer
+                  || (state != r::state_t::OPERATIONAL)                         // we are shutting down
+                  || (!file_iterator && !block_iterator && blocks_requested)    // done
         ;
 
     if (ignore) {
@@ -335,120 +337,106 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto block_index = payload.block_index;
     auto &blocks = file->get_blocks();
     bool final = file->mark_local_available(block_index);
-    auto path = file->get_path();
+    auto &path = file->get_path();
     auto &block = *payload.block;
     auto &hash = block.get_hash();
     request_pool += block.get_size();
-    if (final) {
-        ++final_blocks;
-    }
-    auto offset = file->get_block_offset(block_index);
 
     auto &path_str = path.string();
     if (write_map.count(path_str) == 0) {
-        using request_t = fs::payload::initial_write_request_t;
+        using request_t = fs::payload::open_request_t;
         write_map[path_str].file = file;
-        write_map[path_str].final = final;
         auto file_sz = static_cast<size_t>(file->get_size());
-        request<request_t>(fs, path, file_sz, offset, std::move(data), std::move(hash), final).send(init_timeout);
-        return ready();
+        request<request_t>(fs, path, file_sz).send(init_timeout);
     }
 
     auto &info = write_map.at(path_str);
     info.final = final;
-    info.write_queue.emplace_back(raw_block_t{std::move(data), std::move(hash), offset});
-    if (info.file_desc) {
-        write_next_block(info.file_desc, path, info);
-    }
+    ++info.pending_blocks;
+    intrusive_ptr_add_ref(&message);
+    request<hasher::payload::validation_request_t>(hasher_proxy, data, std::move(hash), &message).send(init_timeout);
     return ready();
 }
 
-void controller_actor_t::on_initial_write(fs::message::initial_write_response_t &message) noexcept {
-    --blocks_kept;
-    auto &payload = message.payload;
+void controller_actor_t::on_open(fs::message::open_response_t &res) noexcept {
+    auto &payload = res.payload;
     auto &ee = payload.ee;
     if (ee) {
-        log->warn("{}, on_write failed : {}", identity, ee->message());
+        log->warn("{}, on_open failed : {}", identity, ee->message());
         return do_shutdown(ee);
     }
 
-    auto &rp = *payload.req->payload.request_payload;
-    auto it = write_map.find(rp.path.string());
+    auto &path_str = payload.req->payload.request_payload.path.string();
+    auto it = write_map.find(path_str);
     assert(it != write_map.end());
-    bool final = rp.final;
-
     auto &info = it->second;
-    auto &file = it->second.file;
-    auto &opened_file = payload.res->file;
-    if (final) {
-        --final_blocks;
-        if (file->get_status() == model::file_status_t::sync && !final_blocks) {
-            on_final_block(file);
-        }
-        write_map.erase(it);
-    } else if (!info.write_queue.empty()) {
-        write_next_block(payload.res->file, rp.path, info);
-    } else {
-        assert(opened_file);
-        info.file_desc = std::move(opened_file);
+    info.file_desc = std::move(payload.res->file);
+    if (info.validated_blocks.size()) {
+        write_blocks(it);
     }
-    ready();
 }
 
-void controller_actor_t::on_write(fs::message::write_response_t &message) noexcept {
-    --blocks_kept;
-    auto &payload = message.payload;
+void controller_actor_t::on_close(fs::message::close_response_t &res) noexcept {
+    auto &payload = res.payload;
     auto &ee = payload.ee;
     if (ee) {
-        log->warn("{}, on_write failed : {}", identity, ee->message());
+        log->warn("{}, on_close failed : {}", identity, ee->message());
         return do_shutdown(ee);
     }
-
-    auto &rp = *payload.req->payload.request_payload;
-    auto it = write_map.find(rp.path.string());
+    auto &path_str = payload.req->payload.request_payload->path.string();
+    auto it = write_map.find(path_str);
     assert(it != write_map.end());
-    bool final = rp.final;
+    write_map.erase(it);
+}
 
-    auto &info = it->second;
-    auto &file = it->second.file;
-    auto &opened_file = payload.res->file;
-    if (final) {
-        --final_blocks;
-        if (file->get_status() == model::file_status_t::sync && !final_blocks) {
-            on_final_block(file);
-        }
-        write_map.erase(it);
-    } else if (!info.write_queue.empty()) {
-        write_next_block(opened_file, rp.path, info);
+void controller_actor_t::on_validation(hasher::message::validation_response_t &res) noexcept {
+    auto &ee = res.payload.ee;
+    if (ee) {
+        log->warn("{}, on_validation failed : {}", identity, ee->message());
+        return do_shutdown(ee);
+    }
+    auto block_res = (message::block_response_t *)res.payload.req->payload.request_payload->custom;
+    auto &payload = block_res->payload.req->payload.request_payload;
+    auto &file = payload.file;
+    auto &path = file->get_path();
+
+    if (!res.payload.res.valid) {
+        std::string context = fmt::format("digest mismatch for {}", path.string());
+        auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
+        log->warn("{}, check_digest, digest mismatch: {}", identity, context);
+        auto ee = r::make_error(context, ec);
+        do_shutdown(ee);
     } else {
-        assert(opened_file);
-        info.file_desc = std::move(opened_file);
+        auto it = write_map.find(path.string());
+        assert(it != write_map.end());
+        auto &info = it->second;
+        --info.pending_blocks;
+        info.validated_blocks.emplace_back(block_res);
+        if (info.file_desc) {
+            write_blocks(it);
+        }
+    }
+    intrusive_ptr_release(block_res);
+}
+
+void controller_actor_t::write_blocks(write_it_t it) noexcept {
+    auto &info = it->second;
+    auto disk_view = info.file_desc->data();
+    auto &blocks = info.validated_blocks;
+    while (!blocks.empty()) {
+        auto &res = blocks.front();
+        auto &payload = res->payload;
+        auto &req_payload = payload.req->payload.request_payload;
+        auto &file = req_payload.file;
+        auto &data = payload.res.data;
+        auto block_index = req_payload.block_index;
+        auto offset = file->get_block_offset(block_index);
+        std::copy(data.begin(), data.end(), disk_view + offset);
+        blocks.pop_front();
+        --blocks_kept;
+    }
+    if (info.final && info.pending_blocks == 0) {
+        request<fs::payload::close_request_t>(fs, std::move(info.file_desc), info.file->get_path()).send(init_timeout);
     }
     ready();
-}
-
-void controller_actor_t::on_final_block(const model::file_info_ptr_t &file) noexcept {
-    log->trace("{}, wrote final block for {}", identity, file->get_path());
-    auto folder = file->get_folder();
-    auto fi = folder->get_folder_info(device);
-    auto seq = fi->get_max_sequence();
-    auto new_seq = file->get_sequence();
-    if (new_seq > seq) {
-        log->trace("{}, updated max sequence '{}' on local device: {} -> {}", identity, folder->label(), seq, new_seq);
-        fi->update_max_sequence(new_seq);
-        request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
-    }
-}
-
-void controller_actor_t::write_next_block(fs::opened_file_t &fd, const bfs::path &path, write_info_t &info) noexcept {
-    using request_t = fs::payload::write_request_t;
-
-    auto &queue = info.write_queue;
-    assert(fd && "non-final block should return opened file");
-    assert(queue.size());
-    auto &next = queue.front();
-    bool final = info.final && queue.size() == 1;
-    request<request_t>(fs, path, std::move(fd), next.offset, std::move(next.data), std::move(next.hash), final)
-        .send(init_timeout);
-    queue.pop_front();
 }

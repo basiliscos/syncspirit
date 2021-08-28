@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <optional>
 #include <boost/filesystem.hpp>
 #include "arc.hpp"
 #include "map.hpp"
@@ -95,7 +96,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
 
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
-    bfs::path get_path() const noexcept;
+    const bfs::path &get_path() noexcept;
 
   private:
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
@@ -121,6 +122,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     blocks_t local_blocks;
     size_t local_blocks_count = 0;
     file_status_t status = file_status_t::older;
+    std::optional<bfs::path> path;
 };
 
 inline const std::string db_key(const file_info_ptr_t &item) noexcept { return item->get_db_key(); }

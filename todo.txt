@@ -1,11 +1,12 @@
+- LOG_MACROS() && log object;
+
+
+- initial file scannig should use hashers
 - model: когда добавляется symlink, папка
-- controller: защитить от перегрузки fs_actor?
-- LOG_MACROS();
 - store_new_folder_request_t: выкинуть peer, peer_source
 - test: continue downloading temporaries
 - test: fs_actor, deleted file from index
 - test: controller, share folder -> index is sent
-- fs_actor: fsync/fsync_data on file end?
 - inactivity-shutdowner
 - when file downloading complete, update in DB it's sequence
 - start syncing folder when new folder has been added, нужно слать cancel{}
