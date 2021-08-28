@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../transport/http.h"
+#include "../utils/log.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor.hpp>
@@ -83,6 +84,7 @@ struct http_actor_t : public r::actor_base_t {
     void write_request() noexcept;
     void start_shutdown_timer() noexcept;
 
+    utils::logger_t log;
     pt::time_duration resolve_timeout;
     pt::time_duration request_timeout;
     std::string registry_name;

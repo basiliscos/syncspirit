@@ -2,6 +2,7 @@
 
 #include "messages.h"
 #include "mdbx.h"
+#include "../utils/log.h"
 #include <optional>
 #include <random>
 
@@ -50,6 +51,8 @@ struct db_actor_t : public r::actor_base_t {
     void on_store_folder(message::store_folder_request_t &message) noexcept;
 
     void open() noexcept;
+
+    utils::logger_t log;
     std::random_device rd;
     std::uniform_int_distribution<std::int64_t> distribution;
     std::mt19937 generator;

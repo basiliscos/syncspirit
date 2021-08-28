@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages.h"
+#include "../utils/log.h"
 #include <boost/asio.hpp>
 #include <optional>
 
@@ -74,6 +75,7 @@ struct global_discovery_actor_t : public r::actor_base_t {
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff) noexcept;
 
+    utils::logger_t log;
     r::address_ptr_t http_client;
     r::address_ptr_t coordinator;
     tcp::endpoint endpoint;

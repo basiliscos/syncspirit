@@ -1,6 +1,5 @@
 #include "http_actor.h"
 #include "../utils/error_code.h"
-#include "spdlog/spdlog.h"
 #include "names.h"
 
 using namespace syncspirit::net;
@@ -14,7 +13,9 @@ r::plugin::resource_id_t request_timer = 1;
 
 http_actor_t::http_actor_t(config_t &config)
     : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout),
-      request_timeout(config.request_timeout), registry_name{config.registry_name}, keep_alive{config.keep_alive} {}
+      request_timeout(config.request_timeout), registry_name{config.registry_name}, keep_alive{config.keep_alive} {
+    log = utils::get_logger("net.http");
+}
 
 void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -87,12 +88,12 @@ void http_actor_t::process() noexcept {
 
     if (keep_alive && kept_alive) {
         if (url.host == resolved_url.host && url.port == resolved_url.port) {
-            spdlog::trace("{} reusing connection", identity);
+            LOG_TRACE(log, "{} reusing connection", identity);
             spawn_timer();
             write_request();
         } else {
-            spdlog::warn("{} :: different endpoint is used: {}:{} vs {}:{}", identity, resolved_url.host,
-                         resolved_url.port, url.host, url.port);
+            LOG_WARN(log, "{} :: different endpoint is used: {}:{} vs {}:{}", identity, resolved_url.host,
+                     resolved_url.port, url.host, url.port);
             kept_alive = false;
             transport->cancel();
             return;
@@ -113,7 +114,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     resolve_request.reset();
     auto &ee = res.payload.ee;
     if (ee) {
-        spdlog::warn("{}, on_resolve error: {}", identity, ee->message());
+        LOG_WARN(log, "{}, on_resolve error: {}", identity, ee->message());
         reply_with_error(*queue.front(), ee);
         queue.pop_front();
         need_response = false;
@@ -155,7 +156,7 @@ void http_actor_t::on_connect(resolve_it_t) noexcept {
         sys::error_code ec;
         local_address = transport->local_address(ec);
         if (ec) {
-            spdlog::warn("{}, on_connect, get local addr error :: {}", identity, ec.message());
+            LOG_WARN(log, "{}, on_connect, get local addr error :: {}", identity, ec.message());
             reply_with_error(*queue.front(), make_error(ec));
             queue.pop_front();
             need_response = false;
@@ -176,7 +177,7 @@ void http_actor_t::write_request() noexcept {
     auto &payload = *queue.front()->payload.request_payload;
     auto &url = payload.url;
     auto &data = payload.data;
-    spdlog::trace("{} :: sending {} bytes to {} ", identity, data.size(), url.full);
+    LOG_TRACE(log, "{} :: sending {} bytes to {} ", identity, data.size(), url.full);
     auto buff = asio::buffer(data.data(), data.size());
     /*
     std::string write_data{(const char *)buff.data(), data.size()};
@@ -228,7 +229,7 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     kept_alive = false;
     if (ec != asio::error::operation_aborted) {
-        spdlog::warn("{}, on_io_error :: {}", identity, ec.message());
+        LOG_WARN(log, "{}, on_io_error :: {}", identity, ec.message());
     }
     if (resources->has(resource::request_timer)) {
         cancel_timer(*timer_request);
@@ -254,7 +255,7 @@ void http_actor_t::on_handshake(bool, utils::x509_t &, const tcp::endpoint &, co
 void http_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        spdlog::warn("{}, on_handshake_error :: {}", identity, ec.message());
+        LOG_WARN(log, "{}, on_handshake_error :: {}", identity, ec.message());
     }
     if (!need_response || stop_io) {
         return process();
@@ -292,12 +293,12 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 }
 
 void http_actor_t::on_start() noexcept {
-    spdlog::trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
     r::actor_base_t::on_start();
 }
 
 void http_actor_t::shutdown_finish() noexcept {
-    spdlog::trace("{}, shutdown_finish", identity);
+    LOG_TRACE(log, "{}, shutdown_finish", identity);
     r::actor_base_t::shutdown_finish();
     transport.reset();
 }

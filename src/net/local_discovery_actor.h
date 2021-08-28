@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages.h"
+#include "../utils/log.h"
 #include <boost/asio.hpp>
 #include <optional>
 
@@ -60,6 +61,7 @@ struct local_discovery_actor_t : public r::actor_base_t {
     void on_write_error(const sys::error_code &ec) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
 
+    utils::logger_t log;
     r::address_ptr_t acceptor;
     r::pt::time_duration frequency;
     model::device_ptr_t device;

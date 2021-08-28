@@ -1,6 +1,5 @@
 #include "db_actor.h"
 #include "names.h"
-#include "spdlog/spdlog.h"
 #include <cstddef>
 #include <string_view>
 #include "../db/utils.h"
@@ -18,9 +17,10 @@ r::plugin::resource_id_t db = 0;
 
 db_actor_t::db_actor_t(config_t &config)
     : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, device{config.device}, generator(rd()) {
+    log = utils::get_logger("net.db");
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
-        spdlog::critical("{}, mbdx environment creation error ({}): {}", r, mdbx_strerror(r), names::db);
+        LOG_CRITICAL(log, "{}, mbdx environment creation error ({}): {}", r, mdbx_strerror(r), names::db);
         throw std::runtime_error(std::string(mdbx_strerror(r)));
     }
 }
@@ -52,47 +52,47 @@ void db_actor_t::open() noexcept {
     auto flags = MDBX_WRITEMAP | MDBX_NOTLS | MDBX_COALESCE | MDBX_LIFORECLAIM;
     auto r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
     if (r != MDBX_SUCCESS) {
-        spdlog::error("{}, open, mbdx open environment error ({}): {}", identity, r, mdbx_strerror(r));
+        LOG_ERROR(log, "{}, open, mbdx open environment error ({}): {}", identity, r, mdbx_strerror(r));
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
     auto txn = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn) {
-        spdlog::error("{}, open, cannot create transaction {}", identity, txn.error().message());
+        LOG_ERROR(log, "{}, open, cannot create transaction {}", identity, txn.error().message());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
 
     auto db_ver = db::get_version(txn.value());
     if (!db_ver) {
-        spdlog::error("{}, open, cannot get db version :: {}", identity, db_ver.error().message());
+        LOG_ERROR(log, "{}, open, cannot get db version :: {}", identity, db_ver.error().message());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
     auto version = db_ver.value();
-    spdlog::debug("got db version: {}, expected : {} ", version, db::version);
+    LOG_DEBUG(log, "got db version: {}, expected : {} ", version, db::version);
 
     txn = db::make_transaction(db::transaction_type_t::RW, env);
     if (!txn) {
-        spdlog::error("{}, open, cannot create transaction {}", identity, txn.error().message());
+        LOG_ERROR(log, "{}, open, cannot create transaction {}", identity, txn.error().message());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
     if (db_ver.value() != db::version) {
         auto r = db::migrate(version, device, txn.value());
         if (!r) {
-            spdlog::error("{}, open, cannot migrate db {}", identity, r.error().message());
+            LOG_ERROR(log, "{}, open, cannot migrate db {}", identity, r.error().message());
             resources->release(resource::db);
             return do_shutdown(make_error(r.error()));
         }
-        spdlog::info("{}, open, successufully migrated db: {} -> {} ", identity, version, db::version);
+        LOG_INFO(log, "{}, open, successufully migrated db: {} -> {} ", identity, version, db::version);
     }
     resources->release(resource::db);
 }
 
 void db_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
-    spdlog::trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
 }
 
 void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexcept {
@@ -129,7 +129,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
         return reply_with_error(message, make_error(blocks_opt.error()));
     }
     auto &blocks = blocks_opt.value();
-    spdlog::trace("{}, on_cluster_load, blocks count =  {}", identity, blocks.size());
+    LOG_TRACE(log, "{}, on_cluster_load, blocks count =  {}", identity, blocks.size());
 
     auto ignored_devices_opt = db::load_ignored_devices(txn);
     if (!ignored_devices_opt) {
@@ -170,16 +170,16 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
     for (auto &it : file_infos) {
         auto &fi = it.second;
         auto folder = fi->get_folder();
-        spdlog::trace("{}, on_cluster_load: {}/{}, seq = {}", identity, folder->label(), fi->get_name(),
-                      fi->get_sequence());
+        LOG_TRACE(log, "{}, on_cluster_load: {}/{}, seq = {}", identity, folder->label(), fi->get_name(),
+                  fi->get_sequence());
         folder->add(fi);
     }
 
     for (auto &it : folder_infos) {
         auto &fi = it.second;
         auto folder = fi->get_folder();
-        spdlog::trace("{}, on_cluster_load: {} on {}, max seq = {}", identity, folder->label(),
-                      fi->get_device()->device_id, fi->get_max_sequence());
+        LOG_TRACE(log, "{}, on_cluster_load: {} on {}, max seq = {}", identity, folder->label(),
+                  fi->get_device()->device_id, fi->get_max_sequence());
         folder->add(fi);
     }
 
@@ -350,8 +350,8 @@ void db_actor_t::on_store_folder(message::store_folder_request_t &message) noexc
             continue;
         }
         r = db::store_folder_info(fi, txn);
-        spdlog::trace("{}, on_store_folder folder_info = {} max seq = {}", identity, fi->get_db_key(),
-                      fi->get_max_sequence());
+        LOG_TRACE(log, "{}, on_store_folder folder_info = {} max seq = {}", identity, fi->get_db_key(),
+                  fi->get_max_sequence());
         if (!r) {
             reply_with_error(message, make_error(r.error()));
             return;
@@ -402,10 +402,10 @@ void db_actor_t::on_store_folder(message::store_folder_request_t &message) noexc
 
 void db_actor_t::on_store_folder_info(message::store_folder_info_request_t &message) noexcept {
     auto &fi = message.payload.request_payload.folder_info;
-    spdlog::trace("{}, on_store_folder_info folder_info = {}", identity, fi->get_db_key());
+    LOG_TRACE(log, "{}, on_store_folder_info folder_info = {}", identity, fi->get_db_key());
     if (!fi->is_dirty()) {
-        spdlog::warn("{}, folder_info = {}  (from {}) is not dirty, no need to save", identity, fi->get_db_key(),
-                     fi->get_folder()->label());
+        LOG_WARN(log, "{}, folder_info = {}  (from {}) is not dirty, no need to save", identity, fi->get_db_key(),
+                 fi->get_folder()->label());
         reply_to(message);
         return;
     }

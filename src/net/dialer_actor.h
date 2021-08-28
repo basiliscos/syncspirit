@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../config/dialer.h"
+#include "../utils/log.h"
 #include "messages.h"
 #include <optional>
 #include <unordered_map>
@@ -63,6 +64,8 @@ struct dialer_actor_t : public r::actor_base_t {
     void on_ready(const model::device_ptr_t &device, const utils::uri_container_t &uris) noexcept;
     void schedule_redial(const model::device_ptr_t &device) noexcept;
     void on_timer(r::request_id_t request_id, bool cancelled) noexcept;
+
+    utils::logger_t log;
 
     r::address_ptr_t coordinator;
     r::address_ptr_t cluster;

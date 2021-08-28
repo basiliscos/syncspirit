@@ -1,6 +1,5 @@
 #include "dialer_actor.h"
 #include "names.h"
-#include "spdlog/spdlog.h"
 
 namespace syncspirit::net {
 
@@ -14,6 +13,7 @@ r::plugin::resource_id_t request = 1;
 dialer_actor_t::dialer_actor_t(config_t &config)
     : r::actor_base_t{config}, redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}},
       device{config.device}, devices{config.devices} {
+    log = utils::get_logger("net.acceptor");
     online_map.emplace(device);
 }
 
@@ -45,17 +45,17 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void dialer_actor_t::on_start() noexcept {
-    spdlog::trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
     r::actor_base_t::on_start();
 }
 
 void dialer_actor_t::shutdown_finish() noexcept {
-    spdlog::trace("{}, shutdown_finish", identity);
+    LOG_TRACE(log, "{}, shutdown_finish", identity);
     r::actor_base_t::shutdown_finish();
 }
 
 void dialer_actor_t::shutdown_start() noexcept {
-    spdlog::trace("{}, shutdown_start", identity);
+    LOG_TRACE(log, "{}, shutdown_start", identity);
     r::actor_base_t::shutdown_start();
     for (auto &it : discovery_map) {
         send<message::discovery_cancel_t::payload_t>(global_discovery, it.second);
@@ -66,7 +66,7 @@ void dialer_actor_t::shutdown_start() noexcept {
 }
 
 void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
-    spdlog::trace("{}, on_announce", identity);
+    LOG_TRACE(log, "{}, on_announce", identity);
     for (auto it : *devices) {
         auto &d = it.second;
         if (*d != *device) {
@@ -85,8 +85,8 @@ void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
                 discovery_map.insert_or_assign(peer_device, req_id);
                 resources->acquire(resource::request);
             } else {
-                spdlog::trace("{}, ignoring discovery request for {}, as one seems already in progress", identity,
-                              peer_device->device_id);
+                LOG_TRACE(log, "{}, ignoring discovery request for {}, as one seems already in progress", identity,
+                          peer_device->device_id);
             }
         }
     } else {
@@ -95,14 +95,14 @@ void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
 }
 
 void dialer_actor_t::schedule_redial(const model::device_ptr_t &peer_device) noexcept {
-    spdlog::trace("{}, scheduling redial to {}, ", identity, peer_device->device_id);
+    LOG_TRACE(log, "{}, scheduling redial to {}, ", identity, peer_device->device_id);
     auto redial_timer = start_timer(redial_timeout, *this, &dialer_actor_t::on_timer);
     redial_map.insert_or_assign(peer_device, redial_timer);
     resources->acquire(resource::timer);
 }
 
 void dialer_actor_t::on_ready(const model::device_ptr_t &peer_device, const utils::uri_container_t &uris) noexcept {
-    spdlog::trace("{}, on_ready to dial to {}, ", identity, peer_device->device_id);
+    LOG_TRACE(log, "{}, on_ready to dial to {}, ", identity, peer_device->device_id);
     schedule_redial(peer_device);
     send<payload::dial_ready_notification_t>(coordinator, peer_device->device_id, uris);
 }
@@ -127,22 +127,22 @@ void dialer_actor_t::on_discovery(message::discovery_response_t &res) noexcept {
                 auto &urls = contact.value().uris;
                 on_ready(peer, urls);
             } else {
-                spdlog::trace("{}, on_discovery, no contact for {} has been discovered", identity, peer_id);
+                LOG_TRACE(log, "{}, on_discovery, no contact for {} has been discovered", identity, peer_id);
                 schedule_redial(peer);
             }
         } else {
-            spdlog::debug("{}, on_discovery, can't discover contacts for {} :: {}", identity, req.device_id,
-                          ee->message());
+            LOG_DEBUG(log, "{}, on_discovery, can't discover contacts for {} :: {}", identity, req.device_id,
+                      ee->message());
             schedule_redial(peer);
         }
     } else {
-        spdlog::trace("{}, on_discovery, peer {} is already online, noop", identity, peer_id);
+        LOG_TRACE(log, "{}, on_discovery, peer {} is already online, noop", identity, peer_id);
     }
     discovery_map.erase(it);
 }
 
 void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexcept {
-    spdlog::trace("{}, on_timer, cancelled = {}", identity, cancelled);
+    LOG_TRACE(log, "{}, on_timer, cancelled = {}", identity, cancelled);
     using value_t = typename redial_map_t::value_type;
     resources->release(resource::timer);
     auto predicate = [&](const value_t &val) -> bool { return val.second == request_id; };
@@ -156,7 +156,7 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
 
 void dialer_actor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
     auto &peer_id = message.payload.peer_device_id;
-    spdlog::trace("{}, on_disconnect, peer = {}", identity, peer_id);
+    LOG_TRACE(log, "{}, on_disconnect, peer = {}", identity, peer_id);
     auto peer = devices->by_id(peer_id.get_sha256());
     assert(peer);
     schedule_redial(peer);
@@ -164,7 +164,7 @@ void dialer_actor_t::on_disconnect(message::disconnect_notify_t &message) noexce
 
 void dialer_actor_t::on_connect(message::connect_notify_t &message) noexcept {
     auto &peer_id = message.payload.peer_device_id;
-    spdlog::trace("{}, on_connect, peer = {}", identity, peer_id);
+    LOG_TRACE(log, "{}, on_connect, peer = {}", identity, peer_id);
 
     auto peer = devices->by_id(peer_id.get_sha256());
     assert(peer);
@@ -198,7 +198,7 @@ void dialer_actor_t::on_remove(message::remove_device_t &message) noexcept {
 }
 
 void dialer_actor_t::on_update(message::update_device_t &message) noexcept {
-    spdlog::warn("[TODO] {}, on_update", identity);
+    LOG_WARN(log, "[TODO] {}, on_update", identity);
 }
 
 } // namespace syncspirit::net
