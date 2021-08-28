@@ -32,7 +32,7 @@ void hasher_proxy_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
 
 void hasher_proxy_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
-    log->trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
 }
 
 r::address_ptr_t hasher_proxy_actor_t::find_next_hasher() noexcept {
@@ -51,7 +51,6 @@ r::address_ptr_t hasher_proxy_actor_t::find_next_hasher() noexcept {
     }
     ++hasher_scores[min];
     index = (index + 1) % hasher_threads;
-    log->trace("{}, using hasher {}", identity, min);
     return hashers[min];
 }
 
@@ -66,7 +65,7 @@ void hasher_proxy_actor_t::free_hasher(r::address_ptr_t &addr) noexcept {
 }
 
 void hasher_proxy_actor_t::on_request(hasher::message::validation_request_t &req) noexcept {
-    log->trace("{}, on_request", identity);
+    LOG_TRACE(log, "{}, on_request", identity);
     intrusive_ptr_add_ref(&req);
     auto hasher = find_next_hasher();
     auto &p = *req.payload.request_payload;
@@ -75,7 +74,7 @@ void hasher_proxy_actor_t::on_request(hasher::message::validation_request_t &req
 
 void hasher_proxy_actor_t::on_response(hasher::message::validation_response_t &res) noexcept {
     using request_t = hasher::message::validation_request_t;
-    log->trace("{}, on_response", identity);
+    LOG_TRACE(log, "{}, on_response", identity);
     auto req = (request_t *)res.payload.req->payload.request_payload->custom;
     auto &payload = res.payload;
     auto &ee = payload.ee;

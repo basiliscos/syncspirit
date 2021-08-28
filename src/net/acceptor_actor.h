@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages.h"
+#include "../utils/log.h"
 #include <boost/asio.hpp>
 #include <boost/optional.hpp>
 #include <rotor/asio/supervisor_asio.h>
@@ -23,6 +24,7 @@ struct acceptor_actor_t : public r::actor_base_t {
     void accept_next() noexcept;
     void on_accept(const sys::error_code &ec) noexcept;
 
+    utils::logger_t log;
     asio::io_context::strand &strand;
     tcp_socket_t sock;
     tcp::endpoint endpoint;

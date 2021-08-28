@@ -41,7 +41,7 @@ sinks = ['stdout']
 default_location = '/tmp/syncspirit'
 device_name = 'hp-note'
 timeout = 5000
-hasher_threads = 4
+hasher_threads = 3
 
 [tui]
 key_config = 'c'

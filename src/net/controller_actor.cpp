@@ -64,16 +64,16 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void controller_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
-    log->trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
     send<payload::start_reading_t>(peer_addr, get_address());
     update(*peer_cluster_config);
     peer_cluster_config.reset();
     ready();
-    log->info("{} is ready/online", identity);
+    LOG_INFO(log, "{} is ready/online", identity);
 }
 
 void controller_actor_t::update(proto::ClusterConfig &config) noexcept {
-    log->trace("{}, update", identity);
+    LOG_TRACE(log, "{}, update", identity);
     auto unknown_folders = cluster->update(config);
     for (auto &folder : unknown_folders) {
         if (!ignored_folders->by_key(folder.id())) {
@@ -93,6 +93,7 @@ void controller_actor_t::update(proto::ClusterConfig &config) noexcept {
 void controller_actor_t::ready() noexcept { send<payload::ready_signal_t>(get_address()); }
 
 void controller_actor_t::shutdown_start() noexcept {
+    LOG_TRACE(log, "{}, shutdown_start", identity);
     send<payload::termination_t>(peer_addr, shutdown_reason);
     r::actor_base_t::shutdown_start();
 }
@@ -104,23 +105,23 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
     sys::error_code ec;
     if (current_file->is_deleted()) {
         if (bfs::exists(path, ec)) {
-            log->debug("{} removing {}", identity, path.string());
+            LOG_DEBUG(log, "{} removing {}", identity, path.string());
             auto ok = bfs::remove_all(path);
             if (!ok) {
-                log->warn("{}, error removing {} : {}", identity, path.string(), ec.message());
+                LOG_WARN(log, "{},  error removing {} : {}", identity, path.string(), ec.message());
                 do_shutdown(make_error(ec));
                 return ImmediateResult::ERROR;
             }
         }
-        log->trace("{}, {} already abscent, noop", identity, path.string());
+        LOG_TRACE(log, "{}, {} already abscent, noop", identity, path.string());
         current_file->mark_sync();
         return ImmediateResult::DONE;
     } else if (current_file->is_file() && current_file->get_size() == 0) {
-        log->trace("{}, creating empty file {}", identity, path.string());
+        LOG_TRACE(log, "{}, creating empty file {}", identity, path.string());
         if (!bfs::exists(parent)) {
             bfs::create_directories(parent, ec);
             if (ec) {
-                log->warn("{}, error creating path {} : {}", identity, parent.string(), ec.message());
+                LOG_WARN(log, "{}, error creating path {} : {}", identity, parent.string(), ec.message());
                 do_shutdown(make_error(ec));
                 return ImmediateResult::ERROR;
             }
@@ -131,17 +132,17 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
             out.open(path.string());
         } catch (const std::ios_base::failure &e) {
             do_shutdown(make_error(e.code()));
-            log->warn("{}, error creating {} : {}", identity, path.string(), e.code().message());
+            LOG_WARN(log, "{}, error creating {} : {}", identity, path.string(), e.code().message());
             return ImmediateResult::ERROR;
         }
         current_file->mark_sync();
         return ImmediateResult::DONE;
     } else if (current_file->is_dir()) {
-        log->trace("{}, creating dir {}", identity, path.string());
+        LOG_TRACE(log, "{}, creating dir {}", identity, path.string());
         if (!bfs::exists(path)) {
             bfs::create_directories(path, ec);
             if (ec) {
-                log->warn("{}, error creating path {} : {}", identity, parent.string(), ec.message());
+                LOG_WARN(log, "{}, error creating path {} : {}", identity, parent.string(), ec.message());
                 do_shutdown(make_error(ec));
                 return ImmediateResult::ERROR;
             }
@@ -150,18 +151,19 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
         return ImmediateResult::DONE;
     } else if (current_file->is_link()) {
         auto target = bfs::path(current_file->get_link_target());
-        log->trace("{}, creating symlink {} -> {}", identity, path.string(), target.string());
+        LOG_TRACE(log, "{}, creating symlink {} -> {}", identity, path.string(), target.string());
         if (!bfs::exists(parent)) {
             bfs::create_directories(parent, ec);
             if (ec) {
-                log->warn("{}, error creating parent path {} : {}", identity, parent.string(), ec.message());
+                LOG_WARN(log, "{}, error creating parent path {} : {}", identity, parent.string(), ec.message());
                 do_shutdown(make_error(ec));
                 return ImmediateResult::ERROR;
             }
         }
         bfs::create_symlink(target, path, ec);
         if (ec) {
-            log->warn("{}, error symlinking {} -> {} {} : {}", identity, path.string(), target.string(), ec.message());
+            LOG_WARN(log, "{}, error symlinking {} -> {} {} : {}", identity, path.string(), target.string(),
+                     ec.message());
             do_shutdown(make_error(ec));
             return ImmediateResult::ERROR;
         }
@@ -174,7 +176,7 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
 }
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
-    log->trace("{}, on_ready, blocks requested = {}, kept = {}", identity, blocks_requested, blocks_kept);
+    LOG_TRACE(log, "{}, on_ready, blocks requested = {}, kept = {}", identity, blocks_requested, blocks_kept);
     bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
                   || (blocks_kept > blocks_max_kept)                            // don't overload hasher / fs-writer
                   || (state != r::state_t::OPERATIONAL)                         // we are shutting down
@@ -188,7 +190,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     if (!file_iterator && !block_iterator) {
         file_iterator = cluster->iterate_files(peer);
         if (!file_iterator) {
-            log->trace("{}, nothing more to sync", identity);
+            LOG_TRACE(log, "{}, nothing more to sync", identity);
             return;
         }
     }
@@ -198,8 +200,9 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         auto cluster_block = block_iterator.next();
         auto existing_block = cluster_block.block->local_file();
         if (existing_block) {
-            log->trace("{}, cloning block {} from {} to {} as block {}", identity, existing_block.file_info->get_name(),
-                       existing_block.block_index, current_file->get_name(), cluster_block.block_index);
+            LOG_TRACE(log, "{}, cloning block {} from {} to {} as block {}", identity,
+                      existing_block.file_info->get_name(), existing_block.block_index, current_file->get_name(),
+                      cluster_block.block_index);
             current_file->clone_block(*existing_block.file_info, existing_block.block_index, cluster_block.block_index);
             ready();
         } else {
@@ -207,7 +210,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
             ready();
         }
         if (!block_iterator) {
-            log->trace("{}, there are no more blocks for {}", identity, current_file->get_full_name());
+            LOG_TRACE(log, "{}, there are no more blocks for {}", identity, current_file->get_full_name());
             current_file.reset();
         }
         return;
@@ -219,7 +222,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         return;
     }
     if (ir == ImmediateResult::NON_IMMEDIATE) {
-        log->trace("{}, going to sync {}", identity, current_file->get_full_name());
+        LOG_TRACE(log, "{}, going to sync {}", identity, current_file->get_full_name());
         block_iterator = current_file->iterate_blocks();
     }
     ready();
@@ -227,8 +230,8 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
 
 void controller_actor_t::request_block(const model::block_location_t &block) noexcept {
     auto sz = block.block->get_size();
-    log->trace("{} request_block, file = {}, block index = {}, sz = {}, request pool sz = {}, blocks_kept = {}",
-               identity, current_file->get_full_name(), block.block_index, sz, request_pool, blocks_kept);
+    LOG_TRACE(log, "{} request_block, file = {}, block index = {}, sz = {}, request pool sz = {}, blocks_kept = {}",
+              identity, current_file->get_full_name(), block.block_index, sz, request_pool, blocks_kept);
     request<payload::block_request_t>(peer_addr, current_file, model::block_info_ptr_t{block.block}, block.block_index)
         .send(request_timeout);
     ++blocks_requested;
@@ -239,7 +242,7 @@ bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {
     auto it = peers_map.find(peer_addr);
     if (it != peers_map.end()) {
         auto &device = it->second;
-        log->debug("{}, on_unlink with {}", identity, device->device_id);
+        LOG_DEBUG(log, "{}, on_unlink with {}", identity, device->device_id);
         peers_map.erase(it);
         resources->release(resource::peer);
         return false;
@@ -256,16 +259,16 @@ void controller_actor_t::on_store_folder(message::store_folder_response_t &messa
     auto &folder = message.payload.req->payload.request_payload.folder;
     auto &label = folder->label();
     if (ee) {
-        log->warn("{}, on_store_folder {} failed : {}", identity, label, ee->message());
+        LOG_WARN(log, "{}, on_store_folder {} failed : {}", identity, label, ee->message());
         return do_shutdown(ee);
     }
-    log->trace("{}, on_store_folder_info, folder = '{}'", identity, label);
+    LOG_TRACE(log, "{}, on_store_folder_info, folder = '{}'", identity, label);
     ready();
 }
 
 void controller_actor_t::on_new_folder(message::store_new_folder_notify_t &message) noexcept {
     auto &folder = message.payload.folder;
-    log->trace("{}, on_new_folder, folder = '{}'", identity, folder->label());
+    LOG_TRACE(log, "{}, on_new_folder, folder = '{}'", identity, folder->label());
     auto cluster_update = cluster->get(peer);
     using payload_t = std::decay_t<decltype(cluster_update)>;
     auto update = std::make_unique<payload_t>(std::move(cluster_update));
@@ -302,12 +305,12 @@ void controller_actor_t::update(folder_updater_t &&updater) noexcept {
     auto &folder_id = updater.id();
     auto folder = cluster->get_folders().by_id(folder_id);
     if (current_file && current_file->get_folder()->id() == folder_id) {
-        log->trace("{}, resetting iterators on folder {}", identity, folder->label());
+        LOG_TRACE(log, "{}, resetting iterators on folder {}", identity, folder->label());
         file_iterator.reset();
         block_iterator.reset();
     }
     if (!folder) {
-        log->warn("{}, unknown folder {}", identity, folder_id);
+        LOG_WARN(log, "{}, unknown folder {}", identity, folder_id);
         auto ec = utils::make_error_code(utils::protocol_error_code_t::unknown_folder);
         std::string context = fmt::format("folder '{}'", folder_id);
         auto ee = r::make_error(context, ec);
@@ -315,7 +318,7 @@ void controller_actor_t::update(folder_updater_t &&updater) noexcept {
     }
     updater.update(*folder);
     auto updated = folder->is_dirty();
-    log->debug("{}, folder {}/{} has been updated = {}", identity, folder_id, folder->label(), updated);
+    LOG_DEBUG(log, "{}, folder {}/{} has been updated = {}", identity, folder_id, folder->label(), updated);
     if (updated) {
         auto timeout = init_timeout / 2;
         request<payload::store_folder_request_t>(db, std::move(folder)).send(timeout);
@@ -326,7 +329,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     --blocks_requested;
     auto ee = message.payload.ee;
     if (ee) {
-        log->warn("{}, can't receive block : {}", identity, ee->message());
+        LOG_WARN(log, "{}, can't receive block : {}", identity, ee->message());
         return do_shutdown(ee);
     }
     ++blocks_kept;
@@ -362,7 +365,7 @@ void controller_actor_t::on_open(fs::message::open_response_t &res) noexcept {
     auto &payload = res.payload;
     auto &ee = payload.ee;
     if (ee) {
-        log->warn("{}, on_open failed : {}", identity, ee->message());
+        LOG_WARN(log, "{}, on_open failed : {}", identity, ee->message());
         return do_shutdown(ee);
     }
 
@@ -380,7 +383,7 @@ void controller_actor_t::on_close(fs::message::close_response_t &res) noexcept {
     auto &payload = res.payload;
     auto &ee = payload.ee;
     if (ee) {
-        log->warn("{}, on_close failed : {}", identity, ee->message());
+        LOG_WARN(log, "{}, on_close failed : {}", identity, ee->message());
         return do_shutdown(ee);
     }
     auto &path_str = payload.req->payload.request_payload->path.string();
@@ -392,7 +395,7 @@ void controller_actor_t::on_close(fs::message::close_response_t &res) noexcept {
 void controller_actor_t::on_validation(hasher::message::validation_response_t &res) noexcept {
     auto &ee = res.payload.ee;
     if (ee) {
-        log->warn("{}, on_validation failed : {}", identity, ee->message());
+        LOG_WARN(log, "{}, on_validation failed : {}", identity, ee->message());
         return do_shutdown(ee);
     }
     auto block_res = (message::block_response_t *)res.payload.req->payload.request_payload->custom;
@@ -403,7 +406,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     if (!res.payload.res.valid) {
         std::string context = fmt::format("digest mismatch for {}", path.string());
         auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-        log->warn("{}, check_digest, digest mismatch: {}", identity, context);
+        LOG_WARN(log, "{}, check_digest, digest mismatch: {}", identity, context);
         auto ee = r::make_error(context, ec);
         do_shutdown(ee);
     } else {

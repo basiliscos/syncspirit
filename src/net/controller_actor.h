@@ -21,8 +21,8 @@ struct controller_actor_config_t : r::actor_config_t {
     pt::time_duration request_timeout;
     payload::cluster_config_ptr_t peer_cluster_config;
     model::ignored_folders_map_t *ignored_folders;
-    size_t blocks_max_kept = 50;
-    size_t blocks_max_requested = 10;
+    size_t blocks_max_kept = 15;
+    size_t blocks_max_requested = 8;
 };
 
 template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {

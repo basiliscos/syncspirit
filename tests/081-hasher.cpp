@@ -35,8 +35,7 @@ struct hash_consumer_t : r::actor_base_t {
     }
 
     void request_validation(const std::string_view &data, const std::string_view &hash) {
-        request<payload::validation_request_t>(hasher, data, std::string(hash), nullptr)
-            .send(init_timeout);
+        request<payload::validation_request_t>(hasher, data, std::string(hash), nullptr).send(init_timeout);
     }
 
     void on_digest(message::digest_response_t &res) noexcept { digest_res = &res; }

@@ -103,7 +103,7 @@ void peer_actor_t::try_next_uri() noexcept {
         }
     }
 
-    log->trace("{}, try_next_uri, no way to conenct found, shut down", identity);
+    LOG_TRACE(log, "{}, try_next_uri, no way to conenct found, shut down", identity);
     resources->release(resource::uris);
     auto ec = utils::make_error_code(utils::error_code_t::connection_impossible);
     do_shutdown(make_error(ec));
@@ -112,8 +112,8 @@ void peer_actor_t::try_next_uri() noexcept {
 void peer_actor_t::initiate(transport::stream_sp_t tran, const utils::URI &url) noexcept {
     transport = std::move(tran);
 
-    log->trace("{}, try_next_uri, will initate connection with via {} (transport = {})", identity, url.full,
-               (void *)transport.get());
+    LOG_TRACE(log, "{}, try_next_uri, will initate connection with via {} (transport = {})", identity, url.full,
+              (void *)transport.get());
     pt::time_duration resolve_timeout = init_timeout / 2;
     auto port = std::to_string(url.port);
     request<payload::address_request_t>(resolver, url.host, port).send(resolve_timeout);
@@ -126,7 +126,7 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 
     auto &ee = res.payload.ee;
     if (ee) {
-        log->warn("{}, on_resolve error : {}", identity, ee->message());
+        LOG_WARN(log, "{}, on_resolve error : {}", identity, ee->message());
         resources->acquire(resource::uris);
         return try_next_uri();
     }
@@ -143,7 +143,7 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 }
 
 void peer_actor_t::on_connect(resolve_it_t) noexcept {
-    log->trace("{}, on_connect, device_id = {}", identity, peer_device_id.get_short());
+    LOG_TRACE(log, "{}, on_connect, device_id = {}", identity, peer_device_id.get_short());
     initiate_handshake();
 }
 
@@ -155,10 +155,10 @@ void peer_actor_t::initiate_handshake() noexcept {
 }
 
 void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
-    log->trace("{}, on_io_error: {}", identity, ec.message());
+    LOG_TRACE(log, "{}, on_io_error: {}", identity, ec.message());
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        log->warn("{}, on_io_error: {}", identity, ec.message());
+        LOG_WARN(log, "{}, on_io_error: {}", identity, ec.message());
     }
     cancel_timer();
     if (state < r::state_t::SHUTTING_DOWN) {
@@ -190,8 +190,8 @@ void peer_actor_t::process_tx_queue() noexcept {
             resources->acquire(resource::io);
             transport->async_send(asio::buffer(tx_buff.data(), tx_buff.size()), on_write, on_error);
         } else {
-            log->trace("peer_actor_t::process_tx_queue, device_id = {}, final empty message, shutting down ",
-                       peer_device_id);
+            LOG_TRACE(log, "peer_actor_t::process_tx_queue, device_id = {}, final empty message, shutting down ",
+                      peer_device_id);
             assert(tx_item->final);
             auto ec = r::make_error_code(r::shutdown_code_t::normal);
             do_shutdown(make_error(ec));
@@ -212,23 +212,23 @@ void peer_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const tcp:
                                 const model::device_id_t *peer_device) noexcept {
     resources->release(resource::io);
     if (!peer_device) {
-        log->warn("{}, on_handshake,  missing peer device id", identity);
+        LOG_WARN(log, "{}, on_handshake,  missing peer device id", identity);
         auto ec = utils::make_error_code(utils::error_code_t::missing_device_id);
         return do_shutdown(make_error(ec));
     }
 
     auto new_id = generate_id(peer_device, &peer_endpoint);
-    log->trace("{} now becomes {}", identity, new_id);
+    LOG_DEBUG(log, "{} now becomes {}", identity, new_id);
     identity = new_id;
 
     identity = new_id;
     auto cert_name = utils::get_common_name(cert);
     if (!cert_name) {
-        log->warn("{}, on_handshake, can't get certificate name: {}", identity, cert_name.error().message());
+        LOG_WARN(log, "{}, on_handshake, can't get certificate name: {}", identity, cert_name.error().message());
         auto ec = utils::make_error_code(utils::error_code_t::missing_cn);
         return do_shutdown(make_error(ec));
     }
-    log->trace("{}, on_handshake, valid = {}, issued by {}", identity, valid_peer, cert_name.value());
+    LOG_TRACE(log, "{}, on_handshake, valid = {}, issued by {}", identity, valid_peer, cert_name.value());
 
     this->cert_name = cert_name.value();
     this->valid_peer = valid_peer;
@@ -246,7 +246,7 @@ void peer_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const tcp:
 void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        log->warn("{}, on_handshake_error: {}", identity, ec.message());
+        LOG_WARN(log, "{}, on_handshake_error: {}", identity, ec.message());
     }
 }
 
@@ -255,7 +255,7 @@ void peer_actor_t::read_more() noexcept {
         return;
     }
     if (rx_idx >= rx_buff.size()) {
-        log->warn("{}, read_more, rx buffer limit reached, {}", identity, rx_buff.size());
+        LOG_WARN(log, "{}, read_more, rx buffer limit reached, {}", identity, rx_buff.size());
         auto ec = utils::make_error_code(utils::error_code_t::rx_limit_reached);
         return do_shutdown(make_error(ec));
     }
@@ -269,10 +269,10 @@ void peer_actor_t::read_more() noexcept {
 
 void peer_actor_t::on_write(std::size_t sz) noexcept {
     resources->release(resource::io);
-    log->trace("{}, on_write, {} bytes", identity, sz);
+    LOG_TRACE(log, "{}, on_write, {} bytes", identity, sz);
     assert(tx_item);
     if (tx_item->final) {
-        log->trace("{}, process_tx_queue, final message has been sent, shutting down", identity);
+        LOG_TRACE(log, "{}, process_tx_queue, final message has been sent, shutting down", identity);
         if (resources->has(resource::controller)) {
             resources->release(resource::controller);
         } else {
@@ -311,7 +311,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         std::memcpy(rx_buff.data(), rx_buff.data() + value.consumed, tail);
     }
     (this->*read_action)(std::move(value.message));
-    log->trace("{}, on_read,  rx_idx = {} ", identity, rx_idx);
+    LOG_TRACE(log, "{}, on_read,  rx_idx = {} ", identity, rx_idx);
 }
 
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
@@ -355,9 +355,9 @@ void peer_actor_t::cancel_timer() noexcept {
 void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
     auto &cluster = res.payload.res->cluster_config;
     bool ok = (bool)cluster;
-    log->trace("{}, on_auth, value = {}", identity, ok);
+    LOG_TRACE(log, "{}, on_auth, value = {}", identity, ok);
     if (!ok) {
-        log->debug("{}, on_auth, peer has been rejected in authorization, disconnecting");
+        LOG_DEBUG(log, "{}, on_auth, peer has been rejected in authorization, disconnecting", identity);
         auto ec = utils::make_error_code(utils::error_code_t::non_authorized);
         return do_shutdown(make_error(ec));
     }
@@ -382,7 +382,7 @@ void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
 }
 
 void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept {
-    log->trace("{}, on_start_reading", identity);
+    LOG_TRACE(log, "{}, on_start_reading", identity);
     controller = message.payload.controller;
     read_action = &peer_actor_t::read_controlled;
     read_more();
@@ -390,7 +390,7 @@ void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept 
 
 void peer_actor_t::on_termination(message::termination_signal_t &message) noexcept {
     auto reason = message.payload.ee->message();
-    log->trace("{}, on_termination: {}", identity, reason);
+    LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
     fmt::memory_buffer buff;
     proto::Close close;
     close.set_reason(reason);
@@ -420,7 +420,7 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
 }
 
 void peer_actor_t::on_cluster_config(message::cluster_config_t &msg) noexcept {
-    log->trace("{}, on_cluster_config", identity);
+    LOG_TRACE(log, "{}, on_cluster_config", identity);
     fmt::memory_buffer buff;
     proto::serialize(buff, *msg.payload.config);
     push_write(std::move(buff), false);
@@ -432,13 +432,13 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
-                log->trace("{}, read_hello,  from {} ({} {})", identity, msg->device_name(), msg->client_name(),
-                           msg->client_version());
+                LOG_TRACE(log, "{}, read_hello,  from {} ({} {})", identity, msg->device_name(), msg->client_name(),
+                          msg->client_version());
                 request<payload::auth_request_t>(coordinator, get_address(), peer_endpoint, peer_device_id, cert_name,
                                                  std::move(*msg))
                     .send(init_timeout / 2);
             } else {
-                log->warn("{}, read_hello, unexpected_message", identity);
+                LOG_WARN(log, "{}, read_hello, unexpected_message", identity);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 do_shutdown(make_error(ec));
             }
@@ -447,7 +447,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
 }
 
 void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept {
-    log->trace("{}, read_cluster_config", identity);
+    LOG_TRACE(log, "{}, read_cluster_config", identity);
     std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
@@ -459,7 +459,7 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
                 reset_tx_timer();
                 reset_rx_timer();
             } else {
-                log->warn("{}, read_cluster_config: unexpected_message", identity);
+                LOG_WARN(log, "{}, read_cluster_config: unexpected_message", identity);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 do_shutdown(make_error(ec));
             }
@@ -468,16 +468,17 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
 }
 
 void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
-    log->trace("{}, read_controlled", identity);
+    LOG_TRACE(log, "{}, read_controlled", identity);
     bool continue_reading = true;
     std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
+            using boost::core::demangle;
             namespace m = proto::message;
-            log->debug("{}, read_controlled, {}", identity, boost::core::demangle(typeid(T).name()));
+            LOG_DEBUG(log, "{}, read_controlled, {}", identity, demangle(typeid(T).name()));
             const constexpr bool unexpected = std::is_same_v<T, m::Hello>;
             if constexpr (unexpected) {
-                log->warn("{}, hello, unexpected_message", identity);
+                LOG_WARN(log, "{}, hello, unexpected_message", identity);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 do_shutdown(make_error(ec));
             } else if constexpr (std::is_same_v<T, m::Ping>) {
@@ -505,7 +506,7 @@ void peer_actor_t::handle_ping(proto::message::Ping &&) noexcept { log->trace("{
 void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
     auto &reason = message->reason();
     const char *str = reason.c_str();
-    log->trace("{}, handle_close, reason = {}", identity, reason);
+    LOG_TRACE(log, "{}, handle_close, reason = {}", identity, reason);
     if (reason.size() == 0) {
         str = "no reason specified";
     }
@@ -515,11 +516,11 @@ void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
 
 void peer_actor_t::handle_response(proto::message::Response &&message) noexcept {
     auto id = message->id();
-    log->trace("{}, handle_response, message id = {}", identity, id);
+    LOG_TRACE(log, "{}, handle_response, message id = {}", identity, id);
     auto predicate = [id = id](const block_request_ptr_t &it) { return ((std::int32_t)it->payload.id) == id; };
     auto it = std::find_if(block_requests.begin(), block_requests.end(), predicate);
     if (it == block_requests.end()) {
-        log->warn("{}, response for unexpected request id {}", identity, id);
+        LOG_WARN(log, "{}, response for unexpected request id {}", identity, id);
         auto ec = utils::make_error_code(utils::bep_error_code_t::response_mismatch);
         return do_shutdown(make_error(ec));
     }
@@ -528,13 +529,13 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
     auto &block_request = *it;
     if (error) {
         auto ec = utils::make_error_code((utils::request_error_code_t)error);
-        log->warn("{}, block request error: {}", identity, ec.message());
+        LOG_WARN(log, "{}, block request error: {}", identity, ec.message());
         reply_with_error(*block_request, make_error(ec));
     } else {
         auto &data = message->data();
         auto request_sz = block_request->payload.request_payload.block->get_size();
         if (data.size() != request_sz) {
-            log->warn("{}, got {} bytes, but requested {}", identity, data.size(), request_sz);
+            LOG_WARN(log, "{}, got {} bytes, but requested {}", identity, data.size(), request_sz);
             auto ec = utils::make_error_code(utils::bep_error_code_t::response_missize);
             return do_shutdown(make_error(ec));
         }

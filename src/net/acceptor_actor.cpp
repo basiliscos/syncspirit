@@ -1,7 +1,6 @@
 #include "acceptor_actor.h"
 #include "names.h"
 #include "../utils/error_code.h"
-#include "spdlog/spdlog.h"
 
 using namespace syncspirit::net;
 
@@ -13,7 +12,9 @@ r::plugin::resource_id_t accepting = 0;
 
 acceptor_actor_t::acceptor_actor_t(config_t &config)
     : r::actor_base_t{config}, strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()},
-      sock(strand.context()), acceptor(strand.context()), peer(strand.context()) {}
+      sock(strand.context()), acceptor(strand.context()), peer(strand.context()) {
+    log = utils::get_logger("net.acceptor");
+}
 
 void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -27,33 +28,33 @@ void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void acceptor_actor_t::on_start() noexcept {
-    spdlog::trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
     sys::error_code ec;
 
     acceptor.open(endpoint.protocol(), ec);
     if (ec) {
-        spdlog::error("{}, cannot open endpoint ({0}:{1}) : {2}", identity, endpoint.address().to_string(),
-                      endpoint.port(), ec.message());
+        LOG_ERROR(log, "{}, cannot open endpoint ({0}:{1}) : {2}", identity, endpoint.address().to_string(),
+                  endpoint.port(), ec.message());
         return do_shutdown(make_error(ec));
     }
 
     acceptor.bind(endpoint, ec);
     if (ec) {
-        spdlog::error("{}, cannot bind endpoint ({0}:{1}) : {2}", identity, endpoint.address().to_string(),
-                      endpoint.port(), ec.message());
+        LOG_ERROR(log, "{}, cannot bind endpoint ({0}:{1}) : {2}", identity, endpoint.address().to_string(),
+                  endpoint.port(), ec.message());
         return do_shutdown(make_error(ec));
     }
 
     acceptor.listen(asio::socket_base::max_listen_connections, ec);
     if (ec) {
-        spdlog::error("{}, cannot listen ({0}:{1}) : {2}", identity, endpoint.address().to_string(), endpoint.port(),
-                      ec.message());
+        LOG_ERROR(log, "{}, cannot listen ({0}:{1}) : {2}", identity, endpoint.address().to_string(), endpoint.port(),
+                  ec.message());
         return do_shutdown(make_error(ec));
     }
 
     endpoint = acceptor.local_endpoint(ec);
     if (ec) {
-        spdlog::error("{}, cannot get local endpoint {}", identity, ec.message());
+        LOG_ERROR(log, "{}, cannot get local endpoint {}", identity, ec.message());
         return do_shutdown(make_error(ec));
     }
 
@@ -77,7 +78,7 @@ void acceptor_actor_t::shutdown_start() noexcept {
         sys::error_code ec;
         acceptor.cancel(ec);
         if (ec) {
-            spdlog::error("{}, cannot cancel accepting :: ", identity, ec.message());
+            LOG_ERROR(log, "{}, cannot cancel accepting :: ", identity, ec.message());
         }
     }
 }
@@ -86,7 +87,7 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
     resources->release(resource::accepting);
     if (ec) {
         if (ec != asio::error::operation_aborted) {
-            spdlog::warn("{}, accepting error :: ", identity, ec.message());
+            LOG_WARN(log, "{}, accepting error :: ", identity, ec.message());
             return do_shutdown(make_error(ec));
         } else {
             shutdown_continue();
@@ -96,10 +97,10 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
     sys::error_code err;
     auto remote = peer.remote_endpoint(err);
     if (err) {
-        spdlog::trace("{}, on_accept, cannot get remote endpoint:: {}", identity, err.message());
+        LOG_WARN(log, "{}, on_accept, cannot get remote endpoint:: {}", identity, err.message());
         return accept_next();
     }
-    spdlog::trace("{}, on_accept, peer = {}, sock = {}", identity, remote, peer.native_handle());
+    LOG_TRACE(log, "{}, on_accept, peer = {}, sock = {}", identity, remote, peer.native_handle());
     send<payload::connection_notify_t>(coordinator, std::move(peer), remote);
     accept_next();
 }

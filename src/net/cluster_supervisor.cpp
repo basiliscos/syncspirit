@@ -1,7 +1,6 @@
 #include "cluster_supervisor.h"
 #include "controller_actor.h"
 #include "names.h"
-#include <spdlog/spdlog.h>
 #include <boost/filesystem.hpp>
 
 namespace fs = boost::filesystem;

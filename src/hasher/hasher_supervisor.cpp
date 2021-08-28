@@ -21,6 +21,6 @@ void hasher_supervisor_t::launch() noexcept {
 }
 
 void hasher_supervisor_t::on_start() noexcept {
-    log->trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
     r::actor_base_t::on_start();
 }

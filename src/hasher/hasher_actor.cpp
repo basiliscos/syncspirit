@@ -24,18 +24,18 @@ void hasher_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void hasher_actor_t::on_start() noexcept {
-    log->trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
     r::actor_base_t::on_start();
 }
 
 void hasher_actor_t::shutdown_finish() noexcept {
-    log->trace("{}, shutdown_finish", identity);
+    LOG_TRACE(log, "{}, shutdown_finish", identity);
     get_supervisor().shutdown();
     r::actor_base_t::shutdown_finish();
 }
 
 void hasher_actor_t::on_digest(message::diget_request_t &req) noexcept {
-    log->trace("{}, on_digest", identity);
+    LOG_TRACE(log, "{}, on_digest", identity);
 
     char digest[SZ];
     auto &data = req.payload.request_payload.data;
@@ -50,7 +50,7 @@ void hasher_actor_t::on_digest(message::diget_request_t &req) noexcept {
 }
 
 void hasher_actor_t::on_validation(message::validation_request_t &req) noexcept {
-    log->trace("{}, on_validation", identity);
+    LOG_TRACE(log, "{}, on_validation", identity);
     auto &payload = *req.payload.request_payload;
 
     char digest[SZ];

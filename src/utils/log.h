@@ -21,4 +21,15 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, bool ov
 
 logger_t get_logger(std::string_view name) noexcept;
 
+#define LOG_GENERIC(LOGGER, LEVEL, ...)                                                                                \
+    if (LEVEL >= LOGGER->level())                                                                                      \
+    LOGGER->log(LEVEL, __VA_ARGS__)
+
+#define LOG_TRACE(LOGGER, ...) LOG_GENERIC(LOGGER, spdlog::level::trace, __VA_ARGS__)
+#define LOG_DEBUG(LOGGER, ...) LOG_GENERIC(LOGGER, spdlog::level::debug, __VA_ARGS__)
+#define LOG_INFO(LOGGER, ...) LOG_GENERIC(LOGGER, spdlog::level::info, __VA_ARGS__)
+#define LOG_WARN(LOGGER, ...) LOG_GENERIC(LOGGER, spdlog::level::warn, __VA_ARGS__)
+#define LOG_ERROR(LOGGER, ...) LOG_GENERIC(LOGGER, spdlog::level::err, __VA_ARGS__)
+#define LOG_CRITICAL(LOGGER, ...) LOG_GENERIC(LOGGER, spdlog::level::critical, __VA_ARGS__)
+
 } // namespace syncspirit::utils
