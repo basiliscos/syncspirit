@@ -1,6 +1,7 @@
 #include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
+#include "model/cluster.h"
 #include "db/utils.h"
 #include <boost/filesystem.hpp>
 
@@ -193,8 +194,10 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
         r_st = db::store_folder(f1, txn);
         REQUIRE(r_st);
 
-        auto folders = model::folders_map_t();
-        folders.put(f1);
+        auto cluster = model::cluster_ptr_t(new model::cluster_t(d1));
+        cluster->add_folder(f1);
+        f1->assign_cluster(cluster.get());
+        auto &folders = cluster->get_folders();
 
         db::FolderInfo db_fi;
         db_fi.set_index_id(1234);
@@ -214,11 +217,23 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
         CHECK(fi_x->get_folder() == fi->get_folder());
 
         SECTION("save & load file_infos") {
+            auto txn = mk_txn(env, transaction_type_t::RW);
+
+            db::BlockInfo db_bi;
+            db_bi.set_hash("aaa");
+            db_bi.set_size(123);
+            auto bi = model::block_info_ptr_t(new model::block_info_t(db_bi));
+
+            auto r = db::store_block_info(bi, txn);
+            CHECK(r);
+            REQUIRE(bi->get_db_key());
+            cluster->get_blocks().put(bi);
+
             db::FileInfo db_fi1;
             db_fi1.set_name("a/b/c.txt");
+            db_fi1.mutable_blocks_keys()->Add(bi->get_db_key());
             auto fi1 = model::file_info_ptr_t(new model::file_info_t(db_fi1, fi.get()));
-            auto txn = mk_txn(env, transaction_type_t::RW);
-            auto r = db::store_file_info(fi1, txn);
+            r = db::store_file_info(fi1, txn);
             REQUIRE(r);
             REQUIRE(txn.commit());
 
@@ -228,8 +243,7 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
             auto fi1_x = fi_infos.value().by_key(fi1->get_db_key());
             CHECK(*fi1_x == *fi1);
             CHECK(fi1_x->get_folder_info()->get_folder() == fi.get()->get_folder());
-
-            // TODO: add blocks
+            REQUIRE(fi1_x->get_blocks().size() == 1);
         }
     }
 }
