@@ -1,12 +1,7 @@
 void controller_actor_t::on_close(fs::message::close_response_t &res) noexcept {
  - sequence++ on my folder info and persist in db
-
-убрать херню:
-        callback_t hanlder = [](cluster_supervisor_t *self, model::folder_ptr_t &folder) {
-            self->handle_scan_new(folder);
-        };
-        reply_to(*create_folder_req, folder);
-
+ - save blocks in db (on buffer full, on file flush)
+ - save file in db on flush
 
 - send updates to peer during downloading?
 

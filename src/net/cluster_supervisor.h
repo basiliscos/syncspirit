@@ -76,6 +76,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     using create_folder_req_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
     using share_folder_req_t = r::intrusive_ptr_t<ui::message::share_folder_request_t>;
     using scan_folders_map_t = std::unordered_map<bfs::path, scan_info_t>;
+    using scan_foders_it = typename scan_folders_map_t::iterator;
 
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
     void on_share_folder(ui::message::share_folder_request_t &message) noexcept;
@@ -83,16 +84,18 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     void on_disconnect(message::disconnect_notify_t &message) noexcept;
     void on_store_new_folder(message::store_new_folder_response_t &message) noexcept;
     void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
-    void on_scan_complete(fs::message::scan_response_t &message) noexcept;
+    void on_scan_complete_initial(fs::message::scan_response_t &message) noexcept;
+    void on_scan_complete_new(fs::message::scan_response_t &message) noexcept;
+    scan_foders_it on_scan_complete(fs::message::scan_response_t &message) noexcept;
     void on_scan_error(fs::message::scan_error_t &message) noexcept;
-    void scan(const model::folder_ptr_t &folder, void *scan_handler) noexcept;
-    void handle_scan_initial(model::folder_ptr_t &folder) noexcept;
-    void handle_scan_new(model::folder_ptr_t &folder) noexcept;
+    void scan(const model::folder_ptr_t &folder, r::address_ptr_t &via) noexcept;
 
     utils::logger_t log;
     r::address_ptr_t coordinator;
     r::address_ptr_t fs;
     r::address_ptr_t db;
+    r::address_ptr_t scan_initial; // for routing
+    r::address_ptr_t scan_new;     // for routing
     config::bep_config_t bep_config;
     model::device_ptr_t device;
     model::cluster_ptr_t cluster;
