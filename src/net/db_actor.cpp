@@ -4,7 +4,6 @@
 #include <string_view>
 #include "../db/utils.h"
 #include "../db/error_code.h"
-#include "../db/transaction.h"
 
 namespace syncspirit::net {
 
@@ -160,19 +159,21 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
     cluster->assign_folders(folders);
     cluster->assign_blocks(std::move(blocks));
 
-    auto file_infos_opt = db::load_file_infos(folders, txn);
-    if (!file_infos_opt) {
-        return reply_with_error(message, make_error(file_infos_opt.error()));
-    }
-    auto &file_infos = file_infos_opt.value();
+    for (auto &it : folders) {
+        auto &folder_infos_map = it.second->get_folder_infos();
+        auto file_infos_opt = db::load_file_infos(folder_infos_map, txn);
+        if (!file_infos_opt) {
+            return reply_with_error(message, make_error(file_infos_opt.error()));
+        }
+        auto &file_infos = file_infos_opt.value();
 
-    // correctly link
-    for (auto &it : file_infos) {
-        auto &fi = it.second;
-        auto folder = fi->get_folder();
-        LOG_TRACE(log, "{}, on_cluster_load: {}/{}, seq = {}", identity, folder->label(), fi->get_name(),
-                  fi->get_sequence());
-        folder->add(fi);
+        // correctly link
+        for (auto &it : file_infos) {
+            auto &fi = it.second;
+            auto folder_info = fi->get_folder_info();
+            LOG_TRACE(log, "{}, on_cluster_load {}, seq = {}", identity, fi->get_full_name(), fi->get_sequence());
+            folder_info->add(fi);
+        }
     }
 
     for (auto &it : folder_infos) {
@@ -221,7 +222,7 @@ void db_actor_t::on_store_device(message::store_device_request_t &message) noexc
     auto &peer_device = message.payload.request_payload.device;
     auto r = db::store_device(peer_device, txn);
     if (!r) {
-        reply_with_error(message, make_error(r.error()));
+        reply_with_error(message, make_error(r.assume_error()));
         return;
     }
 
@@ -327,6 +328,12 @@ void db_actor_t::on_store_new_folder(message::store_new_folder_request_t &messag
         folder->add(fi_source);
     }
 
+    auto &cluster = message.payload.request_payload.cluster;
+    auto &folders = cluster->get_folders();
+    folders.put(folder);
+    folder->assign_cluster(cluster.get());
+    folder->assign_device(device);
+
     reply_to(message, std::move(folder));
 }
 
@@ -357,38 +364,19 @@ void db_actor_t::on_store_folder(message::store_folder_request_t &message) noexc
             return;
         }
         fi->unmark_dirty();
+        folder->add(fi);
     }
 
-    model::block_infos_map_t dirty_blocks;
-    for (auto &it : folder->get_file_infos()) {
+    for (auto &it : folder->get_folder_infos()) {
         auto &fi = it.second;
         if (!fi->is_dirty()) {
             continue;
         }
-        for (auto &bit : fi->get_blocks()) {
-            if (!bit->is_dirty()) {
-                continue;
-            }
-            r = db::store_block_info(bit, txn);
-            if (!r) {
-                reply_with_error(message, make_error(r.error()));
-                return;
-            }
-            bit->unmark_dirty();
-        }
-    }
-
-    for (auto &it : folder->get_file_infos()) {
-        auto &fi = it.second;
-        if (!fi->is_dirty()) {
-            continue;
-        }
-        r = db::store_file_info(it.second, txn);
+        auto r = save(txn, fi);
         if (!r) {
             reply_with_error(message, make_error(r.error()));
             return;
         }
-        fi->unmark_dirty();
     }
 
     r = txn.commit();
@@ -398,6 +386,49 @@ void db_actor_t::on_store_folder(message::store_folder_request_t &message) noexc
     }
 
     reply_to(message);
+}
+
+outcome::result<void> db_actor_t::save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept {
+    auto r = db::store_folder_info(folder_info, txn);
+    if (!r) {
+        return r;
+    }
+
+    auto &blocks_map = folder_info->get_folder()->get_cluster()->get_blocks();
+    auto file_infos = model::file_infos_map_t();
+    for (auto &it : folder_info->get_file_infos()) {
+        auto &fi = it.second;
+        if (!fi->is_dirty()) {
+            continue;
+        }
+
+        for (auto &block : fi->get_blocks()) {
+            if (!block->is_dirty()) {
+                continue;
+            }
+            r = db::store_block_info(block, txn);
+            if (!r) {
+                return r;
+            }
+            block->unmark_dirty();
+            blocks_map.put(block);
+        }
+
+        r = db::store_file_info(it.second, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+        fi->unmark_dirty();
+        file_infos.put(fi);
+    }
+
+    auto &native_file_infos = folder_info->get_file_infos();
+    for (auto it : file_infos) {
+        native_file_infos.put(it.second);
+    }
+
+    folder_info->get_folder()->get_folder_infos().put(folder_info);
+    return outcome::success();
 }
 
 void db_actor_t::on_store_folder_info(message::store_folder_info_request_t &message) noexcept {
@@ -415,14 +446,14 @@ void db_actor_t::on_store_folder_info(message::store_folder_info_request_t &mess
         return reply_with_error(message, make_error(txn_opt.error()));
     }
     auto &txn = txn_opt.value();
-    auto r = db::store_folder_info(fi, txn);
+    auto r = save(txn, fi);
     if (!r) {
         reply_with_error(message, make_error(r.error()));
         return;
     }
 
-    r = txn.commit();
-    if (!r) {
+    auto tx_r = txn.commit();
+    if (!tx_r) {
         reply_with_error(message, make_error(r.error()));
         return;
     }

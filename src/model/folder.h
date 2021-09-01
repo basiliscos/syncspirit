@@ -26,7 +26,6 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     void assign_device(model::device_ptr_t device_) noexcept;
     void assign_cluster(cluster_t *cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
-    void add(const file_info_ptr_t &file_info) noexcept;
     db::Folder serialize() noexcept;
 
     bool operator==(const folder_t &other) const noexcept { return other._id == _id; }
@@ -43,19 +42,14 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     inline void set_db_key(std::uint64_t value) noexcept { db_key = value; }
     inline auto &get_folder_infos() noexcept { return folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
-    inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
     inline const bfs::path &get_path() noexcept { return path; }
     void update(const proto::Folder &remote) noexcept;
-    void update(const proto::Index &data, const device_ptr_t &peer) noexcept;
-    void update(const proto::IndexUpdate &data, const device_ptr_t &peer) noexcept;
     void update(local_file_map_t &local_files) noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
 
   private:
-    template <typename Message> void update_generic(const Message &data, const device_ptr_t &peer) noexcept;
-
     device_ptr_t device;
     std::uint64_t db_key;
     std::string _id;
@@ -71,7 +65,6 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     bool disable_temp_indixes;
     bool paused;
     folder_infos_map_t folder_infos;
-    file_infos_map_t file_infos;
     cluster_t *cluster = nullptr;
 };
 

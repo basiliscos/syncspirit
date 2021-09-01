@@ -29,9 +29,12 @@ TEST_CASE("block iterator", "[model]") {
     folder->assign_cluster(cluster.get());
     folder->assign_device(d1);
 
+    db::FolderInfo db_folderinfo;
+    auto folder_info = folder_info_ptr_t(new folder_info_t(db_folderinfo, d1.get(), folder.get(), 3));
+
     SECTION("no blocks") {
         proto::FileInfo info;
-        auto file = file_info_t(info, folder.get());
+        auto file = file_info_t(info, folder_info.get());
         auto bi = file.iterate_blocks();
         REQUIRE(!bi);
     }
@@ -49,7 +52,7 @@ TEST_CASE("block iterator", "[model]") {
         *info.add_blocks() = b1;
         *info.add_blocks() = b2;
 
-        auto file = file_info_t(info, folder.get());
+        auto file = file_info_t(info, folder_info.get());
 
         SECTION("normal iteration") {
             auto bi = file.iterate_blocks();
@@ -97,18 +100,6 @@ TEST_CASE("block iterator", "[model]") {
             CHECK(r1.block->get_hash() == "h1");
 
             bi.reset();
-            REQUIRE(!bi);
-        }
-
-        SECTION("no iteration on sync") {
-            file.mark_sync();
-            auto bi = file.iterate_blocks();
-            REQUIRE(!bi);
-        }
-
-        SECTION("no iteration on newer") {
-            file.mark_newver();
-            auto bi = file.iterate_blocks();
             REQUIRE(!bi);
         }
     }

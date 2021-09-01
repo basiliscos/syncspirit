@@ -72,8 +72,8 @@ void test_new_folder() {
             db_folder.set_label(p_folder.label());
             db_folder.set_path(dir.string());
 
-            auto folder = model::folder_ptr_t(new model::folder_t(db_folder));
-            cluster->get_folders().put(folder);
+            auto folder = model::folder_ptr_t(new model::folder_t(db_folder, 1));
+            cluster->add_folder(folder);
             folder->assign_device(device_my);
             folder->assign_cluster(cluster.get());
 
@@ -99,21 +99,29 @@ void test_new_folder() {
             proto::Index index;
             index.set_folder(folder->id());
             SECTION("file with content (1 and 0 blocks)") {
-                auto block_info = proto::BlockInfo();
-                block_info.set_size(5);
-                block_info.set_hash(utils::sha256_digest("12345").value());
+                auto raw_block = proto::BlockInfo();
+                raw_block.set_size(5);
+                raw_block.set_hash(utils::sha256_digest("12345").value());
+                auto block = model::block_info_ptr_t(new model::block_info_t(raw_block));
+                block->set_db_key(1234ul); // for saving
+
+                cluster->get_blocks().put(block);
+                assert(cluster->get_blocks().by_key(block->get_db_key()));
 
                 auto fi = proto::FileInfo();
                 fi.set_name("a.txt");
                 fi.set_type(proto::FileInfoType::FILE);
                 fi.set_sequence(5);
                 fi.set_block_size(5);
+                auto counters = fi.mutable_version()->add_counters();
+                counters->set_id(1u);
+                counters->set_value(1u);
 
                 auto path = dir / "a.txt";
 
                 SECTION("non-empty") {
                     fi.set_size(5);
-                    *fi.add_blocks() = block_info;
+                    *fi.add_blocks() = raw_block;
                     *index.add_files() = fi;
 
                     auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
@@ -127,6 +135,7 @@ void test_new_folder() {
 
                     SECTION("block hash mismatches") {
                         peer->push_response("1234");
+                        assert(cluster->get_blocks().by_key(block->get_db_key()));
                         sup->do_process();
                         CHECK(!bfs::exists(path));
                         auto ec = controller->get_shutdown_reason()->next->ec;
@@ -159,6 +168,9 @@ void test_new_folder() {
                 fi.set_type(proto::FileInfoType::FILE);
                 fi.set_sequence(5);
                 fi.set_block_size(5);
+                auto counters = fi.mutable_version()->add_counters();
+                counters->set_id(1u);
+                counters->set_value(1u);
 
                 auto path = dir / "a.txt";
                 fi.set_size(10);
@@ -190,6 +202,10 @@ void test_new_folder() {
                 fi.set_type(proto::FileInfoType::FILE);
                 fi.set_sequence(4);
                 fi.set_deleted(true);
+                auto counters = fi.mutable_version()->add_counters();
+                counters->set_id(1u);
+                counters->set_value(1u);
+
                 *index.add_files() = fi;
 
                 SECTION("file does not exist") {

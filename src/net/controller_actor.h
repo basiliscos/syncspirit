@@ -94,7 +94,7 @@ struct controller_actor_t : public r::actor_base_t {
     struct folder_updater_t {
         model::device_ptr_t peer;
         virtual const std::string &id() noexcept = 0;
-        virtual void update(model::folder_t &folder) noexcept = 0;
+        virtual model::folder_info_ptr_t update(model::folder_t &folder) noexcept = 0;
     };
 
   private:
@@ -116,7 +116,6 @@ struct controller_actor_t : public r::actor_base_t {
 
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_ready(message::ready_signal_t &message) noexcept;
-    void on_store_folder(message::store_folder_response_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
     void on_validation(hasher::message::validation_response_t &res) noexcept;
     void on_open(fs::message::open_response_t &res) noexcept;

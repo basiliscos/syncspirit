@@ -17,7 +17,11 @@ template <typename Message> struct typed_folder_updater_t final : controller_act
     }
     const std::string &id() noexcept override { return (*msg).folder(); }
 
-    void update(model::folder_t &folder) noexcept override { return folder.update(*msg, peer); };
+    model::folder_info_ptr_t update(model::folder_t &folder) noexcept override {
+        auto folder_info = folder.get_folder_info(peer);
+        folder_info->update(*msg, peer);
+        return folder_info;
+    };
 };
 
 namespace {
@@ -50,7 +54,6 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(peer_addr, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
-        p.subscribe_actor(&controller_actor_t::on_store_folder);
         p.subscribe_actor(&controller_actor_t::on_store_folder_info);
         p.subscribe_actor(&controller_actor_t::on_new_folder);
         p.subscribe_actor(&controller_actor_t::on_ready);
@@ -113,7 +116,7 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
             }
         }
         LOG_TRACE(log, "{}, {} already abscent, noop", identity, path.string());
-        current_file->mark_sync();
+        // current_file->record_update(*peer);
         return ImmediateResult::DONE;
     } else if (current_file->is_file() && current_file->get_size() == 0) {
         LOG_TRACE(log, "{}, creating empty file {}", identity, path.string());
@@ -134,7 +137,7 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
             LOG_WARN(log, "{}, error creating {} : {}", identity, path.string(), e.code().message());
             return ImmediateResult::ERROR;
         }
-        current_file->mark_sync();
+        // current_file->record_update(*peer);
         return ImmediateResult::DONE;
     } else if (current_file->is_dir()) {
         LOG_TRACE(log, "{}, creating dir {}", identity, path.string());
@@ -146,7 +149,7 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
                 return ImmediateResult::ERROR;
             }
         }
-        current_file->mark_sync();
+        // current_file->record_update(*peer);
         return ImmediateResult::DONE;
     } else if (current_file->is_link()) {
         auto target = bfs::path(current_file->get_link_target());
@@ -166,9 +169,7 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
             do_shutdown(make_error(ec));
             return ImmediateResult::ERROR;
         }
-        current_file->mark_sync();
-        return ImmediateResult::DONE;
-        current_file->mark_sync();
+        // current_file->record_update(*peer);
         return ImmediateResult::DONE;
     }
     return ImmediateResult::NON_IMMEDIATE;
@@ -253,18 +254,6 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
     std::visit([this](auto &msg) { on_message(msg); }, message.payload);
 }
 
-void controller_actor_t::on_store_folder(message::store_folder_response_t &message) noexcept {
-    auto &ee = message.payload.ee;
-    auto &folder = message.payload.req->payload.request_payload.folder;
-    auto &label = folder->label();
-    if (ee) {
-        LOG_WARN(log, "{}, on_store_folder {} failed : {}", identity, label, ee->message());
-        return do_shutdown(ee);
-    }
-    LOG_TRACE(log, "{}, on_store_folder_info, folder = '{}'", identity, label);
-    ready();
-}
-
 void controller_actor_t::on_new_folder(message::store_new_folder_notify_t &message) noexcept {
     auto &folder = message.payload.folder;
     LOG_TRACE(log, "{}, on_new_folder, folder = '{}'", identity, folder->label());
@@ -284,6 +273,7 @@ void controller_actor_t::on_store_folder_info(message::store_folder_info_respons
         log->warn("{}, on_store_folder_info {} failed : {}", identity, label, ee->message());
         return do_shutdown(ee);
     }
+    ready();
 }
 
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept { update(*message); }
@@ -303,7 +293,7 @@ void controller_actor_t::on_message(proto::message::DownloadProgress &message) n
 void controller_actor_t::update(folder_updater_t &&updater) noexcept {
     auto &folder_id = updater.id();
     auto folder = cluster->get_folders().by_id(folder_id);
-    if (current_file && current_file->get_folder()->id() == folder_id) {
+    if (current_file && current_file->get_folder_info()->get_folder()->id() == folder_id) {
         LOG_TRACE(log, "{}, resetting iterators on folder {}", identity, folder->label());
         file_iterator.reset();
         block_iterator.reset();
@@ -315,12 +305,13 @@ void controller_actor_t::update(folder_updater_t &&updater) noexcept {
         auto ee = r::make_error(context, ec);
         return do_shutdown(ee);
     }
-    updater.update(*folder);
-    auto updated = folder->is_dirty();
-    LOG_DEBUG(log, "{}, folder {}/{} has been updated = {}", identity, folder_id, folder->label(), updated);
+    auto folder_info = updater.update(*folder);
+    auto updated = folder_info->is_dirty();
+    LOG_DEBUG(log, "{}, folder info {} for folder '{}' has been updated = {}", identity, folder_info->get_index(),
+              folder->label(), updated);
     if (updated) {
         auto timeout = init_timeout / 2;
-        request<payload::store_folder_request_t>(db, std::move(folder)).send(timeout);
+        request<payload::store_folder_info_request_t>(db, std::move(folder_info)).send(timeout);
     }
 }
 
@@ -386,8 +377,11 @@ void controller_actor_t::on_close(fs::message::close_response_t &res) noexcept {
         return do_shutdown(ee);
     }
     auto &path_str = payload.req->payload.request_payload->path.string();
+    LOG_INFO(log, "{}, file '{}' has been flushed to disk", identity, path_str);
     auto it = write_map.find(path_str);
     assert(it != write_map.end());
+    auto &info = it->second;
+
     write_map.erase(it);
 }
 

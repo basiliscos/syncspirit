@@ -32,7 +32,7 @@ std::string read_file(const bfs::path& path) {
     if (!in) {
         auto ec = sys::error_code{errno, sys::generic_category()};
         std::cout << "can't open " << file_path_c << " : " << ec.message() << "\n";
-        std::abort();
+        return "";
     }
     assert(in);
     std::vector<char> buffer(filesize, 0);

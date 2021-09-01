@@ -38,6 +38,7 @@ struct file_interator_t {
 
     cluster_t *cluster;
     device_ptr_t peer;
+    folder_info_ptr_t local_folder_info;
     it_folder_t it_folder;
     it_file_t f_begin, f_end;
     file_info_ptr_t file;

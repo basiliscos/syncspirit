@@ -405,7 +405,7 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     auto &file = p.file;
     auto &block = p.block;
     req.set_id(req_id);
-    *req.mutable_folder() = file->get_folder()->id();
+    *req.mutable_folder() = file->get_folder_info()->get_folder()->id();
     *req.mutable_name() = file->get_name();
 
     req.set_offset(file->get_block_offset(p.block_index));

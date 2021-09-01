@@ -290,6 +290,7 @@ struct store_new_folder_request_t {
     db::Folder folder;
     model::device_ptr_t source;
     std::uint64_t source_index;
+    model::cluster_ptr_t cluster;
 };
 
 struct store_new_folder_notify_t {

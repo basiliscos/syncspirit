@@ -14,7 +14,15 @@ template <typename Item, typename Id, typename Key = std::uint64_t> struct gener
 
     void put(const Item &item) noexcept {
         id2d.emplace(natural_key(item), item);
-        key2d.emplace(db_key(item), item);
+
+        auto key = db_key(item);
+        if constexpr (std::is_integral_v<Key>) {
+            if (key) {
+                key2d.emplace(key, item);
+            }
+        } else {
+            key2d.emplace(key, item);
+        }
     }
 
     void remove(const Item &item) noexcept {

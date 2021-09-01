@@ -37,7 +37,7 @@ void test_indexupdate_new_dirs() {
             db_folder.set_id(p_folder.id());
             db_folder.set_label(p_folder.label());
             db_folder.set_path(root_path.string());
-            folder = new model::folder_t(db_folder);
+            folder = new model::folder_t(db_folder, 77);
             folder->assign_device(device_my);
 
             auto db_fi_my = db::FolderInfo();

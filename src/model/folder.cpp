@@ -12,54 +12,7 @@ folder_t::folder_t(const db::Folder &db_folder, uint64_t db_key_) noexcept
       ignore_permissions{db_folder.ignore_permissions()}, ignore_delete{db_folder.ignore_delete()},
       disable_temp_indixes{db_folder.disable_temp_indexes()}, paused{db_folder.paused()} {}
 
-#if 0
-bool folder_t::assign(const proto::Folder &source, const devices_map_t &devices_map) noexcept {
-    // remove outdated
-    bool changed = false;
-    for (auto it = devices.begin(); it != devices.end();) {
-        bool has = false;
-        for (int i = 0; i < source.devices_size(); ++i) {
-            if (it->device->device_id.get_sha256() == source.devices(i).id()) {
-                has = true;
-                break;
-            }
-        }
-        ++it;
-    }
-    // append possibly new
-    for (int i = 0; i < source.devices_size(); ++i) {
-        auto &d = source.devices(i);
-        auto &raw_id = d.id();
-        if (raw_id == device->device_id.get_sha256()) {
-            continue;
-        }
-        auto device_id_option = device_id_t::from_sha256(raw_id);
-        if (!device_id_option) {
-            spdlog::warn("load_folder, cannot obtain device id from digest: {}", raw_id);
-            continue;
-        }
-        auto &device_id = device_id_option.value().get_value();
-        auto device = devices_map.by_id(device_id);
-        if (!device) {
-            spdlog::warn("load_folder, unknown device {}, ignoring", device_id);
-            continue;
-        }
-        auto r = devices.emplace(model::folder_device_t{device, d.index_id(), d.max_sequence()});
-        changed |= r.second;
-    }
-    return changed;
-}
-
-void folder_t::assing_self(index_id_t index, sequence_id_t max_sequence) noexcept {
-    auto e_r = devices.emplace(model::folder_device_t{device, index, max_sequence});
-    assert(e_r.second);
-    (void)e_r;
-}
-#endif
-
 void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
-
-void folder_t::add(const file_info_ptr_t &file_info) noexcept { file_infos.put(file_info); }
 
 void folder_t::assign_device(model::device_ptr_t device_) noexcept { device = device_; }
 
@@ -117,7 +70,7 @@ std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept 
     for (auto &it : folder_infos) {
         auto &fi = *it.second;
         auto &d = *fi.get_device();
-        proto::Device pd;
+        auto &pd = *r.add_devices();
         pd.set_id(d.device_id.get_sha256());
         pd.set_name(d.name);
         pd.set_compression(d.compression);
@@ -130,7 +83,6 @@ std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept 
         pd.set_index_id(fi.get_index());
         pd.set_introducer(d.introducer);
         pd.set_skip_introduction_removals(d.skip_introduction_removals);
-        *r.add_devices() = pd;
         spdlog::trace("folder_t::get (==>), folder = {}/{:#x}, device = {}, max_seq = {}", _label, fi.get_index(),
                       d.device_id, max_seq);
     }
@@ -171,65 +123,10 @@ void folder_t::update(const proto::Folder &remote) noexcept {
     }
 }
 
-template <typename Message> void folder_t::update_generic(const Message &data, const device_ptr_t &peer) noexcept {
-    auto fi = folder_infos.by_id(peer->device_id.get_sha256());
-    std::int64_t max_sequence = fi->get_max_sequence();
-    for (int i = 0; i < data.files_size(); ++i) {
-        auto &file = data.files(i);
-        auto seq = file.sequence();
-        spdlog::trace("folder_t::update, folder = {}, device = {}, file = {}, seq = {}", label(), device->device_id,
-                      file.name(), seq);
-
-        auto file_key = file_info_t::generate_db_key(file.name(), *this);
-        auto fi = file_infos.by_key(file_key);
-        if (fi) {
-            fi->update(file);
-        } else {
-            fi = file_info_ptr_t(new file_info_t(file, this));
-            add(fi);
-            mark_dirty();
-        }
-        if (seq > max_sequence) {
-            max_sequence = seq;
-        }
-    }
-    if (fi->get_max_sequence() < max_sequence) {
-        fi->update_max_sequence(max_sequence);
-        mark_dirty();
-    }
-
-    spdlog::debug("folder_t::update, folder_info = {} max seq = {}, device = {}", fi->get_db_key(), max_sequence,
-                  peer->device_id);
-    /*
-    auto local_folder_info = folder_infos.by_id(device->device_id.get_sha256());
-    if (local_folder_info->get_max_sequence() < max_sequence) {
-        local_folder_info->set_max_sequence(max_sequence);
-        spdlog::trace("folder_t::update, folder_info = {} max seq = {}, device = {} (local)",
-                      local_folder_info->get_db_key(), max_sequence, device->device_id);
-    }
-    */
-}
-
-void folder_t::update(const proto::IndexUpdate &data, const device_ptr_t &peer) noexcept { update_generic(data, peer); }
-
-void folder_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept { update_generic(data, peer); }
-
 void folder_t::update(local_file_map_t &local_files) noexcept {
-    auto file_infos_copy = file_infos;
-    for (auto it : local_files.map) {
-        auto file_key = file_info_t::generate_db_key(it.first.string(), *this);
-        auto cluster_file = file_infos_copy.by_key(file_key);
-        if (cluster_file) {
-            auto status = cluster_file->update(it.second);
-            file_infos_copy.remove(cluster_file);
-            if (status == file_status_t::newer) {
-                std::abort();
-            }
-        }
-    }
-    for (auto it : file_infos_copy) {
-        it.second->mark_outdated();
-    }
+    auto folder_info = folder_infos.by_id(device->get_id());
+    assert(folder_info);
+    folder_info->update(local_files);
 }
 
 folder_info_ptr_t folder_t::get_folder_info(const device_ptr_t &device) noexcept {

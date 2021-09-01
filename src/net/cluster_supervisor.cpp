@@ -154,7 +154,7 @@ void cluster_supervisor_t::on_create_folder(ui::message::create_folder_request_t
     auto source_index = p.source_index;
     log->trace("{}, on_create_folder, {} ({})", identity, folder.label(),
                (source ? source->device_id.get_short() : ""));
-    request<payload::store_new_folder_request_t>(db, folder, source, source_index).send(init_timeout);
+    request<payload::store_new_folder_request_t>(db, folder, source, source_index, cluster).send(init_timeout);
 }
 
 void cluster_supervisor_t::on_share_folder(ui::message::share_folder_request_t &message) noexcept {
@@ -179,10 +179,6 @@ void cluster_supervisor_t::on_store_new_folder(message::store_new_folder_respons
     } else {
         auto &folder = message.payload.res.folder;
         log->debug("{}, created_folder {}/{}", identity, folder->id(), folder->label());
-        folders.put(folder);
-        folder->assign_device(device);
-        folder->assign_cluster(cluster.get());
-
         callback_t hanlder = [](cluster_supervisor_t *self, model::folder_ptr_t &folder) {
             self->handle_scan_new(folder);
         };

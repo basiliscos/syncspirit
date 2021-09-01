@@ -14,12 +14,13 @@ namespace syncspirit::model {
 
 namespace bfs = boost::filesystem;
 
-struct folder_t;
+struct folder_info_t;
 struct block_info_t;
 struct local_file_t;
 struct file_info_t;
+struct device_t;
 
-enum class file_status_t { sync, older, newer };
+using device_ptr_t = intrusive_ptr_t<device_t>;
 
 struct block_location_t {
     block_info_t *block;
@@ -54,37 +55,31 @@ struct blocks_interator_t {
 
 struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     using blocks_t = std::vector<block_info_ptr_t>;
-    file_info_t(const db::FileInfo &info_, folder_t *folder_) noexcept;
-    file_info_t(const proto::FileInfo &info_, folder_t *folder_) noexcept;
+    file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_) noexcept;
+    file_info_t(const proto::FileInfo &info_, folder_info_t *folder_info_) noexcept;
     ~file_info_t();
 
     bool operator==(const file_info_t &other) const noexcept { return other.db_key == db_key; }
 
     db::FileInfo serialize() noexcept;
     void update(const proto::FileInfo &remote_info) noexcept;
-    file_status_t update(const local_file_t &local_file) noexcept;
+    bool update(const local_file_t &local_file) noexcept;
 
     inline const std::string &get_db_key() const noexcept { return db_key; }
 
-    inline folder_t *get_folder() const noexcept { return folder; }
+    inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
     std::string_view get_name() const noexcept;
-    std::string get_full_name() const noexcept;
+    inline const std::string &get_full_name() const noexcept { return full_name; }
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     inline blocks_t &get_blocks() noexcept { return blocks; }
-
-    inline void mark_outdated() noexcept { status = file_status_t::older; }
-    inline void mark_newver() noexcept { status = file_status_t::newer; }
-    inline void mark_sync() noexcept { status = file_status_t::sync; }
 
     inline bool is_file() noexcept { return type == proto::FileInfoType::FILE; }
     inline bool is_dir() noexcept { return type == proto::FileInfoType::DIRECTORY; }
     inline bool is_link() noexcept { return type == proto::FileInfoType::SYMLINK; }
     inline bool is_deleted() noexcept { return deleted; }
 
-    inline file_status_t get_status() const noexcept { return status; }
-
-    static std::string generate_db_key(const std::string &name, const folder_t &folder) noexcept;
+    static std::string generate_db_key(const std::string &name, const folder_info_t &folder) noexcept;
 
     blocks_interator_t iterate_blocks() noexcept;
     inline std::int64_t get_size() const noexcept { return size; }
@@ -97,13 +92,17 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
     const bfs::path &get_path() noexcept;
+    bool is_older(const file_info_t &other) noexcept;
+
+    void record_update(const device_t &source) noexcept;
+    file_info_ptr_t link(const device_ptr_t &target) noexcept;
 
   private:
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void generate_db_key(const std::string &name) noexcept;
     template <typename Source> void fields_update(const Source &s) noexcept;
 
-    folder_t *folder;
+    folder_info_t *folder_info;
     proto::FileInfoType type;
     std::int64_t size;
     std::uint32_t permissions;
@@ -121,12 +120,13 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     blocks_t blocks;
     blocks_t local_blocks;
     size_t local_blocks_count = 0;
-    file_status_t status = file_status_t::older;
     std::optional<bfs::path> path;
+    std::string full_name;
 };
 
-inline const std::string db_key(const file_info_ptr_t &item) noexcept { return item->get_db_key(); }
+inline const std::string &db_key(const file_info_ptr_t &item) noexcept { return item->get_db_key(); }
+inline const std::string &natural_key(const file_info_ptr_t &item) noexcept { return item->get_full_name(); }
 
-using file_infos_map_t = generic_map_t<file_info_ptr_t, void, std::string>;
+using file_infos_map_t = generic_map_t<file_info_ptr_t, std::string, std::string>;
 
 }; // namespace syncspirit::model

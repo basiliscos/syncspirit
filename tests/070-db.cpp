@@ -68,12 +68,21 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
 
         model::devices_map_t devices;
         devices.put(d1);
-        devices.put(d2);
+
+        auto d1_key = d1->get_db_key();
+        CHECK(!devices.by_key(d1_key));
 
         auto txn = mk_txn(env, transaction_type_t::RW);
         auto r = db::store_device(d1, txn);
         REQUIRE(r);
         CHECK(d1->get_db_key() > 0);
+        CHECK(d1->get_db_key() != d1_key);
+        CHECK(!devices.by_key(d1_key));
+
+        devices.put(d1);
+        CHECK(devices.by_key(d1->get_db_key()));
+
+        devices.put(d2);
         r = db::store_device(d2, txn);
         REQUIRE(txn.commit());
         CHECK(d2->get_db_key() > 0);
@@ -167,21 +176,26 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
     }
 
     SECTION("save & load folder_infos") {
+        auto txn = mk_txn(env, transaction_type_t::RW);
         db::Device db_d1;
-        db_d1.set_id(test::device_id2sha256("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
+        db_d1.set_id(test::device_id2sha256("TXCLYU4-TK7GT6O-ZCECZI3-SJGAKRY-EAUJBJI-5XUY4YX-3YZQ6TH-3HGOBAU"));
         db_d1.set_name("d1");
         auto d1 = model::device_ptr_t(new model::device_t(db_d1));
         auto devices = model::devices_map_t();
+        auto r_st = db::store_device(d1, txn);
+        REQUIRE(r_st);
         devices.put(d1);
 
         db::Folder db_f1;
         db_f1.set_id("1111");
         db_f1.set_label("1111-l");
         auto f1 = model::folder_ptr_t(new model::folder_t(db_f1));
+        r_st = db::store_folder(f1, txn);
+        REQUIRE(r_st);
+
         auto folders = model::folders_map_t();
         folders.put(f1);
 
-        auto txn = mk_txn(env, transaction_type_t::RW);
         db::FolderInfo db_fi;
         db_fi.set_index_id(1234);
         // db_fi.set_max_sequence(1235);
@@ -202,18 +216,20 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
         SECTION("save & load file_infos") {
             db::FileInfo db_fi1;
             db_fi1.set_name("a/b/c.txt");
-            auto fi1 = model::file_info_ptr_t(new model::file_info_t(db_fi1, f1.get()));
+            auto fi1 = model::file_info_ptr_t(new model::file_info_t(db_fi1, fi.get()));
             auto txn = mk_txn(env, transaction_type_t::RW);
             auto r = db::store_file_info(fi1, txn);
             REQUIRE(r);
             REQUIRE(txn.commit());
 
             txn = mk_txn(env, transaction_type_t::RO);
-            auto fi_infos = db::load_file_infos(folders, txn);
+            auto fi_infos = db::load_file_infos(infos.value(), txn);
             REQUIRE(fi_infos);
             auto fi1_x = fi_infos.value().by_key(fi1->get_db_key());
             CHECK(*fi1_x == *fi1);
-            CHECK(fi1_x->get_folder() == f1.get());
+            CHECK(fi1_x->get_folder_info()->get_folder() == fi.get()->get_folder());
+
+            // TODO: add blocks
         }
     }
 }

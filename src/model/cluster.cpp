@@ -27,12 +27,13 @@ TRY_ANEW:
             auto &folder = it_folder->second;
             auto &folder_infos_map = folder->get_folder_infos();
 
-            auto peer_folder_info = folder_infos_map.by_id(peer->device_id.get_sha256());
+            auto peer_folder_info = folder_infos_map.by_id(peer->get_id());
             if (!peer_folder_info)
                 continue;
-            ;
 
-            auto &file_infos = folder->get_file_infos();
+            local_folder_info = folder_infos_map.by_id(cluster->get_device()->get_id());
+
+            auto &file_infos = peer_folder_info->get_file_infos();
             f_begin = file_infos.begin();
             f_end = file_infos.end();
 
@@ -44,7 +45,16 @@ TRY_ANEW:
     while (f_begin != f_end) {
         file = f_begin->second;
         ++f_begin;
-        if (file->get_status() == file_status_t::older) {
+        if (!local_folder_info) {
+            return;
+        }
+        auto full_name = natural_key(file);
+        auto local_file = local_folder_info->get_file_infos().by_id(full_name);
+        if (!local_file) {
+            return;
+        }
+        auto needs_update = local_file->is_older(*file);
+        if (needs_update) {
             return;
         }
     }
@@ -54,7 +64,7 @@ TRY_ANEW:
 void file_interator_t::reset() noexcept { cluster = nullptr; }
 
 file_info_ptr_t file_interator_t::next() noexcept {
-    file_info_ptr_t r = file;
+    file_info_ptr_t r = file->link(cluster->get_device());
     prepare();
     return r;
 }
