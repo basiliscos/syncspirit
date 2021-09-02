@@ -32,7 +32,7 @@ struct folder_info_t : arc_base_t<folder_info_t>, storeable_t {
     void update(const proto::IndexUpdate &data, const device_ptr_t &peer) noexcept;
     void update(const proto::Device &device) noexcept;
     void update(local_file_map_t &local_files) noexcept;
-    void update_max_sequence(std::int64_t value) noexcept;
+    std::int64_t inc_max_sequence() noexcept;
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
 
   private:

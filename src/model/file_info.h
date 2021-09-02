@@ -95,6 +95,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     bool is_older(const file_info_t &other) noexcept;
 
     void record_update(const device_t &source) noexcept;
+    void after_sync() noexcept;
     file_info_ptr_t link(const device_ptr_t &target) noexcept;
 
   private:

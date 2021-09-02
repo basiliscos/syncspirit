@@ -32,9 +32,9 @@ void folder_info_t::update(const proto::Device &device) noexcept {
     }
 }
 
-void folder_info_t::update_max_sequence(std::int64_t value) noexcept {
-    max_sequence = value;
+std::int64_t folder_info_t::inc_max_sequence() noexcept {
     mark_dirty();
+    return ++max_sequence;
 }
 
 db::FolderInfo folder_info_t::serialize() noexcept {
@@ -72,7 +72,7 @@ template <typename Message> void folder_info_t::update_generic(const Message &da
         }
     }
     if (get_max_sequence() < max_sequence) {
-        update_max_sequence(max_sequence);
+        this->max_sequence = max_sequence;
         mark_dirty();
     }
 

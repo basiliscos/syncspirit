@@ -55,6 +55,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_store_folder_info);
+        p.subscribe_actor(&controller_actor_t::on_store_file_info);
         p.subscribe_actor(&controller_actor_t::on_new_folder);
         p.subscribe_actor(&controller_actor_t::on_ready);
         p.subscribe_actor(&controller_actor_t::on_block);
@@ -105,6 +106,11 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
     auto &path = current_file->get_path();
     auto parent = path.parent_path();
     sys::error_code ec;
+    auto update_db = [this]() {
+        current_file->after_sync();
+        request<payload::store_file_request_t>(db, current_file).send(init_timeout);
+    };
+
     if (current_file->is_deleted()) {
         if (bfs::exists(path, ec)) {
             LOG_DEBUG(log, "{} removing {}", identity, path.string());
@@ -114,9 +120,9 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
                 do_shutdown(make_error(ec));
                 return ImmediateResult::ERROR;
             }
+            update_db();
         }
         LOG_TRACE(log, "{}, {} already abscent, noop", identity, path.string());
-        // current_file->record_update(*peer);
         return ImmediateResult::DONE;
     } else if (current_file->is_file() && current_file->get_size() == 0) {
         LOG_TRACE(log, "{}, creating empty file {}", identity, path.string());
@@ -128,16 +134,19 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
                 return ImmediateResult::ERROR;
             }
         }
-        std::ofstream out;
-        out.exceptions(out.failbit | out.badbit);
-        try {
-            out.open(path.string());
-        } catch (const std::ios_base::failure &e) {
-            do_shutdown(make_error(e.code()));
-            LOG_WARN(log, "{}, error creating {} : {}", identity, path.string(), e.code().message());
-            return ImmediateResult::ERROR;
+
+        if (!bfs::exists(path)) {
+            std::ofstream out;
+            out.exceptions(out.failbit | out.badbit);
+            try {
+                out.open(path.string());
+            } catch (const std::ios_base::failure &e) {
+                do_shutdown(make_error(e.code()));
+                LOG_WARN(log, "{}, error creating {} : {}", identity, path.string(), e.code().message());
+                return ImmediateResult::ERROR;
+            }
+            update_db();
         }
-        // current_file->record_update(*peer);
         return ImmediateResult::DONE;
     } else if (current_file->is_dir()) {
         LOG_TRACE(log, "{}, creating dir {}", identity, path.string());
@@ -148,8 +157,8 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
                 do_shutdown(make_error(ec));
                 return ImmediateResult::ERROR;
             }
+            update_db();
         }
-        // current_file->record_update(*peer);
         return ImmediateResult::DONE;
     } else if (current_file->is_link()) {
         auto target = bfs::path(current_file->get_link_target());
@@ -162,14 +171,21 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
                 return ImmediateResult::ERROR;
             }
         }
-        bfs::create_symlink(target, path, ec);
-        if (ec) {
-            LOG_WARN(log, "{}, error symlinking {} -> {} {} : {}", identity, path.string(), target.string(),
-                     ec.message());
-            do_shutdown(make_error(ec));
-            return ImmediateResult::ERROR;
+
+        bool attempt_create =
+            !bfs::exists(path, ec) || !bfs::is_symlink(path, ec) || (bfs::read_symlink(path, ec) != target);
+        if (attempt_create) {
+            bfs::create_symlink(target, path, ec);
+            if (ec) {
+                LOG_WARN(log, "{}, error symlinking {} -> {} {} : {}", identity, path.string(), target.string(),
+                         ec.message());
+                do_shutdown(make_error(ec));
+                return ImmediateResult::ERROR;
+            }
+            update_db();
+        } else {
+            LOG_TRACE(log, "{}, no need to create symlink {} -> {}", identity, path.string(), target.string());
         }
-        // current_file->record_update(*peer);
         return ImmediateResult::DONE;
     }
     return ImmediateResult::NON_IMMEDIATE;
@@ -220,8 +236,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     auto ir = process_immediately();
     if (ir == ImmediateResult::ERROR) {
         return;
-    }
-    if (ir == ImmediateResult::NON_IMMEDIATE) {
+    } else if (ir == ImmediateResult::NON_IMMEDIATE) {
         LOG_TRACE(log, "{}, going to sync {}", identity, current_file->get_full_name());
         block_iterator = current_file->iterate_blocks();
     }
@@ -274,6 +289,17 @@ void controller_actor_t::on_store_folder_info(message::store_folder_info_respons
         return do_shutdown(ee);
     }
     ready();
+}
+
+void controller_actor_t::on_store_file_info(message::store_file_response_t &message) noexcept {
+    auto &ee = message.payload.ee;
+    auto &file = message.payload.req->payload.request_payload.file;
+    log->trace("{}, on_store_file_info, file: {}, seq: {}", identity, file->get_full_name(), file->get_sequence());
+    if (ee) {
+        log->error("{}, on_store_file_info, file: {}, error: {}", identity, file->get_full_name(), ee->message());
+        return do_shutdown(ee);
+    }
+    // ready();
 }
 
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept { update(*message); }
@@ -380,7 +406,10 @@ void controller_actor_t::on_close(fs::message::close_response_t &res) noexcept {
     LOG_INFO(log, "{}, file '{}' has been flushed to disk", identity, path_str);
     auto it = write_map.find(path_str);
     assert(it != write_map.end());
-    auto &info = it->second;
+
+    auto &file = it->second.file;
+    file->after_sync();
+    request<payload::store_file_request_t>(db, file).send(init_timeout);
 
     write_map.erase(it);
 }

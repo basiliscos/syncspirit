@@ -43,6 +43,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&db_actor_t::on_store_new_folder);
         p.subscribe_actor(&db_actor_t::on_store_folder);
         p.subscribe_actor(&db_actor_t::on_store_folder_info);
+        p.subscribe_actor(&db_actor_t::on_store_file);
     });
 }
 
@@ -152,12 +153,20 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
     if (!folder_infos_opt) {
         return reply_with_error(message, make_error(folder_infos_opt.error()));
     }
-    auto folder_infos = folder_infos_opt.value();
+    auto &folder_infos = folder_infos_opt.value();
 
     /* should be assigned earlier before file_infos are loaded */
     auto cluster = model::cluster_ptr_t(new model::cluster_t(device));
     cluster->assign_folders(folders);
     cluster->assign_blocks(std::move(blocks));
+
+    for (auto &it : folder_infos) {
+        auto &fi = it.second;
+        auto folder = fi->get_folder();
+        LOG_TRACE(log, "{}, on_cluster_load: {} on {}, max seq = {}", identity, folder->label(),
+                  fi->get_device()->device_id, fi->get_max_sequence());
+        folder->add(fi);
+    }
 
     for (auto &it : folders) {
         auto &folder_infos_map = it.second->get_folder_infos();
@@ -171,17 +180,10 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
         for (auto &it : file_infos) {
             auto &fi = it.second;
             auto folder_info = fi->get_folder_info();
-            LOG_TRACE(log, "{}, on_cluster_load {}, seq = {}", identity, fi->get_full_name(), fi->get_sequence());
+            LOG_TRACE(log, "{}, on_cluster_load {}:{}:{} (seq = {})", identity, folder_info->get_folder()->label(),
+                      folder_info->get_device()->device_id.get_short(), fi->get_name(), fi->get_sequence());
             folder_info->add(fi);
         }
-    }
-
-    for (auto &it : folder_infos) {
-        auto &fi = it.second;
-        auto folder = fi->get_folder();
-        LOG_TRACE(log, "{}, on_cluster_load: {} on {}, max seq = {}", identity, folder->label(),
-                  fi->get_device()->device_id, fi->get_max_sequence());
-        folder->add(fi);
     }
 
     if (auto my_d = devices.by_id(device->get_id()); !my_d) {
@@ -452,13 +454,54 @@ void db_actor_t::on_store_folder_info(message::store_folder_info_request_t &mess
         return;
     }
 
-    auto tx_r = txn.commit();
-    if (!tx_r) {
+    r = txn.commit();
+    if (!r) {
         reply_with_error(message, make_error(r.error()));
         return;
     }
 
     fi->unmark_dirty();
+    reply_to(message);
+}
+
+void db_actor_t::on_store_file(message::store_file_request_t &message) noexcept {
+    auto &file = message.payload.request_payload.file;
+    LOG_TRACE(log, "{}, on_store_file file = {}", identity, file->get_full_name());
+    assert(file->is_dirty() && "file shoudl be marked diry");
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return reply_with_error(message, make_error(txn_opt.error()));
+    }
+    auto &txn = txn_opt.value();
+
+    auto r = db::store_file_info(file, txn);
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+    file->unmark_dirty();
+
+    auto folder_info = file->get_folder_info();
+    if (folder_info->is_dirty()) {
+        auto fi = model::folder_info_ptr_t(folder_info);
+        r = db::store_folder_info(fi, txn);
+        if (!r) {
+            reply_with_error(message, make_error(r.error()));
+            return;
+        }
+        fi->unmark_dirty();
+    }
+
+    r = txn.commit();
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
+    auto &map = folder_info->get_file_infos();
+    map.put(file);
+
     reply_to(message);
 }
 

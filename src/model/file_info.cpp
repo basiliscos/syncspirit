@@ -82,9 +82,11 @@ template <typename Source> void file_info_t::fields_update(const Source &s) noex
 std::string file_info_t::generate_db_key(const std::string &name, const folder_info_t &fi) noexcept {
     std::string dbk;
     auto fi_key = fi.get_db_key();
+    assert(fi_key);
     dbk.resize(sizeof(fi_key) + name.size());
     char *ptr = dbk.data();
-    std::copy(reinterpret_cast<char *>(&fi_key), reinterpret_cast<char *>(&fi_key) + sizeof(fi_key), ptr);
+    auto fi_key_ptr = reinterpret_cast<char *>(&fi_key);
+    std::copy(fi_key_ptr, fi_key_ptr + sizeof(fi_key), ptr);
     ptr += sizeof(fi_key);
     std::copy(name.begin(), name.end(), ptr);
     return dbk;
@@ -255,6 +257,11 @@ file_info_ptr_t file_info_t::link(const device_ptr_t &target) noexcept {
         local_file_infos.put(local_file);
     }
     return local_file;
+}
+
+void file_info_t::after_sync() noexcept {
+    sequence = folder_info->inc_max_sequence();
+    mark_dirty();
 }
 
 } // namespace syncspirit::model

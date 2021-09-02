@@ -52,6 +52,7 @@ struct db_actor_t : public r::actor_base_t {
     void on_store_ignored_folder(message::store_ignored_folder_request_t &message) noexcept;
     void on_store_new_folder(message::store_new_folder_request_t &message) noexcept;
     void on_store_folder(message::store_folder_request_t &message) noexcept;
+    void on_store_file(message::store_file_request_t &message) noexcept;
 
     void open() noexcept;
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;

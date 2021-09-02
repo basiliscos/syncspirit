@@ -27,6 +27,7 @@ outcome::result<void> store_folder(model::folder_ptr_t &folder, transaction_t &t
 outcome::result<model::folders_map_t> load_folders(transaction_t &txn) noexcept;
 
 outcome::result<void> store_folder_info(model::folder_info_ptr_t &info, transaction_t &txn) noexcept;
+
 outcome::result<model::folder_infos_map_t>
 load_folder_infos(model::devices_map_t &devices, model::folders_map_t &folders, transaction_t &txn) noexcept;
 

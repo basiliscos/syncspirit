@@ -1,8 +1,4 @@
-void controller_actor_t::on_close(fs::message::close_response_t &res) noexcept {
- - sequence++ on my folder info and persist in db
- - save blocks in db (on buffer full, on file flush)
- - save file in db on flush
-
+- test: cluster loading after sync;
 - send updates to peer during downloading?
 
 - initial file scannig should use hashers

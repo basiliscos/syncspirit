@@ -323,6 +323,7 @@ load_folder_infos(model::devices_map_t &devices, model::folders_map_t &folders, 
     auto instantiator = [&](const std::string_view &key, db::FolderInfo &&db_item) -> model::folder_info_ptr_t {
         auto device = devices.by_key(db_item.device_key());
         auto folder = folders.by_key(db_item.folder_key());
+        assert(folder && device);
         auto db_key = key_helper_t<std::uint64_t>::extract_key(key);
         return new model::folder_info_t(db_item, device.get(), folder.get(), db_key);
     };
@@ -338,6 +339,7 @@ outcome::result<model::file_infos_map_t> load_file_infos(model::folder_infos_map
     auto instantiator = [&](const std::string_view &key, db::FileInfo &&db_item) -> model::file_info_ptr_t {
         auto db_folder_key = key_helper_t<std::uint64_t>::extract_key(key);
         auto folder_info = folder_infos.by_key(db_folder_key);
+        assert(folder_info);
         return new model::file_info_t(db_item, folder_info.get());
     };
     return load<model::file_info_t>(std::move(instantiator), txn);
