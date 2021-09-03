@@ -106,11 +106,6 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
     auto &path = current_file->get_path();
     auto parent = path.parent_path();
     sys::error_code ec;
-    auto update_db = [this]() {
-        current_file->after_sync();
-        request<payload::store_file_request_t>(db, current_file).send(init_timeout);
-    };
-
     if (current_file->is_deleted()) {
         if (bfs::exists(path, ec)) {
             LOG_DEBUG(log, "{} removing {}", identity, path.string());
@@ -120,7 +115,6 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
                 do_shutdown(make_error(ec));
                 return ImmediateResult::ERROR;
             }
-            update_db();
         }
         LOG_TRACE(log, "{}, {} already abscent, noop", identity, path.string());
         return ImmediateResult::DONE;
@@ -145,7 +139,6 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
                 LOG_WARN(log, "{}, error creating {} : {}", identity, path.string(), e.code().message());
                 return ImmediateResult::ERROR;
             }
-            update_db();
         }
         return ImmediateResult::DONE;
     } else if (current_file->is_dir()) {
@@ -157,7 +150,6 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
                 do_shutdown(make_error(ec));
                 return ImmediateResult::ERROR;
             }
-            update_db();
         }
         return ImmediateResult::DONE;
     } else if (current_file->is_link()) {
@@ -182,7 +174,6 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
                 do_shutdown(make_error(ec));
                 return ImmediateResult::ERROR;
             }
-            update_db();
         } else {
             LOG_TRACE(log, "{}, no need to create symlink {} -> {}", identity, path.string(), target.string());
         }
@@ -239,6 +230,9 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     } else if (ir == ImmediateResult::NON_IMMEDIATE) {
         LOG_TRACE(log, "{}, going to sync {}", identity, current_file->get_full_name());
         block_iterator = current_file->iterate_blocks();
+    } else if (ir == ImmediateResult::DONE) {
+        current_file->after_sync();
+        request<payload::store_file_request_t>(db, current_file).send(init_timeout);
     }
     ready();
 }

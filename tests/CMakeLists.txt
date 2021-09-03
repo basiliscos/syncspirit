@@ -57,6 +57,10 @@ add_executable(051-model-file_info 051-model-file_info.cpp)
 target_link_libraries(051-model-file_info syncspirit_test_lib)
 add_test(051-model-file_info "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/051-model-file_info")
 
+add_executable(052-model-folder 052-model-folder.cpp)
+target_link_libraries(052-model-folder syncspirit_test_lib)
+add_test(052-model-folder "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/052-model-folder")
+
 add_executable(055-model-cluster 055-model-cluster.cpp)
 target_link_libraries(055-model-cluster syncspirit_test_lib)
 add_test(055-model-cluster "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/055-model-cluster")

@@ -108,8 +108,12 @@ void folder_info_t::update(local_file_map_t &local_files) noexcept {
         }
     }
     for (auto it : file_infos_copy) {
-        // it.second->mark_outdated();
-        std::abort();
+        auto &file = it.second;
+        if (file->is_deleted()) {
+            // no-op, file is deleted in local index and does not present in filesystem
+        } else {
+            std::abort();
+        }
     }
 }
 
