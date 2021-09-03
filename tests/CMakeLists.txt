@@ -81,6 +81,10 @@ add_executable(081-hasher 081-hasher.cpp)
 target_link_libraries(081-hasher syncspirit_test_lib)
 add_test(081-hasher "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/081-hasher")
 
+add_executable(082-db-actor 082-db-actor.cpp)
+target_link_libraries(082-db-actor syncspirit_test_lib)
+add_test(082-db-actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/082-db-actor")
+
 add_executable(125-cluster-supervisor 125-cluster-supervisor.cpp)
 target_link_libraries(125-cluster-supervisor syncspirit_test_lib)
 add_test(125-cluster-supervisor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/125-cluster-supervisor")
