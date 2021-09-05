@@ -13,7 +13,10 @@ folder_info_t::folder_info_t(const db::FolderInfo &info_, device_t *device_, fol
 
 folder_info_t::~folder_info_t() {}
 
-void folder_info_t::add(const file_info_ptr_t &file_info) noexcept { file_infos.put(file_info); }
+void folder_info_t::add(const file_info_ptr_t &file_info) noexcept {
+    file_infos.put(file_info);
+    mark_dirty();
+}
 
 void folder_info_t::update(const proto::Device &device) noexcept {
     bool changed = false;

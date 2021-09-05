@@ -18,7 +18,8 @@ using namespace syncspirit::net;
 struct db_consumer_t : r::actor_base_t {
     r::address_ptr_t target;
     r::intrusive_ptr_t<message::store_new_folder_response_t> new_folder_res;
-    r::intrusive_ptr_t<message::store_file_response_t> file_res;
+    r::intrusive_ptr_t<message::store_folder_info_response_t> file_info_res;
+    r::intrusive_ptr_t<message::load_cluster_response_t> cluster_res;
 
     using r::actor_base_t::actor_base_t;
 
@@ -28,13 +29,16 @@ struct db_consumer_t : r::actor_base_t {
             [&](auto &p) { p.discover_name(names::db, target, true).link(true); });
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
             p.subscribe_actor(&db_consumer_t::on_new_folder);
-            p.subscribe_actor(&db_consumer_t::on_file);
+            p.subscribe_actor(&db_consumer_t::on_file_info);
+            p.subscribe_actor(&db_consumer_t::on_cluster);
         });
     }
 
     void on_new_folder(message::store_new_folder_response_t &res) noexcept { new_folder_res = &res; }
 
-    void on_file(message::store_file_response_t &res) noexcept { file_res = &res; }
+    void on_file_info(message::store_folder_info_response_t &res) noexcept { file_info_res = &res; }
+
+    void on_cluster(message::load_cluster_response_t &res) noexcept { cluster_res = &res; }
 };
 
 TEST_CASE("db-actor", "[db]") {
@@ -56,6 +60,7 @@ TEST_CASE("db-actor", "[db]") {
     auto cluster = model::cluster_ptr_t(new model::cluster_t(device));
 
     auto db = sup->create_actor<net::db_actor_t>().db_dir(root_path.string()).device(device).timeout(timeout).finish();
+    auto &db_addr = db->get_address();
     auto act = sup->create_actor<db_consumer_t>().timeout(timeout).finish();
 
     sup->do_process();
@@ -67,8 +72,7 @@ TEST_CASE("db-actor", "[db]") {
     db_folder.set_id("123");
     db_folder.set_path(folder_path.string());
     db_folder.set_label("lll");
-    act->request<payload::store_new_folder_request_t>(db->get_address(), db_folder, nullptr, 0ul, cluster)
-        .send(timeout);
+    act->request<payload::store_new_folder_request_t>(db_addr, db_folder, nullptr, 0ul, cluster).send(timeout);
     sup->do_process();
     REQUIRE(act->new_folder_res);
     REQUIRE(!act->new_folder_res->payload.ee);
@@ -78,6 +82,58 @@ TEST_CASE("db-actor", "[db]") {
     CHECK(folder->label() == "lll");
     CHECK(folder->get_path() == folder_path);
     CHECK(folder->id() == "123");
+
+    auto fi = folder->get_folder_info(device);
+
+    proto::FileInfo pr_fileinfo;
+    pr_fileinfo.set_sequence(7);
+    pr_fileinfo.set_size(5);
+    pr_fileinfo.set_block_size(5);
+
+    auto pr_block = pr_fileinfo.add_blocks();
+    pr_block->set_hash("12345");
+    pr_block->set_size(5);
+    pr_block->set_weak_hash(8);
+
+    auto file = model::file_info_ptr_t(new model::file_info_t(pr_fileinfo, fi.get()));
+    REQUIRE(file);
+    CHECK(file->get_blocks().size() == 1);
+    CHECK(file->is_dirty());
+    fi->add(file);
+    CHECK(fi->is_dirty());
+    act->request<payload::store_folder_info_request_t>(db_addr, fi).send(timeout);
+
+    sup->do_process();
+    REQUIRE(act->file_info_res);
+    REQUIRE(!act->file_info_res->payload.ee);
+    auto &block = *file->get_blocks().begin();
+    CHECK(block->get_db_key());
+
+    // check cluster loading
+    act->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+    sup->do_process();
+    REQUIRE(act->cluster_res);
+    REQUIRE(!act->cluster_res->payload.ee);
+    auto& devices = act->cluster_res->payload.res.devices;
+    CHECK(devices.size() == 1);
+    CHECK(devices.by_key(device->get_db_key()));
+    CHECK(devices.by_id(device->get_id()));
+    auto& cluster_2 = act->cluster_res->payload.res.cluster;
+    REQUIRE(cluster_2->get_folders().size() == 1);
+
+    auto folder_2 = cluster_2->get_folders().by_key(folder->get_db_key());
+    REQUIRE(folder_2);
+    CHECK(folder_2->get_db_key() == folder->get_db_key());
+    CHECK(folder_2->get_path() == folder->get_path());
+    CHECK(folder_2->id() == folder->id());
+    CHECK(folder_2->label() == folder->label());
+    REQUIRE(folder_2->get_folder_infos().size() == 1);
+
+    auto fi_2 = folder_2->get_folder_info(device);
+    REQUIRE(fi_2);
+    CHECK(fi_2->get_db_key() == fi->get_db_key());
+    CHECK(fi_2->get_index() == fi->get_index());
+    REQUIRE(fi_2->get_file_infos().size() == 1);
 
     sup->shutdown();
     sup->do_process();

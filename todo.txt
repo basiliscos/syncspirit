@@ -1,6 +1,4 @@
-- test: cluster loading after sync;
 - send updates to peer during downloading?
-
 - initial file scannig should use hashers
 - model: когда добавляется symlink, папка
 - store_new_folder_request_t: выкинуть peer, peer_source
