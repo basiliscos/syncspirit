@@ -101,11 +101,15 @@ TEST_CASE("iterate_files", "[model]") {
         }
 
         SECTION("one file, but 1 is newer") {
-            auto [folder_info, file_info] = add_file(d1, f1, 0);
-            add_file(d2, f1, 1);
+            auto [folder_info_1, file_info_1] = add_file(d1, f1, 0);
+            auto [folder_info_2, file_info_2] = add_file(d2, f1, 1);
             auto it = cluster->iterate_files(d2);
             REQUIRE((bool)it);
-            CHECK(it.next()->get_full_name() == file_info->get_full_name());
+            auto file = it.next();
+
+            CHECK(file->get_full_name() == file_info_1->get_full_name());
+            CHECK(!file->is_older(*file_info_2));
+            CHECK(!file->is_older(*file_info_1));
             CHECK(!it);
         }
 

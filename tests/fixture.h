@@ -30,7 +30,7 @@ struct Fixture {
     virtual void main();
 
     void run();
-
+    uint64_t seq = 1;
 
 };
 

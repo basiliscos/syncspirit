@@ -1,3 +1,9 @@
+- index update,
+  - delete file is node deleted
+        [2021-09-05 16:48:59.462] [D/19835] KUEQE66/127.0.0.1:22000, read_controlled, std::unique_ptr<syncspirit::proto::IndexUpdate, std::default_delete<syncspirit::proto::IndexUpdate> >
+
+- updated index/index-update is not sent by ST
+
 - send updates to peer during downloading?
 - initial file scannig should use hashers
 - model: когда добавляется symlink, папка

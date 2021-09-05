@@ -218,14 +218,14 @@ const boost::filesystem::path &file_info_t::get_path() noexcept {
 }
 
 void file_info_t::record_update(const device_t &source) noexcept {
-    uint64_t value = version.counters_size();
+    uint64_t value = version.counters_size() + 1;
     auto &device_id = source.device_id.get_sha256();
     uint64_t id;
     std::copy(device_id.data(), device_id.data() + sizeof(id), reinterpret_cast<char *>(&id));
 
-    auto &counter = *version.mutable_counters((int)value);
-    counter.set_id(id);
-    counter.set_value(value);
+    auto counter = version.add_counters();
+    counter->set_id(id);
+    counter->set_value(value);
 }
 
 bool file_info_t::is_older(const file_info_t &other) noexcept {
@@ -250,12 +250,13 @@ file_info_ptr_t file_info_t::link(const device_ptr_t &target) noexcept {
     auto local_folder_info = fi->get_folder()->get_folder_info(target);
     auto &local_file_infos = local_folder_info->get_file_infos();
     auto local_file = local_file_infos.by_id(full_name);
-    if (!local_file) {
-        auto db = serialize();
-        db.clear_sequence();
-        local_file = new file_info_t(db, local_folder_info.get());
-        local_file_infos.put(local_file);
+    if (local_file) {
+        local_file_infos.remove(local_file);
     }
+    auto db = serialize();
+    db.clear_sequence();
+    local_file = new file_info_t(db, local_folder_info.get());
+    local_file_infos.put(local_file);
     return local_file;
 }
 

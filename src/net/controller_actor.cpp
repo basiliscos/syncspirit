@@ -197,7 +197,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     if (!file_iterator && !block_iterator) {
         file_iterator = cluster->iterate_files(peer);
         if (!file_iterator) {
-            LOG_TRACE(log, "{}, nothing more to sync", identity);
+            LOG_DEBUG(log, "{}, nothing more to sync", identity);
             return;
         }
     }
