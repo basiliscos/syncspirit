@@ -18,7 +18,7 @@ file_interator_t::file_interator_t(cluster_t &cluster_, const device_ptr_t &peer
 
 void file_interator_t::prepare() noexcept {
 TRY_ANEW:
-    if (f_begin == f_end) {
+    if (f_peer_it == f_peer_end) {
         for (;; ++it_folder) {
             if (it_folder == cluster->folders.end()) {
                 cluster = nullptr;
@@ -31,23 +31,20 @@ TRY_ANEW:
             if (!peer_folder_info)
                 continue;
 
-            local_folder_info = folder_infos_map.by_id(cluster->get_device()->get_id());
+            auto &peer_file_infos = peer_folder_info->get_file_infos();
+            f_peer_it = peer_file_infos.begin();
+            f_peer_end = peer_file_infos.end();
 
-            auto &file_infos = peer_folder_info->get_file_infos();
-            f_begin = file_infos.begin();
-            f_end = file_infos.end();
+            local_folder_info = folder_infos_map.by_id(cluster->get_device()->get_id());
 
             ++it_folder;
             break;
         }
     }
 
-    while (f_begin != f_end) {
-        file = f_begin->second;
-        ++f_begin;
-        if (!local_folder_info) {
-            return;
-        }
+    while (f_peer_it != f_peer_end) {
+        file = f_peer_it->second;
+        ++f_peer_it;
         auto full_name = natural_key(file);
         auto local_file = local_folder_info->get_file_infos().by_id(full_name);
         if (!local_file) {

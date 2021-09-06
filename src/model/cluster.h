@@ -19,8 +19,8 @@ struct file_interator_t {
         cluster = other.cluster;
         peer = other.peer;
         it_folder = other.it_folder;
-        f_begin = other.f_begin;
-        f_end = other.f_end;
+        f_peer_it = other.f_begin;
+        f_peer_end = other.f_end;
         file = other.file;
         return *this;
     }
@@ -40,7 +40,10 @@ struct file_interator_t {
     device_ptr_t peer;
     folder_info_ptr_t local_folder_info;
     it_folder_t it_folder;
-    it_file_t f_begin, f_end;
+    it_file_t f_peer_it;
+    it_file_t f_peer_end;
+    it_file_t f_local_it;
+    it_file_t f_local_end;
     file_info_ptr_t file;
 };
 

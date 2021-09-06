@@ -130,6 +130,7 @@ struct controller_actor_t : public r::actor_base_t {
     void on_message(proto::message::Request &message) noexcept;
     void on_message(proto::message::DownloadProgress &message) noexcept;
 
+    write_info_t &record_block_data(model::file_info_ptr_t &file, std::size_t block_index) noexcept;
     void request_block(const model::block_location_t &block) noexcept;
     void update(proto::ClusterConfig &config) noexcept;
     void update(folder_updater_t &&updater) noexcept;

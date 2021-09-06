@@ -43,9 +43,9 @@ TEST_CASE("iterate_files", "[model]") {
     cluster_ptr_t cluster = new cluster_t(d1);
     cluster->assign_folders(std::move(folders));
 
-    std::int64_t seq = 1;
 
     SECTION("cluster config") {
+        std::int64_t seq = 1;
         db::FolderInfo db_folder_info;
         db_folder_info.set_max_sequence(++seq);
 
@@ -69,21 +69,16 @@ TEST_CASE("iterate_files", "[model]") {
     }
 
     SECTION("iterate_files") {
-        auto add_file = [&key, &seq](model::device_ptr_t device, model::folder_ptr_t folder,
-                                     size_t versions = 0) mutable {
+        auto add_file = [&key](model::device_ptr_t device, model::folder_ptr_t folder,
+                                     int64_t seq) mutable {
             db::FolderInfo db_folder_info;
-            db_folder_info.set_max_sequence(++seq);
+            db_folder_info.set_max_sequence(seq);
             auto folder_info =
                 model::folder_info_ptr_t(new model::folder_info_t(db_folder_info, device.get(), folder.get(), ++key));
             folder->add(folder_info);
 
             db::FileInfo db_file_info;
             db_file_info.set_sequence(seq);
-            for (size_t i = 0; i < versions; ++i) {
-                auto c = db_file_info.mutable_version()->add_counters();
-                c->set_id(i + 1);
-                c->set_value(i);
-            }
             auto file_info = model::file_info_ptr_t(new model::file_info_t(db_file_info, folder_info.get()));
             folder_info->add(file_info);
             return std::tuple(folder_info, file_info);
@@ -96,26 +91,27 @@ TEST_CASE("iterate_files", "[model]") {
 
         SECTION("no files at peer") {
             auto it = cluster->iterate_files(d2);
-            add_file(d1, f1);
+            add_file(d1, f1, 1);
             CHECK(!it);
         }
 
         SECTION("one file, but 1 is newer") {
-            auto [folder_info_1, file_info_1] = add_file(d1, f1, 0);
-            auto [folder_info_2, file_info_2] = add_file(d2, f1, 1);
+            auto [folder_info_1, file_info_1] = add_file(d1, f1, 1);
+            auto [folder_info_2, file_info_2] = add_file(d2, f1, 2);
             auto it = cluster->iterate_files(d2);
             REQUIRE((bool)it);
             auto file = it.next();
 
             CHECK(file->get_full_name() == file_info_1->get_full_name());
+            CHECK(file->get_db_key() == file_info_1->get_db_key());
             CHECK(!file->is_older(*file_info_2));
             CHECK(!file->is_older(*file_info_1));
             CHECK(!it);
         }
 
         SECTION("when files are in sync, it is not returned") {
-            add_file(d1, f1, 0);
-            add_file(d2, f1, 0);
+            add_file(d1, f1, 2);
+            add_file(d2, f1, 2);
             auto it = cluster->iterate_files(d2);
             CHECK(!it);
         }

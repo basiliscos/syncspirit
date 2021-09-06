@@ -467,7 +467,7 @@ void db_actor_t::on_store_folder_info(message::store_folder_info_request_t &mess
 void db_actor_t::on_store_file(message::store_file_request_t &message) noexcept {
     auto &file = message.payload.request_payload.file;
     LOG_TRACE(log, "{}, on_store_file file = {}", identity, file->get_full_name());
-    assert(file->is_dirty() && "file shoudl be marked diry");
+    assert(file->is_dirty() && "file should be marked dirty");
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
     if (!txn_opt) {

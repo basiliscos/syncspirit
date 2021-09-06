@@ -35,9 +35,10 @@ void folder_info_t::update(const proto::Device &device) noexcept {
     }
 }
 
-std::int64_t folder_info_t::inc_max_sequence() noexcept {
+void folder_info_t::set_max_sequence(int64_t value) noexcept {
+    assert(max_sequence < value);
+    max_sequence = value;
     mark_dirty();
-    return ++max_sequence;
 }
 
 db::FolderInfo folder_info_t::serialize() noexcept {

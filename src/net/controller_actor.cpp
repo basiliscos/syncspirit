@@ -335,6 +335,24 @@ void controller_actor_t::update(folder_updater_t &&updater) noexcept {
     }
 }
 
+controller_actor_t::write_info_t &controller_actor_t::record_block_data(model::file_info_ptr_t &file,
+                                                                        std::size_t block_index) noexcept {
+    auto &path = file->get_path();
+    auto &path_str = path.string();
+    auto &blocks = file->get_blocks();
+    bool final = file->mark_local_available(block_index);
+    if (write_map.count(path_str) == 0) {
+        using request_t = fs::payload::open_request_t;
+        write_map[path_str].file = file;
+        auto file_sz = static_cast<size_t>(file->get_size());
+        request<request_t>(fs, path, file_sz).send(init_timeout);
+    }
+
+    auto &info = write_map.at(path_str);
+    info.final = final;
+    return info;
+}
+
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     --blocks_requested;
     auto ee = message.payload.ee;
@@ -346,27 +364,14 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
 
     auto &payload = message.payload.req->payload.request_payload;
     auto &file = payload.file;
-    auto &data = message.payload.res.data;
-    auto block_index = payload.block_index;
-    auto &blocks = file->get_blocks();
-    bool final = file->mark_local_available(block_index);
-    auto &path = file->get_path();
+    auto &info = record_block_data(payload.file, payload.block_index);
     auto &block = *payload.block;
     auto &hash = block.get_hash();
     request_pool += block.get_size();
 
-    auto &path_str = path.string();
-    if (write_map.count(path_str) == 0) {
-        using request_t = fs::payload::open_request_t;
-        write_map[path_str].file = file;
-        auto file_sz = static_cast<size_t>(file->get_size());
-        request<request_t>(fs, path, file_sz).send(init_timeout);
-    }
-
-    auto &info = write_map.at(path_str);
-    info.final = final;
     ++info.pending_blocks;
     intrusive_ptr_add_ref(&message);
+    auto &data = message.payload.res.data;
     request<hasher::payload::validation_request_t>(hasher_proxy, data, std::move(hash), &message).send(init_timeout);
     return ready();
 }
