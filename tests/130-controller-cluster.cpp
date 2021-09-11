@@ -98,6 +98,7 @@ void test_new_folder() {
 
             proto::Index index;
             index.set_folder(folder->id());
+
             SECTION("file with content (1 and 0 blocks)") {
                 auto raw_block = proto::BlockInfo();
                 raw_block.set_size(5);
@@ -193,6 +194,88 @@ void test_new_folder() {
                     peer->push_response("12345", 0);
                     sup->do_process();
                     CHECK(read_file(path) == "1234567890");
+                }
+            }
+
+            SECTION("block cloning") {
+                auto raw_block = proto::BlockInfo();
+                raw_block.set_size(5);
+                raw_block.set_hash(utils::sha256_digest("12345").value());
+                auto block = model::block_info_ptr_t(new model::block_info_t(raw_block));
+                block->set_db_key(1234ul); // for saving
+                cluster->get_blocks().put(block);
+
+                db::FileInfo db_file_1;
+                db_file_1.set_name("a.txt");
+                db_file_1.set_size(5ul);
+                db_file_1.set_type(proto::FileInfoType::FILE);
+                db_file_1.mutable_blocks_keys()->Add(block->get_db_key());
+
+                auto file_a = model::file_info_ptr_t(new model::file_info_t(db_file_1, fi_local.get()));
+                file_a->mark_local_available(0ul);
+
+                auto fi = proto::FileInfo();
+                fi.set_name("b.txt");
+                fi.set_type(proto::FileInfoType::FILE);
+                fi.set_sequence(6);
+                fi.set_block_size(5);
+                auto counters = fi.mutable_version()->add_counters();
+                counters->set_id(1u);
+                counters->set_value(1u);
+
+                auto source_path = file_a->get_path();
+                auto target_path = dir / fi.name();
+
+                write_file(source_path, "12345");
+
+                SECTION("whole file with the same block") {
+                    fi.set_size(5);
+                    *fi.add_blocks() = raw_block;
+                    *index.add_files() = fi;
+
+                    auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                    peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
+
+                    sup->do_process();
+                    CHECK(read_file(target_path) == "12345");
+                }
+
+                SECTION("file with the same block at the start") {
+                    fi.set_size(10);
+                    *fi.add_blocks() = raw_block;
+
+                    auto raw_block_2 = proto::BlockInfo();
+                    raw_block_2.set_size(5);
+                    raw_block_2.set_hash(utils::sha256_digest("67890").value());
+                    *fi.add_blocks() = raw_block_2;
+
+                    *index.add_files() = fi;
+
+                    auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                    peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
+                    peer->push_response("67890", 1);
+
+                    sup->do_process();
+                    CHECK(read_file(target_path) == "1234567890");
+                }
+
+                SECTION("file with the same block at the end") {
+                    fi.set_size(10);
+
+                    auto raw_block_2 = proto::BlockInfo();
+                    raw_block_2.set_size(5);
+                    raw_block_2.set_hash(utils::sha256_digest("67890").value());
+                    *fi.add_blocks() = raw_block_2;
+                    *fi.add_blocks() = raw_block;
+
+                    *index.add_files() = fi;
+
+                    auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                    peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
+                    peer->push_response("67890", 0);
+
+                    sup->do_process();
+                    CHECK(read_file(target_path) == "6789012345");
                 }
             }
 

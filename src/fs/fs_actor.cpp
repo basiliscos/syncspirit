@@ -24,23 +24,24 @@ void fs_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&fs_actor_t::on_process);
         p.subscribe_actor(&fs_actor_t::on_open);
         p.subscribe_actor(&fs_actor_t::on_close);
+        p.subscribe_actor(&fs_actor_t::on_clone);
     });
 }
 
 void fs_actor_t::on_start() noexcept {
-    log->trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
     r::actor_base_t::on_start();
 }
 
 void fs_actor_t::shutdown_finish() noexcept {
-    log->trace("{}, shutdown_finish", identity);
+    LOG_TRACE(log, "{}, shutdown_finish", identity);
     get_supervisor().shutdown();
     r::actor_base_t::shutdown_finish();
 }
 
 void fs_actor_t::on_scan_request(message::scan_request_t &req) noexcept {
     auto &root = req.payload.root;
-    log->trace("{}, on_scan_request, root = {}", identity, root.c_str());
+    LOG_TRACE(log, "{}, on_scan_request, root = {}", identity, root.c_str());
 
     queue.emplace_back(&req);
     if (queue.size() == 1) {
@@ -49,13 +50,13 @@ void fs_actor_t::on_scan_request(message::scan_request_t &req) noexcept {
 }
 
 void fs_actor_t::on_scan_cancel(message::scan_cancel_t &req) noexcept {
-    log->trace("{}, on_scan_cancel", identity);
+    LOG_TRACE(log, "{}, on_scan_cancel", identity);
     auto req_id = req.payload.request_id;
     if (queue.size()) {
         auto it = queue.begin();
         if ((*it)->payload.request_id == req_id) {
-            log->debug("{}, on_scan_cancel, cancelling ongoing scan for {}", identity,
-                       queue.front()->payload.root.c_str());
+            LOG_DEBUG(log, "{}, on_scan_cancel, cancelling ongoing scan for {}", identity,
+                      queue.front()->payload.root.c_str());
             scan_cancelled = true;
             return;
         }
@@ -63,7 +64,7 @@ void fs_actor_t::on_scan_cancel(message::scan_cancel_t &req) noexcept {
             if ((*it)->payload.request_id == req_id) {
                 auto &payload = (*it)->payload;
                 auto &root = payload.root;
-                log->debug("{}, on_scan_cancel, cancelling pending scan for {}", root.c_str());
+                LOG_DEBUG(log, "{}, on_scan_cancel, cancelling pending scan for {}", root.c_str());
                 auto &requestee = payload.reply_to;
                 auto file_map = model::local_file_map_ptr_t(new model::local_file_map_t(root));
                 file_map->ec = utils::make_error_code(utils::error_code_t::scan_aborted);
@@ -79,7 +80,7 @@ void fs_actor_t::on_process(message::process_signal_t &) noexcept { process_queu
 
 void fs_actor_t::process_queue() noexcept {
     if (queue.empty()) {
-        log->trace("{} empty queue, nothing to process", identity);
+        LOG_TRACE(log, "{} empty queue, nothing to process", identity);
         return;
     }
     auto &req = queue.front();
@@ -169,7 +170,7 @@ void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
                     } else {
                         auto now = std::time(nullptr);
                         if (modified_at + fs_config.temporally_timeout <= now) {
-                            log->debug("{}, removing outdated temporally {}", child_path.string());
+                            LOG_DEBUG(log, "{}, removing outdated temporally {}", child_path.string());
                             bfs::remove(child_path, ec);
                             if (ec) {
                                 send<payload::scan_error_t>(p.reply_to, p.root, child_path, ec);
@@ -240,7 +241,7 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
 }
 
 void fs_actor_t::on_open(message::open_request_t &req) noexcept {
-    log->trace("{}, on_open", identity);
+    LOG_TRACE(log, "{}, on_open", identity);
     auto &payload = req.payload.request_payload;
     auto path = make_temporal(payload.path);
     auto parent = path.parent_path();
@@ -265,7 +266,7 @@ void fs_actor_t::on_open(message::open_request_t &req) noexcept {
     try {
         file->open(params);
     } catch (const std::exception &ex) {
-        log->error("{}, error opening file {}: {}", identity, params.path, ex.what());
+        LOG_ERROR(log, "{}, error opening file {}: {}", identity, params.path, ex.what());
         auto ec = sys::errc::make_error_code(sys::errc::io_error);
         auto ee = make_error(ec);
         reply_with_error(req, ee);
@@ -275,7 +276,7 @@ void fs_actor_t::on_open(message::open_request_t &req) noexcept {
 }
 
 void fs_actor_t::on_close(message::close_request_t &req) noexcept {
-    log->trace("{}, on_close", identity);
+    LOG_TRACE(log, "{}, on_close", identity);
     auto &payload = *req.payload.request_payload;
     auto &file = payload.file;
     auto &path = payload.path;
@@ -283,7 +284,7 @@ void fs_actor_t::on_close(message::close_request_t &req) noexcept {
     try {
         file->close();
     } catch (const std::exception &ex) {
-        log->error("{}, error closing file {}: {}", identity, path.string(), ex.what());
+        LOG_ERROR(log, "{}, error closing file {}: {}", identity, path.string(), ex.what());
         auto ec = sys::errc::make_error_code(sys::errc::io_error);
         auto ee = make_error(ec);
         reply_with_error(req, ee);
@@ -297,4 +298,51 @@ void fs_actor_t::on_close(message::close_request_t &req) noexcept {
         return reply_with_error(req, make_error(ec));
     }
     reply_to(req);
+}
+
+void fs_actor_t::on_clone(message::clone_request_t &req) noexcept {
+    auto &p = req.payload.request_payload;
+    LOG_TRACE(log, "{}, on_clone, from {} (off: {}) {} bytes", identity, p.source.string(), p.source_offset,
+              p.block_size);
+
+    bio::mapped_file_params s_params;
+    s_params.path = p.source.string();
+    s_params.flags = bio::mapped_file::mapmode::readonly;
+
+    auto target = opened_file_t();
+    if (p.target_file) {
+        target = std::move(p.target_file);
+    } else {
+        bio::mapped_file_params params;
+        params.path = p.target.string();
+        params.flags = bio::mapped_file::mapmode::readwrite;
+        if (!bfs::exists(p.target)) {
+            params.new_file_size = p.target_size;
+        }
+        try {
+            target = std::make_unique<bio::mapped_file>(params);
+        } catch (std::exception &ex) {
+            LOG_TRACE(log, "{}, on_clone, error opening {} : {}", identity, p.target.string(), ex.what());
+            auto ec = sys::errc::make_error_code(sys::errc::io_error);
+            auto ee = make_error(ec);
+            reply_with_error(req, ee);
+            return;
+        }
+    }
+
+    try {
+        auto source = bio::mapped_file(s_params);
+        auto begin = source.const_data() + p.source_offset;
+        auto end = begin + p.block_size;
+        auto to = target->data() + p.target_offset;
+        std::copy(begin, end, to);
+        reply_to(req, std::move(target));
+    } catch (std::exception &ex) {
+        LOG_TRACE(log, "{}, on_clone, error cloing from {} (off: {}) {} bytes : {}", identity, p.source.string(),
+                  p.source_offset, p.block_size, ex.what());
+        auto ec = sys::errc::make_error_code(sys::errc::io_error);
+        auto ee = make_error(ec);
+        reply_with_error(req, ee);
+        return;
+    }
 }

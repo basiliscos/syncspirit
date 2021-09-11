@@ -51,7 +51,7 @@ struct open_response_t : r::arc_base_t<open_response_t> {
 struct open_request_t {
     using response_t = r::intrusive_ptr_t<open_response_t>;
     bfs::path path;
-    size_t file_size;
+    size_t file_size; /* 0 = read only */
     const void *custom;
 };
 
@@ -62,6 +62,17 @@ struct close_request_t : r::arc_base_t<close_request_t> {
     opened_file_t file;
     bfs::path path;
     close_request_t(opened_file_t &&f, const bfs::path &path_) noexcept : file{std::move(f)}, path{path_} {}
+};
+
+struct clone_request_t {
+    using response_t = r::intrusive_ptr_t<open_response_t>;
+    bfs::path source;
+    bfs::path target;
+    size_t target_size;
+    size_t block_size;
+    size_t source_offset;
+    size_t target_offset;
+    opened_file_t target_file; // optional
 };
 
 } // namespace payload
@@ -78,6 +89,9 @@ using open_response_t = r::request_traits_t<payload::open_request_t>::response::
 
 using close_request_t = r::request_traits_t<payload::close_request_t>::request::message_t;
 using close_response_t = r::request_traits_t<payload::close_request_t>::response::message_t;
+
+using clone_request_t = r::request_traits_t<payload::clone_request_t>::request::message_t;
+using clone_response_t = r::request_traits_t<payload::clone_request_t>::response::message_t;
 
 } // namespace message
 

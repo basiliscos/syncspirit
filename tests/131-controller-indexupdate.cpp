@@ -113,7 +113,7 @@ void test_indexupdate() {
 
             SECTION("send deleted file") {
                 uint64_t change_id;
-                auto& sha = device_peer->device_id.get_sha256();
+                auto &sha = device_peer->device_id.get_sha256();
                 std::copy(sha.data(), sha.data() + sizeof(change_id), reinterpret_cast<char *>(&change_id));
 
                 fi.set_type(proto::FileInfoType::FILE);
@@ -139,7 +139,6 @@ void test_indexupdate() {
 
                 CHECK(!bfs::exists(file_path));
             }
-
         }
     };
     F().run();

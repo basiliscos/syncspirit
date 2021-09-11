@@ -43,7 +43,6 @@ TEST_CASE("iterate_files", "[model]") {
     cluster_ptr_t cluster = new cluster_t(d1);
     cluster->assign_folders(std::move(folders));
 
-
     SECTION("cluster config") {
         std::int64_t seq = 1;
         db::FolderInfo db_folder_info;
@@ -69,8 +68,7 @@ TEST_CASE("iterate_files", "[model]") {
     }
 
     SECTION("iterate_files") {
-        auto add_file = [&key](model::device_ptr_t device, model::folder_ptr_t folder,
-                                     int64_t seq) mutable {
+        auto add_file = [&key](model::device_ptr_t device, model::folder_ptr_t folder, int64_t seq) mutable {
             db::FolderInfo db_folder_info;
             db_folder_info.set_max_sequence(seq);
             auto folder_info =

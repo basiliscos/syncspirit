@@ -114,11 +114,11 @@ TEST_CASE("db-actor", "[db]") {
     sup->do_process();
     REQUIRE(act->cluster_res);
     REQUIRE(!act->cluster_res->payload.ee);
-    auto& devices = act->cluster_res->payload.res.devices;
+    auto &devices = act->cluster_res->payload.res.devices;
     CHECK(devices.size() == 1);
     CHECK(devices.by_key(device->get_db_key()));
     CHECK(devices.by_id(device->get_id()));
-    auto& cluster_2 = act->cluster_res->payload.res.cluster;
+    auto &cluster_2 = act->cluster_res->payload.res.cluster;
     REQUIRE(cluster_2->get_folders().size() == 1);
 
     auto folder_2 = cluster_2->get_folders().by_key(folder->get_db_key());

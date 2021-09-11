@@ -98,19 +98,29 @@ struct controller_actor_t : public r::actor_base_t {
     };
 
   private:
+    struct clone_block_t {
+        model::block_info_ptr_t block;
+        model::file_info_ptr_t source;
+        size_t source_index;
+        size_t target_index;
+    };
     using blocks_queue_t = std::list<r::intrusive_ptr_t<message::block_response_t>>;
+    using clone_queue_t = std::list<clone_block_t>;
     struct write_info_t {
         using opened_file_t = fs::opened_file_t;
         blocks_queue_t validated_blocks;
-        fs::opened_file_t file_desc;
+        clone_queue_t clone_queue;
+        opened_file_t sink;
         model::file_info_ptr_t file;
         std::uint_fast32_t pending_blocks;
         bool final = false;
+        inline bool complete() const noexcept { return final && pending_blocks == 0 && clone_queue.empty(); }
     };
 
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     using write_map_t = std::unordered_map<std::string, write_info_t>;
     using write_it_t = typename write_map_t::iterator;
+    using local_availability_t = model::block_info_t::local_availability_t;
 
     enum class ImmediateResult { DONE, NON_IMMEDIATE, ERROR };
 
@@ -120,6 +130,7 @@ struct controller_actor_t : public r::actor_base_t {
     void on_validation(hasher::message::validation_response_t &res) noexcept;
     void on_open(fs::message::open_response_t &res) noexcept;
     void on_close(fs::message::close_response_t &res) noexcept;
+    void on_clone(fs::message::clone_response_t &res) noexcept;
     void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
     void on_store_file_info(message::store_file_response_t &message) noexcept;
     void on_new_folder(message::store_new_folder_notify_t &message) noexcept;
@@ -134,10 +145,10 @@ struct controller_actor_t : public r::actor_base_t {
     void request_block(const model::block_location_t &block) noexcept;
     void update(proto::ClusterConfig &config) noexcept;
     void update(folder_updater_t &&updater) noexcept;
+    void clone_block(const model::block_location_t &block, const local_availability_t &info) noexcept;
+    void process(write_it_t it) noexcept;
     ImmediateResult process_immediately() noexcept;
-
     void ready() noexcept;
-    void write_blocks(write_it_t) noexcept;
 
     model::cluster_ptr_t cluster;
     model::folder_ptr_t folder;
@@ -147,6 +158,7 @@ struct controller_actor_t : public r::actor_base_t {
     r::address_ptr_t db;
     r::address_ptr_t fs;
     r::address_ptr_t hasher_proxy;
+    r::address_ptr_t open_reading; /* for routing */
     pt::time_duration request_timeout;
     payload::cluster_config_ptr_t peer_cluster_config;
     model::ignored_folders_map_t *ignored_folders;

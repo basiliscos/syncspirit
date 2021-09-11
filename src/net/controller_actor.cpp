@@ -45,6 +45,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         std::string id = "controller/";
         id += peer->device_id.get_short();
         p.set_identity(id, false);
+        open_reading = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::db, db, false).link(true);
@@ -62,6 +63,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&controller_actor_t::on_validation);
         p.subscribe_actor(&controller_actor_t::on_open);
         p.subscribe_actor(&controller_actor_t::on_close);
+        p.subscribe_actor(&controller_actor_t::on_clone);
     });
 }
 
@@ -207,10 +209,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         auto cluster_block = block_iterator.next();
         auto existing_block = cluster_block.block->local_file();
         if (existing_block) {
-            LOG_TRACE(log, "{}, cloning block {} from {} to {} as block {}", identity,
-                      existing_block.file_info->get_name(), existing_block.block_index, current_file->get_name(),
-                      cluster_block.block_index);
-            current_file->clone_block(*existing_block.file_info, existing_block.block_index, cluster_block.block_index);
+            clone_block(cluster_block, existing_block);
             ready();
         } else {
             request_block(cluster_block);
@@ -234,6 +233,29 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         current_file->after_sync();
         request<payload::store_file_request_t>(db, current_file).send(init_timeout);
     }
+    ready();
+}
+
+void controller_actor_t::clone_block(const model::block_location_t &block, const local_availability_t &local) noexcept {
+    LOG_TRACE(log, "{}, cloning block {} from {} to {} as block {}", identity, local.block_index,
+              local.file_info->get_name(), current_file->get_name(), block.block_index);
+    auto &path = current_file->get_path();
+    auto &path_str = path.string();
+
+    if (write_map.count(path_str) == 0) {
+        using request_t = fs::payload::clone_request_t;
+        write_map[path_str].file = current_file;
+        auto target_sz = static_cast<size_t>(current_file->get_size());
+        auto block_sz = static_cast<size_t>(block.block->get_size());
+        auto &source = local.file_info->get_path();
+        auto source_offset = local.file_info->get_block_offset(local.block_index);
+        auto target_offset = current_file->get_block_offset(block.block_index);
+        request<request_t>(fs, source, path, target_sz, block_sz, source_offset, target_offset).send(init_timeout);
+    }
+    auto &info = write_map[path_str];
+    auto cloned_block =
+        clone_block_t{block.block, model::file_info_ptr_t{local.file_info}, local.block_index, block.block_index};
+    info.clone_queue.emplace_back(std::move(cloned_block));
     ready();
 }
 
@@ -337,19 +359,20 @@ void controller_actor_t::update(folder_updater_t &&updater) noexcept {
 
 controller_actor_t::write_info_t &controller_actor_t::record_block_data(model::file_info_ptr_t &file,
                                                                         std::size_t block_index) noexcept {
+    using request_t = fs::payload::open_request_t;
     auto &path = file->get_path();
     auto &path_str = path.string();
     auto &blocks = file->get_blocks();
     bool final = file->mark_local_available(block_index);
     if (write_map.count(path_str) == 0) {
-        using request_t = fs::payload::open_request_t;
         write_map[path_str].file = file;
+    }
+    auto &info = write_map.at(path_str);
+    info.final = final;
+    if (!info.sink && info.clone_queue.empty()) {
         auto file_sz = static_cast<size_t>(file->get_size());
         request<request_t>(fs, path, file_sz).send(init_timeout);
     }
-
-    auto &info = write_map.at(path_str);
-    info.final = final;
     return info;
 }
 
@@ -388,9 +411,9 @@ void controller_actor_t::on_open(fs::message::open_response_t &res) noexcept {
     auto it = write_map.find(path_str);
     assert(it != write_map.end());
     auto &info = it->second;
-    info.file_desc = std::move(payload.res->file);
+    info.sink = std::move(payload.res->file);
     if (info.validated_blocks.size()) {
-        write_blocks(it);
+        process(it);
     }
 }
 
@@ -411,6 +434,62 @@ void controller_actor_t::on_close(fs::message::close_response_t &res) noexcept {
     request<payload::store_file_request_t>(db, file).send(init_timeout);
 
     write_map.erase(it);
+}
+
+void controller_actor_t::on_clone(fs::message::clone_response_t &res) noexcept {
+    auto &payload = res.payload;
+    auto &ee = payload.ee;
+    if (ee) {
+        LOG_WARN(log, "{}, on_clone failed : {}", identity, ee->message());
+        return do_shutdown(ee);
+    }
+
+    auto &opened_file = payload.res->file;
+    auto &path_str = payload.req->payload.request_payload.target.string();
+    LOG_TRACE(log, "{}, cloned block for '{}' ", identity, path_str);
+    auto it = write_map.find(path_str);
+    assert(it != write_map.end());
+    auto &info = it->second;
+    auto block_info = info.clone_queue.front();
+    info.final |= info.file->mark_local_available(block_info.target_index);
+    info.clone_queue.pop_front();
+    info.sink = std::move(opened_file);
+    process(it);
+}
+
+void controller_actor_t::process(write_it_t it) noexcept {
+    auto &info = it->second;
+    if (!info.clone_queue.empty()) {
+        using request_t = fs::payload::clone_request_t;
+        auto target_sz = static_cast<size_t>(info.file->get_size());
+        auto &clone_block = info.clone_queue.front();
+        auto block_sz = static_cast<size_t>(clone_block.block->get_size());
+        auto &source = clone_block.source->get_path();
+        auto source_offset = clone_block.source->get_block_offset(clone_block.source_index);
+        auto target_offset = info.file->get_block_offset(clone_block.target_index);
+        auto &path = info.file->get_path();
+        request<request_t>(fs, source, path, target_sz, block_sz, source_offset, target_offset, std::move(info.sink))
+            .send(init_timeout);
+    } else if (info.sink && !info.validated_blocks.empty()) {
+        auto disk_view = info.sink->data();
+        auto &blocks = info.validated_blocks;
+        while (!blocks.empty()) {
+            auto &res = blocks.front();
+            auto &payload = res->payload;
+            auto &req_payload = payload.req->payload.request_payload;
+            auto &file = req_payload.file;
+            auto &data = payload.res.data;
+            auto block_index = req_payload.block_index;
+            auto offset = file->get_block_offset(block_index);
+            std::copy(data.begin(), data.end(), disk_view + offset);
+            blocks.pop_front();
+            --blocks_kept;
+        }
+    }
+    if (info.complete()) {
+        request<fs::payload::close_request_t>(fs, std::move(info.sink), info.file->get_path()).send(init_timeout);
+    }
+    ready();
 }
 
 void controller_actor_t::on_validation(hasher::message::validation_response_t &res) noexcept {
@@ -436,31 +515,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
         auto &info = it->second;
         --info.pending_blocks;
         info.validated_blocks.emplace_back(block_res);
-        if (info.file_desc) {
-            write_blocks(it);
-        }
+        process(it);
     }
     intrusive_ptr_release(block_res);
-}
-
-void controller_actor_t::write_blocks(write_it_t it) noexcept {
-    auto &info = it->second;
-    auto disk_view = info.file_desc->data();
-    auto &blocks = info.validated_blocks;
-    while (!blocks.empty()) {
-        auto &res = blocks.front();
-        auto &payload = res->payload;
-        auto &req_payload = payload.req->payload.request_payload;
-        auto &file = req_payload.file;
-        auto &data = payload.res.data;
-        auto block_index = req_payload.block_index;
-        auto offset = file->get_block_offset(block_index);
-        std::copy(data.begin(), data.end(), disk_view + offset);
-        blocks.pop_front();
-        --blocks_kept;
-    }
-    if (info.final && info.pending_blocks == 0) {
-        request<fs::payload::close_request_t>(fs, std::move(info.file_desc), info.file->get_path()).send(init_timeout);
-    }
-    ready();
 }

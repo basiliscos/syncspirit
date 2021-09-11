@@ -1,7 +1,5 @@
-- test & impl: clone block
- -- не надо запрашивать
- -- надо хэшировать
- -- сразу пишем на диск
+-- удалять блоки из модели и БД, когда их больше нет
+-- если N одинаковых блока у файла??
 
 - send updates to peer during downloading?
 
@@ -19,10 +17,12 @@
 - локальные таймстемпы?
 - metadata (timestamp, etc.)
 - cluster is update by 3rd party: регать итераторы в cluster'е и инвалидировать, если надо.
+- https://github.com/syncthing/syncthing/pull/7876
 
 GUI
 
 ./src/ui-daemon/syncspirit-daemon --log_level trace --config_dir=../  --command add_peer:zzz:KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7  --command add_folder:label=my_label:id=nagkw-srrjz:path=/tmp/syncspirit --command share:folder=my_label:device=KUEQE66
+
 
 3. use wxWidgets
 

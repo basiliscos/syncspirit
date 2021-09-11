@@ -178,10 +178,12 @@ struct file_consumer_t : r::actor_base_t {
     using r::actor_base_t::actor_base_t;
     using open_file_ptr_t = r::intrusive_ptr_t<message::open_response_t>;
     using close_file_ptr_t = r::intrusive_ptr_t<message::close_response_t>;
+    using clone_file_ptr_t = r::intrusive_ptr_t<message::clone_response_t>;
 
     r::address_ptr_t fs_actor;
     open_file_ptr_t open_response;
     close_file_ptr_t close_response;
+    clone_file_ptr_t clone_response;
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept {
         r::actor_base_t::configure(plugin);
@@ -191,11 +193,13 @@ struct file_consumer_t : r::actor_base_t {
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
             p.subscribe_actor(&file_consumer_t::on_open);
             p.subscribe_actor(&file_consumer_t::on_close);
+            p.subscribe_actor(&file_consumer_t::on_clone);
         });
     }
 
     void on_open(message::open_response_t &res) noexcept { open_response = &res; }
     void on_close(message::close_response_t &res) noexcept { close_response = &res; }
+    void on_clone(message::clone_response_t &res) noexcept { clone_response = &res; }
 
     void open_request(const bfs::path &path, size_t file_size) noexcept {
         request<payload::open_request_t>(fs_actor, path, file_size, nullptr).send(init_timeout);
@@ -370,6 +374,44 @@ TEST_CASE("fs-actor", "[fs]") {
             CHECK(ee);
             CHECK(ee->root()->ec.value());
         }
+    }
+
+    SECTION("cloning blocks") {
+        sup->create_actor<fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
+        auto act = sup->create_actor<file_consumer_t>().timeout(timeout).finish();
+        sup->do_process();
+
+        auto source = root_path / "my-source";
+        auto dest = root_path / "my-dest";
+        write(source, "1234567890");
+
+        // to new file
+        act->request<payload::clone_request_t>(act->fs_actor, source, dest, 15ul, 5ul, 5ul, 0ul).send(timeout);
+        sup->do_process();
+        REQUIRE(act->clone_response);
+        CHECK(!act->clone_response->payload.ee);
+        REQUIRE(bfs::exists(dest));
+        auto data = read_file(dest);
+        REQUIRE(data.length() == 15);
+        CHECK(data.substr(0, 5) == "67890");
+        auto tail = data.substr(5);
+        auto exp = std::string_view("\0\0\0\0\0\0\0\0\0\0", 10);
+        CHECK(tail == exp);
+
+        // to already opende file
+        auto &target = act->clone_response->payload.res->file;
+        act->request<payload::clone_request_t>(act->fs_actor, source, dest, 15ul, 5ul, 0ul, 5ul, std::move(target))
+            .send(timeout);
+        sup->do_process();
+        REQUIRE(act->clone_response);
+        CHECK(!act->clone_response->payload.ee);
+        act->clone_response.reset();
+        data = read_file(dest);
+        REQUIRE(data.length() == 15);
+        CHECK(data.substr(0, 10) == "6789012345");
+        tail = data.substr(10);
+        exp = std::string_view("\0\0\0\0\0", 5);
+        CHECK(tail == exp);
     }
 
     SECTION("scan temporaries") {

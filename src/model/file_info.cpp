@@ -189,10 +189,6 @@ blocks_interator_t file_info_t::iterate_blocks() noexcept {
     return blocks_interator_t();
 }
 
-void file_info_t::clone_block(file_info_t &source, std::size_t src_block_index, std::size_t dst_block_index) noexcept {
-    std::abort();
-}
-
 std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     assert(!blocks.empty());
     return block_size * block_index;
