@@ -121,6 +121,9 @@ TEST_CASE("db-actor", "[db]") {
     auto &cluster_2 = act->cluster_res->payload.res.cluster;
     REQUIRE(cluster_2->get_folders().size() == 1);
 
+    auto &blocks = cluster_2->get_blocks();
+    CHECK(blocks.size() == 1);
+
     auto folder_2 = cluster_2->get_folders().by_key(folder->get_db_key());
     REQUIRE(folder_2);
     CHECK(folder_2->get_db_key() == folder->get_db_key());
@@ -134,6 +137,24 @@ TEST_CASE("db-actor", "[db]") {
     CHECK(fi_2->get_db_key() == fi->get_db_key());
     CHECK(fi_2->get_index() == fi->get_index());
     REQUIRE(fi_2->get_file_infos().size() == 1);
+
+    // remove block, save and load cluster
+    file->remove_blocks();
+    fi->mark_dirty();
+    act->file_info_res.reset();
+    act->request<payload::store_folder_info_request_t>(db_addr, fi).send(timeout);
+    sup->do_process();
+    REQUIRE(act->cluster_res);
+    REQUIRE(!act->cluster_res->payload.ee);
+
+    act->cluster_res.reset();
+    act->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+    sup->do_process();
+    REQUIRE(act->cluster_res);
+    REQUIRE(!act->cluster_res->payload.ee);
+    auto& cluster_3 = act->cluster_res->payload.res.cluster;
+    auto& blocks_3 = cluster_3->get_blocks();
+    CHECK(blocks_3.size() == 0);
 
     sup->shutdown();
     sup->do_process();

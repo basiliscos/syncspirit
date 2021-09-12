@@ -2,6 +2,7 @@
 #include "file_info.h"
 #include "cluster.h"
 #include <algorithm>
+#include <boost/mpl/pair.hpp>
 #include <spdlog/spdlog.h>
 
 namespace syncspirit::model {
@@ -196,13 +197,32 @@ void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
 
     auto &deleted_blocks_map = cluster.get_deleted_blocks();
     for (auto &it : ex_blocks) {
-        auto last = it.second->unlink(this, true);
-        if (last) {
-            deleted_blocks_map.put(it.second);
-            blocks_map.remove(it.second);
-        }
+        remove_block(it.second, blocks_map, deleted_blocks_map);
     }
     local_blocks = blocks_t(blocks.size());
+}
+
+void file_info_t::remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks,
+                               block_infos_map_t &deleted_blocks) noexcept {
+    bool last = block->unlink(this, true);
+    if (last) {
+        deleted_blocks.put(block);
+        cluster_blocks.remove(block);
+    }
+}
+
+void file_info_t::remove_blocks() noexcept {
+    auto &cluster = *folder_info->get_folder()->get_cluster();
+    auto &blocks_map = cluster.get_blocks();
+    auto &deleted_blocks_map = cluster.get_deleted_blocks();
+    for (auto &it : blocks) {
+        remove_block(it, blocks_map, deleted_blocks_map);
+    }
+    if (blocks.size()) {
+        mark_dirty();
+    }
+    blocks = blocks_t();
+    local_blocks = blocks_t();
 }
 
 blocks_interator_t file_info_t::iterate_blocks() noexcept {

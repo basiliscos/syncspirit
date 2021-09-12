@@ -110,7 +110,10 @@ cluster_t::unknown_folders_t cluster_t::update(const proto::ClusterConfig &confi
     return r;
 }
 
-void cluster_t::add_folder(const folder_ptr_t &folder) noexcept { folders.put(folder); }
+void cluster_t::add_folder(const folder_ptr_t &folder) noexcept {
+    folder->assign_cluster(this);
+    folders.put(folder);
+}
 
 file_interator_t cluster_t::iterate_files(const device_ptr_t &peer_device) noexcept {
     // find local outdated files, which present on peer device

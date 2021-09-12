@@ -73,6 +73,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     inline blocks_t &get_blocks() noexcept { return blocks; }
+    void remove_blocks() noexcept;
 
     inline bool is_file() noexcept { return type == proto::FileInfoType::FILE; }
     inline bool is_dir() noexcept { return type == proto::FileInfoType::DIRECTORY; }
@@ -100,6 +101,8 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
   private:
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void generate_db_key(const std::string &name) noexcept;
+    void remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks,
+                      block_infos_map_t &deleted_blocks) noexcept;
     template <typename Source> void fields_update(const Source &s) noexcept;
 
     folder_info_t *folder_info;

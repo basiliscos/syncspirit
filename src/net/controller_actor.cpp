@@ -117,8 +117,9 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
                 do_shutdown(make_error(ec));
                 return ImmediateResult::ERROR;
             }
+        } else {
+            LOG_TRACE(log, "{}, {} already abscent, noop", identity, path.string());
         }
-        LOG_TRACE(log, "{}, {} already abscent, noop", identity, path.string());
         return ImmediateResult::DONE;
     } else if (current_file->is_file() && current_file->get_size() == 0) {
         LOG_TRACE(log, "{}, creating empty file {}", identity, path.string());

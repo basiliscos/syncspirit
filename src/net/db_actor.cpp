@@ -396,7 +396,9 @@ outcome::result<void> db_actor_t::save(db::transaction_t &txn, model::folder_inf
         return r;
     }
 
-    auto &blocks_map = folder_info->get_folder()->get_cluster()->get_blocks();
+    auto &folder = *folder_info->get_folder();
+    auto &cluster = *folder.get_cluster();
+    auto &blocks_map = cluster.get_blocks();
     auto file_infos = model::file_infos_map_t();
     for (auto &it : folder_info->get_file_infos()) {
         auto &fi = it.second;
@@ -429,7 +431,13 @@ outcome::result<void> db_actor_t::save(db::transaction_t &txn, model::folder_inf
         native_file_infos.put(it.second);
     }
 
-    folder_info->get_folder()->get_folder_infos().put(folder_info);
+    auto &deleted_blocks_map = cluster.get_deleted_blocks();
+    r = db::remove(deleted_blocks_map, txn);
+    if (!r) {
+        return r;
+    }
+
+    folder.get_folder_infos().put(folder_info);
     return outcome::success();
 }
 
