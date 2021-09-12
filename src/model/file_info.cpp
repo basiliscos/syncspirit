@@ -97,8 +97,7 @@ file_info_t::~file_info_t() {
         b->unlink(this);
     }
     blocks.clear();
-
-    // no need to clean local blocks
+    // no need to unlink local blocks
     local_blocks.clear();
 }
 
@@ -169,17 +168,32 @@ bool file_info_t::update(const local_file_t &local_file) noexcept {
 
 void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
     auto &blocks_map = folder_info->get_folder()->get_cluster()->get_blocks();
+    auto ex_blocks = block_infos_map_t();
+    for (auto &block : blocks) {
+        ex_blocks.put(block);
+    }
+    blocks.resize(0);
     for (int i = 0; i < remote_info.blocks_size(); ++i) {
         auto &b = remote_info.blocks(i);
         auto &hash = b.hash();
         auto block = blocks_map.by_id(hash);
         if (!block) {
             block = new block_info_t(b);
+            block->link(this, i);
+        } else {
+            auto ex_block = ex_blocks.by_id(hash);
+            if (ex_block) {
+                ex_blocks.remove(ex_block);
+            } else {
+                block->link(this, i);
+            }
         }
-        block->link(this, i);
         blocks.emplace_back(std::move(block));
     }
-    local_blocks.resize(blocks.size());
+    for (auto &it : ex_blocks) {
+        it.second->unlink(this, true);
+    }
+    local_blocks = blocks_t(blocks.size());
 }
 
 blocks_interator_t file_info_t::iterate_blocks() noexcept {

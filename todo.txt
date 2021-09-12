@@ -18,7 +18,8 @@
 - metadata (timestamp, etc.)
 - cluster is update by 3rd party: регать итераторы в cluster'е и инвалидировать, если надо.
 - https://github.com/syncthing/syncthing/pull/7876
-
+- https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
+- https://en.wikipedia.org/wiki/Filename#Reserved_characters_and_words
 GUI
 
 ./src/ui-daemon/syncspirit-daemon --log_level trace --config_dir=../  --command add_peer:zzz:KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7  --command add_folder:label=my_label:id=nagkw-srrjz:path=/tmp/syncspirit --command share:folder=my_label:device=KUEQE66

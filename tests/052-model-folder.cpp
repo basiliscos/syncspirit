@@ -38,7 +38,6 @@ TEST_CASE("folder, update local files", "[model]") {
         db_file.set_type(proto::FileInfoType::FILE);
         db_file.set_deleted(true);
         auto file = model::file_info_ptr_t(new file_info_t(db_file, folder_info.get()));
-        file->unmark_dirty();
         folder_info->add(file);
 
         auto local_file_map = model::local_file_map_t(bfs::path("/some/path"));
