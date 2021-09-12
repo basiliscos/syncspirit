@@ -59,6 +59,7 @@ struct cluster_t : arc_base_t<cluster_t> {
     file_interator_t iterate_files(const device_ptr_t &peer_device) noexcept;
 
     block_infos_map_t &get_blocks() noexcept;
+    block_infos_map_t &get_deleted_blocks() noexcept;
     folders_map_t &get_folders() noexcept;
     void add_folder(const folder_ptr_t &folder) noexcept;
     inline const device_ptr_t &get_device() const noexcept { return device; }
@@ -67,6 +68,7 @@ struct cluster_t : arc_base_t<cluster_t> {
     device_ptr_t device;
     folders_map_t folders;
     block_infos_map_t blocks;
+    block_infos_map_t deleted_blocks;
 
     friend class file_interator_t;
 };

@@ -167,11 +167,14 @@ bool file_info_t::update(const local_file_t &local_file) noexcept {
 }
 
 void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
-    auto &blocks_map = folder_info->get_folder()->get_cluster()->get_blocks();
+    auto &cluster = *folder_info->get_folder()->get_cluster();
+    auto &blocks_map = cluster.get_blocks();
+
     auto ex_blocks = block_infos_map_t();
     for (auto &block : blocks) {
         ex_blocks.put(block);
     }
+
     blocks.resize(0);
     for (int i = 0; i < remote_info.blocks_size(); ++i) {
         auto &b = remote_info.blocks(i);
@@ -190,8 +193,14 @@ void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
         }
         blocks.emplace_back(std::move(block));
     }
+
+    auto &deleted_blocks_map = cluster.get_deleted_blocks();
     for (auto &it : ex_blocks) {
-        it.second->unlink(this, true);
+        auto last = it.second->unlink(this, true);
+        if (last) {
+            deleted_blocks_map.put(it.second);
+            blocks_map.remove(it.second);
+        }
     }
     local_blocks = blocks_t(blocks.size());
 }

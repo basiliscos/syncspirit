@@ -122,6 +122,38 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
         CHECK(*ignored_devices.by_key(ignored_device->get_sha256()) == *ignored_device);
     }
 
+    SECTION("save, load & remove blocks") {
+        db::BlockInfo db_bi;
+        db_bi.set_hash("aaa");
+        db_bi.set_size(123);
+        auto bi = model::block_info_ptr_t(new model::block_info_t(db_bi));
+
+        auto txn = mk_txn(env, transaction_type_t::RW);
+        auto r = db::store_block_info(bi, txn);
+        CHECK(r);
+        REQUIRE(bi->get_db_key());
+        REQUIRE(txn.commit());
+
+        txn = mk_txn(env, transaction_type_t::RO);
+        auto r_blocks = db::load_block_infos(txn);
+        REQUIRE(r_blocks);
+        auto &blocks = r_blocks.assume_value();
+        CHECK(blocks.by_id(bi->get_hash()));
+        CHECK(blocks.by_key(bi->get_db_key()));
+        REQUIRE(txn.commit());
+
+        txn = mk_txn(env, transaction_type_t::RW);
+        r = db::remove(blocks, txn);
+        CHECK(r);
+        REQUIRE(txn.commit());
+
+        txn = mk_txn(env, transaction_type_t::RO);
+        r_blocks = db::load_block_infos(txn);
+        REQUIRE(r_blocks);
+        CHECK(r_blocks.assume_value().size() == 0);
+        REQUIRE(txn.commit());
+    }
+
     SECTION("save & load ignored folder") {
         auto db_f = db::IgnoredFolder{};
         db_f.set_id("123");

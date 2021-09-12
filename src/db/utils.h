@@ -22,6 +22,7 @@ outcome::result<model::devices_map_t> load_devices(transaction_t &txn) noexcept;
 
 outcome::result<void> store_block_info(model::block_info_ptr_t &info, transaction_t &txn) noexcept;
 outcome::result<model::block_infos_map_t> load_block_infos(transaction_t &txn) noexcept;
+outcome::result<void> remove(model::block_infos_map_t &blocks, transaction_t &txn) noexcept;
 
 outcome::result<void> store_folder(model::folder_ptr_t &folder, transaction_t &txn) noexcept;
 outcome::result<model::folders_map_t> load_folders(transaction_t &txn) noexcept;

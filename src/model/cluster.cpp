@@ -94,6 +94,8 @@ folders_map_t &cluster_t::get_folders() noexcept { return folders; }
 
 block_infos_map_t &cluster_t::get_blocks() noexcept { return blocks; }
 
+block_infos_map_t &cluster_t::get_deleted_blocks() noexcept { return deleted_blocks; }
+
 cluster_t::unknown_folders_t cluster_t::update(const proto::ClusterConfig &config) noexcept {
     unknown_folders_t r;
     for (int i = 0; i < config.folders_size(); ++i) {

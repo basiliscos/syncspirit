@@ -381,4 +381,18 @@ outcome::result<model::block_infos_map_t> load_block_infos(transaction_t &txn) n
     auto instantiator = generic_instantiator<db::BlockInfo, model::block_info_t>;
     return load<model::block_info_t>(std::move(instantiator), txn);
 }
+
+outcome::result<void> remove(model::block_infos_map_t &blocks, transaction_t &txn) noexcept {
+    using helper = persister_helper_t<model::block_info_t>;
+    for (auto &it : blocks) {
+        auto &block = it.second;
+        auto key = helper::get_db_key(block);
+        auto r = mdbx_del(txn.txn, txn.dbi, key, nullptr);
+        if (r != MDBX_SUCCESS) {
+            return make_error_code(r);
+        }
+    }
+    return outcome::success();
+}
+
 } // namespace syncspirit::db

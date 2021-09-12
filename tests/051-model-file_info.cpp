@@ -151,9 +151,15 @@ TEST_CASE("blocks deleteion", "[model]") {
         pr_file.set_type(proto::FileInfoType::FILE);
         pr_file.set_deleted(true);
 
+        auto &bm = cluster->get_blocks();
+        auto &dm = cluster->get_deleted_blocks();
+
+        REQUIRE(!dm.by_id(block->get_hash()));
         file->update(pr_file);
         CHECK(file->is_deleted());
         CHECK(file->get_blocks().size() == 0);
         CHECK(block->is_deleted());
+        CHECK(dm.by_id(block->get_hash()));
+        CHECK(!bm.by_id(block->get_hash()));
     }
 }

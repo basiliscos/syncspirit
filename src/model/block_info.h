@@ -33,7 +33,7 @@ struct block_info_t : arc_base_t<block_info_t>, storeable_t {
 
     db::BlockInfo serialize() noexcept;
     void link(file_info_t *file_info, size_t block_index) noexcept;
-    void unlink(file_info_t *file_info, bool deletion = false) noexcept;
+    bool unlink(file_info_t *file_info, bool deletion = false) noexcept;
 
     void mark_local_available(file_info_t *file_info) noexcept;
     local_availability_t local_file() noexcept;
