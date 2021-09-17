@@ -1,5 +1,3 @@
--- если N одинаковых блока у файла??
-
 - send updates to peer during downloading?
 
 - initial file scannig should use hashers

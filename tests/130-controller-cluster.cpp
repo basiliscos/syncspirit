@@ -277,6 +277,22 @@ void test_new_folder() {
                     sup->do_process();
                     CHECK(read_file(target_path) == "6789012345");
                 }
+
+                SECTION("file, of the same 3 blocks") {
+                    fi.set_size(15);
+
+                    *fi.add_blocks() = raw_block;
+                    *fi.add_blocks() = raw_block;
+                    *fi.add_blocks() = raw_block;
+
+                    *index.add_files() = fi;
+
+                    auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                    peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
+
+                    sup->do_process();
+                    CHECK(read_file(target_path) == "123451234512345");
+                }
             }
 
             SECTION("sync deleted file") {
