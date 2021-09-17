@@ -5,6 +5,7 @@
 #include <vector>
 #include "arc.hpp"
 #include "map.hpp"
+#include "file_block.h"
 #include "structs.pb.h"
 #include "storeable.h"
 
@@ -12,15 +13,9 @@ namespace syncspirit::model {
 
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
+struct file_block_t;
 
 struct block_info_t : arc_base_t<block_info_t>, storeable_t {
-
-    struct local_availability_t {
-        file_info_t *file_info;
-        std::size_t block_index;
-        inline operator bool() const noexcept { return (bool)file_info; }
-    };
-
     block_info_t(const db::BlockInfo &db_block, std::uint64_t db_key_ = 0) noexcept;
     block_info_t(const proto::BlockInfo &block) noexcept;
 
@@ -36,15 +31,12 @@ struct block_info_t : arc_base_t<block_info_t>, storeable_t {
     bool unlink(file_info_t *file_info, bool deletion = false) noexcept;
 
     void mark_local_available(file_info_t *file_info) noexcept;
-    local_availability_t local_file() noexcept;
+    file_block_t local_file() noexcept;
 
     inline bool operator==(const block_info_t &right) const noexcept { return hash == right.hash; }
     inline bool operator!=(const block_info_t &right) const noexcept { return !(hash == right.hash); }
 
   private:
-    struct file_block_t : local_availability_t {
-        bool local_available;
-    };
     using file_blocks_t = std::vector<file_block_t>;
 
     std::string hash;

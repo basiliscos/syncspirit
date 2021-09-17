@@ -7,35 +7,35 @@
 
 namespace syncspirit::model {
 
-blocks_interator_t::blocks_interator_t() noexcept : blocks{nullptr}, local_blocks{nullptr}, i{0} {}
-blocks_interator_t::blocks_interator_t(blocks_t &blocks_, blocks_t &local_blocks_) noexcept
-    : blocks{&blocks_}, local_blocks{&local_blocks_}, i{0} {
-    prepare();
-}
+blocks_interator_t::blocks_interator_t() noexcept : file{nullptr}, i{0} {}
+blocks_interator_t::blocks_interator_t(file_info_t &file_) noexcept : file{&file_}, i{0} { prepare(); }
 
 void blocks_interator_t::prepare() noexcept {
-    if (blocks) {
-        if (i >= blocks->size()) {
-            blocks = nullptr;
+    if (file) {
+        if (i >= file->blocks.size()) {
+            file = nullptr;
         }
     }
 }
 
-void blocks_interator_t::reset() noexcept { blocks = nullptr; }
+void blocks_interator_t::reset() noexcept { file = nullptr; }
 
-block_location_t blocks_interator_t::next() noexcept {
-    assert(blocks);
-    auto b = (*blocks)[i].get();
+file_block_t blocks_interator_t::next() noexcept {
+    assert(file);
+    auto &blocks = file->blocks;
+    auto &local_blocks = file->local_blocks;
+    auto b = blocks[i].get();
     block_info_t *result_block = b;
-    if (i < local_blocks->size()) {
-        auto lb = (*local_blocks)[i].get();
+    if (i < local_blocks.size()) {
+        auto lb = local_blocks[i].get();
         if (!lb || *lb != *b) {
             result_block = lb;
         }
     }
     auto index = i++;
+    auto file_ptr = file;
     prepare();
-    return {b, index};
+    return {b, file_ptr, index};
 }
 
 file_info_t::file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_) noexcept : folder_info{folder_info_} {
@@ -227,7 +227,7 @@ void file_info_t::remove_blocks() noexcept {
 
 blocks_interator_t file_info_t::iterate_blocks() noexcept {
     if (local_blocks_count != local_blocks.size()) {
-        return blocks_interator_t(blocks, local_blocks);
+        return blocks_interator_t(*this);
     }
     return blocks_interator_t();
 }

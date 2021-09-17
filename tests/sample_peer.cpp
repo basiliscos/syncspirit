@@ -21,7 +21,7 @@ void sample_peer_t::on_start_reading(message::start_reading_t &) noexcept {
 void sample_peer_t::on_block_request(message::block_request_t &req) noexcept {
     assert(responses.size());
     requests.push_front(&req);
-    while (requests.size() && requests.front()->payload.request_payload.block_index == responses.front().block_index) {
+    while (requests.size() && requests.front()->payload.request_payload.block.block_index() == responses.front().block_index) {
         reply_to(*requests.front(), responses.front().data);
         responses.pop_front();
         requests.pop_front();

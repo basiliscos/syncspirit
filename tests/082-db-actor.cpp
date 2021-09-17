@@ -152,8 +152,8 @@ TEST_CASE("db-actor", "[db]") {
     sup->do_process();
     REQUIRE(act->cluster_res);
     REQUIRE(!act->cluster_res->payload.ee);
-    auto& cluster_3 = act->cluster_res->payload.res.cluster;
-    auto& blocks_3 = cluster_3->get_blocks();
+    auto &cluster_3 = act->cluster_res->payload.res.cluster;
+    auto &blocks_3 = cluster_3->get_blocks();
     CHECK(blocks_3.size() == 0);
 
     sup->shutdown();

@@ -325,8 +325,7 @@ struct block_response_t {
 struct block_request_t {
     using response_t = block_response_t;
     model::file_info_ptr_t file;
-    model::block_info_ptr_t block;
-    std::size_t block_index;
+    model::file_block_t block;
 };
 
 struct cluster_config_t {

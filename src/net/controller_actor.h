@@ -120,7 +120,6 @@ struct controller_actor_t : public r::actor_base_t {
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     using write_map_t = std::unordered_map<std::string, write_info_t>;
     using write_it_t = typename write_map_t::iterator;
-    using local_availability_t = model::block_info_t::local_availability_t;
 
     enum class ImmediateResult { DONE, NON_IMMEDIATE, ERROR };
 
@@ -142,10 +141,10 @@ struct controller_actor_t : public r::actor_base_t {
     void on_message(proto::message::DownloadProgress &message) noexcept;
 
     write_info_t &record_block_data(model::file_info_ptr_t &file, std::size_t block_index) noexcept;
-    void request_block(const model::block_location_t &block) noexcept;
+    void request_block(const model::file_block_t &block) noexcept;
     void update(proto::ClusterConfig &config) noexcept;
     void update(folder_updater_t &&updater) noexcept;
-    void clone_block(const model::block_location_t &block, const local_availability_t &info) noexcept;
+    void clone_block(const model::file_block_t &block, model::file_block_t &info) noexcept;
     void process(write_it_t it) noexcept;
     ImmediateResult process_immediately() noexcept;
     void ready() noexcept;

@@ -22,35 +22,27 @@ struct device_t;
 
 using device_ptr_t = intrusive_ptr_t<device_t>;
 
-struct block_location_t {
-    block_info_t *block;
-    std::size_t block_index;
-    inline operator bool() const noexcept { return (bool)block; }
-};
-
 struct blocks_interator_t {
     using blocks_t = std::vector<block_info_ptr_t>;
 
     blocks_interator_t() noexcept;
-    blocks_interator_t(blocks_t &blocks, blocks_t &local_blocks) noexcept;
+    blocks_interator_t(file_info_t &file) noexcept;
 
     template <typename T> blocks_interator_t &operator=(T &other) noexcept {
-        blocks = other.blocks;
-        local_blocks = other.local_blocks;
+        file = other.file;
         i = other.i;
         return *this;
     }
 
-    inline operator bool() noexcept { return blocks != nullptr; }
+    inline operator bool() noexcept { return file != nullptr; }
 
-    block_location_t next() noexcept;
+    file_block_t next() noexcept;
     void reset() noexcept;
 
   private:
     void prepare() noexcept;
-    blocks_t *blocks;
-    blocks_t *local_blocks;
-    size_t i;
+    size_t i = 0;
+    file_info_t *file;
 };
 
 struct file_info_t : arc_base_t<file_info_t>, storeable_t {
@@ -125,6 +117,8 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     size_t local_blocks_count = 0;
     std::optional<bfs::path> path;
     std::string full_name;
+
+    friend struct blocks_interator_t;
 };
 
 inline const std::string &db_key(const file_info_ptr_t &item) noexcept { return item->get_db_key(); }

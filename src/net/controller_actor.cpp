@@ -208,7 +208,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     if (block_iterator) {
         assert(current_file);
         auto cluster_block = block_iterator.next();
-        auto existing_block = cluster_block.block->local_file();
+        auto existing_block = cluster_block.block()->local_file();
         if (existing_block) {
             clone_block(cluster_block, existing_block);
             ready();
@@ -237,9 +237,9 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     ready();
 }
 
-void controller_actor_t::clone_block(const model::block_location_t &block, const local_availability_t &local) noexcept {
-    LOG_TRACE(log, "{}, cloning block {} from {} to {} as block {}", identity, local.block_index,
-              local.file_info->get_name(), current_file->get_name(), block.block_index);
+void controller_actor_t::clone_block(const model::file_block_t &block, model::file_block_t &local) noexcept {
+    LOG_TRACE(log, "{}, cloning block {} from {} to {} as block {}", identity, local.block_index(),
+              local.file()->get_name(), current_file->get_name(), block.block_index());
     auto &path = current_file->get_path();
     auto &path_str = path.string();
 
@@ -247,25 +247,24 @@ void controller_actor_t::clone_block(const model::block_location_t &block, const
         using request_t = fs::payload::clone_request_t;
         write_map[path_str].file = current_file;
         auto target_sz = static_cast<size_t>(current_file->get_size());
-        auto block_sz = static_cast<size_t>(block.block->get_size());
-        auto &source = local.file_info->get_path();
-        auto source_offset = local.file_info->get_block_offset(local.block_index);
-        auto target_offset = current_file->get_block_offset(block.block_index);
+        auto block_sz = static_cast<size_t>(block.block()->get_size());
+        auto &source = local.file()->get_path();
+        auto source_offset = local.get_offset();
+        auto target_offset = block.get_offset();
         request<request_t>(fs, source, path, target_sz, block_sz, source_offset, target_offset).send(init_timeout);
     }
     auto &info = write_map[path_str];
     auto cloned_block =
-        clone_block_t{block.block, model::file_info_ptr_t{local.file_info}, local.block_index, block.block_index};
+        clone_block_t{block.block(), model::file_info_ptr_t{local.file()}, local.block_index(), block.block_index()};
     info.clone_queue.emplace_back(std::move(cloned_block));
     ready();
 }
 
-void controller_actor_t::request_block(const model::block_location_t &block) noexcept {
-    auto sz = block.block->get_size();
+void controller_actor_t::request_block(const model::file_block_t &fb) noexcept {
+    auto sz = fb.block()->get_size();
     LOG_TRACE(log, "{} request_block, file = {}, block index = {}, sz = {}, request pool sz = {}, blocks_kept = {}",
-              identity, current_file->get_full_name(), block.block_index, sz, request_pool, blocks_kept);
-    request<payload::block_request_t>(peer_addr, current_file, model::block_info_ptr_t{block.block}, block.block_index)
-        .send(request_timeout);
+              identity, current_file->get_full_name(), fb.block_index(), sz, request_pool, blocks_kept);
+    request<payload::block_request_t>(peer_addr, current_file, fb).send(request_timeout);
     ++blocks_requested;
     request_pool -= (int64_t)sz;
 }
@@ -388,9 +387,10 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
 
     auto &payload = message.payload.req->payload.request_payload;
     auto &file = payload.file;
-    auto &info = record_block_data(payload.file, payload.block_index);
-    auto &block = *payload.block;
-    auto &hash = block.get_hash();
+    auto &file_block = payload.block;
+    auto &info = record_block_data(payload.file, file_block.block_index());
+    auto &block = *file_block.block();
+    auto &hash = file_block.block()->get_hash();
     request_pool += block.get_size();
 
     ++info.pending_blocks;
@@ -480,7 +480,7 @@ void controller_actor_t::process(write_it_t it) noexcept {
             auto &req_payload = payload.req->payload.request_payload;
             auto &file = req_payload.file;
             auto &data = payload.res.data;
-            auto block_index = req_payload.block_index;
+            auto block_index = req_payload.block.block_index();
             auto offset = file->get_block_offset(block_index);
             std::copy(data.begin(), data.end(), disk_view + offset);
             blocks.pop_front();
