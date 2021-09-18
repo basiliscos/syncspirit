@@ -8,7 +8,7 @@ using namespace syncspirit::proto;
 using namespace syncspirit::utils;
 namespace outcome = boost::outcome_v2;
 
-static outcome::result<char> calc(const std::string_view &in) {
+static outcome::result<char> calc(std::string_view in) {
     int factor = 1;
     int sum = 0;
     constexpr const int n = 32;

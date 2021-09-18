@@ -273,7 +273,7 @@ inline static auto load(I &&instantiator, transaction_t &txn) noexcept -> outcom
 template <typename T> struct key_helper_t;
 
 template <> struct key_helper_t<std::uint64_t> {
-    static std::uint64_t extract_key(const std::string_view &key) noexcept {
+    static std::uint64_t extract_key(std::string_view key) noexcept {
         std::uint64_t db_key;
         assert(key.size() >= sizeof(db_key) + sizeof(discr_t));
         auto *ptr = key.data() + sizeof(discr_t);
@@ -283,14 +283,14 @@ template <> struct key_helper_t<std::uint64_t> {
 };
 
 template <> struct key_helper_t<std::string_view> {
-    static std::string_view extract_key(const std::string_view &key) noexcept {
+    static std::string_view extract_key(std::string_view key) noexcept {
         auto *ptr = key.data() + sizeof(discr_t);
         return std::string_view(ptr, key.size() - sizeof(discr_t));
     }
 };
 
 template <typename DB_T, typename T>
-auto generic_instantiator = [](const std::string_view &key, DB_T &&db) {
+auto generic_instantiator = [](std::string_view key, DB_T &&db) {
     using ptr_t = model::intrusive_ptr_t<T>;
     auto db_key = key_helper_t<std::uint64_t>::extract_key(key);
     return ptr_t(new T(std::move(db), db_key));
@@ -320,7 +320,7 @@ outcome::result<void> store_folder_info(model::folder_info_ptr_t &info, transact
 
 outcome::result<model::folder_infos_map_t>
 load_folder_infos(model::devices_map_t &devices, model::folders_map_t &folders, transaction_t &txn) noexcept {
-    auto instantiator = [&](const std::string_view &key, db::FolderInfo &&db_item) -> model::folder_info_ptr_t {
+    auto instantiator = [&](std::string_view key, db::FolderInfo &&db_item) -> model::folder_info_ptr_t {
         auto device = devices.by_key(db_item.device_key());
         auto folder = folders.by_key(db_item.folder_key());
         assert(folder && device);
@@ -336,7 +336,7 @@ outcome::result<void> store_file_info(model::file_info_ptr_t &info, transaction_
 
 outcome::result<model::file_infos_map_t> load_file_infos(model::folder_infos_map_t &folder_infos,
                                                          transaction_t &txn) noexcept {
-    auto instantiator = [&](const std::string_view &key, db::FileInfo &&db_item) -> model::file_info_ptr_t {
+    auto instantiator = [&](std::string_view key, db::FileInfo &&db_item) -> model::file_info_ptr_t {
         auto db_folder_key = key_helper_t<std::uint64_t>::extract_key(key);
         auto folder_info = folder_infos.by_key(db_folder_key);
         assert(folder_info);
@@ -350,7 +350,7 @@ outcome::result<void> store_ignored_device(model::ignored_device_ptr_t &info, tr
 }
 
 outcome::result<model::ignored_devices_map_t> load_ignored_devices(transaction_t &txn) noexcept {
-    auto instantiator = [&](const std::string_view &key, const auto &) -> outcome::result<model::ignored_device_ptr_t> {
+    auto instantiator = [&](std::string_view key, const auto &) -> outcome::result<model::ignored_device_ptr_t> {
         auto id = key_helper_t<std::string_view>::extract_key(key);
         auto device = model::device_id_t::from_sha256(id);
         if (device) {
@@ -367,7 +367,7 @@ outcome::result<void> store_ignored_folder(model::ignored_folder_ptr_t &info, tr
 }
 
 outcome::result<model::ignored_folders_map_t> load_ignored_folders(transaction_t &txn) noexcept {
-    auto instantiator = [&](const std::string_view &, db::IgnoredFolder &&db_item) -> model::ignored_folder_ptr_t {
+    auto instantiator = [&](std::string_view, db::IgnoredFolder &&db_item) -> model::ignored_folder_ptr_t {
         return new model::ignored_folder_t(db_item);
     };
     return load<model::ignored_folder_t>(std::move(instantiator), txn);

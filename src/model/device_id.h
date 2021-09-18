@@ -28,7 +28,7 @@ struct device_id_t : arc_base_t<device_id_t> {
     operator bool() const noexcept { return !value.empty(); }
 
     const std::string &get_value() const noexcept { return value; }
-    const std::string_view get_short() const noexcept;
+    std::string_view get_short() const noexcept;
     const std::string &get_sha256() const noexcept { return sha256; }
 
     template <typename OStream> friend OStream &operator<<(OStream &os, const device_id_t &device_id) {
@@ -37,8 +37,7 @@ struct device_id_t : arc_base_t<device_id_t> {
 
   private:
     device_id_t(const utils::cert_data_t &) noexcept;
-    device_id_t(const std::string_view &value_, const std::string_view &sha256_) noexcept
-        : value(value_), sha256{sha256_} {};
+    device_id_t(std::string_view value_, std::string_view sha256_) noexcept : value(value_), sha256{sha256_} {};
 
     std::string value;
     std::string sha256;

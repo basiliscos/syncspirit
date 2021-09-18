@@ -22,7 +22,7 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
     using parent_t = ra::supervisor_config_asio_builder_t<Supervisor>;
     using parent_t::parent_t;
 
-    builder_t &&device_name(const std::string_view &value) &&noexcept {
+    builder_t &&device_name(std::string_view value) &&noexcept {
         parent_t::config.device_name = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

@@ -90,6 +90,8 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     void after_sync() noexcept;
     file_info_ptr_t link(const device_ptr_t &target) noexcept;
 
+    proto::FileInfo get() const noexcept;
+
   private:
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void generate_db_key(const std::string &name) noexcept;

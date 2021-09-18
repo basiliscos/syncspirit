@@ -45,7 +45,7 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&device_name(const std::string_view &value) &&noexcept {
+    builder_t &&device_name(std::string_view value) &&noexcept {
         parent_t::config.device_name = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -105,6 +105,7 @@ struct peer_actor_t : public r::actor_base_t {
     void on_termination(message::termination_signal_t &) noexcept;
     void on_block_request(message::block_request_t &) noexcept;
     void on_cluster_config(message::cluster_config_t &) noexcept;
+    void on_file_update(message::file_update_notify_t &) noexcept;
 
     void on_connect(resolve_it_t) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;

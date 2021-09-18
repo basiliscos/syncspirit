@@ -241,8 +241,8 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
 }
 
 void fs_actor_t::on_open(message::open_request_t &req) noexcept {
-    LOG_TRACE(log, "{}, on_open", identity);
     auto &payload = req.payload.request_payload;
+    LOG_TRACE(log, "{}, on_open, path = {}", identity, payload.path.string());
     auto path = make_temporal(payload.path);
     auto parent = path.parent_path();
     sys::error_code ec;

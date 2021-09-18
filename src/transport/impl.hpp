@@ -85,7 +85,7 @@ template <> struct base_impl_t<ssl_socket_t> {
     bool validation_passed = false;
     bool cancelling = false;
 
-    static ssl::context get_context(self_t &source, const std::string_view &alpn) noexcept {
+    static ssl::context get_context(self_t &source, std::string_view alpn) noexcept {
         ssl::context ctx(ssl::context::tls);
         ctx.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2);
 

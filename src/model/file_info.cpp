@@ -293,4 +293,39 @@ void file_info_t::after_sync() noexcept {
     }
 }
 
+proto::FileInfo file_info_t::get() const noexcept {
+    proto::FileInfo r;
+    r.set_name(std::string(get_name()));
+    r.set_type(type);
+    r.set_size(size);
+    r.set_permissions(permissions);
+    r.set_modified_s(modified_s);
+    r.set_modified_ns(modified_ns);
+    r.set_modified_by(modified_by);
+    r.set_deleted(deleted);
+    r.set_invalid(invalid);
+    r.set_permissions(permissions);
+
+    auto v = r.mutable_version();
+    for (size_t i = 0; i < version.counters_size(); ++i) {
+        *v->add_counters() = version.counters(i);
+    }
+    r.set_sequence(sequence);
+    r.set_size(size);
+
+    auto r_blocks = r.mutable_blocks();
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        auto tb = r_blocks->Add();
+        auto &sb = blocks[i];
+        tb->set_offset(get_block_offset(i));
+        tb->set_size(sb->get_size());
+        tb->set_hash(sb->get_hash());
+        tb->set_weak_hash(sb->get_weak_hash());
+    }
+
+    r.set_symlink_target(symlink_target);
+
+    return r;
+}
+
 } // namespace syncspirit::model

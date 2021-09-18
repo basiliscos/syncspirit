@@ -5,7 +5,7 @@
 
 namespace syncspirit::daemon::command {
 
-outcome::result<command_ptr_t> share_folder_t::construct(const std::string_view &in) noexcept {
+outcome::result<command_ptr_t> share_folder_t::construct(std::string_view in) noexcept {
     std::string folder, peer;
     auto it = pair_iterator_t(in);
     while (true) {

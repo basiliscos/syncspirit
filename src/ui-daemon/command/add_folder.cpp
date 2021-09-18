@@ -9,7 +9,7 @@ namespace bfs = boost::filesystem;
 
 namespace syncspirit::daemon::command {
 
-outcome::result<command_ptr_t> add_folder_t::construct(const std::string_view &in) noexcept {
+outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noexcept {
     std::string_view label, path;
     std::string id;
 

@@ -8,7 +8,7 @@ namespace syncspirit::daemon {
 
 command_t::~command_t() {}
 
-outcome::result<command_ptr_t> command_t::parse(const std::string_view &in) noexcept {
+outcome::result<command_ptr_t> command_t::parse(std::string_view in) noexcept {
     auto colon = in.find(":");
     if (colon == in.npos) {
         return make_error_code(error_code_t::command_is_missing);

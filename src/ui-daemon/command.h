@@ -18,7 +18,7 @@ struct command_t {
     virtual ~command_t();
     virtual bool execute(governor_actor_t &) noexcept = 0;
 
-    static outcome::result<command_ptr_t> parse(const std::string_view &) noexcept;
+    static outcome::result<command_ptr_t> parse(std::string_view) noexcept;
     utils::logger_t log;
 };
 

@@ -4,7 +4,7 @@
 
 namespace syncspirit::daemon::command {
 
-outcome::result<command_ptr_t> add_peer_t::construct(const std::string_view &in) noexcept {
+outcome::result<command_ptr_t> add_peer_t::construct(std::string_view in) noexcept {
     auto colon = in.find(":");
     if (colon == in.npos) {
         return make_error_code(error_code_t::missing_device_label);

@@ -16,8 +16,8 @@ struct base32 {
     static inline std::size_t encoded_size(std::size_t dec_len) noexcept { return (dec_len + 4) / 5 * 8; }
     static inline std::size_t decoded_size(std::size_t dec_len) noexcept { return dec_len * 5 / 8; }
 
-    static std::string encode(const std::string_view &input) noexcept;
-    static outcome::result<std::string> decode(const std::string_view &input) noexcept;
+    static std::string encode(std::string_view input) noexcept;
+    static outcome::result<std::string> decode(std::string_view input) noexcept;
 };
 
 } // namespace syncspirit::utils

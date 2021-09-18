@@ -44,10 +44,10 @@ struct wrapped_message_t {
 
 } // namespace message
 
-void make_hello_message(fmt::memory_buffer &buff, const std::string_view &device_name) noexcept;
+void make_hello_message(fmt::memory_buffer &buff, std::string_view device_name) noexcept;
 
-std::size_t make_announce_message(fmt::memory_buffer &buff, const std::string_view &device_name,
-                                  const payload::URIs &uris, std::int64_t instance) noexcept;
+std::size_t make_announce_message(fmt::memory_buffer &buff, std::string_view device_name, const payload::URIs &uris,
+                                  std::int64_t instance) noexcept;
 
 template <typename Message>
 void serialize(fmt::memory_buffer &buff, const Message &message,

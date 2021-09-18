@@ -1,8 +1,8 @@
-- send updates to peer during downloading?
-
+- after restart no/wrong ClusterConfig / Update is sent
 - initial file scannig should use hashers
 - model: когда добавляется symlink, папка
 - store_new_folder_request_t: выкинуть peer, peer_source
+- send indices deltas (after restart detects changes)
 - test: continue downloading temporaries
 - test: fs_actor, deleted file from index
 - test: controller, share folder -> index is sent
@@ -18,6 +18,7 @@
 - https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
 - https://en.wikipedia.org/wiki/Filename#Reserved_characters_and_words
 GUI
+- https://github.com/wheybags/glibc_version_header
 
 ./src/ui-daemon/syncspirit-daemon --log_level trace --config_dir=../  --command add_peer:zzz:KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7  --command add_folder:label=my_label:id=nagkw-srrjz:path=/tmp/syncspirit --command share:folder=my_label:device=KUEQE66
 

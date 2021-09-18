@@ -133,6 +133,7 @@ struct controller_actor_t : public r::actor_base_t {
     void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
     void on_store_file_info(message::store_file_response_t &message) noexcept;
     void on_new_folder(message::store_new_folder_notify_t &message) noexcept;
+    void on_file_update(message::file_update_notify_t &message) noexcept;
 
     void on_message(proto::message::ClusterConfig &message) noexcept;
     void on_message(proto::message::Index &message) noexcept;

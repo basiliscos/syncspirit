@@ -58,6 +58,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&controller_actor_t::on_store_folder_info);
         p.subscribe_actor(&controller_actor_t::on_store_file_info);
         p.subscribe_actor(&controller_actor_t::on_new_folder);
+        p.subscribe_actor(&controller_actor_t::on_file_update);
         p.subscribe_actor(&controller_actor_t::on_ready);
         p.subscribe_actor(&controller_actor_t::on_block);
         p.subscribe_actor(&controller_actor_t::on_validation);
@@ -315,6 +316,8 @@ void controller_actor_t::on_store_file_info(message::store_file_response_t &mess
         log->error("{}, on_store_file_info, file: {}, error: {}", identity, file->get_full_name(), ee->message());
         return do_shutdown(ee);
     }
+    auto &dest = supervisor->get_address();
+    send<payload::file_update_t>(dest, file);
     // ready();
 }
 
@@ -488,6 +491,7 @@ void controller_actor_t::process(write_it_t it) noexcept {
         }
     }
     if (info.complete()) {
+        assert(info.sink);
         request<fs::payload::close_request_t>(fs, std::move(info.sink), info.file->get_path()).send(init_timeout);
     }
     ready();
@@ -519,4 +523,12 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
         process(it);
     }
     intrusive_ptr_release(block_res);
+}
+
+void controller_actor_t::on_file_update(message::file_update_notify_t &message) noexcept {
+    auto &file = message.payload.file;
+    LOG_TRACE(log, "{}, on_file_update, {}", identity, file->get_full_name());
+    if (state == r::state_t::OPERATIONAL) {
+        send<payload::file_update_t>(peer_addr, file);
+    }
 }

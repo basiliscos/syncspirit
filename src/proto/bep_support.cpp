@@ -15,7 +15,7 @@ namespace be = boost::endian;
 
 namespace syncspirit::proto {
 
-void make_hello_message(fmt::memory_buffer &buff, const std::string_view &device_name) noexcept {
+void make_hello_message(fmt::memory_buffer &buff, std::string_view device_name) noexcept {
     proto::Hello msg;
     msg.set_device_name(device_name.begin(), device_name.size());
     msg.set_client_name(constants::client_name);
@@ -173,8 +173,8 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
     }
 }
 
-std::size_t make_announce_message(fmt::memory_buffer &buff, const std::string_view &device_name,
-                                  const payload::URIs &uris, std::int64_t instance) noexcept {
+std::size_t make_announce_message(fmt::memory_buffer &buff, std::string_view device_name, const payload::URIs &uris,
+                                  std::int64_t instance) noexcept {
 
     assert(buff.size() > 4);
     std::uint32_t *ptr_32 = reinterpret_cast<std::uint32_t *>(buff.begin());

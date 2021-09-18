@@ -58,6 +58,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
         p.subscribe_actor(&cluster_supervisor_t::on_scan_complete_new, scan_new);
         p.subscribe_actor(&cluster_supervisor_t::on_scan_error, scan_initial);
         p.subscribe_actor(&cluster_supervisor_t::on_scan_error, scan_new);
+        p.subscribe_actor(&cluster_supervisor_t::on_file_update);
     });
 }
 
@@ -240,5 +241,17 @@ void cluster_supervisor_t::on_disconnect(message::disconnect_notify_t &message) 
         device2addr_map.erase(it);
         auto it_r = addr2device_map.find(it->second);
         addr2device_map.erase(it_r);
+    }
+}
+
+void cluster_supervisor_t::on_file_update(message::file_update_notify_t &message) noexcept {
+    auto &file = message.payload.file;
+    auto folder = file->get_folder_info()->get_folder();
+    for (auto &it : *devices) {
+        auto &device = it.second;
+        auto addr_it = device2addr_map.find(device->device_id.get_sha256());
+        if (addr_it != device2addr_map.end() && folder->is_shared_with(device)) {
+            send<payload::file_update_t>(addr_it->second, file);
+        }
     }
 }

@@ -332,6 +332,10 @@ struct cluster_config_t {
     proto::message::ClusterConfig config;
 };
 
+struct file_update_t {
+    model::file_info_ptr_t file;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -406,6 +410,8 @@ using remove_device_t = r::message_t<payload::remove_device_t>;
 
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;
+
+using file_update_notify_t = r::message_t<payload::file_update_t>;
 
 using cluster_config_t = r::message_t<payload::cluster_config_t>;
 

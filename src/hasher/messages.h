@@ -32,7 +32,7 @@ struct validation_request_t : r::arc_base_t<validation_request_t> {
     std::string hash;
     const void *custom;
 
-    validation_request_t(const std::string_view data_, const std::string &hash_, const void *custom_ = nullptr) noexcept
+    validation_request_t(std::string_view data_, std::string hash_, const void *custom_ = nullptr) noexcept
         : data{data_}, hash{hash_}, custom{custom_} {}
 };
 

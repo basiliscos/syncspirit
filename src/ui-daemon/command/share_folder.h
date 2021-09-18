@@ -7,7 +7,7 @@ namespace syncspirit::daemon::command {
 
 struct share_folder_t final : command_t {
     bool execute(governor_actor_t &) noexcept override;
-    static outcome::result<command_ptr_t> construct(const std::string_view &in) noexcept;
+    static outcome::result<command_ptr_t> construct(std::string_view in) noexcept;
 
     inline share_folder_t() noexcept {};
     template <typename Folder, typename Peer>

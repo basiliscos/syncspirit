@@ -8,6 +8,19 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::utils;
 
+namespace {
+namespace to {
+struct get_starter_plugin {};
+} // namespace to
+} // namespace
+
+namespace rotor {
+template <> inline auto &actor_base_t::access<to::get_starter_plugin>() noexcept {
+    auto plugin = get_plugin(plugin::starter_plugin_t::class_identity);
+    return *static_cast<plugin::starter_plugin_t *>(plugin);
+}
+} // namespace rotor
+
 void test_indexupdate() {
     struct F : Fixture {
         model::folder_ptr_t folder;
@@ -94,6 +107,17 @@ void test_indexupdate() {
             }
 
             SECTION("send a symlink") {
+                using message_t = message::file_update_notify_t;
+                auto &starter_plugin = static_cast<r::actor_base_t *>(sup.get())->access<to::get_starter_plugin>();
+                bool sup_notify_received = false;
+                auto handler = r::lambda<message_t>([&](message_t &msg) noexcept {
+                    sup_notify_received = true;
+                    auto &file = msg.payload.file;
+                    CHECK(file);
+                    sup->send<payload::file_update_t>(controller->get_address(), file);
+                });
+                starter_plugin.subscribe_actor(handler);
+
                 fi.set_name("link");
                 fi.set_type(proto::FileInfoType::SYMLINK);
                 fi.set_sequence(4);
@@ -109,6 +133,7 @@ void test_indexupdate() {
                 auto path = bfs::path(root_path / "link");
                 CHECK(bfs::is_symlink(path));
                 CHECK(bfs::read_symlink(path) == target);
+                CHECK(sup_notify_received);
             }
 
             SECTION("send deleted file") {

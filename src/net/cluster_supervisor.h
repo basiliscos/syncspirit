@@ -88,6 +88,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     void on_scan_complete_new(fs::message::scan_response_t &message) noexcept;
     scan_foders_it on_scan_complete(fs::message::scan_response_t &message) noexcept;
     void on_scan_error(fs::message::scan_error_t &message) noexcept;
+    void on_file_update(message::file_update_notify_t &message) noexcept;
     void scan(const model::folder_ptr_t &folder, r::address_ptr_t &via) noexcept;
 
     utils::logger_t log;
