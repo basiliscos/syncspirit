@@ -1,5 +1,6 @@
 #include "governor_actor.h"
 #include "../net/names.h"
+#include "../utils/error_code.h"
 
 using namespace syncspirit::daemon;
 
@@ -64,7 +65,7 @@ void governor_actor_t::process() noexcept {
 
 void governor_actor_t::cmd_add_peer(const model::device_ptr_t &peer) noexcept {
     using request_t = ui::payload::update_peer_request_t;
-    request<request_t>(coordinator, peer).send(init_timeout);
+    request<request_t>(cluster, peer).send(init_timeout);
 }
 
 void governor_actor_t::cmd_add_folder(const db::Folder &folder) noexcept {
@@ -106,12 +107,18 @@ void governor_actor_t::on_folder_share(ui::message::share_folder_response_t &mes
     auto ee = message.payload.ee;
     if (ee) {
         log->error("{}, cannot share folder : {}", identity, ee->message());
-        return do_shutdown(ee);
+        auto root = ee->root();
+        if (root->ec == utils::error_code_t::already_shared) {
+            log->info("error has been ignored");
+        } else {
+            do_shutdown(ee);
+        }
+    } else {
+        auto &payload = message.payload.req->payload.request_payload;
+        auto &folder = payload.folder;
+        auto &peer = payload.peer;
+        log->info("{}, successfully shared folder '{}' with {}", identity, folder->label(), peer->device_id);
     }
-    auto &payload = message.payload.req->payload.request_payload;
-    auto &folder = payload.folder;
-    auto &peer = payload.peer;
-    log->info("{}, successfully shared folder '{}' with {}", identity, folder->label(), peer->device_id);
     commands.pop_front();
     process();
 }

@@ -73,6 +73,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::misconfigured_default_logger:
         r = "default logger is missing or has no sinks";
         break;
+    case error_code_t::already_shared:
+        r = "folder is already shared with the peer";
+        break;
     default:
         r = "unknown";
     }

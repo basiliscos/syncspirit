@@ -59,6 +59,7 @@ enum class error_code_t {
     rx_timeout,
     fs_error,
     scan_aborted,
+    already_shared,
     unknown_sink,
     misconfigured_default_logger,
 };
@@ -135,12 +136,9 @@ inline boost::system::error_code make_error_code(request_error_code_t e) {
 
 } // namespace syncspirit::utils
 
-/*
 namespace std {
-template <> struct is_error_code_enum<syncspirit::utils::error_code> : std::true_type {};
+template <> struct is_error_code_enum<syncspirit::utils::error_code_t> : std::true_type {};
 } // namespace std
-
-*/
 
 namespace boost {
 namespace system {

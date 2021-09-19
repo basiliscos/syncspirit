@@ -80,8 +80,10 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
 
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
     void on_share_folder(ui::message::share_folder_request_t &message) noexcept;
+    void on_update_peer(ui::message::update_peer_request_t &message) noexcept;
     void on_connect(message::connect_notify_t &message) noexcept;
     void on_disconnect(message::disconnect_notify_t &message) noexcept;
+    void on_store_device(message::store_device_response_t &message) noexcept;
     void on_store_new_folder(message::store_new_folder_response_t &message) noexcept;
     void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
     void on_scan_complete_initial(fs::message::scan_response_t &message) noexcept;

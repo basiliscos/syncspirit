@@ -62,10 +62,8 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     void on_load_cluster(message::load_cluster_response_t &message) noexcept;
     void on_cluster_ready(message::cluster_ready_notify_t &message) noexcept;
     void on_ignore_device(ui::message::ignore_device_request_t &message) noexcept;
-    void on_update_peer(ui::message::update_peer_request_t &message) noexcept;
     void on_ignore_folder(ui::message::ignore_folder_request_t &message) noexcept;
     void on_store_ignored_device(message::store_ignored_device_response_t &message) noexcept;
-    void on_store_device(message::store_device_response_t &message) noexcept;
     void on_store_ignored_folder(message::store_ignored_folder_response_t &message) noexcept;
     void on_store_new_folder(message::store_new_folder_response_t &message) noexcept;
     void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
@@ -98,7 +96,6 @@ struct net_supervisor_t : public ra::supervisor_asio_t {
     model::ignored_folders_map_t ignored_folders;
     ignore_device_req_t ignore_device_req;
     ingored_folder_requests_t ingored_folder_requests;
-    update_peer_req_t update_peer_req;
 };
 
 } // namespace net

@@ -272,6 +272,7 @@ struct store_device_response_t {};
 struct store_device_request_t {
     using response_t = store_device_response_t;
     model::device_ptr_t device;
+    void *custom;
 };
 
 struct store_ignored_folder_response_t {};

@@ -46,6 +46,7 @@ struct Fixture {
     using coordinator_ptr_t = r::intrusive_ptr_t<sample_coordinator_t>;
 
     model::device_ptr_t device_my;
+    model::device_ptr_t device_peer;
     r::intrusive_ptr_t<supervisor_t> sup;
     coordinator_ptr_t coord;
     r::address_ptr_t cluster_addr;
@@ -65,6 +66,13 @@ struct Fixture {
         db_my.set_name("d1");
         db_my.set_cert_name("d1_cert_name");
         device_my = model::device_ptr_t(new model::device_t(db_my, ++key));
+
+        db::Device db_peer;
+        db_peer.set_id(test::device_id2sha256("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7"));
+        db_peer.set_name("d2");
+        db_peer.set_cert_name("d2_cert_name");
+        device_peer = model::device_ptr_t(new model::device_t(db_peer, ++key));
+
         cluster = new cluster_t(device_my);
 
         asio::io_context io_context{1};
@@ -123,18 +131,27 @@ void test_start_empty_cluster() {
     };
     F().run();
 }
-void test_add_new_folder() {
-    using request_t = ui::message::create_folder_request_t;
-    using response_t = ui::message::create_folder_response_t;
-    using response_ptr_t = r::intrusive_ptr_t<response_t>;
+void test_add_new_folder_and_share() {
+    using create_folder_t = ui::message::create_folder_response_t;
+    using create_folder_res_ptr_t = r::intrusive_ptr_t<create_folder_t>;
+    using update_peer_t = ui::message::update_peer_response_t;
+    using update_peer_res_ptr_t = r::intrusive_ptr_t<update_peer_t>;
+    using share_folder_t = ui::message::share_folder_response_t;
+    using share_folder_res_ptr_t = r::intrusive_ptr_t<share_folder_t>;
 
     struct F : Fixture {
-        response_ptr_t res;
+        create_folder_res_ptr_t create_folder_res;
+        update_peer_res_ptr_t update_peer_res;
+        share_folder_res_ptr_t share_folder_res;
 
         void pre_run() override {
             coord->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
-                plugin.template with_casted<r::plugin::starter_plugin_t>(
-                    [&](auto &p) { p.subscribe_actor(r::lambda<response_t>([&](response_t &msg) { res = &msg; })); });
+                plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+                    p.subscribe_actor(
+                        r::lambda<create_folder_t>([&](create_folder_t &msg) { create_folder_res = &msg; }));
+                    p.subscribe_actor(r::lambda<update_peer_t>([&](update_peer_t &msg) { update_peer_res = &msg; }));
+                    p.subscribe_actor(r::lambda<share_folder_t>([&](share_folder_t &msg) { share_folder_res = &msg; }));
+                });
             };
         }
         void main() override {
@@ -153,13 +170,33 @@ void test_add_new_folder() {
             coord->request<ui::payload::create_folder_request_t>(cluster_addr, folder).send(timeout);
             sup->do_process();
 
-            REQUIRE(res);
-            REQUIRE(!res->payload.ee);
+            REQUIRE(create_folder_res);
+            REQUIRE(!create_folder_res->payload.ee);
             REQUIRE(cluster->get_folders().size() == 1);
+            auto f = cluster->get_folders().begin()->second;
+
+            coord->request<ui::payload::update_peer_request_t>(cluster_addr, device_peer).send(timeout);
+            sup->do_process();
+
+            REQUIRE(update_peer_res);
+            REQUIRE(!update_peer_res->payload.ee);
+
+            coord->request<ui::payload::share_folder_request_t>(cluster_addr, f, device_peer).send(timeout);
+            sup->do_process();
+
+            REQUIRE(share_folder_res);
+            REQUIRE(!share_folder_res->payload.ee);
+            REQUIRE(f->get_folder_info(device_peer));
+
+            share_folder_res.reset();
+            coord->request<ui::payload::share_folder_request_t>(cluster_addr, f, device_peer).send(timeout);
+            sup->do_process();
+            REQUIRE(share_folder_res);
+            REQUIRE(share_folder_res->payload.ee);
         }
     };
     F().run();
 }
 
 REGISTER_TEST_CASE(test_start_empty_cluster, "test_start_empty_cluster", "[cluster]");
-REGISTER_TEST_CASE(test_add_new_folder, "test_add_new_folder", "[cluster]");
+REGISTER_TEST_CASE(test_add_new_folder_and_share, "test_add_new_folder_and_share", "[cluster]");

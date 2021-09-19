@@ -72,8 +72,6 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_ignore_device);
         p.subscribe_actor(&net_supervisor_t::on_ignore_folder);
         p.subscribe_actor(&net_supervisor_t::on_store_ignored_device);
-        p.subscribe_actor(&net_supervisor_t::on_update_peer);
-        p.subscribe_actor(&net_supervisor_t::on_store_device);
         p.subscribe_actor(&net_supervisor_t::on_store_ignored_folder);
         p.subscribe_actor(&net_supervisor_t::on_cluster_ready);
         launch_early();
@@ -462,13 +460,6 @@ void net_supervisor_t::on_ignore_device(ui::message::ignore_device_request_t &me
     request<payload::store_ignored_device_request_t>(db_addr, peer).send(init_timeout / 2);
 }
 
-void net_supervisor_t::on_update_peer(ui::message::update_peer_request_t &message) noexcept {
-    update_peer_req.reset(&message);
-    auto &device = message.payload.request_payload.peer;
-    LOG_TRACE(log, "{}, on_update_peer, {}", identity, device->device_id);
-    request<payload::store_device_request_t>(db_addr, device).send(init_timeout / 2);
-}
-
 void net_supervisor_t::on_ignore_folder(ui::message::ignore_folder_request_t &message) noexcept {
     ingored_folder_requests.emplace_back(&message);
     auto &folder = message.payload.request_payload.folder;
@@ -490,28 +481,6 @@ void net_supervisor_t::on_store_ignored_device(message::store_ignored_device_res
         reply_to(*ignore_device_req);
     }
     ignore_device_req.reset();
-}
-
-void net_supervisor_t::on_store_device(message::store_device_response_t &message) noexcept {
-    auto &peer = message.payload.req->payload.request_payload.device;
-    LOG_TRACE(log, "{}, on_store_device, {}", identity, peer->device_id);
-    assert(update_peer_req);
-    auto &ee = message.payload.ee;
-    if (ee) {
-        reply_with_error(*update_peer_req, ee);
-    } else {
-        LOG_DEBUG(log, "{}, updated, {}", identity, peer->device_id);
-        auto prev_peer = devices.by_id(peer->get_id());
-        bool updated = (bool)prev_peer;
-        devices.put(peer);
-        reply_to(*update_peer_req);
-        if (updated) {
-            send<payload::update_device_t>(address, prev_peer, peer);
-        } else {
-            send<payload::add_device_t>(address, peer);
-        }
-    }
-    update_peer_req.reset();
 }
 
 void net_supervisor_t::on_store_ignored_folder(message::store_ignored_folder_response_t &message) noexcept {

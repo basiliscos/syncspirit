@@ -1,6 +1,7 @@
 #include "cluster_supervisor.h"
 #include "controller_actor.h"
 #include "names.h"
+#include "../utils/error_code.h"
 #include <boost/filesystem.hpp>
 
 namespace fs = boost::filesystem;
@@ -52,6 +53,8 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
         p.subscribe_actor(&cluster_supervisor_t::on_share_folder);
         p.subscribe_actor(&cluster_supervisor_t::on_store_new_folder);
         p.subscribe_actor(&cluster_supervisor_t::on_store_folder_info);
+        p.subscribe_actor(&cluster_supervisor_t::on_update_peer);
+        p.subscribe_actor(&cluster_supervisor_t::on_store_device);
         p.subscribe_actor(&cluster_supervisor_t::on_connect);
         p.subscribe_actor(&cluster_supervisor_t::on_disconnect);
         p.subscribe_actor(&cluster_supervisor_t::on_scan_complete_initial, scan_initial);
@@ -170,10 +173,46 @@ void cluster_supervisor_t::on_share_folder(ui::message::share_folder_request_t &
     auto &folder = p.folder;
     auto &peer = p.peer;
     log->trace("{}, on_share_folder, {} with ", identity, folder->label(), peer->device_id);
+    if (folder->get_folder_info(peer)) {
+        auto ec = utils::make_error_code(utils::error_code_t::already_shared);
+        auto reason = make_error(ec);
+        reply_with_error(message, reason);
+        return;
+    }
     db::FolderInfo db_fi;
     auto fi = model::folder_info_ptr_t(new model::folder_info_t(db_fi, peer.get(), folder.get(), 0));
     fi->mark_dirty();
     request<payload::store_folder_info_request_t>(db, fi).send(init_timeout);
+}
+
+void cluster_supervisor_t::on_update_peer(ui::message::update_peer_request_t &message) noexcept {
+    auto &device = message.payload.request_payload.peer;
+    LOG_TRACE(log, "{}, on_update_peer, {}", identity, device->device_id);
+    intrusive_ptr_add_ref(&message);
+    request<payload::store_device_request_t>(db, device, &message).send(init_timeout);
+}
+
+void cluster_supervisor_t::on_store_device(message::store_device_response_t &message) noexcept {
+    auto &payload = message.payload.req->payload.request_payload;
+    auto &peer = payload.device;
+    LOG_TRACE(log, "{}, on_store_device, {}", identity, peer->device_id);
+    auto original_req = static_cast<ui::message::update_peer_request_t *>(payload.custom);
+    auto &ee = message.payload.ee;
+    if (ee) {
+        reply_with_error(*original_req, ee);
+    } else {
+        LOG_DEBUG(log, "{}, updated, {}", identity, peer->device_id);
+        auto prev_peer = devices->by_id(peer->get_id());
+        bool updated = (bool)prev_peer;
+        devices->put(peer);
+        reply_to(*original_req);
+        if (updated) {
+            send<payload::update_device_t>(coordinator, prev_peer, peer);
+        } else {
+            send<payload::add_device_t>(coordinator, peer);
+        }
+    }
+    intrusive_ptr_release(original_req);
 }
 
 void cluster_supervisor_t::on_store_new_folder(message::store_new_folder_response_t &message) noexcept {

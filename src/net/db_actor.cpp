@@ -163,8 +163,8 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
     for (auto &it : folder_infos) {
         auto &fi = it.second;
         auto folder = fi->get_folder();
-        LOG_TRACE(log, "{}, on_cluster_load: {} on {}, max seq = {}", identity, folder->label(),
-                  fi->get_device()->device_id, fi->get_max_sequence());
+        LOG_TRACE(log, "{}, on_cluster_load: {} on {}, idx = {},  max seq = {}", identity, folder->label(),
+                  fi->get_device()->device_id, fi->get_index(), fi->get_max_sequence());
         folder->add(fi);
     }
 
