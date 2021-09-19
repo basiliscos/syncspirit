@@ -1,8 +1,8 @@
-- after restart no/wrong ClusterConfig / Update is sent
 - initial file scannig should use hashers
 - model: когда добавляется symlink, папка
 - store_new_folder_request_t: выкинуть peer, peer_source
 - send indices deltas (after restart detects changes)
+- когда нам прислали update, но нету sequence/устаревшая инфа, нужно апдейтить бд, но не запрашивать файлы
 - test: continue downloading temporaries
 - test: fs_actor, deleted file from index
 - test: controller, share folder -> index is sent

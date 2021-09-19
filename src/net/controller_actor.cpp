@@ -80,17 +80,23 @@ void controller_actor_t::on_start() noexcept {
 
 void controller_actor_t::update(proto::ClusterConfig &config) noexcept {
     LOG_TRACE(log, "{}, update", identity);
-    auto unknown_folders = cluster->update(config);
-    for (auto &folder : unknown_folders) {
-        if (!ignored_folders->by_key(folder.id())) {
-            for (int i = 0; i < folder.devices_size(); ++i) {
-                auto &d = folder.devices(i);
+    auto update_result = cluster->update(config);
+    for (auto folder : update_result.unknown_folders) {
+        if (!ignored_folders->by_key(folder->id())) {
+            for (int i = 0; i < folder->devices_size(); ++i) {
+                auto &d = folder->devices(i);
                 if (d.id() == peer->get_id()) {
                     auto &dest = supervisor->get_address();
-                    send<ui::payload::new_folder_notify_t>(dest, folder, peer, d.index_id());
+                    send<ui::payload::new_folder_notify_t>(dest, *folder, peer, d.index_id());
                 }
             }
         }
+    }
+    auto &folders = cluster->get_folders();
+    for (auto f : update_result.outdated_folders) {
+        auto folder = folders.by_id(f->id());
+        LOG_DEBUG(log, "sending index of {} ", folder->label());
+        send<payload::folder_update_t>(peer_addr, std::move(folder));
     }
     file_iterator.reset();
     block_iterator.reset();

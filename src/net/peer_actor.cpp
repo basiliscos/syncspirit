@@ -67,6 +67,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&peer_actor_t::on_block_request);
         p.subscribe_actor(&peer_actor_t::on_cluster_config);
         p.subscribe_actor(&peer_actor_t::on_file_update);
+        p.subscribe_actor(&peer_actor_t::on_folder_update);
         instantiate_transport();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
@@ -590,12 +591,21 @@ void peer_actor_t::on_rx_timeout(r::request_id_t, bool cancelled) noexcept {
 }
 
 void peer_actor_t::on_file_update(message::file_update_notify_t &msg) noexcept {
-    auto file = msg.payload.file;
+    auto &file = msg.payload.file;
     LOG_TRACE(log, "{}, on_file_update, file = {}", identity, file->get_full_name());
     proto::IndexUpdate iu;
     iu.set_folder(file->get_folder_info()->get_folder()->id());
     *iu.add_files() = file->get();
     fmt::memory_buffer buff;
     proto::serialize(buff, iu);
+    push_write(std::move(buff), false);
+}
+
+void peer_actor_t::on_folder_update(message::folder_update_notify_t &msg) noexcept {
+    auto &folder = msg.payload.folder;
+    LOG_TRACE(log, "{}, on_folder_update, folder = {}", identity, folder->label());
+    auto index = folder->generate();
+    fmt::memory_buffer buff;
+    proto::serialize(buff, index);
     push_write(std::move(buff), false);
 }

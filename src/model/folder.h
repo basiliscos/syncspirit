@@ -43,8 +43,9 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     inline auto &get_folder_infos() noexcept { return folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
     inline const bfs::path &get_path() noexcept { return path; }
-    void update(const proto::Folder &remote) noexcept;
+    bool update(const proto::Folder &remote) noexcept;
     void update(local_file_map_t &local_files) noexcept;
+    proto::Index generate() noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;

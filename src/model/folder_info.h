@@ -30,7 +30,7 @@ struct folder_info_t : arc_base_t<folder_info_t>, storeable_t {
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
     void update(const proto::Index &data, const device_ptr_t &peer) noexcept;
     void update(const proto::IndexUpdate &data, const device_ptr_t &peer) noexcept;
-    void update(const proto::Device &device) noexcept;
+    bool update(const proto::Device &device) noexcept;
     void update(local_file_map_t &local_files) noexcept;
     void set_max_sequence(std::int64_t value) noexcept;
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }

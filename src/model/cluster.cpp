@@ -96,15 +96,18 @@ block_infos_map_t &cluster_t::get_blocks() noexcept { return blocks; }
 
 block_infos_map_t &cluster_t::get_deleted_blocks() noexcept { return deleted_blocks; }
 
-cluster_t::unknown_folders_t cluster_t::update(const proto::ClusterConfig &config) noexcept {
-    unknown_folders_t r;
+update_result_t cluster_t::update(const proto::ClusterConfig &config) noexcept {
+    update_result_t r;
     for (int i = 0; i < config.folders_size(); ++i) {
         auto &f = config.folders(i);
         auto folder = folders.by_id(f.id());
         if (!folder) {
-            r.push_back(f);
+            r.unknown_folders.push_back(&f);
         } else {
-            folder->update(f);
+            bool outdated = folder->update(f);
+            if (outdated) {
+                r.outdated_folders.insert(&f);
+            }
         }
     }
     return r;

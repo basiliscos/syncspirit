@@ -111,16 +111,17 @@ int64_t folder_t::score(const device_ptr_t &peer_device) noexcept {
     return r;
 }
 
-void folder_t::update(const proto::Folder &remote) noexcept {
+bool folder_t::update(const proto::Folder &remote) noexcept {
     for (int i = 0; i < remote.devices_size(); ++i) {
         auto &d = remote.devices(i);
         for (auto it : folder_infos) {
             auto &fi = it.second;
             if (fi->get_device()->device_id.get_sha256() == d.id()) {
-                fi->update(d);
+                return fi->update(d);
             }
         }
     }
+    return false;
 }
 
 void folder_t::update(local_file_map_t &local_files) noexcept {
@@ -131,4 +132,15 @@ void folder_t::update(local_file_map_t &local_files) noexcept {
 
 folder_info_ptr_t folder_t::get_folder_info(const device_ptr_t &device) noexcept {
     return folder_infos.by_id(device->get_id());
+}
+
+proto::Index folder_t::generate() noexcept {
+    proto::Index r;
+    r.set_folder(_id);
+    auto fi = get_folder_info(device);
+    for (auto it : fi->get_file_infos()) {
+        auto &file = *it.second;
+        *r.add_files() = file.get();
+    }
+    return r;
 }

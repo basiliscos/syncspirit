@@ -47,15 +47,22 @@ struct file_interator_t {
     file_info_ptr_t file;
 };
 
+struct update_result_t {
+    using unknown_folders_t = std::vector<const proto::Folder *>;
+    using outdated_folders_t = std::unordered_set<const proto::Folder *>;
+
+    unknown_folders_t unknown_folders;
+    outdated_folders_t outdated_folders;
+};
+
 struct cluster_t : arc_base_t<cluster_t> {
-    using unknown_folders_t = std::vector<proto::Folder>;
 
     cluster_t(device_ptr_t device_) noexcept;
 
     void assign_folders(const folders_map_t &folders) noexcept;
     void assign_blocks(block_infos_map_t &&blocks) noexcept;
     proto::ClusterConfig get(model::device_ptr_t target) noexcept;
-    unknown_folders_t update(const proto::ClusterConfig &config) noexcept;
+    update_result_t update(const proto::ClusterConfig &config) noexcept;
     file_interator_t iterate_files(const device_ptr_t &peer_device) noexcept;
 
     block_infos_map_t &get_blocks() noexcept;

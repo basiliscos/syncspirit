@@ -18,21 +18,23 @@ void folder_info_t::add(const file_info_ptr_t &file_info) noexcept {
     mark_dirty();
 }
 
-void folder_info_t::update(const proto::Device &device) noexcept {
-    bool changed = false;
+bool folder_info_t::update(const proto::Device &device) noexcept {
+    bool update = false;
+    bool new_index = false;
     if (index != device.index_id()) {
         index = device.index_id();
-        changed = true;
+        new_index = true;
     }
     if (max_sequence != device.max_sequence()) {
         max_sequence = device.max_sequence();
-        changed = true;
+        update = true;
     }
-    if (changed) {
+    if (update || new_index) {
         spdlog::trace("folder_info_t::update, folder = {}, index = {:#x}, max seq = {}", folder->label(), index,
                       max_sequence);
         mark_dirty();
     }
+    return new_index;
 }
 
 void folder_info_t::set_max_sequence(int64_t value) noexcept {

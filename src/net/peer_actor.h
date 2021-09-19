@@ -106,6 +106,7 @@ struct peer_actor_t : public r::actor_base_t {
     void on_block_request(message::block_request_t &) noexcept;
     void on_cluster_config(message::cluster_config_t &) noexcept;
     void on_file_update(message::file_update_notify_t &) noexcept;
+    void on_folder_update(message::folder_update_notify_t &) noexcept;
 
     void on_connect(resolve_it_t) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;
