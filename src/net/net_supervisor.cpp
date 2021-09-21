@@ -131,7 +131,11 @@ void net_supervisor_t::launch_early() noexcept {
     db_addr =
         create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
     auto threads = app_config.hasher_threads;
-    create_actor<hasher_proxy_actor_t>().timeout(timeout).hasher_threads(threads).finish();
+    create_actor<hasher_proxy_actor_t>()
+        .timeout(timeout)
+        .hasher_threads(threads)
+        .name(net::names::hasher_proxy)
+        .finish();
 }
 
 void net_supervisor_t::load_db() noexcept {

@@ -3,7 +3,7 @@
 #include "model/device.h"
 #include "model/cluster.h"
 #include "net/controller_actor.h"
-#include "fs/fs_actor.h"
+#include "fs/file_actor.h"
 #include "sample_peer.h"
 #include "test_supervisor.h"
 

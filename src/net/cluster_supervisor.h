@@ -95,7 +95,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
 
     utils::logger_t log;
     r::address_ptr_t coordinator;
-    r::address_ptr_t fs;
+    r::address_ptr_t scan_addr;
     r::address_ptr_t db;
     r::address_ptr_t scan_initial; // for routing
     r::address_ptr_t scan_new;     // for routing

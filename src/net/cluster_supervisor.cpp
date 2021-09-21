@@ -45,7 +45,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::cluster, get_address());
         p.discover_name(names::coordinator, coordinator, false).link(false);
-        p.discover_name(names::fs, fs, true).link(true);
+        p.discover_name(names::scan_actor, scan_addr, true).link(true);
         p.discover_name(names::db, db, true).link(true);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -82,7 +82,7 @@ void cluster_supervisor_t::shutdown_start() noexcept {
     log->trace("{}, shutdown_start", identity);
 
     for (auto &it : scan_folders_map) {
-        send<fs::payload::scan_cancel_t>(fs, it.second.request_id);
+        send<fs::payload::scan_cancel_t>(scan_addr, it.second.request_id);
     }
     ra::supervisor_asio_t::shutdown_start();
 }
@@ -90,7 +90,7 @@ void cluster_supervisor_t::shutdown_start() noexcept {
 void cluster_supervisor_t::scan(const model::folder_ptr_t &folder, rotor::address_ptr_t &via) noexcept {
     auto &path = folder->get_path();
     auto req_id = access<to::next_request_id>(to::next_request_id{});
-    send<fs::payload::scan_request_t>(fs, path, via, req_id);
+    send<fs::payload::scan_request_t>(scan_addr, path, via, req_id);
     scan_folders_map.emplace(path, scan_info_t{folder, req_id});
     resources->acquire(resource::fs_scan);
 }

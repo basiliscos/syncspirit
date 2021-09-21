@@ -1,7 +1,7 @@
 #include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
-#include "fs/fs_actor.h"
+#include "fs/messages.h"
 #include "net/db_actor.h"
 #include "net/cluster_supervisor.h"
 #include "net/names.h"
@@ -40,6 +40,26 @@ struct sample_coordinator_t : r::actor_base_t {
     }
 
     void on_cluster_ready(message::cluster_ready_notify_t &msg) noexcept { cluster_ready = &msg; }
+};
+
+struct sample_fs_actor_t : r::actor_base_t {
+    using r::actor_base_t::actor_base_t;
+
+    void configure(r::plugin::plugin_base_t &plugin) noexcept override {
+        r::actor_base_t::configure(plugin);
+        plugin.with_casted<r::plugin::registry_plugin_t>(
+            [&](auto &p) { p.register_name(names::scan_actor, get_address()); });
+        plugin.with_casted<r::plugin::starter_plugin_t>(
+            [&](auto &p) { p.subscribe_actor(&sample_fs_actor_t::on_scan_request); });
+    }
+
+    void on_scan_request(fs::message::scan_request_t &req) noexcept {
+        auto &p = req.payload;
+        auto &requestee = p.reply_to;
+        auto &root = p.root;
+        auto map = model::local_file_map_ptr_t(new model::local_file_map_t(root));
+        send<fs::payload::scan_response_t>(requestee, std::move(map));
+    }
 };
 
 struct Fixture {
@@ -81,7 +101,7 @@ struct Fixture {
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).strand(strand).create_registry().finish();
         sup->start();
         coord = sup->create_actor<sample_coordinator_t>().timeout(timeout).finish();
-        sup->create_actor<fs::fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
+        sup->create_actor<sample_fs_actor_t>().timeout(timeout).finish();
         sup->create_actor<db_actor_t>().db_dir((root_path / "db").string()).device(device_my).timeout(timeout).finish();
 
         pre_run();

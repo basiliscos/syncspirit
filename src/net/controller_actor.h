@@ -156,7 +156,7 @@ struct controller_actor_t : public r::actor_base_t {
     model::device_ptr_t peer;
     r::address_ptr_t peer_addr;
     r::address_ptr_t db;
-    r::address_ptr_t fs;
+    r::address_ptr_t file_addr;
     r::address_ptr_t hasher_proxy;
     r::address_ptr_t open_reading; /* for routing */
     pt::time_duration request_timeout;

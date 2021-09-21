@@ -4,7 +4,11 @@
 #include "access.h"
 #include "db/utils.h"
 #include "fs/utils.h"
-#include "fs/fs_actor.h"
+#include "fs/scan_actor.h"
+#include "fs/file_actor.h"
+#include "net/hasher_proxy_actor.h"
+#include "net/names.h"
+#include "hasher/hasher_actor.h"
 #include "utils/error_code.h"
 #include <ostream>
 #include <fstream>
@@ -153,7 +157,7 @@ struct scan_consumer_t : r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept {
         r::actor_base_t::configure(plugin);
         plugin.with_casted<r::plugin::registry_plugin_t>(
-            [&](auto &p) { p.discover_name(net::names::fs, fs_actor, true).link(); });
+            [&](auto &p) { p.discover_name(net::names::scan_actor, fs_actor, true).link(); });
 
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
             p.subscribe_actor(&scan_consumer_t::on_response);
@@ -188,7 +192,7 @@ struct file_consumer_t : r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept {
         r::actor_base_t::configure(plugin);
         plugin.with_casted<r::plugin::registry_plugin_t>(
-            [&](auto &p) { p.discover_name(net::names::fs, fs_actor, true).link(); });
+            [&](auto &p) { p.discover_name(net::names::file_actor, fs_actor, true).link(); });
 
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
             p.subscribe_actor(&file_consumer_t::on_open);
@@ -217,10 +221,18 @@ TEST_CASE("fs-actor", "[fs]") {
     r::system_context_t ctx;
     auto timeout = r::pt::milliseconds{10};
     auto sup = ctx.create_supervisor<st::supervisor_t>().timeout(timeout).create_registry().finish();
+    sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
+    auto hasher = sup->create_actor<net::hasher_proxy_actor_t>()
+                      .hasher_threads(1)
+                      .name(net::names::hasher_proxy)
+                      .timeout(timeout)
+                      .finish()
+                      ->get_address();
     sup->start();
 
     SECTION("scan") {
-        sup->create_actor<fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
+
+        sup->create_actor<scan_actor_t>().fs_config({1024, 5, 0}).hasher_proxy(hasher).timeout(timeout).finish();
         SECTION("empty path") {
             auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
             sup->do_process();
@@ -321,7 +333,7 @@ TEST_CASE("fs-actor", "[fs]") {
     };
 
     SECTION("open/close") {
-        auto fs_actor = sup->create_actor<fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
+        auto fs_actor = sup->create_actor<file_actor_t>().timeout(timeout).finish();
         auto act = sup->create_actor<file_consumer_t>().timeout(timeout).finish();
         sup->do_process();
 
@@ -377,7 +389,7 @@ TEST_CASE("fs-actor", "[fs]") {
     }
 
     SECTION("cloning blocks") {
-        sup->create_actor<fs_actor_t>().fs_config({1024, 5, 0}).timeout(timeout).finish();
+        sup->create_actor<file_actor_t>().timeout(timeout).finish();
         auto act = sup->create_actor<file_consumer_t>().timeout(timeout).finish();
         sup->do_process();
 
@@ -415,7 +427,7 @@ TEST_CASE("fs-actor", "[fs]") {
     }
 
     SECTION("scan temporaries") {
-        sup->create_actor<fs_actor_t>().fs_config({1024, 5, 10}).timeout(timeout).finish();
+        sup->create_actor<scan_actor_t>().fs_config({1024, 5, 10}).hasher_proxy(hasher).timeout(timeout).finish();
         auto writer = sup->create_actor<file_consumer_t>().timeout(timeout).finish();
         sup->do_process();
 

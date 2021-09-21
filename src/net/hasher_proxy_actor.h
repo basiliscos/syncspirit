@@ -10,6 +10,7 @@ namespace r = rotor;
 
 struct hasher_proxy_actor_config_t : r::actor_config_t {
     uint32_t hasher_threads;
+    std::string name;
 };
 
 template <typename Actor> struct hasher_proxy_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -19,6 +20,11 @@ template <typename Actor> struct hasher_proxy_actor_config_builder_t : r::actor_
 
     builder_t &&hasher_threads(uint32_t value) &&noexcept {
         parent_t::config.hasher_threads = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&name(std::string_view value) &&noexcept {
+        parent_t::config.name = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -44,6 +50,7 @@ struct hasher_proxy_actor_t : public r::actor_base_t {
     addresses_t hashers;
     std::vector<uint32_t> hasher_scores;
     uint32_t hasher_threads;
+    std::string name;
     uint32_t index = 0;
 };
 

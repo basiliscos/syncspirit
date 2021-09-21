@@ -10,7 +10,8 @@ struct names {
     static const char *http10;
     static const char *acceptor;
     static const char *db;
-    static const char *fs;
+    static const char *file_actor;
+    static const char *scan_actor;
     static const char *hasher_proxy;
     static const char *global_discovery;
     static const char *local_discovery;

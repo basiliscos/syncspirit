@@ -11,14 +11,14 @@ hasher_proxy_actor_t::hasher_proxy_actor_t(config_t &config) : r::actor_base_t(c
     hashers.resize(config.hasher_threads);
     hasher_scores.resize(config.hasher_threads);
     hasher_threads = config.hasher_threads;
+    name = config.name;
 }
 
 void hasher_proxy_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>(
-        [&](auto &p) { p.set_identity(net::names::hasher_proxy, false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(name, false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(net::names::hasher_proxy, get_address());
+        p.register_name(name, get_address());
         for (size_t i = 0; i < hashers.size(); ++i) {
             auto name = fmt::format("hasher-{}", i + 1);
             p.discover_name(name, hashers[i], true).link(false);

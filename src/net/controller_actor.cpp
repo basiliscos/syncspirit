@@ -49,7 +49,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::db, db, false).link(true);
-        p.discover_name(names::fs, fs, false).link(true);
+        p.discover_name(names::file_actor, file_addr, false).link(true);
         p.discover_name(names::hasher_proxy, hasher_proxy, false).link();
     });
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(peer_addr, false); });
@@ -258,7 +258,8 @@ void controller_actor_t::clone_block(const model::file_block_t &block, model::fi
         auto &source = local.file()->get_path();
         auto source_offset = local.get_offset();
         auto target_offset = block.get_offset();
-        request<request_t>(fs, source, path, target_sz, block_sz, source_offset, target_offset).send(init_timeout);
+        request<request_t>(file_addr, source, path, target_sz, block_sz, source_offset, target_offset)
+            .send(init_timeout);
     }
     auto &info = write_map[path_str];
     auto cloned_block =
@@ -380,7 +381,7 @@ controller_actor_t::write_info_t &controller_actor_t::record_block_data(model::f
     info.final = final;
     if (!info.sink && info.clone_queue.empty()) {
         auto file_sz = static_cast<size_t>(file->get_size());
-        request<request_t>(fs, path, file_sz).send(init_timeout);
+        request<request_t>(file_addr, path, file_sz).send(init_timeout);
     }
     return info;
 }
@@ -478,7 +479,8 @@ void controller_actor_t::process(write_it_t it) noexcept {
         auto source_offset = clone_block.source->get_block_offset(clone_block.source_index);
         auto target_offset = info.file->get_block_offset(clone_block.target_index);
         auto &path = info.file->get_path();
-        request<request_t>(fs, source, path, target_sz, block_sz, source_offset, target_offset, std::move(info.sink))
+        request<request_t>(file_addr, source, path, target_sz, block_sz, source_offset, target_offset,
+                           std::move(info.sink))
             .send(init_timeout);
     } else if (info.sink && !info.validated_blocks.empty()) {
         auto disk_view = info.sink->data();
@@ -498,7 +500,8 @@ void controller_actor_t::process(write_it_t it) noexcept {
     }
     if (info.complete()) {
         assert(info.sink);
-        request<fs::payload::close_request_t>(fs, std::move(info.sink), info.file->get_path()).send(init_timeout);
+        request<fs::payload::close_request_t>(file_addr, std::move(info.sink), info.file->get_path())
+            .send(init_timeout);
     }
     ready();
 }

@@ -1,4 +1,4 @@
-#include "fs_actor.h"
+#include "scan_actor.h"
 #include "../net/names.h"
 #include "../utils/error_code.h"
 #include "../utils/tls.h"
@@ -8,38 +8,38 @@
 namespace sys = boost::system;
 using namespace syncspirit::fs;
 
-fs_actor_t::fs_actor_t(config_t &cfg) : r::actor_base_t{cfg}, fs_config{cfg.fs_config} {
-    log = utils::get_logger("fs.actor");
+scan_actor_t::scan_actor_t(config_t &cfg)
+    : r::actor_base_t{cfg}, fs_config{cfg.fs_config}, hasher_proxy{cfg.hasher_proxy} {
+    log = utils::get_logger("scan::actor");
 }
 
-void fs_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
+void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(net::names::fs, false); });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(net::names::fs, get_address()); });
-
+    plugin.with_casted<r::plugin::address_maker_plugin_t>(
+        [&](auto &p) { p.set_identity(net::names::scan_actor, false); });
+    plugin.with_casted<r::plugin::registry_plugin_t>(
+        [&](auto &p) { p.register_name(net::names::scan_actor, get_address()); });
+    plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(hasher_proxy, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&fs_actor_t::on_scan_request);
-        p.subscribe_actor(&fs_actor_t::on_scan_cancel);
-        p.subscribe_actor(&fs_actor_t::on_scan);
-        p.subscribe_actor(&fs_actor_t::on_process);
-        p.subscribe_actor(&fs_actor_t::on_open);
-        p.subscribe_actor(&fs_actor_t::on_close);
-        p.subscribe_actor(&fs_actor_t::on_clone);
+        p.subscribe_actor(&scan_actor_t::on_scan_request);
+        p.subscribe_actor(&scan_actor_t::on_scan_cancel);
+        p.subscribe_actor(&scan_actor_t::on_scan);
+        p.subscribe_actor(&scan_actor_t::on_process);
     });
 }
 
-void fs_actor_t::on_start() noexcept {
+void scan_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
     r::actor_base_t::on_start();
 }
 
-void fs_actor_t::shutdown_finish() noexcept {
+void scan_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "{}, shutdown_finish", identity);
     get_supervisor().shutdown();
     r::actor_base_t::shutdown_finish();
 }
 
-void fs_actor_t::on_scan_request(message::scan_request_t &req) noexcept {
+void scan_actor_t::on_scan_request(message::scan_request_t &req) noexcept {
     auto &root = req.payload.root;
     LOG_TRACE(log, "{}, on_scan_request, root = {}", identity, root.c_str());
 
@@ -49,7 +49,7 @@ void fs_actor_t::on_scan_request(message::scan_request_t &req) noexcept {
     }
 }
 
-void fs_actor_t::on_scan_cancel(message::scan_cancel_t &req) noexcept {
+void scan_actor_t::on_scan_cancel(message::scan_cancel_t &req) noexcept {
     LOG_TRACE(log, "{}, on_scan_cancel", identity);
     auto req_id = req.payload.request_id;
     if (queue.size()) {
@@ -76,9 +76,9 @@ void fs_actor_t::on_scan_cancel(message::scan_cancel_t &req) noexcept {
     }
 }
 
-void fs_actor_t::on_process(message::process_signal_t &) noexcept { process_queue(); }
+void scan_actor_t::on_process(message::process_signal_t &) noexcept { process_queue(); }
 
-void fs_actor_t::process_queue() noexcept {
+void scan_actor_t::process_queue() noexcept {
     if (queue.empty()) {
         LOG_TRACE(log, "{} empty queue, nothing to process", identity);
         return;
@@ -90,7 +90,7 @@ void fs_actor_t::process_queue() noexcept {
     send<payload::scan_t>(address, std::move(task));
 }
 
-void fs_actor_t::reply(message::scan_t &scan) noexcept {
+void scan_actor_t::reply(message::scan_t &scan) noexcept {
     auto &p = scan.payload;
     auto &payload = p.request->payload;
     auto &requestee = payload.reply_to;
@@ -100,7 +100,7 @@ void fs_actor_t::reply(message::scan_t &scan) noexcept {
     send<payload::process_signal_t>(address);
 }
 
-void fs_actor_t::on_scan(message::scan_t &req) noexcept {
+void scan_actor_t::on_scan(message::scan_t &req) noexcept {
     auto &p = req.payload;
     if (scan_cancelled) {
         scan_cancelled = true;
@@ -134,7 +134,7 @@ void fs_actor_t::on_scan(message::scan_t &req) noexcept {
     }
 }
 
-void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
+void scan_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
     sys::error_code ec;
     bool ok = bfs::exists(dir, ec);
     if (ec || !ok) {
@@ -197,7 +197,7 @@ void fs_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
     }
 }
 
-std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
+std::uint32_t scan_actor_t::calc_block(payload::scan_t &payload) noexcept {
     if (payload.next_block) {
         auto &block = payload.next_block.value();
         auto &container = payload.file_map->map;
@@ -238,111 +238,4 @@ std::uint32_t fs_actor_t::calc_block(payload::scan_t &payload) noexcept {
         }
     }
     return 0;
-}
-
-void fs_actor_t::on_open(message::open_request_t &req) noexcept {
-    auto &payload = req.payload.request_payload;
-    LOG_TRACE(log, "{}, on_open, path = {}", identity, payload.path.string());
-    auto path = make_temporal(payload.path);
-    auto parent = path.parent_path();
-    sys::error_code ec;
-
-    bool exists = bfs::exists(parent, ec);
-    if (!exists) {
-        bfs::create_directories(parent, ec);
-        if (ec) {
-            return reply_with_error(req, make_error(ec));
-        }
-    }
-
-    bio::mapped_file_params params;
-    params.path = path.string();
-    params.flags = bio::mapped_file::mapmode::readwrite;
-    if (!bfs::exists(path)) {
-        params.new_file_size = payload.file_size;
-    }
-
-    auto file = std::make_unique<typename opened_file_t::element_type>();
-    try {
-        file->open(params);
-    } catch (const std::exception &ex) {
-        LOG_ERROR(log, "{}, error opening file {}: {}", identity, params.path, ex.what());
-        auto ec = sys::errc::make_error_code(sys::errc::io_error);
-        auto ee = make_error(ec);
-        reply_with_error(req, ee);
-        return;
-    }
-    reply_to(req, std::move(file));
-}
-
-void fs_actor_t::on_close(message::close_request_t &req) noexcept {
-    LOG_TRACE(log, "{}, on_close", identity);
-    auto &payload = *req.payload.request_payload;
-    auto &file = payload.file;
-    auto &path = payload.path;
-
-    try {
-        file->close();
-    } catch (const std::exception &ex) {
-        LOG_ERROR(log, "{}, error closing file {}: {}", identity, path.string(), ex.what());
-        auto ec = sys::errc::make_error_code(sys::errc::io_error);
-        auto ee = make_error(ec);
-        reply_with_error(req, ee);
-        return;
-    }
-
-    sys::error_code ec;
-    auto tmp_path = make_temporal(payload.path);
-    bfs::rename(tmp_path, path, ec);
-    if (ec) {
-        return reply_with_error(req, make_error(ec));
-    }
-    reply_to(req);
-}
-
-void fs_actor_t::on_clone(message::clone_request_t &req) noexcept {
-    auto &p = req.payload.request_payload;
-    LOG_TRACE(log, "{}, on_clone, from {} (off: {}) {} bytes", identity, p.source.string(), p.source_offset,
-              p.block_size);
-
-    bio::mapped_file_params s_params;
-    s_params.path = p.source.string();
-    s_params.flags = bio::mapped_file::mapmode::readonly;
-
-    auto target = opened_file_t();
-    if (p.target_file) {
-        target = std::move(p.target_file);
-    } else {
-        bio::mapped_file_params params;
-        params.path = p.target.string();
-        params.flags = bio::mapped_file::mapmode::readwrite;
-        if (!bfs::exists(p.target)) {
-            params.new_file_size = p.target_size;
-        }
-        try {
-            target = std::make_unique<bio::mapped_file>(params);
-        } catch (std::exception &ex) {
-            LOG_TRACE(log, "{}, on_clone, error opening {} : {}", identity, p.target.string(), ex.what());
-            auto ec = sys::errc::make_error_code(sys::errc::io_error);
-            auto ee = make_error(ec);
-            reply_with_error(req, ee);
-            return;
-        }
-    }
-
-    try {
-        auto source = bio::mapped_file(s_params);
-        auto begin = source.const_data() + p.source_offset;
-        auto end = begin + p.block_size;
-        auto to = target->data() + p.target_offset;
-        std::copy(begin, end, to);
-        reply_to(req, std::move(target));
-    } catch (std::exception &ex) {
-        LOG_TRACE(log, "{}, on_clone, error cloing from {} (off: {}) {} bytes : {}", identity, p.source.string(),
-                  p.source_offset, p.block_size, ex.what());
-        auto ec = sys::errc::make_error_code(sys::errc::io_error);
-        auto ee = make_error(ec);
-        reply_with_error(req, ee);
-        return;
-    }
 }

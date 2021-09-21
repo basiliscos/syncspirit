@@ -12,6 +12,7 @@ namespace rth = rotor::thread;
 
 struct fs_supervisor_config_t : r::supervisor_config_t {
     config::fs_config_t fs_config;
+    uint32_t hasher_threads;
 };
 
 template <typename Supervisor> struct fs_supervisor_config_builder_t : r::supervisor_config_builder_t<Supervisor> {
@@ -21,6 +22,10 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
 
     builder_t &&fs_config(const config::fs_config_t &value) &&noexcept {
         parent_t::config.fs_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&hasher_threads(uint32_t value) &&noexcept {
+        parent_t::config.hasher_threads = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -39,6 +44,7 @@ struct fs_supervisor_t : rth::supervisor_thread_t {
 
     utils::logger_t log;
     config::fs_config_t fs_config;
+    uint32_t hasher_threads;
     r::address_ptr_t coordinator;
     r::actor_ptr_t fs_actor;
 };
