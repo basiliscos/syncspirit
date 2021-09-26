@@ -9,7 +9,8 @@ namespace sys = boost::system;
 using namespace syncspirit::fs;
 
 scan_actor_t::scan_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, fs_config{cfg.fs_config}, hasher_proxy{cfg.hasher_proxy} {
+    : r::actor_base_t{cfg}, fs_config{cfg.fs_config}, hasher_proxy{cfg.hasher_proxy}, requested_hashes_limit{
+                                                                                          cfg.requested_hashes_limit} {
     log = utils::get_logger("scan::actor");
 }
 
@@ -25,6 +26,7 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&scan_actor_t::on_scan_cancel);
         p.subscribe_actor(&scan_actor_t::on_scan);
         p.subscribe_actor(&scan_actor_t::on_process);
+        p.subscribe_actor(&scan_actor_t::on_hash);
     });
 }
 
@@ -119,19 +121,7 @@ void scan_actor_t::on_scan(message::scan_t &req) noexcept {
         return;
     }
 
-    auto blocks_size = fs_config.batch_block_size;
-    auto bs_condition = [&]() { return (blocks_size > 0) && (p.next_block || !p.files_queue.empty()); };
-    while (bs_condition()) {
-        auto bytes = calc_block(p);
-        blocks_size -= std::min(bytes, blocks_size);
-    }
-    if (blocks_size == 0) {
-        send<payload::scan_t>(address, std::move(p));
-        return;
-    }
-    if (p.scan_dirs.empty()) {
-        reply(req);
-    }
+    calc_blocks(req);
 }
 
 void scan_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
@@ -197,45 +187,109 @@ void scan_actor_t::scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept {
     }
 }
 
-std::uint32_t scan_actor_t::calc_block(payload::scan_t &payload) noexcept {
-    if (payload.next_block) {
-        auto &block = payload.next_block.value();
-        auto &container = payload.file_map->map;
-        auto &root = payload.request->payload.root;
-        auto rel_path = syncspirit::fs::relative(block.path, root);
-        auto &local_info = container[rel_path.path];
-        auto block_info = compute(block);
-        auto recorded_info = payload.blocks_map.by_id(block_info->get_hash());
-        if (recorded_info) {
-            local_info.blocks.emplace_back(std::move(recorded_info));
-        } else {
-            local_info.blocks.emplace_back(block_info);
-            payload.blocks_map.put(block_info);
+void scan_actor_t::calc_blocks(message::scan_t &req) noexcept {
+    auto &p = req.payload;
+    while (requested_hashes < requested_hashes_limit && !scan_cancelled && state == r::state_t::OPERATIONAL) {
+        if (!p.current_file.get() && p.files_queue.empty()) {
+            if (!requested_hashes) {
+                reply(req);
+            }
+            return;
         }
+        if (!p.current_file) {
+            bio::mapped_file_params params;
+            auto &path = p.files_queue.front();
+            auto &root = p.request->payload.root;
+            params.path = path.string();
+            params.flags = bio::mapped_file::mapmode::readonly;
 
-        // if it is the last block, reset the current block
-        auto next_bytes = block.block_size * (block.block_index + 1);
-        if (next_bytes >= block.file_size) {
-            local_info.temp = rel_path.temp;
-            payload.next_block.reset();
-        } else {
-            block.block_index++;
+            try {
+                auto rel_path = syncspirit::fs::relative(path, root);
+                auto file = payload::file_ptr_t(new payload::file_t(path, rel_path.path, rel_path.temp));
+                auto file_sz = bfs::file_size(path);
+                auto block_size = get_block_size(file_sz);
+                file->mapped_file.open(params);
+                file->file_size = file_sz;
+                file->next_block_idx = 0;
+                file->next_block_sz = block_size.first;
+                file->blocks.resize(block_size.second);
+                p.current_file = std::move(file);
+            } catch (const std::exception &ex) {
+                LOG_ERROR(log, "{}, error opening file {}: {}", identity, params.path, ex.what());
+                auto ec = sys::errc::make_error_code(sys::errc::io_error);
+                auto &requestee = p.request->payload.reply_to;
+                p.current_file.reset();
+                send<payload::scan_error_t>(requestee, root, path, ec);
+            }
+            p.files_queue.pop_front();
+            continue;
         }
+        auto &file = *p.current_file;
+        if (file.file_size && (file.procesed_sz == file.file_size)) {
+            p.current_file.reset();
+            continue;
+        }
+        auto index = file.next_block_idx;
+        auto left = file.file_size - (index * file.next_block_sz);
+        auto block_sz = left > file.next_block_sz ? file.next_block_sz : left;
 
-        return block_info->get_size();
-    } else {
-        assert(!payload.files_queue.empty());
-        auto file = payload.files_queue.front();
-        payload.files_queue.pop_front();
-        auto r = prepare(file);
-        if (!r) {
-            auto &p = payload.request->payload;
-            auto &requestee = p.reply_to;
-            auto &root = p.root;
-            send<payload::scan_error_t>(requestee, root, file, r.error());
-        } else {
-            payload.next_block = std::move(r.value());
-        }
+        using request_t = hasher::payload::digest_request_t;
+        auto data = file.mapped_file.const_data();
+        auto offset = index ? index * file.next_block_sz : 0;
+        auto block = std::string_view(data + offset, block_sz);
+        auto raw_block = new payload::block_task_t(p.current_file, index, file.next_block_sz, &req);
+        auto block_task = payload::block_task_ptr_t(raw_block);
+        request<request_t>(hasher_proxy, block, block_task.get()).send(init_timeout);
+        intrusive_ptr_add_ref(&req);
+        p.block_task_map[p.current_file.get()].emplace(std::move(block_task));
+
+        ++file.next_block_idx;
+        file.procesed_sz += block_sz;
+        ++requested_hashes;
     }
-    return 0;
+    if (!requested_hashes) {
+        reply(req);
+    }
+}
+
+void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
+    --requested_hashes;
+    auto ptr = res.payload.req->payload.request_payload.custom;
+    auto block_task = (payload::block_task_t *)(ptr);
+    auto scan = (message::scan_t *)block_task->backref;
+    auto &blocks = scan->payload.block_task_map[block_task->file.get()];
+    auto block_ptr = payload::block_task_ptr_t(block_task);
+    auto file = block_task->file;
+
+    if (res.payload.ee) {
+        auto &ee = res.payload.ee;
+        LOG_ERROR(log, "{}, on_hash, file: {}, error: {}", identity, file->path.string(), ee->message());
+        intrusive_ptr_release(scan);
+        return do_shutdown(ee);
+    } else {
+        auto &p = res.payload.res;
+        auto &blocks_map = scan->payload.blocks_map;
+        auto block = blocks_map.by_id(p.digest);
+        if (!block) {
+            db::BlockInfo info;
+            info.set_hash(p.digest);
+            info.set_weak_hash(p.weak);
+            info.set_size(block_task->block_sz);
+            block = model::block_info_ptr_t(new model::block_info_t(info));
+            blocks_map.put(block);
+        }
+        file->blocks[block_task->block_idx] = block;
+    }
+    blocks.erase(block_ptr);
+    if (blocks.size() == 0) {
+        auto &container = scan->payload.file_map->map;
+        auto &local_info = container[file->rel_path];
+        local_info.blocks = std::move(file->blocks);
+        local_info.file_type = model::local_file_t::file_type_t::regular;
+        local_info.temp = file->temp;
+    }
+    if (!scan_cancelled) {
+        calc_blocks(*scan);
+    }
+    intrusive_ptr_release(scan);
 }

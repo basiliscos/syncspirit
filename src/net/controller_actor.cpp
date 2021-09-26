@@ -419,10 +419,12 @@ void controller_actor_t::on_open(fs::message::open_response_t &res) noexcept {
     }
 
     auto &path_str = payload.req->payload.request_payload.path.string();
+    LOG_TRACE(log, "{}, on_open, {}", identity, path_str);
     auto it = write_map.find(path_str);
     assert(it != write_map.end());
     auto &info = it->second;
     info.sink = std::move(payload.res->file);
+    assert(info.sink);
     if (info.validated_blocks.size()) {
         process(it);
     }

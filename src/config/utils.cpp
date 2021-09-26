@@ -29,8 +29,7 @@ bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept
 }
 
 bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
-    return lhs.batch_block_size == rhs.batch_block_size && lhs.batch_dirs_count == rhs.batch_block_size &&
-           lhs.temporally_timeout == rhs.temporally_timeout;
+    return lhs.batch_dirs_count == rhs.batch_dirs_count && lhs.temporally_timeout == rhs.temporally_timeout;
 }
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
@@ -338,12 +337,6 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         auto t = root_tbl["fs"];
         auto &c = cfg.fs_config;
 
-        auto batch_block_size = t["batch_block_size"].value<std::uint32_t>();
-        if (!batch_block_size) {
-            return "fs/batch_block_size is incorrect or missing";
-        }
-        c.batch_block_size = batch_block_size.value();
-
         auto batch_dirs_count = t["batch_dirs_count"].value<std::uint32_t>();
         if (!batch_dirs_count) {
             return "fs/batch_dirs_count is incorrect or missing";
@@ -480,7 +473,6 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                        {"redial_timeout", cfg.dialer_config.redial_timeout},
                    }}},
         {"fs", toml::table{{
-                   {"batch_block_size", cfg.fs_config.batch_block_size},
                    {"batch_dirs_count", cfg.fs_config.batch_dirs_count},
                    {"temporally_timeout", cfg.fs_config.temporally_timeout},
                }}},
@@ -578,7 +570,6 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         5 * 60000   /* redial timeout */
     };
     cfg.fs_config = fs_config_t {
-        16777216,   /* 16MB, batch_block_size */
         10,         /* batch_dirs_count */
         86400000    /* temporally_timeout, 24h default */ 
     };

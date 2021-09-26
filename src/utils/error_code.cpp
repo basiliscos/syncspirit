@@ -1,4 +1,5 @@
 #include "error_code.h"
+#include <map>
 
 namespace syncspirit::utils::detail {
 
@@ -163,5 +164,24 @@ const detail::error_code_category &error_code_category() { return category; }
 const detail::bep_error_code_category &bep_error_code_category() { return bep_category; }
 const detail::protocol_error_code_category &protocol_error_code_category() { return protocol_category; }
 const detail::request_error_code_category &request_error_code_category() { return request_category; }
+
+boost::system::error_code adapt(const std::error_code &ec) noexcept {
+    struct category_adapter_t : public boost::system::error_category {
+        category_adapter_t(const std::error_category &category) : m_category(category) {}
+
+        const char *name() const noexcept { return m_category.name(); }
+
+        std::string message(int ev) const { return m_category.message(ev); }
+
+      private:
+        const std::error_category &m_category;
+    };
+
+    using map_t = std::map<std::string, category_adapter_t>;
+    static thread_local map_t name2cat;
+    auto result = name2cat.emplace(ec.category().name(), ec.category());
+    auto &category = result.first->second;
+    return boost::system::error_code(ec.value(), category);
+}
 
 } // namespace syncspirit::utils

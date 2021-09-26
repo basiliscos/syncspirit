@@ -13,43 +13,7 @@ static std::size_t block_sizes[] = {
 static const constexpr size_t block_sizes_count = sizeof(block_sizes) / sizeof(block_sizes[0]);
 static const constexpr size_t max_blocks_count = 2000;
 
-model::block_info_ptr_t compute(payload::scan_t::next_block_t &block) noexcept {
-    // sha256
-    static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
-    char digest[SZ];
-    auto ptr = block.file->data();
-    auto end = ptr + block.file_size;
-    ptr += block.block_index * block.block_size;
-    auto length = block.block_size;
-    if (ptr + length > end) {
-        length = end - ptr;
-    }
-    utils::digest(ptr, length, digest);
-
-    // alder32
-    auto weak_hash = adler32(0L, Z_NULL, 0);
-    weak_hash = adler32(weak_hash, (const unsigned char *)ptr, length);
-
-    db::BlockInfo info;
-    info.set_hash((const char *)digest, SZ);
-    info.set_weak_hash(weak_hash);
-    info.set_size(length);
-
-    return new model::block_info_t(info);
-}
-
-outcome::result<payload::scan_t::next_block_option_t> prepare(const bfs::path &file_path) noexcept {
-    using result_t = payload::scan_t::next_block_option_t;
-    using file_t = payload::scan_t::file_t;
-    sys::error_code ec;
-    auto sz = bfs::file_size(file_path, ec);
-    if (ec) {
-        return ec;
-    }
-    if (sz == 0) {
-        return outcome::success(result_t{});
-    }
-
+std::pair<size_t, size_t> get_block_size(size_t sz) noexcept {
     size_t bs = 0;
     for (size_t i = 0; i < block_sizes_count; ++i) {
         if (block_sizes[i] * max_blocks_count >= sz) {
@@ -60,16 +24,19 @@ outcome::result<payload::scan_t::next_block_option_t> prepare(const bfs::path &f
             break;
         }
     }
-    if (bs == 0) {
+    if (bs == 0 && sz) {
         bs = block_sizes[block_sizes_count - 1];
     }
 
-    bio::mapped_file_params params;
-    params.path = file_path.string();
-    params.flags = bio::mapped_file::mapmode::readonly;
+    size_t count = 0;
+    if (bs != 0) {
+        count = sz / bs;
+        if (count * bs < sz) {
+            ++count;
+        }
+    }
 
-    auto file = std::make_unique<file_t>(params);
-    return result_t({file_path, bs, sz, 0, std::move(file)});
+    return {bs, count};
 }
 
 bfs::path make_temporal(const bfs::path &path) noexcept {

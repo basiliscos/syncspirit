@@ -31,7 +31,7 @@ struct hash_consumer_t : r::actor_base_t {
     }
 
     void request_digest(const std::string_view &data) {
-        request<payload::diget_request_t>(hasher, data).send(init_timeout);
+        request<payload::digest_request_t>(hasher, data).send(init_timeout);
     }
 
     void request_validation(const std::string_view &data, const std::string_view &hash) {

@@ -2,6 +2,7 @@
 
 #include "../config/main.h"
 #include "../utils/log.h"
+#include "../hasher/messages.h"
 #include "messages.h"
 #include "continuation.h"
 #include <rotor.hpp>
@@ -13,6 +14,7 @@ namespace fs {
 struct scan_actor_config_t : r::actor_config_t {
     config::fs_config_t fs_config;
     r::address_ptr_t hasher_proxy;
+    uint32_t requested_hashes_limit;
 };
 
 template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -27,6 +29,11 @@ template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_b
 
     builder_t &&hasher_proxy(r::address_ptr_t &value) &&noexcept {
         parent_t::config.hasher_proxy = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&requested_hashes_limit(uint32_t value) &&noexcept {
+        parent_t::config.requested_hashes_limit = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -50,20 +57,21 @@ struct scan_actor_t : public r::actor_base_t {
 
     void on_scan(message::scan_t &req) noexcept;
     void on_process(message::process_signal_t &) noexcept;
+    void on_hash(hasher::message::digest_response_t &res) noexcept;
 
     void scan_dir(bfs::path &dir, payload::scan_t &payload) noexcept;
     void process_queue() noexcept;
     void reply(message::scan_t &req) noexcept;
 
-    uint32_t calc_block(payload::scan_t &payload) noexcept;
-
-    error_ptr_t check_digest(const std::string &data, const std::string &hash, const bfs::path &path) noexcept;
+    void calc_blocks(message::scan_t &req) noexcept;
 
     utils::logger_t log;
     requests_t queue;
     bool scan_cancelled = false;
     r::address_ptr_t hasher_proxy;
     config::fs_config_t fs_config;
+    uint32_t requested_hashes_limit;
+    uint32_t requested_hashes = 0;
 };
 
 } // namespace fs

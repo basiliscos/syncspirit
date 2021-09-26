@@ -40,8 +40,10 @@ struct hasher_proxy_actor_t : public r::actor_base_t {
   private:
     using addresses_t = std::vector<r::address_ptr_t>;
 
-    void on_request(hasher::message::validation_request_t &req) noexcept;
-    void on_response(hasher::message::validation_response_t &res) noexcept;
+    void on_digest_request(hasher::message::digest_request_t &req) noexcept;
+    void on_digest_response(hasher::message::digest_response_t &res) noexcept;
+    void on_validation_request(hasher::message::validation_request_t &req) noexcept;
+    void on_validation_response(hasher::message::validation_response_t &res) noexcept;
 
     r::address_ptr_t find_next_hasher() noexcept;
     void free_hasher(r::address_ptr_t &addr) noexcept;

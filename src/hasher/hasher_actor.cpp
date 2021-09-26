@@ -34,7 +34,7 @@ void hasher_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
-void hasher_actor_t::on_digest(message::diget_request_t &req) noexcept {
+void hasher_actor_t::on_digest(message::digest_request_t &req) noexcept {
     LOG_TRACE(log, "{}, on_digest", identity);
 
     char digest[SZ];

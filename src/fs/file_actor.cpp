@@ -26,7 +26,7 @@ void file_actor_t::on_start() noexcept {
 
 void file_actor_t::on_open(message::open_request_t &req) noexcept {
     auto &payload = req.payload.request_payload;
-    LOG_TRACE(log, "{}, on_open, path = {}", identity, payload.path.string());
+    LOG_TRACE(log, "{}, on_open, path = {} ({} bytes)", identity, payload.path.string(), payload.file_size);
     auto path = make_temporal(payload.path);
     auto parent = path.parent_path();
     sys::error_code ec;

@@ -10,7 +10,6 @@ enabled = true
 redial_timeout = 300000
 
 [fs]
-batch_block_size = 16777216
 batch_dirs_count = 10
 temporally_timeout = 86400000
 

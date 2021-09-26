@@ -2,6 +2,7 @@
 #include "../net/names.h"
 #include "../net/hasher_proxy_actor.h"
 #include "scan_actor.h"
+#include "file_actor.h"
 
 using namespace syncspirit::fs;
 
@@ -20,13 +21,19 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void fs_supervisor_t::launch() noexcept {
     auto &timeout = shutdown_timeout;
+    create_actor<file_actor_t>().timeout(timeout).finish();
     auto hasher_addr = create_actor<net::hasher_proxy_actor_t>()
                            .hasher_threads(hasher_threads)
                            .name("fs::hasher_proxy")
                            .timeout(timeout)
                            .finish()
                            ->get_address();
-    fs_actor = create_actor<scan_actor_t>().fs_config(fs_config).hasher_proxy(hasher_addr).timeout(timeout).finish();
+    scan_actor = create_actor<scan_actor_t>()
+                     .fs_config(fs_config)
+                     .hasher_proxy(hasher_addr)
+                     .requested_hashes_limit(hasher_threads * 2)
+                     .timeout(timeout)
+                     .finish();
 }
 
 void fs_supervisor_t::on_start() noexcept {

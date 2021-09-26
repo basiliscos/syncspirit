@@ -46,7 +46,8 @@ struct fs_supervisor_t : rth::supervisor_thread_t {
     config::fs_config_t fs_config;
     uint32_t hasher_threads;
     r::address_ptr_t coordinator;
-    r::actor_ptr_t fs_actor;
+    r::actor_ptr_t scan_actor;
+    r::actor_ptr_t file_actor;
 };
 
 } // namespace fs

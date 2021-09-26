@@ -33,7 +33,7 @@ struct hasher_actor_t : public r::actor_base_t {
     void shutdown_finish() noexcept override;
 
   private:
-    void on_digest(message::diget_request_t &req) noexcept;
+    void on_digest(message::digest_request_t &req) noexcept;
     void on_validation(message::validation_request_t &req) noexcept;
 
     utils::logger_t log;

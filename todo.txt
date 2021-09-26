@@ -1,6 +1,7 @@
-- initial file scannig should use hashers
+- hasher proxy move to hasher dir
+- test: validation happens before opening file?
 - model: когда добавляется symlink, папка
-- store_new_folder_request_t: выкинуть peer, peer_source
+- store_new_folder_request_t: выкинуть peer, peer_source?
 - send indices deltas (after restart detects changes)
 - когда нам прислали update, но нету sequence/устаревшая инфа, нужно апдейтить бд, но не запрашивать файлы
 - test: continue downloading temporaries
