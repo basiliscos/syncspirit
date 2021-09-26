@@ -1,5 +1,4 @@
 - test: validation happens before opening file?
-- test: scan file with 2 different blocks
 - model: когда добавляется symlink, папка
 - store_new_folder_request_t: выкинуть peer, peer_source?
 - send indices deltas (after restart detects changes)

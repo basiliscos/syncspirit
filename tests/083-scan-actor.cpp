@@ -88,123 +88,141 @@ TEST_CASE("scan-actor", "[fs]") {
                       .finish()
                       ->get_address();
     sup->start();
+    sup->create_actor<scan_actor_t>()
+        .fs_config({1024, 5})
+        .hasher_proxy(hasher)
+        .requested_hashes_limit(2)
+        .timeout(timeout)
+        .finish();
+    sup->do_process();
 
-    SECTION("scan") {
-        sup->create_actor<scan_actor_t>()
-            .fs_config({1024, 5})
-            .hasher_proxy(hasher)
-            .requested_hashes_limit(2)
-            .timeout(timeout)
-            .finish();
+    SECTION("empty path") {
+        auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+        sup->do_process();
+        CHECK(act->errors.empty());
+        REQUIRE(act->response);
+        auto &r = act->response->payload.map_info;
+        CHECK(r->root == root_path);
+        CHECK(r->map.empty());
+    }
 
-        SECTION("empty path") {
-            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
-            sup->do_process();
-            CHECK(act->errors.empty());
-            REQUIRE(act->response);
-            auto &r = act->response->payload.map_info;
-            CHECK(r->root == root_path);
-            CHECK(r->map.empty());
-        }
+    SECTION("non-existing root path") {
+        auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path / "bla-bla").finish();
+        sup->do_process();
+        CHECK(act->errors.empty());
+        REQUIRE(act->response);
+        auto &r = act->response->payload.map_info;
+        CHECK(r->root == (root_path / "bla-bla"));
+        CHECK(r->map.empty());
+    }
 
-        SECTION("non-existing root path") {
-            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path / "bla-bla").finish();
-            sup->do_process();
-            CHECK(act->errors.empty());
-            REQUIRE(act->response);
-            auto &r = act->response->payload.map_info;
-            CHECK(r->root == (root_path / "bla-bla"));
-            CHECK(r->map.empty());
-        }
+    SECTION("path with dummy file, in root folder and in subfolder") {
+        auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+        auto sub = GENERATE(as<std::string>{}, "", "a/b/");
+        auto dir = root_path / sub;
+        bfs::create_directories(dir);
+        auto file = dir / "my-file";
+        write_file(file, "hi\n");
+        sup->do_process();
+        CHECK(act->errors.empty());
+        REQUIRE(act->response);
+        auto &r = act->response->payload.map_info;
+        REQUIRE(!r->map.empty());
+        auto it = r->map.begin();
+        CHECK(it->first.string() == bfs::path(sub) / "my-file");
+        auto &local = it->second;
+        auto &blocks = local.blocks;
+        REQUIRE(blocks.size() == 1);
+        auto &b = blocks.front();
+        CHECK(hash_string(b->get_hash()) == "98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4");
+        CHECK(b->get_weak_hash() == 0x21700dc);
+    }
 
-        SECTION("path with dummy file, in root folder and in subfolder") {
-            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
-            auto sub = GENERATE(as<std::string>{}, "", "a/b/");
-            auto dir = root_path / sub;
-            bfs::create_directories(dir);
-            auto file = dir / "my-file";
-            write_file(file, "hi\n");
-            sup->do_process();
-            CHECK(act->errors.empty());
-            REQUIRE(act->response);
-            auto &r = act->response->payload.map_info;
-            REQUIRE(!r->map.empty());
-            auto it = r->map.begin();
-            CHECK(it->first.string() == bfs::path(sub) / "my-file");
-            auto &local = it->second;
-            auto &blocks = local.blocks;
-            REQUIRE(blocks.size() == 1);
-            auto &b = blocks.front();
-            CHECK(hash_string(b->get_hash()) == "98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4");
-            CHECK(b->get_weak_hash() == 0x21700dc);
-        }
+    SECTION("file with 2 identical blocks") {
+        static const constexpr size_t SZ = (1 << 7) * 1024;
+        auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+        auto file = root_path / "my-file";
+        std::string data;
+        data.resize(SZ * 2);
+        std::fill(data.begin(), data.end(), 1);
+        write_file(file, data);
+        sup->do_process();
+        CHECK(act->errors.empty());
+        REQUIRE(act->response);
+        auto &r = act->response->payload.map_info;
+        REQUIRE(!r->map.empty());
+        auto it = r->map.begin();
+        CHECK(it->first == "my-file");
+        auto &local = it->second;
+        auto &blocks = local.blocks;
+        REQUIRE(blocks.size() == 2);
+        auto &b1 = blocks[0];
+        auto &b2 = blocks[1];
+        CHECK(*b1 == *b2);
+        CHECK(b1 == b2);
+    }
 
-        SECTION("file with 2 identical blocks") {
-            static const constexpr size_t SZ = (1 << 7) * 1024;
-            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
-            auto file = root_path / "my-file";
-            std::string data;
-            data.resize(SZ * 2);
-            std::fill(data.begin(), data.end(), 1);
-            write_file(file, data);
-            sup->do_process();
-            CHECK(act->errors.empty());
-            REQUIRE(act->response);
-            auto &r = act->response->payload.map_info;
-            REQUIRE(!r->map.empty());
-            auto it = r->map.begin();
-            CHECK(it->first == "my-file");
-            auto &local = it->second;
-            auto &blocks = local.blocks;
-            REQUIRE(blocks.size() == 2);
-            auto &b1 = blocks[0];
-            auto &b2 = blocks[1];
-            CHECK(*b1 == *b2);
-            CHECK(b1 == b2);
-        }
+    SECTION("file with 2 different blocks") {
+        static const constexpr size_t SZ = (1 << 7) * 1024;
+        auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+        auto file = root_path / "my-file";
+        std::string data;
+        data.resize(SZ * 2);
+        std::fill(data.begin(), data.begin() + SZ, 1);
+        std::fill(data.begin() + SZ, data.begin() + SZ * 2, 2);
+        write_file(file, data);
+        sup->do_process();
+        CHECK(act->errors.empty());
+        REQUIRE(act->response);
+        auto &r = act->response->payload.map_info;
+        REQUIRE(!r->map.empty());
+        auto it = r->map.begin();
+        CHECK(it->first == "my-file");
+        auto &local = it->second;
+        auto &blocks = local.blocks;
+        REQUIRE(blocks.size() == 2);
+        auto &b1 = blocks[0];
+        auto &b2 = blocks[1];
+        CHECK(*b1 != *b2);
+        CHECK(b1 != b2);
+        CHECK(hash_string(b1->get_hash()) == "4017b7a27f5d49ed213ab864b83f7d1f706ecc1039001dadcffed8df6bccddd1");
+        CHECK(hash_string(b2->get_hash()) == "964e0165a36948b60ea2e603b1641612b64713783b789275dc51b4f260d5e0a1");
+    }
 
-        SECTION("symlink") {
-            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
-            auto file = root_path / "my-file";
-            bfs::create_symlink("to-some-where", file);
-            sup->do_process();
-            CHECK(act->errors.empty());
-            REQUIRE(act->response);
-            auto &r = act->response->payload.map_info;
-            REQUIRE(!r->map.empty());
-            auto it = r->map.begin();
-            CHECK(it->first == "my-file");
-            auto &local = it->second;
-            CHECK(local.blocks.size() == 0);
-            CHECK(local.file_type == model::local_file_t::symlink);
-            CHECK(local.symlink_target == "to-some-where");
-        }
+    SECTION("symlink") {
+        auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+        auto file = root_path / "my-file";
+        bfs::create_symlink("to-some-where", file);
+        sup->do_process();
+        CHECK(act->errors.empty());
+        REQUIRE(act->response);
+        auto &r = act->response->payload.map_info;
+        REQUIRE(!r->map.empty());
+        auto it = r->map.begin();
+        CHECK(it->first == "my-file");
+        auto &local = it->second;
+        CHECK(local.blocks.size() == 0);
+        CHECK(local.file_type == model::local_file_t::symlink);
+        CHECK(local.symlink_target == "to-some-where");
+    }
 
-        SECTION("dir") {
-            auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
-            auto dir = root_path / "my-dir";
-            bfs::create_directory(dir);
-            sup->do_process();
-            CHECK(act->errors.empty());
-            REQUIRE(act->response);
-            auto &r = act->response->payload.map_info;
-            REQUIRE(!r->map.empty());
-            auto it = r->map.begin();
-            CHECK(it->first == "my-dir");
-            auto &local = it->second;
-            CHECK(local.blocks.size() == 0);
-            CHECK(local.file_type == model::local_file_t::dir);
-        }
-    };
+    SECTION("dir") {
+        auto act = sup->create_actor<scan_consumer_t>().timeout(timeout).root_path(root_path).finish();
+        auto dir = root_path / "my-dir";
+        bfs::create_directory(dir);
+        sup->do_process();
+        CHECK(act->errors.empty());
+        REQUIRE(act->response);
+        auto &r = act->response->payload.map_info;
+        REQUIRE(!r->map.empty());
+        auto it = r->map.begin();
+        CHECK(it->first == "my-dir");
+        auto &local = it->second;
+        CHECK(local.blocks.size() == 0);
+        CHECK(local.file_type == model::local_file_t::dir);
+    }
 
     SECTION("scan temporaries") {
-        sup->create_actor<scan_actor_t>()
-            .fs_config({1024, 5})
-            .hasher_proxy(hasher)
-            .requested_hashes_limit(2)
-            .timeout(timeout)
-            .finish();
-        sup->do_process();
 
         auto path = root_path / "my-file";
         const std::string data = "123456980";
