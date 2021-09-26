@@ -56,5 +56,5 @@ struct hasher_proxy_actor_t : public r::actor_base_t {
     uint32_t index = 0;
 };
 
-} // namespace net
+} // namespace hasher
 } // namespace syncspirit

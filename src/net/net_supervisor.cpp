@@ -12,7 +12,6 @@
 #include "peer_supervisor.h"
 #include "dialer_actor.h"
 #include "db_actor.h"
-#include "../hasher/hasher_proxy_actor.h"
 #include "names.h"
 #include <boost/filesystem.hpp>
 #include <algorithm>
@@ -130,12 +129,6 @@ void net_supervisor_t::launch_early() noexcept {
     auto db_dir = path.append("mbdx-db");
     db_addr =
         create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
-    auto threads = app_config.hasher_threads;
-    create_actor<hasher::hasher_proxy_actor_t>()
-        .timeout(timeout)
-        .hasher_threads(threads)
-        .name(net::names::hasher_proxy)
-        .finish();
 }
 
 void net_supervisor_t::load_db() noexcept {
@@ -167,6 +160,7 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
                        .ignored_folders(&ignored_folders)
                        .cluster(cluster)
                        .bep_config(app_config.bep_config)
+                       .hasher_threads(app_config.hasher_threads)
                        .finish()
                        ->get_address();
 }

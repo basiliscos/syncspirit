@@ -57,7 +57,6 @@ TEST_CASE("utils", "[fs]") {
     CHECK(fs::relative(bfs::path("a/b/c.syncspirit-tmp"), bfs::path("a")).path == bfs::path("b/c"));
 }
 
-
 TEST_CASE("fs-actor", "[fs]") {
     utils::set_default("trace");
     auto root_path = bfs::unique_path();

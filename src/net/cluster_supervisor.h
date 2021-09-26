@@ -16,6 +16,7 @@ namespace bfs = boost::filesystem;
 
 struct cluster_supervisor_config_t : ra::supervisor_config_asio_t {
     config::bep_config_t bep_config;
+    std::uint32_t hasher_threads;
     model::device_ptr_t device;
     model::cluster_ptr_t cluster;
     model::devices_map_t *devices;
@@ -28,13 +29,18 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
     using parent_t = ra::supervisor_config_asio_builder_t<Supervisor>;
     using parent_t::parent_t;
 
-    builder_t &&device(const model::device_ptr_t &value) &&noexcept {
-        parent_t::config.device = value;
+    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
+        parent_t::config.bep_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
-        parent_t::config.bep_config = value;
+    builder_t &&hasher_threads(std::uint32_t value) &&noexcept {
+        parent_t::config.hasher_threads = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&device(const model::device_ptr_t &value) &&noexcept {
+        parent_t::config.device = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -100,6 +106,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     r::address_ptr_t scan_initial; // for routing
     r::address_ptr_t scan_new;     // for routing
     config::bep_config_t bep_config;
+    std::uint32_t hasher_threads;
     model::device_ptr_t device;
     model::cluster_ptr_t cluster;
     model::devices_map_t *devices;

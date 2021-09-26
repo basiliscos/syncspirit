@@ -2,6 +2,7 @@
 #include "controller_actor.h"
 #include "names.h"
 #include "../utils/error_code.h"
+#include "../hasher/hasher_proxy_actor.h"
 #include <boost/filesystem.hpp>
 
 namespace fs = boost::filesystem;
@@ -30,8 +31,9 @@ inline auto supervisor_t::access<to::next_request_id, to::next_request_id>(const
 typedef void (*callback_t)(cluster_supervisor_t *, syncspirit::model::folder_ptr_t &);
 
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
-    : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, device{config.device}, cluster{config.cluster},
-      devices{config.devices}, folders{cluster->get_folders()}, ignored_folders(config.ignored_folders) {
+    : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, hasher_threads{config.hasher_threads},
+      device{config.device}, cluster{config.cluster}, devices{config.devices}, folders{cluster->get_folders()},
+      ignored_folders(config.ignored_folders) {
     log = utils::get_logger("net.cluster_supervisor");
 }
 
@@ -62,6 +64,12 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
         p.subscribe_actor(&cluster_supervisor_t::on_scan_error, scan_initial);
         p.subscribe_actor(&cluster_supervisor_t::on_scan_error, scan_new);
         p.subscribe_actor(&cluster_supervisor_t::on_file_update);
+
+        create_actor<hasher::hasher_proxy_actor_t>()
+            .timeout(init_timeout)
+            .hasher_threads(hasher_threads)
+            .name(net::names::hasher_proxy)
+            .finish();
     });
 }
 

@@ -71,7 +71,6 @@ struct scan_consumer_t : r::actor_base_t {
     void on_error(message::scan_error_t &msg) noexcept { errors.emplace_back(&msg); }
 };
 
-
 TEST_CASE("scan-actor", "[fs]") {
     utils::set_default("trace");
 
