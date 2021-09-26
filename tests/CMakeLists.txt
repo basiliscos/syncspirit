@@ -85,6 +85,10 @@ add_executable(082-db-actor 082-db-actor.cpp)
 target_link_libraries(082-db-actor syncspirit_test_lib)
 add_test(082-db-actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/082-db-actor")
 
+add_executable(083-scan-actor 083-scan-actor.cpp)
+target_link_libraries(083-scan-actor syncspirit_test_lib)
+add_test(083-scan-actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/083-scan-actor")
+
 add_executable(125-cluster-supervisor 125-cluster-supervisor.cpp)
 target_link_libraries(125-cluster-supervisor syncspirit_test_lib)
 add_test(125-cluster-supervisor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/125-cluster-supervisor")

@@ -66,6 +66,16 @@ std::string device_id2sha256(const char* device_id) {
     return model::device_id_t::from_string(device_id).value().get_sha256();
 }
 
+std::string hash_string(const std::string_view &hash) noexcept {
+    auto r = std::string();
+    r.reserve(hash.size() * 2);
+    for (size_t i = 0; i < hash.size(); ++i) {
+        char buff[3];
+        sprintf(buff, "%02x", (unsigned char)hash[i]);
+        r += std::string_view(buff, 2);
+    }
+    return r;
+}
 
 
 }
