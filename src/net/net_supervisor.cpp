@@ -12,7 +12,7 @@
 #include "peer_supervisor.h"
 #include "dialer_actor.h"
 #include "db_actor.h"
-#include "hasher_proxy_actor.h"
+#include "../hasher/hasher_proxy_actor.h"
 #include "names.h"
 #include <boost/filesystem.hpp>
 #include <algorithm>
@@ -131,7 +131,7 @@ void net_supervisor_t::launch_early() noexcept {
     db_addr =
         create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
     auto threads = app_config.hasher_threads;
-    create_actor<hasher_proxy_actor_t>()
+    create_actor<hasher::hasher_proxy_actor_t>()
         .timeout(timeout)
         .hasher_threads(threads)
         .name(net::names::hasher_proxy)

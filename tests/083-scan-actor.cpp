@@ -4,8 +4,8 @@
 #include "access.h"
 #include "fs/utils.h"
 #include "fs/scan_actor.h"
-#include "net/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
+#include "hasher/hasher_proxy_actor.h"
 #include "net/names.h"
 #include "utils/error_code.h"
 #include <net/names.h>
@@ -82,7 +82,7 @@ TEST_CASE("scan-actor", "[fs]") {
     auto timeout = r::pt::milliseconds{10};
     auto sup = ctx.create_supervisor<st::supervisor_t>().timeout(timeout).create_registry().finish();
     sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
-    auto hasher = sup->create_actor<net::hasher_proxy_actor_t>()
+    auto hasher = sup->create_actor<hasher::hasher_proxy_actor_t>()
                       .hasher_threads(1)
                       .name(net::names::hasher_proxy)
                       .timeout(timeout)

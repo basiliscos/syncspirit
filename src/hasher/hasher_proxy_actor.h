@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../hasher/messages.h"
+#include "messages.h"
 #include "../utils/log.h"
 
 namespace syncspirit {
-namespace net {
+namespace hasher {
 
 namespace r = rotor;
 

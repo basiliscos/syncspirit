@@ -4,7 +4,7 @@
 #include <fmt/fmt.h>
 #include <numeric>
 
-using namespace syncspirit::net;
+using namespace syncspirit::hasher;
 
 hasher_proxy_actor_t::hasher_proxy_actor_t(config_t &config) : r::actor_base_t(config) {
     log = utils::get_logger("net.hasher_proxy_actor");

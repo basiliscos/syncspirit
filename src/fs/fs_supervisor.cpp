@@ -1,6 +1,6 @@
 #include "fs_supervisor.h"
 #include "../net/names.h"
-#include "../net/hasher_proxy_actor.h"
+#include "../hasher/hasher_proxy_actor.h"
 #include "scan_actor.h"
 #include "file_actor.h"
 
@@ -22,7 +22,7 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void fs_supervisor_t::launch() noexcept {
     auto &timeout = shutdown_timeout;
     create_actor<file_actor_t>().timeout(timeout).finish();
-    auto hasher_addr = create_actor<net::hasher_proxy_actor_t>()
+    auto hasher_addr = create_actor<hasher::hasher_proxy_actor_t>()
                            .hasher_threads(hasher_threads)
                            .name("fs::hasher_proxy")
                            .timeout(timeout)
