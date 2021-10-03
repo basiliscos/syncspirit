@@ -65,6 +65,8 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     inline blocks_t &get_blocks() noexcept { return blocks; }
+    inline blocks_t &get_local_blocks() noexcept { return local_blocks; }
+
     void remove_blocks() noexcept;
 
     inline bool is_file() noexcept { return type == proto::FileInfoType::FILE; }

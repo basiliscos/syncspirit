@@ -118,6 +118,10 @@ void folder_info_t::update(local_file_map_t &local_files) noexcept {
         if (file->is_deleted()) {
             // no-op, file is deleted in local index and does not present in filesystem
         } else {
+#if 0
+            auto key = file->get_path();
+            auto &local_file = local_files.map.at(key);
+#endif
             std::abort();
         }
     }

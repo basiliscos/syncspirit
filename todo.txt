@@ -1,11 +1,16 @@
+- test: continue downloading temporaries
+    - temp matches - should be appended
+    - temp mismatches - should be overwritten later
+
 - test: validation happens before opening file?
 - model: когда добавляется symlink, папка
 - store_new_folder_request_t: выкинуть peer, peer_source?
 - send indices deltas (after restart detects changes)
 - когда нам прислали update, но нету sequence/устаревшая инфа, нужно апдейтить бд, но не запрашивать файлы
-- test: continue downloading temporaries
 - test: fs_actor, deleted file from index
 - test: controller, share folder -> index is sent
+- test: file is not available
+- test: device file
 - inactivity-shutdowner
 - when file downloading complete, update in DB it's sequence
 - start syncing folder when new folder has been added, нужно слать cancel{}

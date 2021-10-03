@@ -195,8 +195,29 @@ void test_new_folder() {
                     sup->do_process();
                     CHECK(read_file(path) == "1234567890");
                 }
-            }
+#if 0
+                SECTION("resume downloading") {
+                    peer->push_response("12345");
+                    sup->do_process();
+                    peer->do_shutdown();
+                    sup->do_process();
+                    peer.reset();
+                    auto tmp_path = dir / "a.txt.syncspirit-tmp";
+                    CHECK(read_file(tmp_path).size() == 10);
 
+                    auto timeout = r::pt::milliseconds{10};
+                    peer = sup->create_actor<sample_peer_t>().timeout(timeout).finish();
+                    pre_run();
+                    sup->do_process();
+
+                    peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
+                    peer->push_response("67890");
+                    sup->do_process();
+
+                    CHECK(read_file(path) == "1234567890");
+                }
+#endif
+            }
             SECTION("block cloning") {
                 auto raw_block = proto::BlockInfo();
                 raw_block.set_size(5);

@@ -3,6 +3,7 @@
 #include <memory>
 #include <boost/filesystem.hpp>
 #include <boost/system/error_code.hpp>
+#include <boost/functional/hash.hpp>
 #include "block_info.h"
 
 namespace std {
@@ -22,6 +23,7 @@ struct local_file_t {
     blocks_t blocks;
     bfs::path symlink_target;
     file_type_t file_type;
+    size_t file_size;
     bool temp;
 };
 

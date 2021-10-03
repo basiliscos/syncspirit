@@ -8,7 +8,19 @@
 namespace syncspirit::model {
 
 blocks_interator_t::blocks_interator_t() noexcept : file{nullptr}, i{0} {}
-blocks_interator_t::blocks_interator_t(file_info_t &file_) noexcept : file{&file_}, i{0} { prepare(); }
+blocks_interator_t::blocks_interator_t(file_info_t &file_) noexcept : file{&file_}, i{0} {
+    prepare();
+    if (file) {
+        size_t j = 0;
+        auto &blocks = file->get_blocks();
+        auto &local = file->get_local_blocks();
+        auto max = std::min(local.size(), blocks.size());
+        while (j < max && local[j] && *local[j] == *blocks[j]) {
+            ++j;
+        }
+        i = j;
+    }
+}
 
 void blocks_interator_t::prepare() noexcept {
     if (file) {
@@ -144,6 +156,7 @@ void file_info_t::update(const proto::FileInfo &remote_info) noexcept {
 
 bool file_info_t::update(const local_file_t &local_file) noexcept {
     bool matched = local_file.blocks.size() == blocks.size();
+    bool temp = matched && local_file.temp;
     size_t i = 0;
     for (; matched && i < local_file.blocks.size(); ++i) {
         if (i < blocks.size()) {
@@ -153,17 +166,24 @@ bool file_info_t::update(const local_file_t &local_file) noexcept {
                 lb->link(this, i);
                 lb->mark_local_available(this);
             } else {
-                matched = false;
+                if (!temp) {
+                    matched = false;
+                }
+                break;
             }
         }
     }
     if (matched) {
-        local_blocks = blocks;
+        local_blocks.resize(blocks.size());
+        for (size_t j = 0; j < i; ++j) {
+            local_blocks[j] = blocks[j];
+        }
     } else {
         local_blocks = local_file.blocks;
         blocks.resize(0);
+        i = 0;
     }
-    local_blocks_count = local_blocks.size();
+    local_blocks_count = i;
     return !matched;
 }
 

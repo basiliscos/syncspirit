@@ -27,7 +27,8 @@ template <typename Message> struct typed_folder_updater_t final : controller_act
 namespace {
 namespace resource {
 r::plugin::resource_id_t peer = 0;
-}
+r::plugin::resource_id_t file = 0;
+} // namespace resource
 } // namespace
 
 controller_actor_t::controller_actor_t(config_t &config)
@@ -382,6 +383,7 @@ controller_actor_t::write_info_t &controller_actor_t::record_block_data(model::f
     if (!info.sink && info.clone_queue.empty()) {
         auto file_sz = static_cast<size_t>(file->get_size());
         request<request_t>(file_addr, path, file_sz).send(init_timeout);
+        // resources->acquire(resource::file);
     }
     return info;
 }
@@ -411,6 +413,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
 }
 
 void controller_actor_t::on_open(fs::message::open_response_t &res) noexcept {
+    // resources->release(resource::file);
     auto &payload = res.payload;
     auto &ee = payload.ee;
     if (ee) {

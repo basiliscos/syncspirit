@@ -286,6 +286,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
         auto &local_info = container[file->rel_path];
         local_info.blocks = std::move(file->blocks);
         local_info.file_type = model::local_file_t::file_type_t::regular;
+        local_info.file_size = file->file_size;
         local_info.temp = file->temp;
     }
     if (!scan_cancelled) {

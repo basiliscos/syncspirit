@@ -78,16 +78,12 @@ TEST_CASE("block iterator", "[model]") {
             auto bi = file.iterate_blocks();
             REQUIRE((bool)bi);
 
-            auto r1 = bi.next();
-            REQUIRE((bool)bi);
-            CHECK(r1.block_index() == 0);
-            CHECK(r1.block()->get_hash() == "h1");
-            CHECK(r1.block()->local_file().file() == &file);
-
             auto r2 = bi.next();
             REQUIRE(!bi);
             CHECK(r2.block_index() == 1);
             CHECK(r2.block()->get_hash() == "h2");
+            auto lf = r2.block()->local_file();
+            CHECK(lf.file() == nullptr);
 
             REQUIRE(!bi);
         }
