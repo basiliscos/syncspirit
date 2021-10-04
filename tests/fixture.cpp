@@ -48,9 +48,18 @@ void Fixture::run() {
     pre_run();
     sup->do_process();
 
+    create_controller();
+
+    main();
+
+    sup->shutdown();
+    sup->do_process();
+}
+
+void Fixture::create_controller() {
     auto bep_config = config::bep_config_t();
     bep_config.rx_buff_size = 1024;
-
+    auto timeout = r::pt::milliseconds{10};
     controller = sup->create_actor<controller_actor_t>()
                      .cluster(cluster)
                      .device(device_my)
@@ -68,11 +77,8 @@ void Fixture::run() {
         spdlog::warn("shutdown reason = {}", reason->message());
     };
     REQUIRE(!reason);
-    main();
-
-    sup->shutdown();
-    sup->do_process();
 }
+
 
 
 void Fixture::setup() {

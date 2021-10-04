@@ -91,6 +91,8 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     void record_update(const device_t &source) noexcept;
     void after_sync() noexcept;
     file_info_ptr_t link(const device_ptr_t &target) noexcept;
+    inline bool is_locked() const noexcept { return locked; }
+    void unlock() noexcept;
 
     proto::FileInfo get() const noexcept;
 
@@ -121,6 +123,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     size_t local_blocks_count = 0;
     std::optional<bfs::path> path;
     std::string full_name;
+    bool locked = false;
 
     friend struct blocks_interator_t;
 };

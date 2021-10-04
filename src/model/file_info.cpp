@@ -287,7 +287,7 @@ void file_info_t::record_update(const device_t &source) noexcept {
     counter->set_value(value);
 }
 
-bool file_info_t::is_older(const file_info_t &other) noexcept { return sequence < other.sequence; }
+bool file_info_t::is_older(const file_info_t &other) noexcept { return (sequence < other.sequence); }
 
 file_info_ptr_t file_info_t::link(const device_ptr_t &target) noexcept {
     auto fi = folder_info->get_folder()->get_folder_info(target);
@@ -298,18 +298,37 @@ file_info_ptr_t file_info_t::link(const device_ptr_t &target) noexcept {
     auto &local_file_infos = local_folder_info->get_file_infos();
     auto local_file = local_file_infos.by_id(full_name);
     if (local_file) {
+        /* is being synced */
+        if (local_file->get_sequence() == sequence && local_file->is_dirty()) {
+            local_file->locked = true;
+            return local_file;
+        }
         local_file_infos.remove(local_file);
     }
     auto db = serialize();
     local_file = new file_info_t(db, local_folder_info.get());
     local_file->mark_dirty();
     local_file_infos.put(local_file);
+    local_file->locked = true;
     return local_file;
 }
 
 void file_info_t::after_sync() noexcept {
+    assert(locked);
+    locked = false;
     if (sequence > folder_info->get_max_sequence()) {
         folder_info->set_max_sequence(sequence);
+    }
+}
+
+void file_info_t::unlock() noexcept {
+    if (locked) {
+        size_t i = 0;
+        while (i < local_blocks_count && local_blocks[i]) {
+            ++i;
+        }
+        local_blocks_count = i;
+        locked = false;
     }
 }
 

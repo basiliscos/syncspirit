@@ -2,6 +2,7 @@
     - temp matches - should be appended
     - temp mismatches - should be overwritten later
 
+- https://docs.syncthing.net/users/faq.html#is-it-syncthing-syncthing-or-syncthing
 - test: validation happens before opening file?
 - model: когда добавляется symlink, папка
 - store_new_folder_request_t: выкинуть peer, peer_source?

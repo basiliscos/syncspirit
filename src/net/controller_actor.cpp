@@ -111,6 +111,15 @@ void controller_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
+void controller_actor_t::shutdown_finish() noexcept {
+    LOG_TRACE(log, "{}, shutdown_finish", identity);
+    for (auto &it : write_map) {
+        auto &file = it.second.file;
+        file->unlock();
+    }
+    r::actor_base_t::shutdown_finish();
+}
+
 controller_actor_t::ImmediateResult controller_actor_t::process_immediately() noexcept {
     assert(current_file);
     auto &path = current_file->get_path();

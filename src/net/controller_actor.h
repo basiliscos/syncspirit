@@ -89,6 +89,7 @@ struct controller_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
+    void shutdown_finish() noexcept override;
     bool on_unlink(const r::address_ptr_t &peer_addr) noexcept override;
 
     struct folder_updater_t {

@@ -28,6 +28,7 @@ struct Fixture {
     virtual void setup();
     virtual void pre_run();
     virtual void main();
+    void create_controller();
 
     void run();
     uint64_t seq = 1;

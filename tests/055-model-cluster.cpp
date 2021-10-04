@@ -67,7 +67,7 @@ TEST_CASE("iterate_files", "[model]") {
         CHECK(((sd2.name() == d1->name) || (sd2.name() == d2->name)));
     }
 
-    SECTION("iterate_files") {
+    SECTION("iterate files") {
         auto add_file = [&key](model::device_ptr_t device, model::folder_ptr_t folder, int64_t seq) mutable {
             db::FolderInfo db_folder_info;
             db_folder_info.set_max_sequence(seq);
@@ -100,11 +100,21 @@ TEST_CASE("iterate_files", "[model]") {
             REQUIRE((bool)it);
             auto file = it.next();
 
+            CHECK(file->is_locked());
             CHECK(file->get_full_name() == file_info_1->get_full_name());
             CHECK(file->get_db_key() == file_info_1->get_db_key());
             CHECK(!file->is_older(*file_info_2));
             CHECK(!file->is_older(*file_info_1));
             CHECK(!it);
+
+            file->after_sync();
+            CHECK(!file->is_locked());
+
+            file->mark_dirty();
+            it = cluster->iterate_files(d2);
+            REQUIRE((bool)it);
+            auto file2 = it.next();
+            CHECK(file2 == file);
         }
 
         SECTION("when files are in sync, it is not returned") {

@@ -50,7 +50,9 @@ TRY_ANEW:
         if (!local_file) {
             return;
         }
-        auto needs_update = local_file->is_older(*file);
+        auto needs_update = !local_file->is_locked() &&
+                            (local_file->is_older(*file) ||
+                             (local_file->get_sequence() == file->get_sequence() && local_file->is_dirty()));
         if (needs_update) {
             return;
         }

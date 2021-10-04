@@ -24,10 +24,10 @@ void test_new_folder() {
     struct F : Fixture {
         notify_ptr_t notify;
         proto::Folder p_folder;
+        proto::ClusterConfig p_cluster;
         cluster_msg_t cluster_msg;
 
         void setup() override {
-            auto config = proto::ClusterConfig();
             auto folder = proto::Folder();
             folder.set_label("my-folder");
             folder.set_id("123");
@@ -44,8 +44,8 @@ void test_new_folder() {
 
             *folder.add_devices() = d_my;
             *folder.add_devices() = d_peer;
-            *config.add_folders() = folder;
-            peer_cluster_config = payload::cluster_config_ptr_t(new proto::ClusterConfig(config));
+            *p_cluster.add_folders() = folder;
+            peer_cluster_config = payload::cluster_config_ptr_t(new proto::ClusterConfig(p_cluster));
             p_folder = folder;
         }
 
@@ -179,7 +179,7 @@ void test_new_folder() {
                 *fi.add_blocks() = bi2;
                 *index.add_files() = fi;
 
-                auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(std::move(index)));
+                auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(index));
                 peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
 
                 SECTION("direct order") {
@@ -195,29 +195,38 @@ void test_new_folder() {
                     sup->do_process();
                     CHECK(read_file(path) == "1234567890");
                 }
-#if 0
+
                 SECTION("resume downloading") {
                     peer->push_response("12345");
                     sup->do_process();
+
                     peer->do_shutdown();
                     sup->do_process();
-                    peer.reset();
+
                     auto tmp_path = dir / "a.txt.syncspirit-tmp";
                     CHECK(read_file(tmp_path).size() == 10);
+                    auto &file_infos = folder->get_folder_info(device_my)->get_file_infos();
+                    auto file = file_infos.by_id("my-folder/a.txt");
+                    REQUIRE(file);
+                    CHECK(!file->is_locked());
+                    CHECK(file->is_dirty());
+                    auto &lb = file->get_local_blocks();
+                    auto &blocks = file->get_blocks();
+                    CHECK(lb[0]);
+                    CHECK(lb[0] == blocks[0]);
+                    CHECK(!lb[1]);
 
+                    peer_cluster_config = payload::cluster_config_ptr_t(new proto::ClusterConfig(p_cluster));
                     auto timeout = r::pt::milliseconds{10};
                     peer = sup->create_actor<sample_peer_t>().timeout(timeout).finish();
+                    peer->push_response("67890", 1);
                     pre_run();
-                    sup->do_process();
-
-                    peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
-                    peer->push_response("67890");
-                    sup->do_process();
-
+                    CHECK(file->get_folder_info()->get_file_infos().size() == 1);
+                    create_controller();
                     CHECK(read_file(path) == "1234567890");
                 }
-#endif
             }
+
             SECTION("block cloning") {
                 auto raw_block = proto::BlockInfo();
                 raw_block.set_size(5);
