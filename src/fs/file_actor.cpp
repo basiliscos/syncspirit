@@ -65,6 +65,7 @@ void file_actor_t::on_close(message::close_request_t &req) noexcept {
     auto &file = payload.file;
     auto &path = payload.path;
 
+    assert(file);
     try {
         file->close();
     } catch (const std::exception &ex) {
@@ -75,11 +76,13 @@ void file_actor_t::on_close(message::close_request_t &req) noexcept {
         return;
     }
 
-    sys::error_code ec;
-    auto tmp_path = make_temporal(payload.path);
-    bfs::rename(tmp_path, path, ec);
-    if (ec) {
-        return reply_with_error(req, make_error(ec));
+    if (payload.complete) {
+        sys::error_code ec;
+        auto tmp_path = make_temporal(payload.path);
+        bfs::rename(tmp_path, path, ec);
+        if (ec) {
+            return reply_with_error(req, make_error(ec));
+        }
     }
     reply_to(req);
 }
@@ -98,15 +101,16 @@ void file_actor_t::on_clone(message::clone_request_t &req) noexcept {
         target = std::move(p.target_file);
     } else {
         bio::mapped_file_params params;
-        params.path = p.target.string();
+        auto target_path = make_temporal(p.target);
+        params.path = target_path.string();
         params.flags = bio::mapped_file::mapmode::readwrite;
-        if (!bfs::exists(p.target)) {
+        if (!bfs::exists(target_path)) {
             params.new_file_size = p.target_size;
         }
         try {
             target = std::make_unique<bio::mapped_file>(params);
         } catch (std::exception &ex) {
-            LOG_TRACE(log, "{}, on_clone, error opening {} : {}", identity, p.target.string(), ex.what());
+            LOG_TRACE(log, "{}, on_clone, error opening {} : {}", identity, target_path.string(), ex.what());
             auto ec = sys::errc::make_error_code(sys::errc::io_error);
             auto ee = make_error(ec);
             reply_with_error(req, ee);

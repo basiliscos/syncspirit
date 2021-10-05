@@ -209,7 +209,9 @@ void test_new_folder() {
                     auto file = file_infos.by_id("my-folder/a.txt");
                     REQUIRE(file);
                     CHECK(!file->is_locked());
-                    CHECK(file->is_dirty());
+                    CHECK(!file->is_dirty());
+                    CHECK(file->get_sequence() == fi.sequence());
+
                     auto &lb = file->get_local_blocks();
                     auto &blocks = file->get_blocks();
                     CHECK(lb[0]);
@@ -324,7 +326,6 @@ void test_new_folder() {
                     CHECK(read_file(target_path) == "123451234512345");
                 }
             }
-
             SECTION("sync deleted file") {
                 auto fi = proto::FileInfo();
                 fi.set_name("b.txt");

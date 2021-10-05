@@ -110,7 +110,28 @@ TEST_CASE("iterate_files", "[model]") {
             file->after_sync();
             CHECK(!file->is_locked());
 
-            file->mark_dirty();
+            db::BlockInfo db_b1;
+            db_b1.set_hash("h1");
+            db_b1.set_size(5);
+            db_b1.set_weak_hash(23u);
+            auto b1 = model::block_info_ptr_t(new model::block_info_t(db_b1, 1));
+
+            db::BlockInfo db_b2;
+            db_b1.set_hash("h2");
+            db_b1.set_size(5);
+            db_b1.set_weak_hash(23u);
+            auto b2 = model::block_info_ptr_t(new model::block_info_t(db_b2, 1));
+
+            auto &blocks = file->get_blocks();
+            auto &local_blocks = file->get_local_blocks();
+            local_blocks.push_back(model::block_info_ptr_t());
+            local_blocks.push_back(model::block_info_ptr_t());
+            blocks.push_back(b1);
+            blocks.push_back(b2);
+            b1->link(file.get(), 0);
+            b2->link(file.get(), 0);
+            file->mark_local_available(0);
+
             it = cluster->iterate_files(d2);
             REQUIRE((bool)it);
             auto file2 = it.next();

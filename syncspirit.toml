@@ -32,9 +32,17 @@ name = 'default'
 level = 'trace'
 sinks = ['stdout']
 
-# [[log]]
-# name = 'net.peer_actor'
-# level = 'trace'
+[[log]]
+name = 'net.peer_actor'
+level = 'debug'
+
+[[log]]
+name = 'net.hasher_proxy_actor'
+level = 'debug'
+
+[[log]]
+name = 'hasher.actor'
+level = 'debug'
 
 [main]
 default_location = '/tmp/syncspirit'

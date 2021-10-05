@@ -2,9 +2,11 @@
 #include "test-utils.h"
 #include "net/db_actor.h"
 #include "net/names.h"
+#include "access.h"
 #include "hasher/hasher_actor.h"
 #include "hasher/hasher_proxy_actor.h"
 #include "catch.hpp"
+
 
 using namespace syncspirit::test;
 using namespace syncspirit::model;
@@ -54,6 +56,8 @@ void Fixture::run() {
 
     sup->shutdown();
     sup->do_process();
+    CHECK(controller->access<to::state>() == r::state_t::SHUT_DOWN);
+    CHECK(peer->access<to::state>() == r::state_t::SHUT_DOWN);
 }
 
 void Fixture::create_controller() {

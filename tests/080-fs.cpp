@@ -130,6 +130,7 @@ TEST_CASE("fs-actor", "[fs]") {
 
         auto source = root_path / "my-source";
         auto dest = root_path / "my-dest";
+        auto dest_tmp = root_path / "my-dest.syncspirit-tmp";
         write_file(source, "1234567890");
 
         // to new file
@@ -137,8 +138,8 @@ TEST_CASE("fs-actor", "[fs]") {
         sup->do_process();
         REQUIRE(act->clone_response);
         CHECK(!act->clone_response->payload.ee);
-        REQUIRE(bfs::exists(dest));
-        auto data = read_file(dest);
+        REQUIRE(bfs::exists(dest_tmp));
+        auto data = read_file(dest_tmp);
         REQUIRE(data.length() == 15);
         CHECK(data.substr(0, 5) == "67890");
         auto tail = data.substr(5);
@@ -153,7 +154,7 @@ TEST_CASE("fs-actor", "[fs]") {
         REQUIRE(act->clone_response);
         CHECK(!act->clone_response->payload.ee);
         act->clone_response.reset();
-        data = read_file(dest);
+        data = read_file(dest_tmp);
         REQUIRE(data.length() == 15);
         CHECK(data.substr(0, 10) == "6789012345");
         tail = data.substr(10);

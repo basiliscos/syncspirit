@@ -310,6 +310,7 @@ struct store_file_response_t {};
 struct store_file_request_t {
     using response_t = store_file_response_t;
     model::file_info_ptr_t file;
+    void *custom;
 };
 
 struct store_folder_info_response_t {};

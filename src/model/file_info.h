@@ -101,6 +101,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     void generate_db_key(const std::string &name) noexcept;
     void remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks,
                       block_infos_map_t &deleted_blocks) noexcept;
+    bool is_incomplete() noexcept;
     template <typename Source> void fields_update(const Source &s) noexcept;
 
     folder_info_t *folder_info;

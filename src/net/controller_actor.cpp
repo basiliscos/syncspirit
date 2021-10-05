@@ -27,7 +27,7 @@ template <typename Message> struct typed_folder_updater_t final : controller_act
 namespace {
 namespace resource {
 r::plugin::resource_id_t peer = 0;
-r::plugin::resource_id_t file = 0;
+r::plugin::resource_id_t file = 1;
 } // namespace resource
 } // namespace
 
@@ -108,15 +108,20 @@ void controller_actor_t::ready() noexcept { send<payload::ready_signal_t>(get_ad
 void controller_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "{}, shutdown_start", identity);
     send<payload::termination_t>(peer_addr, shutdown_reason);
+    for (auto &it : write_map) {
+        auto &info = it.second;
+        if (info.done()) {
+            auto &sink = info.sink;
+            auto &path = info.file->get_path();
+            request<fs::payload::close_request_t>(file_addr, std::move(sink), path, info.complete()).send(init_timeout);
+        }
+    }
     r::actor_base_t::shutdown_start();
 }
 
 void controller_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "{}, shutdown_finish", identity);
-    for (auto &it : write_map) {
-        auto &file = it.second.file;
-        file->unlock();
-    }
+    assert(write_map.empty());
     r::actor_base_t::shutdown_finish();
 }
 
@@ -249,7 +254,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         block_iterator = current_file->iterate_blocks();
     } else if (ir == ImmediateResult::DONE) {
         current_file->after_sync();
-        request<payload::store_file_request_t>(db, current_file).send(init_timeout);
+        request<payload::store_file_request_t>(db, current_file, nullptr).send(init_timeout);
     }
     ready();
 }
@@ -268,6 +273,7 @@ void controller_actor_t::clone_block(const model::file_block_t &block, model::fi
         auto &source = local.file()->get_path();
         auto source_offset = local.get_offset();
         auto target_offset = block.get_offset();
+        resources->acquire(resource::file);
         request<request_t>(file_addr, source, path, target_sz, block_sz, source_offset, target_offset)
             .send(init_timeout);
     }
@@ -327,7 +333,12 @@ void controller_actor_t::on_store_folder_info(message::store_folder_info_respons
 
 void controller_actor_t::on_store_file_info(message::store_file_response_t &message) noexcept {
     auto &ee = message.payload.ee;
-    auto &file = message.payload.req->payload.request_payload.file;
+    auto &payload = message.payload.req->payload.request_payload;
+    auto &file = payload.file;
+    auto release = payload.custom;
+    if (release) {
+        resources->release(resource::file);
+    }
     log->trace("{}, on_store_file_info, file: {}, seq: {}", identity, file->get_full_name(), file->get_sequence());
     if (ee) {
         log->error("{}, on_store_file_info, file: {}, error: {}", identity, file->get_full_name(), ee->message());
@@ -389,10 +400,10 @@ controller_actor_t::write_info_t &controller_actor_t::record_block_data(model::f
     }
     auto &info = write_map.at(path_str);
     info.final = final;
-    if (!info.sink && info.clone_queue.empty()) {
+    if (!info.sink && info.clone_queue.empty() && !info.opening) {
         auto file_sz = static_cast<size_t>(file->get_size());
         request<request_t>(file_addr, path, file_sz).send(init_timeout);
-        // resources->acquire(resource::file);
+        info.opening = true;
     }
     return info;
 }
@@ -422,14 +433,15 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
 }
 
 void controller_actor_t::on_open(fs::message::open_response_t &res) noexcept {
-    // resources->release(resource::file);
     auto &payload = res.payload;
     auto &ee = payload.ee;
     if (ee) {
         LOG_WARN(log, "{}, on_open failed : {}", identity, ee->message());
+        resources->release(resource::file);
         return do_shutdown(ee);
     }
 
+    resources->acquire(resource::file);
     auto &path_str = payload.req->payload.request_payload.path.string();
     LOG_TRACE(log, "{}, on_open, {}", identity, path_str);
     auto it = write_map.find(path_str);
@@ -456,7 +468,8 @@ void controller_actor_t::on_close(fs::message::close_response_t &res) noexcept {
 
     auto &file = it->second.file;
     file->after_sync();
-    request<payload::store_file_request_t>(db, file).send(init_timeout);
+    auto release_resouce = this;
+    request<payload::store_file_request_t>(db, file, release_resouce).send(init_timeout);
 
     write_map.erase(it);
 }
@@ -516,7 +529,11 @@ void controller_actor_t::process(write_it_t it) noexcept {
         assert(info.sink);
         request<fs::payload::close_request_t>(file_addr, std::move(info.sink), info.file->get_path())
             .send(init_timeout);
+    } else if (state != r::state_t::OPERATIONAL && info.done()) {
+        request<fs::payload::close_request_t>(file_addr, std::move(info.sink), info.file->get_path(), false)
+            .send(init_timeout);
     }
+
     ready();
 }
 

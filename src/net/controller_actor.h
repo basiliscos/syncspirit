@@ -115,9 +115,10 @@ struct controller_actor_t : public r::actor_base_t {
         model::file_info_ptr_t file;
         std::uint_fast32_t pending_blocks;
         bool final = false;
-        inline bool complete() const noexcept {
-            return final && pending_blocks == 0 && clone_queue.empty() && validated_blocks.empty();
-        }
+        bool opening = false;
+
+        inline bool done() const noexcept { return clone_queue.empty() && validated_blocks.empty(); }
+        inline bool complete() const noexcept { return final && pending_blocks == 0 && done(); }
     };
 
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;

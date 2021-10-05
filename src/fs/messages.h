@@ -61,7 +61,9 @@ struct close_request_t : r::arc_base_t<close_request_t> {
     using response_t = close_response_t;
     opened_file_t file;
     bfs::path path;
-    close_request_t(opened_file_t &&f, const bfs::path &path_) noexcept : file{std::move(f)}, path{path_} {}
+    bool complete;
+    close_request_t(opened_file_t &&f, const bfs::path &path_, bool complete_ = true) noexcept
+        : file{std::move(f)}, path{path_}, complete{complete_} {}
 };
 
 struct clone_request_t {

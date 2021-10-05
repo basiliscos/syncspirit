@@ -287,7 +287,23 @@ void file_info_t::record_update(const device_t &source) noexcept {
     counter->set_value(value);
 }
 
-bool file_info_t::is_older(const file_info_t &other) noexcept { return (sequence < other.sequence); }
+bool file_info_t::is_older(const file_info_t &other) noexcept {
+    if (sequence < other.sequence) {
+        return true;
+    }
+    for (auto &lb : local_blocks) {
+        if (!lb)
+            return true;
+    }
+    return false;
+}
+
+bool file_info_t::is_incomplete() noexcept {
+    if (local_blocks.empty()) {
+        return false;
+    }
+    return (bool)local_blocks[0];
+}
 
 file_info_ptr_t file_info_t::link(const device_ptr_t &target) noexcept {
     auto fi = folder_info->get_folder()->get_folder_info(target);
@@ -299,7 +315,7 @@ file_info_ptr_t file_info_t::link(const device_ptr_t &target) noexcept {
     auto local_file = local_file_infos.by_id(full_name);
     if (local_file) {
         /* is being synced */
-        if (local_file->get_sequence() == sequence && local_file->is_dirty()) {
+        if (local_file->get_sequence() == sequence && local_file->is_incomplete()) {
             local_file->locked = true;
             return local_file;
         }

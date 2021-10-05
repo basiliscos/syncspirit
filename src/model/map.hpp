@@ -58,7 +58,7 @@ template <typename Item, typename Id, typename Key = std::uint64_t> struct gener
 
     const_iterator end() const noexcept { return key2d.cend(); }
 
-  private:
+    /*  private: */
     id2d_t id2d;
     key2d_t key2d;
 };
