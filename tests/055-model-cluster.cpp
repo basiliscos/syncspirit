@@ -2,6 +2,7 @@
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
+#include "model/file_iterator.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;

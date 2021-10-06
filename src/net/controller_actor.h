@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages.h"
+#include "../model/file_iterator.h"
 #include "../fs/messages.h"
 #include "../hasher/messages.h"
 #include "../utils/log.h"
