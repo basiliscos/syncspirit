@@ -39,6 +39,7 @@ add_library(syncspirit_lib
     src/hasher/hasher_proxy_actor.cpp
     src/hasher/hasher_supervisor.cpp
     src/model/block_info.cpp
+    src/model/block_iterator.cpp
     src/model/cluster.cpp
     src/model/device.cpp
     src/model/device_id.cpp

@@ -9,41 +9,15 @@
 #include "structs.pb.h"
 #include "block_info.h"
 #include "storeable.h"
+#include "device.h"
 
 namespace syncspirit::model {
 
 namespace bfs = boost::filesystem;
 
 struct folder_info_t;
-struct block_info_t;
 struct local_file_t;
-struct file_info_t;
-struct device_t;
-
-using device_ptr_t = intrusive_ptr_t<device_t>;
-
-struct blocks_interator_t {
-    using blocks_t = std::vector<block_info_ptr_t>;
-
-    blocks_interator_t() noexcept;
-    blocks_interator_t(file_info_t &file) noexcept;
-
-    template <typename T> blocks_interator_t &operator=(T &other) noexcept {
-        file = other.file;
-        i = other.i;
-        return *this;
-    }
-
-    inline operator bool() noexcept { return file != nullptr; }
-
-    file_block_t next() noexcept;
-    void reset() noexcept;
-
-  private:
-    void prepare() noexcept;
-    size_t i = 0;
-    file_info_t *file;
-};
+struct blocks_interator_t;
 
 struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     using blocks_t = std::vector<block_info_ptr_t>;

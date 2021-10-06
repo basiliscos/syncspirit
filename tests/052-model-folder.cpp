@@ -1,6 +1,7 @@
 #include "catch.hpp"
 #include "test-utils.h"
 #include "model/file_info.h"
+#include "model/block_iterator.h"
 #include "model/cluster.h"
 
 using namespace syncspirit;
