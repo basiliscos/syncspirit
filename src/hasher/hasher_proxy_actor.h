@@ -36,6 +36,7 @@ struct hasher_proxy_actor_t : public r::actor_base_t {
     hasher_proxy_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
+    void shutdown_finish() noexcept override;
 
   private:
     using addresses_t = std::vector<r::address_ptr_t>;

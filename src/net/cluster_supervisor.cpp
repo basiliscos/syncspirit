@@ -285,9 +285,9 @@ void cluster_supervisor_t::on_disconnect(message::disconnect_notify_t &message) 
     auto &device_id = message.payload.peer_device_id;
     auto it = device2addr_map.find(device_id.get_sha256());
     if (it != device2addr_map.end()) {
-        device2addr_map.erase(it);
         auto it_r = addr2device_map.find(it->second);
         addr2device_map.erase(it_r);
+        device2addr_map.erase(it);
     }
 }
 

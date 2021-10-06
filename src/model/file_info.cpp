@@ -261,9 +261,9 @@ bool file_info_t::mark_local_available(size_t block_index) noexcept {
     blocks[block_index]->mark_local_available(this);
     local_blocks[block_index] = blocks[block_index];
     ++local_blocks_count;
+    mark_dirty();
     if (local_blocks_count == local_blocks.size()) {
         spdlog::debug("{} is sync (by number of blocks, still unchecked)", get_full_name());
-        mark_dirty();
         return true;
     }
     return false;

@@ -6,6 +6,12 @@
 
 using namespace syncspirit::hasher;
 
+namespace {
+namespace resource {
+r::plugin::resource_id_t hash = 0;
+} // namespace resource
+} // namespace
+
 hasher_proxy_actor_t::hasher_proxy_actor_t(config_t &config) : r::actor_base_t(config) {
     log = utils::get_logger("net.hasher_proxy_actor");
     hashers.resize(config.hasher_threads);
@@ -37,6 +43,11 @@ void hasher_proxy_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
 }
 
+void hasher_proxy_actor_t::shutdown_finish() noexcept {
+    LOG_TRACE(log, "{}, shutdown_finish", identity);
+    r::actor_base_t::shutdown_finish();
+}
+
 r::address_ptr_t hasher_proxy_actor_t::find_next_hasher() noexcept {
     uint32_t score = std::numeric_limits<uint32_t>::max();
     uint32_t min = 0;
@@ -53,10 +64,12 @@ r::address_ptr_t hasher_proxy_actor_t::find_next_hasher() noexcept {
     }
     ++hasher_scores[min];
     index = (index + 1) % hasher_threads;
+    resources->acquire(resource::hash);
     return hashers[min];
 }
 
 void hasher_proxy_actor_t::free_hasher(r::address_ptr_t &addr) noexcept {
+    resources->release(resource::hash);
     for (uint32_t i = 0; i < hashers.size(); ++i) {
         if (hashers[i] == addr) {
             --hasher_scores[i];

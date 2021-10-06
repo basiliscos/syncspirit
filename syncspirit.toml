@@ -34,7 +34,7 @@ sinks = ['stdout']
 
 [[log]]
 name = 'net.peer_actor'
-level = 'debug'
+level = 'trace'
 
 [[log]]
 name = 'net.hasher_proxy_actor'

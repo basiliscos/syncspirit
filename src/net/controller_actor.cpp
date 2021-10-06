@@ -53,7 +53,10 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.discover_name(names::file_actor, file_addr, false).link(true);
         p.discover_name(names::hasher_proxy, hasher_proxy, false).link();
     });
-    plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(peer_addr, false); });
+    plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) {
+        p.link(peer_addr, false);
+        p.on_unlink([this](auto &message) { return this->on_unlink(message); });
+    });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_store_folder_info);
@@ -103,16 +106,14 @@ void controller_actor_t::update(proto::ClusterConfig &config) noexcept {
     block_iterator.reset();
 }
 
-void controller_actor_t::ready() noexcept { send<payload::ready_signal_t>(get_address()); }
-
 void controller_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "{}, shutdown_start", identity);
     send<payload::termination_t>(peer_addr, shutdown_reason);
     for (auto &it : write_map) {
         auto &info = it.second;
-        if (info.done()) {
-            auto &sink = info.sink;
-            auto &path = info.file->get_path();
+        auto &sink = info.sink;
+        auto &path = info.file->get_path();
+        if (sink) {
             request<fs::payload::close_request_t>(file_addr, std::move(sink), path, info.complete()).send(init_timeout);
         }
     }
@@ -124,6 +125,17 @@ void controller_actor_t::shutdown_finish() noexcept {
     assert(write_map.empty());
     r::actor_base_t::shutdown_finish();
 }
+
+bool controller_actor_t::on_unlink(unlink_request_t &message) noexcept {
+    auto &source = message.payload.request_payload.server_addr;
+    if (source == peer_addr) {
+        return false;
+    }
+    unlink_requests.emplace_back(&message);
+    return true;
+}
+
+void controller_actor_t::ready() noexcept { send<payload::ready_signal_t>(get_address()); }
 
 controller_actor_t::ImmediateResult controller_actor_t::process_immediately() noexcept {
     assert(current_file);
@@ -306,6 +318,9 @@ bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {
 }
 
 void controller_actor_t::on_forward(message::forwarded_message_t &message) noexcept {
+    if (state != r::state_t::OPERATIONAL) {
+        return;
+    }
     std::visit([this](auto &msg) { on_message(msg); }, message.payload);
 }
 
@@ -326,9 +341,20 @@ void controller_actor_t::on_store_folder_info(message::store_folder_info_respons
                fi->get_db_key());
     if (ee) {
         log->warn("{}, on_store_folder_info {} failed : {}", identity, label, ee->message());
-        return do_shutdown(ee);
+        do_shutdown(ee);
     }
-    ready();
+    if (state != r::state_t::OPERATIONAL) {
+        if (write_map.empty() && !unlink_requests.empty()) {
+            using plugin_t = r::plugin::link_client_plugin_t;
+            auto plugin = static_cast<plugin_t *>(get_plugin(plugin_t::class_identity));
+            for (auto &it : unlink_requests) {
+                plugin->forget_link(*it);
+            }
+            unlink_requests.resize(0);
+        }
+    } else {
+        ready();
+    }
 }
 
 void controller_actor_t::on_store_file_info(message::store_file_response_t &message) noexcept {
@@ -554,7 +580,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
         LOG_WARN(log, "{}, check_digest, digest mismatch: {}", identity, context);
         auto ee = r::make_error(context, ec);
         do_shutdown(ee);
-    } else {
+    } else if (state == r::state_t::OPERATIONAL) {
         auto it = write_map.find(path.string());
         assert(it != write_map.end());
         auto &info = it->second;
