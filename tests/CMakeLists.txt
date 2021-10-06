@@ -101,3 +101,7 @@ add_executable(131-controller-indexupdate 131-controller-indexupdate.cpp)
 target_link_libraries(131-controller-indexupdate syncspirit_test_lib)
 add_test(131-controller-indexupdate "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/131-controller-indexupdate")
 
+add_executable(132-controller-resume 132-controller-resume.cpp)
+target_link_libraries(132-controller-resume syncspirit_test_lib)
+add_test(132-controller-resume "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/132-controller-resume")
+

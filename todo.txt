@@ -1,9 +1,9 @@
 - test: continue downloading temporaries
-    - по завершении controller_actor, в БД должно быть скинуто, то, что есть?
     - temp matches - should be appended
     - temp mismatches - should be overwritten later
 
 - в БД скидывать только те блоки, которые locally_available
+- отправлять те блоки, к-е locally_available
 
 - https://docs.syncthing.net/users/faq.html#is-it-syncthing-syncthing-or-syncthing
 - test: validation happens before opening file?

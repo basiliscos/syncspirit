@@ -195,38 +195,6 @@ void test_new_folder() {
                     sup->do_process();
                     CHECK(read_file(path) == "1234567890");
                 }
-
-                SECTION("resume downloading") {
-                    peer->push_response("12345");
-                    sup->do_process();
-
-                    peer->do_shutdown();
-                    sup->do_process();
-
-                    auto tmp_path = dir / "a.txt.syncspirit-tmp";
-                    CHECK(read_file(tmp_path).size() == 10);
-                    auto &file_infos = folder->get_folder_info(device_my)->get_file_infos();
-                    auto file = file_infos.by_id("my-folder/a.txt");
-                    REQUIRE(file);
-                    CHECK(!file->is_locked());
-                    CHECK(!file->is_dirty());
-                    CHECK(file->get_sequence() == fi.sequence());
-
-                    auto &lb = file->get_local_blocks();
-                    auto &blocks = file->get_blocks();
-                    CHECK(lb[0]);
-                    CHECK(lb[0] == blocks[0]);
-                    CHECK(!lb[1]);
-
-                    peer_cluster_config = payload::cluster_config_ptr_t(new proto::ClusterConfig(p_cluster));
-                    auto timeout = r::pt::milliseconds{10};
-                    peer = sup->create_actor<sample_peer_t>().timeout(timeout).finish();
-                    peer->push_response("67890", 1);
-                    pre_run();
-                    CHECK(file->get_folder_info()->get_file_infos().size() == 1);
-                    create_controller();
-                    CHECK(read_file(path) == "1234567890");
-                }
             }
 
             SECTION("block cloning") {
