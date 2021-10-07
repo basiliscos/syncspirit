@@ -31,6 +31,22 @@ r::plugin::resource_id_t file = 1;
 } // namespace resource
 } // namespace
 
+controller_actor_t::write_info_t::write_info_t(const model::file_info_ptr_t &file_) noexcept
+    : file{file_}, pending_blocks{0}, opening{false} {
+    auto &blocks = file->get_blocks();
+    blocks_left = blocks.size();
+    for (auto &b : blocks) {
+        if (b)
+            blocks_left--;
+    }
+}
+
+bool controller_actor_t::write_info_t::done() const noexcept {
+    return pending_blocks == 0 && clone_queue.empty() && validated_blocks.empty();
+}
+
+bool controller_actor_t::write_info_t::complete() const noexcept { return blocks_left == 0 && done(); }
+
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device{config.device}, peer{config.peer},
       peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, peer_cluster_config{std::move(
@@ -257,13 +273,15 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         return;
     }
 
-    current_file = file_iterator.next();
+    auto source_file = file_iterator.next();
+    current_file = source_file->link(device);
+
     auto ir = process_immediately();
     if (ir == ImmediateResult::ERROR) {
         return;
     } else if (ir == ImmediateResult::NON_IMMEDIATE) {
         LOG_TRACE(log, "{}, going to sync {}", identity, current_file->get_full_name());
-        block_iterator = current_file->iterate_blocks();
+        block_iterator = model::blocks_interator_t(*source_file, *current_file);
     } else if (ir == ImmediateResult::DONE) {
         current_file->after_sync();
         request<payload::store_file_request_t>(db, current_file, nullptr).send(init_timeout);
@@ -279,7 +297,7 @@ void controller_actor_t::clone_block(const model::file_block_t &block, model::fi
 
     if (write_map.count(path_str) == 0) {
         using request_t = fs::payload::clone_request_t;
-        write_map[path_str].file = current_file;
+        write_map.emplace(path_str, current_file);
         auto target_sz = static_cast<size_t>(current_file->get_size());
         auto block_sz = static_cast<size_t>(block.block()->get_size());
         auto &source = local.file()->get_path();
@@ -289,7 +307,7 @@ void controller_actor_t::clone_block(const model::file_block_t &block, model::fi
         request<request_t>(file_addr, source, path, target_sz, block_sz, source_offset, target_offset)
             .send(init_timeout);
     }
-    auto &info = write_map[path_str];
+    auto &info = write_map.at(path_str);
     auto cloned_block =
         clone_block_t{block.block(), model::file_info_ptr_t{local.file()}, local.block_index(), block.block_index()};
     info.clone_queue.emplace_back(std::move(cloned_block));
@@ -419,13 +437,11 @@ controller_actor_t::write_info_t &controller_actor_t::record_block_data(model::f
     using request_t = fs::payload::open_request_t;
     auto &path = file->get_path();
     auto &path_str = path.string();
-    auto &blocks = file->get_blocks();
-    bool final = file->mark_local_available(block_index);
     if (write_map.count(path_str) == 0) {
-        write_map[path_str].file = file;
+        write_map.emplace(path_str, file);
     }
     auto &info = write_map.at(path_str);
-    info.final = final;
+    --info.blocks_left;
     if (!info.sink && info.clone_queue.empty() && !info.opening) {
         auto file_sz = static_cast<size_t>(file->get_size());
         request<request_t>(file_addr, path, file_sz).send(init_timeout);
@@ -515,7 +531,9 @@ void controller_actor_t::on_clone(fs::message::clone_response_t &res) noexcept {
     assert(it != write_map.end());
     auto &info = it->second;
     auto block_info = info.clone_queue.front();
-    info.final |= info.file->mark_local_available(block_info.target_index);
+    info.file->append_block(block_info.block, block_info.target_index);
+    info.file->mark_local_available(block_info.target_index);
+    --info.blocks_left;
     info.clone_queue.pop_front();
     info.sink = std::move(opened_file);
     process(it);
@@ -547,8 +565,9 @@ void controller_actor_t::process(write_it_t it) noexcept {
             auto block_index = req_payload.block.block_index();
             auto offset = file->get_block_offset(block_index);
             std::copy(data.begin(), data.end(), disk_view + offset);
-            blocks.pop_front();
+            info.file->append_block(req_payload.block.block(), block_index);
             --blocks_kept;
+            blocks.pop_front();
         }
     }
     if (info.complete()) {
@@ -574,15 +593,17 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     auto &file = payload.file;
     auto &path = file->get_path();
 
+    auto it = write_map.find(path.string());
+    assert(it != write_map.end());
     if (!res.payload.res.valid) {
         std::string context = fmt::format("digest mismatch for {}", path.string());
         auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
         LOG_WARN(log, "{}, check_digest, digest mismatch: {}", identity, context);
         auto ee = r::make_error(context, ec);
+        write_map.erase(it);
+        resources->release(resource::file);
         do_shutdown(ee);
     } else if (state == r::state_t::OPERATIONAL) {
-        auto it = write_map.find(path.string());
-        assert(it != write_map.end());
         auto &info = it->second;
         --info.pending_blocks;
         info.validated_blocks.emplace_back(block_res);

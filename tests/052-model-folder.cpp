@@ -46,7 +46,7 @@ TEST_CASE("folder, update local files", "[model]") {
         CHECK(file->is_dirty() == false);
     }
 
-    SECTION("incomplete temporally file") {
+    SECTION("updating blocks") {
         db::BlockInfo db_b1;
         db_b1.set_hash("h1");
         db_b1.set_size(5);
@@ -63,40 +63,68 @@ TEST_CASE("folder, update local files", "[model]") {
         auto b3 = model::block_info_ptr_t(new model::block_info_t(db_b3, 3));
 
         cluster->get_blocks().put(b1);
-        cluster->get_blocks().put(b3);
+        cluster->get_blocks().put(b2);
 
         auto db_file = db::FileInfo();
         db_file.set_name("my-file.txt");
         db_file.set_sequence(5);
         db_file.set_type(proto::FileInfoType::FILE);
         db_file.add_blocks_keys(1ul);
-        db_file.add_blocks_keys(3ul);
+        db_file.add_blocks_keys(2ul);
         auto file = model::file_info_ptr_t(new file_info_t(db_file, folder_info.get()));
         folder_info->add(file);
 
         REQUIRE(file->get_blocks().size() == 2);
+
         model::local_file_t local_file;
-        local_file.blocks.emplace_back(b1);
-        local_file.blocks.emplace_back(b2);
-        local_file.temp = true;
-        auto local_file_map = model::local_file_map_t(bfs::path("/some/path"));
-        local_file_map.map[bfs::path("my-file.txt")] = local_file;
+#if 0
+        SECTION("fs blocks match db blocks") {
+            local_file.blocks.emplace_back(b1);
+            local_file.blocks.emplace_back(b2);
+            auto local_file_map = model::local_file_map_t(bfs::path("/some/path"));
+            local_file_map.map[bfs::path("my-file.txt")] = local_file;
 
-        folder->update(local_file_map);
-        CHECK(file->is_dirty() == false);
-        auto &lb = file->get_local_blocks();
-        REQUIRE(lb.size() == 2);
-        CHECK(lb[0] == b1);
-        CHECK(!lb[1]);
+            folder->update(local_file_map);
+            CHECK(!file->is_dirty());
+            CHECK(!file->is_incomplete());
+            auto &blocks = file->get_blocks();
+            CHECK(blocks.size() == 2);
+            CHECK(blocks[0] == b1);
+            CHECK(blocks[1] == b2);
+        }
 
-        SECTION("iterate only on blocks, which are n/a locally") {
-            auto it = file->iterate_blocks();
-            REQUIRE((bool)it);
-            auto fb = it.next();
-            CHECK(fb.file() == file.get());
-            CHECK(fb.block() == b3.get());
-            CHECK(fb.block_index() == 1);
-            CHECK(!it);
+        SECTION("incomplete temporally file, equal blocks sizes") {
+            local_file.blocks.emplace_back(b1);
+            local_file.blocks.emplace_back(b3);
+            local_file.temp = true;
+            auto local_file_map = model::local_file_map_t(bfs::path("/some/path"));
+            local_file_map.map[bfs::path("my-file.txt")] = local_file;
+
+            folder->update(local_file_map);
+            CHECK(file->is_dirty());
+            CHECK(file->is_incomplete());
+            auto &blocks = file->get_blocks();
+            CHECK(blocks.size() == 2);
+            CHECK(blocks[0] == b1);
+            CHECK(!blocks[1]);
+        }
+#endif
+
+        SECTION("incomplete temporally file, non-equal blocks sizes") {
+            local_file.blocks.emplace_back(b1);
+            local_file.blocks.emplace_back(b1);
+            local_file.blocks.emplace_back(b1);
+            local_file.temp = true;
+            auto local_file_map = model::local_file_map_t(bfs::path("/some/path"));
+            local_file_map.map[bfs::path("my-file.txt")] = local_file;
+
+            folder->update(local_file_map);
+            CHECK(file->is_dirty());
+            CHECK(file->is_incomplete());
+            auto &blocks = file->get_blocks();
+            CHECK(blocks.size() == 2);
+            CHECK(blocks[0] == b1);
+            CHECK(!blocks[1]);
         }
     }
 }

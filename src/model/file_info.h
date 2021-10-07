@@ -27,7 +27,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
 
     bool operator==(const file_info_t &other) const noexcept { return other.db_key == db_key; }
 
-    db::FileInfo serialize() noexcept;
+    db::FileInfo serialize(bool include_blocks = true) noexcept;
     void update(const proto::FileInfo &remote_info) noexcept;
     bool update(const local_file_t &local_file) noexcept;
 
@@ -39,9 +39,9 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     inline blocks_t &get_blocks() noexcept { return blocks; }
-    inline blocks_t &get_local_blocks() noexcept { return local_blocks; }
 
     void remove_blocks() noexcept;
+    void append_block(const model::block_info_ptr_t &block, size_t index) noexcept;
 
     inline bool is_file() noexcept { return type == proto::FileInfoType::FILE; }
     inline bool is_dir() noexcept { return type == proto::FileInfoType::DIRECTORY; }
@@ -50,22 +50,27 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
 
     static std::string generate_db_key(const std::string &name, const folder_info_t &folder) noexcept;
 
-    blocks_interator_t iterate_blocks() noexcept;
     inline std::int64_t get_size() const noexcept { return size; }
 
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 
-    bool mark_local_available(size_t block_index) noexcept;
+    void mark_local_available(size_t block_index) noexcept;
 
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
     const bfs::path &get_path() noexcept;
     bool is_older(const file_info_t &other) noexcept;
 
+    bool is_incomplete() const noexcept;
+    void mark_complete() noexcept;
+    void mark_incomplete() noexcept;
+
     void record_update(const device_t &source) noexcept;
     void after_sync() noexcept;
     file_info_ptr_t link(const device_ptr_t &target) noexcept;
+
     inline bool is_locked() const noexcept { return locked; }
+    void lock() noexcept;
     void unlock() noexcept;
 
     proto::FileInfo get() const noexcept;
@@ -75,7 +80,6 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     void generate_db_key(const std::string &name) noexcept;
     void remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks,
                       block_infos_map_t &deleted_blocks) noexcept;
-    bool is_incomplete() noexcept;
     template <typename Source> void fields_update(const Source &s) noexcept;
 
     folder_info_t *folder_info;
@@ -94,11 +98,10 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     std::string symlink_target;
     std::string db_key; /* folder_info db key + name */
     blocks_t blocks;
-    blocks_t local_blocks;
-    size_t local_blocks_count = 0;
     std::optional<bfs::path> path;
     std::string full_name;
     bool locked = false;
+    bool incomplete = false;
 
     friend struct blocks_interator_t;
 };

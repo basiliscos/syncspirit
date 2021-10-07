@@ -2,9 +2,8 @@
     - temp matches - should be appended
     - temp mismatches - should be overwritten later
 
-- в БД скидывать только те блоки, которые locally_available
-- отправлять те блоки, к-е locally_available
 
+- auto cleanup db: remove orphaned blocks
 - https://docs.syncthing.net/users/faq.html#is-it-syncthing-syncthing-or-syncthing
 - test: validation happens before opening file?
 - model: когда добавляется symlink, папка

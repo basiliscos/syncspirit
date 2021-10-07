@@ -1,47 +1,45 @@
 #include "block_iterator.h"
 #include "file_info.h"
+#include <cassert>
 
 using namespace syncspirit::model;
 
-blocks_interator_t::blocks_interator_t() noexcept : file{nullptr}, i{0} {}
-blocks_interator_t::blocks_interator_t(file_info_t &file_) noexcept : file{&file_}, i{0} {
-    prepare();
-    if (file) {
-        size_t j = 0;
-        auto &blocks = file->get_blocks();
-        auto &local = file->get_local_blocks();
-        auto max = std::min(local.size(), blocks.size());
-        while (j < max && local[j] && *local[j] == *blocks[j]) {
-            ++j;
-        }
-        i = j;
+blocks_interator_t::blocks_interator_t() noexcept : i{0}, source{nullptr}, target{nullptr} {}
+blocks_interator_t::blocks_interator_t(file_info_t &source_, file_info_t &target_) noexcept
+    : i{0}, source{&source_}, target{&target_} {
+    auto &sb = source->get_blocks();
+    auto &tb = target->get_blocks();
+    assert(sb.size() == tb.size() && "number of blocks should match");
+
+    size_t j = 0;
+    auto max = tb.size();
+    while (j < max && tb[j] && *tb[j] == *sb[j]) {
+        ++j;
     }
+    i = j;
+    prepare();
 }
 
 void blocks_interator_t::prepare() noexcept {
-    if (file) {
-        if (i >= file->blocks.size()) {
-            file = nullptr;
+    if (source) {
+        if (i >= source->blocks.size()) {
+            source = nullptr;
         }
     }
 }
 
-void blocks_interator_t::reset() noexcept { file = nullptr; }
+void blocks_interator_t::reset() noexcept { source = nullptr; }
 
 file_block_t blocks_interator_t::next() noexcept {
-    assert(file);
-    auto &blocks = file->blocks;
-    auto &local_blocks = file->local_blocks;
-    auto b = blocks[i].get();
-    block_info_t *result_block = b;
-    if (i < local_blocks.size()) {
-        auto lb = local_blocks[i].get();
-        if (!lb || *lb != *b) {
-            result_block = lb;
-        }
+    assert(source);
+    auto &sb = source->get_blocks();
+    auto &tb = target->get_blocks();
+    while (i < tb.size() && tb[i] && tb[i] == sb[i]) {
+        ++i;
     }
+
     auto index = i++;
-    auto file_ptr = file;
+    auto file = source;
     prepare();
-    return {b, file_ptr, index};
+    return {sb[index].get(), file, index};
 }

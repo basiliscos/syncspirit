@@ -19,7 +19,6 @@ file_info_t::file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_)
         block->link(this, i);
         blocks.emplace_back(std::move(block));
     }
-    local_blocks.resize(blocks.size());
     version = info_.version();
     full_name = fmt::format("{}/{}", folder_info->get_folder()->label(), get_name());
 }
@@ -65,11 +64,12 @@ std::string file_info_t::generate_db_key(const std::string &name, const folder_i
 
 file_info_t::~file_info_t() {
     for (auto &b : blocks) {
+        if (!b) {
+            continue;
+        }
         b->unlink(this);
     }
     blocks.clear();
-    // no need to unlink local blocks
-    local_blocks.clear();
 }
 
 std::string_view file_info_t::get_name() const noexcept {
@@ -78,7 +78,7 @@ std::string_view file_info_t::get_name() const noexcept {
     return std::string_view(ptr, db_key.size() - sizeof(std::uint64_t));
 }
 
-db::FileInfo file_info_t::serialize() noexcept {
+db::FileInfo file_info_t::serialize(bool include_blocks) noexcept {
     db::FileInfo r;
     auto name = get_name();
     r.set_name(name.data(), name.size());
@@ -96,10 +96,15 @@ db::FileInfo file_info_t::serialize() noexcept {
     r.set_block_size(block_size);
     r.set_symlink_target(symlink_target);
 
-    for (auto &block : blocks) {
-        auto db_key = block->get_db_key();
-        assert(db_key && "block have to be persisted first");
-        r.mutable_blocks_keys()->Add(db_key);
+    if (include_blocks) {
+        for (auto &block : blocks) {
+            if (!block) {
+                continue;
+            }
+            auto db_key = block->get_db_key();
+            assert(db_key && "block have to be persisted first");
+            r.mutable_blocks_keys()->Add(db_key);
+        }
     }
     return r;
 }
@@ -113,37 +118,58 @@ void file_info_t::update(const proto::FileInfo &remote_info) noexcept {
 }
 
 bool file_info_t::update(const local_file_t &local_file) noexcept {
-    bool matched = local_file.blocks.size() == blocks.size();
-    bool temp = matched && local_file.temp;
+    auto local_blocks = local_file.blocks;
+    bool matched = local_blocks.size() == blocks.size();
+    auto limit = std::min(local_blocks.size(), blocks.size());
     size_t i = 0;
-    for (; matched && i < local_file.blocks.size(); ++i) {
-        if (i < blocks.size()) {
-            auto &lb = local_file.blocks[i];
-            auto &sb = blocks[i];
-            if (*lb == *sb) {
-                lb->link(this, i);
-                lb->mark_local_available(this);
-            } else {
-                if (!temp) {
-                    matched = false;
-                }
-                break;
-            }
+    for (; i < limit; ++i) {
+        auto &lb = local_blocks[i];
+        auto &sb = blocks[i];
+        if (!(*lb == *sb)) {
+            matched = false;
+            break;
         }
     }
+
     if (matched) {
-        local_blocks.resize(blocks.size());
-        for (size_t j = 0; j < i; ++j) {
-            local_blocks[j] = blocks[j];
+        for (auto &b : blocks) {
+            b->mark_local_available(this);
+            ++i;
         }
     } else {
-        local_blocks = local_file.blocks;
-        blocks.resize(0);
-        i = 0;
+        size_t j = 0;
+        if (!local_file.temp) {
+            for (auto &b : blocks) {
+                b->unlink(this, true);
+            }
+            blocks = local_blocks;
+            for (auto &b : blocks) {
+                b->link(this, j++);
+                b->mark_local_available(this);
+            }
+        } else {
+            for (j = 0; j < i; ++j) {
+                auto &b = blocks[j];
+                b->link(this, j++);
+                b->mark_local_available(this);
+            }
+            for (j = i; j < blocks.size(); ++j) {
+                blocks[j]->unlink(this, true);
+                blocks[j] = nullptr;
+            }
+            mark_incomplete();
+            matched = true;
+        }
+        mark_dirty();
     }
-    local_blocks_count = i;
     return !matched;
 }
+
+bool file_info_t::is_incomplete() const noexcept { return incomplete; }
+
+void file_info_t::mark_complete() noexcept { incomplete = false; }
+
+void file_info_t::mark_incomplete() noexcept { incomplete = true; }
 
 void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
     auto &cluster = *folder_info->get_folder()->get_cluster();
@@ -177,7 +203,6 @@ void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
     for (auto &it : ex_blocks) {
         remove_block(it.second, blocks_map, deleted_blocks_map);
     }
-    local_blocks = blocks_t(blocks.size());
 }
 
 void file_info_t::remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks,
@@ -200,14 +225,13 @@ void file_info_t::remove_blocks() noexcept {
         mark_dirty();
     }
     blocks = blocks_t();
-    local_blocks = blocks_t();
 }
 
-blocks_interator_t file_info_t::iterate_blocks() noexcept {
-    if (local_blocks_count != local_blocks.size()) {
-        return blocks_interator_t(*this);
-    }
-    return blocks_interator_t();
+void file_info_t::append_block(const model::block_info_ptr_t &block, size_t index) noexcept {
+    assert(index < blocks.size() && "blocks should be reserve enough space");
+    blocks[index] = block;
+    block->link(this, index);
+    mark_dirty();
 }
 
 std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
@@ -215,16 +239,9 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     return block_size * block_index;
 }
 
-bool file_info_t::mark_local_available(size_t block_index) noexcept {
+void file_info_t::mark_local_available(size_t block_index) noexcept {
     blocks[block_index]->mark_local_available(this);
-    local_blocks[block_index] = blocks[block_index];
-    ++local_blocks_count;
     mark_dirty();
-    if (local_blocks_count == local_blocks.size()) {
-        spdlog::debug("{} is sync (by number of blocks, still unchecked)", get_full_name());
-        return true;
-    }
-    return false;
 }
 
 const boost::filesystem::path &file_info_t::get_path() noexcept {
@@ -245,23 +262,7 @@ void file_info_t::record_update(const device_t &source) noexcept {
     counter->set_value(value);
 }
 
-bool file_info_t::is_older(const file_info_t &other) noexcept {
-    if (sequence < other.sequence) {
-        return true;
-    }
-    for (auto &lb : local_blocks) {
-        if (!lb)
-            return true;
-    }
-    return false;
-}
-
-bool file_info_t::is_incomplete() noexcept {
-    if (local_blocks.empty()) {
-        return false;
-    }
-    return (bool)local_blocks[0];
-}
+bool file_info_t::is_older(const file_info_t &other) noexcept { return sequence < other.sequence; }
 
 file_info_ptr_t file_info_t::link(const device_ptr_t &target) noexcept {
     auto fi = folder_info->get_folder()->get_folder_info(target);
@@ -272,18 +273,31 @@ file_info_ptr_t file_info_t::link(const device_ptr_t &target) noexcept {
     auto &local_file_infos = local_folder_info->get_file_infos();
     auto local_file = local_file_infos.by_id(full_name);
     if (local_file) {
+        assert(local_file->get_sequence() <= sequence);
         /* is being synced */
         if (local_file->get_sequence() == sequence && local_file->is_incomplete()) {
             local_file->locked = true;
+            auto &cluster = *folder_info->get_folder()->get_cluster();
+            auto &blocks_map = cluster.get_blocks();
+            auto &deleted_blocks_map = cluster.get_deleted_blocks();
+            auto &local_blocks = local_file->get_blocks();
+            for (size_t j = blocks.size(); j < local_blocks.size(); ++j) {
+                local_file->remove_block(local_blocks[j], blocks_map, deleted_blocks_map);
+            }
+            local_blocks.resize(blocks.size());
             return local_file;
         }
         local_file_infos.remove(local_file);
     }
-    auto db = serialize();
+    auto db = serialize(false);
     local_file = new file_info_t(db, local_folder_info.get());
-    local_file->mark_dirty();
     local_file_infos.put(local_file);
+    local_file->mark_dirty();
     local_file->locked = true;
+    local_file->blocks.resize(blocks.size());
+    if (blocks.size()) {
+        local_file->mark_incomplete();
+    }
     return local_file;
 }
 
@@ -295,16 +309,9 @@ void file_info_t::after_sync() noexcept {
     }
 }
 
-void file_info_t::unlock() noexcept {
-    if (locked) {
-        size_t i = 0;
-        while (i < local_blocks_count && local_blocks[i]) {
-            ++i;
-        }
-        local_blocks_count = i;
-        locked = false;
-    }
-}
+void file_info_t::unlock() noexcept { locked = false; }
+
+void file_info_t::lock() noexcept { locked = true; }
 
 proto::FileInfo file_info_t::get() const noexcept {
     proto::FileInfo r;

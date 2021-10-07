@@ -51,7 +51,7 @@ TRY_ANEW:
         }
         auto needs_update = !local_file->is_locked() &&
                             (local_file->is_older(*file) ||
-                             (local_file->get_sequence() == file->get_sequence() && local_file->is_dirty()));
+                             (local_file->get_sequence() == file->get_sequence() && local_file->is_incomplete()));
         if (needs_update) {
             return;
         }
@@ -62,7 +62,7 @@ TRY_ANEW:
 void file_interator_t::reset() noexcept { cluster = nullptr; }
 
 file_info_ptr_t file_interator_t::next() noexcept {
-    file_info_ptr_t r = file->link(cluster->get_device());
+    auto r = file_info_ptr_t(file);
     prepare();
     return r;
 }

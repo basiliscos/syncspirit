@@ -180,8 +180,9 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
         for (auto &it : file_infos) {
             auto &fi = it.second;
             auto folder_info = fi->get_folder_info();
-            LOG_TRACE(log, "{}, on_cluster_load {}:{}:{} (seq = {})", identity, folder_info->get_folder()->label(),
-                      folder_info->get_device()->device_id.get_short(), fi->get_name(), fi->get_sequence());
+            LOG_TRACE(log, "{}, on_cluster_load {}:{}:{} (seq = {}, blocks = {})", identity,
+                      folder_info->get_folder()->label(), folder_info->get_device()->device_id.get_short(),
+                      fi->get_name(), fi->get_sequence(), fi->get_blocks().size());
             folder_info->add(fi);
         }
     }

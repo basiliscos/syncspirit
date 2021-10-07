@@ -111,16 +111,18 @@ struct controller_actor_t : public r::actor_base_t {
     using clone_queue_t = std::list<clone_block_t>;
     struct write_info_t {
         using opened_file_t = fs::opened_file_t;
+        write_info_t(const model::file_info_ptr_t &file) noexcept;
+
         blocks_queue_t validated_blocks;
         clone_queue_t clone_queue;
         opened_file_t sink;
         model::file_info_ptr_t file;
         std::uint_fast32_t pending_blocks;
-        bool final = false;
-        bool opening = false;
+        size_t blocks_left;
+        bool opening;
 
-        inline bool done() const noexcept { return clone_queue.empty() && validated_blocks.empty(); }
-        inline bool complete() const noexcept { return final && pending_blocks == 0 && done(); }
+        bool done() const noexcept;
+        bool complete() const noexcept;
     };
 
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
