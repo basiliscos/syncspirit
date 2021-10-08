@@ -12,7 +12,6 @@
 - inactivity-shutdowner
 - when file downloading complete, update in DB it's sequence
 - start syncing folder when new folder has been added, нужно слать cancel{}
-- void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept { std::abort(); }
 - Canonicalize, TempNameWithPrefix, TempName
 - локальные таймстемпы?
 - metadata (timestamp, etc.)

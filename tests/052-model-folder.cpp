@@ -77,7 +77,7 @@ TEST_CASE("folder, update local files", "[model]") {
         REQUIRE(file->get_blocks().size() == 2);
 
         model::local_file_t local_file;
-#if 0
+
         SECTION("fs blocks match db blocks") {
             local_file.blocks.emplace_back(b1);
             local_file.blocks.emplace_back(b2);
@@ -108,7 +108,6 @@ TEST_CASE("folder, update local files", "[model]") {
             CHECK(blocks[0] == b1);
             CHECK(!blocks[1]);
         }
-#endif
 
         SECTION("incomplete temporally file, non-equal blocks sizes") {
             local_file.blocks.emplace_back(b1);
