@@ -36,7 +36,7 @@ file_info_t::file_info_t(const proto::FileInfo &info_, folder_info_t *folder_inf
 template <typename Source> void file_info_t::fields_update(const Source &s) noexcept {
     sequence = s.sequence();
     type = s.type();
-    size = s.size();
+    set_size(s.size());
     permissions = s.permissions();
     modified_s = s.modified_s();
     modified_ns = s.modified_ns();

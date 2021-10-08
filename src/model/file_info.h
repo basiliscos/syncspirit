@@ -51,6 +51,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     static std::string generate_db_key(const std::string &name, const folder_info_t &folder) noexcept;
 
     inline std::int64_t get_size() const noexcept { return size; }
+    inline void set_size(std::int64_t value) noexcept { size = value; }
 
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 

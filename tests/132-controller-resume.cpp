@@ -163,6 +163,26 @@ void test_resume() {
                 auto b = model::block_info_ptr_t(new model::block_info_t(db_b, 99));
                 cluster->get_blocks().put(b);
                 file->remove_blocks();
+                file->get_blocks().resize(2);
+                file->append_block(b, 0ul);
+                file->append_block(b, 1ul);
+
+                create_controller();
+                CHECK(read_file(path) == "1234567890");
+            }
+
+            SECTION("non-matching garbage will be overwritten (different file size)") {
+                write_file(tmp_path, "000000000000000");
+
+                peer->push_response("12345");
+                peer->push_response("67890", 1);
+                db::BlockInfo db_b;
+                db_b.set_hash(utils::sha256_digest("00000").value());
+                db_b.set_size(5);
+                auto b = model::block_info_ptr_t(new model::block_info_t(db_b, 99));
+                cluster->get_blocks().put(b);
+                file->set_size(15);
+                file->remove_blocks();
                 file->get_blocks().resize(3);
                 file->append_block(b, 0ul);
                 file->append_block(b, 1ul);
