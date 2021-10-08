@@ -1,7 +1,7 @@
 - test: continue downloading temporaries
-    - temp matches - should be appended
     - temp mismatches - should be overwritten later
-
+    - damaged temp
+    - (open_file) if target_file is temp, and it's size mismatches, overwrite it
 
 - auto cleanup db: remove orphaned blocks
 - https://docs.syncthing.net/users/faq.html#is-it-syncthing-syncthing-or-syncthing

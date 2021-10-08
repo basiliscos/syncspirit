@@ -53,8 +53,15 @@ TEST_CASE("linked file", "[model]") {
     db_b2.set_weak_hash(23u);
     auto b2 = model::block_info_ptr_t(new model::block_info_t(db_b2, ++key));
 
+    db::BlockInfo db_b3;
+    db_b3.set_hash("h3");
+    db_b3.set_size(5);
+    db_b3.set_weak_hash(23u);
+    auto b3 = model::block_info_ptr_t(new model::block_info_t(db_b3, ++key));
+
     cluster->get_blocks().put(b1);
     cluster->get_blocks().put(b2);
+    cluster->get_blocks().put(b3);
 
     db::FileInfo db_file_11;
     db_file_11.set_sequence(++key);
@@ -64,7 +71,6 @@ TEST_CASE("linked file", "[model]") {
     db_file_11.add_blocks_keys(b2->get_db_key());
     auto source = model::file_info_ptr_t(new model::file_info_t(db_file_11, fi1_peer.get()));
     fi1_peer->add(source);
-
     SECTION("target file is missing") {
         auto target = source->link(d1);
         REQUIRE(target);
@@ -123,6 +129,58 @@ TEST_CASE("linked file", "[model]") {
         CHECK(t2->get_blocks()[0] == b1);
         CHECK(!t2->get_blocks()[1]);
     }
+
+    SECTION("target file is incomplete, has a garbage blocks") {
+        db::FileInfo db_file_12;
+        db_file_12.set_sequence(db_file_11.sequence());
+        db_file_12.set_name("zzz");
+        db_file_12.set_size(1024);
+        db_file_12.add_blocks_keys(b3->get_db_key());
+        auto target = model::file_info_ptr_t(new model::file_info_t(db_file_12, fi1_my.get()));
+        target->mark_incomplete();
+        fi1_my->add(target);
+        REQUIRE(target->get_blocks().size() == 1);
+
+        auto t2 = source->link(d1);
+        REQUIRE(t2);
+        CHECK(t2 == target);
+        CHECK(t2->is_locked());
+        CHECK(!t2->is_dirty());
+        REQUIRE(t2->get_blocks().size() == 2);
+        CHECK(!t2->get_blocks()[0]);
+        CHECK(!t2->get_blocks()[1]);
+    }
+
+    SECTION("target file has different size") {
+        db::FileInfo db_file_12;
+        db_file_12.set_sequence(db_file_11.sequence());
+        db_file_12.set_name("zzz");
+        db_file_12.set_size(1024 * 2);
+        db_file_12.add_blocks_keys(b2->get_db_key());
+        auto target = model::file_info_ptr_t(new model::file_info_t(db_file_12, fi1_my.get()));
+        target->mark_incomplete();
+        fi1_my->add(target);
+        REQUIRE(target->get_blocks().size() == 1);
+
+        auto t2 = source->link(d1);
+        REQUIRE(t2);
+        CHECK(t2 != target);
+        CHECK(t2->is_locked());
+        CHECK(t2->is_dirty());
+        REQUIRE(t2->get_blocks().size() == 2);
+        CHECK(!t2->get_blocks()[0]);
+        CHECK(!t2->get_blocks()[1]);
+    }
+    SECTION("block duplicates") {
+        db::FileInfo db_file;
+        db_file.set_sequence(db_file_11.sequence());
+        db_file.set_name("zzz");
+        db_file.set_size(1024);
+        db_file.add_blocks_keys(b3->get_db_key());
+        db_file.add_blocks_keys(b3->get_db_key());
+        db_file.add_blocks_keys(b3->get_db_key());
+        auto target = model::file_info_ptr_t(new model::file_info_t(db_file, fi1_my.get()));
+    }
 }
 
 TEST_CASE("blocks deleteion", "[model]") {
@@ -164,7 +222,6 @@ TEST_CASE("blocks deleteion", "[model]") {
         db_file.mutable_blocks_keys()->Add(1);
         auto file = model::file_info_ptr_t(new model::file_info_t(db_file, folder_info.get()));
         REQUIRE(file->get_blocks().front() == block);
-
         proto::FileInfo pr_file;
         pr_file.set_name("my-file.txt");
         pr_file.set_sequence(15);
@@ -176,6 +233,7 @@ TEST_CASE("blocks deleteion", "[model]") {
 
         REQUIRE(!dm.by_id(block->get_hash()));
         file->update(pr_file);
+        CHECK(dm.size() == 1);
         CHECK(file->is_deleted());
         CHECK(file->get_blocks().size() == 0);
         CHECK(block->is_deleted());

@@ -42,12 +42,13 @@ void file_actor_t::on_open(message::open_request_t &req) noexcept {
     bio::mapped_file_params params;
     params.path = path.string();
     params.flags = bio::mapped_file::mapmode::readwrite;
-    if (!bfs::exists(path)) {
-        params.new_file_size = payload.file_size;
-    }
 
     auto file = std::make_unique<typename opened_file_t::element_type>();
     try {
+        if (!bfs::exists(path) || bfs::file_size(path) != payload.file_size) {
+            params.new_file_size = payload.file_size;
+        }
+
         file->open(params);
     } catch (const std::exception &ex) {
         LOG_ERROR(log, "{}, error opening file {}: {}", identity, params.path, ex.what());

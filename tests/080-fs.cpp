@@ -74,9 +74,27 @@ TEST_CASE("fs-actor", "[fs]") {
 
         const std::string data = "123456980";
         auto path = root_path / "my-dir" / "my-file";
+
+        SECTION("size mismatch => content is erased") {
+            auto tmp_path = path.parent_path() / "my-file.syncspirit-tmp";
+            write_file(tmp_path, "12345");
+            act->open_request(path, data.size());
+            sup->do_process();
+
+            REQUIRE(act->open_response);
+            auto &r = act->open_response->payload;
+            CHECK(!r.ee);
+            auto &file = r.res->file;
+            CHECK(file);
+
+            const char zeroes[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+            auto eq = std::equal(zeroes, zeroes + sizeof(zeroes), file->data());
+            CHECK(eq);
+        }
+
         act->open_request(path, data.size());
 
-        SECTION("success case") {
+        SECTION("open missing file") {
             sup->do_process();
 
             REQUIRE(act->open_response);

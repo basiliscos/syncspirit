@@ -67,9 +67,11 @@ file_info_t::~file_info_t() {
         if (!b) {
             continue;
         }
-        b->unlink(this);
+        auto indices = b->unlink(this);
+        for (auto i : indices) {
+            blocks[i].reset();
+        }
     }
-    blocks.clear();
 }
 
 std::string_view file_info_t::get_name() const noexcept {
@@ -198,19 +200,26 @@ void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
         }
         blocks.emplace_back(std::move(block));
     }
-
     auto &deleted_blocks_map = cluster.get_deleted_blocks();
     for (auto &it : ex_blocks) {
-        remove_block(it.second, blocks_map, deleted_blocks_map);
+        remove_block(it.second, blocks_map, deleted_blocks_map, false);
     }
 }
 
 void file_info_t::remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks,
-                               block_infos_map_t &deleted_blocks) noexcept {
-    bool last = block->unlink(this, true);
-    if (last) {
+                               block_infos_map_t &deleted_blocks, bool zero_indices) noexcept {
+    if (!block) {
+        return;
+    }
+    auto indices = block->unlink(this, true);
+    if (block->is_deleted()) {
         deleted_blocks.put(block);
         cluster_blocks.remove(block);
+    }
+    if (zero_indices) {
+        for (auto i : indices) {
+            blocks[i] = nullptr;
+        }
     }
 }
 
@@ -224,7 +233,7 @@ void file_info_t::remove_blocks() noexcept {
     if (blocks.size()) {
         mark_dirty();
     }
-    blocks = blocks_t();
+    blocks.clear();
 }
 
 void file_info_t::append_block(const model::block_info_ptr_t &block, size_t index) noexcept {
@@ -275,13 +284,22 @@ file_info_ptr_t file_info_t::link(const device_ptr_t &target) noexcept {
     if (local_file) {
         assert(local_file->get_sequence() <= sequence);
         /* is being synced */
-        if (local_file->get_sequence() == sequence && local_file->is_incomplete()) {
+        bool match =
+            (local_file->get_sequence() == sequence) && (local_file->size == size) && local_file->is_incomplete();
+        if (match) {
             local_file->locked = true;
             auto &cluster = *folder_info->get_folder()->get_cluster();
             auto &blocks_map = cluster.get_blocks();
             auto &deleted_blocks_map = cluster.get_deleted_blocks();
             auto &local_blocks = local_file->get_blocks();
-            for (size_t j = blocks.size(); j < local_blocks.size(); ++j) {
+            size_t j = 0;
+            for (; j < blocks.size() && j < local_blocks.size(); ++j) {
+                auto &lb = local_blocks[j];
+                if (!lb || (*lb != *blocks[j])) {
+                    break;
+                }
+            }
+            for (; j < local_blocks.size(); ++j) {
                 local_file->remove_block(local_blocks[j], blocks_map, deleted_blocks_map);
             }
             local_blocks.resize(blocks.size());

@@ -16,6 +16,8 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 struct file_block_t;
 
 struct block_info_t : arc_base_t<block_info_t>, storeable_t {
+    using removed_incides_t = std::vector<size_t>;
+
     block_info_t(const db::BlockInfo &db_block, std::uint64_t db_key_ = 0) noexcept;
     block_info_t(const proto::BlockInfo &block) noexcept;
 
@@ -29,7 +31,7 @@ struct block_info_t : arc_base_t<block_info_t>, storeable_t {
 
     db::BlockInfo serialize() noexcept;
     void link(file_info_t *file_info, size_t block_index) noexcept;
-    bool unlink(file_info_t *file_info, bool deletion = false) noexcept;
+    removed_incides_t unlink(file_info_t *file_info, bool deletion = false) noexcept;
 
     void mark_local_available(file_info_t *file_info) noexcept;
     file_block_t local_file() noexcept;

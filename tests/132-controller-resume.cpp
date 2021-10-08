@@ -117,36 +117,57 @@ void test_resume() {
             auto index_ptr = proto::message::Index(std::make_unique<proto::Index>(index));
             peer->send<payload::forwarded_message_t>(controller->get_address(), std::move(index_ptr));
 
+            peer->push_response("12345");
+            sup->do_process();
+
+            peer->do_shutdown();
+            sup->do_process();
+
+            auto tmp_path = dir / "a.txt.syncspirit-tmp";
+            CHECK(read_file(tmp_path).size() == 10);
+
+            auto &file_infos = folder->get_folder_info(device_my)->get_file_infos();
+            auto file = file_infos.by_id("my-folder/a.txt");
+            REQUIRE(file);
+            CHECK(!file->is_locked());
+            CHECK(!file->is_dirty());
+            CHECK(file->get_sequence() == fi.sequence());
+            CHECK(file->is_incomplete());
+
+            auto &blocks = file->get_blocks();
+            CHECK(blocks[0]);
+            CHECK(blocks[0]->get_hash() == bi1.hash());
+            CHECK(!blocks[1]);
+
+            peer_cluster_config = payload::cluster_config_ptr_t(new proto::ClusterConfig(p_cluster));
+            auto timeout = r::pt::milliseconds{10};
+            peer = sup->create_actor<sample_peer_t>().timeout(timeout).finish();
+
+            pre_run();
+            CHECK(file->get_folder_info()->get_file_infos().size() == 1);
+
             SECTION("artificial start") {
-                peer->push_response("12345");
-                sup->do_process();
-
-                peer->do_shutdown();
-                sup->do_process();
-
-                auto tmp_path = dir / "a.txt.syncspirit-tmp";
-                CHECK(read_file(tmp_path).size() == 10);
-
-                auto &file_infos = folder->get_folder_info(device_my)->get_file_infos();
-                auto file = file_infos.by_id("my-folder/a.txt");
-                REQUIRE(file);
-                CHECK(!file->is_locked());
-                CHECK(!file->is_dirty());
-                CHECK(file->get_sequence() == fi.sequence());
-                CHECK(file->is_incomplete());
-
-                auto &blocks = file->get_blocks();
-                CHECK(blocks[0]);
-                CHECK(blocks[0]->get_hash() == bi1.hash());
-                CHECK(!blocks[1]);
-
-                peer_cluster_config = payload::cluster_config_ptr_t(new proto::ClusterConfig(p_cluster));
-                auto timeout = r::pt::milliseconds{10};
-                peer = sup->create_actor<sample_peer_t>().timeout(timeout).finish();
                 peer->push_response("67890", 1);
-                pre_run();
-                CHECK(file->get_folder_info()->get_file_infos().size() == 1);
-                CHECK(file->is_incomplete());
+                create_controller();
+                CHECK(read_file(path) == "1234567890");
+            }
+
+            SECTION("non-matching garbage will be overwritten (same file size)") {
+                write_file(tmp_path, "0000000000");
+
+                peer->push_response("12345");
+                peer->push_response("67890", 1);
+                db::BlockInfo db_b;
+                db_b.set_hash(utils::sha256_digest("00000").value());
+                db_b.set_size(5);
+                auto b = model::block_info_ptr_t(new model::block_info_t(db_b, 99));
+                cluster->get_blocks().put(b);
+                file->remove_blocks();
+                file->get_blocks().resize(3);
+                file->append_block(b, 0ul);
+                file->append_block(b, 1ul);
+                file->append_block(b, 2ul);
+
                 create_controller();
                 CHECK(read_file(path) == "1234567890");
             }

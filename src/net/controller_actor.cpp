@@ -36,8 +36,9 @@ controller_actor_t::write_info_t::write_info_t(const model::file_info_ptr_t &fil
     auto &blocks = file->get_blocks();
     blocks_left = blocks.size();
     for (auto &b : blocks) {
-        if (b)
+        if (b) {
             blocks_left--;
+        }
     }
 }
 

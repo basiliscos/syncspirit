@@ -3,6 +3,7 @@
 #include <functional>
 #include "rotor.hpp"
 #include "net/messages.h"
+#include "utils/log.h"
 
 
 namespace syncspirit::test {
@@ -32,6 +33,7 @@ struct sample_peer_t : r::actor_base_t {
     void on_block_request(message::block_request_t &req) noexcept;
     void push_response(const std::string& data, size_t index = next_block) noexcept;
 
+    utils::logger_t log;
     responses_t responses;
     size_t start_reading = 0;
     configure_callback_t configure_callback;
