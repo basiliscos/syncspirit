@@ -1,20 +1,18 @@
 #include "fixture.h"
 #include "test-utils.h"
-#include "net/db_actor.h"
+//#include "net/db_actor.h"
+#include "sample_db.h"
 #include "net/names.h"
 #include "access.h"
 #include "hasher/hasher_actor.h"
 #include "hasher/hasher_proxy_actor.h"
 #include "catch.hpp"
 
-
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
 
-Fixture::Fixture() {
-    utils::set_default("trace");
-}
+Fixture::Fixture() { utils::set_default("trace"); }
 
 void Fixture::run() {
     root_path = bfs::unique_path();
@@ -43,8 +41,13 @@ void Fixture::run() {
     sup->start();
     sup->create_actor<fs::file_actor_t>().timeout(timeout).finish();
     sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
-    sup->create_actor<hasher::hasher_proxy_actor_t>().hasher_threads(1).name(names::hasher_proxy).timeout(timeout).finish();
-    sup->create_actor<db_actor_t>().db_dir((root_path / "db").string()).device(device_my).timeout(timeout).finish();
+    sup->create_actor<hasher::hasher_proxy_actor_t>()
+        .hasher_threads(1)
+        .name(names::hasher_proxy)
+        .timeout(timeout)
+        .finish();
+    // sup->create_actor<db_actor_t>().db_dir((root_path / "db").string()).device(device_my).timeout(timeout).finish();
+    sup->create_actor<sample_db_t>().timeout(timeout).finish();
     peer = sup->create_actor<sample_peer_t>().timeout(timeout).finish();
 
     pre_run();
@@ -83,15 +86,7 @@ void Fixture::create_controller() {
     REQUIRE(!reason);
 }
 
+void Fixture::setup() {}
 
-
-void Fixture::setup() {
-}
-
-void Fixture::pre_run() {
-
-}
-void Fixture::main() {
-
-}
-
+void Fixture::pre_run() {}
+void Fixture::main() {}

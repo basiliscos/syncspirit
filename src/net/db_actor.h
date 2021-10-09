@@ -44,6 +44,8 @@ struct db_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
 
+    template <typename T> auto &access() noexcept;
+
   private:
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
     void on_store_ignored_device(message::store_ignored_device_request_t &message) noexcept;

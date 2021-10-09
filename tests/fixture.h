@@ -12,7 +12,6 @@ namespace syncspirit::test {
 namespace bfs = boost::filesystem;
 namespace payload = syncspirit::net::payload;
 
-
 struct Fixture {
     model::device_ptr_t device_my;
     model::device_ptr_t device_peer;
@@ -32,7 +31,6 @@ struct Fixture {
 
     void run();
     uint64_t seq = 1;
-
 };
 
-};
+}; // namespace syncspirit::test

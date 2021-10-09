@@ -69,8 +69,10 @@ TEST_CASE("linked file", "[model]") {
     db_file_11.set_size(1024);
     db_file_11.add_blocks_keys(b1->get_db_key());
     db_file_11.add_blocks_keys(b2->get_db_key());
+
     auto source = model::file_info_ptr_t(new model::file_info_t(db_file_11, fi1_peer.get()));
     fi1_peer->add(source);
+
     SECTION("target file is missing") {
         auto target = source->link(d1);
         REQUIRE(target);
@@ -90,7 +92,7 @@ TEST_CASE("linked file", "[model]") {
         db_file_12.set_sequence(db_file_11.sequence() - 1);
         db_file_12.set_name("zzz");
         db_file_12.set_size(1024);
-        db_file_12.add_blocks_keys(b1->get_db_key());
+        db_file_12.add_blocks_keys(b3->get_db_key());
         auto target = model::file_info_ptr_t(new model::file_info_t(db_file_12, fi1_peer.get()));
         fi1_my->add(target);
 
@@ -107,6 +109,10 @@ TEST_CASE("linked file", "[model]") {
         CHECK(t2->get_blocks().size() == source->get_blocks().size());
         CHECK(!t2->get_blocks()[0]);
         CHECK(!t2->get_blocks()[1]);
+
+        REQUIRE(cluster->get_blocks().size() == 2);
+        REQUIRE(cluster->get_deleted_blocks().size() == 1);
+        REQUIRE(cluster->get_deleted_blocks().begin()->second == b3);
     }
 
     SECTION("target file is incomplete") {

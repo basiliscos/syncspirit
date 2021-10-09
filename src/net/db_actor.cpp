@@ -448,6 +448,7 @@ outcome::result<void> db_actor_t::save(db::transaction_t &txn, model::folder_inf
     if (!r) {
         return r;
     }
+    deleted_blocks_map.clear();
 
     folder.get_folder_infos().put(folder_info);
     return outcome::success();
@@ -513,11 +514,22 @@ void db_actor_t::on_store_file(message::store_file_request_t &message) noexcept 
         fi->unmark_dirty();
     }
 
+    auto &folder = *folder_info->get_folder();
+    auto &cluster = *folder.get_cluster();
+    auto &deleted_blocks_map = cluster.get_deleted_blocks();
+    r = db::remove(deleted_blocks_map, txn);
+    if (!r) {
+        reply_with_error(message, make_error(r.error()));
+        return;
+    }
+
     r = txn.commit();
     if (!r) {
         reply_with_error(message, make_error(r.error()));
         return;
     }
+
+    deleted_blocks_map.clear();
 
     auto &map = folder_info->get_file_infos();
     map.put(file);

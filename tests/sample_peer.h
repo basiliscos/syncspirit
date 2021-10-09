@@ -5,7 +5,6 @@
 #include "net/messages.h"
 #include "utils/log.h"
 
-
 namespace syncspirit::test {
 
 namespace r = rotor;
@@ -23,15 +22,12 @@ struct sample_peer_t : r::actor_base_t {
 
     using responses_t = std::list<response_t>;
     using requests_t = std::list<request_ptr_t>;
-
-
-
     using r::actor_base_t::actor_base_t;
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start_reading(message::start_reading_t &) noexcept;
     void on_block_request(message::block_request_t &req) noexcept;
-    void push_response(const std::string& data, size_t index = next_block) noexcept;
+    void push_response(const std::string &data, size_t index = next_block) noexcept;
 
     utils::logger_t log;
     responses_t responses;
@@ -40,5 +36,4 @@ struct sample_peer_t : r::actor_base_t {
     requests_t requests;
 };
 
-
-}
+} // namespace syncspirit::test

@@ -12,8 +12,10 @@ find_package(OpenSSL REQUIRED)
 
 add_library(syncspirit_test_lib
     fixture.cpp
+    sample_db.cpp
     sample_peer.cpp
     test_supervisor.cpp
+    test-db.cpp
     test-main.cpp
 )
 target_link_libraries(syncspirit_test_lib syncspirit_lib)
@@ -112,4 +114,8 @@ add_test(131-controller-indexupdate "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/131-contr
 add_executable(132-controller-resume 132-controller-resume.cpp)
 target_link_libraries(132-controller-resume syncspirit_test_lib)
 add_test(132-controller-resume "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/132-controller-resume")
+
+add_executable(133-controller-download 133-controller-download.cpp)
+target_link_libraries(133-controller-download syncspirit_test_lib)
+add_test(133-controller-download "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/133-controller-download")
 

@@ -306,6 +306,7 @@ file_info_ptr_t file_info_t::link(const device_ptr_t &target) noexcept {
             local_blocks.resize(blocks.size());
             return local_file;
         }
+        local_file->remove_blocks();
         local_file_infos.remove(local_file);
     }
     auto db = serialize(false);

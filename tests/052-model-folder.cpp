@@ -204,5 +204,4 @@ TEST_CASE("network update", "[model]") {
         CHECK(cluster->get_deleted_blocks().size() == 1);
         CHECK(cluster->get_deleted_blocks().by_id(b1->get_hash()));
     }
-
 }

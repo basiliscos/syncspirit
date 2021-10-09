@@ -11,6 +11,7 @@ struct path_guard_t {
     bfs::path& path;
     path_guard_t(bfs::path& path_): path{path_}{}
     ~path_guard_t() {
+        if (!getenv("SYNCSPIRIT_TEST_KEEP_PATH"))
         bfs::remove_all(path);
     }
 };

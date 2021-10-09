@@ -1,5 +1,6 @@
 #include "catch.hpp"
 #include "test-utils.h"
+#include "test-db.h"
 #include "access.h"
 #include "model/cluster.h"
 #include "db/utils.h"
@@ -7,38 +8,8 @@
 
 using namespace syncspirit;
 using namespace syncspirit::db;
+using namespace syncspirit::test;
 namespace fs = boost::filesystem;
-
-struct env_t {
-    MDBX_env *env;
-    fs::path path;
-    ~env_t() {
-        if (env) {
-            mdbx_env_close(env);
-        }
-        // std::cout << path.c_str() << "\n";
-        fs::remove_all(path);
-    }
-};
-
-static env_t mk_env() {
-    auto path = fs::unique_path();
-    MDBX_env *env;
-    auto r = mdbx_env_create(&env);
-    assert(r == MDBX_SUCCESS);
-    MDBX_env_flags_t flags =
-        MDBX_EXCLUSIVE | MDBX_SAFE_NOSYNC | MDBX_WRITEMAP | MDBX_NOTLS | MDBX_COALESCE | MDBX_LIFORECLAIM;
-    r = mdbx_env_open(env, path.c_str(), flags, 0664);
-    assert(r == MDBX_SUCCESS);
-    // std::cout << path.c_str() << "\n";
-    return env_t{env, std::move(path)};
-}
-
-static transaction_t mk_txn(env_t &env, transaction_type_t type) {
-    auto r = db::make_transaction(type, env.env);
-    assert((bool)r);
-    return std::move(r.value());
-}
 
 TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
     auto env = mk_env();

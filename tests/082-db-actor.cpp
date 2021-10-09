@@ -1,5 +1,6 @@
 #include "catch.hpp"
 #include "test-utils.h"
+#include "test-db.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "net/db_actor.h"
@@ -8,17 +9,31 @@
 #include <ostream>
 #include <fstream>
 #include <net/names.h>
+#include <db/utils.h>
 
 namespace r = rotor;
 namespace st = syncspirit::test;
 namespace bfs = boost::filesystem;
+
 using namespace syncspirit;
 using namespace syncspirit::net;
+using namespace syncspirit::test;
+
+namespace {
+struct env {};
+} // namespace
+
+namespace syncspirit::net {
+
+template <> inline auto &db_actor_t::access<env>() noexcept { return env; }
+
+} // namespace syncspirit::net
 
 struct db_consumer_t : r::actor_base_t {
     r::address_ptr_t target;
     r::intrusive_ptr_t<message::store_new_folder_response_t> new_folder_res;
-    r::intrusive_ptr_t<message::store_folder_info_response_t> file_info_res;
+    r::intrusive_ptr_t<message::store_folder_info_response_t> folder_info_res;
+    r::intrusive_ptr_t<message::store_file_response_t> file_info_res;
     r::intrusive_ptr_t<message::load_cluster_response_t> cluster_res;
 
     using r::actor_base_t::actor_base_t;
@@ -29,6 +44,7 @@ struct db_consumer_t : r::actor_base_t {
             [&](auto &p) { p.discover_name(names::db, target, true).link(true); });
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
             p.subscribe_actor(&db_consumer_t::on_new_folder);
+            p.subscribe_actor(&db_consumer_t::on_folder_info);
             p.subscribe_actor(&db_consumer_t::on_file_info);
             p.subscribe_actor(&db_consumer_t::on_cluster);
         });
@@ -36,7 +52,9 @@ struct db_consumer_t : r::actor_base_t {
 
     void on_new_folder(message::store_new_folder_response_t &res) noexcept { new_folder_res = &res; }
 
-    void on_file_info(message::store_folder_info_response_t &res) noexcept { file_info_res = &res; }
+    void on_folder_info(message::store_folder_info_response_t &res) noexcept { folder_info_res = &res; }
+
+    void on_file_info(message::store_file_response_t &res) noexcept { file_info_res = &res; }
 
     void on_cluster(message::load_cluster_response_t &res) noexcept { cluster_res = &res; }
 };
@@ -104,9 +122,9 @@ TEST_CASE("db-actor", "[db]") {
     act->request<payload::store_folder_info_request_t>(db_addr, fi).send(timeout);
 
     sup->do_process();
-    REQUIRE(act->file_info_res);
-    REQUIRE(!act->file_info_res->payload.ee);
-    auto &block = *file->get_blocks().begin();
+    REQUIRE(act->folder_info_res);
+    REQUIRE(!act->folder_info_res->payload.ee);
+    auto block = *file->get_blocks().begin();
     CHECK(block->get_db_key());
 
     // check cluster loading
@@ -121,8 +139,8 @@ TEST_CASE("db-actor", "[db]") {
     auto &cluster_2 = act->cluster_res->payload.res.cluster;
     REQUIRE(cluster_2->get_folders().size() == 1);
 
-    auto &blocks = cluster_2->get_blocks();
-    CHECK(blocks.size() == 1);
+    auto &blocks_2 = cluster_2->get_blocks();
+    CHECK(blocks_2.size() == 1);
 
     auto folder_2 = cluster_2->get_folders().by_key(folder->get_db_key());
     REQUIRE(folder_2);
@@ -139,13 +157,39 @@ TEST_CASE("db-actor", "[db]") {
     REQUIRE(fi_2->get_file_infos().size() == 1);
 
     // remove block, save and load cluster
+    auto &deleted_blocks = cluster->get_deleted_blocks();
+    auto &blocks = cluster->get_blocks();
     file->remove_blocks();
+    CHECK(blocks.size() == 0);
+    CHECK(deleted_blocks.size() == 1);
     fi->mark_dirty();
-    act->file_info_res.reset();
+    act->folder_info_res.reset();
     act->request<payload::store_folder_info_request_t>(db_addr, fi).send(timeout);
     sup->do_process();
-    REQUIRE(act->cluster_res);
-    REQUIRE(!act->cluster_res->payload.ee);
+    REQUIRE(act->folder_info_res);
+    REQUIRE(!act->folder_info_res->payload.ee);
+    CHECK(blocks.size() == 0);
+    CHECK(deleted_blocks.size() == 0);
+
+    // block have to be stored first
+    auto my_env = db->access<env>();
+    auto txr = db::make_transaction(db::transaction_type_t::RW, my_env);
+    REQUIRE(txr);
+    auto &txn = txr.assume_value();
+    auto r = db::store_block_info(block, txn);
+    REQUIRE(r);
+    REQUIRE(txn.commit());
+
+    blocks.put(block);
+    file->get_blocks().resize(1);
+    file->append_block(block, 0);
+    file->remove_blocks();
+    act->request<payload::store_file_request_t>(db_addr, file).send(timeout);
+    sup->do_process();
+    REQUIRE(act->file_info_res);
+    REQUIRE(!act->file_info_res->payload.ee);
+    CHECK(deleted_blocks.size() == 0);
+    CHECK(blocks.size() == 0);
 
     act->cluster_res.reset();
     act->request<payload::load_cluster_request_t>(db_addr).send(timeout);

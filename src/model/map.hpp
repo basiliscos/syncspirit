@@ -58,6 +58,11 @@ template <typename Item, typename Id, typename Key = std::uint64_t> struct gener
 
     const_iterator end() const noexcept { return key2d.cend(); }
 
+    void clear() noexcept {
+        id2d.clear();
+        key2d.clear();
+    }
+
     /*  private: */
     id2d_t id2d;
     key2d_t key2d;
@@ -87,6 +92,8 @@ template <typename Item, typename Key> struct generic_map_t<Item, void, Key> {
     iterator begin() noexcept { return key2d.begin(); }
 
     iterator end() noexcept { return key2d.end(); }
+
+    void clear() noexcept { key2d.clear(); }
 
   private:
     key2d_t key2d;
