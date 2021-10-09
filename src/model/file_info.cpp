@@ -189,6 +189,7 @@ void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
         auto block = blocks_map.by_id(hash);
         if (!block) {
             block = new block_info_t(b);
+            blocks_map.put(block);
             block->link(this, i);
         } else {
             auto ex_block = ex_blocks.by_id(hash);

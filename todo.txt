@@ -1,4 +1,7 @@
 - auto cleanup db: remove orphaned blocks
+ - during new sequence receiving
+ - during file update/removing
+
 - https://docs.syncthing.net/users/faq.html#is-it-syncthing-syncthing-or-syncthing
 - test: validation happens before opening file?
 - model: когда добавляется symlink, папка

@@ -127,3 +127,82 @@ TEST_CASE("folder, update local files", "[model]") {
         }
     }
 }
+
+TEST_CASE("network update", "[model]") {
+    std::uint64_t key = 0;
+    db::Device db_d;
+    db_d.set_id(test::device_id2sha256("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD"));
+    auto device = model::device_ptr_t(new model::device_t(db_d, ++key));
+
+    db::Folder db_f;
+    db_f.set_id("2");
+    db_f.set_label("f2-label");
+    db_f.set_path("/some/path");
+    auto folder = model::folder_ptr_t(new model::folder_t(db_f, ++key));
+
+    cluster_ptr_t cluster = new cluster_t(device);
+    auto folders = model::folders_map_t();
+    folders.put(folder);
+    cluster->assign_folders(std::move(folders));
+    folder->assign_cluster(cluster.get());
+    folder->assign_device(device);
+
+    db::FolderInfo db_folderinfo;
+    auto folder_info = folder_info_ptr_t(new folder_info_t(db_folderinfo, device.get(), folder.get(), ++key));
+
+    db::BlockInfo db_b1;
+    db_b1.set_hash("hash-1");
+    db_b1.set_size(5);
+    auto b1 = model::block_info_ptr_t(new model::block_info_t(db_b1, ++key));
+
+    db::BlockInfo db_b2;
+    db_b2.set_hash("hash-2");
+    db_b2.set_size(5);
+    auto b2 = model::block_info_ptr_t(new model::block_info_t(db_b2, ++key));
+
+    cluster->get_blocks().put(b1);
+
+    auto db_file = db::FileInfo();
+    db_file.set_name("my-file.txt");
+    db_file.set_sequence(++key);
+    db_file.set_type(proto::FileInfoType::FILE);
+    db_file.add_blocks_keys(b1->get_db_key());
+    auto file = model::file_info_ptr_t(new file_info_t(db_file, folder_info.get()));
+    folder_info->add(file);
+
+    CHECK(cluster->get_blocks().size() == 1);
+
+    proto::IndexUpdate iu;
+    iu.set_folder(folder->id());
+    auto fi = iu.add_files();
+
+    SECTION("file has been deleted") {
+        fi->set_name(std::string(file->get_name()));
+        fi->set_type(proto::FileInfoType::FILE);
+        fi->set_sequence(++key);
+        fi->set_deleted(true);
+
+        folder_info->update(iu, device);
+        CHECK(folder_info->get_file_infos().size() == 1);
+        CHECK(cluster->get_blocks().size() == 0);
+        CHECK(cluster->get_deleted_blocks().size() == 1);
+        CHECK(cluster->get_deleted_blocks().by_id(b1->get_hash()));
+    }
+
+    SECTION("file content has been changed") {
+        fi->set_name(std::string(file->get_name()));
+        fi->set_type(proto::FileInfoType::FILE);
+        fi->set_sequence(++key);
+        auto block = fi->add_blocks();
+        block->set_hash(b2->get_hash());
+        block->set_size(b2->get_size());
+
+        folder_info->update(iu, device);
+        CHECK(folder_info->get_file_infos().size() == 1);
+        CHECK(cluster->get_blocks().size() == 1);
+        CHECK(cluster->get_blocks().by_id(b2->get_hash()));
+        CHECK(cluster->get_deleted_blocks().size() == 1);
+        CHECK(cluster->get_deleted_blocks().by_id(b1->get_hash()));
+    }
+
+}

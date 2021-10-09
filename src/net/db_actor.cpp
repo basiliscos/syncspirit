@@ -191,6 +191,17 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexc
         devices.put(device);
     }
 
+    blocks = cluster->get_blocks();
+    size_t orphaned_blocks = 0;
+    for (auto &it : blocks) {
+        if (!it.second->usages()) {
+            ++orphaned_blocks;
+        }
+    }
+    if (orphaned_blocks) {
+        LOG_WARN(log, "{}, {} orphaned blocks has been detected", identity, orphaned_blocks);
+    }
+
     reply_to(message, std::move(cluster), std::move(devices), std::move(ignored_devices), std::move(ignored_folders));
 }
 
