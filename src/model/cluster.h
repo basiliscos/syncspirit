@@ -36,10 +36,13 @@ struct cluster_t : arc_base_t<cluster_t> {
     inline const device_ptr_t &get_device() const noexcept { return device; }
 
   private:
+    using new_folder_infos_t = std::unordered_set<folder_info_ptr_t>;
+
     device_ptr_t device;
     folders_map_t folders;
     block_infos_map_t blocks;
     block_infos_map_t deleted_blocks;
+    new_folder_infos_t new_folder_infos;
 
     friend class file_interator_t;
 };

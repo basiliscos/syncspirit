@@ -38,6 +38,13 @@ add_library(syncspirit_lib
     src/hasher/hasher_actor.cpp
     src/hasher/hasher_proxy_actor.cpp
     src/hasher/hasher_supervisor.cpp
+    src/model/diff/base.cpp
+    src/model/diff/cluster_diff.cpp
+    src/model/diff/cluster_diff_visitor.cpp
+    src/model/diff/cluster/aggregate.cpp
+    src/model/diff/cluster/index_refresher.cpp
+    src/model/diff/cluster/max_sequence_updater.cpp
+    src/model/diff/cluster/unknown_folders.cpp
     src/model/block_info.cpp
     src/model/block_iterator.cpp
     src/model/cluster.cpp
