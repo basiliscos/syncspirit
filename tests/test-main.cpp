@@ -9,6 +9,8 @@
 #include "catch.hpp"
 #include "test-utils.h"
 #include "model/device_id.h"
+#include "structs.pb.h"
+#include "db/prefix.h"
 
 int main(int argc, char *argv[]) {
     return Catch::Session().run(argc, argv);
@@ -62,9 +64,15 @@ void write_file(const bfs::path& path, std::string_view content) {
     fclose(out);
 }
 
-std::string device_id2sha256(const char* device_id) {
-    return model::device_id_t::from_string(device_id).value().get_sha256();
+std::string device_id2sha256(std::string_view device_id) {
+    return std::string(model::device_id_t::from_string(device_id).value().get_sha256());
 }
+
+model::device_ptr_t make_device(std::string_view device_id, std::string_view name) {
+    auto id = model::device_id_t::from_string(device_id).value();
+    return new model::device_t(id, name);
+}
+
 
 std::string hash_string(const std::string_view &hash) noexcept {
     auto r = std::string();

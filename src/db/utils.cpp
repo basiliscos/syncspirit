@@ -187,7 +187,7 @@ template <> struct persister_helper_t<model::ignored_folder_t> {
     using collection_t = model::ignored_folders_map_t;
     using db_type = db::IgnoredFolder;
 
-    static value_t get_db_key(const ptr_t &item) noexcept { return my_prefix::make(item->id); }
+    static value_t get_db_key(const ptr_t &item) noexcept { return my_prefix::make(item->get_key); }
 
     static void append(collection_t &dest, ptr_t &&item) noexcept { dest.put(std::move(item)); }
 

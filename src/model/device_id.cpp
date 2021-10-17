@@ -2,11 +2,21 @@
 #include <cassert>
 #include "../utils/base32.h"
 #include "../proto/luhn32.h"
+#include "../db/prefix.h"
+
 #include <openssl/sha.h>
 
 using namespace syncspirit::proto;
 using namespace syncspirit::model;
 using namespace syncspirit::utils;
+
+static const constexpr char prefix = (char)(syncspirit::db::prefix::device);
+
+device_id_t::device_id_t(std::string_view value_, std::string_view sha256_) noexcept : value{value_} {
+    assert(sha256_.size() == digest_length);
+    hash[0] = prefix;
+    std::copy(sha256_.begin(), sha256_.end(), hash + 1);
+}
 
 std::string_view device_id_t::get_short() const noexcept { return std::string_view(value.data(), DASH_INT); }
 

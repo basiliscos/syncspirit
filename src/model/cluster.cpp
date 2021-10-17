@@ -5,8 +5,11 @@
 using namespace syncspirit;
 using namespace syncspirit::model;
 
-cluster_t::cluster_t(device_ptr_t device_) noexcept : device(device_) {}
+cluster_t::cluster_t(device_ptr_t device_, size_t seed_) noexcept : device(device_), uuid_generator(rng_engine) {
+    rng_engine.seed(seed_);
+}
 
+#if 0
 void cluster_t::assign_folders(const folders_map_t &folders_) noexcept {
     folders = folders_;
     for (auto it : folders) {
@@ -61,4 +64,13 @@ file_interator_t cluster_t::iterate_files(const device_ptr_t &peer_device) noexc
     // find local outdated files, which present on peer device
     assert(peer_device != device);
     return file_interator_t(*this, peer_device);
+}
+#endif
+
+devices_map_t &cluster_t::get_devices() noexcept {
+    return devices;
+}
+
+uuid_t cluster_t::next_uuid() noexcept {
+    return uuid_generator();
 }

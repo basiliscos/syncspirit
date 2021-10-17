@@ -29,8 +29,8 @@ struct file_interator_t {
     void reset() noexcept;
 
   private:
-    using it_folder_t = typename folders_map_t::iterator;
-    using it_file_t = typename file_infos_map_t::iterator;
+    using it_folder_t = typename folders_map_t::iterator_t;
+    using it_file_t = typename file_infos_map_t::iterator_t;
 
     void prepare() noexcept;
 

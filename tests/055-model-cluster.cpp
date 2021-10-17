@@ -3,6 +3,9 @@
 #include "access.h"
 #include "model/cluster.h"
 #include "model/file_iterator.h"
+#include "model/diff/load/devices.h"
+#include "db/prefix.h"
+#include "structs.pb.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -11,6 +14,93 @@ using namespace syncspirit::test;
 
 namespace bfs = boost::filesystem;
 
+TEST_CASE("loading cluster", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_ptr_t(new local_device_t(my_id, "my-device"));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    CHECK(cluster);
+
+    auto self_key = my_device->get_key();
+    auto self_data = my_device->serialize();
+
+    SECTION("local device") {
+        diff::load::container_t devices;
+        devices.emplace_back(diff::load::pair_t{self_key, self_data});
+        auto diff = diff::cluster_diff_ptr_t(new diff::load::devices_t(devices));
+        diff->apply(*cluster);
+        auto& devices_map = cluster->get_devices();
+        REQUIRE(devices_map.size() == 1);
+        auto self = devices_map.get(self_key);
+        auto self_2 = devices_map.bySha256(my_id.get_sha256());
+        REQUIRE(self);
+        REQUIRE(self_2);
+        CHECK(self == my_device);
+        CHECK(self_2 == self);
+    }
+
+    SECTION("devices") {
+        auto prefix = (char)db::prefix::device;
+        auto device_id = test::device_id2sha256("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7");
+        std::string key = std::string(&prefix, 1) + device_id;
+        db::Device db_device;
+        db_device.set_cert_name("cn");
+        db_device.set_name("peer-name");
+        std::string data = db_device.SerializeAsString();
+
+        device_ptr_t peer;
+
+        SECTION("directly") {
+            peer = device_ptr_t(new device_t(key, data));
+        }
+
+        SECTION("via diff (+ local device)") {
+            diff::load::container_t devices;
+            devices.emplace_back(diff::load::pair_t{key, data});
+            devices.emplace_back(diff::load::pair_t{self_key, self_data});
+            auto diff = diff::cluster_diff_ptr_t(new diff::load::devices_t(devices));
+            diff->apply(*cluster);
+            auto& devices_map = cluster->get_devices();
+            REQUIRE(devices_map.size() == 2);
+            peer = devices_map.get(key);
+            auto peer_2 = devices_map.bySha256(device_id);
+            CHECK(peer_2 == peer);
+
+            auto self = devices_map.get(my_device->get_key());
+            auto self_2 = devices_map.bySha256(my_id.get_sha256());
+            CHECK(self == my_device);
+            CHECK(self_2 == self);
+        }
+
+        REQUIRE(peer);
+        CHECK(peer->get_name() == "peer-name");
+        CHECK(peer->get_cert_name());
+        CHECK(peer->get_cert_name().value() == "cn");
+    }
+
+    SECTION("blocks") {
+        auto bi = proto::BlockInfo();
+        bi.set_size(5);
+        bi.set_hash(utils::sha256_digest("12345").value());
+
+        auto block = block_info_ptr_t(new block_info_t(bi));
+        auto key = block->get_key();
+        auto data = block->serialize();
+
+        auto target_block = block_info_ptr_t();
+
+        SECTION("directly") {
+            target_block = new block_info_t(key, data);
+        }
+
+        REQUIRE(target_block);
+        CHECK(target_block->get_hash() == block->get_hash());
+        CHECK(target_block->get_key() == block->get_key());
+        CHECK(target_block->get_weak_hash() == block->get_weak_hash());
+        CHECK(target_block->get_size() == block->get_size());
+    }
+}
+
+#if 0
 TEST_CASE("iterate_files", "[model]") {
     std::uint64_t key = 0;
     db::Device db_d1;
@@ -106,5 +196,5 @@ TEST_CASE("iterate_files", "[model]") {
         CHECK(r.unknown_folders.size() == 0);
         CHECK(r.outdated_folders.size() == 1);
     }
-
 }
+#endif

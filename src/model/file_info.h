@@ -10,6 +10,7 @@
 #include "block_info.h"
 #include "storeable.h"
 #include "device.h"
+#include "uuid.h"
 
 namespace syncspirit::model {
 
@@ -20,18 +21,18 @@ struct local_file_t;
 struct blocks_interator_t;
 
 struct file_info_t : arc_base_t<file_info_t>, storeable_t {
+
     using blocks_t = std::vector<block_info_ptr_t>;
-    file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_) noexcept;
+    file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_, std::string_view uuid) noexcept;
     file_info_t(const proto::FileInfo &info_, folder_info_t *folder_info_) noexcept;
     ~file_info_t();
 
-    bool operator==(const file_info_t &other) const noexcept { return other.db_key == db_key; }
+    std::string_view get_key() const noexcept { return std::string_view(uuid, uuid_length); }
+    bool operator==(const file_info_t &other) const noexcept { return get_key() == other.get_key(); }
 
     db::FileInfo serialize(bool include_blocks = true) noexcept;
     void update(const proto::FileInfo &remote_info) noexcept;
     bool update(const local_file_t &local_file) noexcept;
-
-    inline const std::string &get_db_key() const noexcept { return db_key; }
 
     inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
     std::string_view get_name() const noexcept;
@@ -48,7 +49,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     inline bool is_link() noexcept { return type == proto::FileInfoType::SYMLINK; }
     inline bool is_deleted() noexcept { return deleted; }
 
-    static std::string generate_db_key(const std::string &name, const folder_info_t &folder) noexcept;
+    //static std::string generate_db_key(const std::string &name, const folder_info_t &folder) noexcept;
 
     inline std::int64_t get_size() const noexcept { return size; }
     inline void set_size(std::int64_t value) noexcept { size = value; }
@@ -78,11 +79,11 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
 
   private:
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
-    void generate_db_key(const std::string &name) noexcept;
     void remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks, block_infos_map_t &deleted_blocks,
                       bool zero_indices = true) noexcept;
     template <typename Source> void fields_update(const Source &s) noexcept;
 
+    char uuid[uuid_length*2];
     folder_info_t *folder_info;
     proto::FileInfoType type;
     std::int64_t size;
@@ -97,7 +98,6 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     std::int64_t sequence;
     std::int32_t block_size;
     std::string symlink_target;
-    std::string db_key; /* folder_info db key + name */
     blocks_t blocks;
     std::optional<bfs::path> path;
     std::string full_name;
@@ -107,9 +107,10 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
     friend struct blocks_interator_t;
 };
 
-inline const std::string &db_key(const file_info_ptr_t &item) noexcept { return item->get_db_key(); }
-inline const std::string &natural_key(const file_info_ptr_t &item) noexcept { return item->get_full_name(); }
-
-using file_infos_map_t = generic_map_t<file_info_ptr_t, std::string, std::string>;
+struct file_infos_map_t: public generic_map_t<file_info_ptr_t, 2> {
+    file_info_ptr_t byName(std::string_view name) {
+        return get<1>(name);
+    }
+};
 
 }; // namespace syncspirit::model

@@ -30,21 +30,23 @@ add_library(syncspirit_lib
     src/db/error_code.cpp
     src/db/prefix.cpp
     src/db/transaction.cpp
-    src/db/utils.cpp
-    src/fs/file_actor.cpp
-    src/fs/fs_supervisor.cpp
-    src/fs/scan_actor.cpp
-    src/fs/utils.cpp
-    src/hasher/hasher_actor.cpp
-    src/hasher/hasher_proxy_actor.cpp
-    src/hasher/hasher_supervisor.cpp
+#    src/db/utils.cpp
+#    src/fs/file_actor.cpp
+#    src/fs/fs_supervisor.cpp
+#    src/fs/scan_actor.cpp
+#    src/fs/utils.cpp
+#    src/hasher/hasher_actor.cpp
+#    src/hasher/hasher_proxy_actor.cpp
+#    src/hasher/hasher_supervisor.cpp
     src/model/diff/base.cpp
     src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_diff_visitor.cpp
+    src/model/diff/load/devices.cpp
     src/model/diff/cluster/aggregate.cpp
-    src/model/diff/cluster/index_refresher.cpp
-    src/model/diff/cluster/max_sequence_updater.cpp
-    src/model/diff/cluster/unknown_folders.cpp
+#    src/model/diff/cluster/index_refresher.cpp
+#    src/model/diff/cluster/load_data.cpp
+#    src/model/diff/cluster/max_sequence_updater.cpp
+#    src/model/diff/cluster/unknown_folders.cpp
     src/model/block_info.cpp
     src/model/block_iterator.cpp
     src/model/cluster.cpp
@@ -52,26 +54,26 @@ add_library(syncspirit_lib
     src/model/device_id.cpp
     src/model/file_block.cpp
     src/model/file_info.cpp
-    src/model/file_iterator.cpp
+#    src/model/file_iterator.cpp
     src/model/folder.cpp
     src/model/folder_info.cpp
     src/model/storeable.cpp
-    src/net/acceptor_actor.cpp
-    src/net/cluster_supervisor.cpp
-    src/net/controller_actor.cpp
-    src/net/db_actor.cpp
-    src/net/dialer_actor.cpp
-    src/net/global_discovery_actor.cpp
-    src/net/http_actor.cpp
-    src/net/local_discovery_actor.cpp
-    src/net/net_supervisor.cpp
-    src/net/peer_actor.cpp
-    src/net/peer_supervisor.cpp
-    src/net/resolver_actor.cpp
-    src/net/messages.cpp
-    src/net/names.cpp
-    src/net/ssdp_actor.cpp
-    src/net/upnp_actor.cpp
+#    src/net/acceptor_actor.cpp
+#    src/net/cluster_supervisor.cpp
+#    src/net/controller_actor.cpp
+#    src/net/db_actor.cpp
+#    src/net/dialer_actor.cpp
+#    src/net/global_discovery_actor.cpp
+#    src/net/http_actor.cpp
+#    src/net/local_discovery_actor.cpp
+#    src/net/net_supervisor.cpp
+#    src/net/peer_actor.cpp
+#    src/net/peer_supervisor.cpp
+#    src/net/resolver_actor.cpp
+#    src/net/messages.cpp
+#    src/net/names.cpp
+#    src/net/ssdp_actor.cpp
+#    src/net/upnp_actor.cpp
     src/proto/bep_support.cpp
     src/proto/discovery_support.cpp
     src/proto/luhn32.cpp
@@ -138,9 +140,6 @@ target_link_libraries(syncspirit_lib
     mdbx-static
 )
 
-#target_link_libraries(syncspirit_console syncspirit_lib)
-#target_link_libraries(syncspirit syncspirit_lib syncspirit_console)
-
 enable_testing()
 add_subdirectory("tests")
-add_subdirectory("src/ui-daemon")
+#add_subdirectory("src/ui-daemon")

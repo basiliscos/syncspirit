@@ -1,17 +1,33 @@
 #include "folder_info.h"
 #include "folder.h"
+#include "../db/prefix.h"
 #include <spdlog.h>
 
 namespace syncspirit::model {
 
+static const constexpr char prefix = (char)(db::prefix::folder_info);
+
 folder_info_t::folder_info_t(const db::FolderInfo &info_, device_t *device_, folder_t *folder_,
-                             uint64_t db_key_) noexcept
-    : index{info_.index_id()}, max_sequence{info_.max_sequence()}, device{device_}, folder{folder_}, db_key{db_key_} {
+                             std::string_view key) noexcept
+    : index{info_.index_id()}, max_sequence{info_.max_sequence()}, device{device_}, folder{folder_} {
     assert(device);
     assert(folder);
+    assert(key.size() == data_length);
+    assert(key[0] == prefix);
+    std::copy(key.begin(), key.end(), uuid);
 }
 
 folder_info_t::~folder_info_t() {}
+
+std::string_view folder_info_t::get_key() noexcept {
+    return std::string_view(uuid, data_length);
+}
+
+bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
+    auto r = std::mismatch(uuid, uuid + data_length, other.uuid);
+    return r.first == uuid + data_length;
+}
+
 
 void folder_info_t::add(const file_info_ptr_t &file_info) noexcept {
     file_infos.put(file_info);
@@ -46,17 +62,13 @@ void folder_info_t::set_max_sequence(int64_t value) noexcept {
 db::FolderInfo folder_info_t::serialize() noexcept {
     db::FolderInfo r;
     r.set_index_id(index);
-    auto device_key = device->get_db_key();
-    auto folder_key = folder->get_db_key();
-    assert(device_key && "device have to be persisted first");
-    assert(folder_key && "folder have to be persisted first");
-    r.set_device_key(device_key);
-    r.set_folder_key(folder_key);
     r.set_max_sequence(max_sequence);
     return r;
 }
 
 template <typename Message> void folder_info_t::update_generic(const Message &data, const device_ptr_t &peer) noexcept {
+    std::abort();
+#if 0
     std::int64_t max_sequence = get_max_sequence();
     for (int i = 0; i < data.files_size(); ++i) {
         auto &file = data.files(i);
@@ -92,6 +104,7 @@ template <typename Message> void folder_info_t::update_generic(const Message &da
                       local_folder_info->get_db_key(), max_sequence, device->device_id);
     }
     */
+#endif
 }
 
 void folder_info_t::update(const proto::IndexUpdate &data, const device_ptr_t &peer) noexcept {
@@ -101,6 +114,8 @@ void folder_info_t::update(const proto::IndexUpdate &data, const device_ptr_t &p
 void folder_info_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept { update_generic(data, peer); }
 
 void folder_info_t::update(local_file_map_t &local_files) noexcept {
+    std::abort();
+#if 0
     auto file_infos_copy = file_infos;
     for (auto it : local_files.map) {
         auto file_key = file_info_t::generate_db_key(it.first.string(), *this);
@@ -125,6 +140,7 @@ void folder_info_t::update(local_file_map_t &local_files) noexcept {
             std::abort();
         }
     }
+#endif
 }
 
 } // namespace syncspirit::model

@@ -5,7 +5,6 @@ package syncspirit.db;
 import "bep.proto";
 
 message Device {
-    bytes           id                          = 1;
     string          name                        = 2;
     repeated string addresses                   = 3;
     syncspirit.proto.Compression    compression = 4;
@@ -54,8 +53,6 @@ enum PullOrder {
 
 message FolderInfo {
     uint64 index_id     = 1;
-    uint64 device_key   = 2;
-    uint64 folder_key   = 3;
     int64  max_sequence = 4;
 }
 
@@ -83,7 +80,6 @@ message IngoredFolder {
 }
 
 message BlockInfo {
-    bytes           hash        = 1;
-    uint32          weak_hash   = 2;
-    int32           size        = 3;
+    uint32          weak_hash   = 1;
+    int32           size        = 2;
 }

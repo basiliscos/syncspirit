@@ -49,7 +49,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void db_actor_t::open() noexcept {
     resources->acquire(resource::db);
-    auto flags = MDBX_WRITEMAP | MDBX_NOTLS | MDBX_COALESCE | MDBX_LIFORECLAIM;
+    auto flags = MDBX_WRITEMAP | MDBX_COALESCE | MDBX_LIFORECLAIM | MDBX_EXCLUSIVE;
     auto r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
     if (r != MDBX_SUCCESS) {
         LOG_ERROR(log, "{}, open, mbdx open environment error ({}): {}", identity, r, mdbx_strerror(r));

@@ -1,25 +1,44 @@
 #include "block_info.h"
 #include "file_info.h"
+#include "structs.pb.h"
+#include "../db/prefix.h"
 #include <spdlog.h>
 
 namespace syncspirit::model {
 
-block_info_t::block_info_t(const db::BlockInfo &db_block, uint64_t db_key_) noexcept
-    : hash{db_block.hash()}, weak_hash{db_block.weak_hash()}, size(db_block.size()), db_key{db_key_} {
-    // sspdlog::trace("block {} is available", db_key);
+static const constexpr char prefix = (char)(db::prefix::block_info);
+
+block_info_t::block_info_t(std::string_view key, std::string_view data) noexcept {
+    assert(key.length() == data_length);
+    assert(key[0] == prefix);
+    std::copy(key.begin(), key.end(), hash);
+
+    db::BlockInfo block;
+    auto ok = block.ParseFromArray(data.data(), data.size());
+    assert(ok);
+    (void)ok;
+    weak_hash = block.weak_hash();
+    size = block.size();
 }
 
-block_info_t::block_info_t(const proto::BlockInfo &block) noexcept
-    : hash{block.hash()}, weak_hash{block.weak_hash()}, size{block.size()}, db_key{0} {
+block_info_t::block_info_t(const proto::BlockInfo &block) noexcept : weak_hash{block.weak_hash()}, size{block.size()} {
+    auto &h = block.hash();
+    assert(h.length() <= digest_length);
+    std::copy(h.begin(), h.end(), hash + 1);
+    hash[0] = prefix;
+    auto left = digest_length - h.length();
+    if (left) {
+        std::fill_n(hash + 1 + h.length(), left, 0);
+    }
+
     mark_dirty();
 }
 
-db::BlockInfo block_info_t::serialize() noexcept {
+std::string block_info_t::serialize() noexcept {
     db::BlockInfo r;
-    r.set_hash(hash);
     r.set_weak_hash(weak_hash);
     r.set_size(size);
-    return r;
+    return r.SerializeAsString();
 }
 
 void block_info_t::link(file_info_t *file_info, size_t block_index) noexcept {
@@ -60,4 +79,18 @@ file_block_t block_info_t::local_file() noexcept {
     return {};
 }
 
+#if 0
+static void del_me() {
+    block_infos_map_t map;
+    auto block = block_info_ptr_t(new block_info_t("a", "b"));
+    map.put(block);
+    map.get("a");
+}
+#endif
+
+
+template<> std::string_view get_index<0>(const block_info_ptr_t& item) noexcept { return item->get_key(); }
+
 } // namespace syncspirit::model
+
+

@@ -8,10 +8,10 @@
 #include "../config/main.h"
 #include "device.h"
 #include "bep.pb.h"
-#include "structs.pb.h"
 #include "folder_info.h"
 #include "storeable.h"
 #include "local_file.h"
+#include "uuid.h"
 
 namespace syncspirit::model {
 
@@ -21,8 +21,7 @@ namespace outcome = boost::outcome_v2;
 struct cluster_t;
 
 struct folder_t : arc_base_t<folder_t>, storeable_t {
-
-    folder_t(const db::Folder &db_folder, std::uint64_t db_key_ = 0) noexcept;
+    folder_t(const db::Folder &db_folder, const uuid_t& uuid) noexcept;
     void assign_device(model::device_ptr_t device_) noexcept;
     void assign_cluster(cluster_t *cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
@@ -38,8 +37,6 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
 
     const std::string &id() noexcept { return _id; }
     const std::string &label() noexcept { return _label; }
-    inline std::uint64_t get_db_key() const noexcept { return db_key; }
-    inline void set_db_key(std::uint64_t value) noexcept { db_key = value; }
     inline auto &get_folder_infos() noexcept { return folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
     inline const bfs::path &get_path() noexcept { return path; }
@@ -52,7 +49,6 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
 
   private:
     device_ptr_t device;
-    std::uint64_t db_key;
     std::string _id;
     std::string _label;
     bfs::path path;
@@ -67,14 +63,12 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     bool paused;
     folder_infos_map_t folder_infos;
     cluster_t *cluster = nullptr;
+    char uuid[uuid_length];
 };
 
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
-inline const std::string &natural_key(const folder_ptr_t &folder) noexcept { return folder->id(); }
-inline std::uint64_t db_key(const folder_ptr_t &folder) noexcept { return folder->get_db_key(); }
-
-using folders_map_t = generic_map_t<folder_ptr_t, std::string>;
+using folders_map_t = generic_map_t<folder_ptr_t, 1>;
 
 struct ignored_folder_t : arc_base_t<ignored_folder_t> {
     ignored_folder_t(const db::IgnoredFolder &folder) noexcept;
@@ -89,8 +83,6 @@ struct ignored_folder_t : arc_base_t<ignored_folder_t> {
 };
 
 using ignored_folder_ptr_t = intrusive_ptr_t<ignored_folder_t>;
-inline const std::string &db_key(const ignored_folder_ptr_t &folder) noexcept { return folder->id; }
-
-using ignored_folders_map_t = generic_map_t<ignored_folder_ptr_t, void, std::string>;
+using ignored_folders_map_t = generic_map_t<ignored_folder_ptr_t, 1>;
 
 } // namespace syncspirit::model

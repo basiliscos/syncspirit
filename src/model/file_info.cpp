@@ -1,38 +1,83 @@
-#include "folder_info.h"
+//#include "folder_info.h"
 #include "file_info.h"
 #include "cluster.h"
 #include "block_iterator.h"
+#include "../db/prefix.h"
 #include <algorithm>
 #include <boost/mpl/pair.hpp>
 #include <spdlog/spdlog.h>
 
 namespace syncspirit::model {
 
-file_info_t::file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_) noexcept : folder_info{folder_info_} {
-    db_key = generate_db_key(info_.name(), *folder_info);
+static const constexpr char prefix = (char)(db::prefix::file_info);
+
+file_info_t::file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_, std::string_view uuid_) noexcept : folder_info{folder_info_} {
+    assert(uuid_[0] == prefix);
+    assert(uuid_.size() == uuid_length * 2);
+    std::copy(uuid_.begin(), uuid_.end(), uuid);
+
+#if 0
     fields_update(info_);
     auto &blocks_map = folder_info->get_folder()->get_cluster()->get_blocks();
     for (int i = 0; i < info_.blocks_keys_size(); ++i) {
         auto key = info_.blocks_keys(i);
-        auto block = blocks_map.by_key(key);
+        std::string_view kkey;
+        std::abort();
+        auto block = blocks_map.get(kkey);
         assert(block);
         block->link(this, i);
         blocks.emplace_back(std::move(block));
     }
     version = info_.version();
     full_name = fmt::format("{}/{}", folder_info->get_folder()->label(), get_name());
+#endif
+    std::abort();
 }
 
 file_info_t::file_info_t(const proto::FileInfo &info_, folder_info_t *folder_info_) noexcept
     : folder_info{folder_info_} {
-    db_key = generate_db_key(info_.name(), *folder_info);
+#if 0
+    auto fi_uuid = folder_info_->get_key();
+    std::copy(fi_uuid.begin() + uuid_length  + device_id_t::data_length, fi_uuid.end(), uuid);
+    auto uuid_ = folder_info_->get_folder()->get_cluster()->next_uuid();
+    std::copy(uuid_.begin(), uuid_.end(), uuid + uuid_length);
+    uuid[0] = prefix;
     fields_update(info_);
     update_blocks(info_);
     version = info_.version();
     mark_dirty();
     full_name = fmt::format("{}/{}", folder_info->get_folder()->label(), get_name());
+#endif
+    std::abort();
 }
 
+file_info_t::~file_info_t() {
+    for (auto &b : blocks) {
+        if (!b) {
+            continue;
+        }
+        auto indices = b->unlink(this);
+        for (auto i : indices) {
+            blocks[i].reset();
+        }
+    }
+}
+
+std::string_view file_info_t::get_name() const noexcept {
+#if 0
+    const char *ptr = db_key.data();
+    ptr += sizeof(std::uint64_t);
+    return std::string_view(ptr, db_key.size() - sizeof(std::uint64_t));
+#endif
+    std::abort();
+}
+
+std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
+    assert(!blocks.empty());
+    return block_size * block_index;
+}
+
+#if 0
 template <typename Source> void file_info_t::fields_update(const Source &s) noexcept {
     sequence = s.sequence();
     type = s.type();
@@ -62,23 +107,7 @@ std::string file_info_t::generate_db_key(const std::string &name, const folder_i
     return dbk;
 }
 
-file_info_t::~file_info_t() {
-    for (auto &b : blocks) {
-        if (!b) {
-            continue;
-        }
-        auto indices = b->unlink(this);
-        for (auto i : indices) {
-            blocks[i].reset();
-        }
-    }
-}
 
-std::string_view file_info_t::get_name() const noexcept {
-    const char *ptr = db_key.data();
-    ptr += sizeof(std::uint64_t);
-    return std::string_view(ptr, db_key.size() - sizeof(std::uint64_t));
-}
 
 db::FileInfo file_info_t::serialize(bool include_blocks) noexcept {
     db::FileInfo r;
@@ -244,11 +273,6 @@ void file_info_t::append_block(const model::block_info_ptr_t &block, size_t inde
     mark_dirty();
 }
 
-std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
-    assert(!blocks.empty());
-    return block_size * block_index;
-}
-
 void file_info_t::mark_local_available(size_t block_index) noexcept {
     blocks[block_index]->mark_local_available(this);
     mark_dirty();
@@ -367,5 +391,9 @@ proto::FileInfo file_info_t::get() const noexcept {
 
     return r;
 }
+#endif
+
+template<> std::string_view get_index<0>(const file_info_ptr_t& item) noexcept { return item->get_key(); }
+template<> std::string_view get_index<1>(const file_info_ptr_t& item) noexcept { return item->get_name(); }
 
 } // namespace syncspirit::model
