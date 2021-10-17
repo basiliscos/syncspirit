@@ -3,8 +3,8 @@
 #include <cstdint>
 #include "device.h"
 #include "file_info.h"
-#include "local_file.h"
-#include "storeable.h"
+#include "misc/local_file.h"
+#include "misc/storeable.h"
 
 namespace syncspirit::model {
 

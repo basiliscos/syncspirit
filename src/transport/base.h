@@ -6,7 +6,7 @@
 #include <memory>
 #include <rotor/asio.hpp>
 #include "../model/device_id.h"
-#include "../model/arc.hpp"
+#include "../model/misc/arc.hpp"
 #include "../utils/tls.h"
 #include "../utils/uri.h"
 

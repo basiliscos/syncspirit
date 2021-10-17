@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include "../utils/uri.h"
+#include "../../utils/uri.h"
 
 namespace syncspirit::model {
 

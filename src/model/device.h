@@ -1,9 +1,9 @@
 #pragma once
 
 #include <unordered_map>
-#include "arc.hpp"
-#include "map.hpp"
-#include "uuid.h"
+#include "misc/arc.hpp"
+#include "misc/map.hpp"
+#include "misc/uuid.h"
 #include "device_id.h"
 #include "../utils/uri.h"
 #include "bep.pb.h"

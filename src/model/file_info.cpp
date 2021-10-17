@@ -1,10 +1,9 @@
 //#include "folder_info.h"
 #include "file_info.h"
 #include "cluster.h"
-#include "block_iterator.h"
+#include "misc/block_iterator.h"
 #include "../db/prefix.h"
 #include <algorithm>
-#include <boost/mpl/pair.hpp>
 #include <spdlog/spdlog.h>
 
 namespace syncspirit::model {

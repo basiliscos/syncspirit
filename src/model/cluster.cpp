@@ -1,5 +1,5 @@
 #include "cluster.h"
-#include "file_iterator.h"
+#include "misc/file_iterator.h"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit;

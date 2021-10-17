@@ -9,9 +9,9 @@
 #include "device.h"
 #include "bep.pb.h"
 #include "folder_info.h"
-#include "storeable.h"
-#include "local_file.h"
-#include "uuid.h"
+#include "misc/storeable.h"
+#include "misc/local_file.h"
+#include "misc/uuid.h"
 
 namespace syncspirit::model {
 

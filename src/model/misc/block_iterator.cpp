@@ -1,5 +1,5 @@
 #include "block_iterator.h"
-#include "file_info.h"
+#include "../file_info.h"
 #include <cassert>
 
 using namespace syncspirit::model;

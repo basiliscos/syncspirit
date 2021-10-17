@@ -4,7 +4,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/functional/hash.hpp>
-#include "block_info.h"
+#include "../block_info.h"
 
 namespace std {
 template <> struct hash<boost::filesystem::path> {

@@ -4,11 +4,11 @@
 #include <random>
 #include <boost/uuid/random_generator.hpp>
 #include <unordered_map>
-#include "arc.hpp"
+#include "misc/arc.hpp"
+#include "misc/uuid.h"
 #include "device.h"
 #include "folder.h"
 #include "block_info.h"
-#include "uuid.h"
 
 namespace syncspirit::model {
 

@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "arc.hpp"
-#include "map.hpp"
-#include "file_block.h"
-#include "storeable.h"
+#include "misc/arc.hpp"
+#include "misc/map.hpp"
+#include "misc/file_block.h"
+#include "misc/storeable.h"
 #include "bep.pb.h"
 
 namespace syncspirit::model {
@@ -49,9 +49,6 @@ struct block_info_t : arc_base_t<block_info_t>, storeable_t {
 };
 
 using block_info_ptr_t = intrusive_ptr_t<block_info_t>;
-
-struct block_infos_map_t: generic_map_t<block_info_ptr_t, 2> {
-    block_info_ptr_t byHash(std::string_view hash) noexcept;
-};
+using block_infos_map_t = generic_map_t<block_info_ptr_t, 1>;
 
 } // namespace syncspirit::model

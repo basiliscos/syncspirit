@@ -4,13 +4,13 @@
 #include <vector>
 #include <optional>
 #include <boost/filesystem.hpp>
-#include "arc.hpp"
-#include "map.hpp"
+#include "misc/arc.hpp"
+#include "misc/map.hpp"
+#include "misc/storeable.h"
+#include "misc/uuid.h"
 #include "structs.pb.h"
 #include "block_info.h"
-#include "storeable.h"
 #include "device.h"
-#include "uuid.h"
 
 namespace syncspirit::model {
 

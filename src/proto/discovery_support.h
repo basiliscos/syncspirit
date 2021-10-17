@@ -1,7 +1,7 @@
 #pragma once
 #include "../utils/uri.h"
 #include "../model/device_id.h"
-#include "../model/peer_contact.h"
+#include "../model/misc/peer_contact.h"
 #include <fmt/fmt.h>
 #include <string>
 #include <vector>

@@ -1,6 +1,6 @@
 #include "file_block.h"
-#include "file_info.h"
-#include "block_info.h"
+#include "../block_info.h"
+#include "../file_info.h"
 
 namespace syncspirit::model {
 

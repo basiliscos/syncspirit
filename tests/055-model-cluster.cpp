@@ -2,7 +2,7 @@
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
-#include "model/file_iterator.h"
+#include "model/misc/file_iterator.h"
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/devices.h"
 #include "db/prefix.h"
@@ -100,10 +100,7 @@ TEST_CASE("loading cluster", "[model]") {
             diff->apply(*cluster);
             auto& blocks_map = cluster->get_blocks();
             REQUIRE(blocks_map.size() == 1);
-            target_block = blocks_map.get(key);
-
-            auto same_block = blocks_map.byHash(bi.hash());
-            REQUIRE(same_block == target_block);
+            target_block = blocks_map.get(bi.hash());
         }
 
         REQUIRE(target_block);

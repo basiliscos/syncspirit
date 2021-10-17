@@ -1,9 +1,9 @@
 #pragma once
 
-#include "device.h"
-#include "file_info.h"
-#include "folder_info.h"
-#include "folder.h"
+#include "../device.h"
+#include "../file_info.h"
+#include "../folder_info.h"
+#include "../folder.h"
 
 namespace syncspirit::model {
 

@@ -1,5 +1,5 @@
 #include "file_iterator.h"
-#include "cluster.h"
+#include "../cluster.h"
 
 using namespace syncspirit::model;
 

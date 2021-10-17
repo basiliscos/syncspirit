@@ -10,82 +10,15 @@
 
 namespace syncspirit::model {
 
-#if 0
-namespace details {
-namespace mi = boost::multi_index;
-
-template <typename T, typename Q> struct mutable_pair_t {
-    T first;
-    mutable Q second;
-};
-
-struct hash_op_t {
-    std::size_t operator()(std::string_view v) const noexcept { return std::hash<std::string_view>()(v); }
-    std::size_t operator()(const std::string &s) const noexcept { return std::hash<std::string>()(s); }
-};
-
-struct eq_op_t {
-    std::size_t operator()(const std::string &s1, const std::string &s2) const noexcept { return s1 == s2; }
-    std::size_t operator()(const std::string &s1, std::string_view s2) const noexcept { return s1 == s2; }
-    std::size_t operator()(std::string_view s1, const std::string &s2) const { return s1 == s2; }
-};
-
-template <typename T> using string_pair = mutable_pair_t<std::string, T>;
-
-template <typename T>
-using unordered_string_map_t = mi::multi_index_container<
-    string_pair<T>, mi::indexed_by<
-            mi::hashed_unique<mi::member<string_pair<T>, std::string, &string_pair<T>::first>,
-                                                     hash_op_t, eq_op_t>>>;
-} // namespace details
-
-template <typename Item> struct generic_map_t {
-    using map_t = details::unordered_string_map_t<Item>;
-    using iterator = typename map_t::iterator;
-
-    void put(const Item &item) noexcept {
-        std::string id = id(item);
-        key2item.emplace(std::move(id), item);
-    }
-
-    void remove(const Item &item) noexcept {
-        auto it = key2item.find(id(item));
-        key2item.erase(it);
-    }
-
-    Item get(std::string_view id) noexcept {
-        auto it = key2item.find(id);
-        if (it != key2item.end()) {
-            return it->second;
-        }
-        return {};
-    }
-
-    size_t size() const noexcept { return key2item.size(); }
-
-    iterator begin() noexcept { return key2item.begin(); }
-
-    iterator end() noexcept { return key2item.end(); }
-
-    void clear() noexcept { key2item.clear(); }
-
-  private:
-    map_t key2item;
-};
-#endif
-
 template<size_t I, typename T>
 std::string_view get_index(const T& item) noexcept;
 
-
 namespace details {
 
 namespace mi = boost::multi_index;
 
-
 template<size_t I, typename T>
 std::string_view get_key(const T& key) noexcept { return get_index<I>(key.item); }
-
 
 template<size_t N>
 using StringArray = std::array<std::string, N>;
@@ -95,12 +28,6 @@ template <typename Item, size_t N> struct key_t {
     using item_t = Item;
     Item item;
     mutable Array keys;
-/*
-    template<typename T> key_t(T&& item_, const Array& keys_) noexcept:
-        item{std::forward<T>(item_)},
-        keys{keys_} {
-    }
-*/
 
     key_t(const item_t& item_, const Array& keys_) noexcept:
         item{item_},
@@ -157,9 +84,7 @@ template <typename Item, size_t N> struct generic_map_t {
     void put(const Item &item) noexcept {
         array_t arr;
         fill<N-1>(arr, item);
-        //key2item.emplace(item, std::move(arr));
-        details::key_t key(item, arr);
-        key2item.insert(key);
+        key2item.emplace(item, std::move(arr));
     }
 
     void remove(const Item &item) noexcept {

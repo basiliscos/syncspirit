@@ -48,17 +48,17 @@ add_library(syncspirit_lib
 #    src/model/diff/cluster/load_data.cpp
 #    src/model/diff/cluster/max_sequence_updater.cpp
 #    src/model/diff/cluster/unknown_folders.cpp
+    src/model/misc/file_block.cpp
+    src/model/misc/storeable.cpp
+    src/model/misc/block_iterator.cpp
     src/model/block_info.cpp
-    src/model/block_iterator.cpp
     src/model/cluster.cpp
     src/model/device.cpp
     src/model/device_id.cpp
-    src/model/file_block.cpp
     src/model/file_info.cpp
 #    src/model/file_iterator.cpp
     src/model/folder.cpp
     src/model/folder_info.cpp
-    src/model/storeable.cpp
 #    src/net/acceptor_actor.cpp
 #    src/net/cluster_supervisor.cpp
 #    src/net/controller_actor.cpp
