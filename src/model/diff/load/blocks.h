@@ -4,13 +4,13 @@
 
 namespace syncspirit::model::diff::load {
 
-struct devices_t final : cluster_diff_t {
+struct blocks_t final : cluster_diff_t {
     template<typename T>
-    devices_t(T&& devices_) noexcept: devices{std::forward<T>(devices_)}{}
+    blocks_t(T&& blocks_) noexcept: blocks{std::forward<T>(blocks_)}{}
 
     void apply(cluster_t&) const noexcept override;
 
-    container_t devices;
+    container_t blocks;
 };
 
 } // namespace syncspirit::model::diff::cluster

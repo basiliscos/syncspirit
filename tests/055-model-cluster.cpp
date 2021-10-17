@@ -3,6 +3,7 @@
 #include "access.h"
 #include "model/cluster.h"
 #include "model/file_iterator.h"
+#include "model/diff/load/blocks.h"
 #include "model/diff/load/devices.h"
 #include "db/prefix.h"
 #include "structs.pb.h"
@@ -90,6 +91,19 @@ TEST_CASE("loading cluster", "[model]") {
 
         SECTION("directly") {
             target_block = new block_info_t(key, data);
+        }
+
+        SECTION("via diff") {
+            diff::load::container_t blocks;
+            blocks.emplace_back(diff::load::pair_t{key, data});
+            auto diff = diff::cluster_diff_ptr_t(new diff::load::blocks_t(blocks));
+            diff->apply(*cluster);
+            auto& blocks_map = cluster->get_blocks();
+            REQUIRE(blocks_map.size() == 1);
+            target_block = blocks_map.get(key);
+
+            auto same_block = blocks_map.byHash(bi.hash());
+            REQUIRE(same_block == target_block);
         }
 
         REQUIRE(target_block);

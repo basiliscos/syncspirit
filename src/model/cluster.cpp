@@ -71,6 +71,11 @@ devices_map_t &cluster_t::get_devices() noexcept {
     return devices;
 }
 
+block_infos_map_t &cluster_t::get_blocks() noexcept {
+    return blocks;
+}
+
+
 uuid_t cluster_t::next_uuid() noexcept {
     return uuid_generator();
 }

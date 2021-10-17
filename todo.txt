@@ -1,7 +1,7 @@
-- auto cleanup db: remove orphaned blocks
- - during new sequence receiving
-  -- delete folder_info
-  -- delete file_infos
+- uuid model
+-- ignored devices
+-- ignored folders
+
 
 - https://docs.syncthing.net/users/faq.html#what-things-are-synced
 - test: validation happens before opening file?

@@ -48,8 +48,10 @@ struct block_info_t : arc_base_t<block_info_t>, storeable_t {
     file_blocks_t file_blocks;
 };
 
-
 using block_info_ptr_t = intrusive_ptr_t<block_info_t>;
-using block_infos_map_t = generic_map_t<block_info_ptr_t, 1>;
+
+struct block_infos_map_t: generic_map_t<block_info_ptr_t, 2> {
+    block_info_ptr_t byHash(std::string_view hash) noexcept;
+};
 
 } // namespace syncspirit::model

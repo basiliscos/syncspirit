@@ -41,6 +41,7 @@ add_library(syncspirit_lib
     src/model/diff/base.cpp
     src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_diff_visitor.cpp
+    src/model/diff/load/blocks.cpp
     src/model/diff/load/devices.cpp
     src/model/diff/cluster/aggregate.cpp
 #    src/model/diff/cluster/index_refresher.cpp

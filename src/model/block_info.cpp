@@ -90,6 +90,12 @@ static void del_me() {
 
 
 template<> std::string_view get_index<0>(const block_info_ptr_t& item) noexcept { return item->get_key(); }
+template<> std::string_view get_index<1>(const block_info_ptr_t& item) noexcept { return item->get_hash(); }
+
+block_info_ptr_t block_infos_map_t::byHash(std::string_view hash) noexcept {
+    return get<1>(hash);
+}
+
 
 } // namespace syncspirit::model
 
