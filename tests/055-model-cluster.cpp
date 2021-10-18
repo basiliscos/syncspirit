@@ -5,6 +5,7 @@
 #include "model/misc/file_iterator.h"
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/devices.h"
+#include "model/diff/load/ignored_devices.h"
 #include "db/prefix.h"
 #include "structs.pb.h"
 
@@ -109,6 +110,35 @@ TEST_CASE("loading cluster", "[model]") {
         CHECK(target_block->get_weak_hash() == block->get_weak_hash());
         CHECK(target_block->get_size() == block->get_size());
     }
+
+    SECTION("ignored_devices") {
+        auto device_id = device_id_t::from_string("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7").value();
+
+        auto id = ignored_device_ptr_t(new ignored_device_t(device_id));
+        auto key = id->get_key();
+        auto data = id->serialize();
+
+        auto target = ignored_device_ptr_t();
+
+        SECTION("directly") {
+            target = ignored_device_ptr_t(new ignored_device_t(key, data));
+        }
+
+        SECTION("via diff") {
+            diff::load::container_t devices;
+            devices.emplace_back(diff::load::pair_t{key, data});
+            auto diff = diff::cluster_diff_ptr_t(new diff::load::ignored_devices_t(devices));
+            diff->apply(*cluster);
+            auto& map = cluster->get_ignored_devices();
+            REQUIRE(map.size() == 1);
+            target = map.get(device_id.get_sha256());
+        }
+
+        REQUIRE(target);
+        CHECK(target->get_sha256() == id->get_sha256());
+        CHECK(target->get_key() == id->get_key());
+    }
+
 }
 
 #if 0

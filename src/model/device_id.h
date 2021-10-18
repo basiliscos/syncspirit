@@ -32,6 +32,8 @@ struct device_id_t : arc_base_t<device_id_t> {
     operator bool() const noexcept { return !value.empty(); }
 
     const std::string &get_value() const noexcept { return value; }
+    const std::string& serialize() const noexcept { return value; }
+
     std::string_view get_short() const noexcept;
     std::string_view get_sha256() const noexcept { return std::string_view(hash + 1, digest_length); }
     std::string_view get_key() const noexcept { return std::string_view(hash, data_length); }

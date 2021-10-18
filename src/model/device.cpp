@@ -77,4 +77,5 @@ device_ptr_t devices_map_t::bySha256(std::string_view device_id) noexcept {
     return get<1>(device_id);
 }
 
+
 }

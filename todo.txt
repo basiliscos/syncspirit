@@ -1,5 +1,5 @@
 - uuid model
--- ignored devices
+-- folder
 -- ignored folders
 
 

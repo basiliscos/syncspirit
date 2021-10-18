@@ -36,11 +36,11 @@ outcome::result<void> store_file_info(model::file_info_ptr_t &info, transaction_
 outcome::result<model::file_infos_map_t> load_file_infos(model::folder_infos_map_t &folder_infos,
                                                          transaction_t &txn) noexcept;
 
-outcome::result<void> store_ignored_device(model::ignored_device_ptr_t &info, transaction_t &txn) noexcept;
-outcome::result<model::ignored_devices_map_t> load_ignored_devices(transaction_t &txn) noexcept;
+//outcome::result<void> store_ignored_device(model::ignored_device_ptr_t &info, transaction_t &txn) noexcept;
+//outcome::result<model::ignored_devices_map_t> load_ignored_devices(transaction_t &txn) noexcept;
 
-outcome::result<void> store_ignored_folder(model::ignored_folder_ptr_t &info, transaction_t &txn) noexcept;
-outcome::result<model::ignored_folders_map_t> load_ignored_folders(transaction_t &txn) noexcept;
+//outcome::result<void> store_ignored_folder(model::ignored_folder_ptr_t &info, transaction_t &txn) noexcept;
+//outcome::result<model::ignored_folders_map_t> load_ignored_folders(transaction_t &txn) noexcept;
 
 } // namespace db
 } // namespace syncspirit

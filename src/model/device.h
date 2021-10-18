@@ -1,6 +1,5 @@
 #pragma once
 
-#include <unordered_map>
 #include "misc/arc.hpp"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
@@ -44,7 +43,6 @@ private:
 };
 
 using device_ptr_t = intrusive_ptr_t<device_t>;
-using ignored_device_ptr_t = intrusive_ptr_t<device_id_t>;
 
 struct local_device_t : device_t {
     using device_t::device_t;
@@ -56,7 +54,6 @@ struct devices_map_t: public generic_map_t<device_ptr_t, 2> {
 };
 
 
-using ignored_devices_map_t = generic_map_t<ignored_device_ptr_t, 1>;
 
 } // namespace syncspirit::model
 

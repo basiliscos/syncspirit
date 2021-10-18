@@ -71,6 +71,10 @@ devices_map_t &cluster_t::get_devices() noexcept {
     return devices;
 }
 
+ignored_devices_map_t &cluster_t::get_ignored_devices() noexcept {
+    return ignored_devices;
+}
+
 block_infos_map_t &cluster_t::get_blocks() noexcept {
     return blocks;
 }
