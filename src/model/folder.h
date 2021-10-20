@@ -71,19 +71,4 @@ using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
 using folders_map_t = generic_map_t<folder_ptr_t, 1>;
 
-struct ignored_folder_t : arc_base_t<ignored_folder_t> {
-    ignored_folder_t(const db::IgnoredFolder &folder) noexcept;
-
-    bool operator==(const ignored_folder_t &other) const noexcept { return other.id == id; }
-    bool operator!=(const ignored_folder_t &other) const noexcept { return other.id != id; }
-
-    db::IgnoredFolder serialize() const noexcept;
-
-    std::string id;
-    std::string label;
-};
-
-using ignored_folder_ptr_t = intrusive_ptr_t<ignored_folder_t>;
-using ignored_folders_map_t = generic_map_t<ignored_folder_ptr_t, 1>;
-
 } // namespace syncspirit::model

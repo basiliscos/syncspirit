@@ -47,15 +47,6 @@ std::string folder_t::serialize() noexcept {
     return r.SerializeAsString();
 }
 
-ignored_folder_t::ignored_folder_t(const db::IgnoredFolder &folder) noexcept : id{folder.id()}, label(folder.label()) {}
-
-db::IgnoredFolder ignored_folder_t::serialize() const noexcept {
-    db::IgnoredFolder r;
-    r.set_id(id);
-    r.set_label(label);
-    return r;
-    ;
-}
 
 bool folder_t::is_shared_with(const model::device_ptr_t &device) noexcept {
     for (auto &it : folder_infos) {

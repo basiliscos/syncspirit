@@ -45,6 +45,7 @@ add_library(syncspirit_lib
     src/model/diff/load/devices.cpp
     src/model/diff/load/folders.cpp
     src/model/diff/load/ignored_devices.cpp
+    src/model/diff/load/ignored_folders.cpp
     src/model/diff/cluster/aggregate.cpp
 #    src/model/diff/cluster/index_refresher.cpp
 #    src/model/diff/cluster/load_data.cpp
@@ -62,6 +63,7 @@ add_library(syncspirit_lib
     src/model/folder.cpp
     src/model/folder_info.cpp
     src/model/ignored_device.cpp
+    src/model/ignored_folder.cpp
 #    src/net/acceptor_actor.cpp
 #    src/net/cluster_supervisor.cpp
 #    src/net/controller_actor.cpp

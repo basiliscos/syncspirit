@@ -6,6 +6,7 @@
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/devices.h"
 #include "model/diff/load/ignored_devices.h"
+#include "model/diff/load/ignored_folders.h"
 #include "model/diff/load/folders.h"
 #include "db/prefix.h"
 #include "structs.pb.h"
@@ -174,6 +175,36 @@ TEST_CASE("loading cluster", "[model]") {
         CHECK(folder->get_path() == "/my/path");
     }
 
+    SECTION("ignored folders") {
+        db::IgnoredFolder db_folder;
+        db_folder.set_label("my-label");
+
+        auto folder = ignored_folder_ptr_t(new ignored_folder_t(std::string("folder-id"), "my-label"));
+        auto key = folder ->get_key();
+        auto data = folder ->serialize();
+
+        auto target = ignored_folder_ptr_t();
+
+        SECTION("directly") {
+            target = ignored_folder_ptr_t(new ignored_folder_t(key, data));
+        }
+
+        SECTION("via diff") {
+            diff::load::container_t folders;
+            folders.emplace_back(diff::load::pair_t{key, data});
+            auto diff = diff::cluster_diff_ptr_t(new diff::load::ignored_folders_t(folders));
+            diff->apply(*cluster);
+            auto& map = cluster->get_ignored_folders();
+            REQUIRE(map.size() == 1);
+            target = map.get(folder->get_id());
+        }
+
+        REQUIRE(target);
+
+        CHECK(target->get_id() == folder->get_id());
+        CHECK(folder->get_key() == folder->get_key());
+        CHECK(folder->get_label() == folder->get_label());
+    }
 }
 
 #if 0

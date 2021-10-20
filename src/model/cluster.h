@@ -8,6 +8,7 @@
 #include "misc/uuid.h"
 #include "device.h"
 #include "ignored_device.h"
+#include "ignored_folder.h"
 #include "folder.h"
 #include "block_info.h"
 
@@ -43,6 +44,7 @@ struct cluster_t : arc_base_t<cluster_t> {
     block_infos_map_t &get_blocks() noexcept;
     devices_map_t &get_devices() noexcept;
     ignored_devices_map_t &get_ignored_devices() noexcept;
+    ignored_folders_map_t &get_ignored_folders() noexcept;
     block_infos_map_t &get_deleted_blocks() noexcept;
     folders_map_t &get_folders() noexcept;
     uuid_t next_uuid() noexcept;
@@ -59,6 +61,7 @@ struct cluster_t : arc_base_t<cluster_t> {
     block_infos_map_t deleted_blocks;
     devices_map_t devices;
     ignored_devices_map_t ignored_devices;
+    ignored_folders_map_t ignored_folders;
     //folder_infos_map_t new_folder_infos;
 
     friend class file_interator_t;

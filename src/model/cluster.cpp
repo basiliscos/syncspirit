@@ -75,6 +75,10 @@ ignored_devices_map_t &cluster_t::get_ignored_devices() noexcept {
     return ignored_devices;
 }
 
+ignored_folders_map_t &cluster_t::get_ignored_folders() noexcept {
+    return ignored_folders;
+}
+
 block_infos_map_t &cluster_t::get_blocks() noexcept {
     return blocks;
 }
