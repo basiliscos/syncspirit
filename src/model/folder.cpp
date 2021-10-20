@@ -1,29 +1,39 @@
 #include "folder.h"
 #include "../db/utils.h"
+#include "../db/prefix.h"
 #include <spdlog.h>
 
-using namespace syncspirit;
-using namespace syncspirit::model;
+namespace syncspirit::model {
 
-folder_t::folder_t(const db::Folder &db_folder, const uuid_t &uuid_) noexcept
-    : _id{db_folder.id()}, _label{db_folder.label()}, path{db_folder.path()},
-      folder_type{db_folder.folder_type()}, rescan_interval{static_cast<uint32_t>(db_folder.rescan_interval())},
-      pull_order{db_folder.pull_order()}, watched{db_folder.watched()}, read_only{db_folder.read_only()},
-      ignore_permissions{db_folder.ignore_permissions()}, ignore_delete{db_folder.ignore_delete()},
-      disable_temp_indixes{db_folder.disable_temp_indexes()}, paused{db_folder.paused()} {
-    std::copy(uuid_.begin(), uuid_.end(), uuid);
+static const constexpr char prefix = (char)(db::prefix::folder);
+
+folder_t::folder_t(std::string_view key, std::string_view data) noexcept {
+    assert(key[0] == prefix);
+    this->key = key;
+
+    db::Folder folder;
+    auto ok = folder.ParseFromArray(data.data(), data.size());
+    assert(ok);
+    label = folder.label();
+    path = folder.path();
+    folder_type = folder.folder_type();
+    rescan_interval = folder.rescan_interval();
+    pull_order = folder.pull_order();
+    watched = folder.watched();
+    read_only = folder.read_only();
+    ignore_permissions = folder.ignore_permissions();
+    ignore_delete = folder.ignore_delete();
+    disable_temp_indixes = folder.disable_temp_indexes();
+    paused = folder.paused();
 }
 
 void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
 
-void folder_t::assign_device(model::device_ptr_t device_) noexcept { device = device_; }
-
 void folder_t::assign_cluster(cluster_t *cluster_) noexcept { cluster = cluster_; }
 
-db::Folder folder_t::serialize() noexcept {
+std::string folder_t::serialize() noexcept {
     db::Folder r;
-    r.set_id(_id);
-    r.set_label(_label);
+    r.set_label(label);
     r.set_read_only(read_only);
     r.set_ignore_permissions(ignore_permissions);
     r.set_ignore_delete(ignore_delete);
@@ -34,7 +44,7 @@ db::Folder folder_t::serialize() noexcept {
     r.set_folder_type(folder_type);
     r.set_pull_order(pull_order);
     r.set_rescan_interval(rescan_interval);
-    return r;
+    return r.SerializeAsString();
 }
 
 ignored_folder_t::ignored_folder_t(const db::IgnoredFolder &folder) noexcept : id{folder.id()}, label(folder.label()) {}
@@ -136,15 +146,20 @@ void folder_t::update(local_file_map_t &local_files) noexcept {
 folder_info_ptr_t folder_t::get_folder_info(const device_ptr_t &device) noexcept {
     return folder_infos.byDevice(device);
 }
-#endif
 
 proto::Index folder_t::generate() noexcept {
     proto::Index r;
-    r.set_folder(_id);
+    r.set_folder(std::string(get_id()));
     auto fi = get_folder_info(device);
     for (auto it : fi->get_file_infos()) {
         auto &file = *it.item;
         *r.add_files() = file.get();
     }
     return r;
+}
+#endif
+
+template<> std::string_view get_index<0>(const folder_ptr_t& item) noexcept { return item->get_id(); }
+
+
 }

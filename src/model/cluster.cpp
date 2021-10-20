@@ -79,6 +79,10 @@ block_infos_map_t &cluster_t::get_blocks() noexcept {
     return blocks;
 }
 
+folders_map_t &cluster_t::get_folders() noexcept {
+    return folders;
+}
+
 
 uuid_t cluster_t::next_uuid() noexcept {
     return uuid_generator();

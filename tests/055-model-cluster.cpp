@@ -6,6 +6,7 @@
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/devices.h"
 #include "model/diff/load/ignored_devices.h"
+#include "model/diff/load/folders.h"
 #include "db/prefix.h"
 #include "structs.pb.h"
 
@@ -137,6 +138,40 @@ TEST_CASE("loading cluster", "[model]") {
         REQUIRE(target);
         CHECK(target->get_sha256() == id->get_sha256());
         CHECK(target->get_key() == id->get_key());
+    }
+
+    SECTION("folders") {
+        db::Folder db_folder;
+        db_folder.set_label("my-label");
+        db_folder.set_path("/my/path");
+
+        auto prefix = (char)db::prefix::folder;
+        auto id = std::string("1234-5678");
+        auto key = std::string(&prefix, 1) + id;
+        auto data = db_folder.SerializeAsString();
+
+        auto folder = folder_ptr_t{};
+
+        SECTION("directly") {
+            folder = folder_ptr_t(new folder_t(key, data));
+        }
+
+        SECTION("via diff") {
+            diff::load::container_t folders;
+            folders.emplace_back(diff::load::pair_t{key, data});
+            auto diff = diff::cluster_diff_ptr_t(new diff::load::folders_t(folders));
+            diff->apply(*cluster);
+            auto& map = cluster->get_folders();
+            REQUIRE(map.size() == 1);
+            folder = map.get(id);
+            REQUIRE(folder);
+            CHECK(folder->get_cluster() == cluster.get());
+        }
+
+        REQUIRE(folder);
+        CHECK(folder->get_id() == id);
+        CHECK(folder->get_label() == "my-label");
+        CHECK(folder->get_path() == "/my/path");
     }
 
 }

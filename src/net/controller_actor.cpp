@@ -345,7 +345,7 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
 
 void controller_actor_t::on_new_folder(message::store_new_folder_notify_t &message) noexcept {
     auto &folder = message.payload.folder;
-    LOG_TRACE(log, "{}, on_new_folder, folder = '{}'", identity, folder->label());
+    LOG_TRACE(log, "{}, on_new_folder, folder = '{}'", identity, folder->get_label());
     auto cluster_update = cluster->get(peer);
     using payload_t = std::decay_t<decltype(cluster_update)>;
     auto update = std::make_unique<payload_t>(std::move(cluster_update));
@@ -411,7 +411,7 @@ void controller_actor_t::on_message(proto::message::DownloadProgress &message) n
 void controller_actor_t::update(folder_updater_t &&updater) noexcept {
     auto &folder_id = updater.id();
     auto folder = cluster->get_folders().by_id(folder_id);
-    if (current_file && current_file->get_folder_info()->get_folder()->id() == folder_id) {
+    if (current_file && current_file->get_folder_info()->get_folder()->get_id() == folder_id) {
         LOG_TRACE(log, "{}, resetting iterators on folder {}", identity, folder->label());
         file_iterator.reset();
         block_iterator.reset();

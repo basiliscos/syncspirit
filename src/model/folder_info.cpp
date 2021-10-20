@@ -46,7 +46,7 @@ bool folder_info_t::update(const proto::Device &device) noexcept {
         update = true;
     }
     if (update || new_index) {
-        spdlog::trace("folder_info_t::update, folder = {}, index = {:#x}, max seq = {}", folder->label(), index,
+        spdlog::trace("folder_info_t::update, folder = {}, index = {:#x}, max seq = {}", folder->get_label(), index,
                       max_sequence);
         mark_dirty();
     }
@@ -113,9 +113,9 @@ void folder_info_t::update(const proto::IndexUpdate &data, const device_ptr_t &p
 
 void folder_info_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept { update_generic(data, peer); }
 
+#if 0
 void folder_info_t::update(local_file_map_t &local_files) noexcept {
     std::abort();
-#if 0
     auto file_infos_copy = file_infos;
     for (auto it : local_files.map) {
         auto file_key = file_info_t::generate_db_key(it.first.string(), *this);
@@ -140,7 +140,10 @@ void folder_info_t::update(local_file_map_t &local_files) noexcept {
             std::abort();
         }
     }
-#endif
 }
+#endif
+
+template<> std::string_view get_index<0>(const folder_info_ptr_t& item) noexcept { std::abort(); }
+template<> std::string_view get_index<1>(const folder_info_ptr_t& item) noexcept { std::abort(); }
 
 } // namespace syncspirit::model

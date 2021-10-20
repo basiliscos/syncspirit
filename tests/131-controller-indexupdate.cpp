@@ -86,7 +86,7 @@ void test_indexupdate() {
             CHECK(peer->start_reading == 1);
 
             proto::IndexUpdate iu;
-            iu.set_folder(folder->id());
+            iu.set_folder(folder->get_id());
 
             auto fi = proto::FileInfo();
 

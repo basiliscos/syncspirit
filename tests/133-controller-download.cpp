@@ -44,8 +44,8 @@ struct DonwloadFixture : Fixture {
 
         proto::ClusterConfig p_cluster;
         auto p_folder = p_cluster.add_folders();
-        p_folder->set_label(folder->label());
-        p_folder->set_id(folder->id());
+        p_folder->set_label(folder->get_label());
+        p_folder->set_id(folder->get_id());
 
         auto p_device_my = p_folder->add_devices();
         p_device_my->set_id(device_my->device_id.get_sha256());

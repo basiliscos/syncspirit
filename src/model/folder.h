@@ -21,24 +21,25 @@ namespace outcome = boost::outcome_v2;
 struct cluster_t;
 
 struct folder_t : arc_base_t<folder_t>, storeable_t {
-    folder_t(const db::Folder &db_folder, const uuid_t& uuid) noexcept;
-    void assign_device(model::device_ptr_t device_) noexcept;
+    folder_t(std::string_view key, std::string_view data) noexcept;
+
     void assign_cluster(cluster_t *cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
-    db::Folder serialize() noexcept;
+    std::string serialize() noexcept;
 
-    bool operator==(const folder_t &other) const noexcept { return other._id == _id; }
-    bool operator!=(const folder_t &other) const noexcept { return other._id != _id; }
+    bool operator==(const folder_t &other) const noexcept { return get_id() == other.get_id(); }
+    bool operator!=(const folder_t &other) const noexcept { return !(*this == other); }
 
     std::optional<proto::Folder> get(model::device_ptr_t device) noexcept;
     bool is_shared_with(const model::device_ptr_t &device) noexcept;
     std::int64_t score(const device_ptr_t &peer_device) noexcept;
     folder_info_ptr_t get_folder_info(const device_ptr_t &device) noexcept;
 
-    const std::string &id() noexcept { return _id; }
-    const std::string &label() noexcept { return _label; }
+    std::string_view get_id() const noexcept { return std::string_view(key.data() + 1, key.size() -1); }
+    const std::string &get_label() noexcept { return label; }
     inline auto &get_folder_infos() noexcept { return folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
+
     inline const bfs::path &get_path() noexcept { return path; }
     bool update(const proto::Folder &remote) noexcept;
     void update(local_file_map_t &local_files) noexcept;
@@ -48,9 +49,9 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     template <typename T> auto &access() const noexcept;
 
   private:
+    std::string key;
     device_ptr_t device;
-    std::string _id;
-    std::string _label;
+    std::string label;
     bfs::path path;
     db::FolderType folder_type;
     std::uint32_t rescan_interval;
