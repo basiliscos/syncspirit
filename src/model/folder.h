@@ -35,7 +35,8 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     std::int64_t score(const device_ptr_t &peer_device) noexcept;
     folder_info_ptr_t get_folder_info(const device_ptr_t &device) noexcept;
 
-    std::string_view get_id() const noexcept { return std::string_view(key.data() + 1, key.size() -1); }
+    std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
+    std::string_view get_id() const noexcept { return id; }
     const std::string &get_label() noexcept { return label; }
     inline auto &get_folder_infos() noexcept { return folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
@@ -48,8 +49,10 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
 
+    static const constexpr size_t data_length = uuid_length + 1;
+
   private:
-    std::string key;
+    std::string id;
     device_ptr_t device;
     std::string label;
     bfs::path path;
@@ -64,11 +67,13 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     bool paused;
     folder_infos_map_t folder_infos;
     cluster_t *cluster = nullptr;
-    char uuid[uuid_length];
+    char key[data_length];
 };
 
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
-using folders_map_t = generic_map_t<folder_ptr_t, 1>;
+struct folders_map_t: generic_map_t<folder_ptr_t, 2> {
+    folder_ptr_t byId(std::string_view id) noexcept;
+};
 
 } // namespace syncspirit::model

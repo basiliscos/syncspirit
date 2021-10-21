@@ -22,17 +22,18 @@ message IgnoredFolder {
 }
 
 message Folder {
-    string      label                    = 1;
-    bool        read_only                = 2;
-    bool        ignore_permissions       = 3;
-    bool        ignore_delete            = 4;
-    bool        disable_temp_indexes     = 5;
-    bool        paused                   = 6;
-    bool        watched                  = 7;
-    string      path                     = 8;
-    FolderType  folder_type              = 9;
-    PullOrder   pull_order               = 10;
-    uint32      rescan_interval          = 11;
+    string      id                       = 1;
+    string      label                    = 2;
+    bool        read_only                = 3;
+    bool        ignore_permissions       = 4;
+    bool        ignore_delete            = 5;
+    bool        disable_temp_indexes     = 6;
+    bool        paused                   = 7;
+    bool        watched                  = 8;
+    string      path                     = 9;
+    FolderType  folder_type              = 10;
+    PullOrder   pull_order               = 11;
+    uint32      rescan_interval          = 12;
 }
 
 enum FolderType {

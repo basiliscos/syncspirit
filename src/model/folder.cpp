@@ -7,13 +7,15 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder);
 
-folder_t::folder_t(std::string_view key, std::string_view data) noexcept {
-    assert(key[0] == prefix);
-    this->key = key;
+folder_t::folder_t(std::string_view key_, std::string_view data) noexcept {
+    assert(key_[0] == prefix);
+    assert(key_.size() == data_length);
+    std::copy(key_.begin(), key_.end(), key);
 
     db::Folder folder;
     auto ok = folder.ParseFromArray(data.data(), data.size());
     assert(ok);
+    id = folder.id();
     label = folder.label();
     path = folder.path();
     folder_type = folder.folder_type();
@@ -33,6 +35,7 @@ void folder_t::assign_cluster(cluster_t *cluster_) noexcept { cluster = cluster_
 
 std::string folder_t::serialize() noexcept {
     db::Folder r;
+    r.set_id(id);
     r.set_label(label);
     r.set_read_only(read_only);
     r.set_ignore_permissions(ignore_permissions);
@@ -150,7 +153,12 @@ proto::Index folder_t::generate() noexcept {
 }
 #endif
 
-template<> std::string_view get_index<0>(const folder_ptr_t& item) noexcept { return item->get_id(); }
+template<> std::string_view get_index<0>(const folder_ptr_t& item) noexcept { return item->get_key(); }
+template<> std::string_view get_index<1>(const folder_ptr_t& item) noexcept { return item->get_id(); }
+
+folder_ptr_t folders_map_t::byId(std::string_view id) noexcept {
+    return get<1>(id);
+}
 
 
 }

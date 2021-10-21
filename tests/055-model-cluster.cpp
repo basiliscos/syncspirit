@@ -143,12 +143,14 @@ TEST_CASE("loading cluster", "[model]") {
 
     SECTION("folders") {
         db::Folder db_folder;
+        db_folder.set_id("1234-5678");
         db_folder.set_label("my-label");
         db_folder.set_path("/my/path");
 
+        auto uuid = cluster->next_uuid();
         auto prefix = (char)db::prefix::folder;
         auto id = std::string("1234-5678");
-        auto key = std::string(&prefix, 1) + id;
+        auto key = std::string(&prefix, 1) + std::string(uuid.begin(), uuid.end());
         auto data = db_folder.SerializeAsString();
 
         auto folder = folder_ptr_t{};
@@ -164,8 +166,10 @@ TEST_CASE("loading cluster", "[model]") {
             diff->apply(*cluster);
             auto& map = cluster->get_folders();
             REQUIRE(map.size() == 1);
-            folder = map.get(id);
+            auto f1 = map.begin()->item;
+            folder = map.get(key);
             REQUIRE(folder);
+            REQUIRE(folder == map.byId(id));
             CHECK(folder->get_cluster() == cluster.get());
         }
 
