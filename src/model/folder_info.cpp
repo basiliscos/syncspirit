@@ -7,25 +7,50 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder_info);
 
-folder_info_t::folder_info_t(const db::FolderInfo &info_, device_t *device_, folder_t *folder_,
-                             std::string_view key) noexcept
-    : index{info_.index_id()}, max_sequence{info_.max_sequence()}, device{device_}, folder{folder_} {
-    assert(device);
-    assert(folder);
-    assert(key.size() == data_length);
-    assert(key[0] == prefix);
-    std::copy(key.begin(), key.end(), uuid);
+folder_info_t::folder_info_t(std::string_view key_, std::string_view data, device_t *device_, folder_t *folder_) noexcept: device{device_}, folder{folder_} {
+    assert(key_.size() == data_length);
+    assert(key_[0] == prefix);
+    assert(key_.substr(1, device_id_t::digest_length) == device->get_key().substr(1));
+    assert(key_.substr(device_id_t::digest_length + 1, uuid_length) == folder->get_key().substr(1));
+    std::copy(key_.begin(), key_.end(), key);
+
+    db::FolderInfo fi;
+    auto ok = fi.ParseFromArray(data.data(), data.size());
+    assert(ok);
+    index = fi.index_id();
+    max_sequence = fi.max_sequence();
+}
+
+folder_info_t::folder_info_t(const uuid_t& uuid, std::string_view data, device_t *device_, folder_t *folder_) noexcept: device{device_}, folder{folder_} {
+    auto device_key = device->get_key().substr(1);
+    auto folder_key = folder->get_key().substr(1);
+    key[0] = prefix;
+    std::copy(device_key.begin(), device_key.end(), key + 1);
+    std::copy(folder_key.begin(), folder_key.end(), key + 1 + device_key.size());
+    std::copy(uuid.begin(), uuid.end(), key + 1 + device_key.size() + folder_key.size());
+
+    db::FolderInfo fi;
+    auto ok = fi.ParseFromArray(data.data(), data.size());
+    assert(ok);
+    index = fi.index_id();
+    max_sequence = fi.max_sequence();
 }
 
 folder_info_t::~folder_info_t() {}
 
 std::string_view folder_info_t::get_key() noexcept {
-    return std::string_view(uuid, data_length);
+    return std::string_view(key, data_length);
 }
 
+
+std::string_view folder_info_t::get_uuid() noexcept {
+    return std::string_view(key + 1 + device_id_t::digest_length + uuid_length, uuid_length);
+}
+
+
 bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
-    auto r = std::mismatch(uuid, uuid + data_length, other.uuid);
-    return r.first == uuid + data_length;
+    auto r = std::mismatch(key, key + data_length, other.key);
+    return r.first == key + data_length;
 }
 
 
@@ -59,11 +84,11 @@ void folder_info_t::set_max_sequence(int64_t value) noexcept {
     mark_dirty();
 }
 
-db::FolderInfo folder_info_t::serialize() noexcept {
+std::string folder_info_t::serialize() noexcept {
     db::FolderInfo r;
     r.set_index_id(index);
     r.set_max_sequence(max_sequence);
-    return r;
+    return r.SerializeAsString();
 }
 
 template <typename Message> void folder_info_t::update_generic(const Message &data, const device_ptr_t &peer) noexcept {
@@ -143,7 +168,13 @@ void folder_info_t::update(local_file_map_t &local_files) noexcept {
 }
 #endif
 
-template<> std::string_view get_index<0>(const folder_info_ptr_t& item) noexcept { std::abort(); }
-template<> std::string_view get_index<1>(const folder_info_ptr_t& item) noexcept { std::abort(); }
+folder_info_ptr_t folder_infos_map_t::byDevice(const device_ptr_t& device) noexcept {
+    return get<1>(device->device_id().get_sha256());
+}
+
+template<> std::string_view get_index<0>(const folder_info_ptr_t& item) noexcept { return item->get_uuid(); }
+template<> std::string_view get_index<1>(const folder_info_ptr_t& item) noexcept {
+    return item->get_device()->device_id().get_sha256();
+}
 
 } // namespace syncspirit::model

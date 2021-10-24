@@ -11,17 +11,18 @@ namespace syncspirit::model {
 struct folder_t;
 
 struct folder_info_t : arc_base_t<folder_info_t>, storeable_t {
-    folder_info_t(const db::FolderInfo &info_, device_t *device_, folder_t *folder_, std::string_view key) noexcept;
-    folder_info_t(const db::FolderInfo &info_, device_t *device_, folder_t *folder_) noexcept;
+    folder_info_t(std::string_view key, std::string_view data, device_t *device_, folder_t *folder_) noexcept;
+    folder_info_t(const uuid_t& uuid, std::string_view data, device_t *device_, folder_t *folder_) noexcept;
     ~folder_info_t();
 
     std::string_view get_key() noexcept;
+    std::string_view get_uuid() noexcept;
 
     bool operator==(const folder_info_t &other) const noexcept;
     bool operator!=(const folder_info_t &other) const noexcept { return !(*this == other); }
 
     void add(const file_info_ptr_t &file_info) noexcept;
-    db::FolderInfo serialize() noexcept;
+    std::string serialize() noexcept;
 
     inline std::uint64_t get_index() const noexcept { return index; }
 
@@ -38,9 +39,9 @@ struct folder_info_t : arc_base_t<folder_info_t>, storeable_t {
 
   private:
     template <typename Message> void update_generic(const Message &data, const device_ptr_t &peer) noexcept;
-    static const constexpr auto data_length = uuid_length * 2 + device_id_t::data_length;
+    static const constexpr auto data_length = uuid_length * 2 + device_id_t::digest_length + 1;
 
-    char uuid[data_length];
+    char key[data_length];
 
     std::uint64_t index;
     std::int64_t max_sequence;
@@ -57,9 +58,7 @@ inline std::uint64_t db_key(const folder_info_ptr_t &item) noexcept { return ite
 #endif
 
 struct folder_infos_map_t: public generic_map_t<folder_info_ptr_t, 2> {
-    folder_info_ptr_t byDevice(const device_ptr_t& device) {
-        return get<1>(device->get_key());
-    }
+    folder_info_ptr_t byDevice(const device_ptr_t& device) noexcept;
 };
 
 }; // namespace syncspirit::model

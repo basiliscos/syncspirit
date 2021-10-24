@@ -7,6 +7,7 @@
 #include "model/diff/load/devices.h"
 #include "model/diff/load/ignored_devices.h"
 #include "model/diff/load/ignored_folders.h"
+#include "model/diff/load/folder_infos.h"
 #include "model/diff/load/folders.h"
 #include "db/prefix.h"
 #include "structs.pb.h"
@@ -18,7 +19,7 @@ using namespace syncspirit::test;
 
 namespace bfs = boost::filesystem;
 
-TEST_CASE("loading cluster", "[model]") {
+TEST_CASE("loading cluster (base)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_ptr_t(new local_device_t(my_id, "my-device"));
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
@@ -209,6 +210,62 @@ TEST_CASE("loading cluster", "[model]") {
         CHECK(folder->get_key() == folder->get_key());
         CHECK(folder->get_label() == folder->get_label());
     }
+}
+
+TEST_CASE("loading cluster (folder info)", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_ptr_t(new local_device_t(my_id, "my-device"));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    CHECK(cluster);
+    cluster->get_devices().put(my_device);
+
+    db::Folder db_folder;
+    db_folder.set_id("1234-5678");
+    db_folder.set_label("my-label");
+    db_folder.set_path("/my/path");
+
+    auto uuid = cluster->next_uuid();
+    auto prefix = (char)db::prefix::folder;
+    auto folder_key = std::string(&prefix, 1) + std::string(uuid.begin(), uuid.end());
+    auto folder_data = db_folder.SerializeAsString();
+
+    auto folder = folder_ptr_t(new folder_t(folder_key, folder_data));
+    cluster->get_folders().put(folder);
+
+    db::FolderInfo db_fi;
+    db_fi.set_index_id(2);
+    db_fi.set_max_sequence(3);
+    auto data = db_fi.SerializeAsString();
+    auto fi = folder_info_ptr_t(new folder_info_t(cluster->next_uuid(), data, my_device.get(), folder.get()));
+    CHECK(fi);
+    CHECK(fi->get_index() == 2ul);
+    CHECK(fi->get_max_sequence() == 3ul);
+
+    auto target = folder_info_ptr_t();
+
+    SECTION("directly") {
+        target = new folder_info_t(fi->get_key(), data, my_device.get(), folder.get());
+    }
+
+    SECTION("via diff") {
+        diff::load::container_t folders;
+        auto data = fi->serialize();
+        folders.emplace_back(diff::load::pair_t{fi->get_key(), data});
+        auto diff = diff::cluster_diff_ptr_t(new diff::load::folder_infos_t(folders));
+        diff->apply(*cluster);
+        auto& map = folder->get_folder_infos();
+        REQUIRE(map.size() == 1);
+        target = map.get(fi->get_uuid());
+        REQUIRE(map.byDevice(my_device));
+    }
+
+    REQUIRE(target);
+    CHECK(target->get_key() == fi->get_key());
+    CHECK(target->get_uuid() == fi->get_uuid());
+    CHECK(target->get_device() == fi->get_device());
+    CHECK(target->get_folder() == fi->get_folder());
+    CHECK(target->get_index() == fi->get_index());
+    CHECK(target->get_max_sequence() == fi->get_max_sequence());
 }
 
 #if 0

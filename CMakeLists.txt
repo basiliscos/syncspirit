@@ -43,6 +43,7 @@ add_library(syncspirit_lib
     src/model/diff/cluster_diff_visitor.cpp
     src/model/diff/load/blocks.cpp
     src/model/diff/load/devices.cpp
+    src/model/diff/load/folder_infos.cpp
     src/model/diff/load/folders.cpp
     src/model/diff/load/ignored_devices.cpp
     src/model/diff/load/ignored_folders.cpp
