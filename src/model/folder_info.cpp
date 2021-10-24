@@ -1,5 +1,6 @@
 #include "folder_info.h"
 #include "folder.h"
+#include "structs.pb.h"
 #include "../db/prefix.h"
 #include <spdlog.h>
 

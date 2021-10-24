@@ -26,7 +26,7 @@ struct update_result_t {
 };
 #endif
 
-struct cluster_t : arc_base_t<cluster_t> {
+struct cluster_t final : arc_base_t<cluster_t> {
 
     cluster_t(device_ptr_t device_, size_t seed) noexcept;
 

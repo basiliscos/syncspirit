@@ -8,7 +8,7 @@
 
 namespace syncspirit::model {
 
-struct device_id_t : arc_base_t<device_id_t> {
+struct device_id_t final : arc_base_t<device_id_t> {
     static const constexpr std::size_t SHA256_B32_SIZE = 52;
     static const constexpr std::size_t CHECK_DIGIT_INT = 13;
     static const constexpr std::size_t LUHN_ITERATIONS = SHA256_B32_SIZE / 13;

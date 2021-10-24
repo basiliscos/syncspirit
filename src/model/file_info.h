@@ -8,7 +8,6 @@
 #include "misc/map.hpp"
 #include "misc/storeable.h"
 #include "misc/uuid.h"
-#include "structs.pb.h"
 #include "block_info.h"
 #include "device.h"
 
@@ -17,20 +16,23 @@ namespace syncspirit::model {
 namespace bfs = boost::filesystem;
 
 struct folder_info_t;
+using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
+
 struct local_file_t;
 struct blocks_interator_t;
 
-struct file_info_t : arc_base_t<file_info_t>, storeable_t {
-
+struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     using blocks_t = std::vector<block_info_ptr_t>;
-    file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_, std::string_view uuid) noexcept;
-    file_info_t(const proto::FileInfo &info_, folder_info_t *folder_info_) noexcept;
+
+    file_info_t(std::string_view key, std::string_view data, const folder_info_ptr_t& folder_info_) noexcept;
+    file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
     ~file_info_t();
 
-    std::string_view get_key() const noexcept { return std::string_view(uuid, uuid_length); }
-    bool operator==(const file_info_t &other) const noexcept { return get_key() == other.get_key(); }
+    std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
+    std::string_view get_uuid() const noexcept { return std::string_view(key + 1, uuid_length); }
+    bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
 
-    db::FileInfo serialize(bool include_blocks = true) noexcept;
+    std::string serialize(bool include_blocks = true) noexcept;
     void update(const proto::FileInfo &remote_info) noexcept;
     bool update(const local_file_t &local_file) noexcept;
 
@@ -77,13 +79,17 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
 
     proto::FileInfo get() const noexcept;
 
+    static const constexpr auto data_length = 1 + uuid_length * 2;
+
+
   private:
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks, block_infos_map_t &deleted_blocks,
                       bool zero_indices = true) noexcept;
     template <typename Source> void fields_update(const Source &s) noexcept;
 
-    char uuid[uuid_length*2];
+    char key[data_length];
+    std::string name;
     folder_info_t *folder_info;
     proto::FileInfoType type;
     std::int64_t size;
@@ -108,9 +114,7 @@ struct file_info_t : arc_base_t<file_info_t>, storeable_t {
 };
 
 struct file_infos_map_t: public generic_map_t<file_info_ptr_t, 2> {
-    file_info_ptr_t byName(std::string_view name) {
-        return get<1>(name);
-    }
+    file_info_ptr_t byName(std::string_view name) noexcept;
 };
 
 }; // namespace syncspirit::model

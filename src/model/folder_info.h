@@ -11,7 +11,7 @@ namespace syncspirit::model {
 struct folder_t;
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
-struct folder_info_t : arc_base_t<folder_info_t>, storeable_t {
+struct folder_info_t final : arc_base_t<folder_info_t>, storeable_t {
     folder_info_t(std::string_view key, std::string_view data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
     folder_info_t(const uuid_t& uuid, std::string_view data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
     ~folder_info_t();

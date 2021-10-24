@@ -1,22 +1,28 @@
-//#include "folder_info.h"
+#include "folder_info.h"
 #include "file_info.h"
 #include "cluster.h"
 #include "misc/block_iterator.h"
 #include "../db/prefix.h"
 #include <algorithm>
 #include <spdlog/spdlog.h>
+#include "structs.pb.h"
 
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
 
-file_info_t::file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_, std::string_view uuid_) noexcept : folder_info{folder_info_} {
-    assert(uuid_[0] == prefix);
-    assert(uuid_.size() == uuid_length * 2);
-    std::copy(uuid_.begin(), uuid_.end(), uuid);
+file_info_t::file_info_t(std::string_view key_, std::string_view data, const folder_info_ptr_t& folder_info_) noexcept : folder_info{folder_info_.get()} {
+    assert(key_.size() == data_length);
+    assert(key_[0] == prefix);
+    assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
+    std::copy(key_.begin(), key_.end(), key);
+
+    db::FileInfo fi;
+    auto ok = fi.ParseFromArray(data.data(), data.size());
+    assert(ok);
+    fields_update(fi);
 
 #if 0
-    fields_update(info_);
     auto &blocks_map = folder_info->get_folder()->get_cluster()->get_blocks();
     for (int i = 0; i < info_.blocks_keys_size(); ++i) {
         auto key = info_.blocks_keys(i);
@@ -28,26 +34,20 @@ file_info_t::file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_,
         blocks.emplace_back(std::move(block));
     }
     version = info_.version();
-    full_name = fmt::format("{}/{}", folder_info->get_folder()->label(), get_name());
+    full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
 #endif
-    std::abort();
 }
 
-file_info_t::file_info_t(const proto::FileInfo &info_, folder_info_t *folder_info_) noexcept
-    : folder_info{folder_info_} {
-#if 0
-    auto fi_uuid = folder_info_->get_key();
-    std::copy(fi_uuid.begin() + uuid_length  + device_id_t::data_length, fi_uuid.end(), uuid);
-    auto uuid_ = folder_info_->get_folder()->get_cluster()->next_uuid();
-    std::copy(uuid_.begin(), uuid_.end(), uuid + uuid_length);
-    uuid[0] = prefix;
+file_info_t::file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept
+    : folder_info{folder_info_.get()} {
+    key[0] = prefix;
+    auto fi_key = folder_info_->get_uuid();
+    std::copy(fi_key.begin(), fi_key.end(), key + 1);
+    std::copy(uuid.begin(), uuid.end(), key + 1 + fi_key.size());
     fields_update(info_);
-    update_blocks(info_);
-    version = info_.version();
+#if 0
     mark_dirty();
-    full_name = fmt::format("{}/{}", folder_info->get_folder()->label(), get_name());
 #endif
-    std::abort();
 }
 
 file_info_t::~file_info_t() {
@@ -63,12 +63,7 @@ file_info_t::~file_info_t() {
 }
 
 std::string_view file_info_t::get_name() const noexcept {
-#if 0
-    const char *ptr = db_key.data();
-    ptr += sizeof(std::uint64_t);
-    return std::string_view(ptr, db_key.size() - sizeof(std::uint64_t));
-#endif
-    std::abort();
+    return name;
 }
 
 std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
@@ -76,8 +71,8 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     return block_size * block_index;
 }
 
-#if 0
 template <typename Source> void file_info_t::fields_update(const Source &s) noexcept {
+    name = s.name();
     sequence = s.sequence();
     type = s.type();
     set_size(s.size());
@@ -91,24 +86,12 @@ template <typename Source> void file_info_t::fields_update(const Source &s) noex
     version = s.version();
     block_size = s.block_size();
     symlink_target = s.symlink_target();
-}
-
-std::string file_info_t::generate_db_key(const std::string &name, const folder_info_t &fi) noexcept {
-    std::string dbk;
-    auto fi_key = fi.get_db_key();
-    assert(fi_key);
-    dbk.resize(sizeof(fi_key) + name.size());
-    char *ptr = dbk.data();
-    auto fi_key_ptr = reinterpret_cast<char *>(&fi_key);
-    std::copy(fi_key_ptr, fi_key_ptr + sizeof(fi_key), ptr);
-    ptr += sizeof(fi_key);
-    std::copy(name.begin(), name.end(), ptr);
-    return dbk;
+    version = s.version();
+    full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
 }
 
 
-
-db::FileInfo file_info_t::serialize(bool include_blocks) noexcept {
+std::string file_info_t::serialize(bool include_blocks) noexcept {
     db::FileInfo r;
     auto name = get_name();
     r.set_name(name.data(), name.size());
@@ -131,14 +114,14 @@ db::FileInfo file_info_t::serialize(bool include_blocks) noexcept {
             if (!block) {
                 continue;
             }
-            auto db_key = block->get_db_key();
-            assert(db_key && "block have to be persisted first");
-            r.mutable_blocks_keys()->Add(db_key);
+            auto db_key = block->get_key();
+            r.mutable_blocks_keys()->Add(std::string(db_key));
         }
     }
-    return r;
+    return r.SerializeAsString();
 }
 
+#if 0
 void file_info_t::update(const proto::FileInfo &remote_info) noexcept {
     if (remote_info.sequence() > sequence) {
         fields_update(remote_info);
@@ -392,7 +375,11 @@ proto::FileInfo file_info_t::get() const noexcept {
 }
 #endif
 
-template<> std::string_view get_index<0>(const file_info_ptr_t& item) noexcept { return item->get_key(); }
+template<> std::string_view get_index<0>(const file_info_ptr_t& item) noexcept { return item->get_uuid(); }
 template<> std::string_view get_index<1>(const file_info_ptr_t& item) noexcept { return item->get_name(); }
+
+file_info_ptr_t file_infos_map_t:: byName(std::string_view name) noexcept {
+    return get<1>(name);
+}
 
 } // namespace syncspirit::model

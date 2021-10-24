@@ -5,7 +5,7 @@
 
 namespace syncspirit::model {
 
-struct ignored_folder_t: arc_base_t<ignored_folder_t> {
+struct ignored_folder_t final: arc_base_t<ignored_folder_t> {
     ignored_folder_t(std::string&& folder_id, std::string_view label) noexcept;
 
     ignored_folder_t(std::string_view key, std::string_view data) noexcept;

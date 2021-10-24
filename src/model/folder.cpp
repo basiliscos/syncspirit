@@ -1,6 +1,7 @@
 #include "folder.h"
 #include "../db/utils.h"
 #include "../db/prefix.h"
+#include "structs.pb.h"
 #include <spdlog.h>
 
 namespace syncspirit::model {
@@ -18,9 +19,9 @@ folder_t::folder_t(std::string_view key_, std::string_view data) noexcept {
     id = folder.id();
     label = folder.label();
     path = folder.path();
-    folder_type = folder.folder_type();
+    folder_type = (foldet_type_t)folder.folder_type();
     rescan_interval = folder.rescan_interval();
-    pull_order = folder.pull_order();
+    pull_order = (pull_order_t) folder.pull_order();
     watched = folder.watched();
     read_only = folder.read_only();
     ignore_permissions = folder.ignore_permissions();
@@ -44,8 +45,8 @@ std::string folder_t::serialize() noexcept {
     r.set_paused(paused);
     r.set_watched(watched);
     r.set_path(path.string());
-    r.set_folder_type(folder_type);
-    r.set_pull_order(pull_order);
+    r.set_folder_type((db::FolderType)folder_type);
+    r.set_pull_order((db::PullOrder)pull_order);
     r.set_rescan_interval(rescan_interval);
     return r.SerializeAsString();
 }

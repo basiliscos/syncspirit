@@ -6,7 +6,7 @@
 
 namespace syncspirit::model {
 
-struct ignored_device_t: arc_base_t<ignored_device_t> {
+struct ignored_device_t final : arc_base_t<ignored_device_t> {
     ignored_device_t(const device_id_t&) noexcept;
     ignored_device_t(std::string_view key, std::string_view data) noexcept;
 

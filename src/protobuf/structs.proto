@@ -71,7 +71,7 @@ message FileInfo {
     int64        sequence               = 10;
     int32        block_size             = 13;
     string       symlink_target         = 16;
-    repeated     uint64 blocks_keys     = 17;
+    repeated     string blocks_keys     = 17;
 }
 
 message IngoredFolder {

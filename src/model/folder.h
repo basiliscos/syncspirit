@@ -20,7 +20,11 @@ namespace outcome = boost::outcome_v2;
 
 struct cluster_t;
 
-struct folder_t : arc_base_t<folder_t>, storeable_t {
+struct folder_t final : arc_base_t<folder_t>, storeable_t {
+
+    enum class foldet_type_t { send = 0, receive, send_and_receive };
+    enum class pull_order_t { random = 0, alphabetic, largest, oldest, newest };
+
     folder_t(std::string_view key, std::string_view data) noexcept;
 
     void assign_cluster(cluster_t *cluster) noexcept;
@@ -56,9 +60,9 @@ struct folder_t : arc_base_t<folder_t>, storeable_t {
     device_ptr_t device;
     std::string label;
     bfs::path path;
-    db::FolderType folder_type;
+    foldet_type_t folder_type;
     std::uint32_t rescan_interval;
-    db::PullOrder pull_order;
+    pull_order_t pull_order;
     bool watched;
     bool read_only;
     bool ignore_permissions;

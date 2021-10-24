@@ -7,6 +7,7 @@
 #include "model/diff/load/devices.h"
 #include "model/diff/load/ignored_devices.h"
 #include "model/diff/load/ignored_folders.h"
+#include "model/diff/load/file_infos.h"
 #include "model/diff/load/folder_infos.h"
 #include "model/diff/load/folders.h"
 #include "db/prefix.h"
@@ -267,6 +268,71 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
     CHECK(target->get_index() == fi->get_index());
     CHECK(target->get_max_sequence() == fi->get_max_sequence());
 }
+
+TEST_CASE("loading cluster (file info)", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_ptr_t(new local_device_t(my_id, "my-device"));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    CHECK(cluster);
+    cluster->get_devices().put(my_device);
+
+    db::Folder db_folder;
+    db_folder.set_id("1234-5678");
+    db_folder.set_label("my-label");
+    db_folder.set_path("/my/path");
+
+    auto uuid = cluster->next_uuid();
+    auto folder_prefix = (char)db::prefix::folder;
+    auto folder_key = std::string(&folder_prefix, 1) + std::string(uuid.begin(), uuid.end());
+    auto folder_data = db_folder.SerializeAsString();
+
+    auto folder = folder_ptr_t(new folder_t(folder_key, folder_data));
+    cluster->get_folders().put(folder);
+
+    db::FolderInfo db_folder_info;
+    db_folder_info.set_index_id(2);
+    db_folder_info.set_max_sequence(3);
+    auto folder_info_data = db_folder_info.SerializeAsString();
+    auto folder_info = folder_info_ptr_t(new folder_info_t(cluster->next_uuid(), folder_info_data, my_device, folder));
+    CHECK(folder_info);
+    CHECK(folder_info->get_index() == 2ul);
+    CHECK(folder_info->get_max_sequence() == 3ul);
+    folder->get_folder_infos().put(folder_info);
+
+    proto::FileInfo pr_fi;
+    pr_fi.set_name("a/b.txt");
+    pr_fi.set_size(55ul);
+    auto fi = file_info_ptr_t(new file_info_t(cluster->next_uuid(),  pr_fi, folder_info));
+    CHECK(fi);
+
+
+    auto target = file_info_ptr_t();
+
+    SECTION("directly") {
+        auto data = fi->serialize();
+        target = new file_info_t(fi->get_key(), data, folder_info);
+    }
+
+    SECTION("via diff") {
+        diff::load::container_t container;
+        auto data = fi->serialize();
+        container.emplace_back(diff::load::pair_t{fi->get_key(), data});
+        auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(container));
+        diff->apply(*cluster);
+        auto& map = folder_info->get_file_infos();
+        REQUIRE(map.size() == 1);
+        target = map.get(fi->get_uuid());
+        REQUIRE(map.byName(fi->get_name()));
+    }
+
+    REQUIRE(target);
+    CHECK(target->get_key() == fi->get_key());
+    CHECK(target->get_name() == fi->get_name());
+    CHECK(target->get_full_name() == fi->get_full_name());
+    CHECK(target->get_full_name() == "my-label/a/b.txt");
+}
+
+
 
 #if 0
 TEST_CASE("iterate_files", "[model]") {
