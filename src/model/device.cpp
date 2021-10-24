@@ -30,10 +30,10 @@ device_t::device_t(std::string_view key, std::string_view data) noexcept
     }
 }
 
-device_t::device_t(const device_id_t &device_id, std::string_view name_, std::string_view cert_name_) noexcept {
-    id = std::move(device_id);
-    name = name_;
-    cert_name = cert_name_;
+device_t::device_t(const device_id_t &device_id_, std::string_view name_, std::string_view cert_name_) noexcept:
+    id(std::move(device_id_)), name{name_}, compression{proto::Compression::METADATA}, cert_name{cert_name_},
+    introducer{false}, auto_accept{false}, paused{false}, skip_introduction_removals{false}, online{false}
+{
 }
 
 

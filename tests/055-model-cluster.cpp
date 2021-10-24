@@ -333,7 +333,6 @@ TEST_CASE("loading cluster (file info)", "[model]") {
 }
 
 
-
 #if 0
 TEST_CASE("iterate_files", "[model]") {
     std::uint64_t key = 0;
