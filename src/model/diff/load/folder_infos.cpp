@@ -29,7 +29,7 @@ void folder_infos_t::apply(cluster_t &cluster) const noexcept {
         assert(folder);
 
         auto& map = folder->get_folder_infos();
-        auto fi = folder_info_ptr_t(new folder_info_t(key, pair.value, device.get(), folder.get()));
+        auto fi = folder_info_ptr_t(new folder_info_t(key, pair.value, device, folder));
         map.put(fi);
     }
 }

@@ -7,7 +7,8 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder_info);
 
-folder_info_t::folder_info_t(std::string_view key_, std::string_view data, device_t *device_, folder_t *folder_) noexcept: device{device_}, folder{folder_} {
+folder_info_t::folder_info_t(std::string_view key_, std::string_view data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept:
+    device{device_.get()}, folder{folder_.get()} {
     assert(key_.size() == data_length);
     assert(key_[0] == prefix);
     assert(key_.substr(1, device_id_t::digest_length) == device->get_key().substr(1));
@@ -21,7 +22,8 @@ folder_info_t::folder_info_t(std::string_view key_, std::string_view data, devic
     max_sequence = fi.max_sequence();
 }
 
-folder_info_t::folder_info_t(const uuid_t& uuid, std::string_view data, device_t *device_, folder_t *folder_) noexcept: device{device_}, folder{folder_} {
+folder_info_t::folder_info_t(const uuid_t& uuid, std::string_view data, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept:
+    device{device_.get()}, folder{folder_.get()} {
     auto device_key = device->get_key().substr(1);
     auto folder_key = folder->get_key().substr(1);
     key[0] = prefix;

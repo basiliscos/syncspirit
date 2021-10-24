@@ -236,7 +236,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
     db_fi.set_index_id(2);
     db_fi.set_max_sequence(3);
     auto data = db_fi.SerializeAsString();
-    auto fi = folder_info_ptr_t(new folder_info_t(cluster->next_uuid(), data, my_device.get(), folder.get()));
+    auto fi = folder_info_ptr_t(new folder_info_t(cluster->next_uuid(), data, my_device, folder));
     CHECK(fi);
     CHECK(fi->get_index() == 2ul);
     CHECK(fi->get_max_sequence() == 3ul);
@@ -244,7 +244,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
     auto target = folder_info_ptr_t();
 
     SECTION("directly") {
-        target = new folder_info_t(fi->get_key(), data, my_device.get(), folder.get());
+        target = new folder_info_t(fi->get_key(), data, my_device, folder);
     }
 
     SECTION("via diff") {
