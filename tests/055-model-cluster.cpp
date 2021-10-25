@@ -269,12 +269,19 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
     CHECK(target->get_max_sequence() == fi->get_max_sequence());
 }
 
-TEST_CASE("loading cluster (file info)", "[model]") {
+TEST_CASE("loading cluster (file info + block)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_ptr_t(new local_device_t(my_id, "my-device"));
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     CHECK(cluster);
     cluster->get_devices().put(my_device);
+
+    auto bi = proto::BlockInfo();
+    bi.set_size(5);
+    bi.set_hash(utils::sha256_digest("12345").value());
+    auto block = block_info_ptr_t(new block_info_t(bi));
+    auto& blocks_map = cluster->get_blocks();
+    blocks_map.put(block);
 
     db::Folder db_folder;
     db_folder.set_id("1234-5678");
@@ -294,6 +301,8 @@ TEST_CASE("loading cluster (file info)", "[model]") {
     db_folder_info.set_max_sequence(3);
     auto folder_info_data = db_folder_info.SerializeAsString();
     auto folder_info = folder_info_ptr_t(new folder_info_t(cluster->next_uuid(), folder_info_data, my_device, folder));
+    auto folder_info_db = db::FolderInfo();
+    folder_info_db.ParseFromArray(folder_info_data.c_str(), folder_info_data.size());
     CHECK(folder_info);
     CHECK(folder_info->get_index() == 2ul);
     CHECK(folder_info->get_max_sequence() == 3ul);
@@ -304,28 +313,34 @@ TEST_CASE("loading cluster (file info)", "[model]") {
     pr_fi.set_size(55ul);
     auto fi = file_info_ptr_t(new file_info_t(cluster->next_uuid(),  pr_fi, folder_info));
     CHECK(fi);
-
+    fi->add_block(block);
 
     auto target = file_info_ptr_t();
 
     SECTION("directly") {
-        auto data = fi->serialize();
-        target = new file_info_t(fi->get_key(), data, folder_info);
+        auto data = fi->serialize(true);
+        db::FileInfo file_info_db;
+        file_info_db.ParseFromArray(data.data(), data.size());
+        target = new file_info_t(fi->get_key(), &file_info_db, folder_info);
+        REQUIRE(target);
+        CHECK(target->get_blocks().size() == 0ul);
     }
 
     SECTION("via diff") {
         diff::load::container_t container;
-        auto data = fi->serialize();
+        auto data = fi->serialize(true);
         container.emplace_back(diff::load::pair_t{fi->get_key(), data});
         auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(container));
         diff->apply(*cluster);
         auto& map = folder_info->get_file_infos();
         REQUIRE(map.size() == 1);
         target = map.get(fi->get_uuid());
+        REQUIRE(target);
         REQUIRE(map.byName(fi->get_name()));
+        REQUIRE(target->get_blocks().size() == 1);
+        REQUIRE(target->get_blocks().begin()->get()->get_hash() == block->get_hash());
     }
 
-    REQUIRE(target);
     CHECK(target->get_key() == fi->get_key());
     CHECK(target->get_name() == fi->get_name());
     CHECK(target->get_full_name() == fi->get_full_name());

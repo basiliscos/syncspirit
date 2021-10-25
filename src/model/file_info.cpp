@@ -11,15 +11,13 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
 
-file_info_t::file_info_t(std::string_view key_, std::string_view data, const folder_info_ptr_t& folder_info_) noexcept : folder_info{folder_info_.get()} {
+file_info_t::file_info_t(std::string_view key_, const void *data, const folder_info_ptr_t& folder_info_) noexcept : folder_info{folder_info_.get()} {
     assert(key_.size() == data_length);
     assert(key_[0] == prefix);
     assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
     std::copy(key_.begin(), key_.end(), key);
 
-    db::FileInfo fi;
-    auto ok = fi.ParseFromArray(data.data(), data.size());
-    assert(ok);
+    auto fi = *reinterpret_cast<const db::FileInfo*>(data);
     fields_update(fi);
 
 #if 0
@@ -71,6 +69,12 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     return block_size * block_index;
 }
 
+void file_info_t::add_block(const block_info_ptr_t& block) noexcept {
+    block->link(this, blocks.size());
+    blocks.emplace_back(block);
+}
+
+
 template <typename Source> void file_info_t::fields_update(const Source &s) noexcept {
     name = s.name();
     sequence = s.sequence();
@@ -114,8 +118,8 @@ std::string file_info_t::serialize(bool include_blocks) noexcept {
             if (!block) {
                 continue;
             }
-            auto db_key = block->get_key();
-            r.mutable_blocks_keys()->Add(std::string(db_key));
+            auto db_key = block->get_hash();
+            r.mutable_blocks()->Add(std::string(db_key));
         }
     }
     return r.SerializeAsString();

@@ -24,7 +24,7 @@ struct blocks_interator_t;
 struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     using blocks_t = std::vector<block_info_ptr_t>;
 
-    file_info_t(std::string_view key, std::string_view data, const folder_info_ptr_t& folder_info_) noexcept;
+    file_info_t(std::string_view key, const void* data, const folder_info_ptr_t& folder_info_) noexcept;
     file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
     ~file_info_t();
 
@@ -33,6 +33,9 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
 
     std::string serialize(bool include_blocks = true) noexcept;
+
+    void add_block(const block_info_ptr_t& block) noexcept;
+
     void update(const proto::FileInfo &remote_info) noexcept;
     bool update(const local_file_t &local_file) noexcept;
 
