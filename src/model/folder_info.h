@@ -59,7 +59,7 @@ inline std::uint64_t db_key(const folder_info_ptr_t &item) noexcept { return ite
 #endif
 
 struct folder_infos_map_t: public generic_map_t<folder_info_ptr_t, 2> {
-    folder_info_ptr_t byDevice(const device_ptr_t& device) noexcept;
+    folder_info_ptr_t by_device(const device_ptr_t& device) noexcept;
 };
 
 }; // namespace syncspirit::model

@@ -50,7 +50,7 @@ struct local_device_t final : device_t {
 };
 
 struct devices_map_t: public generic_map_t<device_ptr_t, 2> {
-    device_ptr_t bySha256(std::string_view device_id) noexcept;
+    device_ptr_t by_sha256(std::string_view device_id) noexcept;
 };
 
 

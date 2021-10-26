@@ -77,7 +77,7 @@ struct folder_t final : arc_base_t<folder_t>, storeable_t {
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
 struct folders_map_t: generic_map_t<folder_ptr_t, 2> {
-    folder_ptr_t byId(std::string_view id) noexcept;
+    folder_ptr_t by_id(std::string_view id) noexcept;
 };
 
 } // namespace syncspirit::model

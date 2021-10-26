@@ -20,20 +20,6 @@ file_info_t::file_info_t(std::string_view key_, const void *data, const folder_i
     auto fi = *reinterpret_cast<const db::FileInfo*>(data);
     fields_update(fi);
 
-#if 0
-    auto &blocks_map = folder_info->get_folder()->get_cluster()->get_blocks();
-    for (int i = 0; i < info_.blocks_keys_size(); ++i) {
-        auto key = info_.blocks_keys(i);
-        std::string_view kkey;
-        std::abort();
-        auto block = blocks_map.get(kkey);
-        assert(block);
-        block->link(this, i);
-        blocks.emplace_back(std::move(block));
-    }
-    version = info_.version();
-    full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
-#endif
 }
 
 file_info_t::file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept
@@ -382,7 +368,7 @@ proto::FileInfo file_info_t::get() const noexcept {
 template<> std::string_view get_index<0>(const file_info_ptr_t& item) noexcept { return item->get_uuid(); }
 template<> std::string_view get_index<1>(const file_info_ptr_t& item) noexcept { return item->get_name(); }
 
-file_info_ptr_t file_infos_map_t:: byName(std::string_view name) noexcept {
+file_info_ptr_t file_infos_map_t:: by_name(std::string_view name) noexcept {
     return get<1>(name);
 }
 

@@ -15,5 +15,5 @@ void devices_t::apply(cluster_t &cluster) const noexcept {
         }
         device_map.put(device);
     }
-    assert(device_map.bySha256(local_device->device_id().get_sha256()));
+    assert(device_map.by_sha256(local_device->device_id().get_sha256()));
 }

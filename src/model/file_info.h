@@ -117,7 +117,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
 };
 
 struct file_infos_map_t: public generic_map_t<file_info_ptr_t, 2> {
-    file_info_ptr_t byName(std::string_view name) noexcept;
+    file_info_ptr_t by_name(std::string_view name) noexcept;
 };
 
 }; // namespace syncspirit::model

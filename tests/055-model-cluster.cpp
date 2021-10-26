@@ -37,7 +37,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
         auto& devices_map = cluster->get_devices();
         REQUIRE(devices_map.size() == 1);
         auto self = devices_map.get(self_key);
-        auto self_2 = devices_map.bySha256(my_id.get_sha256());
+        auto self_2 = devices_map.by_sha256(my_id.get_sha256());
         REQUIRE(self);
         REQUIRE(self_2);
         CHECK(self == my_device);
@@ -68,11 +68,11 @@ TEST_CASE("loading cluster (base)", "[model]") {
             auto& devices_map = cluster->get_devices();
             REQUIRE(devices_map.size() == 2);
             peer = devices_map.get(key);
-            auto peer_2 = devices_map.bySha256(device_id);
+            auto peer_2 = devices_map.by_sha256(device_id);
             CHECK(peer_2 == peer);
 
             auto self = devices_map.get(my_device->get_key());
-            auto self_2 = devices_map.bySha256(my_id.get_sha256());
+            auto self_2 = devices_map.by_sha256(my_id.get_sha256());
             CHECK(self == my_device);
             CHECK(self_2 == self);
         }
@@ -171,7 +171,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             auto f1 = map.begin()->item;
             folder = map.get(key);
             REQUIRE(folder);
-            REQUIRE(folder == map.byId(id));
+            REQUIRE(folder == map.by_id(id));
             CHECK(folder->get_cluster() == cluster.get());
         }
 
@@ -257,7 +257,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
         auto& map = folder->get_folder_infos();
         REQUIRE(map.size() == 1);
         target = map.get(fi->get_uuid());
-        REQUIRE(map.byDevice(my_device));
+        REQUIRE(map.by_device(my_device));
     }
 
     REQUIRE(target);
@@ -336,7 +336,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         REQUIRE(map.size() == 1);
         target = map.get(fi->get_uuid());
         REQUIRE(target);
-        REQUIRE(map.byName(fi->get_name()));
+        REQUIRE(map.by_name(fi->get_name()));
         REQUIRE(target->get_blocks().size() == 1);
         REQUIRE(target->get_blocks().begin()->get()->get_hash() == block->get_hash());
     }

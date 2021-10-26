@@ -133,13 +133,13 @@ bool folder_t::update(const proto::Folder &remote) noexcept {
 }
 
 void folder_t::update(local_file_map_t &local_files) noexcept {
-    auto folder_info = folder_infos.byDevice(device);
+    auto folder_info = folder_infos.by_device(device);
     assert(folder_info);
     folder_info->update(local_files);
 }
 
 folder_info_ptr_t folder_t::get_folder_info(const device_ptr_t &device) noexcept {
-    return folder_infos.byDevice(device);
+    return folder_infos.by_device(device);
 }
 
 proto::Index folder_t::generate() noexcept {
@@ -157,7 +157,7 @@ proto::Index folder_t::generate() noexcept {
 template<> std::string_view get_index<0>(const folder_ptr_t& item) noexcept { return item->get_key(); }
 template<> std::string_view get_index<1>(const folder_ptr_t& item) noexcept { return item->get_id(); }
 
-folder_ptr_t folders_map_t::byId(std::string_view id) noexcept {
+folder_ptr_t folders_map_t::by_id(std::string_view id) noexcept {
     return get<1>(id);
 }
 

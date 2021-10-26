@@ -35,9 +35,9 @@ add_library(syncspirit_lib
 #    src/fs/fs_supervisor.cpp
 #    src/fs/scan_actor.cpp
 #    src/fs/utils.cpp
-#    src/hasher/hasher_actor.cpp
-#    src/hasher/hasher_proxy_actor.cpp
-#    src/hasher/hasher_supervisor.cpp
+    src/hasher/hasher_actor.cpp
+    src/hasher/hasher_proxy_actor.cpp
+    src/hasher/hasher_supervisor.cpp
     src/model/diff/base.cpp
     src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_diff_visitor.cpp
@@ -54,6 +54,7 @@ add_library(syncspirit_lib
 #    src/model/diff/cluster/max_sequence_updater.cpp
 #    src/model/diff/cluster/unknown_folders.cpp
     src/model/misc/file_block.cpp
+    src/model/misc/file_iterator.cpp
     src/model/misc/storeable.cpp
     src/model/misc/block_iterator.cpp
     src/model/block_info.cpp

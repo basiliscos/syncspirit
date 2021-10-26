@@ -171,7 +171,7 @@ void folder_info_t::update(local_file_map_t &local_files) noexcept {
 }
 #endif
 
-folder_info_ptr_t folder_infos_map_t::byDevice(const device_ptr_t& device) noexcept {
+folder_info_ptr_t folder_infos_map_t::by_device(const device_ptr_t& device) noexcept {
     return get<1>(device->device_id().get_sha256());
 }
 

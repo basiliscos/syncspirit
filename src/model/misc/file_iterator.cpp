@@ -23,10 +23,10 @@ TRY_ANEW:
                 cluster = nullptr;
                 return;
             }
-            auto &folder = it_folder->second;
+            auto &folder = it_folder->item;
             auto &folder_infos_map = folder->get_folder_infos();
 
-            auto peer_folder_info = folder_infos_map.by_id(peer->get_id());
+            auto peer_folder_info = folder_infos_map.by_device(peer);
             if (!peer_folder_info)
                 continue;
 
@@ -34,7 +34,7 @@ TRY_ANEW:
             f_peer_it = peer_file_infos.begin();
             f_peer_end = peer_file_infos.end();
 
-            local_folder_info = folder_infos_map.by_id(cluster->get_device()->get_id());
+            local_folder_info = folder_infos_map.by_device(cluster->get_device());
 
             ++it_folder;
             break;
@@ -42,10 +42,9 @@ TRY_ANEW:
     }
 
     while (f_peer_it != f_peer_end) {
-        file = f_peer_it->second;
+        file = f_peer_it->item;
         ++f_peer_it;
-        auto full_name = natural_key(file);
-        auto local_file = local_folder_info->get_file_infos().by_id(full_name);
+        auto local_file = local_folder_info->get_file_infos().by_name(file->get_name());
         if (!local_file) {
             return;
         }
