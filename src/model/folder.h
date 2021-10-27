@@ -19,6 +19,8 @@ namespace bfs = boost::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct cluster_t;
+using cluster_ptr_t = intrusive_ptr_t<cluster_t>;
+
 
 struct folder_t final : arc_base_t<folder_t>, storeable_t {
 
@@ -26,8 +28,9 @@ struct folder_t final : arc_base_t<folder_t>, storeable_t {
     enum class pull_order_t { random = 0, alphabetic, largest, oldest, newest };
 
     folder_t(std::string_view key, std::string_view data) noexcept;
+    folder_t(const uuid_t& uuid, std::string_view data) noexcept;
 
-    void assign_cluster(cluster_t *cluster) noexcept;
+    void assign_cluster(const cluster_ptr_t& cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
     std::string serialize() noexcept;
 
@@ -56,6 +59,9 @@ struct folder_t final : arc_base_t<folder_t>, storeable_t {
     static const constexpr size_t data_length = uuid_length + 1;
 
   private:
+
+    void assign_fields(std::string_view data) noexcept;
+
     std::string id;
     device_ptr_t device;
     std::string label;

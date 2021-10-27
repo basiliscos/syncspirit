@@ -12,27 +12,38 @@ folder_t::folder_t(std::string_view key_, std::string_view data) noexcept {
     assert(key_[0] == prefix);
     assert(key_.size() == data_length);
     std::copy(key_.begin(), key_.end(), key);
-
-    db::Folder folder;
-    auto ok = folder.ParseFromArray(data.data(), data.size());
-    assert(ok);
-    id = folder.id();
-    label = folder.label();
-    path = folder.path();
-    folder_type = (foldet_type_t)folder.folder_type();
-    rescan_interval = folder.rescan_interval();
-    pull_order = (pull_order_t) folder.pull_order();
-    watched = folder.watched();
-    read_only = folder.read_only();
-    ignore_permissions = folder.ignore_permissions();
-    ignore_delete = folder.ignore_delete();
-    disable_temp_indixes = folder.disable_temp_indexes();
-    paused = folder.paused();
+    assign_fields(data);
 }
+
+folder_t::folder_t(const uuid_t& uuid, std::string_view data) noexcept {
+    key[0] = prefix;
+    std::copy(uuid.begin(), uuid.end(), key + 1);
+    assign_fields(data);
+}
+
+
+void folder_t::assign_fields(std::string_view data) noexcept {
+    db::Folder item;
+    auto ok = item.ParseFromArray(data.data(), data.size());
+    assert(ok);
+    id = item.id();
+    label = item.label();
+    path = item.path();
+    folder_type = (foldet_type_t)item.folder_type();
+    rescan_interval = item.rescan_interval();
+    pull_order = (pull_order_t) item.pull_order();
+    watched = item.watched();
+    read_only = item.read_only();
+    ignore_permissions = item.ignore_permissions();
+    ignore_delete = item.ignore_delete();
+    disable_temp_indixes = item.disable_temp_indexes();
+    paused = item.paused();
+}
+
 
 void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
 
-void folder_t::assign_cluster(cluster_t *cluster_) noexcept { cluster = cluster_; }
+void folder_t::assign_cluster(const cluster_ptr_t &cluster_) noexcept { cluster = cluster_.get(); }
 
 std::string folder_t::serialize() noexcept {
     db::Folder r;
