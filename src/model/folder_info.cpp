@@ -2,28 +2,53 @@
 #include "folder.h"
 #include "structs.pb.h"
 #include "../db/prefix.h"
+#include "misc/error_code.h"
 #include <spdlog.h>
 
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder_info);
 
-folder_info_t::folder_info_t(std::string_view key_, std::string_view data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept:
+outcome::result<folder_info_ptr_t> folder_info_t::create(std::string_view key, std::string_view data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept {
+    if (key.size() != data_length) {
+        return make_error_code(error_code_t::invalid_folder_info_key_length);
+    }
+    if (key[0] != prefix) {
+        return make_error_code(error_code_t::invalid_folder_info_prefix);
+    }
+
+    auto ptr = folder_info_ptr_t();
+    ptr = new folder_info_t(key, device_, folder_);
+
+    auto r = ptr->assign_fields(data);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return outcome::success(std::move(ptr));
+}
+
+outcome::result<folder_info_ptr_t> folder_info_t::create(const uuid_t& uuid, std::string_view data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept {
+    auto ptr = folder_info_ptr_t();
+    ptr = new folder_info_t(uuid, device_, folder_);
+
+    auto r = ptr->assign_fields(data);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return outcome::success(std::move(ptr));
+}
+
+
+folder_info_t::folder_info_t(std::string_view key_, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept:
     device{device_.get()}, folder{folder_.get()} {
-    assert(key_.size() == data_length);
-    assert(key_[0] == prefix);
     assert(key_.substr(1, device_id_t::digest_length) == device->get_key().substr(1));
     assert(key_.substr(device_id_t::digest_length + 1, uuid_length) == folder->get_key().substr(1));
     std::copy(key_.begin(), key_.end(), key);
-
-    db::FolderInfo fi;
-    auto ok = fi.ParseFromArray(data.data(), data.size());
-    assert(ok);
-    index = fi.index_id();
-    max_sequence = fi.max_sequence();
 }
 
-folder_info_t::folder_info_t(const uuid_t& uuid, std::string_view data, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept:
+folder_info_t::folder_info_t(const uuid_t& uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept:
     device{device_.get()}, folder{folder_.get()} {
     auto device_key = device->get_key().substr(1);
     auto folder_key = folder->get_key().substr(1);
@@ -31,15 +56,20 @@ folder_info_t::folder_info_t(const uuid_t& uuid, std::string_view data, const de
     std::copy(device_key.begin(), device_key.end(), key + 1);
     std::copy(folder_key.begin(), folder_key.end(), key + 1 + device_key.size());
     std::copy(uuid.begin(), uuid.end(), key + 1 + device_key.size() + folder_key.size());
-
-    db::FolderInfo fi;
-    auto ok = fi.ParseFromArray(data.data(), data.size());
-    assert(ok);
-    index = fi.index_id();
-    max_sequence = fi.max_sequence();
 }
 
 folder_info_t::~folder_info_t() {}
+
+outcome::result<void> folder_info_t::assign_fields(std::string_view data) noexcept {
+    db::FolderInfo fi;
+    auto ok = fi.ParseFromArray(data.data(), data.size());
+    if (!ok) {
+        return make_error_code(error_code_t::folder_info_deserialization_failure);
+    }
+    index = fi.index_id();
+    max_sequence = fi.max_sequence();
+    return outcome::success();
+}
 
 std::string_view folder_info_t::get_key() noexcept {
     return std::string_view(key, data_length);

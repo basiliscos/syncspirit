@@ -4,6 +4,7 @@
 #include <vector>
 #include <optional>
 #include <boost/filesystem.hpp>
+#include <boost/outcome.hpp>
 #include "misc/arc.hpp"
 #include "misc/map.hpp"
 #include "misc/storeable.h"
@@ -14,6 +15,7 @@
 namespace syncspirit::model {
 
 namespace bfs = boost::filesystem;
+namespace outcome = boost::outcome_v2;
 
 struct folder_info_t;
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
@@ -21,11 +23,16 @@ using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 struct local_file_t;
 struct blocks_interator_t;
 
+struct file_info_t;
+using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
+
+
 struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     using blocks_t = std::vector<block_info_ptr_t>;
 
-    file_info_t(std::string_view key, const void* data, const folder_info_ptr_t& folder_info_) noexcept;
-    file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
+    static outcome::result<file_info_ptr_t> create(std::string_view key, const void* data, const folder_info_ptr_t& folder_info_) noexcept;
+    static outcome::result<file_info_ptr_t> create(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
+
     ~file_info_t();
 
     std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
@@ -86,6 +93,9 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
 
 
   private:
+    file_info_t(std::string_view key, const void* data, const folder_info_ptr_t& folder_info_) noexcept;
+    file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
+
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks, block_infos_map_t &deleted_blocks,
                       bool zero_indices = true) noexcept;

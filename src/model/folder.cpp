@@ -3,29 +3,56 @@
 #include "../db/prefix.h"
 #include "structs.pb.h"
 #include <spdlog.h>
+#include "misc/error_code.h"
+
 
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder);
 
-folder_t::folder_t(std::string_view key_, std::string_view data) noexcept {
-    assert(key_[0] == prefix);
-    assert(key_.size() == data_length);
-    std::copy(key_.begin(), key_.end(), key);
-    assign_fields(data);
+outcome::result<folder_ptr_t> folder_t::create(std::string_view key, std::string_view data) noexcept {
+    if (key.size() != data_length) {
+        return make_error_code(error_code_t::invalid_folder_key_length);
+    }
+    if (key[0] != prefix) {
+        return make_error_code(error_code_t::invalid_folder_prefix);
+    }
+
+    auto ptr = folder_ptr_t();
+    ptr = new folder_t(key);
+    auto r = ptr->assign_fields(data);
+    if (!r) {
+        return r.assume_error();
+    }
+    return outcome::success(std::move(ptr));
 }
 
-folder_t::folder_t(const uuid_t& uuid, std::string_view data) noexcept {
+outcome::result<folder_ptr_t> folder_t::create(const uuid_t& uuid, std::string_view data) noexcept {
+    auto ptr = folder_ptr_t();
+    ptr = new folder_t(uuid);
+    auto r = ptr->assign_fields(data);
+    if (!r) {
+        return r.assume_error();
+    }
+    return outcome::success(std::move(ptr));
+}
+
+folder_t::folder_t(std::string_view key_) noexcept {
+    std::copy(key_.begin(), key_.end(), key);
+}
+
+folder_t::folder_t(const uuid_t& uuid) noexcept {
     key[0] = prefix;
     std::copy(uuid.begin(), uuid.end(), key + 1);
-    assign_fields(data);
 }
 
 
-void folder_t::assign_fields(std::string_view data) noexcept {
+outcome::result<void> folder_t::assign_fields(std::string_view data) noexcept {
     db::Folder item;
     auto ok = item.ParseFromArray(data.data(), data.size());
-    assert(ok);
+    if (!ok) {
+        return make_error_code(error_code_t::folder_deserialization_failure);
+    }
     id = item.id();
     label = item.label();
     path = item.path();
@@ -38,6 +65,7 @@ void folder_t::assign_fields(std::string_view data) noexcept {
     ignore_delete = item.ignore_delete();
     disable_temp_indixes = item.disable_temp_indexes();
     paused = item.paused();
+    return outcome::success();
 }
 
 

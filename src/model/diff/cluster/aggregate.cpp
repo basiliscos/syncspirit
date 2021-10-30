@@ -2,14 +2,22 @@
 
 using namespace syncspirit::model::diff::cluster;
 
-void aggregate_t::apply(cluster_t &cluster) const noexcept {
+auto aggregate_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
     for (auto &diff : diffs) {
-        diff->apply(cluster);
+        auto r = diff->apply(cluster);
+        if (!r) {
+            return r;
+        }
     }
+    return outcome::success();
 }
 
-void aggregate_t::visit(cluster_diff_visitor_t &vistor) const noexcept {
+auto aggregate_t::visit(cluster_diff_visitor_t &vistor) const noexcept -> outcome::result<void> {
     for (auto &diff : diffs) {
-        diff->visit(vistor);
+        auto r = diff->visit(vistor);
+        if (!r) {
+            return r;
+        }
     }
+    return outcome::success();
 }

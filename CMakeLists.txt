@@ -53,6 +53,7 @@ add_library(syncspirit_lib
 #    src/model/diff/cluster/load_data.cpp
 #    src/model/diff/cluster/max_sequence_updater.cpp
 #    src/model/diff/cluster/unknown_folders.cpp
+    src/model/misc/error_code.cpp
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/storeable.cpp

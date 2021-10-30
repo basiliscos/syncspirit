@@ -2,36 +2,59 @@
 #include "file_info.h"
 #include "structs.pb.h"
 #include "../db/prefix.h"
+#include "misc/error_code.h"
 #include <spdlog.h>
 
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::block_info);
 
-block_info_t::block_info_t(std::string_view key, std::string_view data) noexcept {
-    assert(key.length() == data_length);
-    assert(key[0] == prefix);
+block_info_t::block_info_t(std::string_view key) noexcept {
     std::copy(key.begin(), key.end(), hash);
+}
+
+block_info_t::block_info_t(const proto::BlockInfo &block) noexcept: weak_hash{block.weak_hash()}, size{block.size()} {
+    hash[0] = prefix;
+}
+
+template<> void block_info_t::assign<db::BlockInfo>(const db::BlockInfo& item) noexcept {
+    weak_hash = item.weak_hash();
+    size = item.size();
+}
+
+outcome::result<block_info_ptr_t> block_info_t::create(std::string_view key, std::string_view data) noexcept {
+    if (key.length() != data_length) {
+        return make_error_code(error_code_t::invalid_block_key_length);
+    }
+    if (key[0] != prefix) {
+        return make_error_code(error_code_t::invalid_block_prefix);
+    }
 
     db::BlockInfo block;
     auto ok = block.ParseFromArray(data.data(), data.size());
-    assert(ok);
-    (void)ok;
-    weak_hash = block.weak_hash();
-    size = block.size();
-}
-
-block_info_t::block_info_t(const proto::BlockInfo &block) noexcept : weak_hash{block.weak_hash()}, size{block.size()} {
-    auto &h = block.hash();
-    assert(h.length() <= digest_length);
-    std::copy(h.begin(), h.end(), hash + 1);
-    hash[0] = prefix;
-    auto left = digest_length - h.length();
-    if (left) {
-        std::fill_n(hash + 1 + h.length(), left, 0);
+    if (!ok) {
+        return make_error_code(error_code_t::block_deserialization_failure);
     }
 
-    mark_dirty();
+    auto ptr = block_info_ptr_t(new block_info_t(key));
+    ptr->assign(block);
+    return outcome::success(ptr);
+}
+
+outcome::result<block_info_ptr_t> block_info_t::create(const proto::BlockInfo &block) noexcept {
+    auto &h = block.hash();
+    if (h.length() > digest_length) {
+        return make_error_code(error_code_t::invalid_block_key_length);
+    }
+
+    auto ptr = block_info_ptr_t(new block_info_t(block));
+    auto& h_ptr = ptr->hash;
+    std::copy(h.begin(), h.end(), h_ptr + 1);
+    auto left = digest_length - h.length();
+    if (left) {
+        std::fill_n(h_ptr + 1 + h.length(), left, 0);
+    }
+    return outcome::success(ptr);
 }
 
 std::string block_info_t::serialize() noexcept {

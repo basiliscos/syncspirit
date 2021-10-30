@@ -6,15 +6,21 @@
 #include "device_id.h"
 #include "../utils/uri.h"
 #include "bep.pb.h"
+#include <boost/outcome.hpp>
 
 namespace syncspirit::model {
+
+namespace outcome = boost::outcome_v2;
+
+struct device_t;
+using device_ptr_t = intrusive_ptr_t<device_t>;
 
 struct device_t : arc_base_t<device_t> {
     using static_addresses_t = std::vector<utils::URI>;
     using name_option_t = std::optional<std::string>;
 
-    device_t(std::string_view key, std::string_view data) noexcept;
-    device_t(const device_id_t& device_id, std::string_view name, std::string_view cert_name = "") noexcept;
+    static outcome::result<device_ptr_t> create(std::string_view key, std::string_view data) noexcept;
+    static outcome::result<device_ptr_t> create(const device_id_t& device_id, std::string_view name, std::string_view cert_name = "") noexcept;
 
     virtual std::string_view get_key() const noexcept;
     bool operator==(const device_t &other) const noexcept { return other.id == id; }
@@ -30,6 +36,11 @@ struct device_t : arc_base_t<device_t> {
     inline const name_option_t get_cert_name() const noexcept { return cert_name; }
 
 private:
+    device_t(const device_id_t& device_id, std::string_view name, std::string_view cert_name) noexcept;
+    template<typename T> void assign(const T& item) noexcept;
+    //device_t(std::string_view key, std::string_view data) noexcept;
+
+
     device_id_t id;
     std::string name;
     proto::Compression compression;
@@ -42,7 +53,6 @@ private:
     bool online = false;
 };
 
-using device_ptr_t = intrusive_ptr_t<device_t>;
 
 struct local_device_t final : device_t {
     using device_t::device_t;

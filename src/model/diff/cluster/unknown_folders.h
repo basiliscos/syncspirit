@@ -11,8 +11,8 @@ struct unknown_folders_t final : cluster_diff_t {
 
     template <typename T> unknown_folders_t(T &&folders_) noexcept : folders(std::forward<T>(folders)) {}
 
-    void apply(cluster_t &) const noexcept override;
-    void visit(cluster_diff_visitor_t &) const noexcept override;
+    outcome::result<void> apply(cluster_t &) const noexcept override;
+    outcome::result<void> visit(cluster_diff_visitor_t &) const noexcept override;
 
     folders_t folders;
 };

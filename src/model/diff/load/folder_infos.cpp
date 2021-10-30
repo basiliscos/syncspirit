@@ -1,10 +1,11 @@
 #include "folder_infos.h"
+#include "../../misc/error_code.h"
 #include "../../cluster.h"
 #include "../../../db/prefix.h"
 
 using namespace syncspirit::model::diff::load;
 
-void folder_infos_t::apply(cluster_t &cluster) const noexcept {
+auto folder_infos_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
     static const constexpr char folder_prefix = (char)(db::prefix::folder);
     static const constexpr char device_prefix = (char)(db::prefix::device);
 
@@ -20,16 +21,25 @@ void folder_infos_t::apply(cluster_t &cluster) const noexcept {
         std::copy(device_id.begin(), device_id.end(), device_key+1);
 
         auto device = devices.get(std::string_view(device_key, device_id_t::data_length));
-        assert(device);
+        if (!device) {
+            return make_error_code(error_code_t::no_such_device);
+        }
 
         char folder_key[uuid_length + 1];
         folder_key[0] = folder_prefix;
         std::copy(folder_uuid.begin(), folder_uuid.end(), folder_key+1);
         auto folder = folders.get(std::string_view(folder_key, uuid_length + 1));
-        assert(folder);
+        if (!folder) {
+            return make_error_code(error_code_t::no_such_folder);
+        }
 
         auto& map = folder->get_folder_infos();
-        auto fi = folder_info_ptr_t(new folder_info_t(key, pair.value, device, folder));
+        auto option = folder_info_t::create(key, pair.value, device, folder);
+        if (!option) {
+            return option.assume_error();
+        }
+        auto& fi = option.assume_value();
         map.put(fi);
     }
+    return outcome::success();
 }

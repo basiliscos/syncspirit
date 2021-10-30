@@ -70,7 +70,7 @@ std::string device_id2sha256(std::string_view device_id) {
 
 model::device_ptr_t make_device(std::string_view device_id, std::string_view name) {
     auto id = model::device_id_t::from_string(device_id).value();
-    return new model::device_t(id, name);
+    return model::device_t::create(id, name).assume_value();
 }
 
 

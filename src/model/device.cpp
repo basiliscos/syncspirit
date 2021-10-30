@@ -1,20 +1,14 @@
 #include "device.h"
 #include "structs.pb.h"
 #include "../db/prefix.h"
+#include "misc/error_code.h"
 
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::device);
 
-device_t::device_t(std::string_view key, std::string_view data) noexcept
-    : id{device_id_t::from_sha256(key.substr(1)).value()}{
-    assert(key[0] == prefix);
-
-    db::Device d;
-    auto ok = d.ParsePartialFromArray(data.data(), data.size());
-    assert(ok);
-    (void)ok;
-
+template<>
+void device_t::assign(const db::Device& d) noexcept {
     name = d.name();
     compression = d.compression();
     cert_name = d.cert_name();
@@ -28,6 +22,33 @@ device_t::device_t(std::string_view key, std::string_view data) noexcept
         assert(uri);
         static_addresses.emplace_back(std::move(uri.value()));
     }
+}
+
+
+outcome::result<device_ptr_t> device_t::create(std::string_view key, std::string_view data) noexcept {
+    if (key[0] != prefix) {
+        return make_error_code(error_code_t::invalid_device_prefix);
+    }
+
+    auto id = device_id_t::from_sha256(key.substr(1));
+    if (!id) {
+        return make_error_code(error_code_t::invalid_device_sha256_digest);
+    }
+
+    db::Device d;
+    auto ok = d.ParsePartialFromArray(data.data(), data.size());
+    if (!ok) {
+        return make_error_code(error_code_t::device_deserialization_failure);
+    }
+
+    auto ptr = device_ptr_t(new device_t(id.value(), d.name(), d.cert_name()));
+    ptr->assign(d);
+    return outcome::success(std::move(ptr));
+}
+
+outcome::result<device_ptr_t> device_t::create(const device_id_t& device_id, std::string_view name, std::string_view cert_name) noexcept{
+    auto ptr = device_ptr_t(new device_t(device_id, name, cert_name));
+    return outcome::success(std::move(ptr));
 }
 
 device_t::device_t(const device_id_t &device_id_, std::string_view name_, std::string_view cert_name_) noexcept:

@@ -8,20 +8,26 @@
 #include "misc/file_block.h"
 #include "misc/storeable.h"
 #include "bep.pb.h"
+#include <boost/outcome.hpp>
 
 namespace syncspirit::model {
+
+namespace outcome = boost::outcome_v2;
 
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 struct file_block_t;
+struct block_info_t;
+using block_info_ptr_t = intrusive_ptr_t<block_info_t>;
+
 
 struct block_info_t final : arc_base_t<block_info_t>, storeable_t {
     using removed_incides_t = std::vector<size_t>;
     static const constexpr size_t digest_length = 32;
     static const constexpr size_t data_length = digest_length + 1;
 
-    block_info_t(std::string_view key, std::string_view data) noexcept;
-    block_info_t(const proto::BlockInfo &block) noexcept;
+    static outcome::result<block_info_ptr_t> create(std::string_view key, std::string_view data) noexcept;
+    static outcome::result<block_info_ptr_t> create(const proto::BlockInfo &block) noexcept;
 
     inline std::string_view get_hash() const noexcept { return std::string_view(hash + 1, digest_length); }
     inline std::string_view get_key() const noexcept { return std::string_view(hash, data_length); }
@@ -40,6 +46,10 @@ struct block_info_t final : arc_base_t<block_info_t>, storeable_t {
     inline bool operator!=(const block_info_t &right) const noexcept { return !(hash == right.hash); }
 
   private:
+    template<typename T> void assign(const T& item) noexcept;
+    block_info_t(std::string_view key) noexcept;
+    block_info_t(const proto::BlockInfo &block) noexcept;
+
     using file_blocks_t = std::vector<file_block_t>;
 
     char hash[data_length];
@@ -48,7 +58,6 @@ struct block_info_t final : arc_base_t<block_info_t>, storeable_t {
     file_blocks_t file_blocks;
 };
 
-using block_info_ptr_t = intrusive_ptr_t<block_info_t>;
 using block_infos_map_t = generic_map_t<block_info_ptr_t, 1>;
 
 } // namespace syncspirit::model

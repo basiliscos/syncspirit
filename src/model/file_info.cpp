@@ -2,6 +2,7 @@
 #include "file_info.h"
 #include "cluster.h"
 #include "misc/block_iterator.h"
+#include "misc/error_code.h"
 #include "../db/prefix.h"
 #include <algorithm>
 #include <spdlog/spdlog.h>
@@ -11,15 +12,28 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
 
+outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const void* data, const folder_info_ptr_t& folder_info_) noexcept {
+    if (key.size() != data_length) {
+        return make_error_code(error_code_t::invalid_file_info_key_length);
+    }
+    if (key[0] != prefix) {
+        return make_error_code(error_code_t::invalid_file_info_prefix);
+    }
+
+    auto ptr = file_info_ptr_t();
+    ptr = new file_info_t(key, data, folder_info_);
+    return outcome::success(std::move(ptr));
+}
+
+outcome::result<file_info_ptr_t> file_info_t::create(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept {
+    return file_info_ptr_t(new file_info_t(uuid, info_, folder_info_));
+}
+
 file_info_t::file_info_t(std::string_view key_, const void *data, const folder_info_ptr_t& folder_info_) noexcept : folder_info{folder_info_.get()} {
-    assert(key_.size() == data_length);
-    assert(key_[0] == prefix);
     assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
     std::copy(key_.begin(), key_.end(), key);
-
     auto fi = *reinterpret_cast<const db::FileInfo*>(data);
     fields_update(fi);
-
 }
 
 file_info_t::file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept
@@ -29,9 +43,6 @@ file_info_t::file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const
     std::copy(fi_key.begin(), fi_key.end(), key + 1);
     std::copy(uuid.begin(), uuid.end(), key + 1 + fi_key.size());
     fields_update(info_);
-#if 0
-    mark_dirty();
-#endif
 }
 
 file_info_t::~file_info_t() {

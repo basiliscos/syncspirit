@@ -3,10 +3,15 @@
 
 using namespace syncspirit::model::diff::load;
 
-void ignored_devices_t::apply(cluster_t &cluster) const noexcept {
+auto ignored_devices_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto& map = cluster.get_ignored_devices();
     for(auto& pair:devices) {
-        auto device = ignored_device_ptr_t(new ignored_device_t(pair.key, pair.value));
+        auto option = ignored_device_t::create(pair.key, pair.value);
+        if (!option) {
+            return option.assume_error();
+        }
+        auto& device = option.value();
         map.put(device);
     }
+    return outcome::success();
 }

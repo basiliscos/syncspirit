@@ -3,7 +3,7 @@
 
 using namespace syncspirit::model::diff::load;
 
-void devices_t::apply(cluster_t &cluster) const noexcept {
+auto devices_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto& device_map = cluster.get_devices();
     auto& local_device = cluster.get_device();
     for(auto& pair:devices) {
@@ -11,9 +11,14 @@ void devices_t::apply(cluster_t &cluster) const noexcept {
         if (pair.key == local_device->get_key()) {
             device = local_device;
         } else {
-            device = new device_t(pair.key, pair.value);
+            auto option = device_t::create(pair.key, pair.value);
+            if (!option) {
+                return option.assume_error();
+            }
+            device = std::move(option.value());
         }
         device_map.put(device);
     }
     assert(device_map.by_sha256(local_device->device_id().get_sha256()));
+    return outcome::success();
 }

@@ -21,14 +21,18 @@ namespace outcome = boost::outcome_v2;
 struct cluster_t;
 using cluster_ptr_t = intrusive_ptr_t<cluster_t>;
 
+struct folder_t;
+
+using folder_ptr_t = intrusive_ptr_t<folder_t>;
+
 
 struct folder_t final : arc_base_t<folder_t>, storeable_t {
 
     enum class foldet_type_t { send = 0, receive, send_and_receive };
     enum class pull_order_t { random = 0, alphabetic, largest, oldest, newest };
 
-    folder_t(std::string_view key, std::string_view data) noexcept;
-    folder_t(const uuid_t& uuid, std::string_view data) noexcept;
+    static outcome::result<folder_ptr_t> create(std::string_view key, std::string_view data) noexcept;
+    static outcome::result<folder_ptr_t> create(const uuid_t& uuid, std::string_view data) noexcept;
 
     void assign_cluster(const cluster_ptr_t& cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
@@ -60,7 +64,9 @@ struct folder_t final : arc_base_t<folder_t>, storeable_t {
 
   private:
 
-    void assign_fields(std::string_view data) noexcept;
+    folder_t(std::string_view key) noexcept;
+    folder_t(const uuid_t& uuid) noexcept;
+    outcome::result<void> assign_fields(std::string_view data) noexcept;
 
     std::string id;
     device_ptr_t device;
@@ -80,7 +86,6 @@ struct folder_t final : arc_base_t<folder_t>, storeable_t {
     char key[data_length];
 };
 
-using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
 struct folders_map_t: generic_map_t<folder_ptr_t, 2> {
     folder_ptr_t by_id(std::string_view id) noexcept;
