@@ -93,7 +93,7 @@ template <typename Item, size_t N> struct generic_map_t {
     }
 
     template<size_t I = 0>
-    Item get(std::string_view id) noexcept {
+    Item get(std::string_view id) const noexcept {
         auto& projection = key2item.template get<I>();
         auto it = projection.find(id);
         if (it != projection.end()) {

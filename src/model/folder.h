@@ -53,7 +53,7 @@ struct folder_t final : arc_base_t<folder_t>, storeable_t {
     inline cluster_t *&get_cluster() noexcept { return cluster; }
 
     inline const bfs::path &get_path() noexcept { return path; }
-    bool update(const proto::Folder &remote) noexcept;
+    //bool update(const proto::Folder &remote) noexcept;
     void update(local_file_map_t &local_files) noexcept;
     proto::Index generate() noexcept;
 
@@ -88,7 +88,7 @@ struct folder_t final : arc_base_t<folder_t>, storeable_t {
 
 
 struct folders_map_t: generic_map_t<folder_ptr_t, 2> {
-    folder_ptr_t by_id(std::string_view id) noexcept;
+    folder_ptr_t by_id(std::string_view id) const noexcept;
 };
 
 } // namespace syncspirit::model

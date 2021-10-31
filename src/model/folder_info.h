@@ -39,7 +39,7 @@ struct folder_info_t final : arc_base_t<folder_info_t>, storeable_t {
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
     void update(const proto::Index &data, const device_ptr_t &peer) noexcept;
     void update(const proto::IndexUpdate &data, const device_ptr_t &peer) noexcept;
-    bool update(const proto::Device &device) noexcept;
+    //bool update(const proto::Device &device) noexcept;
     void update(local_file_map_t &local_files) noexcept;
     void remove() noexcept;
     void set_max_sequence(std::int64_t value) noexcept;
@@ -72,6 +72,7 @@ inline std::uint64_t db_key(const folder_info_ptr_t &item) noexcept { return ite
 
 struct folder_infos_map_t: public generic_map_t<folder_info_ptr_t, 2> {
     folder_info_ptr_t by_device(const device_ptr_t& device) noexcept;
+    folder_info_ptr_t by_device_id(std::string_view device_id) noexcept;
 };
 
 }; // namespace syncspirit::model

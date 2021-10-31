@@ -92,6 +92,7 @@ void folder_info_t::add(const file_info_ptr_t &file_info) noexcept {
     mark_dirty();
 }
 
+#if 0
 bool folder_info_t::update(const proto::Device &device) noexcept {
     bool update = false;
     bool new_index = false;
@@ -110,6 +111,7 @@ bool folder_info_t::update(const proto::Device &device) noexcept {
     }
     return new_index;
 }
+#endif
 
 void folder_info_t::set_max_sequence(int64_t value) noexcept {
     assert(max_sequence < value);
@@ -204,6 +206,11 @@ void folder_info_t::update(local_file_map_t &local_files) noexcept {
 folder_info_ptr_t folder_infos_map_t::by_device(const device_ptr_t& device) noexcept {
     return get<1>(device->device_id().get_sha256());
 }
+
+folder_info_ptr_t folder_infos_map_t::by_device_id(std::string_view device_id) noexcept {
+    return get<1>(device_id);
+}
+
 
 template<> std::string_view get_index<0>(const folder_info_ptr_t& item) noexcept { return item->get_uuid(); }
 template<> std::string_view get_index<1>(const folder_info_ptr_t& item) noexcept {

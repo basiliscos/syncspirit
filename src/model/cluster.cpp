@@ -71,6 +71,10 @@ devices_map_t &cluster_t::get_devices() noexcept {
     return devices;
 }
 
+const devices_map_t &cluster_t::get_devices() const noexcept {
+    return devices;
+}
+
 ignored_devices_map_t &cluster_t::get_ignored_devices() noexcept {
     return ignored_devices;
 }
@@ -87,6 +91,9 @@ folders_map_t &cluster_t::get_folders() noexcept {
     return folders;
 }
 
+const folders_map_t &cluster_t::get_folders() const noexcept {
+    return folders;
+}
 
 uuid_t cluster_t::next_uuid() noexcept {
     return uuid_generator();

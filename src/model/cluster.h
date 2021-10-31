@@ -43,10 +43,12 @@ struct cluster_t final : arc_base_t<cluster_t> {
     inline const device_ptr_t &get_device() const noexcept { return device; }
     block_infos_map_t &get_blocks() noexcept;
     devices_map_t &get_devices() noexcept;
+    const devices_map_t &get_devices() const noexcept;
     ignored_devices_map_t &get_ignored_devices() noexcept;
     ignored_folders_map_t &get_ignored_folders() noexcept;
     block_infos_map_t &get_deleted_blocks() noexcept;
     folders_map_t &get_folders() noexcept;
+    const folders_map_t &get_folders() const noexcept;
     uuid_t next_uuid() noexcept;
 
   private:
@@ -62,7 +64,6 @@ struct cluster_t final : arc_base_t<cluster_t> {
     devices_map_t devices;
     ignored_devices_map_t ignored_devices;
     ignored_folders_map_t ignored_folders;
-    //folder_infos_map_t new_folder_infos;
 
     friend class file_interator_t;
 };

@@ -196,7 +196,7 @@ proto::Index folder_t::generate() noexcept {
 template<> std::string_view get_index<0>(const folder_ptr_t& item) noexcept { return item->get_key(); }
 template<> std::string_view get_index<1>(const folder_ptr_t& item) noexcept { return item->get_id(); }
 
-folder_ptr_t folders_map_t::by_id(std::string_view id) noexcept {
+folder_ptr_t folders_map_t::by_id(std::string_view id) const noexcept {
     return get<1>(id);
 }
 

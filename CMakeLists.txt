@@ -49,6 +49,7 @@ add_library(syncspirit_lib
     src/model/diff/load/folders.cpp
     src/model/diff/load/ignored_devices.cpp
     src/model/diff/load/ignored_folders.cpp
+    src/model/diff/peer/cluster_update.cpp
     src/model/diff/cluster/aggregate.cpp
 #    src/model/diff/cluster/index_refresher.cpp
 #    src/model/diff/cluster/load_data.cpp
@@ -135,6 +136,7 @@ target_include_directories(syncspirit_lib PUBLIC
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}
+    ${syncspirit_SOURCE_DIR}/src
 )
 
 target_link_libraries(syncspirit_lib
