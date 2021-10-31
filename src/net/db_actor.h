@@ -5,7 +5,6 @@
 #include "../utils/log.h"
 #include "../db/transaction.h"
 #include <optional>
-#include <random>
 
 namespace syncspirit {
 namespace net {
@@ -60,9 +59,6 @@ struct db_actor_t : public r::actor_base_t {
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;
 
     utils::logger_t log;
-    std::random_device rd;
-    std::uniform_int_distribution<std::int64_t> distribution;
-    std::mt19937 generator;
     MDBX_env *env;
     std::string db_dir;
     model::device_ptr_t device;

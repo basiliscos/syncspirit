@@ -14,6 +14,7 @@ namespace diff {
 struct cluster_diff_visitor_t;
 
 struct cluster_diff_t : base_t {
+    virtual ~cluster_diff_t();
     virtual outcome::result<void> apply(cluster_t &) const noexcept = 0;
     virtual outcome::result<void> visit(cluster_diff_visitor_t &) const noexcept;
 };

@@ -11,10 +11,11 @@
 #include <optional>
 
 #include <fmt/fmt.h>
-#include "../model/upnp.h"
+#include "../model/misc/upnp.h"
+#include "../model/misc/peer_contact.h"
 #include "../model/cluster.h"
-#include "../model/peer_contact.h"
 #include "../model/folder.h"
+#include "../model/diff/cluster_diff.h"
 #include "../transport/base.h"
 #include "../proto/bep_support.h"
 
@@ -217,10 +218,13 @@ struct connection_notify_t {
 };
 
 struct load_cluster_response_t {
+/*
     model::cluster_ptr_t cluster;
     model::devices_map_t devices;
     model::ignored_devices_map_t ignored_devices;
     model::ignored_folders_map_t ignored_folders;
+*/
+    model::diff::cluster_diff_ptr_t diff;
 };
 
 struct load_cluster_request_t {
@@ -288,7 +292,8 @@ struct store_new_folder_response_t {
 
 struct store_new_folder_request_t {
     using response_t = store_new_folder_response_t;
-    db::Folder folder;
+    //db::Folder folder;
+    std::string folder_data;
     model::device_ptr_t source;
     std::uint64_t source_index;
     model::cluster_ptr_t cluster;

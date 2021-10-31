@@ -30,7 +30,7 @@ add_library(syncspirit_lib
     src/db/error_code.cpp
     src/db/prefix.cpp
     src/db/transaction.cpp
-#    src/db/utils.cpp
+    src/db/utils.cpp
 #    src/fs/file_actor.cpp
 #    src/fs/fs_supervisor.cpp
 #    src/fs/scan_actor.cpp
@@ -42,6 +42,7 @@ add_library(syncspirit_lib
     src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_diff_visitor.cpp
     src/model/diff/load/blocks.cpp
+    src/model/diff/load/close_transaction.cpp
     src/model/diff/load/devices.cpp
     src/model/diff/load/file_infos.cpp
     src/model/diff/load/folder_infos.cpp
@@ -71,7 +72,7 @@ add_library(syncspirit_lib
 #    src/net/acceptor_actor.cpp
 #    src/net/cluster_supervisor.cpp
 #    src/net/controller_actor.cpp
-#    src/net/db_actor.cpp
+    src/net/db_actor.cpp
 #    src/net/dialer_actor.cpp
 #    src/net/global_discovery_actor.cpp
 #    src/net/http_actor.cpp

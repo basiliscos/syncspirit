@@ -6,12 +6,10 @@
 
 namespace syncspirit::db {
 
-std::byte zero{0};
-std::uint32_t version{1};
-
 namespace be = boost::endian;
 
-using ignored_device_t = model::device_id_t;
+std::byte zero{0};
+std::uint32_t version{1};
 
 namespace misc {
 static const constexpr std::string_view db_version = "db_version";
@@ -65,13 +63,23 @@ static outcome::result<void> migrate0(model::device_ptr_t &device, transaction_t
         }
     }
 
-    // just to make sure it is non-zero
-    auto seq = txn.next_sequence();
-    if (!seq) {
-        return outcome::failure(seq.error());
-    }
+    auto device_key = device->get_key();
+    auto device_data = device->serialize();
 
-    return store_device(device, txn);
+    MDBX_val device_db_key;
+    device_db_key.iov_base = (void*) device_key.data();
+    device_db_key.iov_len = device_key.size();
+
+    MDBX_val device_db_value;
+    device_db_value.iov_base = device_data.data();
+    device_db_value.iov_len = device_data.size();
+
+
+    r = mdbx_put(txn.txn, txn.dbi, &device_db_key, &device_db_value, MDBX_UPSERT);
+    if (r != MDBX_SUCCESS) {
+        return make_error_code(r);
+    }
+    return outcome::success();
 }
 
 static outcome::result<void> do_migrate(uint32_t from, model::device_ptr_t &device, transaction_t &txn) noexcept {
@@ -96,6 +104,31 @@ outcome::result<void> migrate(uint32_t from, model::device_ptr_t device, transac
     }
     return outcome::success();
 }
+
+
+outcome::result<container_t> load(discr_t prefix, transaction_t &txn) noexcept {
+    char prefix_val = (char)prefix;
+    std::string_view prefix_mask(&prefix_val, 1);
+    auto cursor_opt = txn.cursor();
+    if (!cursor_opt) {
+        return cursor_opt.error();
+    }
+    auto &cursor = cursor_opt.value();
+    container_t container;
+    auto r = cursor.iterate(prefix_mask, [&](auto &key, auto &value) -> outcome::result<void> {
+        container.push_back(pair_t{key, value});
+        return outcome::success();
+    });
+    if (!r) {
+        return r.error();
+    }
+    return outcome::success(std::move(container));
+}
+
+#if 0
+
+using ignored_device_t = model::device_id_t;
+
 
 template <typename T> struct persister_helper_t;
 
@@ -394,5 +427,6 @@ outcome::result<void> remove(model::block_infos_map_t &blocks, transaction_t &tx
     }
     return outcome::success();
 }
+#endif
 
 } // namespace syncspirit::db

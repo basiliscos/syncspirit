@@ -2,8 +2,18 @@
 #include "names.h"
 #include <cstddef>
 #include <string_view>
+#include "../db/prefix.h"
 #include "../db/utils.h"
 #include "../db/error_code.h"
+#include "../model/diff/cluster/aggregate.h"
+#include "../model/diff/load/blocks.h"
+#include "../model/diff/load/close_transaction.h"
+#include "../model/diff/load/devices.h"
+#include "../model/diff/load/file_infos.h"
+#include "../model/diff/load/folder_infos.h"
+#include "../model/diff/load/folders.h"
+#include "../model/diff/load/ignored_devices.h"
+#include "../model/diff/load/ignored_folders.h"
 
 namespace syncspirit::net {
 
@@ -15,7 +25,7 @@ r::plugin::resource_id_t db = 0;
 } // namespace
 
 db_actor_t::db_actor_t(config_t &config)
-    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, device{config.device}, generator(rd()) {
+    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir} {
     log = utils::get_logger("net.db");
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
@@ -95,116 +105,68 @@ void db_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
 }
 
-void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexcept {
+void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {
+    using namespace model::diff;
+    using container_t = cluster::aggregate_t::diffs_t;
+
     auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn_opt) {
-        return reply_with_error(message, make_error(txn_opt.error()));
+        return reply_with_error(request, make_error(txn_opt.error()));
     }
     auto &txn = txn_opt.value();
 
-    auto devices_opt = db::load_devices(txn);
+    auto devices_opt = db::load(db::prefix::device, txn);
     if (!devices_opt) {
-        return reply_with_error(message, make_error(devices_opt.error()));
+        return reply_with_error(request, make_error(devices_opt.error()));
     }
 
-    bool local_fix = false;
-    auto &devices = devices_opt.value();
-    for (auto &it : devices) {
-        auto &d = it.second;
-        if (d->get_id() == device->get_id()) {
-            local_fix = true;
-            device->set_db_key(d->get_db_key());
-            devices.remove(d);
-            devices.put(device);
-            break;
-        }
-    }
-    if (!local_fix) {
-        auto ec = db::make_error_code(db::error_code::local_device_not_found);
-        return reply_with_error(message, make_error(ec));
-    }
-
-    auto blocks_opt = db::load_block_infos(txn);
+    auto blocks_opt = db::load(db::prefix::block_info, txn);
     if (!blocks_opt) {
-        return reply_with_error(message, make_error(blocks_opt.error()));
+        return reply_with_error(request, make_error(blocks_opt.error()));
     }
-    auto &blocks = blocks_opt.value();
-    LOG_TRACE(log, "{}, on_cluster_load, blocks count =  {}", identity, blocks.size());
 
-    auto ignored_devices_opt = db::load_ignored_devices(txn);
+    auto ignored_devices_opt = db::load(db::prefix::ignored_device, txn);
     if (!ignored_devices_opt) {
-        return reply_with_error(message, make_error(ignored_devices_opt.error()));
+        return reply_with_error(request, make_error(ignored_devices_opt.error()));
     }
-    auto &ignored_devices = ignored_devices_opt.value();
 
-    auto ignored_folders_opt = db::load_ignored_folders(txn);
+    auto ignored_folders_opt = db::load(db::prefix::ignored_folder, txn);
     if (!ignored_folders_opt) {
-        return reply_with_error(message, make_error(ignored_folders_opt.error()));
+        return reply_with_error(request, make_error(ignored_folders_opt.error()));
     }
-    auto &ignored_folders = ignored_folders_opt.value();
 
-    auto folders_opt = db::load_folders(txn_opt.value());
+    auto folders_opt = db::load(db::prefix::folder, txn);
     if (!folders_opt) {
-        return reply_with_error(message, make_error(folders_opt.error()));
+        return reply_with_error(request, make_error(folders_opt.error()));
     }
-    auto &folders = folders_opt.value();
 
-    auto folder_infos_opt = db::load_folder_infos(devices, folders, txn);
+    auto folder_infos_opt = db::load(db::prefix::folder_info, txn);
     if (!folder_infos_opt) {
-        return reply_with_error(message, make_error(folder_infos_opt.error()));
-    }
-    auto &folder_infos = folder_infos_opt.value();
-
-    /* should be assigned earlier before file_infos are loaded */
-    auto cluster = model::cluster_ptr_t(new model::cluster_t(device));
-    cluster->assign_folders(folders);
-    cluster->assign_blocks(std::move(blocks));
-
-    for (auto &it : folder_infos) {
-        auto &fi = it.second;
-        auto folder = fi->get_folder();
-        LOG_TRACE(log, "{}, on_cluster_load: {} on {}, idx = {},  max seq = {}", identity, folder->label(),
-                  fi->get_device()->device_id, fi->get_index(), fi->get_max_sequence());
-        folder->add(fi);
+        return reply_with_error(request, make_error(folder_infos_opt.error()));
     }
 
-    for (auto &it : folders) {
-        auto &folder_infos_map = it.second->get_folder_infos();
-        auto file_infos_opt = db::load_file_infos(folder_infos_map, txn);
-        if (!file_infos_opt) {
-            return reply_with_error(message, make_error(file_infos_opt.error()));
-        }
-        auto &file_infos = file_infos_opt.value();
-
-        // correctly link
-        for (auto &it : file_infos) {
-            auto &fi = it.second;
-            auto folder_info = fi->get_folder_info();
-            LOG_TRACE(log, "{}, on_cluster_load {}:{}:{} (seq = {}, blocks = {})", identity,
-                      folder_info->get_folder()->label(), folder_info->get_device()->device_id.get_short(),
-                      fi->get_name(), fi->get_sequence(), fi->get_blocks().size());
-            folder_info->add(fi);
-        }
+    auto file_infos_opt = db::load(db::prefix::file_info, txn);
+    if (!file_infos_opt) {
+        return reply_with_error(request, make_error(file_infos_opt.error()));
     }
 
-    if (auto my_d = devices.by_id(device->get_id()); !my_d) {
-        devices.put(device);
-    }
+    container_t container;
+    container.emplace_back(new load::devices_t(std::move(devices_opt.value())));
+    container.emplace_back(new load::blocks_t(std::move(blocks_opt.value())));
+    container.emplace_back(new load::ignored_devices_t(std::move(ignored_devices_opt.value())));
+    container.emplace_back(new load::ignored_folders_t(std::move(ignored_folders_opt.value())));
+    container.emplace_back(new load::folders_t(std::move(folders_opt.value())));
+    container.emplace_back(new load::folder_infos_t(std::move(folder_infos_opt.value())));
+    container.emplace_back(new load::file_infos_t(std::move(file_infos_opt.value())));
+    container.emplace_back(new load::close_tranaction_t(std::move(txn)));
 
-    blocks = cluster->get_blocks();
-    size_t orphaned_blocks = 0;
-    for (auto &it : blocks) {
-        if (!it.second->usages()) {
-            ++orphaned_blocks;
-        }
-    }
-    if (orphaned_blocks) {
-        LOG_WARN(log, "{}, {} orphaned blocks has been detected", identity, orphaned_blocks);
-    }
+    cluster_diff_ptr_t r = cluster_diff_ptr_t();
+    r = new cluster::aggregate_t(std::move(container));
 
-    reply_to(message, std::move(cluster), std::move(devices), std::move(ignored_devices), std::move(ignored_folders));
+    reply_to(request, r);
 }
 
+#if 0
 void db_actor_t::on_store_ignored_device(message::store_ignored_device_request_t &message) noexcept {
     auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
     if (!txn_opt) {
@@ -536,5 +498,6 @@ void db_actor_t::on_store_file(message::store_file_request_t &message) noexcept 
 
     reply_to(message);
 }
+#endif
 
 } // namespace syncspirit::net
