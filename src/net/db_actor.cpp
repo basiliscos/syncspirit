@@ -5,7 +5,7 @@
 #include "../db/prefix.h"
 #include "../db/utils.h"
 #include "../db/error_code.h"
-#include "../model/diff/cluster/aggregate.h"
+#include "../model/diff/aggregate.h"
 #include "../model/diff/load/blocks.h"
 #include "../model/diff/load/close_transaction.h"
 #include "../model/diff/load/devices.h"
@@ -107,7 +107,7 @@ void db_actor_t::on_start() noexcept {
 
 void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {
     using namespace model::diff;
-    using container_t = cluster::aggregate_t::diffs_t;
+    using container_t = aggregate_t::diffs_t;
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn_opt) {
@@ -160,8 +160,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     container.emplace_back(new load::file_infos_t(std::move(file_infos_opt.value())));
     container.emplace_back(new load::close_tranaction_t(std::move(txn)));
 
-    cluster_diff_ptr_t r = cluster_diff_ptr_t();
-    r = new cluster::aggregate_t(std::move(container));
+    cluster_diff_ptr_t r = cluster_diff_ptr_t(new aggregate_t(std::move(container)));
 
     reply_to(request, r);
 }

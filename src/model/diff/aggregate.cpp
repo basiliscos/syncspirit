@@ -1,6 +1,6 @@
 #include "aggregate.h"
 
-using namespace syncspirit::model::diff::cluster;
+using namespace syncspirit::model::diff;
 
 auto aggregate_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
     for (auto &diff : diffs) {

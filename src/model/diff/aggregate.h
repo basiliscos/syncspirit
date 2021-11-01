@@ -1,9 +1,9 @@
 #pragma once
 
 #include <vector>
-#include "../cluster_diff.h"
+#include "cluster_diff.h"
 
-namespace syncspirit::model::diff::cluster {
+namespace syncspirit::model::diff {
 
 struct aggregate_t final : cluster_diff_t {
     using diffs_t = std::vector<cluster_diff_ptr_t>;

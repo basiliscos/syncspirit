@@ -64,6 +64,7 @@ auto cluster_update_t::apply(cluster_t &cluster) const noexcept -> outcome::resu
                       folder_info->get_index(), folder_info->get_max_sequence(), info.device.max_sequence());
     }
     if (reset_folders.size()) {
+        spdlog::critical("folder reset is not implemented");
         std::abort();
     }
     return outcome::success();
