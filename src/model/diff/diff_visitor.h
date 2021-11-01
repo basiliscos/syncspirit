@@ -1,0 +1,18 @@
+#pragma once
+#include <boost/outcome.hpp>
+
+
+namespace syncspirit::model::diff {
+
+namespace outcome = boost::outcome_v2;
+
+namespace peer {
+    struct cluster_update_t;
+}
+
+struct diff_visitor_t {
+    virtual ~diff_visitor_t();
+    virtual outcome::result<void> operator()(const peer::cluster_update_t &) noexcept;
+};
+
+} // namespace syncspirit::model::diff

@@ -12,7 +12,7 @@ auto aggregate_t::apply(cluster_t &cluster) const noexcept -> outcome::result<vo
     return outcome::success();
 }
 
-auto aggregate_t::visit(cluster_diff_visitor_t &vistor) const noexcept -> outcome::result<void> {
+auto aggregate_t::visit(diff_visitor_t &vistor) const noexcept -> outcome::result<void> {
     for (auto &diff : diffs) {
         auto r = diff->visit(vistor);
         if (!r) {

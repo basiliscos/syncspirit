@@ -94,7 +94,7 @@ std::string_view get_index<1, device_ptr_t>(const device_ptr_t& item) noexcept {
     return item->device_id().get_sha256();
 }
 
-device_ptr_t devices_map_t::by_sha256(std::string_view device_id) noexcept {
+device_ptr_t devices_map_t::by_sha256(std::string_view device_id) const noexcept {
     return get<1>(device_id);
 }
 
