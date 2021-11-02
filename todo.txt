@@ -1,9 +1,7 @@
 - uuid model
 
--- folder
--- ignored folders
 
-
+- make fs-actor smart (clone model)
 - https://docs.syncthing.net/users/faq.html#what-things-are-synced
 - test: validation happens before opening file?
 - model: когда добавляется symlink, папка

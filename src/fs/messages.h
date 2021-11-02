@@ -8,7 +8,7 @@
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <rotor.hpp>
 #include "../model/block_info.h"
-#include "../model/local_file.h"
+#include "../model/misc/local_file.h"
 
 namespace syncspirit {
 

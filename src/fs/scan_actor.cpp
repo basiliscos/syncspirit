@@ -269,13 +269,20 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     } else {
         auto &p = res.payload.res;
         auto &blocks_map = scan->payload.blocks_map;
-        auto block = blocks_map.by_id(p.digest);
+        auto block = blocks_map.get(p.digest);
         if (!block) {
-            db::BlockInfo info;
+            proto::BlockInfo info;
             info.set_hash(p.digest);
             info.set_weak_hash(p.weak);
             info.set_size(block_task->block_sz);
-            block = model::block_info_ptr_t(new model::block_info_t(info));
+            auto block_option = model::block_info_t::create(info);
+            if (!block_option) {
+                auto& ec = block_option.assume_error();
+                LOG_ERROR(log, "{}, on_hash, file: {}, in block creation: {}", identity, file->path.string(), ec.message());
+                intrusive_ptr_release(scan);
+                return do_shutdown(make_error(ec));
+            }
+            block = std::move(block_option.value());
             blocks_map.put(block);
         }
         file->blocks[block_task->block_idx] = block;
