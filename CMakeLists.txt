@@ -66,22 +66,22 @@ add_library(syncspirit_lib
     src/model/folder_info.cpp
     src/model/ignored_device.cpp
     src/model/ignored_folder.cpp
-#    src/net/acceptor_actor.cpp
+    src/net/acceptor_actor.cpp
 #    src/net/cluster_supervisor.cpp
 #    src/net/controller_actor.cpp
     src/net/db_actor.cpp
-#    src/net/dialer_actor.cpp
-#    src/net/global_discovery_actor.cpp
-#    src/net/http_actor.cpp
-#    src/net/local_discovery_actor.cpp
+    src/net/dialer_actor.cpp
+    src/net/global_discovery_actor.cpp
+    src/net/http_actor.cpp
+    src/net/local_discovery_actor.cpp
 #    src/net/net_supervisor.cpp
 #    src/net/peer_actor.cpp
 #    src/net/peer_supervisor.cpp
-#    src/net/resolver_actor.cpp
-#    src/net/messages.cpp
-#    src/net/names.cpp
-#    src/net/ssdp_actor.cpp
-#    src/net/upnp_actor.cpp
+    src/net/resolver_actor.cpp
+    src/net/messages.cpp
+    src/net/names.cpp
+    src/net/ssdp_actor.cpp
+    src/net/upnp_actor.cpp
     src/proto/bep_support.cpp
     src/proto/discovery_support.cpp
     src/proto/luhn32.cpp

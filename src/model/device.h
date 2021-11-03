@@ -34,6 +34,7 @@ struct device_t : arc_base_t<device_t> {
     inline const device_id_t& device_id() const noexcept { return id; }
     inline std::string_view get_name() const noexcept { return name; }
     inline const name_option_t get_cert_name() const noexcept { return cert_name; }
+    inline const auto& get_static_addresses() const noexcept { return  static_addresses;}
 
 private:
     device_t(const device_id_t& device_id, std::string_view name, std::string_view cert_name) noexcept;
