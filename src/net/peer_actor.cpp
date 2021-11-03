@@ -408,7 +408,7 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     auto &file_block = p.block;
     auto &block = *file_block.block();
     req.set_id(req_id);
-    *req.mutable_folder() = file->get_folder_info()->get_folder()->id();
+    *req.mutable_folder() = file->get_folder_info()->get_folder()->get_id();
     *req.mutable_name() = file->get_name();
 
     req.set_offset(file_block.get_offset());
@@ -594,7 +594,8 @@ void peer_actor_t::on_file_update(message::file_update_notify_t &msg) noexcept {
     auto &file = msg.payload.file;
     LOG_TRACE(log, "{}, on_file_update, file = {}", identity, file->get_full_name());
     proto::IndexUpdate iu;
-    iu.set_folder(file->get_folder_info()->get_folder()->get_id());
+    auto folder_id = file->get_folder_info()->get_folder()->get_id();
+    iu.set_folder(std::string(folder_id));
     *iu.add_files() = file->get();
     fmt::memory_buffer buff;
     proto::serialize(buff, iu);
