@@ -1,5 +1,5 @@
 #include "cluster_supervisor.h"
-#include "controller_actor.h"
+//#include "controller_actor.h"
 #include "names.h"
 #include "../utils/error_code.h"
 #include "../hasher/hasher_proxy_actor.h"
@@ -32,8 +32,7 @@ typedef void (*callback_t)(cluster_supervisor_t *, syncspirit::model::folder_ptr
 
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
     : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, hasher_threads{config.hasher_threads},
-      device{config.device}, cluster{config.cluster}, devices{config.devices}, folders{cluster->get_folders()},
-      ignored_folders(config.ignored_folders) {
+      cluster{config.cluster}, folders{cluster->get_folders()} {
     log = utils::get_logger("net.cluster_supervisor");
 }
 
@@ -78,11 +77,11 @@ void cluster_supervisor_t::on_start() noexcept {
     ra::supervisor_asio_t::on_start();
     if (folders.size()) {
         for (auto &it : folders) {
-            auto &folder = it.second;
+            auto &folder = it.item;
             scan(folder, scan_initial);
         }
     } else {
-        send<payload::cluster_ready_notify_t>(coordinator, cluster, *devices);
+        send<payload::cluster_ready_notify_t>(coordinator, cluster);
     }
 }
 
@@ -125,8 +124,8 @@ void cluster_supervisor_t::on_scan_complete_initial(fs::message::scan_response_t
     auto it = on_scan_complete(message);
     auto &folder = it->second.folder;
     if (scan_folders_map.size() == 1) {
-        log->debug("{}, completed initial scan for {}", identity, folder->label());
-        send<payload::cluster_ready_notify_t>(coordinator, cluster, *devices);
+        log->debug("{}, completed initial scan for {}", identity, folder->get_label());
+        send<payload::cluster_ready_notify_t>(coordinator, cluster);
     }
     scan_folders_map.erase(it);
 }
@@ -134,8 +133,9 @@ void cluster_supervisor_t::on_scan_complete_initial(fs::message::scan_response_t
 void cluster_supervisor_t::on_scan_complete_new(fs::message::scan_response_t &message) noexcept {
     auto it = on_scan_complete(message);
     auto &folder = it->second.folder;
+    auto &devices = cluster->get_devices();
     for (auto &it : addr2device_map) {
-        auto device = devices->by_id(it.second);
+        auto device = devices.by_sha256(it.second);
         if (device->is_online() && folder->is_shared_with(device)) {
             send<payload::store_new_folder_notify_t>(it.first, folder);
         }
@@ -167,12 +167,13 @@ void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
 void cluster_supervisor_t::on_create_folder(ui::message::create_folder_request_t &message) noexcept {
     create_folder_req.reset(&message);
     auto &p = message.payload.request_payload;
-    auto &folder = p.folder;
-    auto &source = p.source;
+    auto &data = p.folder_data;
+    auto &source = p.source_device_id;
     auto source_index = p.source_index;
-    log->trace("{}, on_create_folder, {} ({})", identity, folder.label(),
-               (source ? source->device_id.get_short() : ""));
-    request<payload::store_new_folder_request_t>(db, folder, source, source_index, cluster).send(init_timeout);
+    auto &devices = cluster->get_devices();
+    log->trace("{}, on_create_folder, {}", identity,
+               (!source.empty() ? devices.by_sha256(source)->device_id().get_short() : ""));
+    request<payload::store_new_folder_request_t>(db, data, source, source_index, cluster).send(init_timeout);
 }
 
 void cluster_supervisor_t::on_share_folder(ui::message::share_folder_request_t &message) noexcept {

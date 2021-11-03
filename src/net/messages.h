@@ -233,7 +233,6 @@ struct load_cluster_request_t {
 
 struct cluster_ready_notify_t {
     model::cluster_ptr_t cluster;
-    model::devices_map_t devices;
     r::extended_error_ptr_t ee;
 };
 
@@ -292,7 +291,6 @@ struct store_new_folder_response_t {
 
 struct store_new_folder_request_t {
     using response_t = store_new_folder_response_t;
-    //db::Folder folder;
     std::string folder_data;
     model::device_ptr_t source;
     std::uint64_t source_index;

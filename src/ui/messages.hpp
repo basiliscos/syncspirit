@@ -68,8 +68,8 @@ struct create_folder_response_t {
 
 struct create_folder_request_t {
     using response_t = create_folder_response_t;
-    db::Folder folder;
-    model::device_ptr_t source;
+    std::string folder_data;
+    std::string source_device_id;
     std::uint64_t source_index;
 };
 
@@ -77,8 +77,8 @@ struct share_folder_response_t {};
 
 struct share_folder_request_t {
     using response_t = share_folder_response_t;
-    model::folder_ptr_t folder;
-    model::device_ptr_t peer;
+    std::string folder_id;
+    std::string peer_id;
 };
 
 } // namespace payload

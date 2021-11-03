@@ -61,7 +61,6 @@ add_library(syncspirit_lib
     src/model/device.cpp
     src/model/device_id.cpp
     src/model/file_info.cpp
-#    src/model/file_iterator.cpp
     src/model/folder.cpp
     src/model/folder_info.cpp
     src/model/ignored_device.cpp

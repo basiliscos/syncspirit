@@ -17,10 +17,7 @@ namespace bfs = boost::filesystem;
 struct cluster_supervisor_config_t : ra::supervisor_config_asio_t {
     config::bep_config_t bep_config;
     std::uint32_t hasher_threads;
-    model::device_ptr_t device;
     model::cluster_ptr_t cluster;
-    model::devices_map_t *devices;
-    model::ignored_folders_map_t *ignored_folders;
 };
 
 template <typename Supervisor>
@@ -39,25 +36,11 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&device(const model::device_ptr_t &value) &&noexcept {
-        parent_t::config.device = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
     builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&devices(model::devices_map_t *value) &&noexcept {
-        parent_t::config.devices = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&ignored_folders(model::ignored_folders_map_t *value) &&noexcept {
-        parent_t::config.ignored_folders = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
 };
 
 struct cluster_supervisor_t : public ra::supervisor_asio_t {
@@ -107,11 +90,8 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     r::address_ptr_t scan_new;     // for routing
     config::bep_config_t bep_config;
     std::uint32_t hasher_threads;
-    model::device_ptr_t device;
     model::cluster_ptr_t cluster;
-    model::devices_map_t *devices;
     model::folders_map_t &folders;
-    model::ignored_folders_map_t *ignored_folders;
     device2addr_map_t device2addr_map;
     addr2device_map_t addr2device_map;
     create_folder_req_t create_folder_req;

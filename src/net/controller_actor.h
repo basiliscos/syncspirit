@@ -1,8 +1,8 @@
 #pragma once
 
 #include "messages.h"
-#include "../model/file_iterator.h"
-#include "../model/block_iterator.h"
+#include "../model/misc/file_iterator.h"
+#include "../model/misc/block_iterator.h"
 #include "../fs/messages.h"
 #include "../hasher/messages.h"
 #include "../utils/log.h"
