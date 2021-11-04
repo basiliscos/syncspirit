@@ -51,6 +51,9 @@ device_t::device_t(const device_id_t &device_id_, std::string_view name_, std::s
 {
 }
 
+void device_t::update(const db::Device &source) noexcept {
+    assign(source);
+}
 
 std::string device_t::serialize() noexcept {
     db::Device r;
