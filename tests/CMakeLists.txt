@@ -59,6 +59,10 @@ add_executable(031-diff-cluster_update 031-diff-cluster_update.cpp)
 target_link_libraries(031-diff-cluster_update syncspirit_test_lib)
 add_test(031-diff-cluster_update "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/031-diff-cluster_update")
 
+add_executable(032-diff-modify 032-diff-modify.cpp)
+target_link_libraries(032-diff-modify syncspirit_test_lib)
+add_test(032-diff-modify "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/032-diff-modify")
+
 add_executable(050-model-device_id 050-model-device_id.cpp)
 target_link_libraries(050-model-device_id syncspirit_test_lib)
 add_test(050-model-device_id "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-model-device_id")
