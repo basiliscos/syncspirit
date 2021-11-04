@@ -31,6 +31,9 @@ enum class error_code_t {
     ignored_folder_deserialization_failure,
     folder_already_exists,
     source_device_not_exists,
+    folder_does_not_exist,
+    device_does_not_exist,
+    folder_is_already_shared,
 };
 
 namespace detail {
