@@ -50,13 +50,16 @@ struct cluster_t final : arc_base_t<cluster_t> {
     folders_map_t &get_folders() noexcept;
     const folders_map_t &get_folders() const noexcept;
     uuid_t next_uuid() noexcept;
+    uint64_t next_uint64() noexcept;
 
   private:
     using rng_engine_t = std::mt19937;
     using uuid_generator_t = boost::uuids::basic_random_generator<rng_engine_t>;
+    using uint64_generator_t = std::uniform_int_distribution<uint64_t>;
 
     rng_engine_t rng_engine;
     uuid_generator_t uuid_generator;
+    uint64_generator_t uint64_generator;
     device_ptr_t device;
     folders_map_t folders;
     block_infos_map_t blocks;

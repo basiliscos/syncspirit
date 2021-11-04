@@ -29,6 +29,8 @@ enum class error_code_t {
     ignored_device_deserialization_failure,
     invalid_ignored_folder_prefix,
     ignored_folder_deserialization_failure,
+    folder_already_exists,
+    source_device_not_exists,
 };
 
 namespace detail {

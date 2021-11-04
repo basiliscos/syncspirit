@@ -98,3 +98,8 @@ const folders_map_t &cluster_t::get_folders() const noexcept {
 uuid_t cluster_t::next_uuid() noexcept {
     return uuid_generator();
 }
+
+uint64_t cluster_t::next_uint64() noexcept {
+    return uint64_generator(rng_engine);
+}
+
