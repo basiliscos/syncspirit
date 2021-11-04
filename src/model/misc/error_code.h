@@ -18,6 +18,7 @@ enum class error_code_t {
     invalid_folder_key_length,
     invalid_folder_prefix,
     folder_deserialization_failure,
+    file_info_deserialization_failure,
     invalid_file_info_key_length,
     invalid_file_info_prefix,
     invalid_folder_info_key_length,

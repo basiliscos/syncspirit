@@ -12,7 +12,7 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
 
-outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const void* data, const folder_info_ptr_t& folder_info_) noexcept {
+outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const db::FileInfo &data, const folder_info_ptr_t& folder_info_) noexcept {
     if (key.size() != data_length) {
         return make_error_code(error_code_t::invalid_file_info_key_length);
     }
@@ -29,11 +29,10 @@ outcome::result<file_info_ptr_t> file_info_t::create(const uuid_t& uuid, const p
     return file_info_ptr_t(new file_info_t(uuid, info_, folder_info_));
 }
 
-file_info_t::file_info_t(std::string_view key_, const void *data, const folder_info_ptr_t& folder_info_) noexcept : folder_info{folder_info_.get()} {
+file_info_t::file_info_t(std::string_view key_, const db::FileInfo& data, const folder_info_ptr_t& folder_info_) noexcept : folder_info{folder_info_.get()} {
     assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
     std::copy(key_.begin(), key_.end(), key);
-    auto fi = *reinterpret_cast<const db::FileInfo*>(data);
-    fields_update(fi);
+    fields_update(data);
 }
 
 file_info_t::file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept

@@ -5,6 +5,7 @@
 #include "file_info.h"
 #include "misc/local_file.h"
 #include "misc/storeable.h"
+#include "structs.pb.h"
 #include <boost/outcome.hpp>
 
 namespace syncspirit::model {
@@ -19,8 +20,8 @@ using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
 struct folder_info_t final : arc_base_t<folder_info_t>, storeable_t {
 
-    static outcome::result<folder_info_ptr_t> create(std::string_view key, std::string_view data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
-    static outcome::result<folder_info_ptr_t> create(const uuid_t& uuid, std::string_view data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
+    static outcome::result<folder_info_ptr_t> create(std::string_view key, const db::FolderInfo& data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
+    static outcome::result<folder_info_ptr_t> create(const uuid_t& uuid, const db::FolderInfo& data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
     ~folder_info_t();
 
     std::string_view get_key() noexcept;
@@ -48,7 +49,7 @@ struct folder_info_t final : arc_base_t<folder_info_t>, storeable_t {
   private:
     folder_info_t(std::string_view key, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
     folder_info_t(const uuid_t& uuid, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
-    outcome::result<void> assign_fields(std::string_view data) noexcept;
+    void assign_fields(const db::FolderInfo& data) noexcept;
 
     template <typename Message> void update_generic(const Message &data, const device_ptr_t &peer) noexcept;
 

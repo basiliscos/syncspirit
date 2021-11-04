@@ -22,7 +22,7 @@ template<> void block_info_t::assign<db::BlockInfo>(const db::BlockInfo& item) n
     size = item.size();
 }
 
-outcome::result<block_info_ptr_t> block_info_t::create(std::string_view key, std::string_view data) noexcept {
+outcome::result<block_info_ptr_t> block_info_t::create(std::string_view key, const db::BlockInfo &data) noexcept {
     if (key.length() != data_length) {
         return make_error_code(error_code_t::invalid_block_key_length);
     }
@@ -30,14 +30,8 @@ outcome::result<block_info_ptr_t> block_info_t::create(std::string_view key, std
         return make_error_code(error_code_t::invalid_block_prefix);
     }
 
-    db::BlockInfo block;
-    auto ok = block.ParseFromArray(data.data(), data.size());
-    if (!ok) {
-        return make_error_code(error_code_t::block_deserialization_failure);
-    }
-
     auto ptr = block_info_ptr_t(new block_info_t(key));
-    ptr->assign(block);
+    ptr->assign(data);
     return outcome::success(ptr);
 }
 

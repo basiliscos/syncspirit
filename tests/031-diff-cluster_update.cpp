@@ -4,7 +4,6 @@
 #include "model/cluster.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/diff_visitor.h"
-#include "structs.pb.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -69,8 +68,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         db_folder.set_id("1234-5678");
         db_folder.set_label("my-label");
         db_folder.set_path("/my/path");
-        auto data = db_folder.SerializeAsString();
-        auto folder = folder_t::create(cluster->next_uuid(), data).value();
+        auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
 
         cluster->get_folders().put(folder);
 
@@ -80,14 +78,14 @@ TEST_CASE("cluster update, new folder", "[model]") {
             db::FolderInfo db_fi;
             db_fi.set_index_id(5ul);
             db_fi.set_max_sequence(10l);
-            folder_info_my = folder_info_t::create(cluster->next_uuid(), db_fi.SerializeAsString(), my_device, folder).value();
+            folder_info_my = folder_info_t::create(cluster->next_uuid(), db_fi, my_device, folder).value();
             folder->get_folder_infos().put(folder_info_my);
         }
         {
             db::FolderInfo db_fi;
             db_fi.set_index_id(6ul);
             db_fi.set_max_sequence(10l);
-            folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi.SerializeAsString(), peer_device, folder).value();
+            folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi, peer_device, folder).value();
             folder->get_folder_infos().put(folder_info_my);
         }
         folder->get_folder_infos().put(folder_info_my);

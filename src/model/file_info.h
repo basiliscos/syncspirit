@@ -11,6 +11,7 @@
 #include "misc/uuid.h"
 #include "block_info.h"
 #include "device.h"
+#include "structs.pb.h"
 
 namespace syncspirit::model {
 
@@ -30,7 +31,7 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     using blocks_t = std::vector<block_info_ptr_t>;
 
-    static outcome::result<file_info_ptr_t> create(std::string_view key, const void* data, const folder_info_ptr_t& folder_info_) noexcept;
+    static outcome::result<file_info_ptr_t> create(std::string_view key, const db::FileInfo& data, const folder_info_ptr_t& folder_info_) noexcept;
     static outcome::result<file_info_ptr_t> create(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
 
     ~file_info_t();
@@ -93,7 +94,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
 
 
   private:
-    file_info_t(std::string_view key, const void* data, const folder_info_ptr_t& folder_info_) noexcept;
+    file_info_t(std::string_view key, const db::FileInfo& data, const folder_info_ptr_t& folder_info_) noexcept;
     file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
 
     void update_blocks(const proto::FileInfo &remote_info) noexcept;

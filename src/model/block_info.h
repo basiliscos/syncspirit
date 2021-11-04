@@ -8,6 +8,7 @@
 #include "misc/file_block.h"
 #include "misc/storeable.h"
 #include "bep.pb.h"
+#include "structs.pb.h"
 #include <boost/outcome.hpp>
 
 namespace syncspirit::model {
@@ -26,7 +27,7 @@ struct block_info_t final : arc_base_t<block_info_t>, storeable_t {
     static const constexpr size_t digest_length = 32;
     static const constexpr size_t data_length = digest_length + 1;
 
-    static outcome::result<block_info_ptr_t> create(std::string_view key, std::string_view data) noexcept;
+    static outcome::result<block_info_ptr_t> create(std::string_view key, const db::BlockInfo& data) noexcept;
     static outcome::result<block_info_ptr_t> create(const proto::BlockInfo &block) noexcept;
 
     inline std::string_view get_hash() const noexcept { return std::string_view(hash + 1, digest_length); }

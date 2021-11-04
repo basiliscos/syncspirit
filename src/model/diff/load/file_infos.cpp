@@ -1,7 +1,7 @@
 #include "file_infos.h"
 #include "../../cluster.h"
 #include "../../../db/prefix.h"
-#include "structs.pb.h"
+#include "../../misc/error_code.h"
 
 using namespace syncspirit::model::diff::load;
 
@@ -26,11 +26,13 @@ auto file_infos_t::apply(cluster_t &cluster) const noexcept -> outcome::result<v
         assert(folder_info);
 
         auto data = pair.value;
-        db::FileInfo db_fi;
-        auto ok = db_fi.ParseFromArray(data.data(), data.size());
-        assert(ok);
+        db::FileInfo db;
+        auto ok = db.ParseFromArray(data.data(), data.size());
+        if (!ok) {
+            return make_error_code(error_code_t::file_info_deserialization_failure);
+        }
 
-        auto option = file_info_t::create(key, &db_fi, folder_info);
+        auto option = file_info_t::create(key, db, folder_info);
         if (!option) {
             return option.assume_error();
         }
@@ -38,8 +40,8 @@ auto file_infos_t::apply(cluster_t &cluster) const noexcept -> outcome::result<v
         auto& map = folder_info->get_file_infos();
         map.put(fi);
 
-        for(int i = 0; i < db_fi.blocks_size(); ++i){
-            auto block_hash = db_fi.blocks(i);
+        for(int i = 0; i < db.blocks_size(); ++i){
+            auto block_hash = db.blocks(i);
             auto block = blocks.get(block_hash);
             assert(block);
             fi->add_block(block);

@@ -6,6 +6,7 @@
 #include "device_id.h"
 #include "../utils/uri.h"
 #include "bep.pb.h"
+#include "structs.pb.h"
 #include <boost/outcome.hpp>
 
 namespace syncspirit::model {
@@ -19,7 +20,7 @@ struct device_t : arc_base_t<device_t> {
     using static_addresses_t = std::vector<utils::URI>;
     using name_option_t = std::optional<std::string>;
 
-    static outcome::result<device_ptr_t> create(std::string_view key, std::string_view data) noexcept;
+    static outcome::result<device_ptr_t> create(std::string_view key, const db::Device& data) noexcept;
     static outcome::result<device_ptr_t> create(const device_id_t& device_id, std::string_view name, std::string_view cert_name = "") noexcept;
 
     virtual std::string_view get_key() const noexcept;
@@ -39,8 +40,6 @@ struct device_t : arc_base_t<device_t> {
 private:
     device_t(const device_id_t& device_id, std::string_view name, std::string_view cert_name) noexcept;
     template<typename T> void assign(const T& item) noexcept;
-    //device_t(std::string_view key, std::string_view data) noexcept;
-
 
     device_id_t id;
     std::string name;

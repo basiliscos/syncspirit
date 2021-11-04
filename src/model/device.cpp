@@ -25,7 +25,7 @@ void device_t::assign(const db::Device& d) noexcept {
 }
 
 
-outcome::result<device_ptr_t> device_t::create(std::string_view key, std::string_view data) noexcept {
+outcome::result<device_ptr_t> device_t::create(std::string_view key, const db::Device &data) noexcept {
     if (key[0] != prefix) {
         return make_error_code(error_code_t::invalid_device_prefix);
     }
@@ -35,14 +35,8 @@ outcome::result<device_ptr_t> device_t::create(std::string_view key, std::string
         return make_error_code(error_code_t::invalid_device_sha256_digest);
     }
 
-    db::Device d;
-    auto ok = d.ParsePartialFromArray(data.data(), data.size());
-    if (!ok) {
-        return make_error_code(error_code_t::device_deserialization_failure);
-    }
-
-    auto ptr = device_ptr_t(new device_t(id.value(), d.name(), d.cert_name()));
-    ptr->assign(d);
+    auto ptr = device_ptr_t(new device_t(id.value(), data.name(), data.cert_name()));
+    ptr->assign(data);
     return outcome::success(std::move(ptr));
 }
 

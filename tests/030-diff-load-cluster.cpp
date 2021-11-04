@@ -11,7 +11,6 @@
 #include "model/diff/load/folder_infos.h"
 #include "model/diff/load/folders.h"
 #include "db/prefix.h"
-#include "structs.pb.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -49,15 +48,15 @@ TEST_CASE("loading cluster (base)", "[model]") {
         db::Device db_device;
         db_device.set_cert_name("cn");
         db_device.set_name("peer-name");
-        std::string data = db_device.SerializeAsString();
 
         device_ptr_t peer;
 
         SECTION("directly") {
-            peer = device_t::create(key, data).value();
+            peer = device_t::create(key, db_device).value();
         }
 
         SECTION("via diff (+ local device)") {
+            std::string data = db_device.SerializeAsString();
             diff::load::container_t devices;
             devices.emplace_back(diff::load::pair_t{key, data});
             devices.emplace_back(diff::load::pair_t{self_key, self_data});
@@ -88,15 +87,12 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
         auto block = block_info_t::create(bi).assume_value();
         auto key = block->get_key();
-        auto data = block->serialize();
 
         auto target_block = block_info_ptr_t();
 
-        SECTION("directly") {
-            target_block = block_info_t::create(key, data).assume_value();
-        }
 
         SECTION("via diff") {
+            auto data = block->serialize();
             diff::load::container_t blocks;
             blocks.emplace_back(diff::load::pair_t{key, data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::blocks_t(blocks));
@@ -149,11 +145,11 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
         auto uuid = cluster->next_uuid();
         auto id = std::string("1234-5678");
-        auto data = db_folder.SerializeAsString();
 
-        auto folder = folder_t::create(uuid, data).value();
+        auto folder = folder_t::create(uuid, db_folder).value();
 
         SECTION("via diff") {
+            auto data = db_folder.SerializeAsString();
             diff::load::container_t folders;
             auto key = folder->get_key();
             folders.emplace_back(diff::load::pair_t{key, data});
@@ -219,27 +215,18 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
     db_folder.set_path("/my/path");
 
     auto uuid = cluster->next_uuid();
-    auto prefix = (char)db::prefix::folder;
-    auto folder_key = std::string(&prefix, 1) + std::string(uuid.begin(), uuid.end());
-    auto folder_data = db_folder.SerializeAsString();
-
-    auto folder = folder_t::create(folder_key, folder_data).value();
+    auto folder = folder_t::create(uuid, db_folder).value();
     cluster->get_folders().put(folder);
 
     db::FolderInfo db_fi;
     db_fi.set_index_id(2);
     db_fi.set_max_sequence(3);
-    auto data = db_fi.SerializeAsString();
-    auto fi = folder_info_t::create(cluster->next_uuid(), data, my_device, folder).value();
+    auto fi = folder_info_t::create(cluster->next_uuid(), db_fi, my_device, folder).value();
     CHECK(fi);
     CHECK(fi->get_index() == 2ul);
     CHECK(fi->get_max_sequence() == 3ul);
 
     auto target = folder_info_ptr_t();
-
-    SECTION("directly") {
-        target = folder_info_t::create(fi->get_key(), data, my_device, folder).value();
-    }
 
     SECTION("via diff") {
         diff::load::container_t folders;
@@ -282,20 +269,13 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     db_folder.set_path("/my/path");
 
     auto uuid = cluster->next_uuid();
-    auto folder_prefix = (char)db::prefix::folder;
-    auto folder_key = std::string(&folder_prefix, 1) + std::string(uuid.begin(), uuid.end());
-    auto folder_data = db_folder.SerializeAsString();
-
-    auto folder = folder_t::create(folder_key, folder_data).value();
+    auto folder = folder_t::create(uuid, db_folder).value();
     cluster->get_folders().put(folder);
 
     db::FolderInfo db_folder_info;
     db_folder_info.set_index_id(2);
     db_folder_info.set_max_sequence(3);
-    auto folder_info_data = db_folder_info.SerializeAsString();
-    auto folder_info = folder_info_t::create(cluster->next_uuid(), folder_info_data, my_device, folder).value();
-    auto folder_info_db = db::FolderInfo();
-    folder_info_db.ParseFromArray(folder_info_data.c_str(), folder_info_data.size());
+    auto folder_info = folder_info_t::create(cluster->next_uuid(), db_folder_info, my_device, folder).value();
     CHECK(folder_info);
     CHECK(folder_info->get_index() == 2ul);
     CHECK(folder_info->get_max_sequence() == 3ul);
@@ -314,7 +294,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         auto data = fi->serialize(true);
         db::FileInfo file_info_db;
         file_info_db.ParseFromArray(data.data(), data.size());
-        target = file_info_t::create(fi->get_key(), &file_info_db, folder_info).value();
+        target = file_info_t::create(fi->get_key(), file_info_db, folder_info).value();
         REQUIRE(target);
         CHECK(target->get_blocks().size() == 0ul);
     }

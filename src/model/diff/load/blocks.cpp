@@ -1,12 +1,19 @@
 #include "blocks.h"
 #include "../../cluster.h"
+#include "../../misc/error_code.h"
 
 using namespace syncspirit::model::diff::load;
 
 auto blocks_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto& blocks_map = cluster.get_blocks();
     for(auto& pair:blocks) {
-        auto block = block_info_t::create(pair.key, pair.value);
+        auto data = pair.value;
+        auto db = db::BlockInfo();
+        auto ok = db.ParseFromArray(data.data(), data.size());
+        if (!ok) {
+            return make_error_code(error_code_t::block_deserialization_failure);
+        }
+        auto block = block_info_t::create(pair.key, db);
         if (block.has_error()) {
             return block.assume_error();
         }

@@ -33,8 +33,16 @@ auto folder_infos_t::apply(cluster_t &cluster) const noexcept -> outcome::result
             return make_error_code(error_code_t::no_such_folder);
         }
 
+
+        auto data = pair.value;
+        db::FolderInfo db;
+        auto ok = db.ParseFromArray(data.data(), data.size());
+        if (!ok) {
+            return make_error_code(error_code_t::folder_info_deserialization_failure);
+        }
+
         auto& map = folder->get_folder_infos();
-        auto option = folder_info_t::create(key, pair.value, device, folder);
+        auto option = folder_info_t::create(key, db, device, folder);
         if (!option) {
             return option.assume_error();
         }

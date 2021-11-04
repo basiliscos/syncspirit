@@ -10,7 +10,7 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder);
 
-outcome::result<folder_ptr_t> folder_t::create(std::string_view key, std::string_view data) noexcept {
+outcome::result<folder_ptr_t> folder_t::create(std::string_view key, const db::Folder &folder) noexcept {
     if (key.size() != data_length) {
         return make_error_code(error_code_t::invalid_folder_key_length);
     }
@@ -18,22 +18,17 @@ outcome::result<folder_ptr_t> folder_t::create(std::string_view key, std::string
         return make_error_code(error_code_t::invalid_folder_prefix);
     }
 
+
     auto ptr = folder_ptr_t();
     ptr = new folder_t(key);
-    auto r = ptr->assign_fields(data);
-    if (!r) {
-        return r.assume_error();
-    }
+    ptr->assign_fields(folder);
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<folder_ptr_t> folder_t::create(const uuid_t& uuid, std::string_view data) noexcept {
+outcome::result<folder_ptr_t> folder_t::create(const uuid_t& uuid, const db::Folder &folder) noexcept {
     auto ptr = folder_ptr_t();
     ptr = new folder_t(uuid);
-    auto r = ptr->assign_fields(data);
-    if (!r) {
-        return r.assume_error();
-    }
+    ptr->assign_fields(folder);
     return outcome::success(std::move(ptr));
 }
 
@@ -47,12 +42,7 @@ folder_t::folder_t(const uuid_t& uuid) noexcept {
 }
 
 
-outcome::result<void> folder_t::assign_fields(std::string_view data) noexcept {
-    db::Folder item;
-    auto ok = item.ParseFromArray(data.data(), data.size());
-    if (!ok) {
-        return make_error_code(error_code_t::folder_deserialization_failure);
-    }
+void folder_t::assign_fields(const db::Folder& item) noexcept {
     id = item.id();
     label = item.label();
     path = item.path();
@@ -65,7 +55,6 @@ outcome::result<void> folder_t::assign_fields(std::string_view data) noexcept {
     ignore_delete = item.ignore_delete();
     disable_temp_indixes = item.disable_temp_indexes();
     paused = item.paused();
-    return outcome::success();
 }
 
 

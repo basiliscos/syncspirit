@@ -45,7 +45,10 @@ std::string error_code_category_t::message(int c) const {
         r = "invalind folder prefix";
         break;
     case error_code_t::folder_deserialization_failure:
-        r = "fodler deserialization failure";
+        r = "folder deserialization failure";
+        break;
+    case error_code_t::file_info_deserialization_failure:
+        r = "file info deserialization failure";
         break;
     case error_code_t::invalid_file_info_key_length:
         r = "invalid file info key length";

@@ -8,6 +8,7 @@
 #include "../config/main.h"
 #include "device.h"
 #include "bep.pb.h"
+#include "structs.pb.h"
 #include "folder_info.h"
 #include "misc/storeable.h"
 #include "misc/local_file.h"
@@ -31,8 +32,8 @@ struct folder_t final : arc_base_t<folder_t>, storeable_t {
     enum class foldet_type_t { send = 0, receive, send_and_receive };
     enum class pull_order_t { random = 0, alphabetic, largest, oldest, newest };
 
-    static outcome::result<folder_ptr_t> create(std::string_view key, std::string_view data) noexcept;
-    static outcome::result<folder_ptr_t> create(const uuid_t& uuid, std::string_view data) noexcept;
+    static outcome::result<folder_ptr_t> create(std::string_view key, const db::Folder& folder) noexcept;
+    static outcome::result<folder_ptr_t> create(const uuid_t& uuid, const db::Folder& folder) noexcept;
 
     void assign_cluster(const cluster_ptr_t& cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
@@ -66,7 +67,7 @@ struct folder_t final : arc_base_t<folder_t>, storeable_t {
 
     folder_t(std::string_view key) noexcept;
     folder_t(const uuid_t& uuid) noexcept;
-    outcome::result<void> assign_fields(std::string_view data) noexcept;
+    void assign_fields(const db::Folder &item) noexcept;
 
     std::string id;
     device_ptr_t device;

@@ -9,7 +9,7 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder_info);
 
-outcome::result<folder_info_ptr_t> folder_info_t::create(std::string_view key, std::string_view data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept {
+outcome::result<folder_info_ptr_t> folder_info_t::create(std::string_view key, const db::FolderInfo &data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept {
     if (key.size() != data_length) {
         return make_error_code(error_code_t::invalid_folder_info_key_length);
     }
@@ -20,22 +20,16 @@ outcome::result<folder_info_ptr_t> folder_info_t::create(std::string_view key, s
     auto ptr = folder_info_ptr_t();
     ptr = new folder_info_t(key, device_, folder_);
 
-    auto r = ptr->assign_fields(data);
-    if (!r) {
-        return r.assume_error();
-    }
+    ptr->assign_fields(data);
 
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<folder_info_ptr_t> folder_info_t::create(const uuid_t& uuid, std::string_view data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept {
+outcome::result<folder_info_ptr_t> folder_info_t::create(const uuid_t& uuid, const db::FolderInfo &data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept {
     auto ptr = folder_info_ptr_t();
     ptr = new folder_info_t(uuid, device_, folder_);
 
-    auto r = ptr->assign_fields(data);
-    if (!r) {
-        return r.assume_error();
-    }
+    ptr->assign_fields(data);
 
     return outcome::success(std::move(ptr));
 }
@@ -60,15 +54,9 @@ folder_info_t::folder_info_t(const uuid_t& uuid, const device_ptr_t &device_, co
 
 folder_info_t::~folder_info_t() {}
 
-outcome::result<void> folder_info_t::assign_fields(std::string_view data) noexcept {
-    db::FolderInfo fi;
-    auto ok = fi.ParseFromArray(data.data(), data.size());
-    if (!ok) {
-        return make_error_code(error_code_t::folder_info_deserialization_failure);
-    }
+void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
     index = fi.index_id();
     max_sequence = fi.max_sequence();
-    return outcome::success();
 }
 
 std::string_view folder_info_t::get_key() noexcept {
