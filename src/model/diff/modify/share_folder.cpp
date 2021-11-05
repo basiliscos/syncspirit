@@ -18,7 +18,7 @@ auto share_folder_t::apply(cluster_t &cluster) const noexcept -> outcome::result
         return make_error_code(error_code_t::device_does_not_exist);
     }
 
-    auto folder_info = folder->get_folder_info(peer);
+    auto folder_info = folder->get_folder_infos().by_device(peer);
     if (folder_info) {
         return make_error_code(error_code_t::folder_is_already_shared);
     }

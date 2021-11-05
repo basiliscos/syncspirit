@@ -3,6 +3,8 @@
 #include "access.h"
 #include "model/cluster.h"
 #include "model/diff/modify/create_folder.h"
+#include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/update_peer.h"
 #include "model/diff/diff_visitor.h"
 
 using namespace syncspirit;
@@ -31,13 +33,12 @@ TEST_CASE("cluster modifications from ui", "[model]") {
     cluster->get_devices().put(peer_device);
 
     auto& folders = cluster->get_folders();
+    db::Folder db_folder;
+    db_folder.set_id("1234-5678");
+    db_folder.set_label("my-label");
+    db_folder.set_path("/my/path");
 
     SECTION("folder creation") {
-        db::Folder db_folder;
-        db_folder.set_id("1234-5678");
-        db_folder.set_label("my-label");
-        db_folder.set_path("/my/path");
-
         SECTION("simple") {
             auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
             REQUIRE(diff->apply(*cluster));
@@ -78,4 +79,28 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         }
     }
 
+    SECTION("share folder") {
+        auto diff_create = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
+        REQUIRE(diff_create->apply(*cluster));
+        auto diff_share = diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id()));
+        REQUIRE(diff_share->apply(*cluster));
+
+        auto folder = folders.by_id(db_folder.id());
+        REQUIRE(folder);
+        auto fi_peer = folder->get_folder_infos().by_device(peer_device);
+        REQUIRE(fi_peer);
+        CHECK(fi_peer->get_device() == peer_device);
+        CHECK(fi_peer->get_max_sequence() == 0);
+        CHECK(fi_peer->get_index() != 0);
+    }
+
+    SECTION("update peer") {
+        db::Device db;
+        db.set_name("myyy-devices");
+        db.set_cert_name("cn2");
+        auto diff = diff::cluster_diff_ptr_t(new diff::modify::update_peer_t(db, my_id.get_sha256()));
+        REQUIRE(diff->apply(*cluster));
+        CHECK(my_device->get_name() == "myyy-devices");
+        CHECK(my_device->get_cert_name() == "cn2");
+    }
 }
