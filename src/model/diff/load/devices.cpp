@@ -4,7 +4,7 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto devices_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto devices_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto& device_map = cluster.get_devices();
     auto& local_device = cluster.get_device();
     for(auto& pair:devices) {

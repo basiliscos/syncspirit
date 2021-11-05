@@ -51,6 +51,10 @@ add_executable(015-logger 015-logger.cpp)
 target_link_libraries(015-logger syncspirit_test_lib)
 add_test(015-logger "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/015-logger")
 
+add_executable(029-diff-generic 029-diff-generic.cpp)
+target_link_libraries(029-diff-generic syncspirit_test_lib)
+add_test(029-diff-generic "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/029-diff-generic")
+
 add_executable(030-diff-load-cluster 030-diff-load-cluster.cpp)
 target_link_libraries(030-diff-load-cluster syncspirit_test_lib)
 add_test(030-diff-load-cluster "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/030-diff-load-cluster")

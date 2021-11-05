@@ -12,12 +12,16 @@ namespace peer {
 
 namespace modify {
     struct create_folder_t;
+    struct share_folder_t;
+    struct update_peer_t;
 }
 
 struct diff_visitor_t {
     virtual ~diff_visitor_t();
     virtual outcome::result<void> operator()(const peer::cluster_update_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::create_folder_t &) noexcept;
+    virtual outcome::result<void> operator()(const modify::share_folder_t &) noexcept;
+    virtual outcome::result<void> operator()(const modify::update_peer_t &) noexcept;
 };
 
 } // namespace syncspirit::model::diff

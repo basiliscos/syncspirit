@@ -5,7 +5,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-auto share_folder_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto &folders = cluster.get_folders();
     auto folder = folders.by_id(folder_id);
     if (!folder) {

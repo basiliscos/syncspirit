@@ -9,7 +9,7 @@ struct close_tranaction_t final : cluster_diff_t {
     close_tranaction_t(db::transaction_t txn) noexcept;
     ~close_tranaction_t() noexcept;
 
-    outcome::result<void> apply(cluster_t&) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t&) const noexcept override;
 
     db::transaction_t txn;
 };

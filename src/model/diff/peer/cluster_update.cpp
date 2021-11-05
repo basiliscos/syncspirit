@@ -53,7 +53,7 @@ unknown_folders{std::move(unknown_folders)}, reset_folders{std::move(reset_folde
 }
 
 
-auto cluster_update_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto& folders = cluster.get_folders();
 
     for(auto& info: updated_folders) {

@@ -2,7 +2,7 @@
 
 using namespace syncspirit::model::diff;
 
-auto aggregate_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto aggregate_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     for (auto &diff : diffs) {
         auto r = diff->apply(cluster);
         if (!r) {

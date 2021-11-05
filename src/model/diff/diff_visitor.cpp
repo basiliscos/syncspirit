@@ -11,3 +11,11 @@ auto diff_visitor_t::operator ()(const peer::cluster_update_t &) noexcept -> out
 auto diff_visitor_t::operator()(const modify::create_folder_t &) noexcept -> outcome::result<void>  {
     return outcome::success();
 }
+
+auto diff_visitor_t::operator()(const modify::share_folder_t &) noexcept -> outcome::result<void>  {
+    return outcome::success();
+}
+
+auto diff_visitor_t::operator()(const modify::update_peer_t &) noexcept -> outcome::result<void>  {
+    return outcome::success();
+}

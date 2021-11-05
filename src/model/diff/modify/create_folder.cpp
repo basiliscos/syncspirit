@@ -4,7 +4,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-auto create_folder_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto create_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto &folders = cluster.get_folders();
     auto prev_folder = folders.by_id(item.id());
     if (prev_folder) {

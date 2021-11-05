@@ -51,6 +51,8 @@ struct cluster_t final : arc_base_t<cluster_t> {
     const folders_map_t &get_folders() const noexcept;
     uuid_t next_uuid() noexcept;
     uint64_t next_uint64() noexcept;
+    inline bool is_tainted() const noexcept { return tainted; }
+    inline void mark_tainted() noexcept { tainted = true; }
 
   private:
     using rng_engine_t = std::mt19937;
@@ -67,6 +69,7 @@ struct cluster_t final : arc_base_t<cluster_t> {
     devices_map_t devices;
     ignored_devices_map_t ignored_devices;
     ignored_folders_map_t ignored_folders;
+    bool tainted = false;
 
     friend class file_interator_t;
 };

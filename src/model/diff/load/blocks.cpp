@@ -4,7 +4,7 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto blocks_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto blocks_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto& blocks_map = cluster.get_blocks();
     for(auto& pair:blocks) {
         auto data = pair.value;

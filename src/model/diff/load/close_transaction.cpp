@@ -7,7 +7,7 @@ close_tranaction_t::close_tranaction_t(db::transaction_t txn_) noexcept: txn{std
 
 }
 
-auto close_tranaction_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto close_tranaction_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     return outcome::success();
 }
 

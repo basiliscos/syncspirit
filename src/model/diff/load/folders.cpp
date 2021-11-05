@@ -4,7 +4,7 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto folders_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto& map = cluster.get_folders();
     for(auto& pair:folders) {
         auto data = pair.value;

@@ -5,7 +5,7 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto folder_infos_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     static const constexpr char folder_prefix = (char)(db::prefix::folder);
     static const constexpr char device_prefix = (char)(db::prefix::device);
 
