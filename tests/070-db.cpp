@@ -165,6 +165,7 @@ void test_folder_creation() {
 
             auto folder = cluster->get_folders().by_id(db_folder.id());
             REQUIRE(folder);
+            REQUIRE(folder->get_folder_infos().by_device(cluster->get_device()));
 
             sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
@@ -177,6 +178,8 @@ void test_folder_creation() {
             REQUIRE(folder.get() != folder_clone.get());
             REQUIRE(folder_clone->get_label() == db_folder.label());
             REQUIRE(folder_clone->get_path().string() == db_folder.path());
+            REQUIRE(folder_clone->get_folder_infos().size() == 1);
+            REQUIRE(folder_clone->get_folder_infos().by_device(cluster->get_device()));
         }
     };
 

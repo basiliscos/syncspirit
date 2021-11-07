@@ -189,8 +189,8 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) no
     auto& folder_id = diff.item.id();
     auto folder = cluster->get_folders().by_id(folder_id);
     assert(folder);
-    auto key = folder->get_key();
-    auto data = folder->serialize();
+    auto f_key = folder->get_key();
+    auto f_data = folder->serialize();
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
     if (!txn_opt) {
@@ -198,7 +198,15 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) no
     }
     auto &txn = txn_opt.value();
 
-    auto r = db::save({key, data}, txn);
+    auto r = db::save({f_key, f_data}, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    auto folder_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto fi_key = folder_info->get_key();
+    auto fi_data = folder_info->serialize();
+    r = db::save({fi_key, fi_data}, txn);
     if (!r) {
         return r.assume_error();
     }
