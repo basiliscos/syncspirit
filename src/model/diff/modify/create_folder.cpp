@@ -6,6 +6,7 @@
 using namespace syncspirit::model::diff::modify;
 
 auto create_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    LOG_TRACE(log, "applyging create_folder_t, folder_id: {}", item.id());
     auto &folders = cluster.get_folders();
     auto prev_folder = folders.by_id(item.id());
     if (prev_folder) {
@@ -29,29 +30,8 @@ auto create_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     }
     auto& fi_my = fi_my_opt.value();
 
-    auto fi_source = folder_info_ptr_t();
-    if (!source_device.empty()) {
-        auto& devices = cluster.get_devices();
-        auto source = devices.by_sha256(source_device);
-        if (!source) {
-            return make_error_code(error_code_t::source_device_not_exists);
-        }
-        db::FolderInfo db_fi_source;
-        db_fi_source.set_index_id(source_index);
-        db_fi_source.set_max_sequence(source_max_sequence);
-
-        auto fi_source_opt = folder_info_t::create(cluster.next_uuid(), db_fi_source, source, folder);
-        if (!fi_source_opt) {
-            return fi_source_opt.assume_error();
-        }
-        fi_source = std::move(fi_source_opt.value());
-    }
-
     auto& folder_infos = folder->get_folder_infos();
     folder_infos.put(fi_my);
-    if (fi_source) {
-        folder_infos.put(fi_source);
-    }
     folders.put(folder);
     folder->assign_cluster(&cluster);
 
@@ -59,5 +39,6 @@ auto create_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
 }
 
 auto create_folder_t::visit(diff_visitor_t &visitor) const noexcept -> outcome::result<void> {
+    LOG_TRACE(log, "visiting create_folder_t");
     return visitor(*this);
 }

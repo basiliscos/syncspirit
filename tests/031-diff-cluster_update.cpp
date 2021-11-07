@@ -34,16 +34,17 @@ TEST_CASE("cluster update, new folder", "[model]") {
 
     SECTION("unknown folder") {
         auto cc = std::make_unique<proto::ClusterConfig>();
-        auto folder = cc->add_folders();
-        folder->set_id("some-id");
-        folder->set_label("some-label");
-        auto d_peer = folder->add_devices();
+        auto folder_ptr = cc->add_folders();
+        folder_ptr->set_id("some-id");
+        folder_ptr->set_label("some-label");
+        auto d_peer = folder_ptr->add_devices();
         d_peer->set_id(std::string(peer_id.get_sha256()));
         d_peer->set_name(std::string(peer_device->get_name()));
         d_peer->set_max_sequence(10);
         d_peer->set_index_id(22ul);
 
 
+        auto folder = *folder_ptr;
         auto diff_opt = diff::peer::cluster_update_t::create(*cluster, peer_device, std::move(cc));
         REQUIRE(diff_opt);
 
@@ -59,8 +60,8 @@ TEST_CASE("cluster update, new folder", "[model]") {
         auto r_v = diff->visit(visitor);
         REQUIRE(r_v);
         REQUIRE(unknown.size() == 1);
-        REQUIRE(unknown[0].id() == folder->id());
-        REQUIRE(unknown[0].label() == folder->label());
+        REQUIRE(unknown[0].id() == folder.id());
+        REQUIRE(unknown[0].label() == folder.label());
     }
 
     SECTION("existing folder") {

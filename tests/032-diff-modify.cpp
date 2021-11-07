@@ -39,44 +39,19 @@ TEST_CASE("cluster modifications from ui", "[model]") {
     db_folder.set_path("/my/path");
 
     SECTION("folder creation") {
-        SECTION("simple") {
-            auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-            REQUIRE(diff->apply(*cluster));
-            auto folder = folders.by_id(db_folder.id());
-            REQUIRE(folder);
-            CHECK(folder->get_id() == db_folder.id());
-            CHECK(folder->get_label() == db_folder.label());
-            CHECK(folder->get_path() == db_folder.path());
-            CHECK(folder->get_cluster() == cluster);
+        auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
+        REQUIRE(diff->apply(*cluster));
+        auto folder = folders.by_id(db_folder.id());
+        REQUIRE(folder);
+        CHECK(folder->get_id() == db_folder.id());
+        CHECK(folder->get_label() == db_folder.label());
+        CHECK(folder->get_path() == db_folder.path());
+        CHECK(folder->get_cluster() == cluster);
 
-            auto fi = folder->get_folder_infos().by_device(my_device);
-            REQUIRE(fi);
-            CHECK(fi->get_max_sequence() == 0);
-            CHECK(fi->get_index() != 0);
-        }
-
-        SECTION("with prototype") {
-            auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder, peer_id.get_sha256(), 123, 4));
-            REQUIRE(diff->apply(*cluster));
-            auto folder = folders.by_id(db_folder.id());
-            REQUIRE(folder);
-            CHECK(folder->get_id() == db_folder.id());
-            CHECK(folder->get_label() == db_folder.label());
-            CHECK(folder->get_path() == db_folder.path());
-            CHECK(folder->get_cluster() == cluster);
-
-            auto fi_my = folder->get_folder_infos().by_device(my_device);
-            REQUIRE(fi_my);
-            CHECK(fi_my->get_device() == my_device);
-            CHECK(fi_my->get_max_sequence() == 0);
-            CHECK(fi_my->get_index() != 0);
-
-            auto fi_peer = folder->get_folder_infos().by_device(peer_device);
-            REQUIRE(fi_peer);
-            CHECK(fi_peer->get_device() == peer_device);
-            CHECK(fi_peer->get_max_sequence() == 4);
-            CHECK(fi_peer->get_index() == 123);
-        }
+        auto fi = folder->get_folder_infos().by_device(my_device);
+        REQUIRE(fi);
+        CHECK(fi->get_max_sequence() == 0);
+        CHECK(fi->get_index() != 0);
     }
 
     SECTION("share folder") {
@@ -91,7 +66,6 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         REQUIRE(fi_peer);
         CHECK(fi_peer->get_device() == peer_device);
         CHECK(fi_peer->get_max_sequence() == 0);
-        CHECK(fi_peer->get_index() != 0);
     }
 
     SECTION("update peer") {

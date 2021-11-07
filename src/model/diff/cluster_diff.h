@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base.h"
+#include "utils/log.h"
 #include <boost/outcome.hpp>
 
 namespace syncspirit::model {
@@ -14,12 +15,14 @@ namespace diff {
 struct diff_visitor_t;
 
 struct cluster_diff_t : base_t {
+    cluster_diff_t() noexcept;
     virtual ~cluster_diff_t();
     virtual outcome::result<void> visit(diff_visitor_t &) const noexcept;
     outcome::result<void> apply(cluster_t &) const noexcept;
 
     protected:
     virtual outcome::result<void> apply_impl(cluster_t &) const noexcept = 0;
+    utils::logger_t log;
 };
 
 using cluster_diff_ptr_t = boost::intrusive_ptr<cluster_diff_t>;

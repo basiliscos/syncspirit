@@ -20,14 +20,17 @@ auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
         if (!device_opt) {
             return device_opt.assume_error();
         }
-        devices.put(std::move(device_opt.assume_value()));
+        peer = device_opt.assume_value();
+        devices.put(peer);
     } else {
         peer->update(item);
     }
+    LOG_TRACE(log, "applyging update_peer_t, device {}", peer->device_id());
 
     return outcome::success();
 }
 
 auto update_peer_t::visit(diff_visitor_t &visitor) const noexcept -> outcome::result<void> {
+    LOG_TRACE(log, "visiting update_peer_t");
     return visitor(*this);
 }

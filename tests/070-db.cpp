@@ -4,6 +4,7 @@
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/update_peer.h"
+#include "model/diff/aggregate.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -215,10 +216,57 @@ void test_peer_updating() {
     F().run();
 }
 
+void test_folder_sharing() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto sha256 = peer_device->device_id().get_sha256();
+            db::Device db_device;
+            db_device.set_cert_name("some-cn");
+            db_device.set_name("some_name");
+            db_device.set_auto_accept(true);
+
+            auto diffs = diff::aggregate_t::diffs_t{};
+            diffs.push_back(new diff::modify::update_peer_t(db_device, sha256));
+
+            db::Folder db_folder;
+            db_folder.set_id("1234-5678");
+            db_folder.set_label("my-label");
+            db_folder.set_path("/my/path");
+            diffs.push_back(new diff::modify::create_folder_t(db_folder));
+
+            diffs.push_back(new diff::modify::share_folder_t(sha256, db_folder.id(), 5));
+
+            auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
+            sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->do_process();
+            CHECK(static_cast<r::actor_base_t*>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            auto cluster_clone = make_cluster();
+            REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+
+            auto peer_device = cluster_clone->get_devices().by_sha256(sha256);
+            REQUIRE(peer_device);
+            auto folder = cluster_clone->get_folders().by_id(db_folder.id());
+            REQUIRE(folder);
+            REQUIRE(folder->get_folder_infos().size() == 2);
+            auto fi = folder->get_folder_infos().by_device(peer_device);
+            REQUIRE(fi);
+            CHECK(fi->get_index() == 5);
+            CHECK(fi->get_max_sequence() == 0);
+        }
+    };
+
+    F().run();
+}
+
 REGISTER_TEST_CASE(test_db_migration, "test_db_migration", "[db]");
 REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
 REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
 REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
+REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
 
 
 #if 0

@@ -3,6 +3,10 @@
 
 using namespace syncspirit::model::diff;
 
+cluster_diff_t::cluster_diff_t() noexcept {
+    log = utils::get_logger("model");
+}
+
 cluster_diff_t::~cluster_diff_t() {
 
 }

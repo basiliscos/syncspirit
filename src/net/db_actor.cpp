@@ -15,6 +15,7 @@
 #include "../model/diff/load/ignored_devices.h"
 #include "../model/diff/load/ignored_folders.h"
 #include "../model/diff/modify/create_folder.h"
+#include "../model/diff/modify/share_folder.h"
 #include "../model/diff/modify/update_peer.h"
 #include "../model/diff/diff_visitor.h"
 
@@ -215,7 +216,32 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) no
     return outcome::success();
 }
 
-auto db_actor_t::operator()(const model::diff::modify::share_folder_t &) noexcept -> outcome::result<void>  {
+auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff) noexcept -> outcome::result<void>  {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto peer = cluster->get_devices().by_sha256(diff.peer_id);
+    assert(peer);
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    assert(folder);
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = txn_opt.value();
+
+    auto folder_info = folder->get_folder_infos().by_device(peer);
+    assert(folder_info);
+
+    auto fi_key = folder_info->get_key();
+    auto fi_data = folder_info->serialize();
+    auto r = db::save({fi_key, fi_data}, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return outcome::success();
 }
 
