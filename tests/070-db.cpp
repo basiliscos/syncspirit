@@ -43,7 +43,12 @@ struct fixture_t {
     }
 
     virtual supervisor_t::configure_callback_t configure() noexcept {
-        return [](r::plugin::plugin_base_t &){};
+        return [&](r::plugin::plugin_base_t &plugin){
+            plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+                p.subscribe_actor(r::lambda<msg_t>(
+                    [&](msg_t &msg) { reply = &msg; }));
+            });
+        };
     }
 
 
@@ -117,14 +122,6 @@ void test_db_migration() {
 
 void test_loading_empty_db() {
     struct F : fixture_t {
-        supervisor_t::configure_callback_t configure() noexcept override {
-            return [&](r::plugin::plugin_base_t &plugin){
-                plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                    p.subscribe_actor(r::lambda<msg_t>(
-                        [&](msg_t &msg) { reply = &msg; }));
-                });
-            };
-        }
 
         void main() noexcept override {
             sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
@@ -145,15 +142,6 @@ void test_loading_empty_db() {
 
 void test_folder_creation() {
     struct F : fixture_t {
-        supervisor_t::configure_callback_t configure() noexcept override {
-            return [&](r::plugin::plugin_base_t &plugin){
-                plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                    p.subscribe_actor(r::lambda<msg_t>(
-                        [&](msg_t &msg) { reply = &msg; }));
-                });
-            };
-        }
-
         void main() noexcept override {
             db::Folder db_folder;
             db_folder.set_id("1234-5678");
