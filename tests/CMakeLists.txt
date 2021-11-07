@@ -15,7 +15,7 @@ add_library(syncspirit_test_lib
 #    sample_db.cpp
 #    sample_peer.cpp
     test_supervisor.cpp
-#    test-db.cpp
+    test-db.cpp
     test-main.cpp
 )
 target_link_libraries(syncspirit_test_lib syncspirit_lib)

@@ -1,6 +1,6 @@
 #include "catch.hpp"
 #include "test-utils.h"
-///#include "test-db.h"
+//#include "test-db.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/update_peer.h"
@@ -19,6 +19,17 @@ using namespace syncspirit::model;
 using namespace syncspirit::net;
 
 namespace fs = boost::filesystem;
+
+namespace {
+struct env {};
+} // namespace
+
+namespace syncspirit::net {
+
+template <> inline auto &db_actor_t::access<env>() noexcept { return env; }
+
+} // namespace syncspirit::net
+
 
 namespace  {
 
@@ -58,10 +69,10 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t*>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        auto db = sup->create_actor<db_actor_t>().cluster(cluster).db_dir(root_path.string()).timeout(timeout).finish();
+        db_actor = sup->create_actor<db_actor_t>().cluster(cluster).db_dir(root_path.string()).timeout(timeout).finish();
         sup->do_process();
-        CHECK(static_cast<r::actor_base_t*>(db.get())->access<to::state>() == r::state_t::OPERATIONAL);
-        db_addr = db->get_address();
+        CHECK(static_cast<r::actor_base_t*>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        db_addr = db_actor->get_address();
         main();
         reply.reset();
 
@@ -72,13 +83,13 @@ struct fixture_t {
     }
 
     virtual void main() noexcept {
-        //todo, check my device existance DB.
     }
 
     r::address_ptr_t db_addr;
     r::pt::time_duration timeout = r::pt::millisec{10};
     cluster_ptr_t cluster;
     r::intrusive_ptr_t<supervisor_t> sup;
+    r::intrusive_ptr_t<net::db_actor_t> db_actor;
     bfs::path root_path;
     path_guard_t path_quard;
     r::system_context_t ctx;
@@ -88,7 +99,19 @@ struct fixture_t {
 }
 
 void test_db_migration() {
-    struct F : fixture_t { };
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto& db_env = db_actor->access<env>();
+            auto txn_opt = db::make_transaction(db::transaction_type_t::RW, db_env);
+            REQUIRE(txn_opt);
+            auto& txn = txn_opt.value();
+            auto load_opt = db::load(db::prefix::device, txn);
+            REQUIRE(load_opt);
+            auto& values = load_opt.value();
+            REQUIRE(values.size() == 1);
+
+        }
+    };
     F().run();
 }
 
@@ -110,6 +133,10 @@ void test_loading_empty_db() {
 
             auto diff = reply->payload.res.diff;
             REQUIRE(diff->apply(*cluster));
+
+            auto devices = cluster->get_devices();
+            REQUIRE(devices.size() == 1);
+            REQUIRE(devices.by_sha256(cluster->get_device()->device_id().get_sha256()));
         }
     };
 
