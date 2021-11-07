@@ -14,6 +14,8 @@
 #include "../model/diff/load/folders.h"
 #include "../model/diff/load/ignored_devices.h"
 #include "../model/diff/load/ignored_folders.h"
+#include "../model/diff/modify/create_folder.h"
+#include "../model/diff/diff_visitor.h"
 
 namespace syncspirit::net {
 
@@ -25,7 +27,7 @@ r::plugin::resource_id_t db = 0;
 } // namespace
 
 db_actor_t::db_actor_t(config_t &config)
-    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir} {
+    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, cluster{config.cluster} {
     log = utils::get_logger("net.db");
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
@@ -43,22 +45,25 @@ db_actor_t::~db_actor_t() {
 void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::db, false); });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::db, get_address()); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.register_name(names::db, get_address());
+        p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&db_actor_t::on_model_update, coordinator);
+            }
+        });
+    });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         open();
         p.subscribe_actor(&db_actor_t::on_cluster_load);
-        p.subscribe_actor(&db_actor_t::on_store_ignored_device);
-        p.subscribe_actor(&db_actor_t::on_store_device);
-        p.subscribe_actor(&db_actor_t::on_store_ignored_folder);
-        p.subscribe_actor(&db_actor_t::on_store_new_folder);
-        p.subscribe_actor(&db_actor_t::on_store_folder);
-        p.subscribe_actor(&db_actor_t::on_store_folder_info);
-        p.subscribe_actor(&db_actor_t::on_store_file);
     });
 }
 
 void db_actor_t::open() noexcept {
     resources->acquire(resource::db);
+    auto& my_device = cluster->get_device();
     auto flags = MDBX_WRITEMAP | MDBX_COALESCE | MDBX_LIFORECLAIM | MDBX_EXCLUSIVE;
     auto r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
     if (r != MDBX_SUCCESS) {
@@ -82,14 +87,15 @@ void db_actor_t::open() noexcept {
     auto version = db_ver.value();
     LOG_DEBUG(log, "got db version: {}, expected : {} ", version, db::version);
 
-    txn = db::make_transaction(db::transaction_type_t::RW, env);
+
     if (!txn) {
         LOG_ERROR(log, "{}, open, cannot create transaction {}", identity, txn.error().message());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
     if (db_ver.value() != db::version) {
-        auto r = db::migrate(version, device, txn.value());
+        txn = db::make_transaction(db::transaction_type_t::RW, txn.value());
+        auto r = db::migrate(version, my_device, txn.value());
         if (!r) {
             LOG_ERROR(log, "{}, open, cannot migrate db {}", identity, r.error().message());
             resources->release(resource::db);
@@ -158,12 +164,55 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     container.emplace_back(new load::folders_t(std::move(folders_opt.value())));
     container.emplace_back(new load::folder_infos_t(std::move(folder_infos_opt.value())));
     container.emplace_back(new load::file_infos_t(std::move(file_infos_opt.value())));
-    container.emplace_back(new load::close_tranaction_t(std::move(txn)));
+    container.emplace_back(new load::close_transaction_t(std::move(txn)));
 
     cluster_diff_ptr_t r = cluster_diff_ptr_t(new aggregate_t(std::move(container)));
 
     reply_to(request, r);
 }
+
+void db_actor_t::on_model_update(message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_model_update", identity);
+    auto& diff = *message.payload.diff;
+    auto r = diff.visit(*this);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+}
+
+
+auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) noexcept -> outcome::result<void>  {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+    auto& folder_id = diff.item.id();
+    auto folder = cluster->get_folders().by_id(folder_id);
+    assert(folder);
+    auto key = folder->get_key();
+    auto data = folder->serialize();
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = txn_opt.value();
+
+    auto r = db::save({key, data}, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return outcome::success();
+}
+auto db_actor_t::operator()(const model::diff::modify::share_folder_t &) noexcept -> outcome::result<void>  {
+    return outcome::success();
+}
+
+auto db_actor_t::operator()(const model::diff::modify::update_peer_t &) noexcept -> outcome::result<void>  {
+    return outcome::success();
+}
+
 
 #if 0
 void db_actor_t::on_store_ignored_device(message::store_ignored_device_request_t &message) noexcept {

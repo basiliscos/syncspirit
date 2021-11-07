@@ -12,6 +12,7 @@ struct create_folder_t final : cluster_diff_t {
         item{std::forward<T>(item_)}, source_device{source_device_}, source_index{source_index_},  source_max_sequence{source_max_sequence_} {}
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> visit(diff_visitor_t &) const noexcept override;
 
     db::Folder item;
     std::string source_device;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages.h"
+#include "model/diff/diff_visitor.h"
 #include "mdbx.h"
 #include "../utils/log.h"
 #include "../db/transaction.h"
@@ -13,7 +14,7 @@ namespace outcome = boost::outcome_v2;
 
 struct db_actor_config_t : r::actor_config_t {
     std::string db_dir;
-    model::device_ptr_t device;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Actor> struct db_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -26,13 +27,13 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&device(const model::device_ptr_t &value) &&noexcept {
-        parent_t::config.device = value;
+    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+        parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
 
-struct db_actor_t : public r::actor_base_t {
+struct db_actor_t : public r::actor_base_t, private model::diff::diff_visitor_t {
     using config_t = db_actor_config_t;
     template <typename Actor> using config_builder_t = db_actor_config_builder_t<Actor>;
 
@@ -47,21 +48,19 @@ struct db_actor_t : public r::actor_base_t {
 
   private:
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
-    void on_store_ignored_device(message::store_ignored_device_request_t &message) noexcept;
-    void on_store_device(message::store_device_request_t &message) noexcept;
-    void on_store_folder_info(message::store_folder_info_request_t &message) noexcept;
-    void on_store_ignored_folder(message::store_ignored_folder_request_t &message) noexcept;
-    void on_store_new_folder(message::store_new_folder_request_t &message) noexcept;
-    void on_store_folder(message::store_folder_request_t &message) noexcept;
-    void on_store_file(message::store_file_request_t &message) noexcept;
-
+    void on_model_update(message::model_update_t &message) noexcept;
     void open() noexcept;
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;
 
+    outcome::result<void> operator()(const model::diff::modify::create_folder_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::share_folder_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::update_peer_t &) noexcept override;
+
+    r::address_ptr_t coordinator;
     utils::logger_t log;
     MDBX_env *env;
     std::string db_dir;
-    model::device_ptr_t device;
+    model::cluster_ptr_t cluster;
 };
 
 } // namespace net

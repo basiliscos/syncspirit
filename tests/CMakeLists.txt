@@ -14,7 +14,7 @@ add_library(syncspirit_test_lib
 #    fixture.cpp
 #    sample_db.cpp
 #    sample_peer.cpp
-#    test_supervisor.cpp
+    test_supervisor.cpp
 #    test-db.cpp
     test-main.cpp
 )

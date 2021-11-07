@@ -125,6 +125,23 @@ outcome::result<container_t> load(discr_t prefix, transaction_t &txn) noexcept {
     return outcome::success(std::move(container));
 }
 
+outcome::result<void> save(const pair_t& container, transaction_t &txn) noexcept {
+    MDBX_val key;
+    key.iov_base = (void*)container.key.data();
+    key.iov_len = container.key.size();
+
+    MDBX_val value;
+    value.iov_base = (void*)container.value.data();
+    value.iov_len = container.value.size();
+
+    auto r = mdbx_put(txn.txn, txn.dbi, &key, &value, MDBX_UPSERT);
+    if (r != MDBX_SUCCESS) {
+        return make_error_code(r);
+    }
+    return outcome::success();
+}
+
+
 #if 0
 
 using ignored_device_t = model::device_id_t;

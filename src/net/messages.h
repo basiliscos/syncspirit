@@ -345,6 +345,11 @@ struct folder_update_t {
     model::folder_ptr_t folder;
 };
 
+struct model_update_t {
+    model::diff::cluster_diff_ptr_t diff;
+    const void* custom;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -379,6 +384,10 @@ using connection_notify_t = r::message_t<payload::connection_notify_t>;
 
 using auth_request_t = r::request_traits_t<payload::auth_request_t>::request::message_t;
 using auth_response_t = r::request_traits_t<payload::auth_request_t>::response::message_t;
+
+using model_update_t = r::message_t<payload::model_update_t>;
+// remove below
+
 
 using store_ignored_device_request_t = r::request_traits_t<payload::store_ignored_device_request_t>::request::message_t;
 using store_ignored_device_response_t =

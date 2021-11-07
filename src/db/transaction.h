@@ -38,9 +38,8 @@ struct transaction_t {
         : txn{txn_}, dbi{dbi_}, type{type_} {}
 };
 
-inline outcome::result<transaction_t> make_transaction(transaction_type_t type, MDBX_env *env_) noexcept {
-    return transaction_t::make(type, env_);
-}
+outcome::result<transaction_t> make_transaction(transaction_type_t type, MDBX_env *env_) noexcept;
+outcome::result<transaction_t> make_transaction(transaction_type_t type, transaction_t& prev) noexcept;
 
 } // namespace db
 } // namespace syncspirit

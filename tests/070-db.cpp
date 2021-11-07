@@ -1,16 +1,167 @@
 #include "catch.hpp"
 #include "test-utils.h"
-#include "test-db.h"
+///#include "test-db.h"
+#include "model/diff/modify/create_folder.h"
+#include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/update_peer.h"
+#include "test_supervisor.h"
 #include "access.h"
 #include "model/cluster.h"
 #include "db/utils.h"
+#include "net/db_actor.h"
+#include "access.h"
 #include <boost/filesystem.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::db;
 using namespace syncspirit::test;
+using namespace syncspirit::model;
+using namespace syncspirit::net;
+
 namespace fs = boost::filesystem;
 
+namespace  {
+
+struct fixture_t {
+    using msg_t = message::load_cluster_response_t;
+    using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
+
+
+    fixture_t() noexcept: root_path{ bfs::unique_path() }, path_quard{root_path} {
+        utils::set_default("trace");
+    }
+
+    virtual supervisor_t::configure_callback_t configure() noexcept {
+        return [](r::plugin::plugin_base_t &){};
+    }
+
+
+    cluster_ptr_t make_cluster() noexcept {
+        auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+        auto my_device =  device_t::create(my_id, "my-device").value();
+        return cluster_ptr_t(new cluster_t(my_device, 1));
+    }
+
+    virtual void run() noexcept {
+        cluster = make_cluster();
+
+        auto root_path = bfs::unique_path();
+        bfs::create_directory(root_path);
+        auto root_path_guard = path_guard_t(root_path);
+
+        r::system_context_t ctx;
+        sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
+        sup->cluster = cluster;
+        sup->configure_callback = configure();
+
+        sup->start();
+        sup->do_process();
+        CHECK(static_cast<r::actor_base_t*>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+        auto db = sup->create_actor<db_actor_t>().cluster(cluster).db_dir(root_path.string()).timeout(timeout).finish();
+        sup->do_process();
+        CHECK(static_cast<r::actor_base_t*>(db.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        db_addr = db->get_address();
+        main();
+        reply.reset();
+
+        sup->shutdown();
+        sup->do_process();
+
+        CHECK(static_cast<r::actor_base_t*>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+    }
+
+    virtual void main() noexcept {
+        //todo, check my device existance DB.
+    }
+
+    r::address_ptr_t db_addr;
+    r::pt::time_duration timeout = r::pt::millisec{10};
+    cluster_ptr_t cluster;
+    r::intrusive_ptr_t<supervisor_t> sup;
+    bfs::path root_path;
+    path_guard_t path_quard;
+    r::system_context_t ctx;
+    msg_ptr_t reply;
+};
+
+}
+
+void test_db_migration() {
+    struct F : fixture_t { };
+    F().run();
+}
+
+void test_loading_empty_db() {
+    struct F : fixture_t {
+        supervisor_t::configure_callback_t configure() noexcept override {
+            return [&](r::plugin::plugin_base_t &plugin){
+                plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+                    p.subscribe_actor(r::lambda<msg_t>(
+                        [&](msg_t &msg) { reply = &msg; }));
+                });
+            };
+        }
+
+        void main() noexcept override {
+            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+
+            auto diff = reply->payload.res.diff;
+            REQUIRE(diff->apply(*cluster));
+        }
+    };
+
+    F().run();
+}
+
+void test_folder_creation() {
+    struct F : fixture_t {
+        supervisor_t::configure_callback_t configure() noexcept override {
+            return [&](r::plugin::plugin_base_t &plugin){
+                plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+                    p.subscribe_actor(r::lambda<msg_t>(
+                        [&](msg_t &msg) { reply = &msg; }));
+                });
+            };
+        }
+
+        void main() noexcept override {
+            db::Folder db_folder;
+            db_folder.set_id("1234-5678");
+            db_folder.set_label("my-label");
+            db_folder.set_path("/my/path");
+            auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
+            sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->do_process();
+
+            auto folder = cluster->get_folders().by_id(db_folder.id());
+            REQUIRE(folder);
+
+            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            auto cluster_clone = make_cluster();
+            REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+
+            auto folder_clone = cluster_clone->get_folders().by_id(folder->get_id());
+            REQUIRE(folder_clone);
+            REQUIRE(folder.get() != folder_clone.get());
+            REQUIRE(folder_clone->get_label() == db_folder.label());
+            REQUIRE(folder_clone->get_path().string() == db_folder.path());
+        }
+    };
+
+    F().run();
+}
+
+REGISTER_TEST_CASE(test_db_migration, "test_db_migration", "[db]");
+REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
+REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
+
+
+#if 0
 TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
     auto env = mk_env();
     auto txn = mk_txn(env, transaction_type_t::RW);
@@ -250,3 +401,4 @@ TEST_CASE("get db version & migrate 0 -> 1", "[db]") {
         }
     }
 }
+#endif
