@@ -15,6 +15,7 @@
 #include "../model/diff/load/ignored_devices.h"
 #include "../model/diff/load/ignored_folders.h"
 #include "../model/diff/modify/create_folder.h"
+#include "../model/diff/modify/update_peer.h"
 #include "../model/diff/diff_visitor.h"
 
 namespace syncspirit::net {
@@ -213,11 +214,34 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) no
 
     return outcome::success();
 }
+
 auto db_actor_t::operator()(const model::diff::modify::share_folder_t &) noexcept -> outcome::result<void>  {
     return outcome::success();
 }
 
-auto db_actor_t::operator()(const model::diff::modify::update_peer_t &) noexcept -> outcome::result<void>  {
+auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff) noexcept -> outcome::result<void>  {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto& device_id = diff.peer_id;
+    auto device = cluster->get_devices().by_sha256(device_id);
+    assert(device);
+
+    auto key = device->get_key();
+    auto data = device->serialize();
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = txn_opt.value();
+
+    auto r = db::save({key, data}, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return outcome::success();
 }
 

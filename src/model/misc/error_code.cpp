@@ -95,6 +95,9 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::folder_is_already_shared:
         r = "folder is already shared";
         break;
+    case error_code_t::malformed_deviceid:
+        r = "device id is malformed";
+        break;
     default:
         r = "unknown";
         break;

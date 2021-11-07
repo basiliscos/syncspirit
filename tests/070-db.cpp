@@ -55,6 +55,10 @@ struct fixture_t {
     cluster_ptr_t make_cluster() noexcept {
         auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
         auto my_device =  device_t::create(my_id, "my-device").value();
+
+        auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+        peer_device =  device_t::create(peer_id, "peer-device").value();
+
         return cluster_ptr_t(new cluster_t(my_device, 1));
     }
 
@@ -93,6 +97,7 @@ struct fixture_t {
     r::address_ptr_t db_addr;
     r::pt::time_duration timeout = r::pt::millisec{10};
     cluster_ptr_t cluster;
+    device_ptr_t peer_device;
     r::intrusive_ptr_t<supervisor_t> sup;
     r::intrusive_ptr_t<net::db_actor_t> db_actor;
     bfs::path root_path;
@@ -174,9 +179,46 @@ void test_folder_creation() {
     F().run();
 }
 
+void test_peer_updating() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto sha256 = peer_device->device_id().get_sha256();
+            db::Device db_device;
+            db_device.set_cert_name("some-cn");
+            db_device.set_name("some_name");
+            db_device.set_auto_accept(true);
+
+            auto diff = diff::cluster_diff_ptr_t(new diff::modify::update_peer_t(db_device, sha256));
+            sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->do_process();
+
+            auto device = cluster->get_devices().by_sha256(sha256);
+            REQUIRE(device);
+            CHECK(device->get_name() == "some_name");
+            CHECK(device->get_cert_name() == "some-cn");
+
+            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            auto cluster_clone = make_cluster();
+            REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+
+            REQUIRE(cluster_clone->get_devices().size() == 2);
+            auto device_clone = cluster_clone->get_devices().by_sha256(sha256);
+            REQUIRE(device_clone);
+            REQUIRE(device.get() != device_clone.get());
+            CHECK(device_clone->get_name() == "some_name");
+            CHECK(device_clone->get_cert_name() == "some-cn");
+        }
+    };
+
+    F().run();
+}
+
 REGISTER_TEST_CASE(test_db_migration, "test_db_migration", "[db]");
 REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
 REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
+REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
 
 
 #if 0

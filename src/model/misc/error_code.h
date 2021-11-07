@@ -34,6 +34,7 @@ enum class error_code_t {
     folder_does_not_exist,
     device_does_not_exist,
     folder_is_already_shared,
+    malformed_deviceid,
 };
 
 namespace detail {
@@ -45,12 +46,11 @@ class error_code_category_t : public boost::system::error_category {
 
 }
 
-inline boost::system::error_code make_error_code(error_code_t e) {
-    return {static_cast<int>(e), detail::error_code_category_t()};
-}
-
 const detail::error_code_category_t &error_code_category();
 
+inline boost::system::error_code make_error_code(error_code_t e) {
+    return {static_cast<int>(e), error_code_category()};
+}
 
 }
 

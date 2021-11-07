@@ -103,4 +103,15 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         CHECK(my_device->get_name() == "myyy-devices");
         CHECK(my_device->get_cert_name() == "cn2");
     }
+
+    SECTION("update peer // wrong decice_id") {
+        db::Device db;
+        db.set_name("myyy-devices");
+        db.set_cert_name("cn2");
+        auto diff = diff::cluster_diff_ptr_t(new diff::modify::update_peer_t(db, "wrong-sha256"));
+        auto r = diff->apply(*cluster);
+        REQUIRE(!r);
+        auto err = r.error();
+        CHECK(err.message() == "device id is malformed (28)");
+    }
 }
