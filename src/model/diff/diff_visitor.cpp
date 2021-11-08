@@ -8,6 +8,10 @@ auto diff_visitor_t::operator ()(const peer::cluster_update_t &) noexcept -> out
     return outcome::success();
 }
 
+auto diff_visitor_t::operator ()(const peer::peer_state_t &) noexcept -> outcome::result<void>  {
+    return outcome::success();
+}
+
 auto diff_visitor_t::operator()(const modify::create_folder_t &) noexcept -> outcome::result<void>  {
     return outcome::success();
 }

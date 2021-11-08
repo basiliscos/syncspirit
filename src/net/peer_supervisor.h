@@ -2,6 +2,7 @@
 
 #include "../config/bep.h"
 #include "messages.h"
+#include "model/diff/diff_visitor.h"
 #include "../utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
@@ -9,6 +10,8 @@
 
 namespace syncspirit {
 namespace net {
+
+namespace outcome = boost::outcome_v2;
 
 struct peer_supervisor_config_t : ra::supervisor_config_asio_t {
     std::string_view device_name;
@@ -38,7 +41,7 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
     }
 };
 
-struct peer_supervisor_t : public ra::supervisor_asio_t {
+struct peer_supervisor_t : public ra::supervisor_asio_t, private model::diff::diff_visitor_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = peer_supervisor_config_t;
     template <typename Actor> using config_builder_t = peer_supervisor_config_builder_t<Actor>;
@@ -50,12 +53,14 @@ struct peer_supervisor_t : public ra::supervisor_asio_t {
 
   private:
     using connect_ptr_t = r::intrusive_ptr_t<message::connect_request_t>;
-    using id2addr_t = std::map<model::device_id_t, r::address_ptr_t>;
-    using addr2id_t = std::map<r::address_ptr_t, model::device_id_t>;
+    using id2addr_t = std::map<std::string, r::address_ptr_t>;
+    using addr2id_t = std::map<r::address_ptr_t, std::string>;
     using addr2req_t = std::map<r::address_ptr_t, connect_ptr_t>;
 
     void on_connect_request(message::connect_request_t &msg) noexcept;
-    void on_connect_notify(message::connect_notify_t &msg) noexcept;
+    void on_model_update(net::message::model_update_t& ) noexcept;
+
+    outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
 
     utils::logger_t log;
     r::address_ptr_t coordinator;

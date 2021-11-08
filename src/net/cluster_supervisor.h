@@ -62,30 +62,20 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
 
     using device2addr_map_t = std::unordered_map<std::string, r::address_ptr_t>; // device_id: controller
     using addr2device_map_t = std::unordered_map<r::address_ptr_t, std::string>; // reverse
-    using create_folder_req_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
-    using share_folder_req_t = r::intrusive_ptr_t<ui::message::share_folder_request_t>;
     using scan_folders_map_t = std::unordered_map<bfs::path, scan_info_t>;
     using scan_foders_it = typename scan_folders_map_t::iterator;
 
-    void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
-    void on_share_folder(ui::message::share_folder_request_t &message) noexcept;
-    void on_update_peer(ui::message::update_peer_request_t &message) noexcept;
-    void on_connect(message::connect_notify_t &message) noexcept;
-    void on_disconnect(message::disconnect_notify_t &message) noexcept;
-    void on_store_device(message::store_device_response_t &message) noexcept;
-    void on_store_new_folder(message::store_new_folder_response_t &message) noexcept;
-    void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
     void on_scan_complete_initial(fs::message::scan_response_t &message) noexcept;
     void on_scan_complete_new(fs::message::scan_response_t &message) noexcept;
     scan_foders_it on_scan_complete(fs::message::scan_response_t &message) noexcept;
     void on_scan_error(fs::message::scan_error_t &message) noexcept;
     void on_file_update(message::file_update_notify_t &message) noexcept;
+    void on_model_update(message::model_update_t &message) noexcept;
     void scan(const model::folder_ptr_t &folder, r::address_ptr_t &via) noexcept;
 
     utils::logger_t log;
     r::address_ptr_t coordinator;
     r::address_ptr_t scan_addr;
-    r::address_ptr_t db;
     r::address_ptr_t scan_initial; // for routing
     r::address_ptr_t scan_new;     // for routing
     config::bep_config_t bep_config;
@@ -94,8 +84,6 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     model::folders_map_t &folders;
     device2addr_map_t device2addr_map;
     addr2device_map_t addr2device_map;
-    create_folder_req_t create_folder_req;
-    share_folder_req_t share_folder_req;
     scan_folders_map_t scan_folders_map;
 };
 

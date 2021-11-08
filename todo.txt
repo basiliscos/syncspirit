@@ -1,4 +1,5 @@
 - uuid model
+ -- add ignored device/folder
  -- убрать mark_modified()
 
 - make fs-actor smart (clone model)

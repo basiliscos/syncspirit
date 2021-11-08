@@ -53,6 +53,7 @@ add_library(syncspirit_lib
     src/model/diff/modify/create_folder.cpp
     src/model/diff/modify/share_folder.cpp
     src/model/diff/modify/update_peer.cpp
+    src/model/diff/peer/peer_state.cpp
     src/model/diff/peer/cluster_update.cpp
     src/model/misc/error_code.cpp
     src/model/misc/file_block.cpp

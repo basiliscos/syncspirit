@@ -2,6 +2,7 @@
 #include "peer_actor.h"
 #include "names.h"
 #include "../utils/error_code.h"
+#include "model/diff/peer/peer_state.h"
 
 using namespace syncspirit::net;
 
@@ -17,15 +18,21 @@ void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("peer_supervisor", false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::peers, get_address());
-        p.discover_name(names::coordinator, coordinator, true).link(false);
+        p.discover_name(names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&peer_supervisor_t::on_model_update, coordinator);
+            }
+        });
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&peer_supervisor_t::on_connect_request);
-        p.subscribe_actor(&peer_supervisor_t::on_connect_notify);
     });
 }
 
 void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
+    using namespace model::diff;
     auto &peer_addr = actor->get_address();
     auto &reason = actor->get_shutdown_reason();
     LOG_TRACE(log, "{}, on_child_shutdown, {} due to {} ", identity, actor->get_identity(), reason->message());
@@ -38,7 +45,9 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
         auto it = addr2id.find(peer_addr);
         assert(it != addr2id.end());
         auto &device_id = it->second;
-        send<payload::disconnect_notify_t>(coordinator, device_id, peer_addr);
+        auto diff = cluster_diff_ptr_t();
+        diff = new peer::peer_state_t(device_id, peer_addr, false);
+        send<payload::model_update_t>(coordinator, std::move(diff));
         auto it_id = id2addr.find(device_id);
         id2addr.erase(it_id);
         addr2id.erase(it);
@@ -84,12 +93,26 @@ void peer_supervisor_t::on_connect_request(message::connect_request_t &msg) noex
     addr2req.emplace(peer_addr, &msg);
 }
 
-void peer_supervisor_t::on_connect_notify(message::connect_notify_t &msg) noexcept {
-    auto &peer_addr = msg.payload.peer_addr;
-    auto &peer_id = msg.payload.peer_device_id;
-    addr2id.emplace(peer_addr, peer_id);
-    id2addr.emplace(peer_id, peer_addr);
-    auto it = addr2req.find(peer_addr);
-    reply_to(*it->second, peer_addr, peer_id, std::move(msg.payload.cluster_config));
-    addr2req.erase(it);
+void peer_supervisor_t::on_model_update(net::message::model_update_t& msg) noexcept {
+    LOG_TRACE(log, "{}, on_model_update", identity);
+    auto& diff = *msg.payload.diff;
+    auto r = diff.visit(*this);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
 }
+
+auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &state) noexcept -> outcome::result<void>{
+    if(state.online) {
+        auto &peer_addr = state.peer_addr;
+        auto &peer_id = state.peer_id;
+        addr2id.emplace(peer_addr, peer_id);
+        id2addr.emplace(peer_id, peer_addr);
+        auto it = addr2req.find(peer_addr);
+        reply_to(*it->second, peer_id);
+        addr2req.erase(it);
+    }
+    return outcome::success();
+}
+

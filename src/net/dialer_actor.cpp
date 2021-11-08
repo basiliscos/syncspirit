@@ -1,4 +1,5 @@
 #include "dialer_actor.h"
+#include "model/diff/peer/peer_state.h"
 #include "names.h"
 
 namespace syncspirit::net {
@@ -11,32 +12,22 @@ r::plugin::resource_id_t request = 1;
 } // namespace
 
 dialer_actor_t::dialer_actor_t(config_t &config)
-    : r::actor_base_t{config}, redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}},
-      device{config.device}, devices{config.devices} {
+    : r::actor_base_t{config}, redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}}
+      {
     log = utils::get_logger("net.acceptor");
-    online_map.emplace(device);
+    online_map.emplace(cluster->get_device());
 }
 
 void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("dialer", false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(net::names::cluster, cluster, true).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&dialer_actor_t::on_connect, cluster);
-                plugin->subscribe_actor(&dialer_actor_t::on_disconnect, cluster);
-            }
-        });
         p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&dialer_actor_t::on_announce, coordinator);
-                plugin->subscribe_actor(&dialer_actor_t::on_add, coordinator);
-                plugin->subscribe_actor(&dialer_actor_t::on_remove, coordinator);
-                plugin->subscribe_actor(&dialer_actor_t::on_update, coordinator);
+                plugin->subscribe_actor(&dialer_actor_t::on_model_update, coordinator);
             }
         });
         p.discover_name(names::global_discovery, global_discovery, true).link(true);
@@ -67,10 +58,11 @@ void dialer_actor_t::shutdown_start() noexcept {
 
 void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
     LOG_TRACE(log, "{}, on_announce", identity);
-    for (auto it : *devices) {
+    auto& devices = cluster->get_devices();
+    for (auto it : devices) {
         auto &d = it.item;
-        if (*d != *device) {
-            discover(it.item);
+        if (d != cluster->get_device()) {
+            discover(d);
         }
     }
 }
@@ -114,9 +106,10 @@ void dialer_actor_t::on_discovery(message::discovery_response_t &res) noexcept {
         return;
     }
 
+    auto& devices = cluster->get_devices();
     auto &ee = res.payload.ee;
     auto &peer_id = res.payload.req->payload.request_payload->device_id;
-    auto peer = devices->by_sha256(peer_id.get_sha256());
+    auto peer = devices.by_sha256(peer_id.get_sha256());
     assert(peer);
     auto it = discovery_map.find(peer);
     assert(it != discovery_map.end());
@@ -155,51 +148,38 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
     redial_map.erase(it);
 }
 
-void dialer_actor_t::on_disconnect(message::disconnect_notify_t &message) noexcept {
-    auto &peer_id = message.payload.peer_device_id;
-    LOG_TRACE(log, "{}, on_disconnect, peer = {}", identity, peer_id);
-    auto peer = devices->by_sha256(peer_id.get_sha256());
-    assert(peer);
-    schedule_redial(peer);
-}
-
-void dialer_actor_t::on_connect(message::connect_notify_t &message) noexcept {
-    auto &peer_id = message.payload.peer_device_id;
-    LOG_TRACE(log, "{}, on_connect, peer = {}", identity, peer_id);
-
-    auto peer = devices->by_sha256(peer_id.get_sha256());
-    assert(peer);
-
-    auto it_redial = redial_map.find(peer);
-    if (it_redial != redial_map.end()) {
-        cancel_timer(it_redial->second);
-    }
-
-    auto it_discovery = discovery_map.find(peer);
-    if (it_discovery != discovery_map.end()) {
-        send<message::discovery_cancel_t::payload_t>(global_discovery, it_discovery->second);
+void dialer_actor_t::on_model_update(net::message::model_update_t& msg) noexcept {
+    LOG_TRACE(log, "{}, on_model_update", identity);
+    auto& diff = *msg.payload.diff;
+    auto r = diff.visit(*this);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
     }
 }
 
-void dialer_actor_t::on_add(message::add_device_t &message) noexcept {
-    auto &device = message.payload.device;
-    discover(device);
-}
+auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &state) noexcept -> outcome::result<void>{
+    auto& devices = cluster->get_devices();
+    auto peer = devices.by_sha256(state.peer_id);
 
-void dialer_actor_t::on_remove(message::remove_device_t &message) noexcept {
-    auto &peer = message.payload.device;
-    auto it_discovery = discovery_map.find(peer);
-    if (it_discovery != discovery_map.end()) {
-        send<message::discovery_cancel_t::payload_t>(global_discovery, it_discovery->second);
-    }
-    auto it_redial = redial_map.find(peer);
-    if (it_redial != redial_map.end()) {
-        cancel_timer(it_redial->second);
-    }
-}
+    if (!state.online) {
+        if (peer) {
+            schedule_redial(peer);
+        }
+    }  else {
+        if (peer) {
+            auto it_redial = redial_map.find(peer);
+            if (it_redial != redial_map.end()) {
+                cancel_timer(it_redial->second);
+            }
 
-void dialer_actor_t::on_update(message::update_device_t &message) noexcept {
-    LOG_WARN(log, "[TODO] {}, on_update", identity);
+            auto it_discovery = discovery_map.find(peer);
+            if (it_discovery != discovery_map.end()) {
+                send<message::discovery_cancel_t::payload_t>(global_discovery, it_discovery->second);
+            }
+        }
+    }
+    return outcome::success();
 }
 
 } // namespace syncspirit::net

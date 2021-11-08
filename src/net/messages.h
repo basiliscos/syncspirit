@@ -145,7 +145,9 @@ struct dial_ready_notification_t {
     utils::uri_container_t uris;
 };
 
-struct connect_response_t : r::arc_base_t<connect_response_t> {
+struct connect_response_t  /*: r::arc_base_t<connect_response_t>*/ {
+    std::string peer;
+/*
     r::address_ptr_t peer_addr;
     model::device_id_t peer_device_id;
     cluster_config_ptr_t cluster_config;
@@ -153,10 +155,13 @@ struct connect_response_t : r::arc_base_t<connect_response_t> {
     connect_response_t(const r::address_ptr_t &peer_addr_, model::device_id_t &peer_device_id_,
                        cluster_config_ptr_t cluster_config_) noexcept
         : peer_addr{peer_addr_}, peer_device_id{peer_device_id_}, cluster_config{std::move(cluster_config_)} {}
+*/
+
 };
 
 struct connect_request_t : r::arc_base_t<connect_request_t> {
-    using response_t = r::intrusive_ptr_t<connect_response_t>;
+    //using response_t = r::intrusive_ptr_t<connect_response_t>;
+    using response_t = connect_response_t;
 
     struct connect_info_t {
         model::device_id_t device_id;
@@ -179,6 +184,7 @@ struct connect_request_t : r::arc_base_t<connect_request_t> {
     payload_t payload;
 };
 
+/*
 struct auth_response_t : r::arc_base_t<auth_response_t> {
     cluster_config_ptr_t cluster_config;
 
@@ -212,6 +218,8 @@ struct disconnect_notify_t {
     r::address_ptr_t peer_addr;
 };
 
+*/
+
 struct connection_notify_t {
     tcp_socket_t sock;
     tcp::endpoint remote;
@@ -231,13 +239,16 @@ struct load_cluster_request_t {
     using response_t = load_cluster_response_t;
 };
 
+/*
 struct cluster_ready_notify_t {
     model::cluster_ptr_t cluster;
     r::extended_error_ptr_t ee;
 };
+*/
 
 struct start_reading_t {
     r::address_ptr_t controller;
+    bool start;
 };
 
 struct ready_signal_t {};
@@ -250,6 +261,7 @@ using forwarded_message_t =
     std::variant<proto::message::ClusterConfig, proto::message::Index, proto::message::IndexUpdate,
                  proto::message::Request, proto::message::DownloadProgress>;
 
+/*
 struct add_device_t {
     model::device_ptr_t device;
 };
@@ -262,66 +274,7 @@ struct update_device_t {
 struct remove_device_t {
     model::device_ptr_t device;
 };
-
-struct store_ignored_device_response_t {};
-
-struct store_ignored_device_request_t {
-    using response_t = store_ignored_device_response_t;
-    model::ignored_device_ptr_t device;
-};
-
-struct store_device_response_t {};
-
-struct store_device_request_t {
-    using response_t = store_device_response_t;
-    model::device_ptr_t device;
-    void *custom;
-};
-
-struct store_ignored_folder_response_t {};
-
-struct store_ignored_folder_request_t {
-    using response_t = store_ignored_folder_response_t;
-    model::ignored_folder_ptr_t folder;
-};
-
-struct store_new_folder_response_t {
-    model::folder_ptr_t folder;
-};
-
-struct store_new_folder_request_t {
-    using response_t = store_new_folder_response_t;
-    std::string folder_data;
-    model::device_ptr_t source;
-    std::uint64_t source_index;
-    model::cluster_ptr_t cluster;
-};
-
-struct store_new_folder_notify_t {
-    model::folder_ptr_t folder;
-};
-
-struct store_folder_response_t {};
-
-struct store_folder_request_t {
-    using response_t = store_folder_response_t;
-    model::folder_ptr_t folder;
-};
-
-struct store_file_response_t {};
-
-struct store_file_request_t {
-    using response_t = store_file_response_t;
-    model::file_info_ptr_t file;
-    void *custom;
-};
-
-struct store_folder_info_response_t {};
-
-struct store_folder_info_request_t {
-    using response_t = store_folder_info_response_t;
-    model::folder_info_ptr_t folder_info;
-};
+*/
 
 struct block_response_t {
     std::string data;
@@ -378,53 +331,34 @@ using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
 using dial_ready_notify_t = r::message_t<payload::dial_ready_notification_t>;
 using connect_request_t = r::request_traits_t<payload::connect_request_t>::request::message_t;
 using connect_response_t = r::request_traits_t<payload::connect_request_t>::response::message_t;
+/*
 using connect_notify_t = r::message_t<payload::connect_notify_t>;
 using disconnect_notify_t = r::message_t<payload::disconnect_notify_t>;
+*/
 using connection_notify_t = r::message_t<payload::connection_notify_t>;
 
+/*
 using auth_request_t = r::request_traits_t<payload::auth_request_t>::request::message_t;
 using auth_response_t = r::request_traits_t<payload::auth_request_t>::response::message_t;
+*/
 
 using model_update_t = r::message_t<payload::model_update_t>;
 // remove below
 
-
-using store_ignored_device_request_t = r::request_traits_t<payload::store_ignored_device_request_t>::request::message_t;
-using store_ignored_device_response_t =
-    r::request_traits_t<payload::store_ignored_device_request_t>::response::message_t;
-
-using store_ignored_folder_request_t = r::request_traits_t<payload::store_ignored_folder_request_t>::request::message_t;
-using store_ignored_folder_response_t =
-    r::request_traits_t<payload::store_ignored_folder_request_t>::response::message_t;
-
-using store_new_folder_request_t = r::request_traits_t<payload::store_new_folder_request_t>::request::message_t;
-using store_new_folder_response_t = r::request_traits_t<payload::store_new_folder_request_t>::response::message_t;
-using store_new_folder_notify_t = r::message_t<payload::store_new_folder_notify_t>;
-
-using store_device_request_t = r::request_traits_t<payload::store_device_request_t>::request::message_t;
-using store_device_response_t = r::request_traits_t<payload::store_device_request_t>::response::message_t;
-
-using store_folder_request_t = r::request_traits_t<payload::store_folder_request_t>::request::message_t;
-using store_folder_response_t = r::request_traits_t<payload::store_folder_request_t>::response::message_t;
-
-using store_folder_info_request_t = r::request_traits_t<payload::store_folder_info_request_t>::request::message_t;
-using store_folder_info_response_t = r::request_traits_t<payload::store_folder_info_request_t>::response::message_t;
-
-using store_file_request_t = r::request_traits_t<payload::store_file_request_t>::request::message_t;
-using store_file_response_t = r::request_traits_t<payload::store_file_request_t>::response::message_t;
-
 using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
-using cluster_ready_notify_t = r::message_t<payload::cluster_ready_notify_t>;
+//using cluster_ready_notify_t = r::message_t<payload::cluster_ready_notify_t>;
 
 using start_reading_t = r::message_t<payload::start_reading_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
 using termination_signal_t = r::message_t<payload::termination_t>;
 using ready_signal_t = r::message_t<payload::ready_signal_t>;
 
+/*
 using add_device_t = r::message_t<payload::add_device_t>;
 using update_device_t = r::message_t<payload::update_device_t>;
 using remove_device_t = r::message_t<payload::remove_device_t>;
+*/
 
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;

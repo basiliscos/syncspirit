@@ -100,7 +100,6 @@ struct peer_actor_t : public r::actor_base_t {
     using block_requests_t = std::list<block_request_ptr_t>;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
-    void on_auth(message::auth_response_t &res) noexcept;
     void on_start_reading(message::start_reading_t &) noexcept;
     void on_termination(message::termination_signal_t &) noexcept;
     void on_block_request(message::block_request_t &) noexcept;
@@ -130,7 +129,9 @@ struct peer_actor_t : public r::actor_base_t {
     void reset_tx_timer() noexcept;
     void reset_rx_timer() noexcept;
     void read_hello(proto::message::message_t &&msg) noexcept;
+#if 0
     void read_cluster_config(proto::message::message_t &&msg) noexcept;
+#endif
     void read_controlled(proto::message::message_t &&msg) noexcept;
 
     void handle_ping(proto::message::Ping &&) noexcept;

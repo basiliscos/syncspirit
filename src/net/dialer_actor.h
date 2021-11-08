@@ -2,6 +2,8 @@
 
 #include "../config/dialer.h"
 #include "../utils/log.h"
+#include "model/cluster.h"
+#include "model/diff/diff_visitor.h"
 #include "messages.h"
 #include <optional>
 #include <unordered_map>
@@ -9,10 +11,11 @@
 namespace syncspirit {
 namespace net {
 
+namespace outcome = boost::outcome_v2;
+
 struct dialer_actor_config_t : r::actor_config_t {
     config::dialer_config_t dialer_config;
-    model::device_ptr_t device;
-    model::devices_map_t *devices;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Actor> struct dialer_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -20,23 +23,19 @@ template <typename Actor> struct dialer_actor_config_builder_t : r::actor_config
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
+    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+        parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
     builder_t &&dialer_config(const config::dialer_config_t &value) &&noexcept {
         parent_t::config.dialer_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&device(const model::device_ptr_t &value) &&noexcept {
-        parent_t::config.device = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&devices(model::devices_map_t *value) &&noexcept {
-        parent_t::config.devices = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
 };
 
-struct dialer_actor_t : public r::actor_base_t {
+struct dialer_actor_t : public r::actor_base_t, private model::diff::diff_visitor_t {
     using config_t = dialer_actor_config_t;
     template <typename Actor> using config_builder_t = dialer_actor_config_builder_t<Actor>;
 
@@ -52,12 +51,8 @@ struct dialer_actor_t : public r::actor_base_t {
     using online_map_t = std::unordered_set<model::device_ptr_t>;
 
     void on_announce(message::announce_notification_t &message) noexcept;
-    void on_connect(message::connect_notify_t &message) noexcept;
-    void on_disconnect(message::disconnect_notify_t &message) noexcept;
+    void on_model_update(net::message::model_update_t& ) noexcept;
     void on_discovery(message::discovery_response_t &req) noexcept;
-    void on_add(message::add_device_t &message) noexcept;
-    void on_remove(message::remove_device_t &message) noexcept;
-    void on_update(message::update_device_t &message) noexcept;
 
     void discover(const model::device_ptr_t &device) noexcept;
     void remove(const model::device_ptr_t &device) noexcept;
@@ -65,15 +60,15 @@ struct dialer_actor_t : public r::actor_base_t {
     void schedule_redial(const model::device_ptr_t &device) noexcept;
     void on_timer(r::request_id_t request_id, bool cancelled) noexcept;
 
+    outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
+
     utils::logger_t log;
 
     r::address_ptr_t coordinator;
-    r::address_ptr_t cluster;
     r::address_ptr_t global_discovery;
 
+    model::cluster_ptr_t cluster;
     pt::time_duration redial_timeout;
-    model::device_ptr_t device;
-    model::devices_map_t *devices;
     discovery_map_t discovery_map;
     online_map_t online_map;
     redial_map_t redial_map;

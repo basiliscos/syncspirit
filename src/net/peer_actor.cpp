@@ -4,6 +4,7 @@
 #include "../utils/tls.h"
 #include "../utils/error_code.h"
 #include "../proto/bep_support.h"
+#include "model/diff/peer/peer_state.h"
 #include <boost/core/demangle.hpp>
 
 using namespace syncspirit::net;
@@ -61,7 +62,9 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&peer_actor_t::on_resolve);
+#if 0
         p.subscribe_actor(&peer_actor_t::on_auth);
+#endif
         p.subscribe_actor(&peer_actor_t::on_start_reading);
         p.subscribe_actor(&peer_actor_t::on_termination);
         p.subscribe_actor(&peer_actor_t::on_block_request);
@@ -353,6 +356,7 @@ void peer_actor_t::cancel_timer() noexcept {
     }
 }
 
+#if 0
 void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
     auto &cluster = res.payload.res->cluster_config;
     bool ok = (bool)cluster;
@@ -381,12 +385,15 @@ void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
     read_action = &peer_actor_t::read_cluster_config;
     read_more();
 }
+#endif
 
 void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept {
     LOG_TRACE(log, "{}, on_start_reading", identity);
     controller = message.payload.controller;
-    read_action = &peer_actor_t::read_controlled;
-    read_more();
+    if (message.payload.start) {
+        read_action = &peer_actor_t::read_controlled;
+        read_more();
+    }
 }
 
 void peer_actor_t::on_termination(message::termination_signal_t &message) noexcept {
@@ -429,6 +436,7 @@ void peer_actor_t::on_cluster_config(message::cluster_config_t &msg) noexcept {
 }
 
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
+    using namespace model::diff;
     LOG_TRACE(log, "{}, read_hello", identity);
     std::visit(
         [&](auto &&msg) {
@@ -436,9 +444,14 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
                 LOG_TRACE(log, "{}, read_hello,  from {} ({} {})", identity, msg->device_name(), msg->client_name(),
                           msg->client_version());
+#if 0
                 request<payload::auth_request_t>(coordinator, get_address(), peer_endpoint, peer_device_id, cert_name,
                                                  std::move(*msg))
                     .send(init_timeout / 2);
+#endif
+                auto diff = cluster_diff_ptr_t();
+                diff = new peer::peer_state_t(peer_device_id.get_sha256(), get_address(), true, cert_name, peer_endpoint, msg->client_name());
+                send<payload::model_update_t>(coordinator, std::move(diff));
             } else {
                 LOG_WARN(log, "{}, read_hello, unexpected_message", identity);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
@@ -448,6 +461,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
         msg);
 }
 
+#if 0
 void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept {
     LOG_TRACE(log, "{}, read_cluster_config", identity);
     std::visit(
@@ -468,6 +482,7 @@ void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept
         },
         msg);
 }
+#endif
 
 void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
     LOG_TRACE(log, "{}, read_controlled", identity);
