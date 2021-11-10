@@ -51,6 +51,7 @@ add_library(syncspirit_lib
     src/model/diff/load/ignored_devices.cpp
     src/model/diff/load/ignored_folders.cpp
     src/model/diff/modify/create_folder.cpp
+    src/model/diff/modify/local_update.cpp
     src/model/diff/modify/share_folder.cpp
     src/model/diff/modify/update_peer.cpp
     src/model/diff/peer/peer_state.cpp

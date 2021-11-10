@@ -23,3 +23,7 @@ auto diff_visitor_t::operator()(const modify::share_folder_t &) noexcept -> outc
 auto diff_visitor_t::operator()(const modify::update_peer_t &) noexcept -> outcome::result<void>  {
     return outcome::success();
 }
+
+auto diff_visitor_t::operator()(const modify::local_update_t &) noexcept -> outcome::result<void>  {
+    return outcome::success();
+}

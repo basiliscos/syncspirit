@@ -35,12 +35,23 @@ file_info_t::file_info_t(std::string_view key_, const db::FileInfo& data, const 
     fields_update(data);
 }
 
-file_info_t::file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept
-    : folder_info{folder_info_.get()} {
+static void fill(char* key, const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept {
     key[0] = prefix;
     auto fi_key = folder_info_->get_uuid();
     std::copy(fi_key.begin(), fi_key.end(), key + 1);
     std::copy(uuid.begin(), uuid.end(), key + 1 + fi_key.size());
+}
+
+std::string file_info_t::create_key(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept {
+    std::string key;
+    key.resize(data_length);
+    fill(key.data(), uuid, folder_info_);
+    return key;
+}
+
+file_info_t::file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept
+    : folder_info{folder_info_.get()} {
+    fill(key, uuid, folder_info_);
     fields_update(info_);
 }
 

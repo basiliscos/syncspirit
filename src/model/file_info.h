@@ -33,6 +33,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
 
     static outcome::result<file_info_ptr_t> create(std::string_view key, const db::FileInfo& data, const folder_info_ptr_t& folder_info_) noexcept;
     static outcome::result<file_info_ptr_t> create(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
+    static std::string create_key(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept;
 
     ~file_info_t();
 
@@ -93,6 +94,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     static const constexpr auto data_length = 1 + uuid_length * 2;
 
 
+    template <typename Source> void fields_update(const Source &s) noexcept;
   private:
     file_info_t(std::string_view key, const db::FileInfo& data, const folder_info_ptr_t& folder_info_) noexcept;
     file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
@@ -100,7 +102,6 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks, block_infos_map_t &deleted_blocks,
                       bool zero_indices = true) noexcept;
-    template <typename Source> void fields_update(const Source &s) noexcept;
 
     char key[data_length];
     std::string name;
