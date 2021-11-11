@@ -3,6 +3,7 @@
 #include "names.h"
 #include "../utils/error_code.h"
 #include "../hasher/hasher_proxy_actor.h"
+#include "model/diff/peer/peer_state.h"
 #include <boost/filesystem.hpp>
 
 namespace fs = boost::filesystem;
@@ -40,12 +41,16 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     ra::supervisor_asio_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(names::cluster, false);
+        /*
         scan_initial = p.create_address();
         scan_new = p.create_address();
+        */
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::cluster, get_address());
+        /*
         p.discover_name(names::scan_actor, scan_addr, true).link(true);
+        */
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
@@ -80,9 +85,11 @@ void cluster_supervisor_t::on_start() noexcept {
 void cluster_supervisor_t::shutdown_start() noexcept {
     log->trace("{}, shutdown_start", identity);
 
+    /*
     for (auto &it : scan_folders_map) {
         send<fs::payload::scan_cancel_t>(scan_addr, it.second.request_id);
     }
+    */
     ra::supervisor_asio_t::shutdown_start();
 }
 
@@ -96,7 +103,16 @@ void cluster_supervisor_t::on_model_update(message::model_update_t &message) noe
     }
 }
 
+auto cluster_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff) noexcept -> outcome::result<void> {
+    if (!cluster->is_tainted()) {
+        auto peer = cluster->get_devices().by_sha256(diff.peer_id);
+        LOG_TRACE(log, "{}, visiting peer_state_t, {} is online: {}", identity, peer->device_id(), (diff.online? "yes": "no"));
+    }
+    return outcome::success();
+}
 
+
+/*
 void cluster_supervisor_t::scan(const model::folder_ptr_t &folder, rotor::address_ptr_t &via) noexcept {
     auto &path = folder->get_path();
     auto req_id = access<to::next_request_id>(to::next_request_id{});
@@ -104,6 +120,7 @@ void cluster_supervisor_t::scan(const model::folder_ptr_t &folder, rotor::addres
     scan_folders_map.emplace(path, scan_info_t{folder, req_id});
     resources->acquire(resource::fs_scan);
 }
+*/
 
 /*
 cluster_supervisor_t::scan_foders_it

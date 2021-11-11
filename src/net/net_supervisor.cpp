@@ -66,9 +66,9 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_config_request);
         p.subscribe_actor(&net_supervisor_t::on_config_save);
         p.subscribe_actor(&net_supervisor_t::on_connect);
-        p.subscribe_actor(&net_supervisor_t::on_connection);
         p.subscribe_actor(&net_supervisor_t::on_dial_ready);
 #endif
+        p.subscribe_actor(&net_supervisor_t::on_connection);
         p.subscribe_actor(&net_supervisor_t::on_model_update);
         p.subscribe_actor(&net_supervisor_t::on_load_cluster);
         p.subscribe_actor(&net_supervisor_t::on_model_request);
@@ -157,29 +157,6 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
     if (cluster_copies == 0) {
         seed_model();
     }
-#if 0
-    auto &p = message.payload.res;
-    devices = std::move(p.devices);
-    ignored_devices = std::move(p.ignored_devices);
-    ignored_folders = std::move(p.ignored_folders);
-    cluster = std::move(p.cluster);
-    LOG_DEBUG(log,
-              "{}, load cluster. devices = {}, ignored devices = {}, ignored folders = {}, folders = {}, blocks = {}",
-              identity, devices.size(), ignored_devices.size(), ignored_folders.size(), cluster->get_folders().size(),
-              cluster->get_blocks().size());
-
-    cluster_addr = create_actor<cluster_supervisor_t>()
-                       .timeout(shutdown_timeout * 9 / 10)
-                       .strand(strand)
-                       .device(device)
-                       .devices(&devices)
-                       .ignored_folders(&ignored_folders)
-                       .cluster(cluster)
-                       .bep_config(app_config.bep_config)
-                       .hasher_threads(app_config.hasher_threads)
-                       .finish()
-                       ->get_address();
-#endif
 }
 
 void net_supervisor_t::on_model_request(message::model_request_t &message) noexcept {
@@ -212,11 +189,30 @@ void net_supervisor_t::on_model_update(message::model_update_t &message) noexcep
 
 auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noexcept -> outcome::result<void> {
     if (!cluster->is_tainted()) {
+
+        auto& ignored_devices = cluster->get_ignored_devices();
+        auto& ignored_folders = cluster->get_ignored_folders();
+        auto& devices = cluster->get_devices();
+        LOG_DEBUG(log,
+                  "{}, load cluster. devices = {}, ignored devices = {}, ignored folders = {}, folders = {}, blocks = {}",
+                  identity, devices.size(), ignored_devices.size(), ignored_folders.size(), cluster->get_folders().size(),
+                  cluster->get_blocks().size());
+
+        cluster_addr = create_actor<cluster_supervisor_t>()
+                           .timeout(shutdown_timeout * 9 / 10)
+                           .strand(strand)
+                           .cluster(cluster)
+                           .bep_config(app_config.bep_config)
+                           .hasher_threads(app_config.hasher_threads)
+                           .finish()
+                           ->get_address();
+
         launch_ssdp();
         launch_net();
     }
     return outcome::success();
 }
+
 
 #if 0
 void net_supervisor_t::on_cluster_ready(message::cluster_ready_notify_t &message) noexcept {
@@ -456,6 +452,7 @@ void net_supervisor_t::on_disconnect(message::disconnect_notify_t &message) noex
         send<payload::disconnect_notify_t>(cluster_addr, device_id, message.payload.peer_addr);
     }
 }
+#endif
 
 void net_supervisor_t::on_connection(message::connection_notify_t &message) noexcept {
     auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout};
@@ -463,6 +460,7 @@ void net_supervisor_t::on_connection(message::connection_notify_t &message) noex
     request<payload::connect_request_t>(peers_addr, std::move(payload.sock), payload.remote).send(timeout);
 }
 
+#if 0
 void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
     auto &payload = message.payload.request_payload;
     auto &device_id = payload->peer_device_id;
