@@ -15,11 +15,13 @@
 #include "names.h"
 #include <boost/filesystem.hpp>
 #include <algorithm>
+#include <ctime>
 
 namespace bfs = boost::filesystem;
 using namespace syncspirit::net;
 
-net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{cfg}, app_config{cfg.app_config} {
+net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{cfg}, cluster_copies{cfg.cluster_copies}, app_config{cfg.app_config} {
+    seed = (size_t) std::time(nullptr);
     log = utils::get_logger("net.coordinator");
     auto &files_cfg = app_config.global_announce_config;
     auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
@@ -41,14 +43,14 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{c
         LOG_CRITICAL(log, "cannot get common name from certificate");
         throw "cannot get common name from certificate";
     }
-    db::Device my_device;
-    my_device.set_id(device_id.value().get_sha256());
-    my_device.set_name(app_config.device_name);
-    // my_device.set_compression()
-    my_device.set_cert_name(cn.value());
-    device = model::device_ptr_t(new model::local_device_t(my_device));
-    devices.put(device);
-    // update_devices();
+    auto device_opt = model::device_t::create(device_id.value(), app_config.device_name, cn.value());
+    if (!device_opt) {
+        LOG_CRITICAL(log, "cannot get common name from certificate");
+        throw "cannot get common name from certificate";
+    }
+    auto device = model::device_ptr_t();
+    device = new model::local_device_t(device_id.value(), app_config.device_name, cn.value());
+    cluster = new model::cluster_t(device, seed);
 }
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -57,22 +59,19 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.register_name(names::coordinator, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+#if 0
         p.subscribe_actor(&net_supervisor_t::on_ssdp);
         p.subscribe_actor(&net_supervisor_t::on_port_mapping);
         p.subscribe_actor(&net_supervisor_t::on_discovery_notify);
         p.subscribe_actor(&net_supervisor_t::on_config_request);
         p.subscribe_actor(&net_supervisor_t::on_config_save);
         p.subscribe_actor(&net_supervisor_t::on_connect);
-        p.subscribe_actor(&net_supervisor_t::on_disconnect);
         p.subscribe_actor(&net_supervisor_t::on_connection);
-        p.subscribe_actor(&net_supervisor_t::on_auth);
         p.subscribe_actor(&net_supervisor_t::on_dial_ready);
+#endif
+        p.subscribe_actor(&net_supervisor_t::on_model_update);
         p.subscribe_actor(&net_supervisor_t::on_load_cluster);
-        p.subscribe_actor(&net_supervisor_t::on_ignore_device);
-        p.subscribe_actor(&net_supervisor_t::on_ignore_folder);
-        p.subscribe_actor(&net_supervisor_t::on_store_ignored_device);
-        p.subscribe_actor(&net_supervisor_t::on_store_ignored_folder);
-        p.subscribe_actor(&net_supervisor_t::on_cluster_ready);
+        p.subscribe_actor(&net_supervisor_t::on_model_request);
         launch_early();
     });
 }
@@ -83,12 +82,14 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     LOG_TRACE(log, "{}, on_child_shutdown, '{}' due to {} ", identity, actor->get_identity(), reason->message());
     auto &child_addr = actor->get_address();
     if (ssdp_addr && child_addr == ssdp_addr) {
+#if 0
         ssdp_addr.reset();
         auto &ec = reason->root()->ec;
         auto ssdp = (ec != r::shutdown_code_t::normal && state == r::state_t::OPERATIONAL);
         if (ssdp) {
             launch_ssdp();
         }
+#endif
         return;
     }
     if (local_discovery_addr && child_addr == local_discovery_addr) {
@@ -105,9 +106,11 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     if (cluster_addr && cluster_addr == child_addr) {
         cluster_addr.reset();
     }
+/*
     if (!peers_addr && !cluster_addr && cluster) {
         LOG_WARN(log, "{}, TODO, persist_data", identity);
     }
+*/
     if (state == r::state_t::OPERATIONAL) {
         auto inner = r::make_error_code(r::shutdown_code_t::child_down);
         do_shutdown(make_error(inner, reason));
@@ -127,13 +130,20 @@ void net_supervisor_t::launch_early() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     bfs::path path(app_config.config_path);
     auto db_dir = path.append("mbdx-db");
-    db_addr =
-        create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).device(device).finish()->get_address();
+    db_addr = create_actor<db_actor_t>()
+            .timeout(timeout).db_dir(db_dir.string())
+            .cluster(cluster)
+            .finish()
+            ->get_address();
 }
 
 void net_supervisor_t::load_db() noexcept {
     auto timeout = init_timeout * 9 / 10;
     request<payload::load_cluster_request_t>(db_addr).send(timeout);
+}
+
+void net_supervisor_t::seed_model() noexcept {
+    send<payload::model_update_t>(address, std::move(load_diff), nullptr);
 }
 
 void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message) noexcept {
@@ -142,6 +152,12 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
         LOG_ERROR(log, "{}, cannot load clusted : {}", identity, ee->message());
         return do_shutdown(ee);
     }
+    LOG_TRACE(log, "{}, on_load_cluster", identity);
+    load_diff = std::move(message.payload.res.diff);
+    if (cluster_copies == 0) {
+        seed_model();
+    }
+#if 0
     auto &p = message.payload.res;
     devices = std::move(p.devices);
     ignored_devices = std::move(p.ignored_devices);
@@ -163,8 +179,46 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
                        .hasher_threads(app_config.hasher_threads)
                        .finish()
                        ->get_address();
+#endif
 }
 
+void net_supervisor_t::on_model_request(message::model_request_t &message) noexcept {
+    --cluster_copies;
+    LOG_TRACE(log, "{}, on_cluster_seed, left = {}", identity, cluster_copies);
+    auto my_device = cluster->get_device();
+    auto device = model::device_ptr_t();
+    device = new model::local_device_t(my_device->device_id(), app_config.device_name, "");
+    auto cluster_copy = new model::cluster_t(device, seed);
+    reply_to(message, std::move(cluster_copy));
+    if (cluster_copies == 0 && load_diff) {
+        seed_model();
+    }
+}
+
+void net_supervisor_t::on_model_update(message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_model_update", identity);
+    auto& diff = *message.payload.diff;
+    auto r = diff.apply(*cluster);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+    r = diff.visit(*this);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+}
+
+auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noexcept -> outcome::result<void> {
+    if (!cluster->is_tainted()) {
+        launch_ssdp();
+        launch_net();
+    }
+    return outcome::success();
+}
+
+#if 0
 void net_supervisor_t::on_cluster_ready(message::cluster_ready_notify_t &message) noexcept {
     LOG_TRACE(log, "{}, on_cluster_ready", identity);
     auto &ee = message.payload.ee;
@@ -174,6 +228,7 @@ void net_supervisor_t::on_cluster_ready(message::cluster_ready_notify_t &message
     }
     launch_net();
 }
+#endif
 
 void net_supervisor_t::launch_net() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
@@ -194,7 +249,7 @@ void net_supervisor_t::launch_net() noexcept {
         local_discovery_addr = create_actor<local_discovery_actor_t>()
                                    .port(cfg.port)
                                    .frequency(cfg.frequency)
-                                   .device(device)
+                                   .device(cluster->get_device())
                                    .timeout(timeout)
                                    .finish()
                                    ->get_address();
@@ -218,7 +273,6 @@ void net_supervisor_t::launch_upnp() noexcept {
 void net_supervisor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
     parent_t::on_start();
-
     auto timeout = shutdown_timeout * 9 / 10;
     auto io_timeout = shutdown_timeout * 8 / 10;
 
@@ -230,8 +284,6 @@ void net_supervisor_t::on_start() noexcept {
         .registry_name(names::http10)
         .keep_alive(false)
         .finish();
-
-    launch_ssdp();
 }
 
 void net_supervisor_t::on_ssdp(message::ssdp_notification_t &message) noexcept {
@@ -293,13 +345,13 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
             create_actor<dialer_actor_t>()
                 .timeout(timeout)
                 .dialer_config(dcfg)
-                .device(device)
-                .devices(&devices)
+                .cluster(cluster)
                 .finish();
         }
     }
 }
 
+#if 0
 void net_supervisor_t::on_discovery_notify(message::discovery_notify_t &message) noexcept {
     auto &device_id = message.payload.device_id;
     auto &peer_contact = message.payload.peer;
@@ -497,3 +549,4 @@ void net_supervisor_t::on_store_ignored_folder(message::store_ignored_folder_res
     }
     ingored_folder_requests.erase(it);
 }
+#endif

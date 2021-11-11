@@ -38,6 +38,7 @@ int main(int argc, char **argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
     struct sigaction act;
+    memset(&act, 0, sizeof(act));
     act.sa_handler = [](int) { shutdown_flag = true; };
     if (sigaction(SIGINT, &act, nullptr) != 0) {
         spdlog::critical("cannot set signal handler");
@@ -171,6 +172,7 @@ int main(int argc, char **argv) {
                            .timeout(timeout)
                            .create_registry()
                            .guard_context(true)
+                           .cluster_copies(2ul)
                            .finish();
         sup_net->start();
 

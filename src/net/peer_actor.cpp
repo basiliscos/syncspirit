@@ -606,6 +606,8 @@ void peer_actor_t::on_rx_timeout(r::request_id_t, bool cancelled) noexcept {
 }
 
 void peer_actor_t::on_file_update(message::file_update_notify_t &msg) noexcept {
+    std::abort();
+#if 0
     auto &file = msg.payload.file;
     LOG_TRACE(log, "{}, on_file_update, file = {}", identity, file->get_full_name());
     proto::IndexUpdate iu;
@@ -615,13 +617,17 @@ void peer_actor_t::on_file_update(message::file_update_notify_t &msg) noexcept {
     fmt::memory_buffer buff;
     proto::serialize(buff, iu);
     push_write(std::move(buff), false);
+#endif
 }
 
 void peer_actor_t::on_folder_update(message::folder_update_notify_t &msg) noexcept {
+#if 0
     auto &folder = msg.payload.folder;
     LOG_TRACE(log, "{}, on_folder_update, folder = {}", identity, folder->get_label());
     auto index = folder->generate();
     fmt::memory_buffer buff;
     proto::serialize(buff, index);
     push_write(std::move(buff), false);
+#endif
+    std::abort();
 }

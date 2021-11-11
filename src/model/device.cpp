@@ -79,6 +79,11 @@ void device_t::mark_online(bool value) noexcept { online = value; }
 
 std::string_view device_t::get_key() const noexcept { return id.get_key(); }
 
+local_device_t::local_device_t(const device_id_t& device_id, std::string_view name, std::string_view cert_name) noexcept:
+    device_t(device_id, name, cert_name) {
+
+}
+
 std::string_view local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
 
 template<>

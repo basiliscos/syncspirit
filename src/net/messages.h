@@ -145,18 +145,8 @@ struct dial_ready_notification_t {
     utils::uri_container_t uris;
 };
 
-struct connect_response_t  /*: r::arc_base_t<connect_response_t>*/ {
+struct connect_response_t {
     std::string peer;
-/*
-    r::address_ptr_t peer_addr;
-    model::device_id_t peer_device_id;
-    cluster_config_ptr_t cluster_config;
-
-    connect_response_t(const r::address_ptr_t &peer_addr_, model::device_id_t &peer_device_id_,
-                       cluster_config_ptr_t cluster_config_) noexcept
-        : peer_addr{peer_addr_}, peer_device_id{peer_device_id_}, cluster_config{std::move(cluster_config_)} {}
-*/
-
 };
 
 struct connect_request_t : r::arc_base_t<connect_request_t> {
@@ -184,67 +174,18 @@ struct connect_request_t : r::arc_base_t<connect_request_t> {
     payload_t payload;
 };
 
-/*
-struct auth_response_t : r::arc_base_t<auth_response_t> {
-    cluster_config_ptr_t cluster_config;
-
-    auth_response_t(cluster_config_ptr_t &&cluster_config_) noexcept : cluster_config{std::move(cluster_config_)} {}
-};
-
-struct auth_request_t : r::arc_base_t<auth_request_t> {
-    using response_t = r::intrusive_ptr_t<auth_response_t>;
-
-    r::address_ptr_t peer_addr;
-    tcp::endpoint endpoint;
-    model::device_id_t peer_device_id;
-    std::string cert_name;
-    proto::Hello hello;
-
-    auth_request_t(r::address_ptr_t peer_addr_, const tcp::endpoint &endpoint_,
-                   const model::device_id_t &peer_device_id_, const std::string &cert_name_,
-                   proto::Hello &&hello_) noexcept
-        : peer_addr{peer_addr_}, endpoint{endpoint_},
-          peer_device_id{peer_device_id_}, cert_name{cert_name_}, hello{std::move(hello_)} {}
-};
-
-struct connect_notify_t {
-    r::address_ptr_t peer_addr;
-    model::device_id_t peer_device_id;
-    cluster_config_ptr_t cluster_config;
-};
-
-struct disconnect_notify_t {
-    model::device_id_t peer_device_id;
-    r::address_ptr_t peer_addr;
-};
-
-*/
-
 struct connection_notify_t {
     tcp_socket_t sock;
     tcp::endpoint remote;
 };
 
 struct load_cluster_response_t {
-/*
-    model::cluster_ptr_t cluster;
-    model::devices_map_t devices;
-    model::ignored_devices_map_t ignored_devices;
-    model::ignored_folders_map_t ignored_folders;
-*/
     model::diff::cluster_diff_ptr_t diff;
 };
 
 struct load_cluster_request_t {
     using response_t = load_cluster_response_t;
 };
-
-/*
-struct cluster_ready_notify_t {
-    model::cluster_ptr_t cluster;
-    r::extended_error_ptr_t ee;
-};
-*/
 
 struct start_reading_t {
     r::address_ptr_t controller;
@@ -260,21 +201,6 @@ struct termination_t {
 using forwarded_message_t =
     std::variant<proto::message::ClusterConfig, proto::message::Index, proto::message::IndexUpdate,
                  proto::message::Request, proto::message::DownloadProgress>;
-
-/*
-struct add_device_t {
-    model::device_ptr_t device;
-};
-
-struct update_device_t {
-    model::device_ptr_t prev_device;
-    model::device_ptr_t device;
-};
-
-struct remove_device_t {
-    model::device_ptr_t device;
-};
-*/
 
 struct block_response_t {
     std::string data;
@@ -296,6 +222,14 @@ struct file_update_t {
 
 struct folder_update_t {
     model::folder_ptr_t folder;
+};
+
+struct model_response_t {
+    model::cluster_ptr_t cluster;
+};
+
+struct model_request_t {
+    using response_t = model_response_t;
 };
 
 struct model_update_t {
@@ -331,34 +265,20 @@ using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
 using dial_ready_notify_t = r::message_t<payload::dial_ready_notification_t>;
 using connect_request_t = r::request_traits_t<payload::connect_request_t>::request::message_t;
 using connect_response_t = r::request_traits_t<payload::connect_request_t>::response::message_t;
-/*
-using connect_notify_t = r::message_t<payload::connect_notify_t>;
-using disconnect_notify_t = r::message_t<payload::disconnect_notify_t>;
-*/
+
 using connection_notify_t = r::message_t<payload::connection_notify_t>;
 
-/*
-using auth_request_t = r::request_traits_t<payload::auth_request_t>::request::message_t;
-using auth_response_t = r::request_traits_t<payload::auth_request_t>::response::message_t;
-*/
-
 using model_update_t = r::message_t<payload::model_update_t>;
-// remove below
+using model_request_t = r::request_traits_t<payload::model_request_t>::request::message_t;
+using model_response_t = r::request_traits_t<payload::model_request_t>::response::message_t;
 
 using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
-//using cluster_ready_notify_t = r::message_t<payload::cluster_ready_notify_t>;
 
 using start_reading_t = r::message_t<payload::start_reading_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
 using termination_signal_t = r::message_t<payload::termination_t>;
 using ready_signal_t = r::message_t<payload::ready_signal_t>;
-
-/*
-using add_device_t = r::message_t<payload::add_device_t>;
-using update_device_t = r::message_t<payload::update_device_t>;
-using remove_device_t = r::message_t<payload::remove_device_t>;
-*/
 
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;

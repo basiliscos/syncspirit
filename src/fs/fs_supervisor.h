@@ -2,6 +2,7 @@
 
 #include "../config/main.h"
 #include "../utils/log.h"
+#include "../net/messages.h"
 #include <rotor/thread.hpp>
 
 namespace syncspirit {
@@ -40,8 +41,10 @@ struct fs_supervisor_t : rth::supervisor_thread_t {
     void on_start() noexcept override;
 
   private:
+    void on_model_request(net::message::model_response_t& res) noexcept;
     void launch() noexcept;
 
+    model::cluster_ptr_t cluster;
     utils::logger_t log;
     config::fs_config_t fs_config;
     uint32_t hasher_threads;

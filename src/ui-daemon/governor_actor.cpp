@@ -12,25 +12,31 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("governor", false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ec) {
+        p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ec) {
             if (!ec && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&governor_actor_t::on_cluster_ready, coordinator);
+                plugin->subscribe_actor(&governor_actor_t::on_model_update, coordinator);
             }
         });
+#if 0
         p.discover_name(net::names::cluster, cluster, true).link(false);
+#endif
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&governor_actor_t::on_model_response);
+#if 0
         p.subscribe_actor(&governor_actor_t::on_update_peer);
         p.subscribe_actor(&governor_actor_t::on_folder_create);
         p.subscribe_actor(&governor_actor_t::on_folder_share);
+#endif
     });
 }
 
 void governor_actor_t::on_start() noexcept {
     log->trace("{}, on_start", identity);
     r::actor_base_t::on_start();
+    request<net::payload::model_request_t>(coordinator).send(init_timeout);
 }
 
 void governor_actor_t::shutdown_start() noexcept {
@@ -38,31 +44,59 @@ void governor_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
-void governor_actor_t::on_cluster_ready(net::message::cluster_ready_notify_t &message) noexcept {
-    if (message.payload.ee) {
-        return;
+void governor_actor_t::on_model_response(net::message::model_response_t &reply) noexcept {
+    auto& ee = reply.payload.ee;
+    if (ee) {
+        LOG_ERROR(log, "{}, on_cluster_seed: {},", ee->message());
+        return do_shutdown(ee);
     }
-    cluster_copy = message.payload.cluster;
-    devices_copy = message.payload.devices;
-    log->trace("{}, on_cluster_ready", identity);
-    process();
+    log->trace("{}, on_model_response", identity);
+    cluster = std::move(reply.payload.res.cluster);
 }
+
+void governor_actor_t::on_model_update(net::message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_model_update", identity);
+    auto& payload = message.payload;
+    auto& diff = *message.payload.diff;
+    auto r = diff.apply(*cluster);
+    if (!r) {
+        LOG_ERROR(log, "{}, on_model_update (apply): {}", identity, r.assume_error().message());
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+    r = diff.visit(*this);
+    if (!r) {
+        LOG_ERROR(log, "{}, on_model_update (visit): {}", r.assume_error().message());
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+    if (payload.custom == this) {
+        process();
+    }
+}
+
+auto governor_actor_t::operator()(const model::diff::load::load_cluster_t &) noexcept -> outcome::result<void>{
+    process();
+    return outcome::success();
+}
+
 
 void governor_actor_t::process() noexcept {
-    bool again = false;
-    do {
-        if (commands.empty()) {
-            log->debug("{}, no commands left for processing", identity);
-            return;
-        }
-        auto &cmd = commands.front();
-        again = !cmd->execute(*this);
-        if (again) {
-            commands.pop_front();
-        }
-    } while (again);
+    LOG_DEBUG(log, "{}, process", identity);
+NEXT:
+    if (commands.empty()) {
+        log->debug("{}, no commands left for processing", identity);
+        return;
+    }
+    auto &cmd = commands.front();
+    bool ok = cmd->execute(*this);
+    commands.pop_front();
+    if (!ok) {
+        goto NEXT;
+    }
 }
 
+#if 0
 void governor_actor_t::cmd_add_peer(const model::device_ptr_t &peer) noexcept {
     using request_t = ui::payload::update_peer_request_t;
     request<request_t>(cluster, peer).send(init_timeout);
@@ -122,3 +156,4 @@ void governor_actor_t::on_folder_share(ui::message::share_folder_response_t &mes
     commands.pop_front();
     process();
 }
+#endif

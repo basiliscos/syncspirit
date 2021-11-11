@@ -39,7 +39,7 @@ struct device_t : arc_base_t<device_t> {
     inline const auto& get_static_addresses() const noexcept { return  static_addresses;}
     void update(const db::Device& source) noexcept;
 
-private:
+    protected:
     device_t(const device_id_t& device_id, std::string_view name, std::string_view cert_name) noexcept;
     template<typename T> void assign(const T& item) noexcept;
 
@@ -57,7 +57,8 @@ private:
 
 
 struct local_device_t final : device_t {
-    using device_t::device_t;
+public:
+    local_device_t(const device_id_t& device_id, std::string_view name, std::string_view cert_name) noexcept;
     std::string_view get_key() const noexcept override;
 };
 

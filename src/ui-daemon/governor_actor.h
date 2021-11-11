@@ -6,6 +6,7 @@
 #include "../ui/messages.hpp"
 #include "../utils/log.h"
 #include "../model/cluster.h"
+#include "model/diff/diff_visitor.h"
 
 namespace syncspirit::daemon {
 
@@ -26,7 +27,7 @@ template <typename Actor> struct governor_actor_config_builder_t : r::actor_conf
     }
 };
 
-struct governor_actor_t : public r::actor_base_t {
+struct governor_actor_t : public r::actor_base_t, private model::diff::diff_visitor_t {
     using config_t = governor_actor_config_t;
     template <typename Actor> using config_builder_t = governor_actor_config_builder_t<Actor>;
 
@@ -36,23 +37,17 @@ struct governor_actor_t : public r::actor_base_t {
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
 
-    void cmd_add_peer(const model::device_ptr_t &peer) noexcept;
-    void cmd_add_folder(const db::Folder &folder) noexcept;
-    void cmd_share_folder(const model::folder_ptr_t &folder, const model::device_ptr_t &device) noexcept;
-
     r::address_ptr_t coordinator;
-    r::address_ptr_t cluster;
+    model::cluster_ptr_t cluster;
     Commands commands;
-    model::cluster_ptr_t cluster_copy;
-    model::devices_map_t devices_copy;
     utils::logger_t log;
 
   private:
     void process() noexcept;
-    void on_cluster_ready(net::message::cluster_ready_notify_t &message) noexcept;
-    void on_update_peer(ui::message::update_peer_response_t &message) noexcept;
-    void on_folder_create(ui::message::create_folder_response_t &message) noexcept;
-    void on_folder_share(ui::message::share_folder_response_t &message) noexcept;
+    void on_model_update(net::message::model_update_t &message) noexcept;
+    void on_model_response(net::message::model_response_t& reply) noexcept;
+
+    outcome::result<void> operator()(const model::diff::load::load_cluster_t &) noexcept override;
 };
 
 } // namespace syncspirit::daemon

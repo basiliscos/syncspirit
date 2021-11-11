@@ -50,6 +50,7 @@ add_library(syncspirit_lib
     src/model/diff/load/folders.cpp
     src/model/diff/load/ignored_devices.cpp
     src/model/diff/load/ignored_folders.cpp
+    src/model/diff/load/load_cluster.cpp
     src/model/diff/modify/create_folder.cpp
     src/model/diff/modify/local_update.cpp
     src/model/diff/modify/share_folder.cpp
@@ -71,14 +72,14 @@ add_library(syncspirit_lib
     src/model/ignored_device.cpp
     src/model/ignored_folder.cpp
     src/net/acceptor_actor.cpp
-#    src/net/cluster_supervisor.cpp
+    src/net/cluster_supervisor.cpp
 #    src/net/controller_actor.cpp
     src/net/db_actor.cpp
     src/net/dialer_actor.cpp
     src/net/global_discovery_actor.cpp
     src/net/http_actor.cpp
     src/net/local_discovery_actor.cpp
-#    src/net/net_supervisor.cpp
+    src/net/net_supervisor.cpp
     src/net/peer_actor.cpp
     src/net/peer_supervisor.cpp
     src/net/resolver_actor.cpp
@@ -155,4 +156,4 @@ target_link_libraries(syncspirit_lib
 
 enable_testing()
 add_subdirectory("tests")
-#add_subdirectory("src/ui-daemon")
+add_subdirectory("src/ui-daemon")

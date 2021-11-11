@@ -2,6 +2,7 @@
 #include "../governor_actor.h"
 #include "../error_code.h"
 #include "../../utils/base32.h"
+#include "model/diff/modify/create_folder.h"
 #include "pair_iterator.h"
 #include <random>
 
@@ -65,16 +66,18 @@ outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noex
 }
 
 bool add_folder_t::execute(governor_actor_t &actor) noexcept {
+    using namespace model::diff;
     log = actor.log;
+
     bool found = false;
-    for (auto it : actor.cluster_copy->get_folders()) {
-        auto f = it.second;
-        if ((f->id() == folder.id())) {
-            log->warn("{}, folder with id = {} is alredy present is the cluster", actor.get_identity(), f->id());
+    for (auto it : actor.cluster->get_folders()) {
+        auto f = it.item;
+        if ((f->get_id() == folder.id())) {
+            log->warn("{}, folder with id = {} is alredy present is the cluster", actor.get_identity(), f->get_id());
             return false;
         }
-        if (f->label() == folder.label()) {
-            log->warn("{}, folder with label = {} is alredy present is the cluster", actor.get_identity(), f->label());
+        if (f->get_label() == folder.label()) {
+            log->warn("{}, folder with label = {} is alredy present is the cluster", actor.get_identity(), f->get_label());
             return false;
         }
         if (f->get_path().string() == folder.path()) {
@@ -83,7 +86,9 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
             return false;
         }
     }
-    actor.cmd_add_folder(folder);
+
+    auto diff = cluster_diff_ptr_t(new modify::create_folder_t(folder));
+    actor.send<net::payload::model_update_t>(actor.coordinator, std::move(diff), &actor);
     return true;
 }
 

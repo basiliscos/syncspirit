@@ -5,7 +5,6 @@
 #include "../db/prefix.h"
 #include "../db/utils.h"
 #include "../db/error_code.h"
-#include "../model/diff/aggregate.h"
 #include "../model/diff/load/blocks.h"
 #include "../model/diff/load/close_transaction.h"
 #include "../model/diff/load/devices.h"
@@ -14,6 +13,7 @@
 #include "../model/diff/load/folders.h"
 #include "../model/diff/load/ignored_devices.h"
 #include "../model/diff/load/ignored_folders.h"
+#include "../model/diff/load/load_cluster.h"
 #include "../model/diff/modify/create_folder.h"
 #include "../model/diff/modify/share_folder.h"
 #include "../model/diff/modify/update_peer.h"
@@ -25,7 +25,6 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t db = 0;
 }
-
 } // namespace
 
 db_actor_t::db_actor_t(config_t &config)
@@ -66,7 +65,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void db_actor_t::open() noexcept {
     resources->acquire(resource::db);
     auto& my_device = cluster->get_device();
-    auto flags = MDBX_WRITEMAP | MDBX_COALESCE | MDBX_LIFORECLAIM | MDBX_EXCLUSIVE;
+    auto flags = MDBX_WRITEMAP | MDBX_COALESCE | MDBX_LIFORECLAIM | MDBX_EXCLUSIVE | MDBX_NOTLS;
     auto r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
     if (r != MDBX_SUCCESS) {
         LOG_ERROR(log, "{}, open, mbdx open environment error ({}): {}", identity, r, mdbx_strerror(r));
@@ -114,6 +113,7 @@ void db_actor_t::on_start() noexcept {
 }
 
 void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {
+    LOG_TRACE(log, "{}, on_cluster_load", identity);
     using namespace model::diff;
     using container_t = aggregate_t::diffs_t;
 
@@ -168,7 +168,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     container.emplace_back(new load::file_infos_t(std::move(file_infos_opt.value())));
     container.emplace_back(new load::close_transaction_t(std::move(txn)));
 
-    cluster_diff_ptr_t r = cluster_diff_ptr_t(new aggregate_t(std::move(container)));
+    cluster_diff_ptr_t r = cluster_diff_ptr_t(new load::load_cluster_t(std::move(container)));
 
     reply_to(request, r);
 }

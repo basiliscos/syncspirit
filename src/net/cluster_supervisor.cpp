@@ -56,11 +56,13 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
 
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+/*
         p.subscribe_actor(&cluster_supervisor_t::on_scan_complete_initial, scan_initial);
         p.subscribe_actor(&cluster_supervisor_t::on_scan_complete_new, scan_new);
         p.subscribe_actor(&cluster_supervisor_t::on_scan_error, scan_initial);
         p.subscribe_actor(&cluster_supervisor_t::on_scan_error, scan_new);
         p.subscribe_actor(&cluster_supervisor_t::on_file_update);
+*/
 
         create_actor<hasher::hasher_proxy_actor_t>()
             .timeout(init_timeout)
@@ -73,14 +75,6 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
 void cluster_supervisor_t::on_start() noexcept {
     log->trace("{}, on_start, folders count = {}", identity, folders.size());
     ra::supervisor_asio_t::on_start();
-    if (folders.size()) {
-        for (auto &it : folders) {
-            auto &folder = it.item;
-            scan(folder, scan_initial);
-        }
-    } else {
-        send<payload::cluster_ready_notify_t>(coordinator, cluster);
-    }
 }
 
 void cluster_supervisor_t::shutdown_start() noexcept {
@@ -111,6 +105,7 @@ void cluster_supervisor_t::scan(const model::folder_ptr_t &folder, rotor::addres
     resources->acquire(resource::fs_scan);
 }
 
+/*
 cluster_supervisor_t::scan_foders_it
 cluster_supervisor_t::on_scan_complete(fs::message::scan_response_t &message) noexcept {
     auto &file_map = *message.payload.map_info;
@@ -157,6 +152,7 @@ void cluster_supervisor_t::on_scan_error(fs::message::scan_error_t &message) noe
     auto &path = message.payload.path;
     log->warn("{}, on_scan_error on '{}': {} ", identity, path.c_str(), ec.message());
 }
+*/
 
 void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     log->trace("{}, on_child_shutdown", identity);
@@ -206,7 +202,6 @@ void cluster_supervisor_t::on_disconnect(message::disconnect_notify_t &message) 
         device2addr_map.erase(it);
     }
 }
-*/
 
 void cluster_supervisor_t::on_file_update(message::file_update_notify_t &message) noexcept {
     auto &file = message.payload.file;
@@ -219,3 +214,4 @@ void cluster_supervisor_t::on_file_update(message::file_update_notify_t &message
         }
     }
 }
+*/

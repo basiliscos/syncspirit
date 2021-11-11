@@ -1,6 +1,7 @@
 - uuid model
  -- add ignored device/folder
  -- убрать mark_modified()
+ -- загрузить модели из coordinator
 
 local_update_t {
     std::string folder_id;

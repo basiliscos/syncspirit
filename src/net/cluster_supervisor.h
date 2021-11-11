@@ -6,6 +6,7 @@
 #include "../fs/messages.h"
 #include "../ui/messages.hpp"
 #include "../utils/log.h"
+#include "model/diff/diff_visitor.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 
@@ -43,7 +44,7 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
 
 };
 
-struct cluster_supervisor_t : public ra::supervisor_asio_t {
+struct cluster_supervisor_t : public ra::supervisor_asio_t, private model::diff::diff_visitor_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = cluster_supervisor_config_t;
     template <typename Actor> using config_builder_t = cluster_supervisor_config_builder_t<Actor>;
@@ -65,11 +66,13 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     using scan_folders_map_t = std::unordered_map<bfs::path, scan_info_t>;
     using scan_foders_it = typename scan_folders_map_t::iterator;
 
+/*
     void on_scan_complete_initial(fs::message::scan_response_t &message) noexcept;
     void on_scan_complete_new(fs::message::scan_response_t &message) noexcept;
     scan_foders_it on_scan_complete(fs::message::scan_response_t &message) noexcept;
     void on_scan_error(fs::message::scan_error_t &message) noexcept;
     void on_file_update(message::file_update_notify_t &message) noexcept;
+*/
     void on_model_update(message::model_update_t &message) noexcept;
     void scan(const model::folder_ptr_t &folder, r::address_ptr_t &via) noexcept;
 
