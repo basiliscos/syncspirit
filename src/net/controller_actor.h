@@ -17,12 +17,9 @@ namespace bfs = boost::filesystem;
 struct controller_actor_config_t : r::actor_config_t {
     config::bep_config_t bep_config;
     model::cluster_ptr_t cluster;
-    model::device_ptr_t device;
     model::device_ptr_t peer;
     r::address_ptr_t peer_addr;
     pt::time_duration request_timeout;
-    payload::cluster_config_ptr_t peer_cluster_config;
-    model::ignored_folders_map_t *ignored_folders;
     size_t blocks_max_kept = 15;
     size_t blocks_max_requested = 8;
 };
@@ -42,11 +39,6 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&device(const model::device_ptr_t &value) &&noexcept {
-        parent_t::config.device = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
     builder_t &&peer(const model::device_ptr_t &value) &&noexcept {
         parent_t::config.peer = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
@@ -59,16 +51,6 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
 
     builder_t &&request_timeout(const pt::time_duration &value) &&noexcept {
         parent_t::config.request_timeout = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&peer_cluster_config(payload::cluster_config_ptr_t &&value) &&noexcept {
-        parent_t::config.peer_cluster_config = std::move(value);
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&ignored_folders(model::ignored_folders_map_t *value) &&noexcept {
-        parent_t::config.ignored_folders = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -143,9 +125,11 @@ struct controller_actor_t : public r::actor_base_t {
     void on_open(fs::message::open_response_t &res) noexcept;
     void on_close(fs::message::close_response_t &res) noexcept;
     void on_clone(fs::message::clone_response_t &res) noexcept;
+/*
     void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
     void on_store_file_info(message::store_file_response_t &message) noexcept;
     void on_new_folder(message::store_new_folder_notify_t &message) noexcept;
+*/
     void on_file_update(message::file_update_notify_t &message) noexcept;
 
     void on_message(proto::message::ClusterConfig &message) noexcept;
@@ -156,24 +140,29 @@ struct controller_actor_t : public r::actor_base_t {
 
     write_info_t &record_block_data(model::file_info_ptr_t &file, std::size_t block_index) noexcept;
     void request_block(const model::file_block_t &block) noexcept;
+#if 0
     void update(proto::ClusterConfig &config) noexcept;
     void update(folder_updater_t &&updater) noexcept;
+#endif
     void clone_block(const model::file_block_t &block, model::file_block_t &info) noexcept;
     void process(write_it_t it) noexcept;
     ImmediateResult process_immediately() noexcept;
     void ready() noexcept;
 
     model::cluster_ptr_t cluster;
-    model::folder_ptr_t folder;
-    model::device_ptr_t device;
     model::device_ptr_t peer;
+    model::folder_ptr_t folder;
     r::address_ptr_t peer_addr;
+#if 0
     r::address_ptr_t db;
     r::address_ptr_t file_addr;
+#endif
     r::address_ptr_t hasher_proxy;
     r::address_ptr_t open_reading; /* for routing */
     pt::time_duration request_timeout;
+#if 0
     payload::cluster_config_ptr_t peer_cluster_config;
+#endif
     model::ignored_folders_map_t *ignored_folders;
     peers_map_t peers_map;
     write_map_t write_map;

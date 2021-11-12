@@ -388,9 +388,10 @@ void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
 #endif
 
 void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_start_reading", identity);
+    bool start = message.payload.start;
+    LOG_TRACE(log, "{}, on_start_reading, start = ", identity);
     controller = message.payload.controller;
-    if (message.payload.start) {
+    if (start) {
         read_action = &peer_actor_t::read_controlled;
         read_more();
     }

@@ -48,9 +48,13 @@ TRY_ANEW:
         if (!local_file) {
             return;
         }
+#if 0
         auto needs_update = !local_file->is_locked() &&
                             (local_file->is_older(*file) ||
                              (local_file->get_sequence() == file->get_sequence() && local_file->is_incomplete()));
+#endif
+        std::abort();
+        bool needs_update = false;
         if (needs_update) {
             return;
         }

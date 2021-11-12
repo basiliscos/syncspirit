@@ -1,5 +1,5 @@
 #include "cluster_supervisor.h"
-//#include "controller_actor.h"
+#include "controller_actor.h"
 #include "names.h"
 #include "../utils/error_code.h"
 #include "../hasher/hasher_proxy_actor.h"
@@ -107,6 +107,22 @@ auto cluster_supervisor_t::operator()(const model::diff::peer::peer_state_t &dif
     if (!cluster->is_tainted()) {
         auto peer = cluster->get_devices().by_sha256(diff.peer_id);
         LOG_TRACE(log, "{}, visiting peer_state_t, {} is online: {}", identity, peer->device_id(), (diff.online? "yes": "no"));
+        if (diff.online) {
+            /* auto addr = */
+            create_actor<controller_actor_t>()
+                            .bep_config(bep_config)
+                            .timeout(init_timeout * 7 / 9)
+                            .peer(peer)
+                            .peer_addr(diff.peer_addr)
+                            .request_timeout(pt::milliseconds(bep_config.request_timeout))
+                            .cluster(cluster)
+                            .finish();
+            /*
+            auto id = peer->device_id().get_sha256();
+            device2addr_map.emplace(id, addr);
+            addr2device_map.emplace(addr, id);
+            */
+        }
     }
     return outcome::success();
 }
@@ -178,11 +194,13 @@ void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     if (state == r::state_t::OPERATIONAL) {
         log->debug("{}, on_child_shutdown, child {} termination: {}", identity, actor->get_identity(),
                    reason->message());
+/*
         auto &addr = actor->get_address();
         auto it = addr2device_map.find(addr);
         auto it_r = device2addr_map.find(it->second);
         addr2device_map.erase(it);
         device2addr_map.erase(it_r);
+*/
     }
 }
 

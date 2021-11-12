@@ -8,6 +8,7 @@ using namespace syncspirit;
 using namespace syncspirit::net;
 namespace bfs = boost::filesystem;
 
+#if 0
 template <typename Message> struct typed_folder_updater_t final : controller_actor_t::folder_updater_t {
     Message msg;
 
@@ -23,6 +24,7 @@ template <typename Message> struct typed_folder_updater_t final : controller_act
         return folder_info;
     };
 };
+#endif
 
 namespace {
 namespace resource {
@@ -49,10 +51,9 @@ bool controller_actor_t::write_info_t::done() const noexcept {
 bool controller_actor_t::write_info_t::complete() const noexcept { return blocks_left == 0 && done(); }
 
 controller_actor_t::controller_actor_t(config_t &config)
-    : r::actor_base_t{config}, cluster{config.cluster}, device{config.device}, peer{config.peer},
-      peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, peer_cluster_config{std::move(
-                                                                                config.peer_cluster_config)},
-      ignored_folders{config.ignored_folders}, request_pool{config.bep_config.rx_buff_size},
+    : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer},
+      peer_addr{config.peer_addr}, request_timeout{config.request_timeout},
+      request_pool{config.bep_config.rx_buff_size},
       blocks_max_kept{config.blocks_max_kept}, blocks_max_requested{config.blocks_max_requested} {
     log = utils::get_logger("net.controller_actor");
 }
@@ -61,13 +62,15 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         std::string id = "controller/";
-        id += peer->device_id.get_short();
+        id += peer->device_id().get_short();
         p.set_identity(id, false);
         open_reading = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+#if 0
         p.discover_name(names::db, db, false).link(true);
         p.discover_name(names::file_actor, file_addr, false).link(true);
+#endif
         p.discover_name(names::hasher_proxy, hasher_proxy, false).link();
     });
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) {
@@ -76,6 +79,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
+#if 0
         p.subscribe_actor(&controller_actor_t::on_store_folder_info);
         p.subscribe_actor(&controller_actor_t::on_store_file_info);
         p.subscribe_actor(&controller_actor_t::on_new_folder);
@@ -86,19 +90,23 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&controller_actor_t::on_open);
         p.subscribe_actor(&controller_actor_t::on_close);
         p.subscribe_actor(&controller_actor_t::on_clone);
+#endif
     });
 }
 
 void controller_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     LOG_TRACE(log, "{}, on_start", identity);
-    send<payload::start_reading_t>(peer_addr, get_address());
+    send<payload::start_reading_t>(peer_addr, get_address(), true);
+#if 0
     update(*peer_cluster_config);
     peer_cluster_config.reset();
+#endif
     ready();
     LOG_INFO(log, "{} is ready/online", identity);
 }
 
+#if 0
 void controller_actor_t::update(proto::ClusterConfig &config) noexcept {
     LOG_TRACE(log, "{}, update", identity);
     auto update_result = cluster->update(config);
@@ -122,10 +130,12 @@ void controller_actor_t::update(proto::ClusterConfig &config) noexcept {
     file_iterator.reset();
     block_iterator.reset();
 }
+#endif
 
 void controller_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "{}, shutdown_start", identity);
     send<payload::termination_t>(peer_addr, shutdown_reason);
+#if 0
     for (auto &it : write_map) {
         auto &info = it.second;
         auto &sink = info.sink;
@@ -134,12 +144,15 @@ void controller_actor_t::shutdown_start() noexcept {
             request<fs::payload::close_request_t>(file_addr, std::move(sink), path, info.complete()).send(init_timeout);
         }
     }
+#endif
     r::actor_base_t::shutdown_start();
 }
 
 void controller_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "{}, shutdown_finish", identity);
+#if 0
     assert(write_map.empty());
+#endif
     r::actor_base_t::shutdown_finish();
 }
 
@@ -152,8 +165,13 @@ bool controller_actor_t::on_unlink(unlink_request_t &message) noexcept {
     return true;
 }
 
-void controller_actor_t::ready() noexcept { send<payload::ready_signal_t>(get_address()); }
+void controller_actor_t::ready() noexcept {
+#if 0
+    send<payload::ready_signal_t>(get_address());
+#endif
+}
 
+#if 0
 controller_actor_t::ImmediateResult controller_actor_t::process_immediately() noexcept {
     assert(current_file);
     auto &path = current_file->get_path();
@@ -323,12 +341,13 @@ void controller_actor_t::request_block(const model::file_block_t &fb) noexcept {
     ++blocks_requested;
     request_pool -= (int64_t)sz;
 }
+#endif
 
 bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {
     auto it = peers_map.find(peer_addr);
     if (it != peers_map.end()) {
         auto &device = it->second;
-        LOG_DEBUG(log, "{}, on_unlink with {}", identity, device->device_id);
+        LOG_DEBUG(log, "{}, on_unlink with {}", identity, device->device_id());
         peers_map.erase(it);
         resources->release(resource::peer);
         return false;
@@ -343,6 +362,7 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
     std::visit([this](auto &msg) { on_message(msg); }, message.payload);
 }
 
+#if 0
 void controller_actor_t::on_new_folder(message::store_new_folder_notify_t &message) noexcept {
     auto &folder = message.payload.folder;
     LOG_TRACE(log, "{}, on_new_folder, folder = '{}'", identity, folder->get_label());
@@ -393,21 +413,34 @@ void controller_actor_t::on_store_file_info(message::store_file_response_t &mess
     send<payload::file_update_t>(dest, file);
     // ready();
 }
+#endif
 
-void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept { update(*message); }
+void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
+#if 0
+    update(*message);
+#endif
+    std::abort();
+}
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
+#if 0
     update(typed_folder_updater_t(peer, std::move(message)));
+#endif
+    std::abort();
 }
 
 void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
+#if 0
     update(typed_folder_updater_t(peer, std::move(message)));
+#endif
+    std::abort();
 }
 
 void controller_actor_t::on_message(proto::message::Request &message) noexcept { std::abort(); }
 
 void controller_actor_t::on_message(proto::message::DownloadProgress &message) noexcept { std::abort(); }
 
+#if 0
 void controller_actor_t::update(folder_updater_t &&updater) noexcept {
     auto &folder_id = updater.id();
     auto folder = cluster->get_folders().by_id(folder_id);
@@ -432,7 +465,9 @@ void controller_actor_t::update(folder_updater_t &&updater) noexcept {
         request<payload::store_folder_info_request_t>(db, std::move(folder_info)).send(timeout);
     }
 }
+#endif
 
+#if 0
 controller_actor_t::write_info_t &controller_actor_t::record_block_data(model::file_info_ptr_t &file,
                                                                         std::size_t block_index) noexcept {
     using request_t = fs::payload::open_request_t;
@@ -620,3 +655,4 @@ void controller_actor_t::on_file_update(message::file_update_notify_t &message) 
         send<payload::file_update_t>(peer_addr, file);
     }
 }
+#endif

@@ -63,9 +63,11 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t, private model::diff:
     };
 
     using device2addr_map_t = std::unordered_map<std::string, r::address_ptr_t>; // device_id: controller
+/*
     using addr2device_map_t = std::unordered_map<r::address_ptr_t, std::string>; // reverse
     using scan_folders_map_t = std::unordered_map<bfs::path, scan_info_t>;
     using scan_foders_it = typename scan_folders_map_t::iterator;
+*/
 
 /*
     void on_scan_complete_initial(fs::message::scan_response_t &message) noexcept;
@@ -90,9 +92,9 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t, private model::diff:
     std::uint32_t hasher_threads;
     model::cluster_ptr_t cluster;
     model::folders_map_t &folders;
-    device2addr_map_t device2addr_map;
-    addr2device_map_t addr2device_map;
+    //device2addr_map_t device2addr_map;
     /*
+    addr2device_map_t addr2device_map;
     scan_folders_map_t scan_folders_map;
     */
 };
