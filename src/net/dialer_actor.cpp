@@ -12,7 +12,8 @@ r::plugin::resource_id_t request = 1;
 } // namespace
 
 dialer_actor_t::dialer_actor_t(config_t &config)
-    : r::actor_base_t{config}, redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}}
+    : r::actor_base_t{config}, bep_config{config.bep_config}, cluster{config.cluster},
+      redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}}
       {
     log = utils::get_logger("net.acceptor");
     online_map.emplace(cluster->get_device());
@@ -27,10 +28,13 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&dialer_actor_t::on_announce, coordinator);
+                plugin->subscribe_actor(&dialer_actor_t::on_discovery, coordinator);
+                plugin->subscribe_actor(&dialer_actor_t::on_notification, coordinator);
                 plugin->subscribe_actor(&dialer_actor_t::on_model_update, coordinator);
             }
         });
         p.discover_name(names::global_discovery, global_discovery, true).link(true);
+        p.discover_name(names::peers, peers, true).link(true);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&dialer_actor_t::on_discovery); });
 }
@@ -87,17 +91,24 @@ void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
 }
 
 void dialer_actor_t::schedule_redial(const model::device_ptr_t &peer_device) noexcept {
-    LOG_TRACE(log, "{}, scheduling redial to {}, ", identity, peer_device->device_id());
-    auto redial_timer = start_timer(redial_timeout, *this, &dialer_actor_t::on_timer);
-    redial_map.insert_or_assign(peer_device, redial_timer);
-    resources->acquire(resource::timer);
+    auto ms = redial_timeout.total_milliseconds();
+    if (redial_map.count(peer_device) == 0) {
+        LOG_TRACE(log, "{}, scheduling (re)dial to {} in {} ms", identity, peer_device->device_id(), ms);
+        auto redial_timer = start_timer(redial_timeout, *this, &dialer_actor_t::on_timer);
+        redial_map.insert_or_assign(peer_device, redial_timer);
+        resources->acquire(resource::timer);
+    }
 }
 
 void dialer_actor_t::on_ready(const model::device_ptr_t &peer_device, const utils::uri_container_t &uris) noexcept {
     auto& device_id = peer_device->device_id();
-    LOG_TRACE(log, "{}, on_ready to dial to {}, ", identity, device_id);
-    schedule_redial(peer_device);
-    send<payload::dial_ready_notification_t>(coordinator, device_id, uris);
+    LOG_TRACE(log, "{}, on_ready to dial to {}", identity, device_id);
+    auto it = redial_plan.find(peer_device);
+    if (it == redial_plan.end()) {
+        dial(peer_device, uris);
+    } else {
+        schedule_redial(peer_device);
+    }
 }
 
 void dialer_actor_t::on_discovery(message::discovery_response_t &res) noexcept {
@@ -158,6 +169,32 @@ void dialer_actor_t::on_model_update(net::message::model_update_t& msg) noexcept
     }
 }
 
+void dialer_actor_t::on_notification(message::discovery_notify_t &msg) noexcept {
+    LOG_TRACE(log, "{}, on_notification", identity);
+    auto& contact = msg.payload.peer;
+
+    if (!contact) {
+        return;
+    }
+
+    auto& device_id = msg.payload.device_id;
+    auto peer = cluster->get_devices().by_sha256(device_id.get_sha256());
+    if (peer) {
+        if (!peer->is_online()) {
+            auto& uris = contact.value().uris;
+            on_ready(peer, uris);
+        }
+    }
+
+}
+
+void dialer_actor_t::dial(const model::device_ptr_t &peer, const utils::uri_container_t &uris) noexcept {
+    auto& device_id = peer->device_id();
+    LOG_TRACE(log, "{}, dialing to {}", identity, device_id);
+    auto timeout = r::pt::milliseconds{bep_config.connect_timeout * (uris.size() + 1)};
+    request<payload::connect_request_t>(peers, device_id, uris).send(timeout);
+}
+
 auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &state) noexcept -> outcome::result<void>{
     auto& devices = cluster->get_devices();
     auto peer = devices.by_sha256(state.peer_id);
@@ -181,5 +218,6 @@ auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &state) no
     }
     return outcome::success();
 }
+
 
 } // namespace syncspirit::net

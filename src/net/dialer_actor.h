@@ -1,12 +1,14 @@
 #pragma once
 
 #include "../config/dialer.h"
+#include "../config/bep.h"
 #include "../utils/log.h"
 #include "model/cluster.h"
 #include "model/diff/diff_visitor.h"
 #include "messages.h"
 #include <optional>
 #include <unordered_map>
+#include <chrono>
 
 namespace syncspirit {
 namespace net {
@@ -15,6 +17,7 @@ namespace outcome = boost::outcome_v2;
 
 struct dialer_actor_config_t : r::actor_config_t {
     config::dialer_config_t dialer_config;
+    config::bep_config_t bep_config;
     model::cluster_ptr_t cluster;
 };
 
@@ -33,6 +36,11 @@ template <typename Actor> struct dialer_actor_config_builder_t : r::actor_config
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
+    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
+        parent_t::config.bep_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
 };
 
 struct dialer_actor_t : public r::actor_base_t, private model::diff::diff_visitor_t {
@@ -46,6 +54,8 @@ struct dialer_actor_t : public r::actor_base_t, private model::diff::diff_visito
     void on_start() noexcept override;
 
   private:
+    using clock_t = std::chrono::steady_clock;
+    using redial_plan_t = std::unordered_map<model::device_ptr_t, uint64_t>;
     using redial_map_t = std::unordered_map<model::device_ptr_t, rotor::request_id_t>;
     using discovery_map_t = std::unordered_map<model::device_ptr_t, rotor::request_id_t>;
     using online_map_t = std::unordered_set<model::device_ptr_t>;
@@ -53,25 +63,30 @@ struct dialer_actor_t : public r::actor_base_t, private model::diff::diff_visito
     void on_announce(message::announce_notification_t &message) noexcept;
     void on_model_update(net::message::model_update_t& ) noexcept;
     void on_discovery(message::discovery_response_t &req) noexcept;
+    void on_notification(message::discovery_notify_t&) noexcept;
 
     void discover(const model::device_ptr_t &device) noexcept;
     void remove(const model::device_ptr_t &device) noexcept;
     void on_ready(const model::device_ptr_t &device, const utils::uri_container_t &uris) noexcept;
+    void dial(const model::device_ptr_t &peer, const utils::uri_container_t &uris) noexcept;
     void schedule_redial(const model::device_ptr_t &device) noexcept;
     void on_timer(r::request_id_t request_id, bool cancelled) noexcept;
 
     outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
 
     utils::logger_t log;
+    config::bep_config_t bep_config;
+    model::cluster_ptr_t cluster;
+    pt::time_duration redial_timeout;
 
     r::address_ptr_t coordinator;
     r::address_ptr_t global_discovery;
+    r::address_ptr_t peers;
 
-    model::cluster_ptr_t cluster;
-    pt::time_duration redial_timeout;
     discovery_map_t discovery_map;
     online_map_t online_map;
     redial_map_t redial_map;
+    redial_plan_t redial_plan;
 };
 
 } // namespace net

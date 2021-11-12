@@ -59,16 +59,16 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.register_name(names::coordinator, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-#if 0
         p.subscribe_actor(&net_supervisor_t::on_ssdp);
         p.subscribe_actor(&net_supervisor_t::on_port_mapping);
+#if 0
         p.subscribe_actor(&net_supervisor_t::on_discovery_notify);
         p.subscribe_actor(&net_supervisor_t::on_config_request);
         p.subscribe_actor(&net_supervisor_t::on_config_save);
         p.subscribe_actor(&net_supervisor_t::on_connect);
         p.subscribe_actor(&net_supervisor_t::on_dial_ready);
-#endif
         p.subscribe_actor(&net_supervisor_t::on_connection);
+#endif
         p.subscribe_actor(&net_supervisor_t::on_model_update);
         p.subscribe_actor(&net_supervisor_t::on_load_cluster);
         p.subscribe_actor(&net_supervisor_t::on_model_request);
@@ -341,6 +341,7 @@ void net_supervisor_t::on_port_mapping(message::port_mapping_notification_t &mes
             create_actor<dialer_actor_t>()
                 .timeout(timeout)
                 .dialer_config(dcfg)
+                .bep_config(app_config.bep_config)
                 .cluster(cluster)
                 .finish();
         }
@@ -452,7 +453,6 @@ void net_supervisor_t::on_disconnect(message::disconnect_notify_t &message) noex
         send<payload::disconnect_notify_t>(cluster_addr, device_id, message.payload.peer_addr);
     }
 }
-#endif
 
 void net_supervisor_t::on_connection(message::connection_notify_t &message) noexcept {
     auto timeout = r::pt::milliseconds{app_config.bep_config.connect_timeout};
@@ -460,7 +460,6 @@ void net_supervisor_t::on_connection(message::connection_notify_t &message) noex
     request<payload::connect_request_t>(peers_addr, std::move(payload.sock), payload.remote).send(timeout);
 }
 
-#if 0
 void net_supervisor_t::on_auth(message::auth_request_t &message) noexcept {
     auto &payload = message.payload.request_payload;
     auto &device_id = payload->peer_device_id;

@@ -56,8 +56,10 @@ struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::dif
     void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
     void on_discovery_notify(message::discovery_notify_t &message) noexcept;
     void on_connect(message::connect_response_t &message) noexcept;
+/*
     void on_connection(message::connection_notify_t &message) noexcept;
     void on_dial_ready(message::dial_ready_notify_t &message) noexcept;
+*/
     void on_config_request(ui::message::config_request_t &message) noexcept;
     void on_config_save(ui::message::config_save_request_t &message) noexcept;
     void on_load_cluster(message::load_cluster_response_t &message) noexcept;

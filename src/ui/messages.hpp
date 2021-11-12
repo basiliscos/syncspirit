@@ -10,12 +10,6 @@ namespace r = rotor;
 
 namespace payload {
 
-struct discovery_notification_t {
-    using message_ptr_t = r::intrusive_ptr_t<net::message::discovery_notify_t>;
-
-    message_ptr_t net_message;
-};
-
 using config_response_t = config::main_t;
 
 struct config_request_t {
@@ -32,8 +26,6 @@ struct config_save_request_t {
 } // namespace payload
 
 namespace message {
-
-using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
 
 using config_request_t = r::request_traits_t<payload::config_request_t>::request::message_t;
 using config_response_t = r::request_traits_t<payload::config_request_t>::response::message_t;
