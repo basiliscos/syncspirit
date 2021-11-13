@@ -80,24 +80,18 @@ std::string folder_t::serialize() noexcept {
 }
 
 
-bool folder_t::is_shared_with(const model::device_ptr_t &device) noexcept {
-    for (auto &it : folder_infos) {
-        if (it.item->get_device() == device.get()) {
-            return true;
-        }
-    }
-    return false;
+bool folder_t::is_shared_with(const model::device_t &device) const noexcept {
+    return (bool)folder_infos.by_device_id(device.device_id().get_sha256());
 }
 
-#if 0
-std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept {
+std::optional<proto::Folder> folder_t::generate(const model::device_t &device) const noexcept {
     if (!is_shared_with(device)) {
         return {};
     }
 
     proto::Folder r;
-    r.set_id(_id);
-    r.set_label(_label);
+    r.set_id(id);
+    r.set_label(label);
     r.set_read_only(read_only);
     r.set_ignore_permissions(ignore_permissions);
     r.set_ignore_delete(ignore_delete);
@@ -107,24 +101,24 @@ std::optional<proto::Folder> folder_t::get(model::device_ptr_t device) noexcept 
         auto &fi = *it.item;
         auto &d = *fi.get_device();
         auto &pd = *r.add_devices();
-        pd.set_id(std::string(d.device_id.get_sha256()));
-        pd.set_name(d.name);
-        pd.set_compression(d.compression);
-        if (d.cert_name) {
-            pd.set_cert_name(d.cert_name.value());
+        pd.set_id(std::string(d.device_id().get_sha256()));
+        pd.set_name(std::string(d.get_name()));
+        pd.set_compression(d.get_compression());
+        if (auto cn = d.get_cert_name(); cn) {
+            pd.set_cert_name(cn.value());
         }
-        auto db_max_seq = fi.get_max_sequence();
-        std::int64_t max_seq = db_max_seq;
+        std::int64_t max_seq = fi.get_max_sequence();
         pd.set_max_sequence(max_seq);
         pd.set_index_id(fi.get_index());
-        pd.set_introducer(d.introducer);
-        pd.set_skip_introduction_removals(d.skip_introduction_removals);
-        spdlog::trace("folder_t::get (==>), folder = {}/{:#x}, device = {}, max_seq = {}", _label, fi.get_index(),
-                      d.device_id, max_seq);
+        pd.set_introducer(d.is_introducer());
+        pd.set_skip_introduction_removals(d.get_skip_introduction_removals());
+        spdlog::trace("folder_t::get (==>), folder = {}/{:#x}, device = {}, max_seq = {}", label, fi.get_index(),
+                      d.device_id(), max_seq);
     }
     return r;
 }
 
+#if 0
 int64_t folder_t::score(const device_ptr_t &peer_device) noexcept {
     std::int64_t r = 0;
     std::int64_t my_seq = 0;

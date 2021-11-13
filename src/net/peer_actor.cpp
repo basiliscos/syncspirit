@@ -443,7 +443,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
-                LOG_TRACE(log, "{}, read_hello,  from {} ({} {})", identity, msg->device_name(), msg->client_name(),
+                LOG_TRACE(log, "{}, read_hello, from {} ({} {})", identity, msg->device_name(), msg->client_name(),
                           msg->client_version());
 #if 0
                 request<payload::auth_request_t>(coordinator, get_address(), peer_endpoint, peer_device_id, cert_name,

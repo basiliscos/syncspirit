@@ -21,16 +21,6 @@ void cluster_t::assign_folders(const folders_map_t &folders_) noexcept {
 
 void cluster_t::assign_blocks(block_infos_map_t &&blocks_) noexcept { blocks = std::move(blocks_); }
 
-proto::ClusterConfig cluster_t::get(device_ptr_t target) noexcept {
-    proto::ClusterConfig r;
-    for (auto &[id, folder] : folders) {
-        auto folder_opt = folder->get(target);
-        if (folder_opt) {
-            *(r.add_folders()) = folder_opt.value();
-        }
-    }
-    return r;
-}
 
 folders_map_t &cluster_t::get_folders() noexcept { return folders; }
 
@@ -66,6 +56,19 @@ file_interator_t cluster_t::iterate_files(const device_ptr_t &peer_device) noexc
     return file_interator_t(*this, peer_device);
 }
 #endif
+
+proto::ClusterConfig cluster_t::generate(const device_t &target) const noexcept {
+    proto::ClusterConfig r;
+    for (auto it : folders) {
+        auto& folder = it.item;
+        auto folder_opt = folder->generate(target);
+        if (folder_opt) {
+            *(r.add_folders()) = folder_opt.value();
+        }
+    }
+    return r;
+}
+
 
 devices_map_t &cluster_t::get_devices() noexcept {
     return devices;

@@ -16,27 +16,12 @@ namespace syncspirit::model {
 
 struct file_interator_t;
 
-#if 0
-struct update_result_t {
-    using unknown_folders_t = std::vector<const proto::Folder *>;
-    using outdated_folders_t = std::unordered_set<const proto::Folder *>;
-
-    unknown_folders_t unknown_folders;
-    outdated_folders_t outdated_folders;
-};
-#endif
-
 struct cluster_t final : arc_base_t<cluster_t> {
 
     cluster_t(device_ptr_t device_, size_t seed) noexcept;
 
+    proto::ClusterConfig generate(const model::device_t& target) const noexcept;
 #if 0
-    void assign_folders(const folders_map_t &folders) noexcept;
-    void assign_blocks(block_infos_map_t &&blocks) noexcept;
-    proto::ClusterConfig get(model::device_ptr_t target) noexcept;
-#if 0
-    update_result_t update(const proto::ClusterConfig &config) noexcept;
-#endif
     void add_folder(const folder_ptr_t &folder) noexcept;
     file_interator_t iterate_files(const device_ptr_t &peer_device) noexcept;
 #endif

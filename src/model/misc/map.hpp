@@ -80,6 +80,7 @@ template <typename Item, size_t N> struct generic_map_t {
     using array_t = details::StringArray<N>;
     using wrapped_item_t = details::key_t<Item, N>;
     using iterator_t = decltype (std::declval<map_t>().template get<0>().begin());
+    using const_iterator_t = decltype (std::declval<map_t>().template get<0>().cbegin());
 
     void put(const Item &item) noexcept {
         array_t arr;
@@ -107,6 +108,10 @@ template <typename Item, size_t N> struct generic_map_t {
     iterator_t begin() noexcept { return key2item.template get<0>().begin(); }
 
     iterator_t end() noexcept { return key2item.template get<0>().end(); }
+
+    const_iterator_t begin() const noexcept { return key2item.template get<0>().cbegin(); }
+
+    const_iterator_t end() const noexcept { return key2item.template get<0>().cend(); }
 
     void clear() noexcept { key2item.clear(); }
 

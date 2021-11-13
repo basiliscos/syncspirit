@@ -98,6 +98,12 @@ void controller_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     LOG_TRACE(log, "{}, on_start", identity);
     send<payload::start_reading_t>(peer_addr, get_address(), true);
+
+    auto cluster_config = cluster->generate(*peer);
+    using payload_t = std::decay_t<decltype(cluster_config)>;
+    auto payload = std::make_unique<payload_t>(std::move(cluster_config));
+    send<payload::cluster_config_t>(peer_addr, std::move(payload));
+
 #if 0
     update(*peer_cluster_config);
     peer_cluster_config.reset();
@@ -419,7 +425,8 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
 #if 0
     update(*message);
 #endif
-    std::abort();
+    LOG_CRITICAL(log, "{}, on cluster config message", identity);
+    //std::abort();
 }
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {

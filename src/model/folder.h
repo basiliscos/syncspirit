@@ -42,8 +42,7 @@ struct folder_t final : arc_base_t<folder_t>, storeable_t {
     bool operator==(const folder_t &other) const noexcept { return get_id() == other.get_id(); }
     bool operator!=(const folder_t &other) const noexcept { return !(*this == other); }
 
-    std::optional<proto::Folder> get(model::device_ptr_t device) noexcept;
-    bool is_shared_with(const model::device_ptr_t &device) noexcept;
+    bool is_shared_with(const device_t &device) const noexcept;
     std::int64_t score(const device_ptr_t &peer_device) noexcept;
 
     std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
@@ -55,6 +54,7 @@ struct folder_t final : arc_base_t<folder_t>, storeable_t {
     inline const bfs::path &get_path() noexcept { return path; }
     //bool update(const proto::Folder &remote) noexcept;
     void update(local_file_map_t &local_files) noexcept;
+    std::optional<proto::Folder> generate(const model::device_t& device) const noexcept;
     proto::Index generate() noexcept;
 
     template <typename T> auto &access() noexcept;

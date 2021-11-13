@@ -37,6 +37,10 @@ struct device_t : arc_base_t<device_t> {
     inline std::string_view get_name() const noexcept { return name; }
     inline const name_option_t get_cert_name() const noexcept { return cert_name; }
     inline const auto& get_static_addresses() const noexcept { return  static_addresses;}
+    inline proto::Compression get_compression() const noexcept { return compression; }
+    inline bool is_introducer() const noexcept { return introducer; }
+    inline bool get_skip_introduction_removals() const noexcept { return skip_introduction_removals; }
+
     void update(const db::Device& source) noexcept;
 
     protected:
