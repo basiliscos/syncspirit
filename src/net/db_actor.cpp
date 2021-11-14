@@ -290,6 +290,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff) noe
         }
     }
 
+#if 0
     auto& folders = cluster->get_folders();
     for(auto it:diff.reset_folders) {
         auto folder = folders.by_id(it.folder_id);
@@ -302,6 +303,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff) noe
             return r.assume_error();
         }
     }
+#endif
 
     return outcome::success();
 }
