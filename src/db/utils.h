@@ -53,6 +53,7 @@ outcome::result<model::ignored_folders_map_t> load_ignored_folders(transaction_t
 
 outcome::result<container_t> load(discr_t prefix, transaction_t &txn) noexcept;
 outcome::result<void> save(const pair_t& container, transaction_t &txn) noexcept;
+outcome::result<void> remove(std::string_view key, transaction_t &txn) noexcept;
 
 
 

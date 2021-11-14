@@ -67,8 +67,8 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         open_reading = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.discover_name(names::coordinator, coordinator, false).link(true);
 #if 0
-        p.discover_name(names::db, db, false).link(true);
         p.discover_name(names::file_actor, file_addr, false).link(true);
 #endif
         p.discover_name(names::hasher_proxy, hasher_proxy, false).link();
@@ -422,11 +422,14 @@ void controller_actor_t::on_store_file_info(message::store_file_response_t &mess
 #endif
 
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
-#if 0
-    update(*message);
-#endif
-    LOG_CRITICAL(log, "{}, on cluster config message", identity);
-    //std::abort();
+    LOG_DEBUG(log, "{}, on cluster config message", identity);
+    auto diff_opt = cluster->process(*message, *peer);
+    if (!diff_opt) {
+        auto& ec = diff_opt.assume_error();
+        LOG_ERROR(log, "error processing message from {} : {}", identity, peer->device_id(), ec.message());
+        return do_shutdown(make_error(ec));
+    }
+    send<payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {

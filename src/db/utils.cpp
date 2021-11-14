@@ -141,6 +141,18 @@ outcome::result<void> save(const pair_t& container, transaction_t &txn) noexcept
     return outcome::success();
 }
 
+outcome::result<void> remove(std::string_view key_, transaction_t &txn) noexcept {
+    MDBX_val key;
+    key.iov_base = (void*)key_.data();
+    key.iov_len = key_.size();
+
+    auto r = mdbx_del(txn.txn, txn.dbi, &key, nullptr);
+    if (r != MDBX_SUCCESS) {
+        return make_error_code(r);
+    }
+    return outcome::success();
+}
+
 
 #if 0
 

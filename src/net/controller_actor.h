@@ -152,6 +152,7 @@ struct controller_actor_t : public r::actor_base_t {
     model::cluster_ptr_t cluster;
     model::device_ptr_t peer;
     model::folder_ptr_t folder;
+    r::address_ptr_t coordinator;
     r::address_ptr_t peer_addr;
 #if 0
     r::address_ptr_t db;

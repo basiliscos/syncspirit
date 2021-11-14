@@ -17,6 +17,7 @@
 #include "../model/diff/modify/create_folder.h"
 #include "../model/diff/modify/share_folder.h"
 #include "../model/diff/modify/update_peer.h"
+#include "../model/diff/peer/cluster_update.h"
 #include "../model/diff/diff_visitor.h"
 
 namespace syncspirit::net {
@@ -270,6 +271,41 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff) noex
 
     return outcome::success();
 }
+
+auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff) noexcept -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = txn_opt.value();
+
+    for(auto& key:diff.removed_folders) {
+        auto r = db::remove(key, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    auto& folders = cluster->get_folders();
+    for(auto it:diff.reset_folders) {
+        auto folder = folders.by_id(it.folder_id);
+        auto folder_info = folder->get_folder_infos().by_device_id(diff.source_device);
+
+        auto fi_key = folder_info->get_key();
+        auto fi_data = folder_info->serialize();
+        auto r = db::save({fi_key, fi_data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    return outcome::success();
+}
+
 
 
 #if 0

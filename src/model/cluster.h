@@ -11,6 +11,7 @@
 #include "ignored_folder.h"
 #include "folder.h"
 #include "block_info.h"
+#include "diff/cluster_diff.h"
 
 namespace syncspirit::model {
 
@@ -22,7 +23,6 @@ struct cluster_t final : arc_base_t<cluster_t> {
 
     proto::ClusterConfig generate(const model::device_t& target) const noexcept;
 #if 0
-    void add_folder(const folder_ptr_t &folder) noexcept;
     file_interator_t iterate_files(const device_ptr_t &peer_device) noexcept;
 #endif
     inline const device_ptr_t &get_device() const noexcept { return device; }
@@ -38,6 +38,8 @@ struct cluster_t final : arc_base_t<cluster_t> {
     uint64_t next_uint64() noexcept;
     inline bool is_tainted() const noexcept { return tainted; }
     inline void mark_tainted() noexcept { tainted = true; }
+
+    outcome::result<diff::cluster_diff_ptr_t> process(proto::ClusterConfig& msg, const device_t& peer) const noexcept;
 
   private:
     using rng_engine_t = std::mt19937;

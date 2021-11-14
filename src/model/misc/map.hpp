@@ -89,8 +89,7 @@ template <typename Item, size_t N> struct generic_map_t {
     }
 
     void remove(const Item &item) noexcept {
-        auto it = key2item.find(id(item));
-        key2item.erase(it);
+        key2item.template get<0>().erase(get_index<0>(item));
     }
 
     template<size_t I = 0>

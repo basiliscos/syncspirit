@@ -10,16 +10,17 @@
 namespace syncspirit::model::diff::peer {
 
 struct cluster_update_t final : cluster_diff_t {
-    using message_t = proto::message::ClusterConfig;
+    using message_t = proto::ClusterConfig;
     using unknown_folders_t = std::vector<proto::Folder>;
     struct update_info_t {
         std::string folder_id;
         proto::Device device;
     };
     using modified_folders_t = std::vector<update_info_t>;
+    using keys_t = std::vector<std::string>;
 
 
-    static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, const model::device_ptr_t& source, message_t message) noexcept;
+    static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, const model::device_t& source, const message_t& message) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(diff_visitor_t &) const noexcept override;
@@ -27,8 +28,14 @@ struct cluster_update_t final : cluster_diff_t {
     unknown_folders_t unknown_folders;
     modified_folders_t reset_folders;
     modified_folders_t updated_folders;
+    std::string source_device;
+    keys_t removed_folders;
+    keys_t removed_files;
+    keys_t removed_blocks;
 private:
-    cluster_update_t(unknown_folders_t unknown_folders, modified_folders_t reset_folders, modified_folders_t updated_folders) noexcept;
+    cluster_update_t(std::string_view source_device, unknown_folders_t unknown_folders,
+                     modified_folders_t reset_folders, modified_folders_t updated_folders,
+                     keys_t removed_folders, keys_t removed_files, keys_t removed_blocks) noexcept;
 };
 
 }
