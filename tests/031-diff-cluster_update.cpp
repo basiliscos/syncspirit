@@ -13,10 +13,16 @@ using namespace syncspirit::test;
 template <typename F>
 struct my_cluster_update_visitor_t: diff::diff_visitor_t {
     F fn;
+    bool remove_diff = false;
 
     my_cluster_update_visitor_t(F&& fn_): fn{std::forward<F>(fn_)}{}
+
     outcome::result<void> operator()(const diff::peer::cluster_update_t &diff) noexcept override {
         return fn(diff);
+    }
+    outcome::result<void> operator()(const diff::peer::cluster_remove_t &diff) noexcept override {
+        remove_diff = true;
+        return outcome::success();
     }
 };
 
@@ -341,5 +347,5 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     auto r_v = diff->visit(visitor);
     REQUIRE(r_v);
     REQUIRE(visited);
-
+    CHECK(visitor.remove_diff);
 }

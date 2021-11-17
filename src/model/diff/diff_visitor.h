@@ -11,6 +11,7 @@ namespace load {
 }
 
 namespace peer {
+    struct cluster_remove_t;
     struct cluster_update_t;
     struct peer_state_t;
 }
@@ -26,6 +27,7 @@ struct diff_visitor_t {
     virtual ~diff_visitor_t();
     virtual outcome::result<void> operator()(const load::load_cluster_t &) noexcept;
     virtual outcome::result<void> operator()(const peer::peer_state_t &) noexcept;
+    virtual outcome::result<void> operator()(const peer::cluster_remove_t &) noexcept;
     virtual outcome::result<void> operator()(const peer::cluster_update_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::create_folder_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::share_folder_t &) noexcept;

@@ -34,9 +34,7 @@ struct cluster_update_t final : cluster_diff_t {
     keys_t removed_blocks;
 
 private:
-    cluster_update_t(std::string_view source_device, unknown_folders_t unknown_folders,
-                     modified_folders_t reset_folders, modified_folders_t updated_folders,
-                     keys_t removed_folders, keys_t removed_files, keys_t removed_blocks) noexcept;
+    cluster_update_t(unknown_folders_t unknown_folders, modified_folders_t reset_folders, modified_folders_t updated_folders, keys_t removed_blocks) noexcept;
 };
 
 }

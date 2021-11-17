@@ -8,6 +8,10 @@ auto diff_visitor_t::operator()(const load::load_cluster_t &) noexcept -> outcom
     return outcome::success();
 }
 
+auto diff_visitor_t::operator ()(const peer::cluster_remove_t &) noexcept -> outcome::result<void>  {
+    return outcome::success();
+}
+
 auto diff_visitor_t::operator ()(const peer::cluster_update_t &) noexcept -> outcome::result<void>  {
     return outcome::success();
 }

@@ -1,5 +1,7 @@
 #include "cluster_update.h"
+#include "cluster_remove.h"
 #include "model/cluster.h"
+#include "model/diff/aggregate.h"
 #include "model/diff/diff_visitor.h"
 #include "model/misc/map.hpp"
 #include <spdlog/spdlog.h>
@@ -81,15 +83,29 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         }
     }
 
-    ptr = new cluster_update_t(source.device_id().get_sha256(), std::move(unknown), std::move(reset), std::move(updated),
-                               std::move(removed_folders), std::move(removed_files_final), std::move(removed_blocks));
+    ptr = new cluster_update_t(std::move(unknown), std::move(reset), std::move(updated), removed_blocks);
+    bool wrap = !removed_blocks.empty() || !removed_folders.empty();
+    if (wrap) {
+        keys_t updated_folders;
+        for(auto& info: updated) {
+            updated_folders.emplace(info.folder_id);
+        }
+
+        auto remove = cluster_diff_ptr_t(new cluster_remove_t(source.device_id().get_sha256(),
+                                                            std::move(updated_folders),
+                                                          std::move(removed_folders), std::move(removed_files_final),
+                                                          std::move(removed_blocks)));
+        auto diffs = aggregate_t::diffs_t{std::move(ptr), std::move(remove)};
+        auto container = cluster_diff_ptr_t(new aggregate_t(std::move(diffs)));
+        return outcome::success(std::move(container));
+    }
     return outcome::success(std::move(ptr));
 }
 
-cluster_update_t::cluster_update_t(std::string_view source_device_, unknown_folders_t unknown_folders, modified_folders_t reset_folders_,
-                                   modified_folders_t updated_folders_, keys_t removed_folders_, keys_t removed_files_, keys_t removed_blocks_) noexcept:
+cluster_update_t::cluster_update_t(unknown_folders_t unknown_folders, modified_folders_t reset_folders_,
+                                   modified_folders_t updated_folders_, keys_t removed_blocks_) noexcept:
 unknown_folders{std::move(unknown_folders)}, reset_folders{std::move(reset_folders_)}, updated_folders{std::move(updated_folders_)},
-  source_device{source_device_}, removed_folders{removed_folders_}, removed_files{removed_files_}, removed_blocks{removed_blocks_}
+   removed_blocks{removed_blocks_}
 {
 }
 
@@ -130,6 +146,5 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
 }
 
 auto cluster_update_t::visit(diff_visitor_t &visitor) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "visiting cluster_update_t");
     return visitor(*this);
 }
