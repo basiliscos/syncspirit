@@ -24,6 +24,7 @@ using block_info_ptr_t = intrusive_ptr_t<block_info_t>;
 
 struct block_info_t final : arc_base_t<block_info_t>, storeable_t {
     using removed_incides_t = std::vector<size_t>;
+    using file_blocks_t = std::vector<file_block_t>;
     static const constexpr size_t digest_length = 32;
     static const constexpr size_t data_length = digest_length + 1;
 
@@ -35,6 +36,7 @@ struct block_info_t final : arc_base_t<block_info_t>, storeable_t {
     inline std::uint32_t get_weak_hash() const noexcept { return weak_hash; }
     inline std::uint32_t get_size() const noexcept { return size; }
     inline size_t usages() const noexcept { return file_blocks.size(); }
+    inline file_blocks_t& get_file_blocks() { return file_blocks; }
 
     std::string serialize() noexcept;
     void link(file_info_t *file_info, size_t block_index) noexcept;
@@ -50,8 +52,6 @@ struct block_info_t final : arc_base_t<block_info_t>, storeable_t {
     template<typename T> void assign(const T& item) noexcept;
     block_info_t(std::string_view key) noexcept;
     block_info_t(const proto::BlockInfo &block) noexcept;
-
-    using file_blocks_t = std::vector<file_block_t>;
 
     char hash[data_length];
     std::uint32_t weak_hash;

@@ -17,7 +17,7 @@ struct cluster_update_t final : cluster_diff_t {
         proto::Device device;
     };
     using modified_folders_t = std::vector<update_info_t>;
-    using keys_t = std::vector<std::string>;
+    using keys_t = std::set<std::string>;
 
 
     static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, const model::device_t& source, const message_t& message) noexcept;
@@ -32,6 +32,7 @@ struct cluster_update_t final : cluster_diff_t {
     keys_t removed_folders;
     keys_t removed_files;
     keys_t removed_blocks;
+
 private:
     cluster_update_t(std::string_view source_device, unknown_folders_t unknown_folders,
                      modified_folders_t reset_folders, modified_folders_t updated_folders,

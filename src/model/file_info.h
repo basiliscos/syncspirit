@@ -38,7 +38,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     ~file_info_t();
 
     std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
-    std::string_view get_uuid() const noexcept { return std::string_view(key + 1, uuid_length); }
+    std::string_view get_uuid() const noexcept;
     bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
 
     std::string serialize(bool include_blocks = true) noexcept;

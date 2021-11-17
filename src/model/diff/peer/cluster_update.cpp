@@ -1,9 +1,18 @@
 #include "cluster_update.h"
 #include "model/cluster.h"
 #include "model/diff/diff_visitor.h"
+#include "model/misc/map.hpp"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::model::diff::peer;
+
+namespace syncspirit::model {
+
+using string_map = syncspirit::model::generic_map_t<std::string, 1>;
+
+template<> std::string_view get_index<0>(const std::string& item) noexcept { return item; }
+
+}
 
 auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, const message_t &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
     auto ptr = cluster_diff_ptr_t();
@@ -12,8 +21,26 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     modified_folders_t updated;
     modified_folders_t reset;
     keys_t removed_folders;
+    keys_t removed_files_final;
+    string_map removed_files;
+    keys_t removed_blocks;
     auto& folders = cluster.get_folders();
     auto& devices = cluster.get_devices();
+
+    auto remove_blocks = [&](const model::file_info_ptr_t& fi) noexcept {
+        auto& blocks = fi->get_blocks();
+        for(auto& block: blocks) {
+            auto predicate = [&](const model::file_block_t fb) -> bool {
+                auto r = removed_files.get(fb.file()->get_key());
+                return !r.empty();
+            };
+            auto& file_blocks = block->get_file_blocks();
+            bool remove = std::all_of(file_blocks.begin(), file_blocks.end(), predicate);
+            if (remove) {
+                removed_blocks.emplace(std::string(block->get_hash()));
+            }
+        }
+    };
 
     for (int i = 0; i < message.folders_size(); ++i) {
         auto &f = message.folders(i);
@@ -38,10 +65,15 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
             auto update_info = update_info_t { f.id(), d };
             if (d.index_id() != folder_info->get_index()) {
                 reset.emplace_back(update_info);
-                removed_folders.emplace_back(folder_info->get_key());
-                if (folder_info->get_file_infos().size() > 0) {
-                    spdlog::critical("folder reset is not implemented");
-                    std::abort();
+                removed_folders.emplace(folder_info->get_key());
+                auto& files = folder_info->get_file_infos();
+                for(auto it: files) {
+                    auto key = std::string(it.item->get_key());
+                    removed_files_final.emplace(key);
+                    removed_files.put(key);
+                }
+                for(auto it: files) {
+                    remove_blocks(it.item);
                 }
              } else if (d.max_sequence() > folder_info->get_max_sequence()) {
                 updated.emplace_back(update_info);
@@ -50,7 +82,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     }
 
     ptr = new cluster_update_t(source.device_id().get_sha256(), std::move(unknown), std::move(reset), std::move(updated),
-                               removed_folders, {}, {});
+                               std::move(removed_folders), std::move(removed_files_final), std::move(removed_blocks));
     return outcome::success(std::move(ptr));
 }
 
@@ -59,7 +91,6 @@ cluster_update_t::cluster_update_t(std::string_view source_device_, unknown_fold
 unknown_folders{std::move(unknown_folders)}, reset_folders{std::move(reset_folders_)}, updated_folders{std::move(updated_folders_)},
   source_device{source_device_}, removed_folders{removed_folders_}, removed_files{removed_files_}, removed_blocks{removed_blocks_}
 {
-
 }
 
 
@@ -82,12 +113,18 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
         folder_infos.remove(folder_info);
         db::FolderInfo db_fi;
         db_fi.set_index_id(info.device.index_id());
-        db_fi.set_max_sequence(info.device.max_sequence());
+        /* will be updated later, with Index/IndexUpdate */
+        db_fi.set_max_sequence(0);
         auto opt = folder_info_t::create(cluster.next_uuid(), db_fi, folder_info->get_device(), folder);
         if (!opt) {
             return opt.assume_error();
         }
         folder_infos.put(opt.assume_value());
+    }
+    auto& blocks = cluster.get_blocks();
+    for(auto& id: removed_blocks) {
+        auto block = blocks.get(id);
+        blocks.remove(block);
     }
     return outcome::success();
 }

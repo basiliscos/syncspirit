@@ -101,6 +101,9 @@ template <typename Source> void file_info_t::fields_update(const Source &s) noex
     full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
 }
 
+std::string_view file_info_t::get_uuid() const noexcept {
+     return std::string_view(key + 1 + uuid_length, uuid_length);
+}
 
 std::string file_info_t::serialize(bool include_blocks) noexcept {
     db::FileInfo r;
