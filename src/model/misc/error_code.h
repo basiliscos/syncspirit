@@ -35,6 +35,7 @@ enum class error_code_t {
     device_does_not_exist,
     folder_is_already_shared,
     malformed_deviceid,
+    folder_is_not_shared,
 };
 
 namespace detail {

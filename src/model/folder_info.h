@@ -66,11 +66,6 @@ struct folder_info_t final : arc_base_t<folder_info_t>, storeable_t {
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
-#if 0
-inline const std::string &natural_key(const folder_info_ptr_t &item) noexcept { return item->get_device()->get_id(); }
-inline std::uint64_t db_key(const folder_info_ptr_t &item) noexcept { return item->get_db_key(); }
-#endif
-
 struct folder_infos_map_t: public generic_map_t<folder_info_ptr_t, 2> {
     folder_info_ptr_t by_device(const device_ptr_t& device) const noexcept;
     folder_info_ptr_t by_device_id(std::string_view device_id) const noexcept;

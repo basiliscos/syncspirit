@@ -4,6 +4,8 @@
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/update_peer.h"
+#include "model/diff/peer/update_folder.h"
+#include "model/diff/peer/cluster_remove.h"
 #include "model/diff/aggregate.h"
 #include "test_supervisor.h"
 #include "access.h"
@@ -262,11 +264,78 @@ void test_folder_sharing() {
     F().run();
 }
 
+void test_cluster_remove() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            using keys_t = diff::peer::cluster_remove_t::keys_t;
+
+            std::uint64_t peer_index{5};
+            auto diffs = diff::aggregate_t::diffs_t{};
+            db::Folder db_folder;
+            db_folder.set_id("1234-5678");
+            db_folder.set_label("my-label");
+            db_folder.set_path("/my/path");
+            diffs.emplace_back(new diff::modify::create_folder_t(db_folder));
+
+            auto peer_id = peer_device->device_id().get_sha256();
+            db::Device db_peer;
+            db_peer.set_name("some_name");
+            diffs.emplace_back(new diff::modify::update_peer_t(db_peer, peer_id));
+            diffs.emplace_back(new diff::modify::share_folder_t(peer_id, db_folder.id(), peer_index));
+
+            auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
+            sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->do_process();
+
+            proto::Index idx;
+            idx.set_folder(db_folder.id());
+            auto file = idx.add_files();
+            file->set_name("a.txt");
+            file->set_size(5ul);
+            file->set_sequence(6ul);
+            auto block = file->add_blocks();
+            block->set_size(5ul);
+            block->set_hash(utils::sha256_digest("12345").value());
+            diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
+
+            sup->send<payload::model_update_t>(sup->get_address(), diff, nullptr);
+            sup->do_process();
+
+            REQUIRE(cluster->get_blocks().size() == 1);
+            CHECK(cluster->get_blocks().get(block->hash()));
+
+            /*
+            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            REQUIRE(!reply->payload.ee);
+
+            auto cluster_clone = make_cluster();
+            REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+            */
+
+
+            /*
+            auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+
+            keys_t updated_folders{std::string(folder->get_id())};
+            keys_t removed_folder_infos;
+            keys_t removed_filess;
+            keys_t removed_blocks;
+            //auto diff = diff::cluster_diff_ptr_t(new diff::peer::cluster_remove_t(peer_device->device_id().get_sha256(), ));
+            */
+        }
+    };
+
+    F().run();
+}
+
 REGISTER_TEST_CASE(test_db_migration, "test_db_migration", "[db]");
 REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
 REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
 REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
 REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
+REGISTER_TEST_CASE(test_cluster_remove, "test_cluster_remove", "[db]");
 
 
 #if 0
