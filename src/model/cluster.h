@@ -27,6 +27,7 @@ struct cluster_t final : arc_base_t<cluster_t> {
 #endif
     inline const device_ptr_t &get_device() const noexcept { return device; }
     block_infos_map_t &get_blocks() noexcept;
+    const block_infos_map_t &get_blocks() const noexcept;
     devices_map_t &get_devices() noexcept;
     const devices_map_t &get_devices() const noexcept;
     ignored_devices_map_t &get_ignored_devices() noexcept;

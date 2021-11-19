@@ -18,6 +18,7 @@
 #include "../model/diff/modify/share_folder.h"
 #include "../model/diff/modify/update_peer.h"
 #include "../model/diff/peer/cluster_update.h"
+#include "../model/diff/peer/update_folder.h"
 #include "../model/diff/diff_visitor.h"
 
 namespace syncspirit::net {
@@ -307,6 +308,53 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff) noe
 
     return outcome::success();
 }
+
+auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff) noexcept -> outcome::result<void>  {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = txn_opt.value();
+
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_info = folder->get_folder_infos().by_device_id(diff.peer_id);
+
+    auto fi_key = folder_info->get_key();
+    auto fi_data = folder_info->serialize();
+    auto r = db::save({fi_key, fi_data}, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    auto& blocks_map = cluster->get_blocks();
+    for (const auto& b: diff.blocks) {
+        auto block = blocks_map.get(b.hash());
+        auto key = block->get_key();
+        auto data = block->serialize();
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    auto& files_map = folder_info->get_file_infos();
+    for (const auto& f: diff.files) {
+        auto file = files_map.by_name(f.name());
+        auto key = file->get_key();
+        auto data = file->serialize();
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    return outcome::success();
+}
+
 
 
 

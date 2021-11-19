@@ -86,6 +86,10 @@ block_infos_map_t &cluster_t::get_blocks() noexcept {
     return blocks;
 }
 
+const block_infos_map_t &cluster_t::get_blocks() const noexcept {
+    return blocks;
+}
+
 folders_map_t &cluster_t::get_folders() noexcept {
     return folders;
 }

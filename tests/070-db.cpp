@@ -264,7 +264,7 @@ void test_folder_sharing() {
     F().run();
 }
 
-void test_cluster_remove() {
+void test_cluster_update_and_remove() {
     struct F : fixture_t {
         void main() noexcept override {
             using keys_t = diff::peer::cluster_remove_t::keys_t;
@@ -296,24 +296,44 @@ void test_cluster_remove() {
             auto block = file->add_blocks();
             block->set_size(5ul);
             block->set_hash(utils::sha256_digest("12345").value());
-            diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
+            diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
 
             sup->send<payload::model_update_t>(sup->get_address(), diff, nullptr);
             sup->do_process();
 
             REQUIRE(cluster->get_blocks().size() == 1);
             CHECK(cluster->get_blocks().get(block->hash()));
+            auto peer_folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(peer_device);
+            REQUIRE(peer_folder_info);
+            CHECK(peer_folder_info->get_max_sequence() == 6ul);
+            for(auto it: peer_folder_info->get_file_infos()) {
+                auto name = it.item->get_name();
+                printf("n = %s\n", name.data());
+            }
+            REQUIRE(peer_folder_info->get_file_infos().size() == 1);
+            REQUIRE(peer_folder_info->get_file_infos().by_name("a.txt"));
 
-            /*
             sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
             REQUIRE(reply);
             REQUIRE(!reply->payload.ee);
 
             auto cluster_clone = make_cluster();
-            REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-            */
-
+            {
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(cluster_clone->get_blocks().size() == 1);
+                CHECK(cluster_clone->get_blocks().get(block->hash()));
+                REQUIRE(cluster_clone->get_blocks().size() == 1);
+                CHECK(cluster_clone->get_blocks().get(block->hash()));
+                auto peer_folder_info = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(peer_device);
+                REQUIRE(peer_folder_info);
+                for(auto it: peer_folder_info->get_file_infos()) {
+                    auto name = it.item->get_name();
+                    printf("n = %s\n", name.data());
+                }
+                REQUIRE(peer_folder_info->get_file_infos().size() == 1);
+                REQUIRE(peer_folder_info->get_file_infos().by_name("a.txt"));
+            }
 
             /*
             auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
@@ -335,7 +355,7 @@ REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
 REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
 REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
 REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
-REGISTER_TEST_CASE(test_cluster_remove, "test_cluster_remove", "[db]");
+REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
 
 
 #if 0
