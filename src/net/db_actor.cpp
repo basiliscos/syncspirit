@@ -17,7 +17,7 @@
 #include "../model/diff/modify/create_folder.h"
 #include "../model/diff/modify/share_folder.h"
 #include "../model/diff/modify/update_peer.h"
-#include "../model/diff/peer/cluster_update.h"
+#include "../model/diff/peer/cluster_remove.h"
 #include "../model/diff/peer/update_folder.h"
 #include "../model/diff/diff_visitor.h"
 
@@ -273,7 +273,7 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff) noex
     return outcome::success();
 }
 
-auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::peer::cluster_remove_t &diff) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -284,27 +284,24 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff) noe
     }
     auto &txn = txn_opt.value();
 
-    for(auto& key:diff.removed_folders) {
+    for(auto& key:diff.removed_folder_infos) {
         auto r = db::remove(key, txn);
         if (!r) {
             return r.assume_error();
         }
     }
-
-#if 0
-    auto& folders = cluster->get_folders();
-    for(auto it:diff.reset_folders) {
-        auto folder = folders.by_id(it.folder_id);
-        auto folder_info = folder->get_folder_infos().by_device_id(diff.source_device);
-
-        auto fi_key = folder_info->get_key();
-        auto fi_data = folder_info->serialize();
-        auto r = db::save({fi_key, fi_data}, txn);
+    for(auto& key:diff.removed_files) {
+        auto r = db::remove(key, txn);
         if (!r) {
             return r.assume_error();
         }
     }
-#endif
+    for(auto& key:diff.removed_blocks) {
+        auto r = db::remove(key, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
 
     return outcome::success();
 }

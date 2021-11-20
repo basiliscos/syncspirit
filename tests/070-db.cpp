@@ -59,13 +59,13 @@ struct fixture_t {
         auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
         auto my_device =  device_t::create(my_id, "my-device").value();
 
-        auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-        peer_device =  device_t::create(peer_id, "peer-device").value();
-
         return cluster_ptr_t(new cluster_t(my_device, 1));
     }
 
     virtual void run() noexcept {
+        auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+        peer_device =  device_t::create(peer_id, "peer-device").value();
+
         cluster = make_cluster();
 
         auto root_path = bfs::unique_path();
@@ -293,25 +293,23 @@ void test_cluster_update_and_remove() {
             file->set_name("a.txt");
             file->set_size(5ul);
             file->set_sequence(6ul);
-            auto block = file->add_blocks();
-            block->set_size(5ul);
-            block->set_hash(utils::sha256_digest("12345").value());
+            auto b = file->add_blocks();
+            b->set_size(5ul);
+            b->set_hash(utils::sha256_digest("12345").value());
             diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
 
             sup->send<payload::model_update_t>(sup->get_address(), diff, nullptr);
             sup->do_process();
 
             REQUIRE(cluster->get_blocks().size() == 1);
-            CHECK(cluster->get_blocks().get(block->hash()));
+            auto block = cluster->get_blocks().get(b->hash());
+            REQUIRE(block);
             auto peer_folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(peer_device);
             REQUIRE(peer_folder_info);
             CHECK(peer_folder_info->get_max_sequence() == 6ul);
-            for(auto it: peer_folder_info->get_file_infos()) {
-                auto name = it.item->get_name();
-                printf("n = %s\n", name.data());
-            }
             REQUIRE(peer_folder_info->get_file_infos().size() == 1);
-            REQUIRE(peer_folder_info->get_file_infos().by_name("a.txt"));
+            auto peer_file = peer_folder_info->get_file_infos().by_name("a.txt");
+            REQUIRE(peer_file);
 
             sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
@@ -322,28 +320,36 @@ void test_cluster_update_and_remove() {
             {
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
                 REQUIRE(cluster_clone->get_blocks().size() == 1);
-                CHECK(cluster_clone->get_blocks().get(block->hash()));
-                REQUIRE(cluster_clone->get_blocks().size() == 1);
-                CHECK(cluster_clone->get_blocks().get(block->hash()));
+                CHECK(cluster_clone->get_blocks().get(b->hash()));
                 auto peer_folder_info = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(peer_device);
                 REQUIRE(peer_folder_info);
-                for(auto it: peer_folder_info->get_file_infos()) {
-                    auto name = it.item->get_name();
-                    printf("n = %s\n", name.data());
-                }
                 REQUIRE(peer_folder_info->get_file_infos().size() == 1);
                 REQUIRE(peer_folder_info->get_file_infos().by_name("a.txt"));
             }
 
-            /*
-            auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+            keys_t updated_folders{std::string(db_folder.id())};
+            keys_t removed_folder_infos{std::string(peer_folder_info->get_key())};
+            keys_t removed_files{std::string(peer_file->get_key())};
+            keys_t removed_blocks{std::string(block->get_key())};
+            diff = new diff::peer::cluster_remove_t(peer_id, updated_folders, removed_folder_infos,
+                                                    removed_files, removed_blocks);
+            sup->send<payload::model_update_t>(sup->get_address(), diff, nullptr);
+            sup->do_process();
 
-            keys_t updated_folders{std::string(folder->get_id())};
-            keys_t removed_folder_infos;
-            keys_t removed_filess;
-            keys_t removed_blocks;
-            //auto diff = diff::cluster_diff_ptr_t(new diff::peer::cluster_remove_t(peer_device->device_id().get_sha256(), ));
-            */
+            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            REQUIRE(!reply->payload.ee);
+
+            cluster_clone = make_cluster();
+            {
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(cluster_clone->get_blocks().size() == 0);
+                auto& fis = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos();
+                REQUIRE(fis.size() == 1);
+                REQUIRE(!fis.by_device(peer_device));
+                REQUIRE(fis.by_device(cluster->get_device()));
+            }
         }
     };
 
