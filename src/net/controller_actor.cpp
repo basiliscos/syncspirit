@@ -1,7 +1,6 @@
 #include "controller_actor.h"
 #include "names.h"
 #include "../utils/error_code.h"
-#include "../ui/messages.hpp"
 #include <fstream>
 
 using namespace syncspirit;

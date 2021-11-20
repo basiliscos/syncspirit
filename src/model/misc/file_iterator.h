@@ -9,19 +9,9 @@ namespace syncspirit::model {
 
 struct cluster_t;
 
-struct file_interator_t {
-    file_interator_t() noexcept;
+struct file_interator_t: arc_base_t<file_interator_t> {
     file_interator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
-
-    template <typename T> file_interator_t &operator=(T &other) noexcept {
-        cluster = other.cluster;
-        peer = other.peer;
-        it_folder = other.it_folder;
-        f_peer_it = other.f_begin;
-        f_peer_end = other.f_end;
-        file = other.file;
-        return *this;
-    }
+    file_interator_t(const file_interator_t&) = delete;
 
     inline operator bool() noexcept { return cluster != nullptr; }
 
@@ -44,5 +34,7 @@ struct file_interator_t {
     it_file_t f_local_end;
     file_info_ptr_t file;
 };
+
+using file_iterator_ptr_t = intrusive_ptr_t<file_interator_t>;
 
 } // namespace syncspirit::model

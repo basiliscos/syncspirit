@@ -4,8 +4,8 @@
 #include "../model/cluster.h"
 #include "../model/folder.h"
 #include "../fs/messages.h"
-#include "../ui/messages.hpp"
 #include "../utils/log.h"
+#include "messages.h"
 #include "model/diff/diff_visitor.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>

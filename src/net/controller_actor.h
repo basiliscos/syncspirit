@@ -168,7 +168,7 @@ struct controller_actor_t : public r::actor_base_t {
     peers_map_t peers_map;
     write_map_t write_map;
 
-    model::file_interator_t file_iterator;
+    model::file_iterator_ptr_t file_iterator;
     model::file_info_ptr_t current_file;
     model::blocks_interator_t block_iterator;
     // generic

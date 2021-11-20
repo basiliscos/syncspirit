@@ -3,7 +3,6 @@
 #include <rotor.hpp>
 #include "command.h"
 #include "../net/messages.h"
-#include "../ui/messages.hpp"
 #include "../utils/log.h"
 #include "../model/cluster.h"
 #include "model/diff/diff_visitor.h"

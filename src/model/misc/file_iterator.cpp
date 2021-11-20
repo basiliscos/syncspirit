@@ -3,8 +3,6 @@
 
 using namespace syncspirit::model;
 
-file_interator_t::file_interator_t() noexcept : cluster{nullptr} {}
-
 file_interator_t::file_interator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
     : cluster{&cluster_}, peer{peer_} {
     it_folder = cluster->folders.begin();

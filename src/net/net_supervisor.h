@@ -3,7 +3,6 @@
 #include "../model/device.h"
 #include "../model/cluster.h"
 #include "../model/diff/diff_visitor.h"
-#include "../ui/messages.hpp"
 #include "../utils/log.h"
 #include "messages.h"
 #include <boost/asio.hpp>
@@ -59,9 +58,9 @@ struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::dif
 /*
     void on_connection(message::connection_notify_t &message) noexcept;
     void on_dial_ready(message::dial_ready_notify_t &message) noexcept;
-*/
     void on_config_request(ui::message::config_request_t &message) noexcept;
     void on_config_save(ui::message::config_save_request_t &message) noexcept;
+*/
     void on_load_cluster(message::load_cluster_response_t &message) noexcept;
     void on_model_update(message::model_update_t &message) noexcept;
     void on_model_request(message::model_request_t &message) noexcept;
