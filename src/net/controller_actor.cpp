@@ -422,7 +422,7 @@ void controller_actor_t::on_store_file_info(message::store_file_response_t &mess
 #endif
 
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
-    LOG_DEBUG(log, "{}, on cluster config message", identity);
+    LOG_DEBUG(log, "{}, on_message", identity);
     auto diff_opt = cluster->process(*message, *peer);
     if (!diff_opt) {
         auto& ec = diff_opt.assume_error();
@@ -433,17 +433,25 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
 }
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
-#if 0
-    update(typed_folder_updater_t(peer, std::move(message)));
-#endif
-    std::abort();
+    LOG_DEBUG(log, "{}, on_message", identity);
+    auto diff_opt = cluster->process(*message, *peer);
+    if (!diff_opt) {
+        auto& ec = diff_opt.assume_error();
+        LOG_ERROR(log, "error processing message from {} : {}", identity, peer->device_id(), ec.message());
+        return do_shutdown(make_error(ec));
+    }
+    send<payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 
 void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
-#if 0
-    update(typed_folder_updater_t(peer, std::move(message)));
-#endif
-    std::abort();
+    LOG_DEBUG(log, "{}, on_message", identity);
+    auto diff_opt = cluster->process(*message, *peer);
+    if (!diff_opt) {
+        auto& ec = diff_opt.assume_error();
+        LOG_ERROR(log, "error processing message from {} : {}", identity, peer->device_id(), ec.message());
+        return do_shutdown(make_error(ec));
+    }
+    send<payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 
 void controller_actor_t::on_message(proto::message::Request &message) noexcept { std::abort(); }

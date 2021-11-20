@@ -1,6 +1,5 @@
 - uuid model
  -- убрать mark_modified()
- -- cluste_update, remove folder_infos/files/blocks
 
 - make fs-actor smart (clone model)
 - https://docs.syncthing.net/users/faq.html#what-things-are-synced

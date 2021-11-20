@@ -41,6 +41,8 @@ struct cluster_t final : arc_base_t<cluster_t> {
     inline void mark_tainted() noexcept { tainted = true; }
 
     outcome::result<diff::cluster_diff_ptr_t> process(proto::ClusterConfig& msg, const device_t& peer) const noexcept;
+    outcome::result<diff::cluster_diff_ptr_t> process(proto::Index& msg, const device_t& peer) const noexcept;
+    outcome::result<diff::cluster_diff_ptr_t> process(proto::IndexUpdate& msg, const device_t& peer) const noexcept;
 
   private:
     using rng_engine_t = std::mt19937;

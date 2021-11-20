@@ -1,6 +1,7 @@
 #include "cluster.h"
 #include "misc/file_iterator.h"
 #include "diff/peer/cluster_update.h"
+#include "diff/peer/update_folder.h"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit;
@@ -108,4 +109,12 @@ uint64_t cluster_t::next_uint64() noexcept {
 
 auto cluster_t::process(proto::ClusterConfig& msg, const device_t &peer) const noexcept -> outcome::result<diff::cluster_diff_ptr_t> {
     return diff::peer::cluster_update_t::create(*this, peer, msg);
+}
+
+auto cluster_t::process(proto::Index& msg, const device_t &peer) const noexcept -> outcome::result<diff::cluster_diff_ptr_t> {
+    return diff::peer::update_folder_t::create(*this, peer, msg);
+}
+
+auto cluster_t::process(proto::IndexUpdate& msg, const device_t &peer) const noexcept -> outcome::result<diff::cluster_diff_ptr_t> {
+    return diff::peer::update_folder_t::create(*this, peer, msg);
 }
