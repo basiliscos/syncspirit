@@ -1,4 +1,22 @@
 - uuid model
+
+diff: lock_file - когда продолжаем докачивать нескаченный файл: когда локальнй файл скачивается с 1-го пира, чтобы он не скачивался со 2-го
+
+diff: file_content/local_update: (sequence = 0, availabe blocks)
+    - когда fs-scanner задетектит неполный файл (seq = 0),
+    - когда закончили скачивать все блоки,  (seq = x)
+        - seq =0 -> is_incomplte
+        - нету блоков -> удалить блоки из модели/бд
+        - новые блоки -> добавить в модель, но не в базу
+        - увеличить seq, если всё ок.
+
+diff: new_file (prototype = proto::FileInfo, folder_id = string )
+    - нет, блоков -> seq = 0
+        -- когда начинаем скачивать новый файл -> потом лочим
+    - иначе, есть блоки, seq вычисляем
+        -- фс обнаружила новый файл
+
+ -- cluster, deleted_xxx (deleted_blocks, etc.) - убрать?
  -- убрать mark_modified()
  -- убрать/переместить http/transport/private мессаджи в net/net_messages.h
 

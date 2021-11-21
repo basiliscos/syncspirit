@@ -2,6 +2,8 @@
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
+#include "model/diff/modify/create_folder.h"
+#include "model/diff/modify/lock_file.h"
 #include "model/diff/peer/peer_state.h"
 #include "model/diff/diff_visitor.h"
 
@@ -31,4 +33,20 @@ TEST_CASE("peer state update", "[model]") {
     diff = new diff::peer::peer_state_t(peer_id.get_sha256(), addr, false);
     REQUIRE(diff->apply(*cluster));
     CHECK(peer_device->is_online() == false);
+}
+
+TEST_CASE("lock file", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device =  device_t::create(my_id, "my-device").value();
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    cluster->get_devices().put(my_device);
+
+    db::Folder db_folder;
+    db_folder.set_id("1234-5678");
+    db_folder.set_label("my-label");
+    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
+    REQUIRE(diff->apply(*cluster));
+
+    // TODO: new_file diff
+    // TODO: lock_file diff
 }

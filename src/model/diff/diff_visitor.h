@@ -21,7 +21,9 @@ namespace modify {
     struct create_folder_t;
     struct share_folder_t;
     struct update_peer_t;
+    struct new_file_t;
     struct local_update_t;
+    struct lock_file_t;
 }
 
 struct diff_visitor_t {
@@ -34,7 +36,9 @@ struct diff_visitor_t {
     virtual outcome::result<void> operator()(const modify::create_folder_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::share_folder_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::update_peer_t &) noexcept;
+    virtual outcome::result<void> operator()(const modify::new_file_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::local_update_t &) noexcept;
+    virtual outcome::result<void> operator()(const modify::lock_file_t &) noexcept;
 };
 
 } // namespace syncspirit::model::diff

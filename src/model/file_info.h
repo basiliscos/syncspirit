@@ -41,7 +41,8 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     std::string_view get_uuid() const noexcept;
     bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
 
-    std::string serialize(bool include_blocks = true) noexcept;
+    db::FileInfo as_db(bool include_blocks = true) const noexcept;
+    std::string serialize(bool include_blocks = true) const noexcept;
 
     void add_block(const block_info_ptr_t& block) noexcept;
 
@@ -53,7 +54,10 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     inline const std::string &get_full_name() const noexcept { return full_name; }
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
+    void set_sequence(std::int64_t value) noexcept;
+
     inline blocks_t &get_blocks() noexcept { return blocks; }
+    inline const blocks_t &get_blocks() const noexcept { return blocks; }
 
     void remove_blocks() noexcept;
     void append_block(const model::block_info_ptr_t &block, size_t index) noexcept;
@@ -62,8 +66,6 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     inline bool is_dir() noexcept { return type == proto::FileInfoType::DIRECTORY; }
     inline bool is_link() noexcept { return type == proto::FileInfoType::SYMLINK; }
     inline bool is_deleted() noexcept { return deleted; }
-
-    //static std::string generate_db_key(const std::string &name, const folder_info_t &folder) noexcept;
 
     inline std::int64_t get_size() const noexcept { return size; }
     inline void set_size(std::int64_t value) noexcept { size = value; }
@@ -123,7 +125,6 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     std::optional<bfs::path> path;
     std::string full_name;
     bool locked = false;
-    bool incomplete = false;
 
     friend struct blocks_interator_t;
 };

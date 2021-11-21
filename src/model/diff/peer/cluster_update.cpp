@@ -3,18 +3,10 @@
 #include "model/cluster.h"
 #include "model/diff/aggregate.h"
 #include "model/diff/diff_visitor.h"
-#include "model/misc/map.hpp"
+#include "model/misc/string_map.hpp"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::model::diff::peer;
-
-namespace syncspirit::model {
-
-using string_map = syncspirit::model::generic_map_t<std::string, 1>;
-
-template<> std::string_view get_index<0>(const std::string& item) noexcept { return item; }
-
-}
 
 auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, const message_t &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
     auto ptr = cluster_diff_ptr_t();

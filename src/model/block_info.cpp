@@ -51,7 +51,16 @@ outcome::result<block_info_ptr_t> block_info_t::create(const proto::BlockInfo &b
     return outcome::success(ptr);
 }
 
-std::string block_info_t::serialize() noexcept {
+proto::BlockInfo block_info_t::as_bep(size_t offset) const noexcept {
+    proto::BlockInfo r;
+    r.set_hash(std::string(get_hash()));
+    r.set_weak_hash(weak_hash);
+    r.set_size(size);
+    r.set_offset(offset);
+    return r;
+}
+
+std::string block_info_t::serialize() const noexcept {
     db::BlockInfo r;
     r.set_weak_hash(weak_hash);
     r.set_size(size);

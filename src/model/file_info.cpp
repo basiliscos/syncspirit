@@ -105,7 +105,11 @@ std::string_view file_info_t::get_uuid() const noexcept {
      return std::string_view(key + 1 + uuid_length, uuid_length);
 }
 
-std::string file_info_t::serialize(bool include_blocks) noexcept {
+void file_info_t::set_sequence(std::int64_t value) noexcept {
+    sequence = value;
+}
+
+db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     db::FileInfo r;
     auto name = get_name();
     r.set_name(name.data(), name.size());
@@ -132,7 +136,11 @@ std::string file_info_t::serialize(bool include_blocks) noexcept {
             r.mutable_blocks()->Add(std::string(db_key));
         }
     }
-    return r.SerializeAsString();
+    return r;
+}
+
+std::string file_info_t::serialize(bool include_blocks) const noexcept {
+    return as_db(include_blocks).SerializeAsString();
 }
 
 #if 0
@@ -191,12 +199,6 @@ bool file_info_t::update(const local_file_t &local_file) noexcept {
     }
     return !matched;
 }
-
-bool file_info_t::is_incomplete() const noexcept { return incomplete; }
-
-void file_info_t::mark_complete() noexcept { incomplete = false; }
-
-void file_info_t::mark_incomplete() noexcept { incomplete = true; }
 
 void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
     auto &cluster = *folder_info->get_folder()->get_cluster();
@@ -349,10 +351,6 @@ void file_info_t::after_sync() noexcept {
     }
 }
 
-void file_info_t::unlock() noexcept { locked = false; }
-
-void file_info_t::lock() noexcept { locked = true; }
-
 proto::FileInfo file_info_t::get() const noexcept {
     proto::FileInfo r;
     r.set_name(std::string(get_name()));
@@ -388,6 +386,12 @@ proto::FileInfo file_info_t::get() const noexcept {
     return r;
 }
 #endif
+
+bool file_info_t::is_incomplete() const noexcept { return sequence == 0; }
+
+void file_info_t::unlock() noexcept { locked = false; }
+
+void file_info_t::lock() noexcept { locked = true; }
 
 template<> std::string_view get_index<0>(const file_info_ptr_t& item) noexcept { return item->get_uuid(); }
 template<> std::string_view get_index<1>(const file_info_ptr_t& item) noexcept { return item->get_name(); }
