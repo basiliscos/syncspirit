@@ -4,6 +4,7 @@
 #include "model/cluster.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/lock_file.h"
+#include "model/diff/modify/new_file.h"
 #include "model/diff/peer/peer_state.h"
 #include "model/diff/diff_visitor.h"
 
@@ -47,6 +48,20 @@ TEST_CASE("lock file", "[model]") {
     auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
     REQUIRE(diff->apply(*cluster));
 
-    // TODO: new_file diff
-    // TODO: lock_file diff
+    proto::FileInfo pr_file_info;
+    pr_file_info.set_name("a.txt");
+    pr_file_info.set_type(proto::FileInfoType::SYMLINK);
+    pr_file_info.set_symlink_target("/some/where");
+    diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, true, {}));
+    REQUIRE(diff->apply(*cluster));
+
+    diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(db_folder.id(), pr_file_info.name(), true));
+    REQUIRE(diff->apply(*cluster));
+    auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
+    auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
+    REQUIRE(file->is_locked());
+
+    diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(db_folder.id(), pr_file_info.name(), false));
+    REQUIRE(diff->apply(*cluster));
+    REQUIRE(!file->is_locked());
 }
