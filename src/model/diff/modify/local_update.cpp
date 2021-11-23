@@ -5,14 +5,14 @@
 
 using namespace syncspirit::model::diff::modify;
 
-local_update_t::local_update_t(std::string_view folder_id_, const file_info_t &file, db::FileInfo current_, blocks_t current_blocks_) noexcept:
-    folder_id{folder_id_}, current{std::move(current_)}, current_blocks{std::move(current_blocks_)}  {
+local_update_t::local_update_t(const file_info_t &file, info_option_t current_, blocks_t current_blocks_, size_t current_blocks_sz_) noexcept:
+     current{std::move(current_)}, current_blocks{std::move(current_blocks_)}, current_blocks_sz{current_blocks_sz_}  {
+
+    inc_sequence = current_blocks.size() == current_blocks_sz;
+    folder_id = file.get_folder_info()->get_folder()->get_id();
+    file_name = file.get_name();
 
     prev = file.as_db(false);
-
-    if (current.sequence() == 0) {
-        return;
-    }
 
     auto& blocks = file.get_blocks();
     if (blocks.size() != current_blocks.size()) {
@@ -54,10 +54,13 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     auto device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device(device);
-    auto file = folder_info->get_file_infos().by_name(current.name());
-    file->fields_update(current);
+    auto file = folder_info->get_file_infos().by_name(file_name);
 
-    if (!file->is_incomplete())  {
+    if(current) {
+        file->fields_update(*current);
+    }
+
+    if (inc_sequence) {
         auto seq = folder_info->get_max_sequence() + 1;
         folder_info->set_max_sequence(seq);
         file->set_sequence(seq);
@@ -66,10 +69,14 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     if (blocks_updated) {
         auto& blocks_map = cluster.get_blocks();
         block_infos_map_t tmp_blocks;
-        for(auto& b: file->get_blocks()) {
+        auto& blocks = file->get_blocks();
+        for(auto& b: blocks) {
             tmp_blocks.put(b);
         }
         file->remove_blocks();
+
+        blocks.resize(current_blocks_sz);
+        assert(current_blocks.size() <= current_blocks_sz);
 
         for(size_t i = 0; i < current_blocks.size(); ++i) {
             auto& b = current_blocks[i];
@@ -77,7 +84,9 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
             auto block = blocks_map.get(hash);
             if (!block) {
                 block = tmp_blocks.get(hash);
-                blocks_map.put(block);
+                if (block) {
+                    blocks_map.put(block);
+                }
             }
             if (!block) {
                 auto opt = block_info_t::create(b);

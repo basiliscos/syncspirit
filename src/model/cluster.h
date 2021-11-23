@@ -32,7 +32,6 @@ struct cluster_t final : arc_base_t<cluster_t> {
     const devices_map_t &get_devices() const noexcept;
     ignored_devices_map_t &get_ignored_devices() noexcept;
     ignored_folders_map_t &get_ignored_folders() noexcept;
-    block_infos_map_t &get_deleted_blocks() noexcept;
     folders_map_t &get_folders() noexcept;
     const folders_map_t &get_folders() const noexcept;
     uuid_t next_uuid() noexcept;

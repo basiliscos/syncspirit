@@ -102,8 +102,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
 
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
-    void remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks, block_infos_map_t &deleted_blocks,
-                      bool zero_indices = true) noexcept;
+    void remove_block(block_info_ptr_t &block) noexcept;
 
     char key[data_length];
     std::string name;

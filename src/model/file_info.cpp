@@ -387,11 +387,43 @@ proto::FileInfo file_info_t::get() const noexcept {
 }
 #endif
 
-bool file_info_t::is_incomplete() const noexcept { return sequence == 0; }
+bool file_info_t::is_incomplete() const noexcept {
+    if (blocks.empty()) {
+        return false;;
+    }
+    for(auto it = blocks.rbegin(); it != blocks.rend(); ++it) {
+        if (!*it) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void file_info_t::unlock() noexcept { locked = false; }
 
 void file_info_t::lock() noexcept { locked = true; }
+
+void file_info_t::append_block(const model::block_info_ptr_t &block, size_t index) noexcept {
+    assert(index < blocks.size() && "blocks should be reserve enough space");
+    blocks[index] = block;
+    block->link(this, index);
+}
+
+void file_info_t::remove_blocks() noexcept {
+    for (auto &it : blocks) {
+        remove_block(it);
+    }
+}
+
+void file_info_t::remove_block(block_info_ptr_t &block) noexcept {
+    if (!block) {
+        return;
+    }
+    auto indices = block->unlink(this, true);
+    for (auto i : indices) {
+        blocks[i] = nullptr;
+    }
+}
 
 template<> std::string_view get_index<0>(const file_info_ptr_t& item) noexcept { return item->get_uuid(); }
 template<> std::string_view get_index<1>(const file_info_ptr_t& item) noexcept { return item->get_name(); }

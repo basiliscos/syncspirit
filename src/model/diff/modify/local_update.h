@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include "../cluster_diff.h"
 #include "model/file_info.h"
 #include "structs.pb.h"
@@ -8,18 +9,22 @@ namespace syncspirit::model::diff::modify {
 
 struct local_update_t final : cluster_diff_t {
     using blocks_t = std::vector<proto::BlockInfo>;
+    using info_option_t = std::optional<db::FileInfo>;
 
-    local_update_t(std::string_view folder_id, const file_info_t& file, db::FileInfo current, blocks_t current_blocks) noexcept;
+    local_update_t(const file_info_t& file, info_option_t current, blocks_t current_blocks, size_t current_blocks_sz) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(diff_visitor_t &) const noexcept override;
 
     std::string folder_id;
+    std::string file_name;
+    bool inc_sequence;
+    size_t current_blocks_sz;
 
     db::FileInfo prev;
     blocks_t prev_blocks;
 
-    db::FileInfo current;
+    info_option_t current;
     blocks_t current_blocks;
 
     bool blocks_updated = false;
