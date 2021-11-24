@@ -5,23 +5,19 @@
 
 using namespace syncspirit::model::diff::modify;
 
-new_file_t::new_file_t(std::string_view folder_id_, proto::FileInfo file_, bool inc_sequence_, blocks_t blocks_) noexcept:
-    folder_id{folder_id_}, file{std::move(file_)}, inc_sequence{inc_sequence_}, blocks{std::move(blocks_)}
+new_file_t::new_file_t(std::string_view folder_id_, proto::FileInfo file_, blocks_t blocks_) noexcept:
+    folder_id{folder_id_}, file{std::move(file_)}, blocks{std::move(blocks_)}
 {
-    assert(!blocks.empty() || inc_sequence);
 }
 
 auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device(cluster.get_device());
 
-    std::int64_t seq = 0;
     auto file = this->file;
-    if (inc_sequence) {
-        seq = folder_info->get_max_sequence() + 1;
-        folder_info->set_max_sequence(seq);
-        file.set_sequence(seq);
-    }
+    auto seq = folder_info->get_max_sequence() + 1;
+    folder_info->set_max_sequence(seq);
+    file.set_sequence(seq);
 
     auto opt = file_info_t::create(cluster.next_uuid(), file, folder_info);
     if (!opt) {

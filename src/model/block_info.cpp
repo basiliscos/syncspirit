@@ -105,16 +105,6 @@ file_block_t block_info_t::local_file() noexcept {
     return {};
 }
 
-#if 0
-static void del_me() {
-    block_infos_map_t map;
-    auto block = block_info_ptr_t(new block_info_t("a", "b"));
-    map.put(block);
-    map.get("a");
-}
-#endif
-
-
 template<> std::string_view get_index<0>(const block_info_ptr_t& item) noexcept { return item->get_hash(); }
 
 

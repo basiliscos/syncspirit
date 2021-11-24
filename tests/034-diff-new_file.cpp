@@ -32,7 +32,7 @@ TEST_CASE("new file diff", "[model]") {
     SECTION("symlink, inc sequence, no blocks") {
         pr_file_info.set_type(proto::FileInfoType::SYMLINK);
         pr_file_info.set_symlink_target("/some/where");
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, true, {}));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, {}));
         REQUIRE(diff->apply(*cluster));
 
         auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
@@ -54,7 +54,7 @@ TEST_CASE("new file diff", "[model]") {
         bi.set_weak_hash(12);
         bi.set_hash(utils::sha256_digest("12345").value());
         bi.set_offset(0);
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, false, {bi}));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, {bi}));
         REQUIRE(diff->apply(*cluster));
 
         auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
@@ -63,8 +63,8 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(file->get_size() == 5);
         REQUIRE(file->get_name() == "a.txt");
         REQUIRE(!file->is_link());
-        REQUIRE(file->get_sequence() == 0);
-        REQUIRE(folder_info->get_max_sequence() == 0);
+        REQUIRE(file->get_sequence() == 1);
+        REQUIRE(folder_info->get_max_sequence() == 1);
         REQUIRE(file->get_blocks().size() == 1);
         REQUIRE(file->get_blocks()[0]->get_hash() == bi.hash());
         REQUIRE(cluster->get_blocks().size() == 1);

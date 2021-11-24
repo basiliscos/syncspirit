@@ -31,10 +31,10 @@ TEST_CASE("local_update diff", "[model]") {
     proto::FileInfo pr_file_info;
     pr_file_info.set_name("a.txt");
 
-    SECTION("download all blocks from a peer") {
+    SECTION("empty file -> file with blocks") {
         pr_file_info.set_type(proto::FileInfoType::FILE);
         pr_file_info.set_size(5ul);
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, true, {}));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, {}));
         REQUIRE(diff->apply(*cluster));
 
         auto file_info = folder_info->get_file_infos().by_name("a.txt");
@@ -51,7 +51,7 @@ TEST_CASE("local_update diff", "[model]") {
         bi.set_hash(utils::sha256_digest("12345").value());
         bi.set_offset(0);
 
-        diff = diff::cluster_diff_ptr_t(new diff::modify::local_update_t(*file_info, {}, {bi}, 1));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::local_update_t(*file_info, {}, {bi}));
         REQUIRE(diff->apply(*cluster));
         CHECK(file_info->get_sequence() == 2ul);
 
@@ -61,22 +61,11 @@ TEST_CASE("local_update diff", "[model]") {
 
         REQUIRE(blocks_map.size() == 1);
         REQUIRE(blocks_map.get(bi.hash()));
-        CHECK(!file_info->is_incomplete());
     }
 
-    SECTION("some blocks from a peer") {
+    SECTION("file with blocks -> empty") {
         pr_file_info.set_type(proto::FileInfoType::FILE);
-        pr_file_info.set_size(10ul);
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, true, {}));
-        REQUIRE(diff->apply(*cluster));
-
-        auto file_info = folder_info->get_file_infos().by_name("a.txt");
-        REQUIRE(file_info);
-
-        db::FileInfo db_file;
-        db_file.set_name("a.txt");
-        db_file.set_size(5ul);
-        db_file.set_type(pr_file_info.type());
+        pr_file_info.set_size(5ul);
 
         auto bi = proto::BlockInfo();
         bi.set_size(5);
@@ -84,17 +73,25 @@ TEST_CASE("local_update diff", "[model]") {
         bi.set_hash(utils::sha256_digest("12345").value());
         bi.set_offset(0);
 
-        diff = diff::cluster_diff_ptr_t(new diff::modify::local_update_t(*file_info, {}, {bi}, 2));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, {bi}));
         REQUIRE(diff->apply(*cluster));
-        CHECK(file_info->get_sequence() == 1ul);
+        REQUIRE(blocks_map.size() == 1);
+
+        auto file_info = folder_info->get_file_infos().by_name("a.txt");
+        REQUIRE(file_info);
+
+        db::FileInfo db_file;
+        db_file.set_name("a.txt");
+        db_file.set_size(0ul);
+        db_file.set_type(pr_file_info.type());
+
+        diff = diff::cluster_diff_ptr_t(new diff::modify::local_update_t(*file_info, db_file, {}));
+        REQUIRE(diff->apply(*cluster));
+        CHECK(file_info->get_sequence() == 2ul);
 
         auto &blocks = file_info->get_blocks();
-        REQUIRE(blocks.size() == 2);
-        REQUIRE(blocks[0]->get_hash() == bi.hash());
-        REQUIRE(!blocks[1]);
+        REQUIRE(blocks.size() == 0);
 
-        REQUIRE(blocks_map.size() == 1);
-        REQUIRE(blocks_map.get(bi.hash()));
-        CHECK(file_info->is_incomplete());
+        REQUIRE(blocks_map.size() == 0);
     }
 }
