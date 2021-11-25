@@ -1,5 +1,5 @@
 #include "local_update.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
 #include "model/misc/string_map.hpp"
 
@@ -104,7 +104,7 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     return outcome::success();
 }
 
-auto local_update_t::visit(diff_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto local_update_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting local_update_t");
     return visitor(*this);
 }

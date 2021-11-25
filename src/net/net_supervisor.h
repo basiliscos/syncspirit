@@ -2,7 +2,7 @@
 
 #include "../model/device.h"
 #include "../model/cluster.h"
-#include "../model/diff/diff_visitor.h"
+#include "../model/diff/cluster_visitor.h"
 #include "../utils/log.h"
 #include "messages.h"
 #include <boost/asio.hpp>
@@ -37,7 +37,7 @@ struct net_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<Su
     }
 };
 
-struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::diff_visitor_t {
+struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::cluster_visitor_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = net_supervisor_config_t;
 

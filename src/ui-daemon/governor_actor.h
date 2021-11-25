@@ -5,7 +5,7 @@
 #include "../net/messages.h"
 #include "../utils/log.h"
 #include "../model/cluster.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 
 namespace syncspirit::daemon {
 
@@ -26,7 +26,7 @@ template <typename Actor> struct governor_actor_config_builder_t : r::actor_conf
     }
 };
 
-struct governor_actor_t : public r::actor_base_t, private model::diff::diff_visitor_t {
+struct governor_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = governor_actor_config_t;
     template <typename Actor> using config_builder_t = governor_actor_config_builder_t<Actor>;
 

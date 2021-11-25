@@ -23,7 +23,7 @@ struct cluster_update_t final : cluster_diff_t {
     static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, const model::device_t& source, const message_t& message) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
-    outcome::result<void> visit(diff_visitor_t &) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
 
     unknown_folders_t unknown_folders;
     modified_folders_t reset_folders;

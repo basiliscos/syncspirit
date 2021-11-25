@@ -1,5 +1,5 @@
 #include "create_folder.h"
-#include "../diff_visitor.h"
+#include "../cluster_visitor.h"
 #include "../../cluster.h"
 #include "../../misc/error_code.h"
 
@@ -38,7 +38,7 @@ auto create_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     return outcome::success();
 }
 
-auto create_folder_t::visit(diff_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto create_folder_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting create_folder_t");
     return visitor(*this);
 }

@@ -5,7 +5,7 @@
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/update_peer.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -13,7 +13,7 @@ using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
 template <typename F>
-struct my_cluster_update_visitor_t: diff::diff_visitor_t {
+struct my_cluster_update_visitor_t: diff::cluster_visitor_t {
     F fn;
 
     my_cluster_update_visitor_t(F&& fn_): fn{std::forward<F>(fn_)}{}

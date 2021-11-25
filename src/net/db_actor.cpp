@@ -19,7 +19,7 @@
 #include "../model/diff/modify/update_peer.h"
 #include "../model/diff/peer/cluster_remove.h"
 #include "../model/diff/peer/update_folder.h"
-#include "../model/diff/diff_visitor.h"
+#include "../model/diff/cluster_visitor.h"
 
 namespace syncspirit::net {
 

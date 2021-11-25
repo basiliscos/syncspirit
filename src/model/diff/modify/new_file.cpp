@@ -1,6 +1,6 @@
 #include "new_file.h"
 #include "db/prefix.h"
-#include "../diff_visitor.h"
+#include "../cluster_visitor.h"
 #include "../../cluster.h"
 
 using namespace syncspirit::model::diff::modify;
@@ -45,7 +45,7 @@ auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resul
     return outcome::success();
 }
 
-auto new_file_t::visit(diff_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto new_file_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting new_file_t");
     return visitor(*this);
 }

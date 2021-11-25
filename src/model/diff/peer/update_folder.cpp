@@ -1,5 +1,5 @@
 #include "update_folder.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "../../misc/error_code.h"
 
 using namespace syncspirit::model;
@@ -43,7 +43,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     return outcome::success();
 }
 
-auto update_folder_t::visit(diff_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto update_folder_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
     return visitor(*this);
 }
 

@@ -3,7 +3,7 @@
 #include "access.h"
 #include "model/cluster.h"
 #include "model/diff/peer/cluster_update.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -11,7 +11,7 @@ using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
 template <typename F>
-struct my_cluster_update_visitor_t: diff::diff_visitor_t {
+struct my_cluster_update_visitor_t: diff::cluster_visitor_t {
     F fn;
     bool remove_diff = false;
 

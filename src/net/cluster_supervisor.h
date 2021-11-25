@@ -6,7 +6,7 @@
 #include "../fs/messages.h"
 #include "../utils/log.h"
 #include "messages.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 
@@ -45,7 +45,7 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
 
 };
 
-struct cluster_supervisor_t : public ra::supervisor_asio_t, private model::diff::diff_visitor_t {
+struct cluster_supervisor_t : public ra::supervisor_asio_t, private model::diff::cluster_visitor_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = cluster_supervisor_config_t;
     template <typename Actor> using config_builder_t = cluster_supervisor_config_builder_t<Actor>;

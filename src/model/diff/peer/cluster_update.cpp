@@ -2,7 +2,7 @@
 #include "cluster_remove.h"
 #include "model/cluster.h"
 #include "model/diff/aggregate.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "model/misc/string_map.hpp"
 #include <spdlog/spdlog.h>
 
@@ -137,6 +137,6 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     return outcome::success();
 }
 
-auto cluster_update_t::visit(diff_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto cluster_update_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
     return visitor(*this);
 }

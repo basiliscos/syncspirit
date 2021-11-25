@@ -1,6 +1,6 @@
 #include "update_peer.h"
 #include "db/prefix.h"
-#include "../diff_visitor.h"
+#include "../cluster_visitor.h"
 #include "../../cluster.h"
 #include "../../misc/error_code.h"
 
@@ -30,7 +30,7 @@ auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
     return outcome::success();
 }
 
-auto update_peer_t::visit(diff_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto update_peer_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting update_peer_t");
     return visitor(*this);
 }

@@ -11,7 +11,7 @@ struct aggregate_t: cluster_diff_t {
     template <typename T> aggregate_t(T &&diffs_) noexcept : diffs(std::forward<T>(diffs_)) {}
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
-    outcome::result<void> visit(diff_visitor_t &) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
 
     diffs_t diffs;
 };

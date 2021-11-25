@@ -1,6 +1,6 @@
 #include "peer_state.h"
 #include "model/cluster.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit::model::diff::peer;
 
@@ -12,6 +12,6 @@ auto peer_state_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     return outcome::success();
 }
 
-auto peer_state_t::visit(diff_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto peer_state_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
     return visitor(*this);
 }

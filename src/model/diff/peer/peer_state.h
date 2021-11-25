@@ -17,7 +17,7 @@ struct peer_state_t final : cluster_diff_t {
     {}
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
-    outcome::result<void> visit(diff_visitor_t &) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
 
     std::string peer_id;
     r::address_ptr_t peer_addr;

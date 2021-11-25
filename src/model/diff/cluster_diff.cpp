@@ -20,6 +20,6 @@ auto cluster_diff_t::apply(cluster_t &cluster) const noexcept -> outcome::result
 }
 
 
-auto cluster_diff_t::visit(diff_visitor_t &) const noexcept -> outcome::result<void> {
+auto cluster_diff_t::visit(cluster_visitor_t &) const noexcept -> outcome::result<void> {
     return outcome::success();
 }

@@ -12,12 +12,12 @@ struct cluster_t;
 
 namespace diff {
 
-struct diff_visitor_t;
+struct cluster_visitor_t;
 
 struct cluster_diff_t : base_t {
     cluster_diff_t() noexcept;
     virtual ~cluster_diff_t();
-    virtual outcome::result<void> visit(diff_visitor_t &) const noexcept;
+    virtual outcome::result<void> visit(cluster_visitor_t &) const noexcept;
     outcome::result<void> apply(cluster_t &) const noexcept;
 
     protected:

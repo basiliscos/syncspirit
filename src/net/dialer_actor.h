@@ -4,7 +4,7 @@
 #include "../config/bep.h"
 #include "../utils/log.h"
 #include "model/cluster.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "messages.h"
 #include <optional>
 #include <unordered_map>
@@ -43,7 +43,7 @@ template <typename Actor> struct dialer_actor_config_builder_t : r::actor_config
 
 };
 
-struct dialer_actor_t : public r::actor_base_t, private model::diff::diff_visitor_t {
+struct dialer_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = dialer_actor_config_t;
     template <typename Actor> using config_builder_t = dialer_actor_config_builder_t<Actor>;
 

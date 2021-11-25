@@ -6,7 +6,7 @@
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/new_file.h"
 #include "model/diff/peer/peer_state.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;

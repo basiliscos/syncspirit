@@ -10,7 +10,7 @@ struct share_folder_t final : cluster_diff_t {
         peer_id{peer_device_}, folder_id{folder_id_}, index{index_} {}
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
-    outcome::result<void> visit(diff_visitor_t &) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
 
     std::string peer_id;
     std::string folder_id;

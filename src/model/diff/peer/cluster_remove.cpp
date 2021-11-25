@@ -1,5 +1,5 @@
 #include "cluster_remove.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit::model::diff::peer;
 
@@ -15,6 +15,6 @@ auto cluster_remove_t::apply_impl(cluster_t &) const noexcept -> outcome::result
     return outcome::success();
 }
 
-auto cluster_remove_t::visit(diff_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto cluster_remove_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
     return visitor(*this);
 }

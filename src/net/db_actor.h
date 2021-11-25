@@ -1,7 +1,7 @@
 #pragma once
 
 #include "messages.h"
-#include "model/diff/diff_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "mdbx.h"
 #include "../utils/log.h"
 #include "../db/transaction.h"
@@ -33,7 +33,7 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
     }
 };
 
-struct db_actor_t : public r::actor_base_t, private model::diff::diff_visitor_t {
+struct db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = db_actor_config_t;
     template <typename Actor> using config_builder_t = db_actor_config_builder_t<Actor>;
 
