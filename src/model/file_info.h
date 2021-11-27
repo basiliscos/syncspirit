@@ -44,8 +44,6 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     db::FileInfo as_db(bool include_blocks = true) const noexcept;
     std::string serialize(bool include_blocks = true) const noexcept;
 
-    void add_block(const block_info_ptr_t& block) noexcept;
-
     void update(const proto::FileInfo &remote_info) noexcept;
     bool update(const local_file_t &local_file) noexcept;
 
@@ -56,7 +54,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     void set_sequence(std::int64_t value) noexcept;
 
-    inline blocks_t &get_blocks() noexcept { return blocks; }
+    // inline blocks_t &aget_blocks() noexcept { return blocks; }
     inline const blocks_t &get_blocks() const noexcept { return blocks; }
 
     void remove_blocks() noexcept;
@@ -97,11 +95,12 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     static const constexpr auto data_length = 1 + uuid_length * 2;
 
 
-    void fields_update(const db::FileInfo&) noexcept;
+    outcome::result<void> fields_update(const db::FileInfo&) noexcept;
   private:
-    template <typename Source> void fields_update(const Source &s) noexcept;
-    file_info_t(std::string_view key, const db::FileInfo& data, const folder_info_ptr_t& folder_info_) noexcept;
-    file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
+    template <typename Source> outcome::result<void>  fields_update(const Source &s) noexcept;
+    file_info_t(std::string_view key, const folder_info_ptr_t& folder_info_) noexcept;
+    file_info_t(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept;
+    outcome::result<void> reserve_blocks() noexcept;
 
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void remove_block(block_info_ptr_t &block) noexcept;

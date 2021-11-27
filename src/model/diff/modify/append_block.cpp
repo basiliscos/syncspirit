@@ -15,9 +15,7 @@ auto append_block_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device(cluster.get_device());
     auto file = folder_info->get_file_infos().by_name(file_name);
-    auto& blocks = file->get_blocks();
-    auto& block = blocks[block_index];
-    block->mark_local_available(file.get());
+    file->mark_local_available(block_index);
     return outcome::success();
 }
 

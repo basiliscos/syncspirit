@@ -280,12 +280,14 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     proto::FileInfo pr_fi_my;
     pr_fi_my.set_name("a/b.txt");
     pr_fi_my.set_size(5ul);
+    pr_fi_my.set_block_size(5ul);
     auto fi_my = file_info_t::create(cluster->next_uuid(),  pr_fi_my, folder_info_my).value();
     folder_info_my->get_file_infos().put(fi_my);
 
     proto::FileInfo pr_fi_peer1;
     pr_fi_peer1.set_name("a/c.txt");
-    pr_fi_peer1.set_size(10ul);
+    pr_fi_peer1.set_size(5ul);
+    pr_fi_peer1.set_block_size(5ul);
     auto fi_peer1 = file_info_t::create(cluster->next_uuid(),  pr_fi_peer1, folder_info_peer).value();
     folder_info_peer->get_file_infos().put(fi_peer1);
     REQUIRE(folder_info_peer->get_file_infos().size() == 1);
@@ -293,14 +295,15 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     proto::FileInfo pr_fi_peer2;
     pr_fi_peer2.set_name("a/d.txt");
     pr_fi_peer2.set_size(10ul);
+    pr_fi_peer2.set_block_size(5ul);
     auto fi_peer2 = file_info_t::create(cluster->next_uuid(),  pr_fi_peer2, folder_info_peer).value();
     folder_info_peer->get_file_infos().put(fi_peer2);
     REQUIRE(folder_info_peer->get_file_infos().size() == 2);
 
-    fi_my->add_block(b1);
-    fi_peer1->add_block(b2);
-    fi_peer2->add_block(b2);
-    fi_peer2->add_block(b3);
+    fi_my->append_block(b1, 0);
+    fi_peer1->append_block(b2, 0);
+    fi_peer2->append_block(b2, 0);
+    fi_peer2->append_block(b3, 1);
 
     auto cc = std::make_unique<proto::ClusterConfig>();
     auto p_folder = cc->add_folders();

@@ -27,7 +27,8 @@ auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resul
     auto fi = std::move(opt.value());
 
     auto& blocks_map = cluster.get_blocks();
-    for(auto& b: blocks) {
+    for(size_t i = 0; i < blocks.size(); ++i) {
+        auto& b = blocks[i];
         auto block = blocks_map.get(b.hash());
         if (!block) {
             auto block_opt = block_info_t::create(b);
@@ -37,7 +38,7 @@ auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resul
             block = std::move(block_opt.assume_value());
             blocks_map.put(block);
         }
-        fi->add_block(block);
+        fi->append_block(block, i);
     }
 
     folder_info->get_file_infos().put(fi);

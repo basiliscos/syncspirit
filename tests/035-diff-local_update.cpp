@@ -34,6 +34,7 @@ TEST_CASE("local_update diff", "[model]") {
     SECTION("empty file -> file with blocks") {
         pr_file_info.set_type(proto::FileInfoType::FILE);
         pr_file_info.set_size(5ul);
+        pr_file_info.set_block_size(5ul);
         diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, {}));
         REQUIRE(diff->apply(*cluster));
 
@@ -43,6 +44,7 @@ TEST_CASE("local_update diff", "[model]") {
         db::FileInfo db_file;
         db_file.set_name("a.txt");
         db_file.set_size(5ul);
+        db_file.set_block_size(5ul);
         db_file.set_type(pr_file_info.type());
 
         auto bi = proto::BlockInfo();
@@ -67,6 +69,7 @@ TEST_CASE("local_update diff", "[model]") {
     SECTION("file with blocks -> empty") {
         pr_file_info.set_type(proto::FileInfoType::FILE);
         pr_file_info.set_size(5ul);
+        pr_file_info.set_block_size(5ul);
 
         auto bi = proto::BlockInfo();
         bi.set_size(5);

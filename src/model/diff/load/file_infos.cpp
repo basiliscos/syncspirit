@@ -44,7 +44,7 @@ auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
             auto block_hash = db.blocks(i);
             auto block = blocks.get(block_hash);
             assert(block);
-            fi->add_block(block);
+            fi->append_block(block, (size_t)i);
         }
     }
     return outcome::success();

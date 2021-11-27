@@ -34,9 +34,7 @@ auto clone_block_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
     auto target_folder = cluster.get_folders().by_id(target_folder_id);
     auto target_folder_info = target_folder->get_folder_infos().by_device(cluster.get_device());
     auto target_file = target_folder_info->get_file_infos().by_name(target_file_name);
-    auto& target_blocks = target_file->get_blocks();
-    auto& block = target_blocks[target_block_index];
-    block->mark_local_available(target_file.get());
+    target_file->mark_local_available(target_block_index);
     return outcome::success();
 }
 

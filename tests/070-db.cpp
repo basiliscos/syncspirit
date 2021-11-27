@@ -292,6 +292,7 @@ void test_cluster_update_and_remove() {
             auto file = idx.add_files();
             file->set_name("a.txt");
             file->set_size(5ul);
+            file->set_block_size(5ul);
             file->set_sequence(6ul);
             auto b = file->add_blocks();
             b->set_size(5ul);

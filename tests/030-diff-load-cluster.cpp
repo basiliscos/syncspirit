@@ -284,9 +284,10 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     proto::FileInfo pr_fi;
     pr_fi.set_name("a/b.txt");
     pr_fi.set_size(55ul);
+    pr_fi.set_block_size(5ul);
     auto fi = file_info_t::create(cluster->next_uuid(),  pr_fi, folder_info).value();
     CHECK(fi);
-    fi->add_block(block);
+    fi->append_block(block, 0);
 
     auto target = file_info_ptr_t();
 
@@ -296,7 +297,9 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         file_info_db.ParseFromArray(data.data(), data.size());
         target = file_info_t::create(fi->get_key(), file_info_db, folder_info).value();
         REQUIRE(target);
-        CHECK(target->get_blocks().size() == 0ul);
+        CHECK(target->get_size() == 55ul);
+        CHECK(target->get_block_size() == 5ul);
+        CHECK(target->get_blocks().size() == 11ul);
     }
 
     SECTION("via diff") {
@@ -310,7 +313,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         target = map.get(fi->get_uuid());
         REQUIRE(target);
         REQUIRE(map.by_name(fi->get_name()));
-        REQUIRE(target->get_blocks().size() == 1);
+        REQUIRE(target->get_blocks().size() == 11);
         REQUIRE(target->get_blocks().begin()->get()->get_hash() == block->get_hash());
     }
 

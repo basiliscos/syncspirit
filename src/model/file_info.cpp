@@ -21,18 +21,31 @@ outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const
     }
 
     auto ptr = file_info_ptr_t();
-    ptr = new file_info_t(key, data, folder_info_);
+    ptr = new file_info_t(key, folder_info_);
+
+    auto r = ptr->fields_update(data);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return outcome::success(std::move(ptr));
 }
 
 outcome::result<file_info_ptr_t> file_info_t::create(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept {
-    return file_info_ptr_t(new file_info_t(uuid, info_, folder_info_));
+    auto ptr = file_info_ptr_t();
+    ptr = new file_info_t(uuid, folder_info_);
+
+    auto r = ptr->fields_update(info_);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return outcome::success(std::move(ptr));
 }
 
-file_info_t::file_info_t(std::string_view key_, const db::FileInfo& data, const folder_info_ptr_t& folder_info_) noexcept : folder_info{folder_info_.get()} {
+file_info_t::file_info_t(std::string_view key_, const folder_info_ptr_t& folder_info_) noexcept : folder_info{folder_info_.get()} {
     assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
     std::copy(key_.begin(), key_.end(), key);
-    fields_update(data);
 }
 
 static void fill(char* key, const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept {
@@ -49,10 +62,9 @@ std::string file_info_t::create_key(const uuid_t& uuid, const folder_info_ptr_t&
     return key;
 }
 
-file_info_t::file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept
+file_info_t::file_info_t(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept
     : folder_info{folder_info_.get()} {
     fill(key, uuid, folder_info_);
-    fields_update(info_);
 }
 
 file_info_t::~file_info_t() {
@@ -76,13 +88,7 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     return block_size * block_index;
 }
 
-void file_info_t::add_block(const block_info_ptr_t& block) noexcept {
-    block->link(this, blocks.size());
-    blocks.emplace_back(block);
-}
-
-
-template <typename Source> void file_info_t::fields_update(const Source &s) noexcept {
+template <typename Source> outcome::result<void> file_info_t::fields_update(const Source &s) noexcept {
     name = s.name();
     sequence = s.sequence();
     type = s.type();
@@ -99,10 +105,11 @@ template <typename Source> void file_info_t::fields_update(const Source &s) noex
     symlink_target = s.symlink_target();
     version = s.version();
     full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
+    return reserve_blocks();
 }
 
-void file_info_t::fields_update(const db::FileInfo& source) noexcept {
-    fields_update<db::FileInfo>(source);
+auto file_info_t::fields_update(const db::FileInfo& source) noexcept -> outcome::result<void> {
+    return fields_update<db::FileInfo>(source);
 }
 
 
@@ -144,8 +151,37 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     return r;
 }
 
+outcome::result<void> file_info_t::reserve_blocks() noexcept {
+    if (size < block_size) {
+        return make_error_code(error_code_t::invalid_block_size);
+    }
+    size_t count = 0;
+    if (size) {
+        if (!block_size) {
+            return make_error_code(error_code_t::invalid_block_size);
+        }
+        count = size / block_size;
+        if (block_size * count != size) {
+            ++count;
+        }
+    }
+    remove_blocks();
+    blocks.resize(count);
+    return outcome::success();
+/*
+    if (size) {
+        assert(block_size && )
+    }
+    auto count = size / bloc
+*/
+}
+
 std::string file_info_t::serialize(bool include_blocks) const noexcept {
     return as_db(include_blocks).SerializeAsString();
+}
+
+void file_info_t::mark_local_available(size_t block_index) noexcept {
+    blocks[block_index]->mark_local_available(this);
 }
 
 #if 0
@@ -276,10 +312,6 @@ void file_info_t::append_block(const model::block_info_ptr_t &block, size_t inde
     mark_dirty();
 }
 
-void file_info_t::mark_local_available(size_t block_index) noexcept {
-    blocks[block_index]->mark_local_available(this);
-    mark_dirty();
-}
 
 const boost::filesystem::path &file_info_t::get_path() noexcept {
     if (!path) {

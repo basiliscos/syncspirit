@@ -17,9 +17,10 @@ local_update_t::local_update_t(const file_info_t &file, db::FileInfo current_, b
     if (blocks.size() != current_blocks.size()) {
         blocks_updated = true;
     } else {
-        for(size_t i = 0; i < prev_blocks.size(); ++i) {
+        for(size_t i = 0; i < blocks.size(); ++i) {
             bool mismatch =
-                       (blocks[i]->get_size() != current_blocks[i].size())
+                       !blocks[i]
+                    || (blocks[i]->get_size() != current_blocks[i].size())
                     || (blocks[i]->get_weak_hash() != current_blocks[i].weak_hash())
                     || (blocks[i]->get_hash() != current_blocks[i].hash());
             if(mismatch) {
@@ -33,7 +34,9 @@ local_update_t::local_update_t(const file_info_t &file, db::FileInfo current_, b
         /* save prev blocks */
         prev_blocks.reserve(blocks.size());
         for(const auto& b: blocks) {
-            prev_blocks.push_back(b->as_bep(0));
+            if (b) {
+                prev_blocks.push_back(b->as_bep(0));
+            }
         }
 
         auto tmp_blocks = string_map{};
@@ -42,7 +45,7 @@ local_update_t::local_update_t(const file_info_t &file, db::FileInfo current_, b
             tmp_blocks.put(b.hash());
         };
         for(const auto& b : blocks) {
-            if (tmp_blocks.get(b->get_hash()).empty()) {
+            if (b && tmp_blocks.get(b->get_hash()).empty()) {
                 removed_blocks.insert(std::string(b->get_hash()));
             }
         };
@@ -54,22 +57,29 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device(device);
     auto file = folder_info->get_file_infos().by_name(file_name);
+    auto& blocks_map = cluster.get_blocks();
+    block_infos_map_t tmp_blocks;
+    auto& blocks = file->get_blocks();
 
-    file->fields_update(current);
+    if (blocks_updated) {
+        for(auto& b: blocks) {
+            if (b) {
+                tmp_blocks.put(b);
+            }
+        }
+    }
+
+    auto r = file->fields_update(current);
+    if (!r) {
+        return r.assume_error();
+    }
+
     auto seq = folder_info->get_max_sequence() + 1;
     folder_info->set_max_sequence(seq);
     file->set_sequence(seq);
 
     if (blocks_updated) {
-        auto& blocks_map = cluster.get_blocks();
-        block_infos_map_t tmp_blocks;
-        auto& blocks = file->get_blocks();
-        for(auto& b: blocks) {
-            tmp_blocks.put(b);
-        }
         file->remove_blocks();
-
-        blocks.resize(current_blocks.size());
 
         for(size_t i = 0; i < current_blocks.size(); ++i) {
             auto& b = current_blocks[i];

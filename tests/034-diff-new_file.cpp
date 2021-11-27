@@ -47,7 +47,8 @@ TEST_CASE("new file diff", "[model]") {
 
     SECTION("file, no inc, with blocks") {
         pr_file_info.set_type(proto::FileInfoType::FILE);
-        pr_file_info.set_size(5);
+        pr_file_info.set_size(5ul);
+        pr_file_info.set_block_size(5ul);
 
         auto bi = proto::BlockInfo();
         bi.set_size(5);
