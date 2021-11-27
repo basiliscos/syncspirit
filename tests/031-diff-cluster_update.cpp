@@ -300,10 +300,10 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     folder_info_peer->get_file_infos().put(fi_peer2);
     REQUIRE(folder_info_peer->get_file_infos().size() == 2);
 
-    fi_my->append_block(b1, 0);
-    fi_peer1->append_block(b2, 0);
-    fi_peer2->append_block(b2, 0);
-    fi_peer2->append_block(b3, 1);
+    fi_my->assign_block(b1, 0);
+    fi_peer1->assign_block(b2, 0);
+    fi_peer2->assign_block(b2, 0);
+    fi_peer2->assign_block(b3, 1);
 
     auto cc = std::make_unique<proto::ClusterConfig>();
     auto p_folder = cc->add_folders();

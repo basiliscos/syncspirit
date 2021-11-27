@@ -182,7 +182,7 @@ TEST_CASE("db-actor", "[db]") {
 
     blocks.put(block);
     file->get_blocks().resize(1);
-    file->append_block(block, 0);
+    file->assign_block(block, 0);
     file->remove_blocks();
     act->request<payload::store_file_request_t>(db_addr, file).send(timeout);
     sup->do_process();

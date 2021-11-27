@@ -584,7 +584,7 @@ void controller_actor_t::on_clone(fs::message::clone_response_t &res) noexcept {
     assert(it != write_map.end());
     auto &info = it->second;
     auto block_info = info.clone_queue.front();
-    info.file->append_block(block_info.block, block_info.target_index);
+    info.file->assign_block(block_info.block, block_info.target_index);
     info.file->mark_local_available(block_info.target_index);
     --info.blocks_left;
     info.clone_queue.pop_front();
@@ -618,7 +618,7 @@ void controller_actor_t::process(write_it_t it) noexcept {
             auto block_index = req_payload.block.block_index();
             auto offset = file->get_block_offset(block_index);
             std::copy(data.begin(), data.end(), disk_view + offset);
-            info.file->append_block(req_payload.block.block(), block_index);
+            info.file->assign_block(req_payload.block.block(), block_index);
             --blocks_kept;
             blocks.pop_front();
         }

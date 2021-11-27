@@ -99,7 +99,7 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
                 block = std::move(opt.assume_value());
                 blocks_map.put(block);
             }
-            file->append_block(block, i);
+            file->assign_block(block, i);
         }
 
         for(auto& hash: removed_blocks) {

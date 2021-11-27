@@ -38,7 +38,7 @@ auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resul
             block = std::move(block_opt.assume_value());
             blocks_map.put(block);
         }
-        fi->append_block(block, i);
+        fi->assign_block(block, i);
     }
 
     folder_info->get_file_infos().put(fi);

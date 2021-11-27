@@ -305,7 +305,7 @@ void file_info_t::remove_blocks() noexcept {
     blocks.clear();
 }
 
-void file_info_t::append_block(const model::block_info_ptr_t &block, size_t index) noexcept {
+void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t index) noexcept {
     assert(index < blocks.size() && "blocks should be reserve enough space");
     blocks[index] = block;
     block->link(this, index);
@@ -440,7 +440,7 @@ void file_info_t::unlock() noexcept { locked = false; }
 
 void file_info_t::lock() noexcept { locked = true; }
 
-void file_info_t::append_block(const model::block_info_ptr_t &block, size_t index) noexcept {
+void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t index) noexcept {
     assert(index < blocks.size() && "blocks should be reserve enough space");
     blocks[index] = block;
     block->link(this, index);

@@ -287,7 +287,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     pr_fi.set_block_size(5ul);
     auto fi = file_info_t::create(cluster->next_uuid(),  pr_fi, folder_info).value();
     CHECK(fi);
-    fi->append_block(block, 0);
+    fi->assign_block(block, 0);
 
     auto target = file_info_ptr_t();
 

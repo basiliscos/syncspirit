@@ -36,7 +36,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         for(int i = 0; i < f.blocks_size(); ++i) {
             auto& b = f.blocks(i);
             auto block = blocks_map.get(b.hash());
-            file->append_block(block, (size_t)i);
+            file->assign_block(block, (size_t)i);
         }
     }
     folder_info->set_max_sequence(max_seq);

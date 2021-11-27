@@ -58,7 +58,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     inline const blocks_t &get_blocks() const noexcept { return blocks; }
 
     void remove_blocks() noexcept;
-    void append_block(const model::block_info_ptr_t &block, size_t index) noexcept;
+    void assign_block(const model::block_info_ptr_t &block, size_t index) noexcept;
 
     inline bool is_file() noexcept { return type == proto::FileInfoType::FILE; }
     inline bool is_dir() noexcept { return type == proto::FileInfoType::DIRECTORY; }
