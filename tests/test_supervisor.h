@@ -21,6 +21,7 @@ struct supervisor_t final: r::supervisor_t {
     void enqueue(r::message_ptr_t message) noexcept override;
 
     void on_model_update(net::message::model_update_t& ) noexcept;
+    void on_block_update(net::message::block_update_t& ) noexcept;
     void do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept override;
     void do_cancel_timer(r::request_id_t timer_id) noexcept override;
 

@@ -24,6 +24,7 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&supervisor_t::on_model_update);
+        p.subscribe_actor(&supervisor_t::on_block_update);
     });
     if (configure_callback) {
         configure_callback(plugin);
@@ -64,6 +65,16 @@ void supervisor_t::on_model_update(net::message::model_update_t& msg) noexcept {
     auto r = diff->apply(*cluster);
     if (!r) {
         LOG_ERROR(log, "{}, error updating model: {}", r.assume_error().message());
+        do_shutdown(make_error(r.assume_error()));
+    }
+}
+
+void supervisor_t::on_block_update(net::message::block_update_t& msg) noexcept {
+    LOG_TRACE(log, "{}, updating block", identity);
+    auto& diff = msg.payload.diff;
+    auto r = diff->apply(*cluster);
+    if (!r) {
+        LOG_ERROR(log, "{}, error updating block: {}", r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
     }
 }

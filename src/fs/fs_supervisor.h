@@ -42,6 +42,8 @@ struct fs_supervisor_t : rth::supervisor_thread_t {
 
   private:
     void on_model_request(net::message::model_response_t& res) noexcept;
+    void on_model_update(net::message::model_update_t &message) noexcept;
+    void on_block_update(net::message::block_update_t &message) noexcept;
     void launch() noexcept;
 
     model::cluster_ptr_t cluster;

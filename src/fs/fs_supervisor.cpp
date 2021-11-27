@@ -24,6 +24,10 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&fs_supervisor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&fs_supervisor_t::on_block_update, coordinator);
                 request<net::payload::model_request_t>(coordinator).send(init_timeout);
                 resources->acquire(resource::model);
             }
@@ -31,7 +35,7 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
 
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-            p.subscribe_actor(&fs_supervisor_t::on_model_request);
+        p.subscribe_actor(&fs_supervisor_t::on_model_request);
     }, r::plugin::config_phase_t::PREINIT );
 }
 
@@ -67,4 +71,24 @@ void fs_supervisor_t::on_model_request(net::message::model_response_t &res) noex
 void fs_supervisor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
     r::actor_base_t::on_start();
+}
+
+void fs_supervisor_t::on_model_update(net::message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_model_update", identity);
+    auto& diff = *message.payload.diff;
+    auto r = diff.apply(*cluster);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+}
+
+void fs_supervisor_t::on_block_update(net::message::block_update_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_block_update", identity);
+    auto& diff = *message.payload.diff;
+    auto r = diff.apply(*cluster);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
 }
