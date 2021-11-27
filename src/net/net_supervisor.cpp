@@ -70,6 +70,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_connection);
 #endif
         p.subscribe_actor(&net_supervisor_t::on_model_update);
+        p.subscribe_actor(&net_supervisor_t::on_block_update);
         p.subscribe_actor(&net_supervisor_t::on_load_cluster);
         p.subscribe_actor(&net_supervisor_t::on_model_request);
         launch_early();
@@ -181,6 +182,16 @@ void net_supervisor_t::on_model_update(message::model_update_t &message) noexcep
         do_shutdown(ee);
     }
     r = diff.visit(*this);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+}
+
+void net_supervisor_t::on_block_update(message::block_update_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_block_update", identity);
+    auto& diff = *message.payload.diff;
+    auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);

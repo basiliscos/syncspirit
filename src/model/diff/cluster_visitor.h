@@ -1,10 +1,7 @@
 #pragma once
-#include <boost/outcome.hpp>
-
+#include "generic_diff.hpp"
 
 namespace syncspirit::model::diff {
-
-namespace outcome = boost::outcome_v2;
 
 namespace load {
     struct load_cluster_t;
@@ -26,8 +23,10 @@ namespace modify {
     struct lock_file_t;
 }
 
-struct cluster_visitor_t {
-    virtual ~cluster_visitor_t();
+template<>
+struct generic_visitor_t<tag::cluster> {
+    virtual ~generic_visitor_t() = default;
+
     virtual outcome::result<void> operator()(const load::load_cluster_t &) noexcept;
     virtual outcome::result<void> operator()(const peer::peer_state_t &) noexcept;
     virtual outcome::result<void> operator()(const peer::cluster_remove_t &) noexcept;
@@ -40,5 +39,8 @@ struct cluster_visitor_t {
     virtual outcome::result<void> operator()(const modify::local_update_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::lock_file_t &) noexcept;
 };
+
+using cluster_visitor_t = generic_visitor_t<tag::cluster>;
+
 
 } // namespace syncspirit::model::diff

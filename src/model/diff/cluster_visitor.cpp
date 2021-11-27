@@ -2,8 +2,6 @@
 
 using namespace syncspirit::model::diff;
 
-cluster_visitor_t::~cluster_visitor_t(){}
-
 auto cluster_visitor_t::operator()(const load::load_cluster_t &) noexcept -> outcome::result<void>  {
     return outcome::success();
 }

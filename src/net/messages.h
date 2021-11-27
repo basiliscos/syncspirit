@@ -16,6 +16,7 @@
 #include "../model/cluster.h"
 #include "../model/folder.h"
 #include "../model/diff/cluster_diff.h"
+#include "../model/diff/block_diff.h"
 #include "../transport/base.h"
 #include "../proto/bep_support.h"
 
@@ -239,6 +240,11 @@ struct model_update_t {
     const void* custom;
 };
 
+struct block_update_t {
+    model::diff::block_diff_ptr_t diff;
+    const void* custom;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -270,6 +276,7 @@ using connect_response_t = r::request_traits_t<payload::connect_request_t>::resp
 using connection_notify_t = r::message_t<payload::connection_notify_t>;
 
 using model_update_t = r::message_t<payload::model_update_t>;
+using block_update_t = r::message_t<payload::block_update_t>;
 using model_request_t = r::request_traits_t<payload::model_request_t>::request::message_t;
 using model_response_t = r::request_traits_t<payload::model_request_t>::response::message_t;
 

@@ -1,32 +1,15 @@
 #pragma once
 
-#include "base.h"
-#include "utils/log.h"
-#include <boost/outcome.hpp>
+#include "generic_diff.hpp"
+#include "cluster_visitor.h"
 
-namespace syncspirit::model {
+namespace syncspirit::model::diff {
 
-namespace outcome = boost::outcome_v2;
-
-struct cluster_t;
-
-namespace diff {
-
-struct cluster_visitor_t;
-
-struct cluster_diff_t : base_t {
-    cluster_diff_t() noexcept;
-    virtual ~cluster_diff_t();
-    virtual outcome::result<void> visit(cluster_visitor_t &) const noexcept;
-    outcome::result<void> apply(cluster_t &) const noexcept;
-
-    protected:
-    virtual outcome::result<void> apply_impl(cluster_t &) const noexcept = 0;
-    utils::logger_t log;
+struct cluster_diff_t: generic_diff_t<tag::cluster> {
+    virtual outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
 };
 
 using cluster_diff_ptr_t = boost::intrusive_ptr<cluster_diff_t>;
 
-} // namespace diff
 
 } // namespace syncspirit::model

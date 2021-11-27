@@ -3,6 +3,7 @@
 #include "../model/device.h"
 #include "../model/cluster.h"
 #include "../model/diff/cluster_visitor.h"
+#include "../model/diff/block_visitor.h"
 #include "../utils/log.h"
 #include "messages.h"
 #include <boost/asio.hpp>
@@ -63,6 +64,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::clu
 */
     void on_load_cluster(message::load_cluster_response_t &message) noexcept;
     void on_model_update(message::model_update_t &message) noexcept;
+    void on_block_update(message::block_update_t &message) noexcept;
     void on_model_request(message::model_request_t &message) noexcept;
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;

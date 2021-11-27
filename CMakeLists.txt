@@ -39,7 +39,9 @@ add_library(syncspirit_lib
     src/hasher/hasher_proxy_actor.cpp
     src/hasher/hasher_supervisor.cpp
     src/model/diff/aggregate.cpp
-    src/model/diff/base.cpp
+    src/model/diff/base_diff.cpp
+    src/model/diff/block_diff.cpp
+    src/model/diff/block_visitor.cpp
     src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_visitor.cpp
     src/model/diff/load/blocks.cpp
@@ -51,6 +53,8 @@ add_library(syncspirit_lib
     src/model/diff/load/ignored_devices.cpp
     src/model/diff/load/ignored_folders.cpp
     src/model/diff/load/load_cluster.cpp
+    src/model/diff/modify/append_block.cpp
+    src/model/diff/modify/clone_block.cpp
     src/model/diff/modify/create_folder.cpp
     src/model/diff/modify/local_update.cpp
     src/model/diff/modify/lock_file.cpp

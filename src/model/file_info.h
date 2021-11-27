@@ -70,6 +70,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     inline std::int64_t get_size() const noexcept { return size; }
     inline void set_size(std::int64_t value) noexcept { size = value; }
 
+    std::int32_t get_block_size() const noexcept { return block_size; }
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 
     void mark_local_available(size_t block_index) noexcept;
@@ -96,8 +97,9 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     static const constexpr auto data_length = 1 + uuid_length * 2;
 
 
-    template <typename Source> void fields_update(const Source &s) noexcept;
+    void fields_update(const db::FileInfo&) noexcept;
   private:
+    template <typename Source> void fields_update(const Source &s) noexcept;
     file_info_t(std::string_view key, const db::FileInfo& data, const folder_info_ptr_t& folder_info_) noexcept;
     file_info_t(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
 

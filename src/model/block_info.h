@@ -37,6 +37,7 @@ struct block_info_t final : arc_base_t<block_info_t>, storeable_t {
     inline std::uint32_t get_size() const noexcept { return size; }
     inline size_t usages() const noexcept { return file_blocks.size(); }
     inline file_blocks_t& get_file_blocks() { return file_blocks; }
+    inline const file_blocks_t& get_file_blocks() const { return file_blocks; }
 
     proto::BlockInfo as_bep(size_t offset) const noexcept;
     std::string serialize() const noexcept;
