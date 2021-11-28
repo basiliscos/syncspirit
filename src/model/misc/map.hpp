@@ -34,7 +34,7 @@ template <typename Item, size_t N> struct key_t {
         keys{keys_} {
     }
 
-    template<size_t I> std::string get() noexcept {
+    template<size_t I> std::string_view get() noexcept {
         return keys.at(I);
     }
 };

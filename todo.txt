@@ -1,13 +1,9 @@
 - uuid model
+ -- fs-actor
+   -- LRU
+   -- append block
+   -- clone block
 
-  -- new_file/local_update : check that file size matches size by blocks
-diffs:
-    - blocks_update...
-
-
-- blocks_change:
-    - когда fs-scanner задетектит неполный файл (seq = 0),
-    - частичное скачивание
 
 file_iterator, должен понимать, что файл недокачан
 
