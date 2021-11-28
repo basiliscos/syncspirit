@@ -167,13 +167,9 @@ outcome::result<void> file_info_t::reserve_blocks() noexcept {
     }
     remove_blocks();
     blocks.resize(count);
+    marks.resize(count);
+    missing_blocks = count;
     return outcome::success();
-/*
-    if (size) {
-        assert(block_size && )
-    }
-    auto count = size / bloc
-*/
 }
 
 std::string file_info_t::serialize(bool include_blocks) const noexcept {
@@ -181,8 +177,17 @@ std::string file_info_t::serialize(bool include_blocks) const noexcept {
 }
 
 void file_info_t::mark_local_available(size_t block_index) noexcept {
+    assert(!marks[block_index]);
+    assert(block_index < block_size);
     blocks[block_index]->mark_local_available(this);
+    marks[block_index] = true;
+    --missing_blocks;
 }
+
+bool file_info_t::is_locally_available() noexcept {
+    return missing_blocks == 0;
+}
+
 
 #if 0
 void file_info_t::update(const proto::FileInfo &remote_info) noexcept {
@@ -442,6 +447,7 @@ void file_info_t::lock() noexcept { locked = true; }
 
 void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t index) noexcept {
     assert(index < blocks.size() && "blocks should be reserve enough space");
+    assert(!blocks[index]);
     blocks[index] = block;
     block->link(this, index);
 }
@@ -450,6 +456,8 @@ void file_info_t::remove_blocks() noexcept {
     for (auto &it : blocks) {
         remove_block(it);
     }
+    std::fill_n(marks.begin(), blocks.size(), false);
+    missing_blocks = blocks.size();
 }
 
 void file_info_t::remove_block(block_info_ptr_t &block) noexcept {

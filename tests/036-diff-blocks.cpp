@@ -53,6 +53,7 @@ TEST_CASE("various block diffs", "[model]") {
 
     diff = diff::cluster_diff_ptr_t(new diff::modify::local_update_t(*file, file->as_db(false), {bi1, bi2}));
     REQUIRE(diff->apply(*cluster));
+    REQUIRE(!file->is_locally_available());
 
     SECTION("append") {
         auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 0, "12345"));
@@ -64,6 +65,7 @@ TEST_CASE("various block diffs", "[model]") {
         CHECK(lf1.block_index() == 0);
         CHECK(lf1.get_offset() == 0);
         CHECK(lf1.is_locally_available());
+        CHECK(!file->is_locally_available());
     }
 
     SECTION("clone, from different file") {
@@ -87,6 +89,7 @@ TEST_CASE("various block diffs", "[model]") {
         CHECK(lf1.block_index() == 1);
         CHECK(lf1.get_offset() == 5);
         CHECK(lf1.is_locally_available());
+        CHECK(!file->is_locally_available());
     }
 
 

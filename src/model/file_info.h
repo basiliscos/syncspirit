@@ -72,6 +72,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 
     void mark_local_available(size_t block_index) noexcept;
+    bool is_locally_available() noexcept;
 
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
@@ -97,6 +98,8 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
 
     outcome::result<void> fields_update(const db::FileInfo&) noexcept;
   private:
+    using marks_vector_t = std::vector<bool>;
+
     template <typename Source> outcome::result<void>  fields_update(const Source &s) noexcept;
     file_info_t(std::string_view key, const folder_info_ptr_t& folder_info_) noexcept;
     file_info_t(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept;
@@ -125,6 +128,8 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     std::optional<bfs::path> path;
     std::string full_name;
     bool locked = false;
+    marks_vector_t marks;
+    size_t missing_blocks;
 
     friend struct blocks_interator_t;
 };
