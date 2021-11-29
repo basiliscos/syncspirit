@@ -1,3 +1,4 @@
+#if 0
 #pragma once
 
 #include "../config/main.h"
@@ -76,3 +77,4 @@ struct scan_actor_t : public r::actor_base_t {
 
 } // namespace fs
 } // namespace syncspirit
+#endif

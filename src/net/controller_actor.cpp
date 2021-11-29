@@ -32,6 +32,7 @@ r::plugin::resource_id_t file = 1;
 } // namespace resource
 } // namespace
 
+#if 0
 controller_actor_t::write_info_t::write_info_t(const model::file_info_ptr_t &file_) noexcept
     : file{file_}, pending_blocks{0}, opening{false} {
     auto &blocks = file->get_blocks();
@@ -48,6 +49,7 @@ bool controller_actor_t::write_info_t::done() const noexcept {
 }
 
 bool controller_actor_t::write_info_t::complete() const noexcept { return blocks_left == 0 && done(); }
+#endif
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer},

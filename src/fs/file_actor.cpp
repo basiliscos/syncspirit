@@ -6,7 +6,7 @@
 
 using namespace syncspirit::fs;
 
-file_actor_t::file_actor_t(config_t &cfg) : r::actor_base_t{cfg} { log = utils::get_logger(net::names::file_actor); }
+file_actor_t::file_actor_t(config_t &cfg) : r::actor_base_t{cfg}, cluster{cfg.cluster}, files_cache(cfg.mru_size) { log = utils::get_logger(net::names::file_actor); }
 
 void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -51,7 +51,30 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
     auto file = file_info->get_file_infos().by_name(diff.file_name);
-    //auto file_opt = open_file(file->get_path());
+    auto path = file->get_path();
+    auto file_opt = open_file(path, true, file->get_size());
+    if (!file_opt) {
+        auto& err = file_opt.assume_error();
+        LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path.string(), err.message());
+        return err;
+    }
+
+
+    auto& mmaped_file = file_opt.assume_value();
+    auto disk_view = mmaped_file->data();
+    auto &data = diff.data;
+    auto block_index = diff.block_index;
+    auto offset = file->get_block_offset(block_index);
+    std::copy(data.begin(), data.end(), disk_view + offset);
+    if (file->is_locally_available()) {
+        files_cache.remove(mmaped_file);
+        auto ok = mmaped_file->close();
+        if (!ok) {
+            auto& ec = ok.assume_error();
+            LOG_ERROR(log, "{}, cannot close file (after appending block): {}: {}", identity, path.string(), ec.message());
+            return ec;
+        }
+    }
 
     return outcome::success();
 }
@@ -60,12 +83,17 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
     return outcome::success();
 }
 
-auto file_actor_t::open_file(bfs::path path, bool temporal, size_t size) noexcept -> outcome::result<opened_file_t> {
-    LOG_TRACE(log, "{}, on_open, path = {} ({} bytes)", identity, path.string());
-    if (temporal) {
-        path = make_temporal(path);
+auto file_actor_t::open_file(bfs::path path, bool temporal, size_t size) noexcept -> outcome::result<mmaped_file_ptr_t> {
+    LOG_TRACE(log, "{}, on_open, path = {} ({} bytes)", identity, path.string(), size);
+
+    auto item = files_cache.get(path.string());
+    if (item) {
+        return item;
     }
-    auto parent = path.parent_path();
+
+    bfs::path operational_path = temporal ? make_temporal(path) : path;
+
+    auto parent = operational_path.parent_path();
     sys::error_code ec;
 
     bool exists = bfs::exists(parent, ec);
@@ -77,12 +105,12 @@ auto file_actor_t::open_file(bfs::path path, bool temporal, size_t size) noexcep
     }
 
     bio::mapped_file_params params;
-    params.path = path.string();
+    params.path = operational_path.string();
     params.flags = bio::mapped_file::mapmode::readwrite;
 
-    auto file = std::make_unique<typename opened_file_t::element_type>();
+    auto file = std::make_unique<bio::mapped_file>();
     try {
-        if (!bfs::exists(path) || bfs::file_size(path) != size) {
+        if (!bfs::exists(operational_path) || bfs::file_size(operational_path) != size) {
             params.new_file_size = size;
         }
         file->open(params);
@@ -91,7 +119,10 @@ auto file_actor_t::open_file(bfs::path path, bool temporal, size_t size) noexcep
         auto ec = sys::errc::make_error_code(sys::errc::io_error);
         return ec;
     }
-    return std::move(file);
+
+    item = new mmaped_file_t(path, std::move(file), temporal);
+    files_cache.put(item);
+    return std::move(item);
 }
 
 

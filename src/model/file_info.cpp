@@ -318,13 +318,6 @@ void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t inde
 }
 
 
-const boost::filesystem::path &file_info_t::get_path() noexcept {
-    if (!path) {
-        path = folder_info->get_folder()->get_path() / std::string(get_name());
-    }
-    return path.value();
-}
-
 void file_info_t::record_update(const device_t &source) noexcept {
     uint64_t value = version.counters_size() + 1;
     auto &device_id = source.device_id.get_sha256();
@@ -428,6 +421,13 @@ proto::FileInfo file_info_t::get() const noexcept {
     return r;
 }
 #endif
+
+const boost::filesystem::path &file_info_t::get_path() noexcept {
+    if (!path) {
+        path = folder_info->get_folder()->get_path() / std::string(get_name());
+    }
+    return path.value();
+}
 
 bool file_info_t::is_incomplete() const noexcept {
     if (blocks.empty()) {

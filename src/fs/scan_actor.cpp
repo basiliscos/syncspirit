@@ -1,3 +1,4 @@
+#if 0
 #include "scan_actor.h"
 #include "../net/names.h"
 #include "../utils/error_code.h"
@@ -301,3 +302,4 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     }
     intrusive_ptr_release(scan);
 }
+#endif

@@ -1,10 +1,13 @@
 #pragma once
+
+#if 0
 #include "messages.h"
 
 #include <deque>
 #include <optional>
 #include <boost/outcome.hpp>
 #include <boost/iostreams/stream.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <memory>
 #include <fstream>
@@ -14,7 +17,14 @@
 namespace syncspirit {
 namespace fs {
 
+#if 0
 using request_ptr_t = r::intrusive_ptr_t<message::scan_request_t>;
+#endif
+
+namespace r = rotor;
+namespace bfs = boost::filesystem;
+namespace bio = boost::iostreams;
+namespace sys = boost::system;
 
 namespace payload {
 
@@ -87,3 +97,5 @@ using process_signal_t = r::message_t<payload::process_signal_t>;
 
 } // namespace fs
 } // namespace syncspirit
+
+#endif

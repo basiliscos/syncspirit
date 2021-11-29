@@ -1,12 +1,15 @@
 #pragma once
 
+
+#include <rotor.hpp>
+#if 0
+
 #include <memory>
 #include <unordered_map>
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
-#include <rotor.hpp>
 #include "../model/block_info.h"
 #include "../model/misc/local_file.h"
 
@@ -19,7 +22,7 @@ namespace bfs = boost::filesystem;
 namespace bio = boost::iostreams;
 namespace sys = boost::system;
 
-using opened_file_t = std::unique_ptr<bio::mapped_file>;
+// using opened_file_t = std::unique_ptr<bio::mapped_file>;
 
 namespace payload {
 
@@ -99,3 +102,4 @@ using clone_response_t = r::request_traits_t<payload::clone_request_t>::response
 
 } // namespace fs
 } // namespace syncspirit
+#endif
