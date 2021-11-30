@@ -98,7 +98,7 @@ struct fixture_t {
 
 }
 
-void test_single_block_file() {
+void test_append_block() {
     struct F : fixture_t {
         void main() noexcept override {
             proto::FileInfo pr_source;
@@ -133,7 +133,7 @@ void test_single_block_file() {
                 CHECK(data == "12345");
             }
 
-            SECTION("file with 2 different block") {
+            SECTION("file with 2 different blocks") {
                 pr_source.set_size(10ul);
 
                 auto bi2 = proto::BlockInfo();
@@ -177,4 +177,4 @@ void test_single_block_file() {
 }
 
 
-REGISTER_TEST_CASE(test_single_block_file, "test_single_block_file", "[fs]");
+REGISTER_TEST_CASE(test_append_block, "test_single_block_file", "[fs]");
