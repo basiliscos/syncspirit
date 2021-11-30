@@ -101,35 +101,76 @@ struct fixture_t {
 void test_single_block_file() {
     struct F : fixture_t {
         void main() noexcept override {
+            proto::FileInfo pr_source;
+            pr_source.set_name("q.txt");
+            pr_source.set_block_size(5ul);
+
             auto bi1 = proto::BlockInfo();
             bi1.set_size(5);
             bi1.set_weak_hash(12);
             bi1.set_hash(utils::sha256_digest("12345").value());
             bi1.set_offset(0);
 
-            proto::FileInfo pr_source;
-            pr_source.set_name("q.txt");
-            pr_source.set_block_size(5ul);
-            pr_source.set_size(5ul);
+            SECTION("file with 1 block") {
+                pr_source.set_size(5ul);
 
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_source, {bi1}));
+                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->do_process();
 
-            auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_source, {bi1}));
-            sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-            sup->do_process();
+                auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto& files_info = folders_info.by_device(cluster->get_device())->get_file_infos();
+                auto file = files_info.by_name(pr_source.name());
 
-            auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
-            auto& files_info = folders_info.by_device(cluster->get_device())->get_file_infos();
-            auto file = files_info.by_name(pr_source.name());
+                auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 0, "12345"));
+                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                sup->do_process();
 
-            auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 0, "12345"));
-            sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-            sup->do_process();
+                auto path = root_path / std::string(file->get_name());
+                REQUIRE(bfs::exists(path));
+                REQUIRE(bfs::file_size(path) == 5);
+                auto data = read_file(path);
+                CHECK(data == "12345");
+            }
 
-            auto path = root_path / std::string(file->get_name());
-            REQUIRE(bfs::exists(path));
-            REQUIRE(bfs::file_size(path) == 5);
-            auto data = read_file(path);
-            CHECK(data == "12345");
+            SECTION("file with 2 different block") {
+                pr_source.set_size(10ul);
+
+                auto bi2 = proto::BlockInfo();
+                bi2.set_size(5);
+                bi2.set_weak_hash(12);
+                bi2.set_hash(utils::sha256_digest("67890").value());
+                bi2.set_offset(0);
+
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_source, {bi1, bi2}));
+                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->do_process();
+
+                auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto& files_info = folders_info.by_device(cluster->get_device())->get_file_infos();
+                auto file = files_info.by_name(pr_source.name());
+
+                auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 0, "12345"));
+                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                sup->do_process();
+
+                auto filename = std::string(file->get_name()) + ".syncspirit-tmp";
+                auto path = root_path / filename;
+                REQUIRE(bfs::exists(path));
+                REQUIRE(bfs::file_size(path) == 10);
+                auto data = read_file(path);
+                CHECK(data.substr(0, 5) == "12345");
+
+                bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 1, "67890"));
+                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                sup->do_process();
+                filename = std::string(file->get_name());
+                path = root_path / filename;
+                REQUIRE(bfs::exists(path));
+                REQUIRE(bfs::file_size(path) == 10);
+                data = read_file(path);
+                CHECK(data == "1234567890");
+            }
         }
     };
     F().run();
