@@ -27,6 +27,8 @@ struct fixture_t {
 
     fixture_t() noexcept: root_path{ bfs::unique_path() }, path_quard{root_path} {
         utils::set_default("trace");
+        root_path = bfs::unique_path();
+        bfs::create_directory(root_path);
     }
 
     virtual supervisor_t::configure_callback_t configure() noexcept {
@@ -49,10 +51,6 @@ struct fixture_t {
     virtual void run() noexcept {
         cluster = make_cluster();
 
-        auto root_path = bfs::unique_path();
-        bfs::create_directory(root_path);
-        auto root_path_guard = path_guard_t(root_path);
-
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
         sup->cluster = cluster;
@@ -66,6 +64,14 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t*>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         file_addr = file_actor->get_address();
+
+        db_folder.set_id("1234-5678");
+        db_folder.set_label("my-label");
+        db_folder.set_path(root_path.string());
+        auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
+        sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+        sup->do_process();
+
         main();
         reply.reset();
 
@@ -87,6 +93,7 @@ struct fixture_t {
     path_guard_t path_quard;
     r::system_context_t ctx;
     msg_ptr_t reply;
+    db::Folder db_folder;
 };
 
 }
@@ -94,25 +101,19 @@ struct fixture_t {
 void test_single_block_file() {
     struct F : fixture_t {
         void main() noexcept override {
-            db::Folder db_folder;
-            db_folder.set_id("1234-5678");
-            db_folder.set_label("my-label");
-            db_folder.set_path(root_path.string());
-            auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-            sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-
-            proto::FileInfo pr_source;
-            pr_source.set_name("q.txt");
-            pr_source.set_block_size(5ul);
-            pr_source.set_size(5ul);
-
             auto bi1 = proto::BlockInfo();
             bi1.set_size(5);
             bi1.set_weak_hash(12);
             bi1.set_hash(utils::sha256_digest("12345").value());
             bi1.set_offset(0);
 
-            diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_source, {bi1}));
+            proto::FileInfo pr_source;
+            pr_source.set_name("q.txt");
+            pr_source.set_block_size(5ul);
+            pr_source.set_size(5ul);
+
+
+            auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_source, {bi1}));
             sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
             sup->do_process();
 
