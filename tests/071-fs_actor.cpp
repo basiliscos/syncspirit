@@ -161,16 +161,27 @@ void test_append_block() {
                 auto data = read_file(path);
                 CHECK(data.substr(0, 5) == "12345");
 
-                bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 1, "67890"));
-                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                sup->do_process();
-                filename = std::string(file->get_name());
-                path = root_path / filename;
-                REQUIRE(bfs::exists(path));
-                REQUIRE(bfs::file_size(path) == 10);
-                data = read_file(path);
-                CHECK(data == "1234567890");
+                SECTION("add 2nd block") {
+                    bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 1, "67890"));
+                    sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                    sup->do_process();
+                    filename = std::string(file->get_name());
+                    path = root_path / filename;
+                    REQUIRE(bfs::exists(path));
+                    REQUIRE(bfs::file_size(path) == 10);
+                    data = read_file(path);
+                    CHECK(data == "1234567890");
+                }
+
+                SECTION("remove folder (simulate err)") {
+                    bfs::remove_all(root_path);
+                    bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 1, "67890"));
+                    sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                    sup->do_process();
+                    CHECK(static_cast<r::actor_base_t*>(file_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+                }
             }
+
         }
     };
     F().run();
