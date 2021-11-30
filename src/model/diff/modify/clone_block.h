@@ -15,6 +15,7 @@ struct clone_block_t final : block_diff_t {
     std::string target_file_name;
     size_t target_block_index;
 
+    std::string source_device_id;
     std::string source_folder_id;
     std::string source_file_name;
     size_t source_block_index;

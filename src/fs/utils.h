@@ -5,6 +5,7 @@
 #include <boost/outcome.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
+#include <boost/smart_ptr/local_shared_ptr.hpp>
 
 
 namespace syncspirit {
@@ -16,7 +17,7 @@ namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
 
 struct mmaped_file_t: boost::intrusive_ref_counter<mmaped_file_t, boost::thread_unsafe_counter> {
-    using backend_t = std::unique_ptr<bio::mapped_file>;
+    using backend_t = boost::local_shared_ptr<bio::mapped_file>;
 
     mmaped_file_t() noexcept;
     mmaped_file_t(const bfs::path&, backend_t backend, bool temporal) noexcept;
@@ -25,6 +26,8 @@ struct mmaped_file_t: boost::intrusive_ref_counter<mmaped_file_t, boost::thread_
     operator bool() const noexcept;
     char* data() noexcept;
     const char* data() const noexcept;
+
+    backend_t get_backend() noexcept;
 
     outcome::result<void> close() noexcept;
 

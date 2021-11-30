@@ -66,6 +66,7 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
     auto block_index = diff.block_index;
     auto offset = file->get_block_offset(block_index);
     std::copy(data.begin(), data.end(), disk_view + offset);
+
     if (file->is_locally_available()) {
         files_cache.remove(mmaped_file);
         auto ok = mmaped_file->close();
@@ -80,10 +81,62 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
 }
 
 auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) noexcept -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.target_folder_id);
+    auto target_folder_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto target = target_folder_info->get_file_infos().by_name(diff.target_file_name);
+
+    auto source_folder_info = folder->get_folder_infos().by_device_id(diff.source_device_id);
+    auto source = source_folder_info->get_file_infos().by_name(diff.source_file_name);
+
+    auto target_path = target->get_path();
+    auto file_opt = open_file(target_path, true, target->get_size());
+    if (!file_opt) {
+        auto& err = file_opt.assume_error();
+        LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, target_path.string(), err.message());
+        return err;
+    }
+    auto target_mmap = std::move(file_opt.assume_value());
+    auto source_mmap = mmaped_file_t::backend_t();
+
+    auto source_path = source->get_path();
+    if (source_path == target_path) {
+        source_mmap = target_mmap->get_backend();
+    } else {
+        bio::mapped_file_params params;
+        params.path = source_path.string();
+        params.flags = bio::mapped_file::mapmode::readonly;
+        auto source_opt = open_file(source_path, params);
+        if (!source_opt) {
+            auto& ec = source_opt.assume_error();
+            LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, params.path, ec.message());
+            return ec;
+        }
+        source_mmap = std::move(source_opt.assume_value());
+    }
+
+    auto target_view = target_mmap->data();
+    auto& block = target->get_blocks()[diff.target_block_index];
+    auto target_offset = target->get_block_offset(diff.target_block_index);
+    auto source_view = source_mmap->data();
+    auto source_offset = source->get_block_offset(diff.source_block_index);
+    auto source_begin = source_view + source_offset;
+    auto source_end = source_begin + block->get_size();
+    std::copy(source_begin, source_end, target_view + target_offset);
+
+    if (target->is_locally_available()) {
+        files_cache.remove(target_mmap);
+        auto ok = target_mmap->close();
+        if (!ok) {
+            auto& ec = ok.assume_error();
+            LOG_ERROR(log, "{}, cannot close file (after appending block): {}: {}", identity, target_path.string(), ec.message());
+            return ec;
+        }
+    }
+
     return outcome::success();
 }
 
-auto file_actor_t::open_file(bfs::path path, bool temporal, size_t size) noexcept -> outcome::result<mmaped_file_ptr_t> {
+auto file_actor_t::open_file(const boost::filesystem::path &path, bool temporal, size_t size) noexcept -> outcome::result<mmaped_file_ptr_t> {
     LOG_TRACE(log, "{}, on_open, path = {} ({} bytes)", identity, path.string(), size);
 
     auto item = files_cache.get(path.string());
@@ -107,23 +160,34 @@ auto file_actor_t::open_file(bfs::path path, bool temporal, size_t size) noexcep
     bio::mapped_file_params params;
     params.path = operational_path.string();
     params.flags = bio::mapped_file::mapmode::readwrite;
+    if (!bfs::exists(operational_path, ec) || bfs::file_size(operational_path, ec) != size) {
+        params.new_file_size = size;
+    }
 
-    auto file = std::make_unique<bio::mapped_file>();
+    auto backend_opt = open_file(path, params);
+    if (!backend_opt) {
+        return backend_opt.assume_error();
+    }
+
+    auto& backend = backend_opt.assume_value();
+    item = new mmaped_file_t(path, std::move(std::move(backend)), temporal);
+    files_cache.put(item);
+    return std::move(item);
+}
+
+
+auto file_actor_t::open_file(const boost::filesystem::path &path, const bio::mapped_file_params& params) noexcept -> outcome::result<mmaped_file_t::backend_t> {
+    auto file = mmaped_file_t::backend_t(new bio::mapped_file());
     try {
-        if (!bfs::exists(operational_path) || bfs::file_size(operational_path) != size) {
-            params.new_file_size = size;
-        }
         file->open(params);
     } catch (const std::exception &ex) {
         LOG_ERROR(log, "{}, error opening file {}: {}", identity, params.path, ex.what());
         auto ec = sys::errc::make_error_code(sys::errc::io_error);
         return ec;
     }
-
-    item = new mmaped_file_t(path, std::move(file), temporal);
-    files_cache.put(item);
-    return std::move(item);
+    return outcome::success(std::move(file));
 }
+
 
 
 

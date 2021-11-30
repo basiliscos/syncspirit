@@ -29,6 +29,10 @@ const char* mmaped_file_t::data() const noexcept {
     return backend->const_data();
 }
 
+auto mmaped_file_t::get_backend() noexcept -> backend_t {
+    return backend;
+}
+
 outcome::result<void> mmaped_file_t::close() noexcept {
     assert(backend);
     try {

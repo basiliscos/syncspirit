@@ -62,7 +62,8 @@ struct file_actor_t : public r::actor_base_t, private model::diff::block_visitor
     using cache_t = model::mru_list_t<mmaped_file_ptr_t>;
     void on_block_update(net::message::block_update_t &message) noexcept;
 
-    outcome::result<mmaped_file_ptr_t> open_file(bfs::path path, bool temporal, size_t size) noexcept;
+    outcome::result<mmaped_file_ptr_t> open_file(const bfs::path& path, bool temporal, size_t size) noexcept;
+    outcome::result<mmaped_file_t::backend_t> open_file(const bfs::path& path, const bio::mapped_file_params& params) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::append_block_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &) noexcept override;
