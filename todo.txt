@@ -1,7 +1,4 @@
 - uuid model
- -- fs-actor
-   -- clone block (test)
- -- backpressue
 
 
 file_iterator, должен понимать, что файл недокачан
@@ -25,6 +22,7 @@ file_iterator, должен понимать, что файл недокачан
 - inactivity-shutdowner
 - when file downloading complete, update in DB it's sequence
 - start syncing folder when new folder has been added, нужно слать cancel{}
+- backpressue on controller by file-actor?
 - Canonicalize, TempNameWithPrefix, TempName
 - локальные таймстемпы?
 - metadata (timestamp, etc.)
