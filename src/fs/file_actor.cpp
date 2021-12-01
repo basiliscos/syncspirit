@@ -117,7 +117,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
     auto target_view = target_mmap->data();
     auto& block = target->get_blocks()[diff.target_block_index];
     auto target_offset = target->get_block_offset(diff.target_block_index);
-    auto source_view = source_mmap->data();
+    auto source_view = source_mmap->const_data();
     auto source_offset = source->get_block_offset(diff.source_block_index);
     auto source_begin = source_view + source_offset;
     auto source_end = source_begin + block->get_size();

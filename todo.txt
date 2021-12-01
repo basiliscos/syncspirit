@@ -1,8 +1,7 @@
 - uuid model
  -- fs-actor
-   -- LRU
-   -- append block
-   -- clone block
+   -- clone block (test)
+ -- backpressue
 
 
 file_iterator, должен понимать, что файл недокачан

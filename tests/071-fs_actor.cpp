@@ -1,7 +1,9 @@
 #include "catch.hpp"
 #include "test-utils.h"
 #include "fs/file_actor.h"
+#include "model/diff/aggregate.h"
 #include "model/diff/modify/append_block.h"
+#include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/new_file.h"
 #include "test_supervisor.h"
@@ -187,5 +189,95 @@ void test_append_block() {
     F().run();
 }
 
+void test_clone_block() {
+    struct F : fixture_t {
+        void main() noexcept override {
 
-REGISTER_TEST_CASE(test_append_block, "test_single_block_file", "[fs]");
+            auto bi1 = proto::BlockInfo();
+            bi1.set_size(5);
+            bi1.set_weak_hash(12);
+            bi1.set_hash(utils::sha256_digest("12345").value());
+            bi1.set_offset(0);
+
+            proto::FileInfo pr_source;
+            pr_source.set_name("a.txt");
+            pr_source.set_block_size(5ul);
+
+            proto::FileInfo pr_target;
+            pr_target.set_name("b.txt");
+            pr_target.set_block_size(5ul);
+
+            SECTION("single block target file") {
+                pr_source.set_size(5ul);
+                pr_target.set_size(5ul);
+
+                auto diffs = diff::aggregate_t::diffs_t{};
+                diffs.push_back(new diff::modify::new_file_t(db_folder.id(), pr_source, {bi1}));
+                diffs.push_back(new diff::modify::new_file_t(db_folder.id(), pr_target, {bi1}));
+
+                auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
+                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->do_process();
+
+                auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto& files_info = folders_info.by_device(cluster->get_device())->get_file_infos();
+                auto source_file = files_info.by_name(pr_source.name());
+                auto target_file = files_info.by_name(pr_target.name());
+
+                auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*source_file, 0, "12345"));
+                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                sup->do_process();
+
+                auto block = source_file->get_blocks()[0];
+                bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *block));
+                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                sup->do_process();
+
+                auto path = root_path / std::string(target_file->get_name());
+                REQUIRE(bfs::exists(path));
+                REQUIRE(bfs::file_size(path) == 5);
+                auto data = read_file(path);
+                CHECK(data == "12345");
+            }
+
+            SECTION("multi block target file") {
+                pr_source.set_size(5ul);
+                pr_target.set_size(10ul);
+
+                auto diffs = diff::aggregate_t::diffs_t{};
+                diffs.push_back(new diff::modify::new_file_t(db_folder.id(), pr_source, {bi1}));
+                diffs.push_back(new diff::modify::new_file_t(db_folder.id(), pr_target, {bi1, bi1}));
+
+                auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
+                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->do_process();
+
+                auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto& files_info = folders_info.by_device(cluster->get_device())->get_file_infos();
+                auto source_file = files_info.by_name(pr_source.name());
+                auto target_file = files_info.by_name(pr_target.name());
+
+                auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*source_file, 0, "12345"));
+                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                sup->do_process();
+
+                auto block = source_file->get_blocks()[0];
+                bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *block));
+                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                sup->do_process();
+
+                auto filename = std::string(target_file->get_name()) + ".syncspirit-tmp";
+                auto path = root_path / filename;
+                REQUIRE(bfs::exists(path));
+                REQUIRE(bfs::file_size(path) == 10);
+                auto data = read_file(path);
+                CHECK(data.substr(0, 5) == "12345");
+            }
+        }
+    };
+    F().run();
+}
+
+
+REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
+REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
