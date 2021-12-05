@@ -40,11 +40,12 @@ struct folder_info_t final : arc_base_t<folder_info_t>, storeable_t {
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
     void update(const proto::Index &data, const device_ptr_t &peer) noexcept;
     void update(const proto::IndexUpdate &data, const device_ptr_t &peer) noexcept;
-    //bool update(const proto::Device &device) noexcept;
     void update(local_file_map_t &local_files) noexcept;
+    void set_remote_max_sequence(std::int64_t value) noexcept { remote_max_sequence = value; }
     void remove() noexcept;
     void set_max_sequence(std::int64_t value) noexcept;
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
+    bool is_actual() noexcept;
 
   private:
     folder_info_t(std::string_view key, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
@@ -59,6 +60,7 @@ struct folder_info_t final : arc_base_t<folder_info_t>, storeable_t {
 
     std::uint64_t index;
     std::int64_t max_sequence;
+    std::int64_t remote_max_sequence;
     device_t *device;
     folder_t *folder;
     file_infos_map_t file_infos;

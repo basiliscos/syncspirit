@@ -115,6 +115,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             auto& diff = diff_opt.value();
             auto r_a = diff->apply(*cluster);
             CHECK(r_a);
+            CHECK(folder_info_peer->is_actual());
 
             bool visited = false;
             auto visitor = my_cluster_update_visitor_t([&](auto& diff){
@@ -137,6 +138,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
 
             auto& diff = diff_opt.value();
             auto r_a = diff->apply(*cluster);
+            CHECK(!folder_info_peer->is_actual());
             CHECK(r_a);
 
             bool visited = false;

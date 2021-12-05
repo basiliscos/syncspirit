@@ -110,8 +110,10 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
         auto folder = folders.by_id(info.folder_id);
         assert(folder);
         auto folder_info = folder->get_folder_infos().by_device_id(info.device.id());
+        auto max_seq = info.device.max_sequence();
+        folder_info->set_remote_max_sequence(max_seq);
         spdlog::trace("cluster_update_t::apply folder = {}, index = {:#x}, max seq = {} -> {}", folder->get_label(),
-                      folder_info->get_index(), folder_info->get_max_sequence(), info.device.max_sequence());
+                      folder_info->get_index(), folder_info->get_max_sequence(), max_seq);
     }
     for(auto& info: reset_folders) {
         auto folder = folders.by_id(info.folder_id);

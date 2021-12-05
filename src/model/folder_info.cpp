@@ -56,7 +56,7 @@ folder_info_t::~folder_info_t() {}
 
 void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
     index = fi.index_id();
-    max_sequence = fi.max_sequence();
+    remote_max_sequence = max_sequence = fi.max_sequence();
 }
 
 std::string_view folder_info_t::get_key() noexcept {
@@ -103,7 +103,7 @@ bool folder_info_t::update(const proto::Device &device) noexcept {
 
 void folder_info_t::set_max_sequence(int64_t value) noexcept {
     assert(max_sequence < value);
-    max_sequence = value;
+    remote_max_sequence = max_sequence = value;
     mark_dirty();
 }
 
@@ -160,6 +160,11 @@ void folder_info_t::update(const proto::IndexUpdate &data, const device_ptr_t &p
 }
 
 void folder_info_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept { update_generic(data, peer); }
+
+bool folder_info_t::is_actual() noexcept {
+    return max_sequence == remote_max_sequence;
+}
+
 
 #if 0
 void folder_info_t::update(local_file_map_t &local_files) noexcept {

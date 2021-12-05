@@ -26,7 +26,7 @@ TRY_ANEW:
             auto &folder_infos_map = folder->get_folder_infos();
 
             auto peer_folder_info = folder_infos_map.by_device(peer);
-            if (!peer_folder_info)
+            if (!peer_folder_info || !peer_folder_info->is_actual())
                 continue;
 
             auto &peer_file_infos = peer_folder_info->get_file_infos();
