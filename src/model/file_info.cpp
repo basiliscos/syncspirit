@@ -152,17 +152,19 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
 }
 
 outcome::result<void> file_info_t::reserve_blocks() noexcept {
-    if (size < block_size) {
-        return make_error_code(error_code_t::invalid_block_size);
-    }
     size_t count = 0;
-    if (size) {
-        if (!block_size) {
+    if (!deleted && !invalid) {
+        if (size < block_size) {
             return make_error_code(error_code_t::invalid_block_size);
         }
-        count = size / block_size;
-        if (block_size * count != size) {
-            ++count;
+        if (size) {
+            if (!block_size) {
+                return make_error_code(error_code_t::invalid_block_size);
+            }
+            count = size / block_size;
+            if (block_size * count != size) {
+                ++count;
+            }
         }
     }
     remove_blocks();
