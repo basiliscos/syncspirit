@@ -36,6 +36,13 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         for(int i = 0; i < f.blocks_size(); ++i) {
             auto& b = f.blocks(i);
             auto block = blocks_map.get(b.hash());
+            if (!block) {
+                auto opt = block_info_t::create(b);
+                if (!opt) {
+                    return opt.assume_error();
+                }
+                block = std::move(opt.value());
+            }
             file->assign_block(block, (size_t)i);
         }
     }

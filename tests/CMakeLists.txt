@@ -87,6 +87,14 @@ add_executable(036-diff-blocks 036-diff-blocks.cpp)
 target_link_libraries(036-diff-blocks syncspirit_test_lib)
 add_test(036-diff-blocks "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/036-diff-blocks")
 
+add_executable(037-diff-update_folder 037-diff-update_folder.cpp)
+target_link_libraries(037-diff-update_folder syncspirit_test_lib)
+add_test(037-diff-update_folder "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/037-diff-update_folder")
+
+add_executable(050-file_iterator 050-file_iterator.cpp)
+target_link_libraries(050-file_iterator syncspirit_test_lib)
+add_test(050-file_iterator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-file_iterator")
+
 #add_executable(050-model-device_id 050-model-device_id.cpp)
 #target_link_libraries(050-model-device_id syncspirit_test_lib)
 #add_test(050-model-device_id "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-model-device_id")
@@ -98,10 +106,6 @@ add_test(036-diff-blocks "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/036-diff-blocks")
 #add_executable(052-model-folder 052-model-folder.cpp)
 #target_link_libraries(052-model-folder syncspirit_test_lib)
 #add_test(052-model-folder "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/052-model-folder")
-
-#add_executable(053-model-file_iterator 053-model-file_iterator.cpp)
-#target_link_libraries(053-model-file_iterator syncspirit_test_lib)
-#add_test(053-model-file_iterator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/053-model-file_iterator")
 
 #add_executable(054-model-block_iterator 054-model-block_iterator.cpp)
 #target_link_libraries(054-model-block_iterator syncspirit_test_lib)

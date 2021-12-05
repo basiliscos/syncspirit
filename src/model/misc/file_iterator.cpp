@@ -10,6 +10,7 @@ file_interator_t::file_interator_t(cluster_t &cluster_, const device_ptr_t &peer
         cluster = nullptr;
         return;
     }
+    f_peer_it = f_peer_end = it_file_t{};;
     prepare();
 }
 
@@ -46,21 +47,21 @@ TRY_ANEW:
         if (!local_file) {
             return;
         }
-#if 0
-        auto needs_update = !local_file->is_locked() &&
-                            (local_file->is_older(*file) ||
-                             (local_file->get_sequence() == file->get_sequence() && local_file->is_incomplete()));
-#endif
-        std::abort();
-        bool needs_update = false;
-        if (needs_update) {
+        bool needs_download = local_file->need_download(*file);
+        if (needs_download) {
             return;
         }
     }
     goto TRY_ANEW;
 }
 
-void file_interator_t::reset() noexcept { cluster = nullptr; }
+void file_interator_t::reset() noexcept {
+    cluster = nullptr;
+#if 0
+    auto folders = cluster->folders;
+    f_local_it = f_local_end = it_file_t{};
+#endif
+}
 
 file_info_ptr_t file_interator_t::next() noexcept {
     auto r = file_info_ptr_t(file);

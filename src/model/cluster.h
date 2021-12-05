@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include "misc/arc.hpp"
 #include "misc/uuid.h"
+#include "misc/file_iterator.h"
 #include "device.h"
 #include "ignored_device.h"
 #include "ignored_folder.h"
@@ -22,9 +23,6 @@ struct cluster_t final : arc_base_t<cluster_t> {
     cluster_t(device_ptr_t device_, size_t seed) noexcept;
 
     proto::ClusterConfig generate(const model::device_t& target) const noexcept;
-#if 0
-    file_interator_t iterate_files(const device_ptr_t &peer_device) noexcept;
-#endif
     inline const device_ptr_t &get_device() const noexcept { return device; }
     block_infos_map_t &get_blocks() noexcept;
     const block_infos_map_t &get_blocks() const noexcept;
@@ -36,6 +34,8 @@ struct cluster_t final : arc_base_t<cluster_t> {
     const folders_map_t &get_folders() const noexcept;
     uuid_t next_uuid() noexcept;
     uint64_t next_uint64() noexcept;
+    file_info_ptr_t next_file(const device_ptr_t& device, bool reset = false) noexcept;
+
     inline bool is_tainted() const noexcept { return tainted; }
     inline void mark_tainted() noexcept { tainted = true; }
 
@@ -47,6 +47,7 @@ struct cluster_t final : arc_base_t<cluster_t> {
     using rng_engine_t = std::mt19937;
     using uuid_generator_t = boost::uuids::basic_random_generator<rng_engine_t>;
     using uint64_generator_t = std::uniform_int_distribution<uint64_t>;
+    using iterator_map_t = std::unordered_map<device_ptr_t, file_iterator_ptr_t>;
 
     rng_engine_t rng_engine;
     uuid_generator_t uuid_generator;
@@ -59,6 +60,7 @@ struct cluster_t final : arc_base_t<cluster_t> {
     ignored_devices_map_t ignored_devices;
     ignored_folders_map_t ignored_folders;
     bool tainted = false;
+    iterator_map_t iterator_map;
 
     friend class file_interator_t;
 };

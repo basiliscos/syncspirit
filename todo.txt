@@ -1,8 +1,4 @@
 - uuid model
-
-
-file_iterator, должен понимать, что файл недокачан
-
  -- cluster, deleted_xxx (deleted_blocks, etc.) - убрать?
  -- убрать mark_modified()
  -- убрать/переместить http/transport/private мессаджи в net/net_messages.h

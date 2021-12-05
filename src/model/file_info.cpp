@@ -470,6 +470,33 @@ void file_info_t::remove_block(block_info_ptr_t &block) noexcept {
     }
 }
 
+bool file_info_t::need_download(const file_info_t &other) noexcept {
+    assert(folder_info->get_device() == folder_info->get_folder()->get_cluster()->get_device().get());
+    assert(other.folder_info->get_device() != folder_info->get_folder()->get_cluster()->get_device().get());
+    assert(name == other.name);
+    if (locked) {
+        return false;
+    }
+    for(int i = 0; i < version.counters_size(); ++i ) {
+        if (i > other.version.counters_size()) {
+            return false;
+        }
+        auto &my = version.counters(i);
+        auto &oth = other.version.counters(i);
+        if (my.id() == oth.id() && my.value() == oth.value()) {
+            continue;
+        } else {
+            // conflict
+            break;
+        }
+    }
+
+    if (version.counters_size() < other.version.counters_size()) {
+        return true;
+    }
+    return !is_locally_available();
+}
+
 template<> std::string_view get_index<0>(const file_info_ptr_t& item) noexcept { return item->get_uuid(); }
 template<> std::string_view get_index<1>(const file_info_ptr_t& item) noexcept { return item->get_name(); }
 

@@ -77,7 +77,10 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
     const bfs::path &get_path() noexcept;
+    bool need_download(const file_info_t& other) noexcept;
+#if 0
     bool is_older(const file_info_t &other) noexcept;
+#endif
 
     bool is_incomplete() const noexcept;
     void mark_complete() noexcept;

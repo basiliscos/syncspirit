@@ -11,49 +11,6 @@ cluster_t::cluster_t(device_ptr_t device_, size_t seed_) noexcept : device(devic
     rng_engine.seed(seed_);
 }
 
-#if 0
-void cluster_t::assign_folders(const folders_map_t &folders_) noexcept {
-    folders = folders_;
-    for (auto it : folders) {
-        auto &folder = it.second;
-        folder->assign_device(device);
-        folder->assign_cluster(this);
-    }
-}
-
-void cluster_t::assign_blocks(block_infos_map_t &&blocks_) noexcept { blocks = std::move(blocks_); }
-
-
-folders_map_t &cluster_t::get_folders() noexcept { return folders; }
-
-block_infos_map_t &cluster_t::get_blocks() noexcept { return blocks; }
-
-block_infos_map_t &cluster_t::get_deleted_blocks() noexcept { return deleted_blocks; }
-
-update_result_t cluster_t::update(const proto::ClusterConfig &config) noexcept {
-    update_result_t r;
-    for (int i = 0; i < config.folders_size(); ++i) {
-        auto &f = config.folders(i);
-        auto folder = folders.by_id(f.id());
-        if (!folder) {
-            r.unknown_folders.push_back(&f);
-        } else {
-            bool outdated = folder->update(f);
-            if (outdated) {
-                r.outdated_folders.insert(&f);
-            }
-        }
-    }
-    return r;
-}
-
-file_interator_t cluster_t::iterate_files(const device_ptr_t &peer_device) noexcept {
-    // find local outdated files, which present on peer device
-    assert(peer_device != device);
-    return file_interator_t(*this, peer_device);
-}
-#endif
-
 proto::ClusterConfig cluster_t::generate(const device_t &target) const noexcept {
     proto::ClusterConfig r;
     for (auto it : folders) {
@@ -117,4 +74,16 @@ auto cluster_t::process(proto::Index& msg, const device_t &peer) const noexcept 
 
 auto cluster_t::process(proto::IndexUpdate& msg, const device_t &peer) const noexcept -> outcome::result<diff::cluster_diff_ptr_t> {
     return diff::peer::update_folder_t::create(*this, peer, msg);
+}
+
+auto cluster_t::next_file(const device_ptr_t& peer, bool reset) noexcept -> file_info_ptr_t {
+    assert(peer != device);
+    if (reset) {
+        iterator_map[peer] = new file_interator_t(*this, peer);
+    }
+    auto &it = iterator_map[peer];
+    if (it && *it) {
+        return it->next();
+    }
+    return {};
 }
