@@ -1,4 +1,5 @@
 - uuid model
+ -- block_iterator
  -- cluster, deleted_xxx (deleted_blocks, etc.) - убрать?
  -- убрать mark_modified()
  -- убрать/переместить http/transport/private мессаджи в net/net_messages.h

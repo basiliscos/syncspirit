@@ -195,8 +195,6 @@ struct start_reading_t {
     bool start;
 };
 
-struct ready_signal_t {};
-
 struct termination_t {
     r::extended_error_ptr_t ee;
 };
@@ -286,7 +284,6 @@ using load_cluster_response_t = r::request_traits_t<payload::load_cluster_reques
 using start_reading_t = r::message_t<payload::start_reading_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
 using termination_signal_t = r::message_t<payload::termination_t>;
-using ready_signal_t = r::message_t<payload::ready_signal_t>;
 
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;

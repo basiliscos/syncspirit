@@ -1,7 +1,6 @@
 #include "folder_info.h"
 #include "file_info.h"
 #include "cluster.h"
-#include "misc/block_iterator.h"
 #include "misc/error_code.h"
 #include "../db/prefix.h"
 #include <algorithm>

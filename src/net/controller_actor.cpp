@@ -80,12 +80,12 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
+        p.subscribe_actor(&controller_actor_t::on_ready);
 #if 0
         p.subscribe_actor(&controller_actor_t::on_store_folder_info);
         p.subscribe_actor(&controller_actor_t::on_store_file_info);
         p.subscribe_actor(&controller_actor_t::on_new_folder);
         p.subscribe_actor(&controller_actor_t::on_file_update);
-        p.subscribe_actor(&controller_actor_t::on_ready);
         p.subscribe_actor(&controller_actor_t::on_block);
         p.subscribe_actor(&controller_actor_t::on_validation);
         p.subscribe_actor(&controller_actor_t::on_open);
@@ -173,9 +173,7 @@ bool controller_actor_t::on_unlink(unlink_request_t &message) noexcept {
 }
 
 void controller_actor_t::ready() noexcept {
-#if 0
     send<payload::ready_signal_t>(get_address());
-#endif
 }
 
 #if 0
@@ -260,9 +258,11 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
     }
     return ImmediateResult::NON_IMMEDIATE;
 }
+#endif
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     LOG_TRACE(log, "{}, on_ready, blocks requested = {}, kept = {}", identity, blocks_requested, blocks_kept);
+#if 0
     bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
                   || (blocks_kept > blocks_max_kept)                            // don't overload hasher / fs-writer
                   || (state != r::state_t::OPERATIONAL)                         // we are shutting down
@@ -313,8 +313,10 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         request<payload::store_file_request_t>(db, current_file, nullptr).send(init_timeout);
     }
     ready();
+#endif
 }
 
+#if 0
 void controller_actor_t::clone_block(const model::file_block_t &block, model::file_block_t &local) noexcept {
     LOG_TRACE(log, "{}, cloning block {} from {} to {} as block {}", identity, local.block_index(),
               local.file()->get_name(), current_file->get_name(), block.block_index());

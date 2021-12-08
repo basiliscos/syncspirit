@@ -14,6 +14,16 @@ namespace net {
 
 namespace bfs = boost::filesystem;
 
+namespace payload {
+
+struct ready_signal_t {};
+
+}
+
+namespace message {
+using ready_signal_t = r::message_t<payload::ready_signal_t>;
+}
+
 struct controller_actor_config_t : r::actor_config_t {
     config::bep_config_t bep_config;
     model::cluster_ptr_t cluster;
@@ -174,9 +184,9 @@ struct controller_actor_t : public r::actor_base_t {
     write_map_t write_map;
 #endif
 
-    model::file_iterator_ptr_t file_iterator;
+    //model::file_iterator_ptr_t file_iterator;
     model::file_info_ptr_t current_file;
-    model::blocks_interator_t block_iterator;
+    //model::blocks_interator_t block_iterator;
     // generic
     std::uint_fast32_t blocks_requested = 0;
     std::uint_fast32_t blocks_kept = 0;

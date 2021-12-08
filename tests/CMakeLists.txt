@@ -55,6 +55,10 @@ add_executable(020-generic-map 020-generic-map.cpp)
 target_link_libraries(020-generic-map syncspirit_test_lib)
 add_test(020-generic-map "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/020-generic-map")
 
+add_executable(025-device_id 025-device_id.cpp)
+target_link_libraries(025-device_id syncspirit_test_lib)
+add_test(025-device_id "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/025-device_id")
+
 add_executable(029-diff-generic 029-diff-generic.cpp)
 target_link_libraries(029-diff-generic syncspirit_test_lib)
 add_test(029-diff-generic "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/029-diff-generic")
@@ -95,9 +99,9 @@ add_executable(050-file_iterator 050-file_iterator.cpp)
 target_link_libraries(050-file_iterator syncspirit_test_lib)
 add_test(050-file_iterator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-file_iterator")
 
-#add_executable(050-model-device_id 050-model-device_id.cpp)
-#target_link_libraries(050-model-device_id syncspirit_test_lib)
-#add_test(050-model-device_id "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-model-device_id")
+add_executable(051-block_iterator 051-block_iterator.cpp)
+target_link_libraries(051-block_iterator syncspirit_test_lib)
+add_test(051-block_iterator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/051-block_iterator")
 
 #add_executable(051-model-file_info 051-model-file_info.cpp)
 #target_link_libraries(051-model-file_info syncspirit_test_lib)
@@ -106,10 +110,6 @@ add_test(050-file_iterator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-file_iterator"
 #add_executable(052-model-folder 052-model-folder.cpp)
 #target_link_libraries(052-model-folder syncspirit_test_lib)
 #add_test(052-model-folder "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/052-model-folder")
-
-#add_executable(054-model-block_iterator 054-model-block_iterator.cpp)
-#target_link_libraries(054-model-block_iterator syncspirit_test_lib)
-#add_test(054-model-block_iterator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/054-model-block_iterator")
 
 #add_executable(055-model-cluster 055-model-cluster.cpp)
 #target_link_libraries(055-model-cluster syncspirit_test_lib)

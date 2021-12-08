@@ -142,3 +142,12 @@ struct file_infos_map_t: public generic_map_t<file_info_ptr_t, 2> {
 };
 
 }; // namespace syncspirit::model
+
+namespace std {
+
+template <> struct hash<syncspirit::model::file_info_ptr_t> {
+    inline size_t operator()(const syncspirit::model::file_info_ptr_t &file) const noexcept {
+        return reinterpret_cast<size_t>(file.get());
+    }
+};
+}
