@@ -2,6 +2,7 @@
 #include "test-utils.h"
 //#include "test-db.h"
 #include "model/diff/modify/create_folder.h"
+#include "model/diff/modify/new_file.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/update_folder.h"
@@ -353,7 +354,62 @@ void test_cluster_update_and_remove() {
             }
         }
     };
+    F().run();
+}
 
+void test_new_file() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            db::Folder db_folder;
+            db_folder.set_id("some-id");
+            db_folder.set_label("some-label");
+
+            auto bi1 = proto::BlockInfo();
+            bi1.set_size(5);
+            bi1.set_weak_hash(12);
+            bi1.set_hash(utils::sha256_digest("12345").value());
+            bi1.set_offset(0);
+
+            auto pr_file = proto::FileInfo();
+            pr_file.set_name("a.bin");
+            pr_file.set_size(5);
+            pr_file.set_block_size(5);
+
+            auto diffs = diff::aggregate_t::diffs_t{};
+            diffs.push_back(new diff::modify::create_folder_t(db_folder));
+            diffs.push_back(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file, {bi1}));
+
+            auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
+            sup->send<payload::model_update_t>(sup->get_address(),  diff, nullptr);
+            sup->do_process();
+
+            REQUIRE(cluster->get_blocks().size() == 1);
+            REQUIRE(cluster->get_blocks().get(bi1.hash()));
+
+            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            REQUIRE(!reply->payload.ee);
+
+            auto cluster_clone = make_cluster();
+            {
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(cluster_clone->get_blocks().size() == 1);
+                auto& fis = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos();
+                REQUIRE(fis.size() == 1);
+                auto folder_info_clone = fis.by_device(cluster_clone->get_device());
+                auto file_clone = folder_info_clone->get_file_infos().by_name(pr_file.name());
+                REQUIRE(file_clone);
+                REQUIRE(file_clone->get_name() == pr_file.name());
+                REQUIRE(file_clone->get_size() == 5);
+                REQUIRE(file_clone->get_block_size() == 5);
+                REQUIRE(file_clone->get_blocks().size() == 1);
+                REQUIRE(file_clone->get_blocks()[0]->get_hash() == bi1.hash());
+                REQUIRE(file_clone->get_sequence() == 1);
+                REQUIRE(folder_info_clone->get_max_sequence() == 1);
+            }
+        }
+    };
     F().run();
 }
 
@@ -363,3 +419,4 @@ REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
 REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
 REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
 REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
+REGISTER_TEST_CASE(test_new_file, "test_new_file", "[db]");

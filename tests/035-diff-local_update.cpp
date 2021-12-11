@@ -35,7 +35,7 @@ TEST_CASE("local_update diff", "[model]") {
         pr_file_info.set_type(proto::FileInfoType::FILE);
         pr_file_info.set_size(5ul);
         pr_file_info.set_block_size(5ul);
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, {}));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {}));
         REQUIRE(diff->apply(*cluster));
 
         auto file_info = folder_info->get_file_infos().by_name("a.txt");
@@ -77,7 +77,7 @@ TEST_CASE("local_update diff", "[model]") {
         bi.set_hash(utils::sha256_digest("12345").value());
         bi.set_offset(0);
 
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, {bi}));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {bi}));
         REQUIRE(diff->apply(*cluster));
         REQUIRE(blocks_map.size() == 1);
 

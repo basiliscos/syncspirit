@@ -40,15 +40,14 @@ TEST_CASE("block iterator", "[model]") {
     p_file->set_name("a.txt");
     p_file->set_sequence(2ul);
 
-#if 0
+
     SECTION("no blocks") {
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), *p_file, {}));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file, {}));
         REQUIRE(diff->apply(*cluster));
 
         auto my_file = my_folder->get_file_infos().by_name(p_file->name());
         REQUIRE(!cluster->next_block(my_file, true));
     }
-#endif
 
     SECTION("two blocks") {
         auto bi1 = proto::BlockInfo();
@@ -68,7 +67,7 @@ TEST_CASE("block iterator", "[model]") {
         *p_file->add_blocks() = bi1;
         *p_file->add_blocks() = bi2;
 
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), *p_file, {bi1, bi2}));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file, {bi1, bi2}));
         REQUIRE(diff->apply(*cluster));
 
         auto my_file = my_folder->get_file_infos().by_name(p_file->name());

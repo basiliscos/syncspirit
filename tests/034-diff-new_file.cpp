@@ -32,7 +32,7 @@ TEST_CASE("new file diff", "[model]") {
     SECTION("symlink, inc sequence, no blocks") {
         pr_file_info.set_type(proto::FileInfoType::SYMLINK);
         pr_file_info.set_symlink_target("/some/where");
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, {}));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {}));
         REQUIRE(diff->apply(*cluster));
 
         auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
@@ -55,7 +55,7 @@ TEST_CASE("new file diff", "[model]") {
         bi.set_weak_hash(12);
         bi.set_hash(utils::sha256_digest("12345").value());
         bi.set_offset(0);
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, {bi}));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {bi}));
         REQUIRE(diff->apply(*cluster));
 
         auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);

@@ -55,6 +55,7 @@ struct db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor
     outcome::result<void> operator()(const model::diff::modify::create_folder_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::share_folder_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_peer_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::new_file_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::cluster_remove_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &) noexcept override;
 

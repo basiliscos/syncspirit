@@ -35,7 +35,7 @@ TEST_CASE("various block diffs", "[model]") {
     pr_file_info.set_block_size(5ul);
     pr_file_info.set_size(10ul);
 
-    diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, {}));
+    diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {}));
     REQUIRE(diff->apply(*cluster));
     auto file = folder_info->get_file_infos().by_name("a.txt");
 
@@ -74,7 +74,7 @@ TEST_CASE("various block diffs", "[model]") {
         pr_source.set_block_size(5ul);
         pr_source.set_size(5ul);
 
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_source, {bi2}));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_source, {bi2}));
         REQUIRE(diff->apply(*cluster));
         auto source = folder_info->get_file_infos().by_name("b.txt");
         auto b2 = source->get_blocks().at(0);

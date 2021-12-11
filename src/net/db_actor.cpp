@@ -15,6 +15,7 @@
 #include "../model/diff/load/ignored_folders.h"
 #include "../model/diff/load/load_cluster.h"
 #include "../model/diff/modify/create_folder.h"
+#include "../model/diff/modify/new_file.h"
 #include "../model/diff/modify/share_folder.h"
 #include "../model/diff/modify/update_peer.h"
 #include "../model/diff/peer/cluster_remove.h"
@@ -268,6 +269,55 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff) noex
     auto r = db::save({key, data}, txn);
     if (!r) {
         return r.assume_error();
+    }
+
+    return outcome::success();
+}
+
+auto db_actor_t::operator()(const model::diff::modify::new_file_t &diff) noexcept -> outcome::result<void>  {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto file = file_info->get_file_infos().by_name(diff.file.name());
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = txn_opt.value();
+
+    auto& blocks_map = cluster->get_blocks();
+    for(auto idx: diff.new_blocks) {
+        auto& hash = diff.blocks[idx].hash();
+        auto block = blocks_map.get(hash);
+        auto key = block->get_key();
+        auto data = block->serialize();
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    {
+        auto key = file->get_key();
+        auto data = file->serialize();
+
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+    {
+        auto key = file_info->get_key();
+        auto data = file_info->serialize();
+
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
     }
 
     return outcome::success();

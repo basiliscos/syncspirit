@@ -1,6 +1,4 @@
 - uuid model
- -- new_file_t
-    -- db_actor: save
 
  -- cluster, deleted_xxx (deleted_blocks, etc.) - убрать?
  -- убрать mark_modified()
@@ -8,6 +6,10 @@
 
 
 - make fs-actor smart (clone model)
+- scan_actor:
+    -- если file_info.seq = folder_info.seq и файла нет, не считать что он удалён, а считать что был крэш
+    -- делать start++ и finish++ , иначе считать крешем
+
 - https://docs.syncthing.net/users/faq.html#what-things-are-synced
 - test: validation happens before opening file?
 - model: когда добавляется symlink, папка

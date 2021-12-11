@@ -55,7 +55,7 @@ TEST_CASE("lock file", "[model]") {
     pr_file_info.set_name("a.txt");
     pr_file_info.set_type(proto::FileInfoType::SYMLINK);
     pr_file_info.set_symlink_target("/some/where");
-    diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_file_info, {}));
+    diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {}));
     REQUIRE(diff->apply(*cluster));
 
     diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(db_folder.id(), pr_file_info.name(), true));
