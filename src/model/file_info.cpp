@@ -423,7 +423,7 @@ proto::FileInfo file_info_t::get() const noexcept {
 }
 #endif
 
-const boost::filesystem::path &file_info_t::get_path() noexcept {
+const boost::filesystem::path &file_info_t::get_path() const noexcept {
     if (!path) {
         path = folder_info->get_folder()->get_path() / std::string(get_name());
     }

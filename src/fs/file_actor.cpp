@@ -2,6 +2,7 @@
 #include "net/names.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
+#include "model/diff/modify/new_file.h"
 #include "utils.h"
 
 using namespace syncspirit::fs;
@@ -18,6 +19,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&file_actor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&file_actor_t::on_block_update, coordinator);
             }
         });
@@ -37,6 +39,17 @@ void file_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
 }
 
+void file_actor_t::on_model_update(net::message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_model_update", identity);
+    auto& diff = *message.payload.diff;
+    auto r = diff.visit(*this);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+}
+
+
 void file_actor_t::on_block_update(net::message::block_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_block_update", identity);
     auto& diff = *message.payload.diff;
@@ -47,11 +60,100 @@ void file_actor_t::on_block_update(net::message::block_update_t &message) noexce
     }
 }
 
+auto file_actor_t::reflect(const model::file_info_t& file) noexcept -> outcome::result<void> {
+    auto& path = file.get_path();
+    sys::error_code ec;
+
+    if (file.is_deleted()) {
+        if (bfs::exists(path, ec)) {
+            LOG_DEBUG(log, "{} removing {}", identity, path.string());
+            auto ok = bfs::remove_all(path, ec);
+            if (!ok) {
+                LOG_ERROR(log, "{},  error removing {} : {}", identity, path.string(), ec.message());
+                return ec;
+
+            }
+        } else {
+            LOG_TRACE(log, "{}, {} already abscent, noop", identity, path.string());
+        }
+        return outcome::success();
+    }
+
+    auto parent = path.parent_path();
+
+    bool exists = bfs::exists(parent, ec);
+    if (!exists) {
+        bfs::create_directories(parent, ec);
+        if (ec) {
+            return ec;
+        }
+    }
+
+    if (file.is_file()) {
+        auto sz = file.get_size();
+        bool temporal = sz > 0;
+        if (temporal) {
+            LOG_TRACE(log, "{}, touching file {} ({} bytes)", identity, path.string(), sz);
+            auto file_opt = open_file(path, temporal, sz);
+            if (!file_opt) {
+                auto& err = file_opt.assume_error();
+                LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path.string(), err.message());
+                return err;
+            }
+            auto& f = file_opt.assume_value();
+        } else {
+            LOG_TRACE(log, "{}, touching empty file {}", identity, path.string());
+            std::ofstream out;
+            out.exceptions(out.failbit | out.badbit);
+            try {
+                out.open(path.string());
+            } catch (const std::ios_base::failure &e) {
+                LOG_ERROR(log, "{}, error creating {} : {}", identity, path.string(), e.code().message());
+                return sys::errc::make_error_code(sys::errc::io_error);
+            }
+        }
+    }
+    else if (file.is_dir()) {
+        LOG_TRACE(log, "{}, creating directory {}", identity, path.string());
+        bfs::create_directory(path, ec);
+        if (ec) {
+            return ec;
+        }
+    } else if (file.is_link()) {
+        auto target = bfs::path(file.get_link_target());
+        LOG_TRACE(log, "{}, creating symlink {} -> {}", identity, path.string(), target.string());
+
+        bool attempt_create =
+            !bfs::exists(path, ec) || !bfs::is_symlink(path, ec) || (bfs::read_symlink(path, ec) != target);
+        if (attempt_create) {
+            bfs::create_symlink(target, path, ec);
+            if (ec) {
+                LOG_WARN(log, "{}, error symlinking {} -> {} {} : {}", identity, path.string(), target.string(),
+                         ec.message());
+                return ec;
+            }
+        } else {
+            LOG_TRACE(log, "{}, no need to create symlink {} -> {}", identity, path.string(), target.string());
+        }
+    }
+
+    return outcome::success();
+}
+
+
+auto file_actor_t::operator()(const model::diff::modify::new_file_t &diff) noexcept -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto file = file_info->get_file_infos().by_name(diff.file.name());
+    return reflect(*file);
+}
+
+
 auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) noexcept -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
     auto file = file_info->get_file_infos().by_name(diff.file_name);
-    auto path = file->get_path();
+    auto& path = file->get_path();
     auto file_opt = open_file(path, true, file->get_size());
     if (!file_opt) {
         auto& err = file_opt.assume_error();
@@ -88,7 +190,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
     auto source_folder_info = folder->get_folder_infos().by_device_id(diff.source_device_id);
     auto source = source_folder_info->get_file_infos().by_name(diff.source_file_name);
 
-    auto target_path = target->get_path();
+    auto& target_path = target->get_path();
     auto file_opt = open_file(target_path, true, target->get_size());
     if (!file_opt) {
         auto& err = file_opt.assume_error();
@@ -98,7 +200,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
     auto target_mmap = std::move(file_opt.assume_value());
     auto source_mmap = mmaped_file_t::backend_t();
 
-    auto source_path = source->get_path();
+    auto& source_path = source->get_path();
     if (source_path == target_path) {
         source_mmap = target_mmap->get_backend();
     } else {
@@ -137,7 +239,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
 }
 
 auto file_actor_t::open_file(const boost::filesystem::path &path, bool temporal, size_t size) noexcept -> outcome::result<mmaped_file_ptr_t> {
-    LOG_TRACE(log, "{}, on_open, path = {} ({} bytes)", identity, path.string(), size);
+    LOG_TRACE(log, "{}, open_file, path = {} ({} bytes)", identity, path.string(), size);
 
     auto item = files_cache.get(path.string());
     if (item) {

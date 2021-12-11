@@ -97,7 +97,120 @@ struct fixture_t {
     msg_ptr_t reply;
     db::Folder db_folder;
 };
+}
 
+
+void test_new_files() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            proto::FileInfo pr_fi;
+            pr_fi.set_name("q.txt");
+
+            SECTION("empty regular file") {
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_fi, {}));
+                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->do_process();
+
+                auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto& files_info = folders_info.by_device(cluster->get_device())->get_file_infos();
+                auto file = files_info.by_name(pr_fi.name());
+
+                auto& path = file->get_path();
+                REQUIRE(bfs::exists(path));
+                REQUIRE(bfs::file_size(path) == 0);
+            }
+
+            SECTION("empty regular file a subdir") {
+                pr_fi.set_name("a/b/c/d/e.txt");
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_fi, {}));
+                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->do_process();
+
+                auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto& files_info = folders_info.by_device(cluster->get_device())->get_file_infos();
+                auto file = files_info.by_name(pr_fi.name());
+
+                auto& path = file->get_path();
+                REQUIRE(bfs::exists(path));
+                REQUIRE(bfs::file_size(path) == 0);
+            }
+
+            SECTION("non-empty regular file") {
+                pr_fi.set_size(5);
+                pr_fi.set_block_size(5);
+
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_fi, {}));
+                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->do_process();
+
+                auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto& files_info = folders_info.by_device(cluster->get_device())->get_file_infos();
+                auto file = files_info.by_name(pr_fi.name());
+
+                auto filename = std::string(file->get_name()) + ".syncspirit-tmp";
+                auto path = root_path / filename;
+                REQUIRE(bfs::exists(path));
+                REQUIRE(bfs::file_size(path) == 5);
+            }
+
+            SECTION("directory") {
+                pr_fi.set_type(proto::FileInfoType::DIRECTORY);
+
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_fi, {}));
+                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->do_process();
+
+                auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto& files_info = folders_info.by_device(cluster->get_device())->get_file_infos();
+                auto file = files_info.by_name(pr_fi.name());
+
+                auto& path = file->get_path();
+                REQUIRE(bfs::exists(path));
+                REQUIRE(bfs::is_directory(path));
+            }
+
+            SECTION("symlink") {
+                bfs::path target = root_path / "not-existing";
+
+                pr_fi.set_type(proto::FileInfoType::SYMLINK);
+                pr_fi.set_symlink_target(target.string());
+
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_fi, {}));
+                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->do_process();
+
+                auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto& files_info = folders_info.by_device(cluster->get_device())->get_file_infos();
+                auto file = files_info.by_name(pr_fi.name());
+
+                auto& path = file->get_path();
+                CHECK(!bfs::exists(path));
+                CHECK(bfs::is_symlink(path));
+                CHECK(bfs::read_symlink(path) == target);
+            }
+
+            SECTION("deleted file") {
+                pr_fi.set_deleted(true);
+                bfs::path target = root_path / pr_fi.name();
+                write_file(target, "zzz");
+                REQUIRE(bfs::exists(target));
+
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(db_folder.id(), pr_fi, {}));
+                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->do_process();
+
+                auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto& files_info = folders_info.by_device(cluster->get_device())->get_file_infos();
+                auto file = files_info.by_name(pr_fi.name());
+                CHECK(file->is_deleted());
+
+                auto& path = file->get_path();
+                REQUIRE(!bfs::exists(target));
+            }
+
+        }
+    };
+    F().run();
 }
 
 void test_append_block() {
@@ -312,5 +425,7 @@ void test_clone_block() {
 }
 
 
+
+REGISTER_TEST_CASE(test_new_files, "test_new_files", "[fs]");
 REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
 REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");

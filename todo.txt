@@ -1,5 +1,7 @@
 - uuid model
- -- block_iterator
+ -- new_file_t
+    -- db_actor: save
+
  -- cluster, deleted_xxx (deleted_blocks, etc.) - убрать?
  -- убрать mark_modified()
  -- убрать/переместить http/transport/private мессаджи в net/net_messages.h

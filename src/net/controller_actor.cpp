@@ -262,15 +262,32 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     LOG_TRACE(log, "{}, on_ready, blocks requested = {}, kept = {}", identity, blocks_requested, blocks_kept);
-#if 0
     bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
                   || (blocks_kept > blocks_max_kept)                            // don't overload hasher / fs-writer
                   || (state != r::state_t::OPERATIONAL)                         // we are shutting down
-                  || (!file_iterator && !block_iterator && blocks_requested)    // done
+            ;
+                  //|| (!file_iterator && !block_iterator && blocks_requested)    // done
         ;
 
     if (ignore) {
         return;
+    }
+
+#if 0
+    if (!block_iterator) {
+        auto file = cluster->next_file(peer, !iterating_files);
+        iterating_files = (bool)file;
+        if (file) {
+            auto diff = model::diff::cluster_diff_ptr_t{};
+            auto info = file->as_proto(false);
+            blocks = ...;
+            diff = new model::diff::modify::new_file_t(
+                file->get_folder_info()->get_folder()->get_id(),
+                file->set_sequence()
+            );
+            send<payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
+
+        }
     }
 
     if (!file_iterator && !block_iterator) {

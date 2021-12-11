@@ -60,10 +60,10 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     void remove_blocks() noexcept;
     void assign_block(const model::block_info_ptr_t &block, size_t index) noexcept;
 
-    inline bool is_file() noexcept { return type == proto::FileInfoType::FILE; }
-    inline bool is_dir() noexcept { return type == proto::FileInfoType::DIRECTORY; }
-    inline bool is_link() noexcept { return type == proto::FileInfoType::SYMLINK; }
-    inline bool is_deleted() noexcept { return deleted; }
+    inline bool is_file() const  noexcept { return type == proto::FileInfoType::FILE; }
+    inline bool is_dir() const noexcept { return type == proto::FileInfoType::DIRECTORY; }
+    inline bool is_link() const noexcept { return type == proto::FileInfoType::SYMLINK; }
+    inline bool is_deleted() const noexcept { return deleted; }
 
     inline std::int64_t get_size() const noexcept { return size; }
     inline void set_size(std::int64_t value) noexcept { size = value; }
@@ -76,7 +76,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
 
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
-    const bfs::path &get_path() noexcept;
+    const bfs::path &get_path() const noexcept;
     bool need_download(const file_info_t& other) noexcept;
 #if 0
     bool is_older(const file_info_t &other) noexcept;
@@ -128,7 +128,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     std::int32_t block_size;
     std::string symlink_target;
     blocks_t blocks;
-    std::optional<bfs::path> path;
+    mutable std::optional<bfs::path> path;
     std::string full_name;
     bool locked = false;
     marks_vector_t marks;

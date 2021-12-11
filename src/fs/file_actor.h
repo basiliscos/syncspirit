@@ -49,7 +49,7 @@ template <typename Actor> struct file_actor_config_builder_t : r::actor_config_b
 };
 
 
-struct file_actor_t : public r::actor_base_t, private model::diff::block_visitor_t {
+struct file_actor_t : public r::actor_base_t, private model::diff::block_visitor_t, private model::diff::cluster_visitor_t {
     using config_t = file_actor_config_t;
     template <typename Actor> using config_builder_t = file_actor_config_builder_t<Actor>;
 
@@ -60,13 +60,18 @@ struct file_actor_t : public r::actor_base_t, private model::diff::block_visitor
 
   private:
     using cache_t = model::mru_list_t<mmaped_file_ptr_t>;
+
+    void on_model_update(net::message::model_update_t &message) noexcept;
     void on_block_update(net::message::block_update_t &message) noexcept;
 
     outcome::result<mmaped_file_ptr_t> open_file(const bfs::path& path, bool temporal, size_t size) noexcept;
     outcome::result<mmaped_file_t::backend_t> open_file(const bfs::path& path, const bio::mapped_file_params& params) noexcept;
 
+    outcome::result<void> operator()(const model::diff::modify::new_file_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::append_block_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &) noexcept override;
+
+    outcome::result<void> reflect(const model::file_info_t& file) noexcept;
 
 #if 0
     void on_open(message::open_request_t &req) noexcept;

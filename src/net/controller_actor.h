@@ -168,16 +168,9 @@ struct controller_actor_t : public r::actor_base_t {
     model::folder_ptr_t folder;
     r::address_ptr_t coordinator;
     r::address_ptr_t peer_addr;
-#if 0
-    r::address_ptr_t db;
-    r::address_ptr_t file_addr;
-#endif
     r::address_ptr_t hasher_proxy;
     r::address_ptr_t open_reading; /* for routing */
     pt::time_duration request_timeout;
-#if 0
-    payload::cluster_config_ptr_t peer_cluster_config;
-#endif
     model::ignored_folders_map_t *ignored_folders;
     peers_map_t peers_map;
 #if 0
@@ -185,8 +178,7 @@ struct controller_actor_t : public r::actor_base_t {
 #endif
 
     //model::file_iterator_ptr_t file_iterator;
-    model::file_info_ptr_t current_file;
-    //model::blocks_interator_t block_iterator;
+    model::block_iterator_ptr_t block_iterator;
     // generic
     std::uint_fast32_t blocks_requested = 0;
     std::uint_fast32_t blocks_kept = 0;
@@ -196,6 +188,7 @@ struct controller_actor_t : public r::actor_base_t {
     size_t blocks_max_requested;
     utils::logger_t log;
     unlink_requests_t unlink_requests;
+    bool iterating_files = false;
 };
 
 } // namespace net
