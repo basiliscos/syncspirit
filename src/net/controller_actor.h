@@ -13,6 +13,7 @@ namespace syncspirit {
 namespace net {
 
 namespace bfs = boost::filesystem;
+namespace outcome = boost::outcome_v2;
 
 namespace payload {
 
@@ -75,7 +76,7 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
     }
 };
 
-struct controller_actor_t : public r::actor_base_t {
+struct controller_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = controller_actor_config_t;
     template <typename Actor> using config_builder_t = controller_actor_config_builder_t<Actor>;
 
@@ -123,9 +124,9 @@ struct controller_actor_t : public r::actor_base_t {
 #if 0
     using write_map_t = std::unordered_map<std::string, write_info_t>;
     using write_it_t = typename write_map_t::iterator;
-#endif
 
     enum class ImmediateResult { DONE, NON_IMMEDIATE, ERROR };
+#endif
 
     using unlink_request_t = r::message::unlink_request_t;
     using unlink_request_ptr_t = r::intrusive_ptr_t<unlink_request_t>;
@@ -145,6 +146,7 @@ struct controller_actor_t : public r::actor_base_t {
     void on_new_folder(message::store_new_folder_notify_t &message) noexcept;
 */
     void on_file_update(message::file_update_notify_t &message) noexcept;
+    void on_model_update(message::model_update_t &message) noexcept;
 
     void on_message(proto::message::ClusterConfig &message) noexcept;
     void on_message(proto::message::Index &message) noexcept;
@@ -158,10 +160,14 @@ struct controller_actor_t : public r::actor_base_t {
     void update(proto::ClusterConfig &config) noexcept;
     void update(folder_updater_t &&updater) noexcept;
     void process(write_it_t it) noexcept;
-#endif
     void clone_block(const model::file_block_t &block, model::file_block_t &info) noexcept;
     ImmediateResult process_immediately() noexcept;
+#endif
     void ready() noexcept;
+
+    outcome::result<void> operator()(const model::diff::modify::new_file_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::update_folder_t &) noexcept override;
+
 
     model::cluster_ptr_t cluster;
     model::device_ptr_t peer;

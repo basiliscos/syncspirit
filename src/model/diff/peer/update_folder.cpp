@@ -51,6 +51,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
 }
 
 auto update_folder_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
+    LOG_TRACE(log, "visiting update_folder_t", folder_id);
     return visitor(*this);
 }
 

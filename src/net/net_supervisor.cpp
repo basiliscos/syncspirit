@@ -204,10 +204,20 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noe
         auto& ignored_devices = cluster->get_ignored_devices();
         auto& ignored_folders = cluster->get_ignored_folders();
         auto& devices = cluster->get_devices();
+        auto& folders = cluster->get_folders();
+        size_t files = 0;
+        for(const auto& it: folders) {
+            auto& folder_info = it.item;
+            if (!folder_info) {
+                continue;
+            }
+            auto fi = folder_info->get_folder_infos().by_device(cluster->get_device());
+            files += fi->get_file_infos().size();
+        }
         LOG_DEBUG(log,
-                  "{}, load cluster. devices = {}, ignored devices = {}, ignored folders = {}, folders = {}, blocks = {}",
-                  identity, devices.size(), ignored_devices.size(), ignored_folders.size(), cluster->get_folders().size(),
-                  cluster->get_blocks().size());
+                  "{}, load cluster, devices = {}, folders = {}, local files = {}, blocks = {}, ignored devices = {}, ignored folders = {}",
+                  identity, devices.size(), folders.size(), files, cluster->get_blocks().size(),
+                  ignored_devices.size(), ignored_folders.size());
 
         cluster_addr = create_actor<cluster_supervisor_t>()
                            .timeout(shutdown_timeout * 9 / 10)

@@ -55,6 +55,6 @@ auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resul
 }
 
 auto new_file_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "visiting new_file_t");
+    LOG_TRACE(log, "visiting new_file_t, folder = {}, file = {}", folder_id, file.name());
     return visitor(*this);
 }

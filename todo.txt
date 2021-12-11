@@ -1,4 +1,6 @@
 - uuid model
+ - controller_actor
+ - scan_actor
 
  -- cluster, deleted_xxx (deleted_blocks, etc.) - убрать?
  -- убрать mark_modified()

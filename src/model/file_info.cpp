@@ -120,8 +120,8 @@ void file_info_t::set_sequence(std::int64_t value) noexcept {
     sequence = value;
 }
 
-db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
-    db::FileInfo r;
+template<typename T> T file_info_t::as() const noexcept {
+    T r;
     auto name = get_name();
     r.set_name(name.data(), name.size());
     r.set_sequence(sequence);
@@ -137,6 +137,11 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     *r.mutable_version() = version;
     r.set_block_size(block_size);
     r.set_symlink_target(symlink_target);
+    return r;
+}
+
+db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
+    auto r = as<db::FileInfo>();
 
     if (include_blocks) {
         for (auto &block : blocks) {
@@ -149,6 +154,12 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     }
     return r;
 }
+
+proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
+    assert(!include_blocks && "TODO");
+    return as<proto::FileInfo>();
+}
+
 
 outcome::result<void> file_info_t::reserve_blocks() noexcept {
     size_t count = 0;

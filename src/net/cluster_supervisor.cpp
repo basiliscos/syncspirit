@@ -58,7 +58,6 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
                 plugin->subscribe_actor(&cluster_supervisor_t::on_model_update, coordinator);
             }
         });
-
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
 /*

@@ -1,5 +1,6 @@
 #include "controller_actor.h"
 #include "names.h"
+#include "model/diff/modify/new_file.h"
 #include "../utils/error_code.h"
 #include <fstream>
 
@@ -68,11 +69,15 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         open_reading = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(names::coordinator, coordinator, false).link(true);
-#if 0
-        p.discover_name(names::file_actor, file_addr, false).link(true);
-#endif
         p.discover_name(names::hasher_proxy, hasher_proxy, false).link();
+        p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&controller_actor_t::on_model_update, coordinator);
+            }
+        });
+
     });
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) {
         p.link(peer_addr, false);
@@ -273,22 +278,32 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         return;
     }
 
-#if 0
     if (!block_iterator) {
         auto file = cluster->next_file(peer, !iterating_files);
         iterating_files = (bool)file;
-        if (file) {
+        if (iterating_files) {
+            LOG_TRACE(log, "{}, next_file = {}", identity, file->get_name());
+            using blocks_t = std::vector<proto::BlockInfo>;
             auto diff = model::diff::cluster_diff_ptr_t{};
             auto info = file->as_proto(false);
-            blocks = ...;
+            auto& source_blocks = file->get_blocks();
+            auto blocks = blocks_t();
+            blocks.reserve(source_blocks.size());
+            for(auto& b: source_blocks) {
+                proto::BlockInfo bi;
+                bi.set_hash(std::string(b->get_hash()));
+                blocks.emplace_back(std::move(bi));
+            }
             diff = new model::diff::modify::new_file_t(
+                *cluster,
                 file->get_folder_info()->get_folder()->get_id(),
-                file->set_sequence()
+                std::move(info),
+                std::move(blocks)
             );
-            send<payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
-
+            send<payload::model_update_t>(coordinator, std::move(diff), this);
         }
     }
+#if 0
 
     if (!file_iterator && !block_iterator) {
         file_iterator = cluster->iterate_files(peer);
@@ -388,6 +403,18 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
     std::visit([this](auto &msg) { on_message(msg); }, message.payload);
 }
 
+void controller_actor_t::on_model_update(message::model_update_t &message) noexcept {
+    if (message.payload.custom == this) {
+        LOG_TRACE(log, "{}, on_model_update", identity);
+        auto& diff = *message.payload.diff;
+        auto r = diff.visit(*this);
+        if (!r) {
+            auto ee = make_error(r.assume_error());
+            do_shutdown(ee);
+        }
+    }
+}
+
 #if 0
 void controller_actor_t::on_new_folder(message::store_new_folder_notify_t &message) noexcept {
     auto &folder = message.payload.folder;
@@ -477,6 +504,19 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
 void controller_actor_t::on_message(proto::message::Request &message) noexcept { std::abort(); }
 
 void controller_actor_t::on_message(proto::message::DownloadProgress &message) noexcept { std::abort(); }
+
+
+auto controller_actor_t::operator()(const model::diff::modify::new_file_t &) noexcept -> outcome::result<void>  {
+    ready();
+    return outcome::success();
+}
+
+auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &) noexcept -> outcome::result<void> {
+    ready();
+    return outcome::success();
+}
+
+
 
 #if 0
 void controller_actor_t::update(folder_updater_t &&updater) noexcept {

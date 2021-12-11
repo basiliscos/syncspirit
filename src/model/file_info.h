@@ -41,6 +41,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     std::string_view get_uuid() const noexcept;
     bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
 
+    proto::FileInfo as_proto(bool include_blocks = true) const noexcept;
     db::FileInfo as_db(bool include_blocks = true) const noexcept;
     std::string serialize(bool include_blocks = true) const noexcept;
 
@@ -104,6 +105,8 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     using marks_vector_t = std::vector<bool>;
 
     template <typename Source> outcome::result<void>  fields_update(const Source &s) noexcept;
+    template<typename T> T as() const noexcept;
+
     file_info_t(std::string_view key, const folder_info_ptr_t& folder_info_) noexcept;
     file_info_t(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept;
     outcome::result<void> reserve_blocks() noexcept;
