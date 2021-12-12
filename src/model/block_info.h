@@ -61,10 +61,10 @@ struct block_info_t final : arc_base_t<block_info_t>, storeable_t {
     block_info_t(const proto::BlockInfo &block) noexcept;
 
     char hash[data_length];
-    std::uint32_t weak_hash;
-    std::int32_t size;
+    std::uint32_t weak_hash = 0;
+    std::int32_t size = 0;
     file_blocks_t file_blocks;
-    bool locked;
+    bool locked = false;
 };
 
 using block_infos_map_t = generic_map_t<block_info_ptr_t, 1>;

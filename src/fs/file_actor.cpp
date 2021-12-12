@@ -154,10 +154,11 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
     auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
     auto file = file_info->get_file_infos().by_name(diff.file_name);
     auto& path = file->get_path();
+    auto& path_str = path.string();
     auto file_opt = open_file(path, true, file->get_size());
     if (!file_opt) {
         auto& err = file_opt.assume_error();
-        LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path.string(), err.message());
+        LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path_str, err.message());
         return err;
     }
 
@@ -177,6 +178,7 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
             LOG_ERROR(log, "{}, cannot close file (after appending block): {}: {}", identity, path.string(), ec.message());
             return ec;
         }
+        LOG_INFO(log, "{}, file {} is now locally available", identity, path_str);
     }
 
     return outcome::success();
@@ -233,19 +235,19 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
             LOG_ERROR(log, "{}, cannot close file (after appending block): {}: {}", identity, target_path.string(), ec.message());
             return ec;
         }
+        LOG_INFO(log, "{}, file {} is now locally available", identity, target_path.string());
     }
 
     return outcome::success();
 }
 
 auto file_actor_t::open_file(const boost::filesystem::path &path, bool temporal, size_t size) noexcept -> outcome::result<mmaped_file_ptr_t> {
-    LOG_TRACE(log, "{}, open_file, path = {} ({} bytes)", identity, path.string(), size);
-
     auto item = files_cache.get(path.string());
     if (item) {
         return item;
     }
 
+    LOG_TRACE(log, "{}, open_file, path = {} ({} bytes)", identity, path.string(), size);
     bfs::path operational_path = temporal ? make_temporal(path) : path;
 
     auto parent = operational_path.parent_path();
