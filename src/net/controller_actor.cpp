@@ -1,5 +1,7 @@
 #include "controller_actor.h"
 #include "names.h"
+#include "model/diff/modify/append_block.h"
+#include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/new_file.h"
 #include "../utils/error_code.h"
 #include <fstream>
@@ -29,7 +31,7 @@ template <typename Message> struct typed_folder_updater_t final : controller_act
 namespace {
 namespace resource {
 r::plugin::resource_id_t peer = 0;
-r::plugin::resource_id_t file = 1;
+//r::plugin::resource_id_t file = 1;
 } // namespace resource
 } // namespace
 
@@ -56,7 +58,7 @@ controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer},
       peer_addr{config.peer_addr}, request_timeout{config.request_timeout},
       request_pool{config.bep_config.rx_buff_size},
-      blocks_max_kept{config.blocks_max_kept}, blocks_max_requested{config.blocks_max_requested} {
+      blocks_max_requested{config.blocks_max_requested} {
     log = utils::get_logger("net.controller_actor");
 }
 
@@ -86,13 +88,13 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_ready);
+        p.subscribe_actor(&controller_actor_t::on_block);
+        p.subscribe_actor(&controller_actor_t::on_validation);
 #if 0
         p.subscribe_actor(&controller_actor_t::on_store_folder_info);
         p.subscribe_actor(&controller_actor_t::on_store_file_info);
         p.subscribe_actor(&controller_actor_t::on_new_folder);
         p.subscribe_actor(&controller_actor_t::on_file_update);
-        p.subscribe_actor(&controller_actor_t::on_block);
-        p.subscribe_actor(&controller_actor_t::on_validation);
         p.subscribe_actor(&controller_actor_t::on_open);
         p.subscribe_actor(&controller_actor_t::on_close);
         p.subscribe_actor(&controller_actor_t::on_clone);
@@ -266,10 +268,9 @@ controller_actor_t::ImmediateResult controller_actor_t::process_immediately() no
 #endif
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_ready, blocks requested = {}, kept = {}", identity, blocks_requested, blocks_kept);
+    LOG_TRACE(log, "{}, on_ready, blocks requested = {}", identity, blocks_requested);
     bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
-                  || (blocks_kept > blocks_max_kept)                            // don't overload hasher / fs-writer
-                  || (state != r::state_t::OPERATIONAL)                         // we are shutting down
+                  || (state != r::state_t::OPERATIONAL)                         // wrequest pool sz = 32505856e are shutting down
             ;
                   //|| (!file_iterator && !block_iterator && blocks_requested)    // done
         ;
@@ -278,10 +279,20 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         return;
     }
 
-    if (!block_iterator) {
-        auto file = cluster->next_file(peer, !iterating_files);
-        iterating_files = (bool)file;
-        if (iterating_files) {
+    if (file && file->get_size()) {
+        auto block = cluster->next_block(file, !(substate & substate_t::iterating_blocks));
+        if (block) {
+            substate |= substate_t::iterating_blocks;
+            preprocess_block(block);
+        } else {
+            substate = substate & ~substate_t::iterating_blocks;
+        }
+    }
+    if (!(substate & substate_t::iterating_blocks)) {
+        bool reset_file = !(substate & substate_t::iterating_files) && !blocks_requested;
+        file = cluster->next_file(peer, reset_file);
+        if (file) {
+            substate |= substate_t::iterating_files;
             LOG_TRACE(log, "{}, next_file = {}", identity, file->get_name());
             using blocks_t = std::vector<proto::BlockInfo>;
             auto diff = model::diff::cluster_diff_ptr_t{};
@@ -300,7 +311,10 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
                 std::move(info),
                 std::move(blocks)
             );
+            cluster->next_block(file, true);
             send<payload::model_update_t>(coordinator, std::move(diff), this);
+        } else {
+            substate = substate & ~substate_t::iterating_files;
         }
     }
 #if 0
@@ -347,6 +361,29 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     ready();
 #endif
 }
+
+void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexcept {
+    using namespace model::diff;
+    auto folder = file->get_folder_info()->get_folder();
+    auto folder_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto target_file = folder_info->get_file_infos().by_name(file->get_name());
+    assert(target_file);
+
+    if (file_block.is_locally_available()) {
+        auto diff = block_diff_ptr_t(new modify::clone_block_t(*target_file, *file_block.block()));
+        send<payload::block_update_t>(coordinator, std::move(diff), this);
+    }
+    else {
+        auto sz = file_block.block()->get_size();
+        LOG_TRACE(log, "{} request_block, file = {}, block index = {}, sz = {}, request pool sz = {}",
+                  identity, file->get_full_name(), file_block.block_index(), sz, request_pool);
+        request<payload::block_request_t>(peer_addr, file, file_block).send(request_timeout);
+        ++blocks_requested;
+        request_pool -= (int64_t)sz;
+    }
+    ready();
+}
+
 
 #if 0
 void controller_actor_t::clone_block(const model::file_block_t &block, model::file_block_t &local) noexcept {
@@ -563,6 +600,7 @@ controller_actor_t::write_info_t &controller_actor_t::record_block_data(model::f
     }
     return info;
 }
+#endif
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     --blocks_requested;
@@ -571,23 +609,21 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
         LOG_WARN(log, "{}, can't receive block : {}", identity, ee->message());
         return do_shutdown(ee);
     }
-    ++blocks_kept;
 
     auto &payload = message.payload.req->payload.request_payload;
     auto &file = payload.file;
     auto &file_block = payload.block;
-    auto &info = record_block_data(payload.file, file_block.block_index());
     auto &block = *file_block.block();
-    auto &hash = file_block.block()->get_hash();
+    auto hash = std::string(file_block.block()->get_hash());
     request_pool += block.get_size();
 
-    ++info.pending_blocks;
     intrusive_ptr_add_ref(&message);
     auto &data = message.payload.res.data;
-    request<hasher::payload::validation_request_t>(hasher_proxy, data, std::move(hash), &message).send(init_timeout);
+    request<hasher::payload::validation_request_t>(hasher_proxy, data, hash, &message).send(init_timeout);
     return ready();
 }
 
+#if 0
 void controller_actor_t::on_open(fs::message::open_response_t &res) noexcept {
     auto &payload = res.payload;
     auto &ee = payload.ee;
@@ -695,37 +731,40 @@ void controller_actor_t::process(write_it_t it) noexcept {
 
     ready();
 }
+#endif
 
 void controller_actor_t::on_validation(hasher::message::validation_response_t &res) noexcept {
+    using namespace model::diff;
     auto &ee = res.payload.ee;
     if (ee) {
         LOG_WARN(log, "{}, on_validation failed : {}", identity, ee->message());
         return do_shutdown(ee);
     }
+
     auto block_res = (message::block_response_t *)res.payload.req->payload.request_payload->custom;
     auto &payload = block_res->payload.req->payload.request_payload;
     auto &file = payload.file;
     auto &path = file->get_path();
 
-    auto it = write_map.find(path.string());
-    assert(it != write_map.end());
     if (!res.payload.res.valid) {
         std::string context = fmt::format("digest mismatch for {}", path.string());
         auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
         LOG_WARN(log, "{}, check_digest, digest mismatch: {}", identity, context);
         auto ee = r::make_error(context, ec);
-        write_map.erase(it);
-        resources->release(resource::file);
+        // resources->release(resource::file);
         do_shutdown(ee);
-    } else if (state == r::state_t::OPERATIONAL) {
-        auto &info = it->second;
-        --info.pending_blocks;
-        info.validated_blocks.emplace_back(block_res);
-        process(it);
+    }
+    else {
+        auto &data = block_res->payload.res.data;
+        auto index = payload.block.block_index();
+
+        auto diff = block_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
+        send<payload::block_update_t>(coordinator, std::move(diff), this);
     }
     intrusive_ptr_release(block_res);
 }
 
+#if 0
 void controller_actor_t::on_file_update(message::file_update_notify_t &message) noexcept {
     auto &file = message.payload.file;
     LOG_TRACE(log, "{}, on_file_update, {}", identity, file->get_full_name());

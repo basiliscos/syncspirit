@@ -31,7 +31,6 @@ struct controller_actor_config_t : r::actor_config_t {
     model::device_ptr_t peer;
     r::address_ptr_t peer_addr;
     pt::time_duration request_timeout;
-    size_t blocks_max_kept = 15;
     size_t blocks_max_requested = 8;
 };
 
@@ -94,6 +93,9 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     };
 
   private:
+
+    enum substate_t { none = 0, iterating_files, iterating_blocks };
+
     struct clone_block_t {
         model::block_info_ptr_t block;
         model::file_info_ptr_t source;
@@ -145,6 +147,7 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     void on_store_file_info(message::store_file_response_t &message) noexcept;
     void on_new_folder(message::store_new_folder_notify_t &message) noexcept;
 */
+    void preprocess_block(model::file_block_t& block) noexcept;
     void on_file_update(message::file_update_notify_t &message) noexcept;
     void on_model_update(message::model_update_t &message) noexcept;
 
@@ -184,17 +187,17 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
 #endif
 
     //model::file_iterator_ptr_t file_iterator;
-    model::block_iterator_ptr_t block_iterator;
+    //model::block_iterator_ptr_t block_iterator;
     // generic
     std::uint_fast32_t blocks_requested = 0;
-    std::uint_fast32_t blocks_kept = 0;
 
     int64_t request_pool;
     size_t blocks_max_kept;
     size_t blocks_max_requested;
     utils::logger_t log;
     unlink_requests_t unlink_requests;
-    bool iterating_files = false;
+    model::file_info_ptr_t file;
+    int substate = substate_t::none;
 };
 
 } // namespace net
