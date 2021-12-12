@@ -49,13 +49,13 @@ TEST_CASE("block iterator", "[model]") {
         REQUIRE(!cluster->next_block(my_file, true));
     }
 
-    SECTION("two blocks") {
-        auto bi1 = proto::BlockInfo();
-        bi1.set_size(5);
-        bi1.set_weak_hash(12);
-        bi1.set_hash(utils::sha256_digest("12345").value());
-        bi1.set_offset(0);
+    auto bi1 = proto::BlockInfo();
+    bi1.set_size(5);
+    bi1.set_weak_hash(12);
+    bi1.set_hash(utils::sha256_digest("12345").value());
+    bi1.set_offset(0);
 
+    SECTION("two blocks") {
         auto bi2 = proto::BlockInfo();
         bi2.set_size(5);
         bi2.set_weak_hash(12);
@@ -87,6 +87,25 @@ TEST_CASE("block iterator", "[model]") {
         REQUIRE(!cluster->next_block(my_file));
     }
 
+    SECTION("locked/unlock blocks") {
+        p_file->set_size(5ul);
+        p_file->set_block_size(5ul);
+        *p_file->add_blocks() = bi1;
+
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file, {bi1}));
+        REQUIRE(diff->apply(*cluster));
+        auto my_file = my_folder->get_file_infos().by_name(p_file->name());
+
+        auto fb = cluster->next_block(my_file, true);
+        REQUIRE(fb);
+        auto block = fb.block();
+
+        block->lock();
+        REQUIRE(!cluster->next_block(my_file, true));
+
+        block->unlock();
+        REQUIRE(cluster->next_block(my_file, true));
+    }
 }
 
 #if 0

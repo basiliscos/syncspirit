@@ -374,7 +374,9 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
         send<payload::block_update_t>(coordinator, std::move(diff), this);
     }
     else {
-        auto sz = file_block.block()->get_size();
+        auto block = file_block.block();
+        block->lock();
+        auto sz = block->get_size();
         LOG_TRACE(log, "{} request_block, file = {}, block index = {}, sz = {}, request pool sz = {}",
                   identity, file->get_full_name(), file_block.block_index(), sz, request_pool);
         request<payload::block_request_t>(peer_addr, file, file_block).send(request_timeout);
@@ -736,31 +738,32 @@ void controller_actor_t::process(write_it_t it) noexcept {
 void controller_actor_t::on_validation(hasher::message::validation_response_t &res) noexcept {
     using namespace model::diff;
     auto &ee = res.payload.ee;
-    if (ee) {
-        LOG_WARN(log, "{}, on_validation failed : {}", identity, ee->message());
-        return do_shutdown(ee);
-    }
-
     auto block_res = (message::block_response_t *)res.payload.req->payload.request_payload->custom;
     auto &payload = block_res->payload.req->payload.request_payload;
     auto &file = payload.file;
     auto &path = file->get_path();
+    auto block = payload.block.block();
 
-    if (!res.payload.res.valid) {
-        std::string context = fmt::format("digest mismatch for {}", path.string());
-        auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-        LOG_WARN(log, "{}, check_digest, digest mismatch: {}", identity, context);
-        auto ee = r::make_error(context, ec);
-        // resources->release(resource::file);
+    if (ee) {
+        LOG_WARN(log, "{}, on_validation failed : {}", identity, ee->message());
         do_shutdown(ee);
-    }
-    else {
-        auto &data = block_res->payload.res.data;
-        auto index = payload.block.block_index();
+    } else {
+        if (!res.payload.res.valid) {
+            std::string context = fmt::format("digest mismatch for {}", path.string());
+            auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
+            LOG_WARN(log, "{}, check_digest, digest mismatch: {}", identity, context);
+            auto ee = r::make_error(context, ec);
+            do_shutdown(ee);
+        }
+        else {
+            auto &data = block_res->payload.res.data;
+            auto index = payload.block.block_index();
 
-        auto diff = block_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
-        send<payload::block_update_t>(coordinator, std::move(diff), this);
+            auto diff = block_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
+            send<payload::block_update_t>(coordinator, std::move(diff), this);
+        }
     }
+    block->unlock();
     intrusive_ptr_release(block_res);
 }
 

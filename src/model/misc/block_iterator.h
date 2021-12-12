@@ -27,6 +27,7 @@ struct blocks_interator_t: arc_base_t<blocks_interator_t> {
 
   private:
     void prepare() noexcept;
+    void advance() noexcept;
     size_t i = 0;
     file_info_ptr_t source;
 };

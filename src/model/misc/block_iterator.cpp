@@ -12,14 +12,22 @@ blocks_interator_t::blocks_interator_t(file_info_t &source_) noexcept
         source.reset();
         return;
     }
-    size_t j = 0;
+    advance();
+}
+
+void blocks_interator_t::advance() noexcept {
+    auto &sb = source->get_blocks();
     auto max = sb.size();
-    while (j < max && sb[j] && sb[j]->local_file()) {
-        ++j;
+    while (i < max && sb[i]) {
+        auto& b = *sb[i];
+        if (!b.local_file() && !b.is_locked()) {
+            break;
+        }
+        ++i;
     }
-    i = j;
     prepare();
 }
+
 
 void blocks_interator_t::prepare() noexcept {
     if (source) {
@@ -37,12 +45,9 @@ void blocks_interator_t::reset() noexcept { source.reset(); }
 
 file_block_t blocks_interator_t::next() noexcept {
     assert(source);
-    auto &sb = source->get_blocks();
-    auto idx = i++;
-    while (i < sb.size() && sb[i] && sb[i]->local_file()) {
-        ++i;
-    }
     auto src = source.get();
-    prepare();
+    auto &sb = src->get_blocks();
+    auto idx = i++;
+    advance();
     return {sb[idx].get(), src, idx};
 }

@@ -105,6 +105,15 @@ file_block_t block_info_t::local_file() noexcept {
     return {};
 }
 
+void block_info_t::lock() noexcept {
+    locked = true;
+}
+
+void block_info_t::unlock() noexcept {
+    locked = false;
+}
+
+
 template<> std::string_view get_index<0>(const block_info_ptr_t& item) noexcept { return item->get_hash(); }
 
 

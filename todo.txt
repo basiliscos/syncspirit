@@ -1,5 +1,7 @@
 - uuid model
  - controller_actor
+   -- check when file is reopenen multiple times
+   -- tests
  - scan_actor
 
  -- cluster, deleted_xxx (deleted_blocks, etc.) - убрать?
