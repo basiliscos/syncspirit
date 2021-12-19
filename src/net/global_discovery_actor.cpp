@@ -9,10 +9,6 @@
 
 using namespace syncspirit::net;
 
-namespace private_names {
-const char *https = "net::gda::https";
-}
-
 namespace {
 namespace resource {
 r::plugin::resource_id_t timer = 0;
@@ -36,19 +32,7 @@ void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexc
         p.set_identity("net::global_discovery", false);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        auto timeout = (shutdown_timeout * 9) / 10;
-        auto io_timeout = (shutdown_timeout * 8) / 10;
-        get_supervisor()
-            .create_actor<http_actor_t>()
-            .timeout(timeout)
-            .request_timeout(io_timeout)
-            .resolve_timeout(io_timeout)
-            .registry_name(private_names::https)
-            .keep_alive(true)
-            .finish();
-
-        p.discover_name(private_names::https, http_client, true).link(true);
-
+        p.discover_name(names::http11_gda, http_client, true).link(true);
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);

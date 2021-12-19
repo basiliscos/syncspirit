@@ -250,7 +250,17 @@ void net_supervisor_t::launch_net() noexcept {
                       identity, gcfg.device_id);
             return;
         }
+
         auto timeout = shutdown_timeout * 9 / 10;
+        auto io_timeout = shutdown_timeout * 8 / 10;
+        create_actor<http_actor_t>()
+            .timeout(timeout)
+            .request_timeout(io_timeout)
+            .resolve_timeout(io_timeout)
+            .registry_name(names::http11_gda)
+            .keep_alive(true)
+            .finish();
+
         auto port = app_config.upnp_config.external_port;
         create_actor<global_discovery_actor_t>()
             .timeout(timeout)
