@@ -62,9 +62,6 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&peer_actor_t::on_resolve);
-#if 0
-        p.subscribe_actor(&peer_actor_t::on_auth);
-#endif
         p.subscribe_actor(&peer_actor_t::on_start_reading);
         p.subscribe_actor(&peer_actor_t::on_termination);
         p.subscribe_actor(&peer_actor_t::on_block_request);
@@ -332,7 +329,6 @@ void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 }
 
 void peer_actor_t::shutdown_start() noexcept {
-    r::actor_base_t::shutdown_start();
     cancel_timer();
     if (resources->has(resource::io)) {
         transport->cancel();
@@ -347,6 +343,7 @@ void peer_actor_t::shutdown_start() noexcept {
         // wait termination
         resources->acquire(resource::controller);
     }
+    r::actor_base_t::shutdown_start();
 }
 
 void peer_actor_t::cancel_timer() noexcept {
@@ -355,37 +352,6 @@ void peer_actor_t::cancel_timer() noexcept {
         timer_request.reset();
     }
 }
-
-#if 0
-void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
-    auto &cluster = res.payload.res->cluster_config;
-    bool ok = (bool)cluster;
-    LOG_TRACE(log, "{}, on_auth, value = {}", identity, ok);
-    if (!ok) {
-        LOG_DEBUG(log, "{}, on_auth, peer has been rejected in authorization, disconnecting", identity);
-        auto ec = utils::make_error_code(utils::error_code_t::non_authorized);
-        return do_shutdown(make_error(ec));
-    }
-
-    /*
-    for (int i = 0; i < cluster->folders_size(); ++i) {
-        auto &f = cluster->folders(i);
-        for (auto j = 0; j < f.devices_size(); ++j) {
-            auto &d = f.devices(j);
-            log->debug(">> {}, folder {}, for device {} has index/max_seq = {}/{} ", identity, f.id(), d.id(),
-                          d.index_id(), d.max_sequence());
-        }
-    }
-    */
-
-    fmt::memory_buffer buff;
-    serialize(buff, *cluster);
-    push_write(std::move(buff), false);
-
-    read_action = &peer_actor_t::read_cluster_config;
-    read_more();
-}
-#endif
 
 void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept {
     bool start = message.payload.start;
@@ -445,11 +411,6 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
                 LOG_TRACE(log, "{}, read_hello, from {} ({} {})", identity, msg->device_name(), msg->client_name(),
                           msg->client_version());
-#if 0
-                request<payload::auth_request_t>(coordinator, get_address(), peer_endpoint, peer_device_id, cert_name,
-                                                 std::move(*msg))
-                    .send(init_timeout / 2);
-#endif
                 auto diff = cluster_diff_ptr_t();
                 diff = new peer::peer_state_t(peer_device_id.get_sha256(), get_address(), true, cert_name, peer_endpoint, msg->client_name());
                 send<payload::model_update_t>(coordinator, std::move(diff));
@@ -461,29 +422,6 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
         },
         msg);
 }
-
-#if 0
-void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept {
-    LOG_TRACE(log, "{}, read_cluster_config", identity);
-    std::visit(
-        [&](auto &&msg) {
-            using T = std::decay_t<decltype(msg)>;
-            if constexpr (std::is_same_v<T, proto::message::ClusterConfig>) {
-                proto::ClusterConfig &config = *msg;
-                auto config_ptr = payload::cluster_config_ptr_t{new proto::ClusterConfig(std::move(config))};
-                send<payload::connect_notify_t>(supervisor->get_address(), get_address(), peer_device_id,
-                                                std::move(config_ptr));
-                reset_tx_timer();
-                reset_rx_timer();
-            } else {
-                LOG_WARN(log, "{}, read_cluster_config: unexpected_message", identity);
-                auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
-                do_shutdown(make_error(ec));
-            }
-        },
-        msg);
-}
-#endif
 
 void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
     LOG_TRACE(log, "{}, read_controlled", identity);

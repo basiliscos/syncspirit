@@ -4,6 +4,7 @@
 #include "model/diff/aggregate.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/string_map.hpp"
+#include "model/misc/error_code.h"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::model::diff::peer;
@@ -55,6 +56,11 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
 
             auto& folder_infos = folder->get_folder_infos();
             auto folder_info = folder_infos.by_device(device);
+            if (!folder_info) {
+                auto log = get_log();
+                LOG_WARN(log, "folder {} was not shared with a peer {}", folder->get_label(), device->device_id());
+                return make_error_code(error_code_t::folder_is_not_shared);
+            }
 
             auto update_info = update_info_t { f.id(), d };
             if (d.index_id() != folder_info->get_index()) {
