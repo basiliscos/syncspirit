@@ -1,5 +1,7 @@
 - uuid model
- - dialer, global_discovery, local_discovery, peer_sup: add tests
+ - global_discovery: add tests
+ -
+ - dialer, peer_sup: add tests
  - controller_actor
    -- tests
  - scan_actor

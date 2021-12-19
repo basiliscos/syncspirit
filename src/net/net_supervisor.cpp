@@ -278,7 +278,6 @@ void net_supervisor_t::launch_net() noexcept {
         create_actor<dialer_actor_t>()
             .timeout(timeout)
             .dialer_config(dcfg)
-            .bep_config(app_config.bep_config)
             .cluster(cluster)
             .finish();
     }

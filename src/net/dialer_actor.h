@@ -17,7 +17,6 @@ namespace outcome = boost::outcome_v2;
 
 struct dialer_actor_config_t : r::actor_config_t {
     config::dialer_config_t dialer_config;
-    config::bep_config_t bep_config;
     model::cluster_ptr_t cluster;
 };
 
@@ -35,12 +34,6 @@ template <typename Actor> struct dialer_actor_config_builder_t : r::actor_config
         parent_t::config.dialer_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
-    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
-        parent_t::config.bep_config = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
 };
 
 struct dialer_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
@@ -68,7 +61,6 @@ struct dialer_actor_t : public r::actor_base_t, private model::diff::cluster_vis
     outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
 
     utils::logger_t log;
-    config::bep_config_t bep_config;
     model::cluster_ptr_t cluster;
     pt::time_duration redial_timeout;
 

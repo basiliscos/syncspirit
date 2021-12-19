@@ -11,7 +11,7 @@ r::plugin::resource_id_t timer = 0;
 } // namespace
 
 dialer_actor_t::dialer_actor_t(config_t &config)
-    : r::actor_base_t{config}, bep_config{config.bep_config}, cluster{config.cluster},
+    : r::actor_base_t{config}, cluster{config.cluster},
       redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}}
       {
     log = utils::get_logger("net.acceptor");
