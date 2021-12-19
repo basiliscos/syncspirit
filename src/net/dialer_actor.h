@@ -55,20 +55,13 @@ struct dialer_actor_t : public r::actor_base_t, private model::diff::cluster_vis
 
   private:
     using clock_t = std::chrono::steady_clock;
-    using redial_plan_t = std::unordered_map<model::device_ptr_t, uint64_t>;
     using redial_map_t = std::unordered_map<model::device_ptr_t, rotor::request_id_t>;
-    using discovery_map_t = std::unordered_map<model::device_ptr_t, rotor::request_id_t>;
-    using online_map_t = std::unordered_set<model::device_ptr_t>;
-
     void on_announce(message::announce_notification_t &message) noexcept;
     void on_model_update(net::message::model_update_t& ) noexcept;
-    void on_discovery(message::discovery_response_t &req) noexcept;
-    void on_notification(message::discovery_notify_t&) noexcept;
 
     void discover(const model::device_ptr_t &device) noexcept;
     void remove(const model::device_ptr_t &device) noexcept;
     void on_ready(const model::device_ptr_t &device, const utils::uri_container_t &uris) noexcept;
-    void dial(const model::device_ptr_t &peer, const utils::uri_container_t &uris) noexcept;
     void schedule_redial(const model::device_ptr_t &device) noexcept;
     void on_timer(r::request_id_t request_id, bool cancelled) noexcept;
 
@@ -80,13 +73,8 @@ struct dialer_actor_t : public r::actor_base_t, private model::diff::cluster_vis
     pt::time_duration redial_timeout;
 
     r::address_ptr_t coordinator;
-    r::address_ptr_t global_discovery;
     r::address_ptr_t peers;
-
-    discovery_map_t discovery_map;
-    online_map_t online_map;
     redial_map_t redial_map;
-    redial_plan_t redial_plan;
 };
 
 } // namespace net

@@ -20,7 +20,8 @@ void device_t::assign(const db::Device& d) noexcept {
     for (int i = 0; i < d.addresses_size(); ++i) {
         auto uri = utils::parse(d.addresses(i));
         assert(uri);
-        static_addresses.emplace_back(std::move(uri.value()));
+        uris.emplace_back(std::move(uri.value()));
+        static_uris.emplace_back(uris.back());
     }
 }
 
@@ -68,8 +69,8 @@ std::string device_t::serialize() noexcept {
     r.set_paused(paused);
 
     int i = 0;
-    for (auto &address : static_addresses) {
-        *r.mutable_addresses(i) = address.full;
+    for (auto &address : static_uris) {
+        *r.add_addresses() =  address.full;
     }
 
     return r.SerializeAsString();
@@ -79,12 +80,17 @@ void device_t::mark_online(bool value) noexcept { online = value; }
 
 std::string_view device_t::get_key() const noexcept { return id.get_key(); }
 
+void device_t::assing_uris(const uris_t& uris_) noexcept {
+    uris = uris_;
+}
+
 local_device_t::local_device_t(const device_id_t& device_id, std::string_view name, std::string_view cert_name) noexcept:
     device_t(device_id, name, cert_name) {
 
 }
 
 std::string_view local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
+
 
 template<>
 std::string_view get_index<0, device_ptr_t>(const device_ptr_t& item) noexcept {

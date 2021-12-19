@@ -16,9 +16,13 @@ namespace http = boost::beast::http;
 using json = nlohmann::json;
 
 outcome::result<URI> make_announce_request(fmt::memory_buffer &buff, const URI &announce_uri,
-                                           const tcp::endpoint &endpoint) noexcept {
+                                           const utils::uri_container_t &listening_uris) noexcept {
     json payload = json::object();
-    payload["addresses"] = {fmt::format("tcp://{0}:{1}", endpoint.address().to_string(), endpoint.port())};
+    json addresses = json::array();
+    for(auto& uri: listening_uris) {
+        addresses.push_back(uri.full);
+    }
+    payload["addresses"] = addresses;
 
     utils::URI uri(announce_uri);
     uri.set_path("/v2");
@@ -89,10 +93,10 @@ outcome::result<std::uint32_t> parse_announce(http::response<http::string_body> 
     return static_cast<std::uint32_t>(reannounce);
 }
 
-outcome::result<model::peer_contact_option_t> parse_contact(http::response<http::string_body> &res) noexcept {
+outcome::result<utils::uri_container_t> parse_contact(http::response<http::string_body> &res) noexcept {
     auto code = res.result_int();
     if (code == 404) {
-        return model::peer_contact_option_t{};
+        return utils::uri_container_t{};
     };
     if (code != 200) {
         return make_error_code(error_code_t::unexpected_response_code);
@@ -135,7 +139,7 @@ outcome::result<model::peer_contact_option_t> parse_contact(http::response<http:
     }
     try {
         auto date = boost::posix_time::from_iso_extended_string(seen.get<std::string>());
-        return model::peer_contact_t{std::move(date), std::move(urls)};
+        return outcome::success(std::move(urls));
     } catch (...) {
         return make_error_code(error_code_t::malformed_date);
     }

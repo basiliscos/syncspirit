@@ -20,7 +20,7 @@ device_id = 'LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW'
 enabled = true
 key_file = '/home/b/.config/syncthing/key.pem'
 rx_buff_size = 32768
-timeout = 3000
+timeout = 4000
 
 [local_discovery]
 enabled = true
@@ -50,15 +50,8 @@ device_name = 'hp-note'
 timeout = 5000
 hasher_threads = 3
 
-[tui]
-key_config = 'c'
-key_help = '?'
-key_less_logs = '-'
-key_more_logs = '+'
-key_quit = 'q'
-refresh_interval = 50
-
 [upnp]
+enabled = true
 discovery_attempts = 2
 external_port = 22001
 max_wait = 1

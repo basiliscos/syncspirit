@@ -49,19 +49,13 @@ bool operator==(const log_config_t &lhs, const log_config_t &rhs) noexcept {
 bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
     return lhs.local_announce_config == rhs.local_announce_config && lhs.upnp_config == rhs.upnp_config &&
            lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
-           lhs.tui_config == rhs.tui_config && lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
+           lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
            lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs &&
            lhs.hasher_threads == rhs.hasher_threads;
 }
 
-bool operator==(const tui_config_t &lhs, const tui_config_t &rhs) noexcept {
-    return lhs.refresh_interval == rhs.refresh_interval && lhs.key_quit == rhs.key_quit &&
-           lhs.key_more_logs == rhs.key_more_logs && lhs.key_less_logs == rhs.key_less_logs &&
-           lhs.key_help == rhs.key_help && lhs.key_config == rhs.key_config;
-}
-
 bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept {
-    return lhs.discovery_attempts == rhs.discovery_attempts && lhs.max_wait == rhs.max_wait &&
+    return lhs.enabled == rhs.enabled && lhs.discovery_attempts == rhs.discovery_attempts && lhs.max_wait == rhs.max_wait &&
            lhs.timeout == rhs.timeout && lhs.external_port == rhs.external_port && lhs.rx_buff_size == rhs.rx_buff_size;
 }
 
@@ -248,9 +242,16 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
     {
         auto t = root_tbl["upnp"];
         auto &c = cfg.upnp_config;
+
+        auto enabled = t["enabled"].value<bool>();
+        if (!enabled) {
+            return "upnp/enabled is incorrect or missing";
+        }
+        c.enabled = enabled.value();
+
         auto max_wait = t["max_wait"].value<std::uint32_t>();
         if (!max_wait) {
-            return "global_discovery/max_wait is incorrect or missing";
+            return "upnp/max_wait is incorrect or missing";
         }
         c.max_wait = max_wait.value();
 
@@ -350,47 +351,6 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         c.temporally_timeout = temporally_timeout.value();
     }
 
-    // tui
-    {
-        auto t = root_tbl["tui"];
-        auto &c = cfg.tui_config;
-        auto refresh_interval = t["refresh_interval"].value<std::uint32_t>();
-        if (!refresh_interval) {
-            return "tui/refresh_interval is incorrect or missing";
-        }
-        c.refresh_interval = refresh_interval.value();
-
-        auto key_quit = t["key_quit"].value<std::string>();
-        if (!key_quit || key_quit.value().empty()) {
-            return "tui/key_quit is incorrect or missing";
-        }
-        c.key_quit = key_quit.value()[0];
-
-        auto key_more_logs = t["key_more_logs"].value<std::string>();
-        if (!key_more_logs || key_more_logs.value().empty()) {
-            return "tui/key_more_logs is incorrect or missing";
-        }
-        c.key_more_logs = key_more_logs.value()[0];
-
-        auto key_less_logs = t["key_less_logs"].value<std::string>();
-        if (!key_less_logs || key_less_logs.value().empty()) {
-            return "tui/key_less_logs is incorrect or missing";
-        }
-        c.key_less_logs = key_less_logs.value()[0];
-
-        auto key_config = t["key_config"].value<std::string>();
-        if (!key_config || key_config.value().empty()) {
-            return "tui/key_config is incorrect or missing";
-        }
-        c.key_config = key_config.value()[0];
-
-        auto key_help = t["key_help"].value<std::string>();
-        if (!key_help || key_help.value().empty()) {
-            return "tui/key_help is incorrect or missing";
-        }
-        c.key_help = key_help.value()[0];
-    }
-
     return std::move(cfg);
 }
 
@@ -455,6 +415,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                                  {"timeout", cfg.global_announce_config.timeout},
                              }}},
         {"upnp", toml::table{{
+                     {"enabled", cfg.upnp_config.enabled},
                      {"discovery_attempts", cfg.upnp_config.discovery_attempts},
                      {"max_wait", cfg.upnp_config.max_wait},
                      {"timeout", cfg.upnp_config.timeout},
@@ -476,14 +437,6 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                    {"batch_dirs_count", cfg.fs_config.batch_dirs_count},
                    {"temporally_timeout", cfg.fs_config.temporally_timeout},
                }}},
-        {"tui", toml::table{{
-                    {"refresh_interval", cfg.tui_config.refresh_interval},
-                    {"key_quit", std::string_view(&cfg.tui_config.key_quit, 1)},
-                    {"key_more_logs", std::string_view(&cfg.tui_config.key_more_logs, 1)},
-                    {"key_less_logs", std::string_view(&cfg.tui_config.key_less_logs, 1)},
-                    {"key_config", std::string_view(&cfg.tui_config.key_config, 1)},
-                    {"key_help", std::string_view(&cfg.tui_config.key_help, 1)},
-                }}},
     }};
     // clang-format on
     out << tbl;
@@ -544,6 +497,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         10 * 60,
     };
     cfg.upnp_config = upnp_config_t {
+        true,       /* enabled */
         2,          /* discovery_attempts */
         1,          /* max_wait */
         10,         /* timeout */
@@ -556,14 +510,6 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         60000,              /* request_timeout */
         90000,              /* tx_timeout */
         300000,             /* rx_timeout */
-    };
-    cfg.tui_config = tui_config_t {
-        100,   /* refresh_interval */
-        'q',   /* key_quit */
-        '+',   /* key_more_logs */
-        '-',   /* key_less_logs */
-        '?',   /* key_help */
-        'c'    /* key_config */
     };
     cfg.dialer_config = dialer_config_t {
         true,       /* enabled */

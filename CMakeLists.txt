@@ -42,6 +42,8 @@ add_library(syncspirit_lib
     src/model/diff/base_diff.cpp
     src/model/diff/block_diff.cpp
     src/model/diff/block_visitor.cpp
+    src/model/diff/contact_diff.cpp
+    src/model/diff/contact_visitor.cpp
     src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_visitor.cpp
     src/model/diff/load/blocks.cpp
@@ -55,11 +57,13 @@ add_library(syncspirit_lib
     src/model/diff/load/load_cluster.cpp
     src/model/diff/modify/append_block.cpp
     src/model/diff/modify/clone_block.cpp
+    src/model/diff/modify/connect_request.cpp
     src/model/diff/modify/create_folder.cpp
     src/model/diff/modify/local_update.cpp
     src/model/diff/modify/lock_file.cpp
     src/model/diff/modify/new_file.cpp
     src/model/diff/modify/share_folder.cpp
+    src/model/diff/modify/update_contact.cpp
     src/model/diff/modify/update_peer.cpp
     src/model/diff/peer/peer_state.cpp
     src/model/diff/peer/cluster_remove.cpp

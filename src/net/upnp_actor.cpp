@@ -1,7 +1,9 @@
 #include "upnp_actor.h"
-#include "../proto/upnp_support.h"
-#include "../utils/error_code.h"
+#include "proto/upnp_support.h"
+#include "utils/error_code.h"
 #include "names.h"
+#include "model/diff/modify/update_contact.h"
+
 
 using namespace syncspirit::net;
 using namespace syncspirit::utils;
@@ -9,14 +11,13 @@ using namespace syncspirit::proto;
 
 namespace {
 namespace resource {
-r::plugin::resource_id_t req_acceptor = 0;
-r::plugin::resource_id_t external_port = 1;
-r::plugin::resource_id_t http_req = 2;
+r::plugin::resource_id_t external_port = 0;
+r::plugin::resource_id_t http_req = 1;
 } // namespace resource
 } // namespace
 
 upnp_actor_t::upnp_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, main_url{cfg.descr_url}, rx_buff_size{cfg.rx_buff_size}, external_port(cfg.external_port) {
+    : r::actor_base_t{cfg}, cluster{cfg.cluster}, main_url{cfg.descr_url}, rx_buff_size{cfg.rx_buff_size}, external_port(cfg.external_port) {
     log = utils::get_logger("net.upnp");
 }
 
@@ -30,15 +31,10 @@ void upnp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         addr_unmapping = p.create_address();
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&upnp_actor_t::on_endpoint);
         p.subscribe_actor(&upnp_actor_t::on_igd_description, addr_description);
         p.subscribe_actor(&upnp_actor_t::on_external_ip, addr_external_ip);
         p.subscribe_actor(&upnp_actor_t::on_mapping_port, addr_mapping);
         p.subscribe_actor(&upnp_actor_t::on_unmapping_port, addr_unmapping);
-
-        auto timeout = shutdown_timeout / 2;
-        request<payload::endpoint_request_t>(acceptor).send(timeout);
-        resources->acquire(resource::req_acceptor);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::http10, http_client, true).link(true);
@@ -76,26 +72,13 @@ void upnp_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri, f
     resources->acquire(resource::http_req);
     auto timeout = shutdown_timeout * 8 / 9;
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
-                                                        rx_buff_size, get_local_address)
+                                                        rx_buff_size, get_local_address, nullptr)
                        .send(timeout);
 }
 
 void upnp_actor_t::request_finish() noexcept {
     resources->release(resource::http_req);
     http_request.reset();
-}
-
-void upnp_actor_t::on_endpoint(message::endpoint_response_t &res) noexcept {
-    LOG_TRACE(log, "{}, on_endpoint", identity);
-    resources->release(resource::req_acceptor);
-    auto &ee = res.payload.ee;
-    if (ee) {
-        auto inner = utils::make_error_code(utils::error_code_t::endpoint_failed);
-        LOG_WARN(log, "{}, on_endpoint, cannot get acceptor endpoint :: {}", identity, ee->message());
-        return do_shutdown(make_error(inner, ee));
-    }
-    accepting_endpoint = res.payload.res.local_endpoint;
-    LOG_DEBUG(log, "{}, local endpoint = {}", identity, accepting_endpoint);
 }
 
 void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
@@ -107,6 +90,9 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
         auto inner = utils::make_error_code(utils::error_code_t::igd_description_failed);
         LOG_WARN(log, "{}, get IGD description: {}", identity, ee->message());
         return do_shutdown(make_error(inner, ee));
+    }
+    if (state != r::state_t::OPERATIONAL) {
+        return;
     }
 
     local_address = msg.payload.res->local_addr.value();
@@ -154,6 +140,10 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
         auto inner = utils::make_error_code(utils::error_code_t::external_ip_failed);
         return do_shutdown(make_error(inner, ee));
     }
+    if (state != r::state_t::OPERATIONAL) {
+        return;
+    }
+
     auto &body = msg.payload.res->response.body();
     auto ip_addr_result = parse_external_ip(body.data(), body.size());
     if (!ip_addr_result) {
@@ -174,7 +164,13 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
         return do_shutdown(make_error(io_ec));
     }
 
-    auto local_port = accepting_endpoint.port();
+    auto local_port = 0;
+    for(auto& uri: cluster->get_device()->get_uris()) {
+        if(uri.port) {
+            local_port = uri.port;
+            break;
+        }
+    }
     LOG_DEBUG(log, "{}, going to map {}:{} => {}:{}", identity, external_addr.to_string(), external_port, local_address,
               local_port);
 
@@ -196,25 +192,33 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     auto &ee = msg.payload.ee;
     if (ee) {
         LOG_WARN(log, "{}, unsuccessfull port mapping: {}", ee->message(), identity);
-    } else if (state < r::state_t::SHUTTING_DOWN) {
-        auto &body = msg.payload.res->response.body();
-        auto result = parse_mapping(body.data(), body.size());
-        if (!result) {
-            LOG_WARN(log, "{}, can't parse port mapping reply : {}", identity, result.error().message());
-            std::string xml(body);
-            LOG_DEBUG(log, "xml:\n{0}\n", xml);
+    } else if (state != r::state_t::OPERATIONAL) {
+        return;
+    }
+
+    auto &body = msg.payload.res->response.body();
+    auto result = parse_mapping(body.data(), body.size());
+    if (!result) {
+        LOG_WARN(log, "{}, can't parse port mapping reply : {}", identity, result.error().message());
+        std::string xml(body);
+        LOG_DEBUG(log, "xml:\n{0}\n", xml);
+    } else {
+        rx_buff->consume(msg.payload.res->bytes);
+        if (!result.value()) {
+            LOG_WARN(log, "{}, unsuccessfull port mapping", identity);
         } else {
-            rx_buff->consume(msg.payload.res->bytes);
-            if (!result.value()) {
-                LOG_WARN(log, "{}, unsuccessfull port mapping", identity);
-            } else {
-                LOG_DEBUG(log, "{}, port mapping succeeded", identity);
-                ok = true;
-                resources->acquire(resource::external_port);
-            }
+            LOG_DEBUG(log, "{}, port mapping succeeded", identity);
+            ok = true;
+            resources->acquire(resource::external_port);
         }
     }
-    send<payload::port_mapping_notification_t>(coordinator, external_addr, ok);
+
+    if (ok) {
+        using namespace model::diff;
+        auto diff = model::diff::contact_diff_ptr_t{};
+        diff = new modify::update_contact_t(*cluster, {external_addr.to_string(), local_address.to_string() });
+        send<payload::contact_update_t>(coordinator, std::move(diff), this);
+    }
 }
 
 void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
@@ -247,9 +251,6 @@ void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
 void upnp_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "{}, shutdown_start", identity);
     r::actor_base_t::shutdown_start();
-    if (resources->has(resource::req_acceptor)) {
-        resources->release(resource::req_acceptor);
-    }
 
     if (resources->has(resource::http_req)) {
         send<message::http_cancel_t::payload_t>(http_client, *http_request, get_address());

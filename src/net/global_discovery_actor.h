@@ -1,31 +1,30 @@
 #pragma once
 
 #include "messages.h"
-#include "../utils/log.h"
+#include "utils/log.h"
+#include "model/diff/contact_visitor.h"
 #include <boost/asio.hpp>
 #include <optional>
+#include <unordered_set>
 
 namespace syncspirit {
 namespace net {
 
+namespace outcome = boost::outcome_v2;
+
 struct global_discovery_actor_config_t : r::actor_config_t {
-    tcp::endpoint endpoint;
     utils::URI announce_url;
     model::device_id_t device_id;
     const utils::key_pair_t *ssl_pair;
     std::uint32_t rx_buff_size;
     std::uint32_t io_timeout;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Actor> struct global_discovery_actor_config_builder_t : r::actor_config_builder_t<Actor> {
     using builder_t = typename Actor::template config_builder_t<Actor>;
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
-
-    builder_t &&endpoint(const tcp::endpoint &value) &&noexcept {
-        parent_t::config.endpoint = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
 
     builder_t &&announce_url(const utils::URI &value) &&noexcept {
         parent_t::config.announce_url = value;
@@ -34,11 +33,6 @@ template <typename Actor> struct global_discovery_actor_config_builder_t : r::ac
 
     builder_t &&ssl_pair(const utils::key_pair_t *value) &&noexcept {
         parent_t::config.ssl_pair = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&device_id(model::device_id_t &&value) &&noexcept {
-        parent_t::config.device_id = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -51,9 +45,19 @@ template <typename Actor> struct global_discovery_actor_config_builder_t : r::ac
         parent_t::config.io_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&device_id(const model::device_id_t &value) &&noexcept {
+        parent_t::config.device_id = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+        parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
-struct global_discovery_actor_t : public r::actor_base_t {
+struct global_discovery_actor_t : public r::actor_base_t, private model::diff::contact_visitor_t {
     using config_t = global_discovery_actor_config_t;
     template <typename Actor> using config_builder_t = global_discovery_actor_config_builder_t<Actor>;
 
@@ -65,20 +69,23 @@ struct global_discovery_actor_t : public r::actor_base_t {
 
   private:
     using rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
-    using discovery_request_t = r::intrusive_ptr_t<message::discovery_request_t>;
-    using discovery_queue_t = std::list<discovery_request_t>;
+    using discovering_devices_t = std::unordered_set<std::string>;
+    using uris_t = std::unordered_set<std::string>;
 
     void announce() noexcept;
     void on_announce_response(message::http_response_t &message) noexcept;
     void on_discovery_response(message::http_response_t &message) noexcept;
-    void on_discovery(message::discovery_request_t &req) noexcept;
+    void on_contact_update(message::contact_update_t& message) noexcept;
+    void on_discovery(message::discovery_notify_t &req) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
-    void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff) noexcept;
+    void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff, message::discovery_notify_t* msg) noexcept;
 
+    outcome::result<void> operator()(const model::diff::modify::update_contact_t &) noexcept override;
+
+    model::device_id_t device_id;
     utils::logger_t log;
     r::address_ptr_t http_client;
     r::address_ptr_t coordinator;
-    tcp::endpoint endpoint;
     utils::URI announce_url;
     model::device_id_t dicovery_device_id;
     const utils::key_pair_t &ssl_pair;
@@ -90,7 +97,9 @@ struct global_discovery_actor_t : public r::actor_base_t {
     r::address_ptr_t addr_discovery; /* for routing */
     std::optional<r::request_id_t> timer_request;
     std::optional<r::request_id_t> http_request;
-    discovery_queue_t discovery_queue;
+    discovering_devices_t discovering_devices;
+    model::cluster_ptr_t cluster;
+    uris_t announced_uris;
 };
 
 } // namespace net

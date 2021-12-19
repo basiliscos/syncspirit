@@ -1,7 +1,8 @@
 #pragma once
 
 #include "messages.h"
-#include "../utils/log.h"
+#include "config/upnp.h"
+#include "utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>
 #include <optional>
@@ -10,7 +11,8 @@ namespace syncspirit {
 namespace net {
 
 struct ssdp_actor_config_t : r::actor_config_t {
-    std::uint32_t max_wait;
+    config::upnp_config_t upnp_config;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Actor> struct ssdp_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -18,8 +20,13 @@ template <typename Actor> struct ssdp_actor_config_builder_t : r::actor_config_b
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&max_wait(std::uint32_t value) &&noexcept {
-        parent_t::config.max_wait = value;
+    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+        parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&upnp_config(const config::upnp_config_t& value) &&noexcept {
+        parent_t::config.upnp_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -41,13 +48,15 @@ struct ssdp_actor_t : public r::actor_base_t {
     void on_discovery_received(std::size_t bytes) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void timer_cancel() noexcept;
+    void launch_upnp(const utils::URI& igd_uri) noexcept;
 
+    model::cluster_ptr_t cluster;
     utils::logger_t log;
     asio::io_context::strand &strand;
     std::optional<r::request_id_t> timer_request;
-    std::uint32_t max_wait;
     std::unique_ptr<udp_socket_t> sock;
-    r::address_ptr_t coordinator_addr;
+    config::upnp_config_t upnp_config;
+    r::address_ptr_t coordinator;
 
     fmt::memory_buffer tx_buff;
     fmt::memory_buffer rx_buff;

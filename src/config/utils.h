@@ -15,7 +15,6 @@ bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept;
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept;
 bool operator==(const local_announce_config_t &lhs, const local_announce_config_t &rhs) noexcept;
 bool operator==(const main_t &lhs, const main_t &rhs) noexcept;
-bool operator==(const tui_config_t &lhs, const tui_config_t &rhs) noexcept;
 bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept;
 
 // misc

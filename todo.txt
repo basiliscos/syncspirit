@@ -1,6 +1,6 @@
 - uuid model
+ - dialer, global_discovery, local_discovery, peer_sup: add tests
  - controller_actor
-   -- check when file is reopenen multiple times
    -- tests
  - scan_actor
 
@@ -13,6 +13,11 @@
 - scan_actor:
     -- если file_info.seq = folder_info.seq и файла нет, не считать что он удалён, а считать что был крэш
     -- делать start++ и finish++ , иначе считать крешем
+
+не работает, когда подключаются к нам?
+[2021-12-18 17:18:43.152] [T/15077] net::accceptor, on_accept, peer = 127.0.0.1:22000, sock = 11
+
+===================
 
 - https://docs.syncthing.net/users/faq.html#what-things-are-synced
 - test: validation happens before opening file?

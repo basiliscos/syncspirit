@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../model/device.h"
-#include "../model/cluster.h"
-#include "../model/diff/cluster_visitor.h"
-#include "../model/diff/block_visitor.h"
-#include "../utils/log.h"
+#include "model/device.h"
+#include "model/cluster.h"
+#include "model/diff/cluster_visitor.h"
+#include "model/diff/block_visitor.h"
+#include "utils/log.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
@@ -49,22 +49,13 @@ struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::clu
     void on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override;
     void on_child_shutdown(actor_base_t *actor) noexcept override;
     void on_start() noexcept override;
+    void shutdown_finish() noexcept override;
 
   private:
-
-    void on_ssdp(message::ssdp_notification_t &message) noexcept;
-    void on_port_mapping(message::port_mapping_notification_t &message) noexcept;
-    void on_discovery_notify(message::discovery_notify_t &message) noexcept;
-    void on_connect(message::connect_response_t &message) noexcept;
-/*
-    void on_connection(message::connection_notify_t &message) noexcept;
-    void on_dial_ready(message::dial_ready_notify_t &message) noexcept;
-    void on_config_request(ui::message::config_request_t &message) noexcept;
-    void on_config_save(ui::message::config_save_request_t &message) noexcept;
-*/
     void on_load_cluster(message::load_cluster_response_t &message) noexcept;
     void on_model_update(message::model_update_t &message) noexcept;
     void on_block_update(message::block_update_t &message) noexcept;
+    void on_contact_update(message::contact_update_t &message) noexcept;
     void on_model_request(message::model_request_t &message) noexcept;
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
@@ -72,7 +63,6 @@ struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::clu
     void launch_cluster() noexcept;
     void launch_ssdp() noexcept;
     void launch_net() noexcept;
-    void launch_upnp() noexcept;
     void load_db() noexcept;
     void seed_model() noexcept;
 
@@ -86,16 +76,14 @@ struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::clu
     size_t cluster_copies;
     model::diff::cluster_diff_ptr_t load_diff;
     r::address_ptr_t db_addr;
-    r::address_ptr_t ssdp_addr;
-    r::address_ptr_t upnp_addr;
-    r::address_ptr_t peers_addr;
-    r::address_ptr_t cluster_addr;
-    r::address_ptr_t controller_addr;
     r::address_ptr_t local_discovery_addr;
+    r::address_ptr_t ssdp_addr;
     std::uint32_t ssdp_attempts = 0;
     model::cluster_ptr_t cluster;
     utils::key_pair_t ssl_pair;
-    utils::URI igd_location;
+
+    r::supervisor_ptr_t cluster_sup;
+    r::supervisor_ptr_t peers_sup;
 };
 
 } // namespace net

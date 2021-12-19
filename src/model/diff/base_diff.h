@@ -13,7 +13,7 @@ struct cluster_t;
 
 namespace diff {
 
-struct base_diff_t : boost::intrusive_ref_counter<base_diff_t, boost::thread_safe_counter> {
+struct base_diff_t : boost::intrusive_ref_counter<base_diff_t, boost::thread_unsafe_counter> {
     base_diff_t() noexcept;
     virtual ~base_diff_t() = default;
 

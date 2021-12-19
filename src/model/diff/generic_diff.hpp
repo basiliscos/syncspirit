@@ -8,6 +8,7 @@ namespace tag {
 
 struct cluster{};
 struct block{};
+struct contact{};
 
 }
 

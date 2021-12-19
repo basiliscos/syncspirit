@@ -133,7 +133,6 @@ void resolver_actor_t::on_resolve(resolve_results_t results) noexcept {
 void resolver_actor_t::on_resolve_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     cancel_timer();
-    auto &payload = queue.front()->payload.request_payload;
     if (ec == asio::error::operation_aborted) {
         if (resources->has(resource::io)) {
             auto ec = r::make_error_code(r::error_code_t::cancelled);
@@ -142,8 +141,11 @@ void resolver_actor_t::on_resolve_error(const sys::error_code &ec) noexcept {
             return;
         }
     } else {
-        auto endpoint = endpoint_t{payload->host, payload->port};
-        mass_reply(endpoint, ec);
+        if (!queue.empty()) {
+            auto &payload = *queue.front()->payload.request_payload;
+            auto endpoint = endpoint_t{payload.host, payload.port};
+            mass_reply(endpoint, ec);
+        }
     }
 
     process();

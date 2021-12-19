@@ -1,6 +1,8 @@
 #include "ssdp_actor.h"
-#include "../proto/upnp_support.h"
+#include "upnp_actor.h"
+#include "proto/upnp_support.h"
 #include "names.h"
+
 
 using namespace syncspirit::net;
 using namespace syncspirit::utils;
@@ -17,8 +19,10 @@ r::plugin::resource_id_t timer = 2;
 } // namespace
 
 ssdp_actor_t::ssdp_actor_t(ssdp_actor_config_t &cfg)
-    : r::actor_base_t::actor_base_t(cfg), strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()},
-      max_wait{cfg.max_wait} {
+    : r::actor_base_t::actor_base_t(cfg),
+      cluster{cfg.cluster},
+      strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()},
+      upnp_config{cfg.upnp_config} {
     log = utils::get_logger("net.ssdp");
     rx_buff.resize(RX_BUFF_SIZE);
 }
@@ -27,7 +31,7 @@ void ssdp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("ssdp", false); });
     plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.discover_name(names::coordinator, coordinator_addr, true).link(false); });
+        [&](auto &p) { p.discover_name(names::coordinator, coordinator, true).link(false); });
 }
 
 void ssdp_actor_t::on_start() noexcept {
@@ -36,6 +40,7 @@ void ssdp_actor_t::on_start() noexcept {
 
     /* broadcast discorvery */
     auto destination = udp::endpoint(v4::from_string(upnp_addr), upnp_port);
+    auto max_wait = upnp_config.max_wait;
     auto request_result = make_discovery_request(tx_buff, max_wait);
     if (!request_result) {
         auto &ec = request_result.error();
@@ -100,10 +105,11 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     }
 
     auto &&value = discovery_result.value();
-    auto my_ip = sock->local_endpoint().address();
+    auto &igd_location = value.location;
 
-    send<payload::ssdp_notification_t>(coordinator_addr, std::move(value), my_ip);
+    launch_upnp(igd_location);
     timer_cancel();
+    do_shutdown();
 }
 
 void ssdp_actor_t::on_udp_send_error(const sys::error_code &ec) noexcept {
@@ -137,4 +143,19 @@ void ssdp_actor_t::timer_cancel() noexcept {
     if (resources->has(resource::timer)) {
         cancel_timer(*timer_request);
     }
+}
+
+void ssdp_actor_t::launch_upnp(const URI &igd_uri) noexcept {
+    LOG_DEBUG(log, "{}, launching upnp", identity);
+    auto timeout = shutdown_timeout * 9 / 10;
+
+    auto& sup = get_supervisor();
+    sup.create_actor<upnp_actor_t>()
+                    .cluster(cluster)
+                    .timeout(timeout)
+                    .descr_url(igd_uri)
+                    .rx_buff_size(upnp_config.rx_buff_size)
+                    .external_port(upnp_config.external_port)
+                    .finish()
+                    ->get_address();
 }

@@ -9,7 +9,6 @@
 #include "net/messages.h"
 #include <rotor.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
-#include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
 namespace syncspirit {
 

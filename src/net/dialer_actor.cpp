@@ -7,7 +7,6 @@ namespace syncspirit::net {
 namespace {
 namespace resource {
 r::plugin::resource_id_t timer = 0;
-r::plugin::resource_id_t request = 1;
 } // namespace resource
 } // namespace
 
@@ -16,7 +15,6 @@ dialer_actor_t::dialer_actor_t(config_t &config)
       redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}}
       {
     log = utils::get_logger("net.acceptor");
-    online_map.emplace(cluster->get_device());
 }
 
 void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -28,15 +26,11 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&dialer_actor_t::on_announce, coordinator);
-                plugin->subscribe_actor(&dialer_actor_t::on_discovery, coordinator);
-                plugin->subscribe_actor(&dialer_actor_t::on_notification, coordinator);
                 plugin->subscribe_actor(&dialer_actor_t::on_model_update, coordinator);
             }
         });
-        p.discover_name(names::global_discovery, global_discovery, true).link(true);
         p.discover_name(names::peers, peers, true).link(true);
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&dialer_actor_t::on_discovery); });
 }
 
 void dialer_actor_t::on_start() noexcept {
@@ -52,9 +46,6 @@ void dialer_actor_t::shutdown_finish() noexcept {
 void dialer_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "{}, shutdown_start", identity);
     r::actor_base_t::shutdown_start();
-    for (auto &it : discovery_map) {
-        send<message::discovery_cancel_t::payload_t>(global_discovery, it.second);
-    }
     while (!redial_map.empty()) {
         cancel_timer(redial_map.begin()->second);
     }
@@ -73,20 +64,10 @@ void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
 
 void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
     if (peer_device->is_dynamic()) {
-        if (global_discovery) {
-            auto &device_id = peer_device->device_id();
-            if (!discovery_map.count(peer_device)) {
-                auto timeout = shutdown_timeout / 2;
-                auto req_id = request<payload::discovery_request_t>(global_discovery, device_id).send(timeout);
-                discovery_map.insert_or_assign(peer_device, req_id);
-                resources->acquire(resource::request);
-            } else {
-                LOG_TRACE(log, "{}, ignoring discovery request for {}, as one seems already in progress", identity,
-                          device_id);
-            }
-        }
+        auto &device_id = peer_device->device_id();
+        send<payload::discovery_notification_t>(coordinator, device_id);
     } else {
-        on_ready(peer_device, peer_device->get_static_addresses());
+        on_ready(peer_device, peer_device->get_uris());
     }
 }
 
@@ -101,49 +82,11 @@ void dialer_actor_t::schedule_redial(const model::device_ptr_t &peer_device) noe
 }
 
 void dialer_actor_t::on_ready(const model::device_ptr_t &peer_device, const utils::uri_container_t &uris) noexcept {
-    auto& device_id = peer_device->device_id();
-    LOG_TRACE(log, "{}, on_ready to dial to {}", identity, device_id);
-    auto it = redial_plan.find(peer_device);
-    if (it == redial_plan.end()) {
-        dial(peer_device, uris);
-    } else {
+    if (!peer_device->is_online()) {
+        auto& device_id = peer_device->device_id();
+        LOG_TRACE(log, "{}, on_ready to dial to {}", identity, device_id);
         schedule_redial(peer_device);
     }
-}
-
-void dialer_actor_t::on_discovery(message::discovery_response_t &res) noexcept {
-    resources->release(resource::request);
-    if (state != r::state_t::OPERATIONAL) {
-        return;
-    }
-
-    auto& devices = cluster->get_devices();
-    auto &ee = res.payload.ee;
-    auto &peer_id = res.payload.req->payload.request_payload->device_id;
-    auto peer = devices.by_sha256(peer_id.get_sha256());
-    assert(peer);
-    auto it = discovery_map.find(peer);
-    assert(it != discovery_map.end());
-    if (!peer->is_online()) {
-        auto &req = *res.payload.req->payload.request_payload;
-        if (!ee) {
-            auto &contact = res.payload.res->peer;
-            if (contact) {
-                auto &urls = contact.value().uris;
-                on_ready(peer, urls);
-            } else {
-                LOG_TRACE(log, "{}, on_discovery, no contact for {} has been discovered", identity, peer_id);
-                schedule_redial(peer);
-            }
-        } else {
-            LOG_DEBUG(log, "{}, on_discovery, can't discover contacts for {} :: {}", identity, req.device_id,
-                      ee->message());
-            schedule_redial(peer);
-        }
-    } else {
-        LOG_TRACE(log, "{}, on_discovery, peer {} is already online, noop", identity, peer_id);
-    }
-    discovery_map.erase(it);
 }
 
 void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexcept {
@@ -169,50 +112,19 @@ void dialer_actor_t::on_model_update(net::message::model_update_t& msg) noexcept
     }
 }
 
-void dialer_actor_t::on_notification(message::discovery_notify_t &msg) noexcept {
-    LOG_TRACE(log, "{}, on_notification", identity);
-    auto& contact = msg.payload.peer;
-
-    if (!contact) {
-        return;
-    }
-
-    auto& device_id = msg.payload.device_id;
-    auto peer = cluster->get_devices().by_sha256(device_id.get_sha256());
-    if (peer) {
-        if (!peer->is_online()) {
-            auto& uris = contact.value().uris;
-            on_ready(peer, uris);
-        }
-    }
-
-}
-
-void dialer_actor_t::dial(const model::device_ptr_t &peer, const utils::uri_container_t &uris) noexcept {
-    auto& device_id = peer->device_id();
-    LOG_TRACE(log, "{}, dialing to {}", identity, device_id);
-    auto timeout = r::pt::milliseconds{bep_config.connect_timeout * (uris.size() + 1)};
-    request<payload::connect_request_t>(peers, device_id, uris).send(timeout);
-}
 
 auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &state) noexcept -> outcome::result<void>{
     auto& devices = cluster->get_devices();
     auto peer = devices.by_sha256(state.peer_id);
 
-    if (!state.online) {
-        if (peer) {
+    if (peer) {
+        if (!state.online) {
             schedule_redial(peer);
         }
-    }  else {
-        if (peer) {
-            auto it_redial = redial_map.find(peer);
-            if (it_redial != redial_map.end()) {
-                cancel_timer(it_redial->second);
-            }
-
-            auto it_discovery = discovery_map.find(peer);
-            if (it_discovery != discovery_map.end()) {
-                send<message::discovery_cancel_t::payload_t>(global_discovery, it_discovery->second);
+        else {
+            auto it = redial_map.find(peer);
+            if (it != redial_map.end()) {
+                cancel_timer(it->second);
             }
         }
     }

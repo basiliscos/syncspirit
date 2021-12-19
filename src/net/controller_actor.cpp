@@ -79,7 +79,6 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&controller_actor_t::on_model_update, coordinator);
             }
         });
-
     });
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) {
         p.link(peer_addr, false);

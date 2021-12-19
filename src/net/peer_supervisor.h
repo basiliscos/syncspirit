@@ -1,9 +1,10 @@
 #pragma once
 
-#include "../config/bep.h"
+#include "config/bep.h"
 #include "messages.h"
 #include "model/diff/cluster_visitor.h"
-#include "../utils/log.h"
+#include "model/diff/contact_visitor.h"
+#include "utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 #include <map>
@@ -41,7 +42,7 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
     }
 };
 
-struct peer_supervisor_t : public ra::supervisor_asio_t, private model::diff::cluster_visitor_t {
+struct peer_supervisor_t : public ra::supervisor_asio_t, private model::diff::cluster_visitor_t, private model::diff::contact_visitor_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = peer_supervisor_config_t;
     template <typename Actor> using config_builder_t = peer_supervisor_config_builder_t<Actor>;
@@ -52,15 +53,15 @@ struct peer_supervisor_t : public ra::supervisor_asio_t, private model::diff::cl
     void on_start() noexcept override;
 
   private:
-    using connect_ptr_t = r::intrusive_ptr_t<message::connect_request_t>;
     using id2addr_t = std::map<std::string, r::address_ptr_t>;
     using addr2id_t = std::map<r::address_ptr_t, std::string>;
-    using addr2req_t = std::map<r::address_ptr_t, connect_ptr_t>;
 
-    void on_connect_request(message::connect_request_t &msg) noexcept;
     void on_model_update(net::message::model_update_t& ) noexcept;
+    void on_contact_update(net::message::contact_update_t& ) noexcept;
 
     outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::update_contact_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::connect_request_t &) noexcept override;
 
     utils::logger_t log;
     r::address_ptr_t coordinator;
@@ -69,7 +70,6 @@ struct peer_supervisor_t : public ra::supervisor_asio_t, private model::diff::cl
     config::bep_config_t bep_config;
     id2addr_t id2addr;
     addr2id_t addr2id;
-    addr2req_t addr2req;
 };
 
 } // namespace net

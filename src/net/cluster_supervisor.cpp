@@ -68,6 +68,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
         p.subscribe_actor(&cluster_supervisor_t::on_file_update);
 */
 
+        auto& sup = get_supervisor();
         create_actor<hasher::hasher_proxy_actor_t>()
             .timeout(init_timeout)
             .hasher_threads(hasher_threads)
