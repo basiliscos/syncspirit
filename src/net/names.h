@@ -13,7 +13,6 @@ struct names {
     static const char *file_actor;
     static const char *scan_actor;
     static const char *hasher_proxy;
-    static const char *peers;
 };
 
 } // namespace net

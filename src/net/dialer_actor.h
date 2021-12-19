@@ -73,7 +73,6 @@ struct dialer_actor_t : public r::actor_base_t, private model::diff::cluster_vis
     pt::time_duration redial_timeout;
 
     r::address_ptr_t coordinator;
-    r::address_ptr_t peers;
     redial_map_t redial_map;
 };
 

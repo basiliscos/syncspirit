@@ -11,4 +11,3 @@ const char *names::db = "net::db";
 const char *names::file_actor = "fs::actor";
 const char *names::scan_actor = "fs::scan";
 const char *names::hasher_proxy = "net::hasher_proxy";
-const char *names::peers = "net::peers";

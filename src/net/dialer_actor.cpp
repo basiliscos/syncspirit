@@ -29,7 +29,6 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&dialer_actor_t::on_model_update, coordinator);
             }
         });
-        p.discover_name(names::peers, peers, true).link(true);
     });
 }
 
