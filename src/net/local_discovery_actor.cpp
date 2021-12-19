@@ -19,7 +19,7 @@ local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, frequency{r::pt::seconds(cfg.frequency)},
       strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, sock{strand.context()},
       bc_endpoint(udp::v4(), cfg.port), cluster{cfg.cluster} {
-    log = utils::get_logger("net.acceptor");
+    log = utils::get_logger("net.local_discovery");
     rx_buff.resize(BUFF_SZ);
     tx_buff.resize(BUFF_SZ);
 }
@@ -28,7 +28,6 @@ void local_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexce
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("local_discovery", false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(names::acceptor, acceptor, true).link(true);
         p.discover_name(names::coordinator, coordinator, true).link(false);
     });
 }

@@ -22,9 +22,8 @@ acceptor_actor_t::acceptor_actor_t(config_t &config)
 
 void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::acceptor, false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(log->name(), false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(names::acceptor, get_address());
         p.discover_name(names::coordinator, coordinator, true).link(false);
     });
 }

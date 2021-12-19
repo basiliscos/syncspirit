@@ -2,25 +2,25 @@
 #include "names.h"
 #include <cstddef>
 #include <string_view>
-#include "../db/prefix.h"
-#include "../db/utils.h"
-#include "../db/error_code.h"
-#include "../model/diff/load/blocks.h"
-#include "../model/diff/load/close_transaction.h"
-#include "../model/diff/load/devices.h"
-#include "../model/diff/load/file_infos.h"
-#include "../model/diff/load/folder_infos.h"
-#include "../model/diff/load/folders.h"
-#include "../model/diff/load/ignored_devices.h"
-#include "../model/diff/load/ignored_folders.h"
-#include "../model/diff/load/load_cluster.h"
-#include "../model/diff/modify/create_folder.h"
-#include "../model/diff/modify/new_file.h"
-#include "../model/diff/modify/share_folder.h"
-#include "../model/diff/modify/update_peer.h"
-#include "../model/diff/peer/cluster_remove.h"
-#include "../model/diff/peer/update_folder.h"
-#include "../model/diff/cluster_visitor.h"
+#include "db/prefix.h"
+#include "db/utils.h"
+#include "db/error_code.h"
+#include "model/diff/load/blocks.h"
+#include "model/diff/load/close_transaction.h"
+#include "model/diff/load/devices.h"
+#include "model/diff/load/file_infos.h"
+#include "model/diff/load/folder_infos.h"
+#include "model/diff/load/folders.h"
+#include "model/diff/load/ignored_devices.h"
+#include "model/diff/load/ignored_folders.h"
+#include "model/diff/load/load_cluster.h"
+#include "model/diff/modify/create_folder.h"
+#include "model/diff/modify/new_file.h"
+#include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/update_peer.h"
+#include "model/diff/peer/cluster_remove.h"
+#include "model/diff/peer/update_folder.h"
+#include "model/diff/cluster_visitor.h"
 
 namespace syncspirit::net {
 
@@ -35,7 +35,7 @@ db_actor_t::db_actor_t(config_t &config)
     log = utils::get_logger("net.db");
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
-        LOG_CRITICAL(log, "{}, mbdx environment creation error ({}): {}", r, mdbx_strerror(r), names::db);
+        LOG_CRITICAL(log, "{}, mbdx environment creation error ({}): {}", log->name(), r, mdbx_strerror(r));
         throw std::runtime_error(std::string(mdbx_strerror(r)));
     }
 }
@@ -48,9 +48,8 @@ db_actor_t::~db_actor_t() {
 
 void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::db, false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(log->name(), false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(names::db, get_address());
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);

@@ -60,7 +60,6 @@ struct local_discovery_actor_t final : public r::actor_base_t {
     void on_timer(r::request_id_t, bool cancelled) noexcept;
 
     utils::logger_t log;
-    r::address_ptr_t acceptor;
     r::pt::time_duration frequency;
     asio::io_context::strand &strand;
     udp_socket_t sock;

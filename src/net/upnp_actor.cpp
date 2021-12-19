@@ -39,7 +39,6 @@ void upnp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::http10, http_client, true).link(true);
         p.discover_name(names::coordinator, coordinator).link();
-        p.discover_name(names::acceptor, acceptor, true).link(true);
     });
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) {
         p.on_unlink([&](auto &req) {

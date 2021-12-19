@@ -34,23 +34,15 @@ typedef void (*callback_t)(cluster_supervisor_t *, syncspirit::model::folder_ptr
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
     : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, hasher_threads{config.hasher_threads},
       cluster{config.cluster}, folders{cluster->get_folders()} {
-    log = utils::get_logger("net.cluster_supervisor");
+    log = utils::get_logger("net.cluster");
 }
 
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     ra::supervisor_asio_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        p.set_identity(names::cluster, false);
-        /*
-        scan_initial = p.create_address();
-        scan_new = p.create_address();
-        */
+        p.set_identity(log->name(), false);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(names::cluster, get_address());
-        /*
-        p.discover_name(names::scan_actor, scan_addr, true).link(true);
-        */
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);

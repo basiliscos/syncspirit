@@ -72,7 +72,6 @@ struct upnp_actor_t : public r::actor_base_t {
     utils::URI main_url;
     utils::URI igd_control_url;
     r::address_ptr_t http_client;
-    r::address_ptr_t acceptor;
     r::address_ptr_t coordinator;
     r::address_ptr_t addr_description; /* for routing */
     r::address_ptr_t addr_external_ip; /* for routing */
