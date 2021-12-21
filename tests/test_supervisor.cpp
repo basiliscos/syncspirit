@@ -65,6 +65,18 @@ void supervisor_t::do_cancel_timer(r::request_id_t timer_id) noexcept {
     assert(0 && "should not happen");
 }
 
+void supervisor_t::do_invoke_timer(r::request_id_t timer_id) noexcept {
+    LOG_DEBUG(log, "{}, invoking timer {}", identity, timer_id);
+    auto predicate = [&](auto& handler) { return handler->request_id == timer_id;  };
+    auto it = std::find_if(timers.begin(), timers.end(), predicate);
+    assert(it != timers.end());
+    auto& handler = *it;
+    auto& actor_ptr = handler->owner;
+    actor_ptr->access<to::on_timer_trigger, r::request_id_t, bool>(timer_id, false);
+    timers.erase(it);
+}
+
+
 void supervisor_t::start() noexcept {}
 void supervisor_t::shutdown() noexcept { do_shutdown(); }
 

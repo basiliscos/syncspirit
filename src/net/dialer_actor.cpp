@@ -65,27 +65,16 @@ void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
     if (peer_device->is_dynamic()) {
         auto &device_id = peer_device->device_id();
         send<payload::discovery_notification_t>(coordinator, device_id);
-    } else {
-        on_ready(peer_device, peer_device->get_uris());
+        schedule_redial(peer_device);
     }
 }
 
 void dialer_actor_t::schedule_redial(const model::device_ptr_t &peer_device) noexcept {
     auto ms = redial_timeout.total_milliseconds();
-    if (redial_map.count(peer_device) == 0) {
-        LOG_TRACE(log, "{}, scheduling (re)dial to {} in {} ms", identity, peer_device->device_id(), ms);
-        auto redial_timer = start_timer(redial_timeout, *this, &dialer_actor_t::on_timer);
-        redial_map.insert_or_assign(peer_device, redial_timer);
-        resources->acquire(resource::timer);
-    }
-}
-
-void dialer_actor_t::on_ready(const model::device_ptr_t &peer_device, const utils::uri_container_t &uris) noexcept {
-    if (!peer_device->is_online()) {
-        auto& device_id = peer_device->device_id();
-        LOG_TRACE(log, "{}, on_ready to dial to {}", identity, device_id);
-        schedule_redial(peer_device);
-    }
+    LOG_TRACE(log, "{}, scheduling (re)dial to {} in {} ms", identity, peer_device->device_id(), ms);
+    auto redial_timer = start_timer(redial_timeout, *this, &dialer_actor_t::on_timer);
+    redial_map.insert_or_assign(peer_device, redial_timer);
+    resources->acquire(resource::timer);
 }
 
 void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexcept {
@@ -97,8 +86,9 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
     assert(it != redial_map.end());
     if (!cancelled) {
         discover(it->first);
+    } else {
+        redial_map.erase(it);
     }
-    redial_map.erase(it);
 }
 
 void dialer_actor_t::on_model_update(net::message::model_update_t& msg) noexcept {

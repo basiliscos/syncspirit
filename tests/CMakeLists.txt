@@ -119,6 +119,10 @@ add_executable(072-global_discovery 072-global_discovery.cpp)
 target_link_libraries(072-global_discovery syncspirit_test_lib)
 add_test(072-global_discovery "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/072-global_discovery")
 
+add_executable(073-dialer 073-dialer.cpp)
+target_link_libraries(073-dialer syncspirit_test_lib)
+add_test(073-dialer "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/073-dialer")
+
 #add_executable(080-fs 080-fs.cpp)
 #target_link_libraries(080-fs syncspirit_test_lib)
 #add_test(080-fs "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/080-fs")

@@ -3,7 +3,6 @@
 #include "access.h"
 #include "model/cluster.h"
 #include "model/diff/modify/update_contact.h"
-#include "db/utils.h"
 #include "utils/tls.h"
 #include "utils/error_code.h"
 
