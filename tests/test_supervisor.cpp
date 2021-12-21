@@ -3,9 +3,20 @@
 
 namespace to {
 struct queue{};
+struct on_timer_trigger{};
 }
 
 template <> inline auto &rotor::supervisor_t::access<to::queue>() noexcept { return queue; }
+
+namespace rotor {
+
+template <> inline auto rotor::actor_base_t::access<to::on_timer_trigger, request_id_t, bool>(request_id_t request_id,
+                                                                                        bool cancelled) noexcept {
+    on_timer_trigger(request_id, cancelled);
+}
+
+}
+
 
 
 using namespace syncspirit::net;
@@ -25,6 +36,7 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&supervisor_t::on_model_update);
         p.subscribe_actor(&supervisor_t::on_block_update);
+        p.subscribe_actor(&supervisor_t::on_contact_update);
     });
     if (configure_callback) {
         configure_callback(plugin);
@@ -42,6 +54,7 @@ void supervisor_t::do_cancel_timer(r::request_id_t timer_id) noexcept {
         auto& handler = *it;
         if (handler->request_id == timer_id) {
             auto& actor_ptr = handler->owner;
+            actor_ptr->access<to::on_timer_trigger, r::request_id_t, bool>(timer_id, true);
             on_timer_trigger(timer_id, true);
             timers.erase(it);
             return;
@@ -75,6 +88,16 @@ void supervisor_t::on_block_update(net::message::block_update_t& msg) noexcept {
     auto r = diff->apply(*cluster);
     if (!r) {
         LOG_ERROR(log, "{}, error updating block: {}", identity, r.assume_error().message());
+        do_shutdown(make_error(r.assume_error()));
+    }
+}
+
+void supervisor_t::on_contact_update(net::message::contact_update_t& msg) noexcept {
+    LOG_TRACE(log, "{}, updating contact", identity);
+    auto& diff = msg.payload.diff;
+    auto r = diff->apply(*cluster);
+    if (!r) {
+        LOG_ERROR(log, "{}, error updating contact: {}", identity, r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
     }
 }

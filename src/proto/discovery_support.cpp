@@ -1,6 +1,6 @@
 #include "discovery_support.h"
-#include "../utils/beast_support.h"
-#include "../utils/error_code.h"
+#include "utils/beast_support.h"
+#include "utils/error_code.h"
 #include <boost/beast/http.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <nlohmann/json.hpp>

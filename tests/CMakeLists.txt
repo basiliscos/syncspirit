@@ -115,6 +115,10 @@ add_executable(071-fs_actor 071-fs_actor.cpp)
 target_link_libraries(071-fs_actor syncspirit_test_lib)
 add_test(071-fs_actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/071-fs_actor")
 
+add_executable(072-global_discovery 072-global_discovery.cpp)
+target_link_libraries(072-global_discovery syncspirit_test_lib)
+add_test(072-global_discovery "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/072-global_discovery")
+
 #add_executable(080-fs 080-fs.cpp)
 #target_link_libraries(080-fs syncspirit_test_lib)
 #add_test(080-fs "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/080-fs")
