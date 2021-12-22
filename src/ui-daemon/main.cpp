@@ -193,7 +193,7 @@ int main(int argc, char **argv) {
             hasher_ctxs.push_back(new rth::system_context_thread_t{});
             auto &ctx = hasher_ctxs.back();
             ctx->create_supervisor<hasher::hasher_supervisor_t>()
-                .timeout(timeout)
+                .timeout(timeout / 2)
                 .registry_address(sup_net->get_registry_address())
                 .index(i)
                 .finish();
