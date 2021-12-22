@@ -67,8 +67,16 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void db_actor_t::open() noexcept {
     resources->acquire(resource::db);
     auto& my_device = cluster->get_device();
+    /* enable automatic size management */
+    auto r = mdbx_env_set_geometry(env, 0, -1, 0, -1, -1, 0);
+    if (r != MDBX_SUCCESS) {
+        LOG_ERROR(log, "{}, open, mbdx set geometry error ({}): {}", identity, r, mdbx_strerror(r));
+        resources->release(resource::db);
+        return do_shutdown(make_error(db::make_error_code(r)));
+    }
+
     auto flags = MDBX_WRITEMAP | MDBX_COALESCE | MDBX_LIFORECLAIM | MDBX_EXCLUSIVE | MDBX_NOTLS;
-    auto r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
+    r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
     if (r != MDBX_SUCCESS) {
         LOG_ERROR(log, "{}, open, mbdx open environment error ({}): {}", identity, r, mdbx_strerror(r));
         resources->release(resource::db);
