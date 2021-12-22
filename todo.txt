@@ -1,5 +1,5 @@
 - uuid model
- - dialer, peer_sup?: add tests
+ - dialer: звонить, если нету global_discovery, но local_dicovery обнаружил.
  - controller_actor
    -- tests
  - scan_actor

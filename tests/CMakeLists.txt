@@ -123,13 +123,13 @@ add_executable(073-dialer 073-dialer.cpp)
 target_link_libraries(073-dialer syncspirit_test_lib)
 add_test(073-dialer "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/073-dialer")
 
+add_executable(074-hasher 074-hasher.cpp)
+target_link_libraries(074-hasher syncspirit_test_lib)
+add_test(074-hasher "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/074-hasher")
+
 #add_executable(080-fs 080-fs.cpp)
 #target_link_libraries(080-fs syncspirit_test_lib)
 #add_test(080-fs "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/080-fs")
-
-#add_executable(081-hasher 081-hasher.cpp)
-#target_link_libraries(081-hasher syncspirit_test_lib)
-#add_test(081-hasher "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/081-hasher")
 
 #add_executable(082-db-actor 082-db-actor.cpp)
 #target_link_libraries(082-db-actor syncspirit_test_lib)
