@@ -92,7 +92,7 @@ struct peer_actor_t : public r::actor_base_t {
     };
 
     using resolve_it_t = payload::address_response_t::resolve_results_t::iterator;
-    using tx_item_t = r::intrusive_ptr_t<confidential::payload::tx_item_t>;
+    using tx_item_t = model::intrusive_ptr_t<confidential::payload::tx_item_t>;
     using tx_message_t = confidential::message::tx_item_t;
     using tx_queue_t = std::list<tx_item_t>;
     using read_action_t = void (peer_actor_t::*)(proto::message::message_t &&msg);

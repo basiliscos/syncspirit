@@ -169,7 +169,8 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
         } else {
             do_shutdown(make_error(ec));
         }
-    } else {
+    }
+    else {
         // forsing shutdown
         if (resources->has(resource::controller)) {
             resources->release(resource::controller);
@@ -276,10 +277,19 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
         LOG_TRACE(log, "{}, process_tx_queue, final message has been sent, shutting down", identity);
         if (resources->has(resource::controller)) {
             resources->release(resource::controller);
-        } else {
+        }
+#if 0
+        else {
             auto ec = r::make_error_code(r::shutdown_code_t::normal);
             do_shutdown(make_error(ec));
         }
+#endif
+#if 0
+        if (controller && state == r::state_t::OPERATIONAL) {
+            auto ec = r::make_error_code(r::shutdown_code_t::normal);
+            do_shutdown(make_error(ec));
+        }
+#endif
     } else {
         tx_item.reset();
         process_tx_queue();
@@ -342,6 +352,7 @@ void peer_actor_t::shutdown_start() noexcept {
     if (controller) {
         // wait termination
         resources->acquire(resource::controller);
+        send<payload::termination_t>(controller, shutdown_reason);
     }
     r::actor_base_t::shutdown_start();
 }
@@ -364,14 +375,23 @@ void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept 
 }
 
 void peer_actor_t::on_termination(message::termination_signal_t &message) noexcept {
-    auto reason = message.payload.ee->message();
-    LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
-    fmt::memory_buffer buff;
-    proto::Close close;
-    close.set_reason(reason);
-    proto::serialize(buff, close);
-    push_write(std::move(buff), true);
-    controller.reset();
+    if (controller) {
+        auto reason = message.payload.ee->message();
+        LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
+        fmt::memory_buffer buff;
+        proto::Close close;
+        close.set_reason(reason);
+        proto::serialize(buff, close);
+
+        tx_queue.clear();
+        push_write(std::move(buff), true);
+        controller.reset();
+#if 0
+        if (resources->has(resource::controller)) {
+            resources->release(resource::controller);
+        }
+#endif
+    }
 }
 
 void peer_actor_t::on_block_request(message::block_request_t &message) noexcept {

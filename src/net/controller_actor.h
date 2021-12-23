@@ -134,7 +134,8 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     using unlink_request_ptr_t = r::intrusive_ptr_t<unlink_request_t>;
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
 
-    bool on_unlink(unlink_request_t &message) noexcept;
+    void on_termination(message::termination_signal_t& message) noexcept;
+    // bool on_unlink(unlink_request_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_ready(message::ready_signal_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;

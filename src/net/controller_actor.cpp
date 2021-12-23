@@ -82,11 +82,12 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) {
         p.link(peer_addr, false);
-        p.on_unlink([this](auto &message) { return this->on_unlink(message); });
+        //p.on_unlink([this](auto &message) { return this->on_unlink(message); });
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_ready);
+        p.subscribe_actor(&controller_actor_t::on_termination);
         p.subscribe_actor(&controller_actor_t::on_block);
         p.subscribe_actor(&controller_actor_t::on_validation);
 #if 0
@@ -169,13 +170,28 @@ void controller_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
+#if 0
 bool controller_actor_t::on_unlink(unlink_request_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_unlink");
+    do_shutdown();
+    return true;
+#if 0
     auto &source = message.payload.request_payload.server_addr;
     if (source == peer_addr) {
+
         return false;
     }
     unlink_requests.emplace_back(&message);
+#endif
     return true;
+}
+#endif
+
+
+void controller_actor_t::on_termination(message::termination_signal_t& message) noexcept {
+    auto& ee = message.payload.ee;
+    LOG_TRACE(log, "{}, on_termination reason: {}", identity, ee->message());
+    do_shutdown(ee);
 }
 
 void controller_actor_t::ready() noexcept {

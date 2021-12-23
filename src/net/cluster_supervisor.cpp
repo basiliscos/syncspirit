@@ -40,7 +40,7 @@ cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     ra::supervisor_asio_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        p.set_identity(log->name(), false);
+        p.set_identity("net::cluster", false);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
