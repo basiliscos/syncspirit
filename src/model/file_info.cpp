@@ -34,7 +34,7 @@ outcome::result<file_info_ptr_t> file_info_t::create(const uuid_t& uuid, const p
     auto ptr = file_info_ptr_t();
     ptr = new file_info_t(uuid, folder_info_);
 
-    auto r = ptr->fields_update(info_);
+    auto r = ptr->fields_update(info_, info_.blocks_size());
     if (!r) {
         return r.assume_error();
     }
@@ -87,7 +87,7 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     return block_size * block_index;
 }
 
-template <typename Source> outcome::result<void> file_info_t::fields_update(const Source &s) noexcept {
+template <typename Source> outcome::result<void> file_info_t::fields_update(const Source &s, size_t block_count) noexcept {
     name = s.name();
     sequence = s.sequence();
     type = s.type();
@@ -104,11 +104,11 @@ template <typename Source> outcome::result<void> file_info_t::fields_update(cons
     symlink_target = s.symlink_target();
     version = s.version();
     full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
-    return reserve_blocks();
+    return reserve_blocks(block_count);
 }
 
 auto file_info_t::fields_update(const db::FileInfo& source) noexcept -> outcome::result<void> {
-    return fields_update<db::FileInfo>(source);
+    return fields_update<db::FileInfo>(source, source.blocks_size());
 }
 
 
@@ -161,9 +161,9 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
 }
 
 
-outcome::result<void> file_info_t::reserve_blocks() noexcept {
+outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
     size_t count = 0;
-    if (!deleted && !invalid) {
+    if (!block_count && !deleted && !invalid) {
         if (size < block_size) {
             return make_error_code(error_code_t::invalid_block_size);
         }
@@ -176,11 +176,13 @@ outcome::result<void> file_info_t::reserve_blocks() noexcept {
                 ++count;
             }
         }
+    } else {
+        count = block_count;
     }
     remove_blocks();
     blocks.resize(count);
     marks.resize(count);
-    missing_blocks = count;
+    missing_blocks = (!deleted && !invalid) ? count : 0;
     return outcome::success();
 }
 

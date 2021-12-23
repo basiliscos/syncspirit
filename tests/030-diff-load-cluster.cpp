@@ -17,6 +17,7 @@ using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
+
 TEST_CASE("loading cluster (base)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device =  device_t::create(my_id, "my-device").value();
@@ -287,7 +288,9 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     pr_fi.set_block_size(5ul);
     auto fi = file_info_t::create(cluster->next_uuid(),  pr_fi, folder_info).value();
     CHECK(fi);
-    fi->assign_block(block, 0);
+    for(size_t i = 0; i < 11; ++i) {
+        fi->assign_block(block, i);
+    }
 
     auto target = file_info_ptr_t();
 

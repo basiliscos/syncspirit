@@ -94,12 +94,14 @@ auto cluster_t::next_file(const device_ptr_t& peer, bool reset) noexcept -> file
 }
 
 auto cluster_t::next_block(const file_info_ptr_t& source, bool reset) noexcept -> file_block_t {
-    if (reset) {
-        block_iterator_map[source] = new blocks_interator_t(*source);
-    }
-    auto &it = block_iterator_map[source];
-    if (it && *it) {
-        return it->next();
+    if (source->is_file() && !source->is_deleted()) {
+        if (reset) {
+            block_iterator_map[source] = new blocks_interator_t(*source);
+        }
+        auto &it = block_iterator_map[source];
+        if (it && *it) {
+            return it->next();
+        }
     }
     return {};
 }

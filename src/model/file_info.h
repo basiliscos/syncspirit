@@ -104,12 +104,12 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
   private:
     using marks_vector_t = std::vector<bool>;
 
-    template <typename Source> outcome::result<void>  fields_update(const Source &s) noexcept;
+    template <typename Source> outcome::result<void>  fields_update(const Source &s, size_t block_count) noexcept;
     template<typename T> T as() const noexcept;
 
     file_info_t(std::string_view key, const folder_info_ptr_t& folder_info_) noexcept;
     file_info_t(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept;
-    outcome::result<void> reserve_blocks() noexcept;
+    outcome::result<void> reserve_blocks(size_t block_count) noexcept;
 
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void remove_block(block_info_ptr_t &block) noexcept;
