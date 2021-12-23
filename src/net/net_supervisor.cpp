@@ -224,6 +224,7 @@ void net_supervisor_t::launch_net() noexcept {
 
     create_actor<acceptor_actor_t>().cluster(cluster).timeout(timeout).finish();
     peers_sup = create_actor<peer_supervisor_t>()
+                     .cluster(cluster)
                      .ssl_pair(&ssl_pair)
                      .device_name(app_config.device_name)
                      .strand(strand)

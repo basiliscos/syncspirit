@@ -17,7 +17,7 @@ temporally_timeout = 86400000
 announce_url = 'https://discovery.syncthing.net/'
 cert_file = '/home/b/.config/syncthing/cert.pem'
 device_id = 'LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW'
-enabled = true
+enabled = false
 key_file = '/home/b/.config/syncthing/key.pem'
 rx_buff_size = 32768
 timeout = 4000
@@ -51,7 +51,7 @@ timeout = 5000
 hasher_threads = 3
 
 [upnp]
-enabled = true
+enabled = false
 discovery_attempts = 2
 external_port = 22001
 max_wait = 1

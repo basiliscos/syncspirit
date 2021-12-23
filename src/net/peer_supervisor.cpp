@@ -11,7 +11,7 @@ using namespace syncspirit::net;
 template <class> inline constexpr bool always_false_v = false;
 
 peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
-    : parent_t{cfg}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair}, bep_config(cfg.bep_config) {
+    : parent_t{cfg}, cluster{cfg.cluster}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair}, bep_config(cfg.bep_config) {
     log = utils::get_logger("net.peer_supervisor");
 }
 
@@ -105,17 +105,22 @@ auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t 
 
 auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &diff) noexcept -> outcome::result<void> {
     if (!diff.self && diff.known) {
-        auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
-        auto peer_addr =  create_actor<peer_actor_t>()
-           .ssl_pair(&ssl_pair)
-           .device_name(device_name)
-           .bep_config(bep_config)
-           .coordinator(coordinator)
-           .timeout(timeout)
-           .peer_device_id(diff.device)
-           .uris(diff.uris)
-           .finish()
-           ->get_address();
+        auto& devices = cluster->get_devices();
+        auto peer = devices.by_sha256(diff.device.get_sha256());
+        if (!peer->is_online()) {
+            auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
+            LOG_DEBUG(log, "{} initiating connection with {}", identity, peer->device_id());
+            auto peer_addr =  create_actor<peer_actor_t>()
+               .ssl_pair(&ssl_pair)
+               .device_name(device_name)
+               .bep_config(bep_config)
+               .coordinator(coordinator)
+               .timeout(timeout)
+               .peer_device_id(diff.device)
+               .uris(diff.uris)
+               .finish()
+               ->get_address();
+        }
     }
     return outcome::success();
 }

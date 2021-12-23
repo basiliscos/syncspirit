@@ -1,3 +1,6 @@
+rotor, бага:
+    рутовый супервайзер не может слинковаться - приходит link_response c ec, и нихуя не происходит
+    (link_client.cpp)
 - uuid model
  - dialer: звонить, если нету global_discovery, но local_dicovery обнаружил.
  - controller_actor

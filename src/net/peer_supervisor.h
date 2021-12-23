@@ -18,6 +18,7 @@ struct peer_supervisor_config_t : ra::supervisor_config_asio_t {
     std::string_view device_name;
     const utils::key_pair_t *ssl_pair;
     config::bep_config_t bep_config;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Supervisor>
@@ -38,6 +39,11 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
 
     builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
         parent_t::config.bep_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+        parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -62,7 +68,8 @@ struct peer_supervisor_t : public ra::supervisor_asio_t, private model::diff::cl
     outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_contact_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::connect_request_t &) noexcept override;
-
+    
+    model::cluster_ptr_t cluster;
     utils::logger_t log;
     r::address_ptr_t coordinator;
     std::string_view device_name;
