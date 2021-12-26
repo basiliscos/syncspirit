@@ -116,6 +116,11 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     resources->release(resource::resolver);
     resolve_request.reset();
     auto &ee = res.payload.ee;
+
+    if (state != r::state_t::OPERATIONAL) {
+        return;
+    }
+
     if (ee) {
         LOG_WARN(log, "{}, on_resolve error: {}", identity, ee->message());
         reply_with_error(*queue.front(), ee);
