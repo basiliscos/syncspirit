@@ -1,9 +1,9 @@
 #include "peer_actor.h"
 #include "names.h"
-#include "../constants.h"
-#include "../utils/tls.h"
-#include "../utils/error_code.h"
-#include "../proto/bep_support.h"
+#include "constants.h"
+#include "utils/tls.h"
+#include "utils/error_code.h"
+#include "proto/bep_support.h"
 #include "model/diff/peer/peer_state.h"
 #include <boost/core/demangle.hpp>
 

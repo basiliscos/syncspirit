@@ -12,7 +12,6 @@
 
 
 using namespace syncspirit;
-using namespace syncspirit::db;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;

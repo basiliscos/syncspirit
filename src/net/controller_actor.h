@@ -26,7 +26,7 @@ using ready_signal_t = r::message_t<payload::ready_signal_t>;
 }
 
 struct controller_actor_config_t : r::actor_config_t {
-    config::bep_config_t bep_config;
+    int64_t request_pool;
     model::cluster_ptr_t cluster;
     model::device_ptr_t peer;
     r::address_ptr_t peer_addr;
@@ -39,8 +39,8 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
-        parent_t::config.bep_config = value;
+    builder_t &&request_pool(int64_t value) &&noexcept {
+        parent_t::config.request_pool = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 

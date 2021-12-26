@@ -57,7 +57,7 @@ bool controller_actor_t::write_info_t::complete() const noexcept { return blocks
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer},
       peer_addr{config.peer_addr}, request_timeout{config.request_timeout},
-      request_pool{config.bep_config.rx_buff_size},
+      request_pool{config.request_pool},
       blocks_max_requested{config.blocks_max_requested} {
     log = utils::get_logger("net.controller_actor");
 }
