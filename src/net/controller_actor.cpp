@@ -31,7 +31,7 @@ template <typename Message> struct typed_folder_updater_t final : controller_act
 namespace {
 namespace resource {
 r::plugin::resource_id_t peer = 0;
-//r::plugin::resource_id_t file = 1;
+r::plugin::resource_id_t hash = 1;
 } // namespace resource
 } // namespace
 
@@ -80,10 +80,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
-    plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) {
-        p.link(peer_addr, false);
-        //p.on_unlink([this](auto &message) { return this->on_unlink(message); });
-    });
+    plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(peer_addr, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_ready);
@@ -112,6 +109,8 @@ void controller_actor_t::on_start() noexcept {
     auto payload = std::make_unique<payload_t>(std::move(cluster_config));
     send<payload::cluster_config_t>(peer_addr, std::move(payload));
 
+    resources->acquire(resource::peer);
+    resources->acquire(resource::peer);
 #if 0
     update(*peer_cluster_config);
     peer_cluster_config.reset();
@@ -170,28 +169,13 @@ void controller_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
-#if 0
-bool controller_actor_t::on_unlink(unlink_request_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_unlink");
-    do_shutdown();
-    return true;
-#if 0
-    auto &source = message.payload.request_payload.server_addr;
-    if (source == peer_addr) {
-
-        return false;
-    }
-    unlink_requests.emplace_back(&message);
-#endif
-    return true;
-}
-#endif
-
-
 void controller_actor_t::on_termination(message::termination_signal_t& message) noexcept {
-    auto& ee = message.payload.ee;
-    LOG_TRACE(log, "{}, on_termination reason: {}", identity, ee->message());
-    do_shutdown(ee);
+    resources->release(resource::peer);
+    if (resources->has(resource::peer)) {
+        auto& ee = message.payload.ee;
+        LOG_TRACE(log, "{}, on_termination reason: {}", identity, ee->message());
+        do_shutdown(ee);
+    }
 }
 
 void controller_actor_t::ready() noexcept {
@@ -438,18 +422,6 @@ void controller_actor_t::request_block(const model::file_block_t &fb) noexcept {
 }
 #endif
 
-bool controller_actor_t::on_unlink(const r::address_ptr_t &peer_addr) noexcept {
-    auto it = peers_map.find(peer_addr);
-    if (it != peers_map.end()) {
-        auto &device = it->second;
-        LOG_DEBUG(log, "{}, on_unlink with {}", identity, device->device_id());
-        peers_map.erase(it);
-        resources->release(resource::peer);
-        return false;
-    }
-    return r::actor_base_t::on_unlink(peer_addr);
-}
-
 void controller_actor_t::on_forward(message::forwarded_message_t &message) noexcept {
     if (state != r::state_t::OPERATIONAL) {
         return;
@@ -637,6 +609,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     intrusive_ptr_add_ref(&message);
     auto &data = message.payload.res.data;
     request<hasher::payload::validation_request_t>(hasher_proxy, data, hash, &message).send(init_timeout);
+    resources->acquire(resource::hash);
     return ready();
 }
 
@@ -752,6 +725,7 @@ void controller_actor_t::process(write_it_t it) noexcept {
 
 void controller_actor_t::on_validation(hasher::message::validation_response_t &res) noexcept {
     using namespace model::diff;
+    resources->release(resource::hash);
     auto &ee = res.payload.ee;
     auto block_res = (message::block_response_t *)res.payload.req->payload.request_payload->custom;
     auto &payload = block_res->payload.req->payload.request_payload;

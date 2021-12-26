@@ -73,6 +73,7 @@ struct peer_actor_t : public r::actor_base_t {
     peer_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void shutdown_start() noexcept override;
+    void shutdown_finish() noexcept override;
 
   private:
     struct confidential {

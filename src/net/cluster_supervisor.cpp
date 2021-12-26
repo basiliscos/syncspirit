@@ -180,7 +180,7 @@ void cluster_supervisor_t::on_scan_error(fs::message::scan_error_t &message) noe
 */
 
 void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
-    log->trace("{}, on_child_shutdown", identity);
+    LOG_TRACE(log, "{}, on_child_shutdown: {}({})", identity, actor->get_identity(), actor->use_count());
     ra::supervisor_asio_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
     if (state == r::state_t::OPERATIONAL) {

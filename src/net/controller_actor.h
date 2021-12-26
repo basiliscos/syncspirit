@@ -84,7 +84,6 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
-    bool on_unlink(const r::address_ptr_t &peer_addr) noexcept override;
 
     struct folder_updater_t {
         model::device_ptr_t peer;
@@ -135,7 +134,6 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
 
     void on_termination(message::termination_signal_t& message) noexcept;
-    // bool on_unlink(unlink_request_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_ready(message::ready_signal_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;

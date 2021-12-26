@@ -72,6 +72,10 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
     LOG_TRACE(log, "{}, on_child_shutdown, '{}' due to {} ", identity, actor->get_identity(), reason->message());
+    if (actor->get_identity() == "peer_supervisor") {
+        auto aaa = static_cast<peer_supervisor_t*>(actor);
+        //LOG_ERROR(log, "zzz, qs = {}, iq = {}",   aaa->queue.size(), aaa->inbound_queue.empty());
+    }
     auto &child_addr = actor->get_address();
     if (ssdp_addr && child_addr == ssdp_addr) {
         return;

@@ -179,6 +179,9 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
 }
 
 void peer_actor_t::process_tx_queue() noexcept {
+    if (finished) {
+        return;
+    }
     assert(!tx_item);
     if (!tx_queue.empty() && !finished) {
         auto &item = tx_queue.front();
@@ -266,6 +269,7 @@ void peer_actor_t::read_more() noexcept {
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     resources->acquire(resource::io);
     auto buff = asio::buffer(rx_buff.data() + rx_idx, rx_buff.size() - rx_idx);
+    LOG_TRACE(log, "{}, read_more", identity);
     transport->async_recv(buff, on_read, on_error);
 }
 
@@ -300,7 +304,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     assert(read_action);
     resources->release(resource::io);
     rx_idx += bytes;
-    // log->trace("{}, on_read, {} bytes, total = {}", identity, bytes, rx_idx);
+    LOG_TRACE(log, "{}, on_read, {} bytes, total = {}", identity, bytes, rx_idx);
     auto buff = asio::buffer(rx_buff.data(), rx_idx);
     auto result = proto::parse_bep(buff);
     if (result.has_error()) {
@@ -327,7 +331,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
 
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::io_timer);
-    // log->trace("peer_actor_t::on_timer_trigger, peer = {}, cancelled = {}", peer_identity, cancelled);
+    LOG_TRACE(log, "{}, on_timer_trigger, cancelled = {}", identity, cancelled);
     if (!cancelled) {
         if (connected) {
             auto ec = r::make_error_code(r::shutdown_code_t::normal);
@@ -339,8 +343,10 @@ void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 }
 
 void peer_actor_t::shutdown_start() noexcept {
+    LOG_TRACE(log, "{}, shutdown_start", identity);
     cancel_timer();
     if (resources->has(resource::io)) {
+        LOG_TRACE(log, "{}, cancelling transport...", identity);
         transport->cancel();
     }
     if (tx_timer_request) {
@@ -355,6 +361,16 @@ void peer_actor_t::shutdown_start() noexcept {
         send<payload::termination_t>(controller, shutdown_reason);
     }
     r::actor_base_t::shutdown_start();
+}
+
+void peer_actor_t::shutdown_finish() noexcept {
+    LOG_TRACE(log, "{}, shutdown_finish", identity);
+    r::actor_base_t::shutdown_finish();
+    for(auto& it: block_requests) {
+        auto ec = r::make_error_code(r::error_code_t::cancelled);
+        reply_with_error(*it, make_error(ec));
+    }
+    block_requests.clear();
 }
 
 void peer_actor_t::cancel_timer() noexcept {
@@ -376,7 +392,8 @@ void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept 
 
 void peer_actor_t::on_termination(message::termination_signal_t &message) noexcept {
     if (controller) {
-        auto reason = message.payload.ee->message();
+        auto& ee = message.payload.ee;
+        auto reason = ee->message();
         LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
         fmt::memory_buffer buff;
         proto::Close close;
@@ -385,12 +402,12 @@ void peer_actor_t::on_termination(message::termination_signal_t &message) noexce
 
         tx_queue.clear();
         push_write(std::move(buff), true);
+        auto& notify_ee = shutdown_reason ? shutdown_reason : ee;
+        send<payload::termination_t>(controller, notify_ee);
         controller.reset();
-#if 0
         if (resources->has(resource::controller)) {
             resources->release(resource::controller);
         }
-#endif
     }
 }
 
@@ -496,26 +513,30 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
     auto predicate = [id = id](const block_request_ptr_t &it) { return ((std::int32_t)it->payload.id) == id; };
     auto it = std::find_if(block_requests.begin(), block_requests.end(), predicate);
     if (it == block_requests.end()) {
-        LOG_WARN(log, "{}, response for unexpected request id {}", identity, id);
-        auto ec = utils::make_error_code(utils::bep_error_code_t::response_mismatch);
-        return do_shutdown(make_error(ec));
+        if (!shutdown_reason) {
+            LOG_WARN(log, "{}, response for unexpected request id {}", identity, id);
+            auto ec = utils::make_error_code(utils::bep_error_code_t::response_mismatch);
+            do_shutdown(make_error(ec));
+        }
     }
 
     auto error = message->code();
     auto &block_request = *it;
-    if (error) {
-        auto ec = utils::make_error_code((utils::request_error_code_t)error);
-        LOG_WARN(log, "{}, block request error: {}", identity, ec.message());
-        reply_with_error(*block_request, make_error(ec));
-    } else {
-        auto &data = message->data();
-        auto request_sz = block_request->payload.request_payload.block.block()->get_size();
-        if (data.size() != request_sz) {
-            LOG_WARN(log, "{}, got {} bytes, but requested {}", identity, data.size(), request_sz);
-            auto ec = utils::make_error_code(utils::bep_error_code_t::response_missize);
-            return do_shutdown(make_error(ec));
+    if (!shutdown_reason) {
+        if (error) {
+            auto ec = utils::make_error_code((utils::request_error_code_t)error);
+            LOG_WARN(log, "{}, block request error: {}", identity, ec.message());
+            reply_with_error(*block_request, make_error(ec));
+        } else {
+            auto &data = message->data();
+            auto request_sz = block_request->payload.request_payload.block.block()->get_size();
+            if (data.size() != request_sz) {
+                LOG_WARN(log, "{}, got {} bytes, but requested {}", identity, data.size(), request_sz);
+                auto ec = utils::make_error_code(utils::bep_error_code_t::response_missize);
+                return do_shutdown(make_error(ec));
+            }
+            reply_to(*block_request, std::move(data));
         }
-        reply_to(*block_request, std::move(data));
     }
     block_requests.erase(it);
 }
