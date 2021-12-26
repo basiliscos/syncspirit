@@ -166,13 +166,16 @@ int main(int argc, char **argv) {
         ra::system_context_ptr_t sys_context{new ra::system_context_asio_t{io_context}};
         auto strand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
+
+        auto cluster_copies = 2ul;
+
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                            .app_config(cfg)
                            .strand(strand)
                            .timeout(timeout)
                            .create_registry()
                            .guard_context(true)
-                           .cluster_copies(2ul)
+                           .cluster_copies(cluster_copies)
                            .finish();
         sup_net->start();
 
