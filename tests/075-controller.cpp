@@ -125,7 +125,7 @@ struct fixture_t {
         peer_device =  device_t::create(peer_id, "peer-device").value();
 
         auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-        auto my_device =  device_t::create(my_id, "my-device").value();
+        my_device =  device_t::create(my_id, "my-device").value();
         cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
@@ -202,6 +202,7 @@ struct fixture_t {
     r::pt::time_duration timeout = r::pt::millisec{10};
     cluster_ptr_t cluster;
     device_ptr_t peer_device;
+    device_ptr_t my_device;
     r::intrusive_ptr_t<supervisor_t> sup;
     r::system_context_t ctx;
     model::folder_ptr_t folder_1;
@@ -229,7 +230,7 @@ void test_startup() {
     F().run();
 }
 
-void test_wrong_index() {
+void test_index() {
     struct F : fixture_t {
         void main() noexcept override {
             REQUIRE(peer_actor->reading);
@@ -238,19 +239,58 @@ void test_wrong_index() {
             CHECK(std::get_if<proto::message::ClusterConfig>(&msg));
 
             auto cc = proto::ClusterConfig{};
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
-
             auto index = proto::Index{};
-            index.set_folder("non-existing-folder");
-            peer_actor->forward(proto::message::Index(new proto::Index(index)));
-            sup->do_process();
 
-            CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
-            CHECK(static_cast<r::actor_base_t*>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+            SECTION("wrong index") {
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+
+                index.set_folder("non-existing-folder");
+                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                sup->do_process();
+
+                CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+                CHECK(static_cast<r::actor_base_t*>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+            }
+
+            SECTION("index is applied") {
+                auto folder = cc.add_folders();
+                folder->set_id(std::string(folder_1->get_id()));
+                auto d_peer = folder->add_devices();
+                d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
+                d_peer->set_max_sequence(1ul);
+                d_peer->set_index_id(123ul);
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+
+                index.set_folder(std::string(folder_1->get_id()));
+                auto file = index.add_files();
+                file->set_name("some-dir");
+                file->set_type(proto::FileInfoType::DIRECTORY);
+                file->set_sequence(1ul);
+                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                sup->do_process();
+
+                CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+                CHECK(static_cast<r::actor_base_t*>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+                auto& folder_infos = folder_1->get_folder_infos();
+
+                auto folder_peer = folder_infos.by_device(peer_device);
+                REQUIRE(folder_peer);
+                CHECK(folder_peer->get_max_sequence() == 1ul);
+                REQUIRE(folder_peer->get_file_infos().size() == 1);
+                CHECK(folder_peer->get_file_infos().begin()->item->get_name() == file->name());
+
+                auto folder_my = folder_infos.by_device(peer_device);
+                REQUIRE(folder_my);
+                CHECK(folder_my->get_max_sequence() == 1ul);
+                REQUIRE(folder_my->get_file_infos().size() == 1);
+                CHECK(folder_my->get_file_infos().begin()->item->get_name() == file->name());
+            }
         }
     };
     F().run();
 }
 
+
 REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
-REGISTER_TEST_CASE(test_wrong_index, "test_wrong_index", "[net]");
+REGISTER_TEST_CASE(test_index, "test_index", "[net]");
