@@ -138,10 +138,6 @@ struct block_request_t {
     model::file_block_t block;
 };
 
-struct cluster_config_t {
-    proto::message::ClusterConfig config;
-};
-
 struct file_update_t {
     model::file_info_ptr_t file;
 };
@@ -209,7 +205,6 @@ using block_response_t = r::request_traits_t<payload::block_request_t>::response
 
 using file_update_notify_t = r::message_t<payload::file_update_t>;
 using folder_update_notify_t = r::message_t<payload::folder_update_t>;
-using cluster_config_t = r::message_t<payload::cluster_config_t>;
 
 } // end of namespace message
 

@@ -1,16 +1,17 @@
 #include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
-#include "model/cluster.h"
-#include "model/diff/peer/peer_state.h"
-#include "utils/error_code.h"
+#include "test_supervisor.h"
 
+#include "model/cluster.h"
+#include "model/diff/aggregate.h"
+#include "model/diff/modify/create_folder.h"
+#include "model/diff/modify/share_folder.h"
 #include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
 #include "net/controller_actor.h"
 #include "net/names.h"
-#include "access.h"
-#include "test_supervisor.h"
+#include "utils/error_code.h"
 
 
 using namespace syncspirit;
@@ -41,6 +42,9 @@ struct sample_peer_t : r::actor_base_t {
     using config_t = sample_peer_config_t;
     template <typename Actor> using config_builder_t = sample_peer_config_builder_t<Actor>;
 
+    using remote_message_t = r::intrusive_ptr_t<net::message::forwarded_message_t>;
+    using remote_messages_t = std::vector<remote_message_t>;
+
     sample_peer_t(config_t& config): r::actor_base_t{config}, peer_device{config.peer_device_id} {
         log = utils::get_logger("test.sample_peer");
     }
@@ -53,6 +57,7 @@ struct sample_peer_t : r::actor_base_t {
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
             p.subscribe_actor(&sample_peer_t::on_start_reading);
             p.subscribe_actor(&sample_peer_t::on_termination);
+            p.subscribe_actor(&sample_peer_t::on_forward);
         });
     }
 
@@ -73,6 +78,7 @@ struct sample_peer_t : r::actor_base_t {
     void on_start_reading(net::message::start_reading_t &msg) noexcept {
         LOG_TRACE(log, "{}, on_start_reading", identity);
         controller = msg.payload.controller;
+        reading = msg.payload.start;
     }
 
     void on_termination(net::message::termination_signal_t &msg) noexcept {
@@ -89,12 +95,20 @@ struct sample_peer_t : r::actor_base_t {
         }
     }
 
+    void on_forward(net::message::forwarded_message_t &message) noexcept {
+        LOG_TRACE(log, "{}, on_forward", identity);
+        messages.emplace_back(&message);
+    }
+
+    bool reading = false;
+    remote_messages_t messages;
     r::address_ptr_t controller;
     model::device_id_t peer_device;
     utils::logger_t log;
 };
 
 struct fixture_t {
+    using peer_ptr_t = r::intrusive_ptr_t<sample_peer_t>;
 
     fixture_t() noexcept {
         utils::set_default("trace");
@@ -112,6 +126,21 @@ struct fixture_t {
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
 
+        db::Folder db_folder_1;
+        db_folder_1.set_id("1234-5678");
+        db_folder_1.set_label("my-f1");
+
+        db::Folder db_folder_2;
+        db_folder_1.set_id("5555");
+        db_folder_1.set_label("my-f2");
+
+        auto diffs = diff::aggregate_t::diffs_t{};
+        diffs.push_back(new diff::modify::create_folder_t(db_folder_1));
+        diffs.push_back(new diff::modify::create_folder_t(db_folder_2));
+        diffs.push_back(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder_1.id()));
+        auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
+        REQUIRE(diff->apply(*cluster));
+
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
         sup->cluster = cluster;
@@ -127,7 +156,7 @@ struct fixture_t {
             .name(net::names::hasher_proxy)
             .finish();
 
-        auto peer_actor = sup->create_actor<sample_peer_t>()
+        peer_actor = sup->create_actor<sample_peer_t>()
             .timeout(timeout)
             .finish();
 
@@ -158,6 +187,7 @@ struct fixture_t {
     virtual void main() noexcept {
     }
 
+    peer_ptr_t peer_actor;
     r::address_ptr_t target_addr;
     r::pt::time_duration timeout = r::pt::millisec{10};
     cluster_ptr_t cluster;
@@ -168,11 +198,16 @@ struct fixture_t {
 
 }
 
-void test_dummy_cycle() {
+void test_startup() {
     struct F : fixture_t {
-        void main() noexcept override {}
+        void main() noexcept override {
+            REQUIRE(peer_actor->reading);
+            REQUIRE(peer_actor->messages.size() == 1);
+            auto& msg = (*peer_actor->messages.front()).payload;
+            CHECK(std::get_if<proto::message::ClusterConfig>(&msg));
+        }
     };
     F().run();
 }
 
-REGISTER_TEST_CASE(test_dummy_cycle, "test_dummy_cycle", "[net]");
+REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");

@@ -104,7 +104,7 @@ struct peer_actor_t : public r::actor_base_t {
     void on_start_reading(message::start_reading_t &) noexcept;
     void on_termination(message::termination_signal_t &) noexcept;
     void on_block_request(message::block_request_t &) noexcept;
-    void on_cluster_config(message::cluster_config_t &) noexcept;
+    void on_forward(message::forwarded_message_t &message) noexcept;
     void on_file_update(message::file_update_notify_t &) noexcept;
     void on_folder_update(message::folder_update_notify_t &) noexcept;
 

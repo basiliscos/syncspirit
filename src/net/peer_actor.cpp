@@ -65,7 +65,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&peer_actor_t::on_start_reading);
         p.subscribe_actor(&peer_actor_t::on_termination);
         p.subscribe_actor(&peer_actor_t::on_block_request);
-        p.subscribe_actor(&peer_actor_t::on_cluster_config);
+        p.subscribe_actor(&peer_actor_t::on_forward);
         p.subscribe_actor(&peer_actor_t::on_file_update);
         p.subscribe_actor(&peer_actor_t::on_folder_update);
         instantiate_transport();
@@ -432,10 +432,14 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     block_requests.emplace_back(&message);
 }
 
-void peer_actor_t::on_cluster_config(message::cluster_config_t &msg) noexcept {
-    LOG_TRACE(log, "{}, on_cluster_config", identity);
+void peer_actor_t::on_forward(message::forwarded_message_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_forward", identity);
     fmt::memory_buffer buff;
-    proto::serialize(buff, *msg.payload.config);
+
+    std::visit([&](auto &&msg) {
+        proto::serialize(buff, *msg);
+    }, message.payload);
+
     push_write(std::move(buff), false);
 }
 

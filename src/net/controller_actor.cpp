@@ -107,7 +107,7 @@ void controller_actor_t::on_start() noexcept {
     auto cluster_config = cluster->generate(*peer);
     using payload_t = std::decay_t<decltype(cluster_config)>;
     auto payload = std::make_unique<payload_t>(std::move(cluster_config));
-    send<payload::cluster_config_t>(peer_addr, std::move(payload));
+    send<payload::forwarded_message_t>(peer_addr, std::move(payload));
 
     resources->acquire(resource::peer);
     resources->acquire(resource::peer);
