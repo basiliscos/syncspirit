@@ -63,7 +63,6 @@ struct sample_peer_t : r::actor_base_t {
 
     void shutdown_start() noexcept override {
         LOG_TRACE(log, "{}, shutdown_start", identity);
-
         if (controller) {
             send<net::payload::termination_t>(controller, shutdown_reason);
         }
@@ -73,6 +72,9 @@ struct sample_peer_t : r::actor_base_t {
     void shutdown_finish() noexcept override {
         r::actor_base_t::shutdown_finish();
         LOG_TRACE(log, "{}, shutdown_finish", identity);
+        if (controller) {
+            send<net::payload::termination_t>(controller, shutdown_reason);
+        }
     }
 
     void on_start_reading(net::message::start_reading_t &msg) noexcept {
@@ -84,20 +86,22 @@ struct sample_peer_t : r::actor_base_t {
     void on_termination(net::message::termination_signal_t &msg) noexcept {
         LOG_TRACE(log, "{}, on_termination", identity);
 
-        if (controller) {
+        if (!shutdown_reason) {
             auto& ee = msg.payload.ee;
             auto reason = ee->message();
             LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
 
-            auto& notify_ee = shutdown_reason ? shutdown_reason : ee;
-            send<net::payload::termination_t>(controller, notify_ee);
-            controller.reset();
+            do_shutdown(ee);
         }
     }
 
     void on_forward(net::message::forwarded_message_t &message) noexcept {
         LOG_TRACE(log, "{}, on_forward", identity);
         messages.emplace_back(&message);
+    }
+
+    void forward(net::payload::forwarded_message_t payload) noexcept {
+        send<net::payload::forwarded_message_t>(controller, std::move(payload));
     }
 
     bool reading = false;
@@ -109,6 +113,7 @@ struct sample_peer_t : r::actor_base_t {
 
 struct fixture_t {
     using peer_ptr_t = r::intrusive_ptr_t<sample_peer_t>;
+    using target_ptr_t = r::intrusive_ptr_t<net::controller_actor_t>;
 
     fixture_t() noexcept {
         utils::set_default("trace");
@@ -141,6 +146,10 @@ struct fixture_t {
         auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
         REQUIRE(diff->apply(*cluster));
 
+        auto& folders = cluster->get_folders();
+        folder_1 = folders.by_id(db_folder_1.id());
+        folder_2 = folders.by_id(db_folder_2.id());
+
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
         sup->cluster = cluster;
@@ -163,7 +172,7 @@ struct fixture_t {
 
         sup->do_process();
 
-        auto target = sup->create_actor<controller_actor_t>()
+        target = sup->create_actor<controller_actor_t>()
                 .peer(peer_device)
                 .peer_addr(peer_actor->get_address())
                 .request_pool(1024)
@@ -188,12 +197,15 @@ struct fixture_t {
     }
 
     peer_ptr_t peer_actor;
+    target_ptr_t target;
     r::address_ptr_t target_addr;
     r::pt::time_duration timeout = r::pt::millisec{10};
     cluster_ptr_t cluster;
     device_ptr_t peer_device;
     r::intrusive_ptr_t<supervisor_t> sup;
     r::system_context_t ctx;
+    model::folder_ptr_t folder_1;
+    model::folder_ptr_t folder_2;
 };
 
 }
@@ -205,9 +217,40 @@ void test_startup() {
             REQUIRE(peer_actor->messages.size() == 1);
             auto& msg = (*peer_actor->messages.front()).payload;
             CHECK(std::get_if<proto::message::ClusterConfig>(&msg));
+
+            auto cc = proto::ClusterConfig{};
+            auto payload = proto::message::ClusterConfig(new proto::ClusterConfig(cc));
+            peer_actor->forward(std::move(payload));
+            sup->do_process();
+
+            CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        }
+    };
+    F().run();
+}
+
+void test_wrong_index() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            REQUIRE(peer_actor->reading);
+            REQUIRE(peer_actor->messages.size() == 1);
+            auto& msg = (*peer_actor->messages.front()).payload;
+            CHECK(std::get_if<proto::message::ClusterConfig>(&msg));
+
+            auto cc = proto::ClusterConfig{};
+            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+
+            auto index = proto::Index{};
+            index.set_folder("non-existing-folder");
+            peer_actor->forward(proto::message::Index(new proto::Index(index)));
+            sup->do_process();
+
+            CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+            CHECK(static_cast<r::actor_base_t*>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
         }
     };
     F().run();
 }
 
 REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
+REGISTER_TEST_CASE(test_wrong_index, "test_wrong_index", "[net]");

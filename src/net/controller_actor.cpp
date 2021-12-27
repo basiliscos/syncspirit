@@ -199,7 +199,7 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
     auto diff_opt = cluster->process(*message, *peer);
     if (!diff_opt) {
         auto& ec = diff_opt.assume_error();
-        LOG_ERROR(log, "error processing message from {} : {}", identity, peer->device_id(), ec.message());
+        LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
     send<payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
@@ -210,7 +210,7 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
     auto diff_opt = cluster->process(*message, *peer);
     if (!diff_opt) {
         auto& ec = diff_opt.assume_error();
-        LOG_ERROR(log, "error processing message from {} : {}", identity, peer->device_id(), ec.message());
+        LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
     send<payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
@@ -221,7 +221,7 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
     auto diff_opt = cluster->process(*message, *peer);
     if (!diff_opt) {
         auto& ec = diff_opt.assume_error();
-        LOG_ERROR(log, "error processing message from {} : {}", identity, peer->device_id(), ec.message());
+        LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
     send<payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);

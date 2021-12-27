@@ -2,6 +2,7 @@
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
+#include "model/misc/error_code.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/peer/update_folder.h"
@@ -23,33 +24,59 @@ TEST_CASE("update folder (via Index)", "[model]") {
     cluster->get_devices().put(peer_device);
 
     auto& folders = cluster->get_folders();
-    db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    db_folder.set_path("/my/path");
+    db::Folder db_folder_1;
+    db_folder_1.set_id("1234-5678");
+    db_folder_1.set_label("my-label");
+    db_folder_1.set_path("/my/path");
 
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
+    db::Folder db_folder_2;
+    db_folder_2.set_id("5555-4444");
+    db_folder_2.set_label("my-l2");
+    db_folder_2.set_path("/my/path/2");
+
+    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder_1));
     REQUIRE(diff->apply(*cluster));
-    auto folder = folders.by_id(db_folder.id());
 
-    diff = diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id()));
+    diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder_2));
+    REQUIRE(diff->apply(*cluster));
+
+    auto folder = folders.by_id(db_folder_1.id());
+
+    diff = diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder_1.id()));
     REQUIRE(diff->apply(*cluster));
 
     auto pr_index = proto::Index();
-    pr_index.set_folder(db_folder.id());
+    pr_index.set_folder(db_folder_1.id());
 
-    auto file = pr_index.add_files();
-    file->set_name("a.txt");
-    file->set_sequence(10ul);
-    file->set_size(5ul);
-    file->set_block_size(5ul);
-    auto b = file->add_blocks();
-    b->set_hash("123");
+    SECTION("successful case") {
+        auto file = pr_index.add_files();
+        file->set_name("a.txt");
+        file->set_sequence(10ul);
+        file->set_size(5ul);
+        file->set_block_size(5ul);
+        auto b = file->add_blocks();
+        b->set_hash("123");
 
-    diff = diff::peer::update_folder_t::create(*cluster, *peer_device, pr_index).value();
-    REQUIRE(diff->apply(*cluster));
+        diff = diff::peer::update_folder_t::create(*cluster, *peer_device, pr_index).value();
+        REQUIRE(diff->apply(*cluster));
 
-    auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
-    REQUIRE(peer_folder_info->get_file_infos().size() == 1);
-    CHECK(peer_folder_info->is_actual());
+        auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
+        REQUIRE(peer_folder_info->get_file_infos().size() == 1);
+        CHECK(peer_folder_info->is_actual());
+    }
+
+    SECTION("folder does not exists") {
+        pr_index.set_folder(db_folder_1.id() + "xxx");
+        auto opt = diff::peer::update_folder_t::create(*cluster, *peer_device, pr_index);
+        REQUIRE(!opt);
+        CHECK(opt.error() == model::make_error_code(model::error_code_t::folder_does_not_exist));
+    }
+
+    SECTION("folder is not shared") {
+        pr_index.set_folder(db_folder_2.id());
+        auto opt = diff::peer::update_folder_t::create(*cluster, *peer_device, pr_index);
+        REQUIRE(!opt);
+        CHECK(opt.error() == model::make_error_code(model::error_code_t::folder_is_not_shared));
+    }
 }
+

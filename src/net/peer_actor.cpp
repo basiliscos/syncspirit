@@ -18,7 +18,7 @@ r::plugin::resource_id_t io = 2;
 r::plugin::resource_id_t io_timer = 3;
 r::plugin::resource_id_t tx_timer = 4;
 r::plugin::resource_id_t rx_timer = 5;
-r::plugin::resource_id_t controller = 6;
+r::plugin::resource_id_t finalization = 6;
 } // namespace resource
 } // namespace
 
@@ -167,13 +167,14 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
             resources->acquire(resource::uris);
             try_next_uri();
         } else {
+            connected = false;
+            LOG_DEBUG(log, "{}, on_io_error, initiating shutdown...", identity);
             do_shutdown(make_error(ec));
         }
-    }
-    else {
+    } else {
         // forsing shutdown
-        if (resources->has(resource::controller)) {
-            resources->release(resource::controller);
+        if (resources->has(resource::finalization)) {
+            resources->release(resource::finalization);
         }
     }
 }
@@ -210,6 +211,9 @@ void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
     tx_queue.emplace_back(std::move(item));
     if (!tx_item) {
         process_tx_queue();
+    }
+    if (final) {
+        resources->acquire(resource::finalization);
     }
 }
 
@@ -279,8 +283,10 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
     assert(tx_item);
     if (tx_item->final) {
         LOG_TRACE(log, "{}, process_tx_queue, final message has been sent, shutting down", identity);
-        if (resources->has(resource::controller)) {
-            resources->release(resource::controller);
+        resources->release(resource::finalization);
+        if (resources->has(resource::io)) {
+            LOG_TRACE(log, "{}, cancelling transport...", identity);
+            transport->cancel();
         }
 #if 0
         else {
@@ -345,10 +351,6 @@ void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 void peer_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "{}, shutdown_start", identity);
     cancel_timer();
-    if (resources->has(resource::io)) {
-        LOG_TRACE(log, "{}, cancelling transport...", identity);
-        transport->cancel();
-    }
     if (tx_timer_request) {
         r::actor_base_t::cancel_timer(*tx_timer_request);
     }
@@ -356,21 +358,32 @@ void peer_actor_t::shutdown_start() noexcept {
         r::actor_base_t::cancel_timer(*rx_timer_request);
     }
     if (controller) {
-        // wait termination
-        resources->acquire(resource::controller);
         send<payload::termination_t>(controller, shutdown_reason);
     }
+
+    if (connected) {
+        fmt::memory_buffer buff;
+        proto::Close close;
+        close.set_reason(shutdown_reason->message());
+        proto::serialize(buff, close);
+        tx_queue.clear();
+        push_write(std::move(buff), true);
+    }
+
     r::actor_base_t::shutdown_start();
 }
 
 void peer_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "{}, shutdown_finish", identity);
-    r::actor_base_t::shutdown_finish();
     for(auto& it: block_requests) {
         auto ec = r::make_error_code(r::error_code_t::cancelled);
         reply_with_error(*it, make_error(ec));
     }
     block_requests.clear();
+    if (controller) {
+        send<payload::termination_t>(controller, shutdown_reason);
+    }
+    r::actor_base_t::shutdown_finish();
 }
 
 void peer_actor_t::cancel_timer() noexcept {
@@ -391,23 +404,11 @@ void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept 
 }
 
 void peer_actor_t::on_termination(message::termination_signal_t &message) noexcept {
-    if (controller) {
+    if (!shutdown_reason) {
         auto& ee = message.payload.ee;
         auto reason = ee->message();
         LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
-        fmt::memory_buffer buff;
-        proto::Close close;
-        close.set_reason(reason);
-        proto::serialize(buff, close);
-
-        tx_queue.clear();
-        push_write(std::move(buff), true);
-        auto& notify_ee = shutdown_reason ? shutdown_reason : ee;
-        send<payload::termination_t>(controller, notify_ee);
-        controller.reset();
-        if (resources->has(resource::controller)) {
-            resources->release(resource::controller);
-        }
+        do_shutdown(ee);
     }
 }
 
