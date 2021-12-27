@@ -280,11 +280,33 @@ void test_index() {
                 REQUIRE(folder_peer->get_file_infos().size() == 1);
                 CHECK(folder_peer->get_file_infos().begin()->item->get_name() == file->name());
 
-                auto folder_my = folder_infos.by_device(peer_device);
+                auto folder_my = folder_infos.by_device(my_device);
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
                 CHECK(folder_my->get_file_infos().begin()->item->get_name() == file->name());
+
+                SECTION("then index update is applied") {
+                    auto index_update = proto::IndexUpdate{};
+                    index_update.set_folder(std::string(folder_1->get_id()));
+                    auto file = index_update.add_files();
+                    file->set_name("some-dir-2");
+                    file->set_type(proto::FileInfoType::DIRECTORY);
+                    file->set_sequence(3ul);
+                    peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
+
+                    sup->do_process();
+                    CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+                    CHECK(static_cast<r::actor_base_t*>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+                    CHECK(folder_peer->get_max_sequence() == 3ul);
+                    REQUIRE(folder_peer->get_file_infos().size() == 2);
+                    CHECK(folder_peer->get_file_infos().by_name("some-dir-2"));
+
+                    CHECK(folder_my->get_max_sequence() == 2ul);
+                    REQUIRE(folder_my->get_file_infos().size() == 2);
+                    CHECK(folder_my->get_file_infos().by_name("some-dir-2"));
+                }
             }
         }
     };
