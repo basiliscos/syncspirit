@@ -43,7 +43,7 @@ struct sample_peer_t : r::actor_base_t {
     template <typename Actor> using config_builder_t = sample_peer_config_builder_t<Actor>;
 
     using remote_message_t = r::intrusive_ptr_t<net::message::forwarded_message_t>;
-    using remote_messages_t = std::vector<remote_message_t>;
+    using remote_messages_t = std::list<remote_message_t>;
 
     sample_peer_t(config_t& config): r::actor_base_t{config}, peer_device{config.peer_device_id} {
         log = utils::get_logger("test.sample_peer");
@@ -115,7 +115,7 @@ struct fixture_t {
     using peer_ptr_t = r::intrusive_ptr_t<sample_peer_t>;
     using target_ptr_t = r::intrusive_ptr_t<net::controller_actor_t>;
 
-    fixture_t() noexcept {
+    fixture_t(bool auto_start_) noexcept: auto_start{auto_start_} {
         utils::set_default("trace");
     }
 
@@ -185,6 +185,13 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
         target_addr = target->get_address();
 
+        if (auto_start) {
+            REQUIRE(peer_actor->reading);
+            REQUIRE(peer_actor->messages.size() == 1);
+            auto& msg = (*peer_actor->messages.front()).payload;
+            REQUIRE(std::get_if<proto::message::ClusterConfig>(&msg));
+            peer_actor->messages.pop_front();
+        }
         main();
 
         sup->shutdown();
@@ -196,6 +203,7 @@ struct fixture_t {
     virtual void main() noexcept {
     }
 
+    bool auto_start;
     peer_ptr_t peer_actor;
     target_ptr_t target;
     r::address_ptr_t target_addr;
@@ -213,6 +221,7 @@ struct fixture_t {
 
 void test_startup() {
     struct F : fixture_t {
+        using fixture_t::fixture_t;
         void main() noexcept override {
             REQUIRE(peer_actor->reading);
             REQUIRE(peer_actor->messages.size() == 1);
@@ -227,16 +236,13 @@ void test_startup() {
             CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
         }
     };
-    F().run();
+    F(false).run();
 }
 
 void test_index() {
     struct F : fixture_t {
+        using fixture_t::fixture_t;
         void main() noexcept override {
-            REQUIRE(peer_actor->reading);
-            REQUIRE(peer_actor->messages.size() == 1);
-            auto& msg = (*peer_actor->messages.front()).payload;
-            CHECK(std::get_if<proto::message::ClusterConfig>(&msg));
 
             auto cc = proto::ClusterConfig{};
             auto index = proto::Index{};
@@ -310,7 +316,7 @@ void test_index() {
             }
         }
     };
-    F().run();
+    F(true).run();
 }
 
 
