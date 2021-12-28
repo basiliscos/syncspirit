@@ -6,7 +6,7 @@
 using namespace syncspirit::model::diff::modify;
 
 append_block_t::append_block_t(const file_info_t& file, size_t block_index_, std::string data_) noexcept:
-    block_index{block_index_}, data{std::move(data_)} {
+    block_diff_t{file.get_folder_info()->get_folder()->get_id(), file.get_name(), block_index_}, data{std::move(data_)} {
     folder_id = file.get_folder_info()->get_folder()->get_id();
     file_name = file.get_name();
 }

@@ -104,6 +104,9 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::invalid_block_size:
         r = "block size is invalid (i.e. greater than file size)";
         break;
+    case error_code_t::no_progress:
+        r = "no progress has been made (i.e. empty index/index_update)";
+        break;
     default:
         r = "unknown";
         break;

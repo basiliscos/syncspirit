@@ -149,6 +149,7 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     void preprocess_block(model::file_block_t& block) noexcept;
     void on_file_update(message::file_update_notify_t &message) noexcept;
     void on_model_update(message::model_update_t &message) noexcept;
+    void on_block_update(net::message::block_update_t &message) noexcept;
 
     void on_message(proto::message::ClusterConfig &message) noexcept;
     void on_message(proto::message::Index &message) noexcept;

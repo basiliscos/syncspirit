@@ -45,6 +45,14 @@ struct sample_peer_t : r::actor_base_t {
     using remote_message_t = r::intrusive_ptr_t<net::message::forwarded_message_t>;
     using remote_messages_t = std::list<remote_message_t>;
 
+    struct block_response_t {
+        size_t block_index;
+        std::string data;
+    };
+    using block_responses_t = std::list<block_response_t>;
+    using block_request_t = r::intrusive_ptr_t<net::message::block_request_t>;
+    using block_requests_t = std::list<block_request_t>;
+
     sample_peer_t(config_t& config): r::actor_base_t{config}, peer_device{config.peer_device_id} {
         log = utils::get_logger("test.sample_peer");
     }
@@ -58,6 +66,7 @@ struct sample_peer_t : r::actor_base_t {
             p.subscribe_actor(&sample_peer_t::on_start_reading);
             p.subscribe_actor(&sample_peer_t::on_termination);
             p.subscribe_actor(&sample_peer_t::on_forward);
+            p.subscribe_actor(&sample_peer_t::on_block_request);
         });
     }
 
@@ -100,8 +109,36 @@ struct sample_peer_t : r::actor_base_t {
         messages.emplace_back(&message);
     }
 
+    void on_block_request(net::message::block_request_t &req) noexcept {
+        block_requests.push_front(&req);
+        log->debug("{}, requesting block # {}", identity, block_requests.front()->payload.request_payload.block.block_index());
+        if (block_responses.size()) {
+            log->debug("{}, top response block # {}", identity, block_responses.front().block_index);
+        }
+        auto condition = [&]() -> bool {
+            return block_requests.size() && block_responses.size() &&
+                   block_requests.front()->payload.request_payload.block.block_index() == block_responses.front().block_index;
+        };
+        while (condition()) {
+            log->debug("{}, matched replying...", identity);
+            reply_to(*block_requests.front(), block_responses.front().data);
+            block_responses.pop_front();
+            block_requests.pop_front();
+        }
+    }
+
+
     void forward(net::payload::forwarded_message_t payload) noexcept {
         send<net::payload::forwarded_message_t>(controller, std::move(payload));
+    }
+
+    static const constexpr size_t next_block = 1000000;
+
+    void push_block(std::string_view data, size_t index) {
+        if (index == next_block) {
+            index = block_responses.size();
+        }
+        block_responses.push_back(block_response_t{index, std::string(data)});
     }
 
     bool reading = false;
@@ -109,6 +146,8 @@ struct sample_peer_t : r::actor_base_t {
     r::address_ptr_t controller;
     model::device_id_t peer_device;
     utils::logger_t log;
+    block_requests_t block_requests;
+    block_responses_t block_responses;
 };
 
 struct fixture_t {
@@ -319,6 +358,56 @@ void test_index() {
     F(true).run();
 }
 
+void test_downloading() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main() noexcept override {
+            auto cc = proto::ClusterConfig{};
+
+            auto folder = cc.add_folders();
+            folder->set_id(std::string(folder_1->get_id()));
+            auto d_peer = folder->add_devices();
+            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
+            d_peer->set_max_sequence(1ul);
+            d_peer->set_index_id(123ul);
+            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+
+            auto index = proto::Index{};
+            index.set_folder(std::string(folder_1->get_id()));
+            auto file = index.add_files();
+            file->set_name("some-file");
+            file->set_type(proto::FileInfoType::FILE);
+            file->set_sequence(1ul);
+            file->set_block_size(5);
+            file->set_size(5);
+            auto b1 = file->add_blocks();
+            b1->set_hash(utils::sha256_digest("12345").value());
+            b1->set_offset(0);
+            b1->set_size(5);
+
+            auto& folder_infos = folder_1->get_folder_infos();
+            auto folder_my = folder_infos.by_device(my_device);
+            CHECK(folder_my->get_max_sequence() == 0ul);
+
+            peer_actor->forward(proto::message::Index(new proto::Index(index)));
+            peer_actor->push_block("12345", 0);
+            sup->do_process();
+
+            REQUIRE(folder_my);
+            CHECK(folder_my->get_max_sequence() == 1ul);
+            REQUIRE(folder_my->get_file_infos().size() == 1);
+            auto f = folder_my->get_file_infos().begin()->item;
+            REQUIRE(f);
+            CHECK(f->get_name() == file->name());
+            CHECK(f->get_size() == 5);
+            CHECK(f->get_blocks().size() == 1);
+            CHECK(f->is_locally_available());
+            CHECK(!f->is_locked());
+        }
+    };
+    F(true).run();
+}
 
 REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
 REGISTER_TEST_CASE(test_index, "test_index", "[net]");
+REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");

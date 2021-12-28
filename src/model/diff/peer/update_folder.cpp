@@ -70,6 +70,7 @@ static auto instantiate(const cluster_t &cluster, const device_t& source, const 
         return make_error_code(error_code_t::folder_is_not_shared);
     }
 
+    auto max_seq = fi->get_max_sequence();
     auto& blocks = cluster.get_blocks();
     update_folder_t::files_t files;
     update_folder_t::blocks_t new_blocks;
@@ -83,6 +84,11 @@ static auto instantiate(const cluster_t &cluster, const device_t& source, const 
             }
         }
         files.emplace_back(std::move(message.files(i)));
+        max_seq = std::max(max_seq, f.sequence());
+    }
+
+    if (max_seq <= fi->get_max_sequence()) {
+        return make_error_code(error_code_t::no_progress);
     }
 
     auto diff = diff_t(new update_folder_t(message.folder(), device_id, std::move(files), std::move(new_blocks)));

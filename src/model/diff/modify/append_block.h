@@ -12,9 +12,6 @@ struct append_block_t final : block_diff_t {
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(block_visitor_t &) const noexcept override;
 
-    std::string folder_id;
-    std::string file_name;
-    size_t block_index;
     std::string data;
 };
 

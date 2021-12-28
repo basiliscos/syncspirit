@@ -3,6 +3,7 @@
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/new_file.h"
+#include "model/diff/modify/lock_file.h"
 #include "../utils/error_code.h"
 #include <fstream>
 
@@ -41,6 +42,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&controller_actor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&controller_actor_t::on_block_update, coordinator);
             }
         });
     });
@@ -111,9 +113,16 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     }
 
     if (file && file->get_size()) {
-        auto block = cluster->next_block(file, !(substate & substate_t::iterating_blocks));
+        auto reset_block = !(substate & substate_t::iterating_blocks);
+        auto block = cluster->next_block(file, reset_block);
         if (block) {
             substate |= substate_t::iterating_blocks;
+            if (reset_block) {
+                auto diff = model::diff::cluster_diff_ptr_t{};
+                auto folder_id = file->get_folder_info()->get_folder()->get_id();
+                diff = new model::diff::modify::lock_file_t(folder_id, file->get_name(), true);
+                send<payload::model_update_t>(coordinator, std::move(diff), this);
+            }
             preprocess_block(block);
         } else {
             substate = substate & ~substate_t::iterating_blocks;
@@ -142,7 +151,6 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
                 std::move(info),
                 std::move(blocks)
             );
-            cluster->next_block(file, true);
             send<payload::model_update_t>(coordinator, std::move(diff), this);
         } else {
             substate = substate & ~substate_t::iterating_files;
@@ -189,6 +197,22 @@ void controller_actor_t::on_model_update(message::model_update_t &message) noexc
         if (!r) {
             auto ee = make_error(r.assume_error());
             do_shutdown(ee);
+        }
+    }
+}
+
+
+void controller_actor_t::on_block_update(message::block_update_t &message) noexcept {
+    if (message.payload.custom == this) {
+        LOG_TRACE(log, "{}, on_block_update", identity);
+        auto& d = *message.payload.diff;
+        auto folder = cluster->get_folders().by_id(d.folder_id);
+        auto folder_info = folder->get_folder_infos().by_device(cluster->get_device());
+        auto file = folder_info->get_file_infos().by_name(d.file_name);
+        if (file->is_locally_available()) {
+            auto diff = model::diff::cluster_diff_ptr_t{};
+            diff = new model::diff::modify::lock_file_t(d.folder_id, d.file_name, false);
+            send<payload::model_update_t>(coordinator, std::move(diff), this);
         }
     }
 }

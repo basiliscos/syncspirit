@@ -181,9 +181,9 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
 }
 
 auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) noexcept -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.target_folder_id);
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto target_folder_info = folder->get_folder_infos().by_device(cluster->get_device());
-    auto target = target_folder_info->get_file_infos().by_name(diff.target_file_name);
+    auto target = target_folder_info->get_file_infos().by_name(diff.file_name);
 
     auto source_folder_info = folder->get_folder_infos().by_device_id(diff.source_device_id);
     auto source = source_folder_info->get_file_infos().by_name(diff.source_file_name);
@@ -215,8 +215,8 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
     }
 
     auto target_view = target_mmap->data();
-    auto& block = target->get_blocks()[diff.target_block_index];
-    auto target_offset = target->get_block_offset(diff.target_block_index);
+    auto& block = target->get_blocks()[diff.block_index];
+    auto target_offset = target->get_block_offset(diff.block_index);
     auto source_view = source_mmap->const_data();
     auto source_offset = source->get_block_offset(diff.source_block_index);
     auto source_begin = source_view + source_offset;
