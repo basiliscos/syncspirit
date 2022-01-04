@@ -169,6 +169,7 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     void ready() noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::new_file_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::cluster_update_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &) noexcept override;
 
 

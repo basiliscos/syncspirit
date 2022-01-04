@@ -4,13 +4,13 @@
 using namespace syncspirit::model;
 
 file_interator_t::file_interator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
-    : cluster{&cluster_}, peer{peer_} {
-    it_folder = cluster->folders.begin();
-    if (it_folder == cluster->folders.end()) {
+    : cluster{&cluster_}, peer{peer_}, folders{cluster->get_folders()} {
+    it_folder = folders.begin();
+    if (it_folder == folders.end()) {
         cluster = nullptr;
         return;
     }
-    f_peer_it = f_peer_end = it_file_t{};;
+    f_peer_it = f_peer_end = it_file_t{};
     prepare();
 }
 
@@ -18,7 +18,7 @@ void file_interator_t::prepare() noexcept {
 TRY_ANEW:
     if (f_peer_it == f_peer_end) {
         for (;; ++it_folder) {
-            if (it_folder == cluster->folders.end()) {
+            if (it_folder == folders.end()) {
                 cluster = nullptr;
                 return;
             }

@@ -19,7 +19,7 @@ struct digest_response_t {
 struct digest_request_t {
     using response_t = digest_response_t;
     std::string_view data;
-    const void *custom;
+    r::message_ptr_t custom;
 };
 
 struct validation_response_t {
@@ -30,10 +30,10 @@ struct validation_request_t : r::arc_base_t<validation_request_t> {
     using response_t = validation_response_t;
     std::string_view data;
     std::string hash;
-    const void *custom;
+    r::message_ptr_t custom;
 
-    validation_request_t(std::string_view data_, std::string hash_, const void *custom_ = nullptr) noexcept
-        : data{data_}, hash{hash_}, custom{custom_} {}
+    validation_request_t(std::string_view data_, std::string hash_, r::message_ptr_t custom_ = nullptr) noexcept
+        : data{data_}, hash{hash_}, custom{std::move(custom_)} {}
 };
 
 } // namespace payload

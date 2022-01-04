@@ -25,6 +25,7 @@ struct file_interator_t: arc_base_t<file_interator_t> {
     void prepare() noexcept;
 
     cluster_t *cluster;
+    folders_map_t& folders;
     device_ptr_t peer;
     folder_info_ptr_t local_folder_info;
     it_folder_t it_folder;

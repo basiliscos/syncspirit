@@ -89,7 +89,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
 
     void record_update(const device_t &source) noexcept;
     void after_sync() noexcept;
-    file_info_ptr_t link(const device_ptr_t &target) noexcept;
+    file_info_ptr_t local_file() noexcept;
 
     inline bool is_locked() const noexcept { return locked; }
     void lock() noexcept;

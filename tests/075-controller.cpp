@@ -175,13 +175,13 @@ struct fixture_t {
         db_folder_1.set_label("my-f1");
 
         db::Folder db_folder_2;
-        db_folder_1.set_id("5555");
-        db_folder_1.set_label("my-f2");
+        db_folder_2.set_id("5555");
+        db_folder_2.set_label("my-f2");
 
         auto diffs = diff::aggregate_t::diffs_t{};
         diffs.push_back(new diff::modify::create_folder_t(db_folder_1));
         diffs.push_back(new diff::modify::create_folder_t(db_folder_2));
-        diffs.push_back(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder_1.id()));
+        diffs.push_back(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder_1.id(), 123ul));
         auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
         REQUIRE(diff->apply(*cluster));
 
@@ -219,6 +219,7 @@ struct fixture_t {
                 .timeout(timeout)
                 .request_timeout(timeout)
                 .finish();
+
         sup->do_process();
 
         CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -362,47 +363,92 @@ void test_downloading() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main() noexcept override {
-            auto cc = proto::ClusterConfig{};
 
+            auto& folder_infos = folder_1->get_folder_infos();
+            auto folder_my = folder_infos.by_device(my_device);
+
+            auto cc = proto::ClusterConfig{};
             auto folder = cc.add_folders();
             folder->set_id(std::string(folder_1->get_id()));
             auto d_peer = folder->add_devices();
             d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(1ul);
-            d_peer->set_index_id(123ul);
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
 
-            auto index = proto::Index{};
-            index.set_folder(std::string(folder_1->get_id()));
-            auto file = index.add_files();
-            file->set_name("some-file");
-            file->set_type(proto::FileInfoType::FILE);
-            file->set_sequence(1ul);
-            file->set_block_size(5);
-            file->set_size(5);
-            auto b1 = file->add_blocks();
-            b1->set_hash(utils::sha256_digest("12345").value());
-            b1->set_offset(0);
-            b1->set_size(5);
+            SECTION("cluster config & index has a new file => download it") {
+                d_peer->set_max_sequence(1ul);
+                d_peer->set_index_id(123ul);
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
 
-            auto& folder_infos = folder_1->get_folder_infos();
-            auto folder_my = folder_infos.by_device(my_device);
-            CHECK(folder_my->get_max_sequence() == 0ul);
+                auto index = proto::Index{};
+                index.set_folder(std::string(folder_1->get_id()));
+                auto file = index.add_files();
+                file->set_name("some-file");
+                file->set_type(proto::FileInfoType::FILE);
+                file->set_sequence(1ul);
+                file->set_block_size(5);
+                file->set_size(5);
+                auto b1 = file->add_blocks();
+                b1->set_hash(utils::sha256_digest("12345").value());
+                b1->set_offset(0);
+                b1->set_size(5);
 
-            peer_actor->forward(proto::message::Index(new proto::Index(index)));
-            peer_actor->push_block("12345", 0);
-            sup->do_process();
+                auto folder_my = folder_infos.by_device(my_device);
+                CHECK(folder_my->get_max_sequence() == 0ul);
 
-            REQUIRE(folder_my);
-            CHECK(folder_my->get_max_sequence() == 1ul);
-            REQUIRE(folder_my->get_file_infos().size() == 1);
-            auto f = folder_my->get_file_infos().begin()->item;
-            REQUIRE(f);
-            CHECK(f->get_name() == file->name());
-            CHECK(f->get_size() == 5);
-            CHECK(f->get_blocks().size() == 1);
-            CHECK(f->is_locally_available());
-            CHECK(!f->is_locked());
+                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                peer_actor->push_block("12345", 0);
+                sup->do_process();
+
+                REQUIRE(folder_my);
+                CHECK(folder_my->get_max_sequence() == 1ul);
+                REQUIRE(folder_my->get_file_infos().size() == 1);
+                auto f = folder_my->get_file_infos().begin()->item;
+                REQUIRE(f);
+                CHECK(f->get_name() == file->name());
+                CHECK(f->get_size() == 5);
+                CHECK(f->get_blocks().size() == 1);
+                CHECK(f->is_locally_available());
+                CHECK(!f->is_locked());
+            }
+
+            SECTION("cluster config is the same, but there are non-downloaded files") {
+                auto folder_peer = folder_infos.by_device(peer_device);
+                CHECK(folder_peer->get_max_sequence() == 0ul);
+
+                auto pr_fi = proto::FileInfo{};
+                pr_fi.set_name("some-file");
+                pr_fi.set_type(proto::FileInfoType::FILE);
+                pr_fi.set_sequence(1ul);
+                pr_fi.set_block_size(5);
+                pr_fi.set_size(5);
+                auto b1 = pr_fi.add_blocks();
+                b1->set_hash(utils::sha256_digest("12345").value());
+                b1->set_offset(0);
+                b1->set_size(5);
+                auto b = model::block_info_t::create(*b1).value();
+
+                auto file_info = model::file_info_t::create(cluster->next_uuid(), pr_fi, folder_peer).value();
+                file_info->assign_block(b, 0);
+                folder_peer->add(file_info);
+                folder_peer->set_max_sequence(1ul);
+
+                d_peer->set_max_sequence(1ul);
+                d_peer->set_index_id(123ul);
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+
+                peer_actor->push_block("12345", 0);
+                sup->do_process();
+
+                CHECK(folder_my->get_max_sequence() == 1ul);
+                REQUIRE(folder_my->get_file_infos().size() == 1);
+                auto f = folder_my->get_file_infos().begin()->item;
+                REQUIRE(f);
+                CHECK(f->get_name() == pr_fi.name());
+                CHECK(f->get_size() == 5);
+                CHECK(f->get_blocks().size() == 1);
+                CHECK(f->is_locally_available());
+                CHECK(!f->is_locked());
+            }
+
         }
     };
     F(true).run();

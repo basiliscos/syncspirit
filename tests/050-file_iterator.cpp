@@ -138,5 +138,20 @@ TEST_CASE("file iterator", "[model]") {
             CHECK(f->get_name() == "a.txt");
             REQUIRE(!cluster->next_file(peer_device));
         }
+
+        SECTION("folder info is non-actual") {
+            file_1->set_size(5ul);
+            file_1->set_block_size(5ul);
+
+            diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
+            REQUIRE(diff->apply(*cluster));
+
+            auto& folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+            auto peer_folder = folder_infos.by_device(peer_device);
+            peer_folder->add(file_info_t::create(cluster->next_uuid(), *file_1, peer_folder).value());
+            peer_folder->set_remote_max_sequence(peer_folder->get_max_sequence() + 1);
+            REQUIRE(!peer_folder->is_actual());
+            REQUIRE(!cluster->next_file(peer_device, true));
+        }
     }
 }

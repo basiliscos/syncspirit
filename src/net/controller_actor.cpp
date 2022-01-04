@@ -68,12 +68,7 @@ void controller_actor_t::on_start() noexcept {
 
     resources->acquire(resource::peer);
     resources->acquire(resource::peer);
-#if 0
-    update(*peer_cluster_config);
-    peer_cluster_config.reset();
-#endif
-    ready();
-    LOG_INFO(log, "{} is ready/online", identity);
+    LOG_INFO(log, "{} is online", identity);
 }
 
 void controller_actor_t::shutdown_start() noexcept {
@@ -83,7 +78,7 @@ void controller_actor_t::shutdown_start() noexcept {
 }
 
 void controller_actor_t::shutdown_finish() noexcept {
-    LOG_TRACE(log, "{}, shutdown_finish", identity);
+    LOG_TRACE(log, "{}, shutdown_finish, blocks_requested = {}", identity, blocks_requested);
     r::actor_base_t::shutdown_finish();
 }
 
@@ -112,7 +107,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         return;
     }
 
-    if (file && file->get_size()) {
+    if (file && file->get_size() && file->local_file()) {
         auto reset_block = !(substate & substate_t::iterating_blocks);
         auto block = cluster->next_block(file, reset_block);
         if (block) {
@@ -133,25 +128,29 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         file = cluster->next_file(peer, reset_file);
         if (file) {
             substate |= substate_t::iterating_files;
-            LOG_TRACE(log, "{}, next_file = {}", identity, file->get_name());
-            using blocks_t = std::vector<proto::BlockInfo>;
-            auto diff = model::diff::cluster_diff_ptr_t{};
-            auto info = file->as_proto(false);
-            auto& source_blocks = file->get_blocks();
-            auto blocks = blocks_t();
-            blocks.reserve(source_blocks.size());
-            for(auto& b: source_blocks) {
-                proto::BlockInfo bi;
-                bi.set_hash(std::string(b->get_hash()));
-                blocks.emplace_back(std::move(bi));
+            if (!file->local_file()) {
+                LOG_TRACE(log, "{}, next_file = {}", identity, file->get_name());
+                using blocks_t = std::vector<proto::BlockInfo>;
+                auto diff = model::diff::cluster_diff_ptr_t{};
+                auto info = file->as_proto(false);
+                auto& source_blocks = file->get_blocks();
+                auto blocks = blocks_t();
+                blocks.reserve(source_blocks.size());
+                for(auto& b: source_blocks) {
+                    proto::BlockInfo bi;
+                    bi.set_hash(std::string(b->get_hash()));
+                    blocks.emplace_back(std::move(bi));
+                }
+                diff = new model::diff::modify::new_file_t(
+                    *cluster,
+                    file->get_folder_info()->get_folder()->get_id(),
+                    std::move(info),
+                    std::move(blocks)
+                );
+                send<payload::model_update_t>(coordinator, std::move(diff), this);
+            } else {
+                ready();
             }
-            diff = new model::diff::modify::new_file_t(
-                *cluster,
-                file->get_folder_info()->get_folder()->get_id(),
-                std::move(info),
-                std::move(blocks)
-            );
-            send<payload::model_update_t>(coordinator, std::move(diff), this);
         } else {
             substate = substate & ~substate_t::iterating_files;
         }
@@ -160,9 +159,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
 
 void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexcept {
     using namespace model::diff;
-    auto folder = file->get_folder_info()->get_folder();
-    auto folder_info = folder->get_folder_infos().by_device(cluster->get_device());
-    auto target_file = folder_info->get_file_infos().by_name(file->get_name());
+    auto target_file = file->local_file();
     assert(target_file);
 
     if (file_block.is_locally_available()) {
@@ -255,6 +252,10 @@ void controller_actor_t::on_message(proto::message::Request &message) noexcept {
 
 void controller_actor_t::on_message(proto::message::DownloadProgress &message) noexcept { std::abort(); }
 
+auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &) noexcept -> outcome::result<void> {
+    ready();
+    return outcome::success();
+}
 
 auto controller_actor_t::operator()(const model::diff::modify::new_file_t &) noexcept -> outcome::result<void>  {
     ready();
@@ -283,7 +284,6 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto hash = std::string(file_block.block()->get_hash());
     request_pool += block.get_size();
 
-    intrusive_ptr_add_ref(&message);
     auto &data = message.payload.res.data;
     request<hasher::payload::validation_request_t>(hasher_proxy, data, hash, &message).send(init_timeout);
     resources->acquire(resource::hash);
@@ -294,7 +294,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     using namespace model::diff;
     resources->release(resource::hash);
     auto &ee = res.payload.ee;
-    auto block_res = (message::block_response_t *)res.payload.req->payload.request_payload->custom;
+    auto block_res = (message::block_response_t *)res.payload.req->payload.request_payload->custom.get();
     auto &payload = block_res->payload.req->payload.request_payload;
     auto &file = payload.file;
     auto &path = file->get_path();
@@ -320,5 +320,4 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
         }
     }
     block->unlock();
-    intrusive_ptr_release(block_res);
 }

@@ -81,7 +81,6 @@ void hasher_proxy_actor_t::free_hasher(r::address_ptr_t &addr) noexcept {
 
 void hasher_proxy_actor_t::on_validation_request(hasher::message::validation_request_t &req) noexcept {
     LOG_TRACE(log, "{}, on_validation_request", identity);
-    intrusive_ptr_add_ref(&req);
     auto hasher = find_next_hasher();
     auto &p = *req.payload.request_payload;
     request<hasher::payload::validation_request_t>(hasher, p.data, p.hash, &req).send(init_timeout);
@@ -90,7 +89,7 @@ void hasher_proxy_actor_t::on_validation_request(hasher::message::validation_req
 void hasher_proxy_actor_t::on_validation_response(hasher::message::validation_response_t &res) noexcept {
     using request_t = hasher::message::validation_request_t;
     LOG_TRACE(log, "{}, on_validation_response", identity);
-    auto req = (request_t *)res.payload.req->payload.request_payload->custom;
+    auto req = (request_t *)res.payload.req->payload.request_payload->custom.get();
     auto &payload = res.payload;
     auto &ee = payload.ee;
     if (ee) {
@@ -99,12 +98,10 @@ void hasher_proxy_actor_t::on_validation_response(hasher::message::validation_re
         reply_to(*req, payload.res.valid);
     }
     free_hasher(payload.req->address);
-    intrusive_ptr_release(req);
 }
 
 void hasher_proxy_actor_t::on_digest_request(hasher::message::digest_request_t &req) noexcept {
     LOG_TRACE(log, "{}, on_digest_request", identity);
-    intrusive_ptr_add_ref(&req);
     auto hasher = find_next_hasher();
     auto &p = req.payload.request_payload;
     request<hasher::payload::digest_request_t>(hasher, p.data, &req).send(init_timeout);
@@ -113,7 +110,7 @@ void hasher_proxy_actor_t::on_digest_request(hasher::message::digest_request_t &
 void hasher_proxy_actor_t::on_digest_response(hasher::message::digest_response_t &res) noexcept {
     LOG_TRACE(log, "{}, on_digest_response", identity);
     using request_t = hasher::message::digest_request_t;
-    auto req = (request_t *)res.payload.req->payload.request_payload.custom;
+    auto req = (request_t *)res.payload.req->payload.request_payload.custom.get();
     auto &payload = res.payload;
     auto &ee = payload.ee;
     if (ee) {
@@ -122,5 +119,4 @@ void hasher_proxy_actor_t::on_digest_response(hasher::message::digest_response_t
         reply_to(*req, payload.res.digest, payload.res.weak);
     }
     free_hasher(payload.req->address);
-    intrusive_ptr_release(req);
 }
