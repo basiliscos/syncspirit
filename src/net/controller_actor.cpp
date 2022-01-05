@@ -129,7 +129,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
         if (file) {
             substate |= substate_t::iterating_files;
             if (!file->local_file()) {
-                LOG_TRACE(log, "{}, next_file = {}", identity, file->get_name());
+                LOG_DEBUG(log, "{}, next_file = {}", identity, file->get_name());
                 using blocks_t = std::vector<proto::BlockInfo>;
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 auto info = file->as_proto(false);
@@ -141,6 +141,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
                     bi.set_hash(std::string(b->get_hash()));
                     blocks.emplace_back(std::move(bi));
                 }
+
                 diff = new model::diff::modify::new_file_t(
                     *cluster,
                     file->get_folder_info()->get_folder()->get_id(),
@@ -189,12 +190,7 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
 void controller_actor_t::on_model_update(message::model_update_t &message) noexcept {
     if (message.payload.custom == this) {
         LOG_TRACE(log, "{}, on_model_update", identity);
-        auto& diff = *message.payload.diff;
-        auto r = diff.visit(*this);
-        if (!r) {
-            auto ee = make_error(r.assume_error());
-            do_shutdown(ee);
-        }
+        ready();
     }
 }
 
@@ -251,22 +247,6 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
 void controller_actor_t::on_message(proto::message::Request &message) noexcept { std::abort(); }
 
 void controller_actor_t::on_message(proto::message::DownloadProgress &message) noexcept { std::abort(); }
-
-auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &) noexcept -> outcome::result<void> {
-    ready();
-    return outcome::success();
-}
-
-auto controller_actor_t::operator()(const model::diff::modify::new_file_t &) noexcept -> outcome::result<void>  {
-    ready();
-    return outcome::success();
-}
-
-auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &) noexcept -> outcome::result<void> {
-    ready();
-    return outcome::success();
-}
-
 
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {

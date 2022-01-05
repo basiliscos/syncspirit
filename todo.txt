@@ -1,5 +1,4 @@
 - uuid model
- - index/index update, when deleted file has any blocks
  - controller_actor
    -- частота запросов снижается
    -- tests

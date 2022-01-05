@@ -20,6 +20,6 @@ auto append_block_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
 }
 
 auto append_block_t::visit(block_visitor_t &visitor) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "visiting assign_block_t");
+    LOG_TRACE(log, "visiting append_block_t");
     return visitor(*this);
 }
