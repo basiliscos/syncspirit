@@ -85,11 +85,18 @@ template <typename Item, size_t N> struct generic_map_t {
     void put(const Item &item) noexcept {
         array_t arr;
         fill<N-1>(arr, item);
-        key2item.emplace(item, std::move(arr));
+        auto r = key2item.emplace(item, std::move(arr));
+        if (!r.second) {
+            remove(item);
+            fill<N-1>(arr, item);
+            r = key2item.emplace(item, std::move(arr));
+            assert(r.second);
+        }
     }
 
     void remove(const Item &item) noexcept {
-        key2item.template get<0>().erase(get_index<0>(item));
+        remove<0>(item);
+        //key2item.template get<0>().erase(get_index<0>(item));
     }
 
     template<size_t I = 0>
@@ -120,6 +127,14 @@ template <typename Item, size_t N> struct generic_map_t {
         arr[I] = std::string(get_index<I>(item));
         if constexpr (I > 0) {
             fill<I-1>(arr, item);
+        }
+    }
+
+    template<size_t I>
+    void remove(const Item &item) noexcept {
+        key2item.template get<I>().erase(get_index<I>(item));
+        if constexpr (I + 1 < N) {
+            remove<I+1>(item);
         }
     }
 

@@ -216,7 +216,7 @@ void controller_actor_t::on_block_update(message::block_update_t &message) noexc
 
 
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
-    LOG_DEBUG(log, "{}, on_message", identity);
+    LOG_DEBUG(log, "{}, on_message (ClusterConfig)", identity);
     auto diff_opt = cluster->process(*message, *peer);
     if (!diff_opt) {
         auto& ec = diff_opt.assume_error();
@@ -227,7 +227,7 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
 }
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
-    LOG_DEBUG(log, "{}, on_message", identity);
+    LOG_DEBUG(log, "{}, on_message (Index)", identity);
     auto diff_opt = cluster->process(*message, *peer);
     if (!diff_opt) {
         auto& ec = diff_opt.assume_error();
@@ -238,7 +238,7 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
 }
 
 void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
-    LOG_DEBUG(log, "{}, on_message", identity);
+    LOG_DEBUG(log, "{}, on_message (IndexUpdate)", identity);
     auto diff_opt = cluster->process(*message, *peer);
     if (!diff_opt) {
         auto& ec = diff_opt.assume_error();

@@ -97,3 +97,32 @@ TEST_CASE("lru cache", "[model]") {
     }
 }
 
+struct item_t {
+    std::string key;
+    int value;
+};
+
+using item_map_t = syncspirit::model::generic_map_t<item_t, 1>;
+
+namespace syncspirit::model {
+
+template<>
+inline std::string_view get_index<0>(const item_t& item) noexcept { return item.key; }
+
+}
+
+TEST_CASE("generic map ops") {
+    item_map_t map;
+    auto i1 = item_t {"k", 1};
+    auto i2 = item_t {"k", 2};
+
+    map.put(i1);
+    CHECK(map.get("k").value == 1);
+
+    map.put(i2);
+    CHECK(map.get("k").value == 2);
+    REQUIRE(map.size() == 1);
+
+    map.remove(i2);
+    REQUIRE(map.size() == 0);
+}

@@ -80,7 +80,7 @@ struct sample_peer_t : r::actor_base_t {
 
     void shutdown_finish() noexcept override {
         r::actor_base_t::shutdown_finish();
-        LOG_TRACE(log, "{}, shutdown_finish", identity);
+        LOG_TRACE(log, "{}, shutdown_finish, blocks requested = {}", identity, blocks_requested);
         if (controller) {
             send<net::payload::termination_t>(controller, shutdown_reason);
         }
@@ -111,6 +111,7 @@ struct sample_peer_t : r::actor_base_t {
 
     void on_block_request(net::message::block_request_t &req) noexcept {
         block_requests.push_front(&req);
+        ++blocks_requested;
         log->debug("{}, requesting block # {}", identity, block_requests.front()->payload.request_payload.block.block_index());
         if (block_responses.size()) {
             log->debug("{}, top response block # {}", identity, block_responses.front().block_index);
@@ -141,6 +142,7 @@ struct sample_peer_t : r::actor_base_t {
         block_responses.push_back(block_response_t{index, std::string(data)});
     }
 
+    size_t blocks_requested = 0;
     bool reading = false;
     remote_messages_t messages;
     r::address_ptr_t controller;
@@ -447,6 +449,58 @@ void test_downloading() {
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_locked());
+            }
+
+            SECTION("don't attempt to download a file, which is deleted") {
+                auto folder_peer = folder_infos.by_device(peer_device);
+                CHECK(folder_peer->get_max_sequence() == 0ul);
+
+                auto pr_fi = proto::FileInfo{};
+                pr_fi.set_name("some-file");
+                pr_fi.set_type(proto::FileInfoType::FILE);
+                pr_fi.set_sequence(1ul);
+                pr_fi.set_block_size(5);
+                pr_fi.set_size(5);
+                auto b1 = pr_fi.add_blocks();
+                b1->set_hash(utils::sha256_digest("12345").value());
+                b1->set_offset(0);
+                b1->set_size(5);
+                auto b = model::block_info_t::create(*b1).value();
+
+                auto file_info = model::file_info_t::create(cluster->next_uuid(), pr_fi, folder_peer).value();
+                file_info->assign_block(b, 0);
+                folder_peer->add(file_info);
+                folder_peer->set_max_sequence(1ul);
+
+                d_peer->set_max_sequence(2ul);
+                d_peer->set_index_id(123ul);
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+
+                auto index = proto::Index{};
+                index.set_folder(std::string(folder_1->get_id()));
+                auto file = index.add_files();
+                file->set_name("some-file");
+                file->set_type(proto::FileInfoType::FILE);
+                file->set_deleted(true);
+                file->set_sequence(2ul);
+                file->set_block_size(0);
+                file->set_size(0);
+
+                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                sup->do_process();
+
+                CHECK(folder_my->get_max_sequence() == 1ul);
+                REQUIRE(folder_my->get_file_infos().size() == 1);
+                auto f = folder_my->get_file_infos().begin()->item;
+                REQUIRE(f);
+                CHECK(f->get_name() == pr_fi.name());
+                CHECK(f->get_size() == 0);
+                CHECK(f->get_blocks().size() == 0);
+                CHECK(f->is_locally_available());
+                CHECK(f->is_deleted());
+                CHECK(!f->is_locked());
+                CHECK(f->get_sequence() == 1ul);
+                CHECK(peer_actor->blocks_requested == 0);
             }
 
         }
