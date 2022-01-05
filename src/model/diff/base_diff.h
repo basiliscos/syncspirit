@@ -19,10 +19,9 @@ struct base_diff_t : boost::intrusive_ref_counter<base_diff_t, boost::thread_uns
 
     outcome::result<void> apply(cluster_t &) const noexcept;
 
-    protected:
-
     static utils::logger_t get_log() noexcept;
 
+ protected:
     virtual outcome::result<void> apply_impl(cluster_t &) const noexcept = 0;
     utils::logger_t log;
 };

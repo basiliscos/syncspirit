@@ -107,6 +107,9 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::no_progress:
         r = "no progress has been made (i.e. empty index/index_update)";
         break;
+    case error_code_t::unexpected_blocks:
+        r = "blocks are not expected (e.g. in deleted file)";
+        break;
     default:
         r = "unknown";
         break;

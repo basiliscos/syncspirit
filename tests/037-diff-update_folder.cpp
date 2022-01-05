@@ -85,5 +85,20 @@ TEST_CASE("update folder (via Index)", "[model]") {
         REQUIRE(!opt);
         CHECK(opt.error() == model::make_error_code(model::error_code_t::no_progress));
     }
+
+    SECTION("blocks are not expected") {
+        auto file = pr_index.add_files();
+        file->set_name("a.txt");
+        file->set_sequence(10ul);
+        file->set_size(5ul);
+        file->set_block_size(5ul);
+        file->set_deleted(true);
+        auto b = file->add_blocks();
+        b->set_hash("123");
+
+        auto opt = diff::peer::update_folder_t::create(*cluster, *peer_device, pr_index);
+        REQUIRE(!opt);
+        CHECK(opt.error() == model::make_error_code(model::error_code_t::unexpected_blocks));
+    }
 }
 

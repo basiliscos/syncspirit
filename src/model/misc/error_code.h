@@ -38,6 +38,7 @@ enum class error_code_t {
     folder_is_not_shared,
     invalid_block_size,
     no_progress,
+    unexpected_blocks,
 };
 
 namespace detail {

@@ -11,9 +11,9 @@ update_folder_t::update_folder_t(std::string_view folder_id_, std::string_view p
 auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device_id(peer_id);
-    auto& files_map = folder_info->get_file_infos();
-    auto& blocks_map = cluster.get_blocks();
 
+    auto& bm = cluster.get_blocks();
+    auto blocks_map = block_infos_map_t();
     for(const auto& b: blocks) {
         auto opt = block_info_t::create(b);
         if (!opt) {
@@ -24,6 +24,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     }
 
     auto max_seq = folder_info->get_max_sequence();
+    auto files_map = file_infos_map_t();
     for(const auto& f: files) {
         auto opt = file_info_t::create(cluster.next_uuid(), f, folder_info);
         if (!opt) {
@@ -37,6 +38,9 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
             auto& b = f.blocks(i);
             auto block = blocks_map.get(b.hash());
             if (!block) {
+                block = bm.get(b.hash());
+            }
+            if (!block) {
                 auto opt = block_info_t::create(b);
                 if (!opt) {
                     return opt.assume_error();
@@ -46,7 +50,17 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
             file->assign_block(block, (size_t)i);
         }
     }
+
+    // all ok, commit
+    auto& fm = folder_info->get_file_infos();
+    for(auto& it: blocks_map) {
+        bm.put(it.item);
+    }
+    for(auto& it: files_map) {
+        fm.put(it.item);
+    }
     folder_info->set_max_sequence(max_seq);
+
     return outcome::success();
 }
 
@@ -77,6 +91,11 @@ static auto instantiate(const cluster_t &cluster, const device_t& source, const 
     files.reserve(static_cast<size_t>(message.files_size()));
     for(int i = 0; i < message.files_size(); ++i) {
         auto& f = message.files(i);
+        if (f.deleted() && f.blocks_size()) {
+            auto log = update_folder_t::get_log();
+            LOG_WARN(log, "file {}, should not have blocks");
+            return make_error_code(error_code_t::unexpected_blocks);
+        }
         for(int j = 0; j < f.blocks_size(); ++j) {
             auto& b = f.blocks(j);
             if (!blocks.get(b.hash())) {
