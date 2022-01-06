@@ -103,6 +103,10 @@ add_executable(051-block_iterator 051-block_iterator.cpp)
 target_link_libraries(051-block_iterator syncspirit_test_lib)
 add_test(051-block_iterator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/051-block_iterator")
 
+add_executable(052-file_info 052-file_info.cpp)
+target_link_libraries(052-file_info syncspirit_test_lib)
+add_test(052-file_info "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/052-file_info")
+
 add_executable(060-bep 060-bep.cpp)
 target_link_libraries(060-bep syncspirit_test_lib)
 add_test(060-bep "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/060-bep")

@@ -510,11 +510,20 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
         }
         auto &my = version.counters(i);
         auto &oth = other.version.counters(i);
-        if (my.id() == oth.id() && my.value() == oth.value()) {
-            continue;
+        if (my.id() == oth.id()) {
+            if (my.value() == oth.value()) {
+                continue;
+            } else if (my.value() < oth.value() && (i + 1 == version.counters_size())) {
+                return true;
+            }
         } else {
             // conflict
             break;
+        }
+
+        if (my.id() == oth.id() && my.value() == oth.value()) {
+            continue;
+        } else {
         }
     }
 

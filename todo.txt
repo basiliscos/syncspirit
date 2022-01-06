@@ -1,4 +1,5 @@
 - uuid model
+ - index_update, приплыл новый файл, а в итоге missing_blocks = 0
  - controller_actor
    -- частота запросов снижается
    -- tests
