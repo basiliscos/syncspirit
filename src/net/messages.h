@@ -11,16 +11,10 @@
 #include <optional>
 
 #include <fmt/fmt.h>
-#include "../model/misc/upnp.h"
-#include "../model/cluster.h"
-/*
-#include "../model/folder.h"
-#include "../model/diff/cluster_diff.h"
-#include "../model/diff/block_diff.h"
-#include "../model/diff/contact_diff.h"
-*/
-#include "../transport/base.h"
-#include "../proto/bep_support.h"
+#include "model/misc/upnp.h"
+#include "model/cluster.h"
+#include "transport/base.h"
+#include "proto/bep_support.h"
 
 namespace syncspirit {
 namespace net {
@@ -38,8 +32,6 @@ using udp = asio::ip::udp;
 using v4 = asio::ip::address_v4;
 using udp_socket_t = udp::socket;
 using tcp_socket_t = tcp::socket;
-
-extern r::pt::time_duration default_timeout;
 
 namespace payload {
 
@@ -140,30 +132,6 @@ struct block_request_t {
     model::file_block_t block;
 };
 
-/*
-struct model_response_t {
-    model::cluster_ptr_t cluster;
-};
-
-struct model_request_t {
-    using response_t = model_response_t;
-};
-
-struct model_update_t {
-    model::diff::cluster_diff_ptr_t diff;
-    const void* custom;
-};
-
-struct block_update_t {
-    model::diff::block_diff_ptr_t diff;
-    const void* custom;
-};
-
-struct contact_update_t {
-    model::diff::contact_diff_ptr_t diff;
-    const void* custom;
-};
-*/
 } // end of namespace payload
 
 namespace message {
@@ -180,15 +148,6 @@ using http_cancel_t = r::request_traits_t<payload::http_request_t>::cancel::mess
 using http_close_connection_t = r::message_t<payload::http_close_connection_t>;
 
 using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
-
-#if 0
-using model_update_t = r::message_t<payload::model_update_t>;
-using block_update_t = r::message_t<payload::block_update_t>;
-using contact_update_t = r::message_t<payload::contact_update_t>;
-
-using model_request_t = r::request_traits_t<payload::model_request_t>::request::message_t;
-using model_response_t = r::request_traits_t<payload::model_request_t>::response::message_t;
-#endif
 
 using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;

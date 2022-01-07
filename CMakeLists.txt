@@ -96,7 +96,6 @@ add_library(syncspirit_lib
     src/net/peer_actor.cpp
     src/net/peer_supervisor.cpp
     src/net/resolver_actor.cpp
-    src/net/messages.cpp
     src/net/names.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
