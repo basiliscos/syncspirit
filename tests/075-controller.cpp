@@ -503,6 +503,93 @@ void test_downloading() {
                 CHECK(peer_actor->blocks_requested == 0);
             }
 
+            SECTION("new file via index_update => download it") {
+                d_peer->set_index_id(123ul);
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+
+                auto index = proto::Index{};
+                index.set_folder(std::string(folder_1->get_id()));
+                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+
+                auto index_update = proto::IndexUpdate{};
+                index_update.set_folder(std::string(folder_1->get_id()));
+                auto file = index_update.add_files();
+                file->set_name("some-file");
+                file->set_type(proto::FileInfoType::FILE);
+                file->set_sequence(1ul);
+                file->set_block_size(5);
+                file->set_size(5);
+                auto b1 = file->add_blocks();
+                b1->set_hash(utils::sha256_digest("12345").value());
+                b1->set_offset(0);
+                b1->set_size(5);
+
+                peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
+                peer_actor->push_block("12345", 0);
+                sup->do_process();
+
+                auto folder_my = folder_infos.by_device(my_device);
+                CHECK(folder_my->get_max_sequence() == 1ul);
+                REQUIRE(folder_my->get_file_infos().size() == 1);
+                auto f = folder_my->get_file_infos().begin()->item;
+                REQUIRE(f);
+                CHECK(f->get_name() == file->name());
+                CHECK(f->get_size() == 5);
+                CHECK(f->get_blocks().size() == 1);
+                CHECK(f->is_locally_available());
+                CHECK(!f->is_locked());
+            }
+
+            SECTION("deleted file, has been restored => download it") {
+                auto index = proto::Index{};
+                index.set_folder(std::string(folder_1->get_id()));
+                auto file_1 = index.add_files();
+                file_1->set_name("some-file");
+                file_1->set_type(proto::FileInfoType::FILE);
+                file_1->set_sequence(2ul);
+                file_1->set_deleted(true);
+                auto v1 = file_1->mutable_version();
+                auto c1 = v1->add_counters();
+                c1->set_id(1u);
+                c1->set_value(1u);
+
+                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                sup->do_process();
+
+                auto folder_my = folder_infos.by_device(my_device);
+                CHECK(folder_my->get_max_sequence() == 1ul);
+
+                auto index_update = proto::IndexUpdate{};
+                index_update.set_folder(std::string(folder_1->get_id()));
+                auto file_2 = index_update.add_files();
+                file_2->set_name("some-file");
+                file_2->set_type(proto::FileInfoType::FILE);
+                file_2->set_sequence(3ul);
+                file_2->set_block_size(5);
+                file_2->set_size(5);
+                auto v2 = file_2->mutable_version();
+                auto c2 = v2->add_counters();
+                c2->set_id(1u);
+                c2->set_value(2u);
+
+                auto b1 = file_2->add_blocks();
+                b1->set_hash(utils::sha256_digest("12345").value());
+                b1->set_offset(0);
+                b1->set_size(5);
+
+                peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
+                peer_actor->push_block("12345", 0);
+                sup->do_process();
+
+                REQUIRE(folder_my->get_file_infos().size() == 1);
+                auto f = folder_my->get_file_infos().begin()->item;
+                REQUIRE(f);
+                CHECK(f->get_name() == file_1->name());
+                CHECK(f->get_size() == 5);
+                CHECK(f->get_blocks().size() == 1);
+                CHECK(f->is_locally_available());
+                CHECK(!f->is_locked());
+            }
         }
     };
     F(true).run();

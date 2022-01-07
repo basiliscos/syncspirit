@@ -130,6 +130,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
             substate |= substate_t::iterating_files;
             if (!file->local_file()) {
                 LOG_DEBUG(log, "{}, next_file = {}", identity, file->get_name());
+                file->locally_lock();
                 using blocks_t = std::vector<proto::BlockInfo>;
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 auto info = file->as_proto(false);
@@ -190,9 +191,34 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
 void controller_actor_t::on_model_update(message::model_update_t &message) noexcept {
     if (message.payload.custom == this) {
         LOG_TRACE(log, "{}, on_model_update", identity);
+        auto& diff = *message.payload.diff;
+        auto r = diff.visit(*this);
+        if (!r) {
+            auto ee = make_error(r.assume_error());
+            return do_shutdown(ee);
+        }
         ready();
     }
 }
+
+auto controller_actor_t::locally_unlock_file(std::string_view folder_id, std::string_view file_name) noexcept -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(folder_id);
+    auto folder_info = folder->get_folder_infos().by_device(peer);
+    auto file = folder_info->get_file_infos().by_name(file_name);
+    file->locally_unlock();
+    return outcome::success();
+}
+
+auto controller_actor_t::operator()(const model::diff::modify::new_file_t& diff) noexcept -> outcome::result<void> {
+    return locally_unlock_file(diff.folder_id, diff.file.name());
+}
+
+/*
+auto controller_actor_t::operator()(const model::diff::modify::lock_file_t& diff) noexcept -> outcome::result<void> {
+    return locally_unlock_file(diff.folder_id, diff.file_name);
+    return outcome::success();
+}
+*/
 
 
 void controller_actor_t::on_block_update(message::block_update_t &message) noexcept {
@@ -203,6 +229,7 @@ void controller_actor_t::on_block_update(message::block_update_t &message) noexc
         auto folder_info = folder->get_folder_infos().by_device(cluster->get_device());
         auto file = folder_info->get_file_infos().by_name(d.file_name);
         if (file->is_locally_available()) {
+            LOG_TRACE(log, "{}, on_block_update, finalizing", identity);
             auto diff = model::diff::cluster_diff_ptr_t{};
             diff = new model::diff::modify::lock_file_t(d.folder_id, d.file_name, false);
             send<payload::model_update_t>(coordinator, std::move(diff), this);

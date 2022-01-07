@@ -29,6 +29,15 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
 
 struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
+
+    enum flags_t {
+        f_deleted = 1 << 0,
+        f_invalid = 1 << 1,
+        f_no_permissions = 1 << 2,
+        f_locked = 1 << 3,
+        f_local_locked = 1 << 4,
+    };
+
     using blocks_t = std::vector<block_info_ptr_t>;
 
     static outcome::result<file_info_ptr_t> create(std::string_view key, const db::FileInfo& data, const folder_info_ptr_t& folder_info_) noexcept;
@@ -64,7 +73,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     inline bool is_file() const  noexcept { return type == proto::FileInfoType::FILE; }
     inline bool is_dir() const noexcept { return type == proto::FileInfoType::DIRECTORY; }
     inline bool is_link() const noexcept { return type == proto::FileInfoType::SYMLINK; }
-    inline bool is_deleted() const noexcept { return deleted; }
+    inline bool is_deleted() const noexcept { return flags & f_deleted; }
 
     inline std::int64_t get_size() const noexcept { return size; }
     inline void set_size(std::int64_t value) noexcept { size = value; }
@@ -91,9 +100,13 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     void after_sync() noexcept;
     file_info_ptr_t local_file() noexcept;
 
-    inline bool is_locked() const noexcept { return locked; }
+    bool is_locked() const noexcept;
     void lock() noexcept;
     void unlock() noexcept;
+
+    bool is_locally_locked() const noexcept;
+    void locally_lock() noexcept;
+    void locally_unlock() noexcept;
 
     proto::FileInfo get() const noexcept;
 
@@ -123,9 +136,8 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     std::int64_t modified_s;
     std::uint32_t modified_ns;
     std::uint64_t modified_by;
-    bool deleted;
-    bool invalid;
-    bool no_permissions;
+
+    int flags = 0;
     proto::Vector version;
     std::int64_t sequence;
     std::int32_t block_size;
@@ -133,7 +145,6 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     blocks_t blocks;
     mutable std::optional<bfs::path> path;
     std::string full_name;
-    bool locked = false;
     marks_vector_t marks;
     size_t missing_blocks;
 

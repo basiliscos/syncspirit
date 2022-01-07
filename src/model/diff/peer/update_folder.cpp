@@ -59,7 +59,9 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     for(auto& it: files_map) {
         fm.put(it.item);
     }
-    folder_info->set_max_sequence(max_seq);
+    if (max_seq) {
+        folder_info->set_max_sequence(max_seq);
+    }
 
     return outcome::success();
 }
@@ -106,7 +108,7 @@ static auto instantiate(const cluster_t &cluster, const device_t& source, const 
         max_seq = std::max(max_seq, f.sequence());
     }
 
-    if (max_seq <= fi->get_max_sequence()) {
+    if ((max_seq <= fi->get_max_sequence()) &&  message.files_size() ) {
         return make_error_code(error_code_t::no_progress);
     }
 

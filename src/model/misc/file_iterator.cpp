@@ -43,6 +43,9 @@ TRY_ANEW:
     while (f_peer_it != f_peer_end) {
         file = f_peer_it->item;
         ++f_peer_it;
+        if (file->is_locally_locked()) {
+            continue;
+        }
         auto local_file = local_folder_info->get_file_infos().by_name(file->get_name());
         if (!local_file) {
             return;

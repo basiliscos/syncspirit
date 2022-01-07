@@ -69,11 +69,12 @@ add_library(syncspirit_lib
     src/model/diff/peer/cluster_remove.cpp
     src/model/diff/peer/cluster_update.cpp
     src/model/diff/peer/update_folder.cpp
+    src/model/misc/block_iterator.cpp
     src/model/misc/error_code.cpp
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/storeable.cpp
-    src/model/misc/block_iterator.cpp
+    src/model/misc/version_utils.cpp
     src/model/block_info.cpp
     src/model/cluster.cpp
     src/model/device.cpp

@@ -2,10 +2,10 @@
 #include "file_info.h"
 #include "cluster.h"
 #include "misc/error_code.h"
+#include "misc/version_utils.h"
 #include "../db/prefix.h"
 #include <algorithm>
 #include <spdlog/spdlog.h>
-#include "structs.pb.h"
 
 namespace syncspirit::model {
 
@@ -96,9 +96,15 @@ template <typename Source> outcome::result<void> file_info_t::fields_update(cons
     modified_s = s.modified_s();
     modified_ns = s.modified_ns();
     modified_by = s.modified_by();
-    deleted = s.deleted();
-    invalid = s.invalid();
-    no_permissions = s.no_permissions();
+    if (s.deleted()) {
+        flags |= flags_t::f_deleted;
+    }
+    if (s.invalid()) {
+        flags |= flags_t::f_invalid;
+    }
+    if (s.no_permissions()) {
+        flags |= flags_t::f_no_permissions;
+    }
     version = s.version();
     block_size = s.block_size();
     symlink_target = s.symlink_target();
@@ -131,9 +137,9 @@ template<typename T> T file_info_t::as() const noexcept {
     r.set_modified_s(modified_s);
     r.set_modified_ns(modified_ns);
     r.set_modified_by(modified_by);
-    r.set_deleted(deleted);
-    r.set_invalid(invalid);
-    r.set_no_permissions(no_permissions);
+    r.set_deleted(flags & f_deleted);
+    r.set_invalid(flags & f_invalid);
+    r.set_no_permissions(flags & f_no_permissions);
     *r.mutable_version() = version;
     r.set_block_size(block_size);
     r.set_symlink_target(symlink_target);
@@ -163,7 +169,7 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
 
 outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
     size_t count = 0;
-    if (!block_count && !deleted && !invalid) {
+    if (!block_count && !(flags & f_deleted) && !(flags & f_invalid)) {
         if (size < block_size) {
             return make_error_code(error_code_t::invalid_block_size);
         }
@@ -182,7 +188,7 @@ outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
     remove_blocks();
     blocks.resize(count);
     marks.resize(count);
-    missing_blocks = (!deleted && !invalid) ? count : 0;
+    missing_blocks = !(flags & f_deleted) && !(flags & f_invalid) ? count : 0;
     return outcome::success();
 }
 
@@ -465,12 +471,35 @@ auto file_info_t::local_file() noexcept -> file_info_ptr_t {
     if (!my_folder_info) {
         return {};
     }
-    return my_folder_info->get_file_infos().by_name(get_name());
+
+    auto local_file = my_folder_info->get_file_infos().by_name(get_name());
+    if (!local_file) {
+        return {};
+    }
+
+    auto r = compare(local_file->version, version);
+    if (r == version_relation_t::identity) {
+        return local_file;
+    } else if (r == version_relation_t::conflict) {
+        auto log = utils::get_logger("model");
+        LOG_CRITICAL(log, "conflict handling is not available");
+    }
+
+    return {};
 }
 
-void file_info_t::unlock() noexcept { locked = false; }
+void file_info_t::unlock() noexcept { flags = flags & ~flags_t::f_locked; }
 
-void file_info_t::lock() noexcept { locked = true; }
+void file_info_t::lock() noexcept { flags |= flags_t::f_locked; }
+
+bool file_info_t::is_locked() const noexcept { return flags & flags_t::f_locked; }
+
+void file_info_t::locally_unlock() noexcept { flags = flags & ~flags_t::f_local_locked; }
+
+void file_info_t::locally_lock() noexcept { flags |= flags_t::f_local_locked; }
+
+bool file_info_t::is_locally_locked() const noexcept { return flags & flags_t::f_local_locked; }
+
 
 void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t index) noexcept {
     assert(index < blocks.size() && "blocks should be reserve enough space");
@@ -501,36 +530,22 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
     assert(folder_info->get_device() == folder_info->get_folder()->get_cluster()->get_device().get());
     assert(other.folder_info->get_device() != folder_info->get_folder()->get_cluster()->get_device().get());
     assert(name == other.name);
-    if (locked) {
+    if (is_locked()) {
         return false;
     }
-    for(int i = 0; i < version.counters_size(); ++i ) {
-        if (i > other.version.counters_size()) {
-            return false;
-        }
-        auto &my = version.counters(i);
-        auto &oth = other.version.counters(i);
-        if (my.id() == oth.id()) {
-            if (my.value() == oth.value()) {
-                continue;
-            } else if (my.value() < oth.value() && (i + 1 == version.counters_size())) {
-                return true;
-            }
-        } else {
-            // conflict
-            break;
-        }
-
-        if (my.id() == oth.id() && my.value() == oth.value()) {
-            continue;
-        } else {
-        }
-    }
-
-    if (version.counters_size() < other.version.counters_size()) {
+    auto r = compare(version, other.version);
+    if (r == version_relation_t::identity) {
+        return !is_locally_available();
+    } else if (r == version_relation_t::older) {
         return true;
+    } else if (r == version_relation_t::newer) {
+        return false;
+    } else {
+        assert(r == version_relation_t::conflict);
+        auto log = utils::get_logger("model");
+        LOG_CRITICAL(log, "conflict handling is not available");
+        return false;
     }
-    return !is_locally_available();
 }
 
 template<> std::string_view get_index<0>(const file_info_ptr_t& item) noexcept { return item->get_uuid(); }

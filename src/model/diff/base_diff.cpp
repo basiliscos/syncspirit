@@ -8,7 +8,7 @@ base_diff_t::base_diff_t() noexcept {
 }
 
 auto base_diff_t::get_log() noexcept -> utils::logger_t {
-    return utils::get_logger("model");;
+    return utils::get_logger("model");
 }
 
 

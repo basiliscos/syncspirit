@@ -81,6 +81,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
 
     SECTION("no progress") {
         pr_index.set_folder(db_folder_1.id());
+        auto f = pr_index.add_files();
         auto opt = diff::peer::update_folder_t::create(*cluster, *peer_device, pr_index);
         REQUIRE(!opt);
         CHECK(opt.error() == model::make_error_code(model::error_code_t::no_progress));
