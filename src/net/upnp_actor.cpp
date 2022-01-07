@@ -2,6 +2,7 @@
 #include "proto/upnp_support.h"
 #include "utils/error_code.h"
 #include "names.h"
+#include "model/messages.h"
 #include "model/diff/modify/update_contact.h"
 
 
@@ -216,7 +217,7 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
         using namespace model::diff;
         auto diff = model::diff::contact_diff_ptr_t{};
         diff = new modify::update_contact_t(*cluster, {external_addr.to_string(), local_address.to_string() });
-        send<payload::contact_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     }
 }
 

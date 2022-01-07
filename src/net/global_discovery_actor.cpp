@@ -159,7 +159,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
                 using namespace model::diff;
                 auto diff = model::diff::contact_diff_ptr_t{};
                 diff = new modify::update_contact_t(*cluster, device_id, uris);
-                send<payload::contact_update_t>(coordinator, std::move(diff), this);
+                send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
                 LOG_DEBUG(log, "{}, on_discovery_response, found some URIs for {}", identity, device_id);
             } else {
                 LOG_DEBUG(log, "{}, on_discovery_response, no known URIs for {}", identity, device_id);
@@ -192,7 +192,7 @@ void global_discovery_actor_t::on_discovery(message::discovery_notify_t &req) no
     make_request(addr_discovery, r.value(), std::move(tx_buff), &req);
 }
 
-void global_discovery_actor_t::on_contact_update(message::contact_update_t& message) noexcept {
+void global_discovery_actor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_contact_update", identity);
     auto& diff = *message.payload.diff;
     auto r = diff.visit(*this);

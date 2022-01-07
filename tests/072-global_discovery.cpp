@@ -5,9 +5,10 @@
 #include "model/diff/modify/update_contact.h"
 #include "utils/tls.h"
 #include "utils/error_code.h"
-
 #include "net/global_discovery_actor.h"
 #include "net/names.h"
+#include "net/messages.h"
+
 #include "access.h"
 #include "test_supervisor.h"
 
@@ -28,7 +29,7 @@ namespace  {
 static auto ssl_pair = utils::generate_pair("sample").value();
 
 struct dummy_http_actor_t : r::actor_base_t {
-    using response_t = r::intrusive_ptr_t<payload::http_response_t>;
+    using response_t = r::intrusive_ptr_t<net::payload::http_response_t>;
     using queue_t = std::list<response_t>;
 
     using r::actor_base_t::actor_base_t;
@@ -45,7 +46,7 @@ struct dummy_http_actor_t : r::actor_base_t {
         });
     }
 
-    void on_request(message::http_request_t &req) noexcept {
+    void on_request(net::message::http_request_t &req) noexcept {
         if (!responses.empty()) {
             auto& res = *responses.front();
             reply_to(req, std::move(res.response), res.bytes, std::move(res.local_addr));
@@ -57,7 +58,7 @@ struct dummy_http_actor_t : r::actor_base_t {
         }
     }
 
-    void on_close_connection(message::http_close_connection_t &) noexcept {
+    void on_close_connection(net::message::http_close_connection_t &) noexcept {
         closed = true;
     }
 
@@ -68,7 +69,7 @@ struct dummy_http_actor_t : r::actor_base_t {
 
 struct fixture_t {
     using http_actor_ptr_t = r::intrusive_ptr_t<dummy_http_actor_t>;
-    using announce_msg_t = message::announce_notification_t;
+    using announce_msg_t = net::message::announce_notification_t;
     using announce_ptr_t = r::intrusive_ptr_t<announce_msg_t>;
 
     fixture_t() noexcept {
@@ -156,7 +157,7 @@ void test_succesfull_announcement() {
                 http::response<http::string_body> res;
                 res.result(204);
                 res.set("Reannounce-After", "123");
-                http_actor->responses.push_back(new payload::http_response_t(std::move(res), 0));
+                http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
                 sup->do_process();
                 CHECK(http_actor->connected);
                 CHECK(announce);
@@ -177,7 +178,7 @@ void test_failded_announcement() {
             SECTION("successul (and empty) announce response") {
                 http::response<http::string_body> res;
                 res.result(204);
-                http_actor->responses.push_back(new payload::http_response_t(std::move(res), 0));
+                http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
                 sup->do_process();
                 CHECK(http_actor->connected);
                 CHECK(!announce);
@@ -194,7 +195,7 @@ void test_peer_discovery() {
     struct F : fixture_t {
         void main() noexcept override {
 
-            sup->send<payload::discovery_notification_t>(sup->get_address(), peer_device->device_id());
+            sup->send<net::payload::discovery_notification_t>(sup->get_address(), peer_device->device_id());
             http::response<http::string_body> res;
 
             SECTION("successful case") {
@@ -203,7 +204,7 @@ void test_peer_discovery() {
                 j["seen"] = "2020-10-13T18:41:37.02287354Z";
                 res.body() = j.dump();
 
-                http_actor->responses.push_back(new payload::http_response_t(std::move(res), 0));
+                http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
                 sup->do_process();
 
                 REQUIRE(peer_device->get_uris().size() == 1);
@@ -211,7 +212,7 @@ void test_peer_discovery() {
             }
 
             SECTION("gargbage in response") {
-                http_actor->responses.push_back(new payload::http_response_t(std::move(res), 0));
+                http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
                 sup->do_process();
                 REQUIRE(peer_device->get_uris().size() == 0);
                 CHECK(static_cast<r::actor_base_t*>(gda.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -227,12 +228,12 @@ void test_late_announcement() {
 
             auto diff = model::diff::contact_diff_ptr_t{};
             diff = new model::diff::modify::update_contact_t(*cluster, {"127.0.0.3"});
-            sup->send<payload::contact_update_t>(sup->get_address(), diff);
+            sup->send<model::payload::contact_update_t>(sup->get_address(), diff);
 
             http::response<http::string_body> res;
             res.result(204);
             res.set("Reannounce-After", "123");
-            http_actor->responses.push_back(new payload::http_response_t(std::move(res), 0));
+            http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
 
             sup->do_process();
             CHECK(http_actor->connected);

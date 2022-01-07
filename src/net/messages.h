@@ -13,10 +13,12 @@
 #include <fmt/fmt.h>
 #include "../model/misc/upnp.h"
 #include "../model/cluster.h"
+/*
 #include "../model/folder.h"
 #include "../model/diff/cluster_diff.h"
 #include "../model/diff/block_diff.h"
 #include "../model/diff/contact_diff.h"
+*/
 #include "../transport/base.h"
 #include "../proto/bep_support.h"
 
@@ -138,14 +140,7 @@ struct block_request_t {
     model::file_block_t block;
 };
 
-struct file_update_t {
-    model::file_info_ptr_t file;
-};
-
-struct folder_update_t {
-    model::folder_ptr_t folder;
-};
-
+/*
 struct model_response_t {
     model::cluster_ptr_t cluster;
 };
@@ -168,7 +163,7 @@ struct contact_update_t {
     model::diff::contact_diff_ptr_t diff;
     const void* custom;
 };
-
+*/
 } // end of namespace payload
 
 namespace message {
@@ -186,12 +181,14 @@ using http_close_connection_t = r::message_t<payload::http_close_connection_t>;
 
 using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
 
+#if 0
 using model_update_t = r::message_t<payload::model_update_t>;
 using block_update_t = r::message_t<payload::block_update_t>;
 using contact_update_t = r::message_t<payload::contact_update_t>;
 
 using model_request_t = r::request_traits_t<payload::model_request_t>::request::message_t;
 using model_response_t = r::request_traits_t<payload::model_request_t>::response::message_t;
+#endif
 
 using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
@@ -203,46 +200,7 @@ using termination_signal_t = r::message_t<payload::termination_t>;
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;
 
-using file_update_notify_t = r::message_t<payload::file_update_t>;
-using folder_update_notify_t = r::message_t<payload::folder_update_t>;
-
 } // end of namespace message
 
 } // namespace net
 } // namespace syncspirit
-
-
-/*
-namespace syncspirit::ui {
-
-namespace r = rotor;
-
-namespace payload {
-
-using config_response_t = config::main_t;
-
-struct config_request_t {
-    using response_t = config_response_t;
-};
-
-struct config_save_response_t {};
-
-struct config_save_request_t {
-    using response_t = config_save_response_t;
-    config::main_t config;
-};
-
-} // namespace payload
-
-namespace message {
-
-using config_request_t = r::request_traits_t<payload::config_request_t>::request::message_t;
-using config_response_t = r::request_traits_t<payload::config_request_t>::response::message_t;
-
-using config_save_request_t = r::request_traits_t<payload::config_save_request_t>::request::message_t;
-using config_save_response_t = r::request_traits_t<payload::config_save_request_t>::response::message_t;
-
-} // namespace message
-
-} // namespace syncspirit::ui
-*/

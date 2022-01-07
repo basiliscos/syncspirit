@@ -1,8 +1,9 @@
 #pragma once
 
 #include "messages.h"
-#include "utils/log.h"
+#include "model/messages.h"
 #include "model/diff/contact_visitor.h"
+#include "utils/log.h"
 #include <boost/asio.hpp>
 #include <optional>
 #include <unordered_set>
@@ -75,7 +76,7 @@ struct global_discovery_actor_t : public r::actor_base_t, private model::diff::c
     void announce() noexcept;
     void on_announce_response(message::http_response_t &message) noexcept;
     void on_discovery_response(message::http_response_t &message) noexcept;
-    void on_contact_update(message::contact_update_t& message) noexcept;
+    void on_contact_update(model::message::contact_update_t& message) noexcept;
     void on_discovery(message::discovery_notify_t &req) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff, message::discovery_notify_t* msg) noexcept;

@@ -47,7 +47,7 @@ void cluster_supervisor_t::shutdown_start() noexcept {
     ra::supervisor_asio_t::shutdown_start();
 }
 
-void cluster_supervisor_t::on_model_update(message::model_update_t &message) noexcept {
+void cluster_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto& diff = *message.payload.diff;
     auto r = diff.visit(*this);

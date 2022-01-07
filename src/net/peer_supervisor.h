@@ -2,6 +2,7 @@
 
 #include "config/bep.h"
 #include "messages.h"
+#include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/contact_visitor.h"
 #include "utils/log.h"
@@ -62,8 +63,8 @@ struct peer_supervisor_t : public ra::supervisor_asio_t, private model::diff::cl
     using id2addr_t = std::map<std::string, r::address_ptr_t>;
     using addr2id_t = std::map<r::address_ptr_t, std::string>;
 
-    void on_model_update(net::message::model_update_t& ) noexcept;
-    void on_contact_update(net::message::contact_update_t& ) noexcept;
+    void on_model_update(model::message::model_update_t& ) noexcept;
+    void on_contact_update(model::message::contact_update_t& ) noexcept;
 
     outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_contact_t &) noexcept override;

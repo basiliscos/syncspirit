@@ -4,7 +4,7 @@
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/new_file.h"
 #include "model/diff/modify/lock_file.h"
-#include "../utils/error_code.h"
+#include "utils/error_code.h"
 #include <fstream>
 
 using namespace syncspirit;
@@ -116,7 +116,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 auto folder_id = file->get_folder_info()->get_folder()->get_id();
                 diff = new model::diff::modify::lock_file_t(folder_id, file->get_name(), true);
-                send<payload::model_update_t>(coordinator, std::move(diff), this);
+                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             }
             preprocess_block(block);
         } else {
@@ -149,7 +149,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
                     std::move(info),
                     std::move(blocks)
                 );
-                send<payload::model_update_t>(coordinator, std::move(diff), this);
+                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             } else {
                 ready();
             }
@@ -166,7 +166,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
 
     if (file_block.is_locally_available()) {
         auto diff = block_diff_ptr_t(new modify::clone_block_t(*target_file, *file_block.block()));
-        send<payload::block_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::block_update_t>(coordinator, std::move(diff), this);
     }
     else {
         auto block = file_block.block();
@@ -188,7 +188,7 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
     std::visit([this](auto &msg) { on_message(msg); }, message.payload);
 }
 
-void controller_actor_t::on_model_update(message::model_update_t &message) noexcept {
+void controller_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     if (message.payload.custom == this) {
         LOG_TRACE(log, "{}, on_model_update", identity);
         auto& diff = *message.payload.diff;
@@ -221,7 +221,7 @@ auto controller_actor_t::operator()(const model::diff::modify::lock_file_t& diff
 */
 
 
-void controller_actor_t::on_block_update(message::block_update_t &message) noexcept {
+void controller_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
     if (message.payload.custom == this) {
         LOG_TRACE(log, "{}, on_block_update", identity);
         auto& d = *message.payload.diff;
@@ -232,7 +232,7 @@ void controller_actor_t::on_block_update(message::block_update_t &message) noexc
             LOG_TRACE(log, "{}, on_block_update, finalizing", identity);
             auto diff = model::diff::cluster_diff_ptr_t{};
             diff = new model::diff::modify::lock_file_t(d.folder_id, d.file_name, false);
-            send<payload::model_update_t>(coordinator, std::move(diff), this);
+            send<model::payload::model_update_t>(coordinator, std::move(diff), this);
         }
     }
 }
@@ -246,7 +246,7 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
         LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
-    send<payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
+    send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
@@ -257,7 +257,7 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
         LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
-    send<payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
+    send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 
 void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
@@ -268,7 +268,7 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
         LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
-    send<payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
+    send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 
 void controller_actor_t::on_message(proto::message::Request &message) noexcept { std::abort(); }
@@ -323,7 +323,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
             auto index = payload.block.block_index();
 
             auto diff = block_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
-            send<payload::block_update_t>(coordinator, std::move(diff), this);
+            send<model::payload::block_update_t>(coordinator, std::move(diff), this);
         }
     }
     block->unlock();

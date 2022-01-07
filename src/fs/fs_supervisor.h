@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../config/main.h"
-#include "../utils/log.h"
-#include "../net/messages.h"
+#include "config/main.h"
+#include "utils/log.h"
+#include "model/messages.h"
 #include <rotor/thread.hpp>
 
 namespace syncspirit {
@@ -41,9 +41,9 @@ struct fs_supervisor_t : rth::supervisor_thread_t {
     void on_start() noexcept override;
 
   private:
-    void on_model_request(net::message::model_response_t& res) noexcept;
-    void on_model_update(net::message::model_update_t &message) noexcept;
-    void on_block_update(net::message::block_update_t &message) noexcept;
+    void on_model_request(model::message::model_response_t& res) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_block_update(model::message::block_update_t &message) noexcept;
     void launch() noexcept;
 
     model::cluster_ptr_t cluster;

@@ -28,7 +28,7 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void governor_actor_t::on_start() noexcept {
     log->trace("{}, on_start", identity);
     r::actor_base_t::on_start();
-    request<net::payload::model_request_t>(coordinator).send(init_timeout);
+    request<model::payload::model_request_t>(coordinator).send(init_timeout);
 }
 
 void governor_actor_t::shutdown_start() noexcept {
@@ -36,7 +36,7 @@ void governor_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
-void governor_actor_t::on_model_response(net::message::model_response_t &reply) noexcept {
+void governor_actor_t::on_model_response(model::message::model_response_t &reply) noexcept {
     auto& ee = reply.payload.ee;
     if (ee) {
         LOG_ERROR(log, "{}, on_cluster_seed: {},", ee->message());
@@ -46,7 +46,7 @@ void governor_actor_t::on_model_response(net::message::model_response_t &reply) 
     cluster = std::move(reply.payload.res.cluster);
 }
 
-void governor_actor_t::on_model_update(net::message::model_update_t &message) noexcept {
+void governor_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto& payload = message.payload;
     auto& diff = *message.payload.diff;

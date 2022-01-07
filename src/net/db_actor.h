@@ -1,10 +1,11 @@
 #pragma once
 
 #include "messages.h"
+#include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
 #include "mdbx.h"
-#include "../utils/log.h"
-#include "../db/transaction.h"
+#include "utils/log.h"
+#include "db/transaction.h"
 #include <optional>
 
 namespace syncspirit {
@@ -48,7 +49,7 @@ struct db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor
 
   private:
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
-    void on_model_update(message::model_update_t &message) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
     void open() noexcept;
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;
 

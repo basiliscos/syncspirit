@@ -38,7 +38,7 @@ template <> inline auto &db_actor_t::access<env>() noexcept { return env; }
 namespace  {
 
 struct fixture_t {
-    using msg_t = message::load_cluster_response_t;
+    using msg_t = net::message::load_cluster_response_t;
     using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
 
 
@@ -133,7 +133,7 @@ void test_loading_empty_db() {
     struct F : fixture_t {
 
         void main() noexcept override {
-            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
             REQUIRE(reply);
 
@@ -157,14 +157,14 @@ void test_folder_creation() {
             db_folder.set_label("my-label");
             db_folder.set_path("/my/path");
             auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-            sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
             sup->do_process();
 
             auto folder = cluster->get_folders().by_id(db_folder.id());
             REQUIRE(folder);
             REQUIRE(folder->get_folder_infos().by_device(cluster->get_device()));
 
-            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
             REQUIRE(reply);
             auto cluster_clone = make_cluster();
@@ -193,7 +193,7 @@ void test_peer_updating() {
             db_device.set_auto_accept(true);
 
             auto diff = diff::cluster_diff_ptr_t(new diff::modify::update_peer_t(db_device, sha256));
-            sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
             sup->do_process();
 
             auto device = cluster->get_devices().by_sha256(sha256);
@@ -201,7 +201,7 @@ void test_peer_updating() {
             CHECK(device->get_name() == "some_name");
             CHECK(device->get_cert_name() == "some-cn");
 
-            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
             REQUIRE(reply);
             auto cluster_clone = make_cluster();
@@ -240,11 +240,11 @@ void test_folder_sharing() {
             diffs.push_back(new diff::modify::share_folder_t(sha256, db_folder.id(), 5));
 
             auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-            sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
             sup->do_process();
             CHECK(static_cast<r::actor_base_t*>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
             REQUIRE(reply);
             auto cluster_clone = make_cluster();
@@ -285,7 +285,7 @@ void test_cluster_update_and_remove() {
             diffs.emplace_back(new diff::modify::share_folder_t(peer_id, db_folder.id(), peer_index));
 
             auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-            sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
             sup->do_process();
 
             proto::Index idx;
@@ -300,7 +300,7 @@ void test_cluster_update_and_remove() {
             b->set_hash(utils::sha256_digest("12345").value());
             diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
 
-            sup->send<payload::model_update_t>(sup->get_address(), diff, nullptr);
+            sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
             sup->do_process();
 
             REQUIRE(cluster->get_blocks().size() == 1);
@@ -313,7 +313,7 @@ void test_cluster_update_and_remove() {
             auto peer_file = peer_folder_info->get_file_infos().by_name("a.txt");
             REQUIRE(peer_file);
 
-            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
             REQUIRE(reply);
             REQUIRE(!reply->payload.ee);
@@ -335,10 +335,10 @@ void test_cluster_update_and_remove() {
             keys_t removed_blocks{std::string(block->get_key())};
             diff = new diff::peer::cluster_remove_t(peer_id, updated_folders, removed_folder_infos,
                                                     removed_files, removed_blocks);
-            sup->send<payload::model_update_t>(sup->get_address(), diff, nullptr);
+            sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
             sup->do_process();
 
-            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
             REQUIRE(reply);
             REQUIRE(!reply->payload.ee);
@@ -380,13 +380,13 @@ void test_new_file() {
             diffs.push_back(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file, {bi1}));
 
             auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-            sup->send<payload::model_update_t>(sup->get_address(),  diff, nullptr);
+            sup->send<model::payload::model_update_t>(sup->get_address(),  diff, nullptr);
             sup->do_process();
 
             REQUIRE(cluster->get_blocks().size() == 1);
             REQUIRE(cluster->get_blocks().get(bi1.hash()));
 
-            sup->request<payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
             REQUIRE(reply);
             REQUIRE(!reply->payload.ee);

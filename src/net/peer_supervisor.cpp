@@ -1,7 +1,7 @@
 #include "peer_supervisor.h"
 #include "peer_actor.h"
 #include "names.h"
-#include "../utils/error_code.h"
+#include "utils/error_code.h"
 #include "model/diff/peer/peer_state.h"
 #include "model/diff/modify/connect_request.h"
 #include "model/diff/modify/update_contact.h"
@@ -41,7 +41,7 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
         auto &device_id = it->second;
         auto diff = cluster_diff_ptr_t();
         diff = new peer::peer_state_t(device_id, peer_addr, false);
-        send<payload::model_update_t>(coordinator, std::move(diff));
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
         auto it_id = id2addr.find(device_id);
         id2addr.erase(it_id);
         addr2id.erase(it);
@@ -54,7 +54,7 @@ void peer_supervisor_t::on_start() noexcept {
     parent_t::on_start();
 }
 
-void peer_supervisor_t::on_model_update(net::message::model_update_t& msg) noexcept {
+void peer_supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto& diff = *msg.payload.diff;
     auto r = diff.visit(*this);
@@ -64,7 +64,7 @@ void peer_supervisor_t::on_model_update(net::message::model_update_t& msg) noexc
     }
 }
 
-void peer_supervisor_t::on_contact_update(net::message::contact_update_t& msg) noexcept {
+void peer_supervisor_t::on_contact_update(model::message::contact_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_contact_update", identity);
     auto& diff = *msg.payload.diff;
     auto r = diff.visit(*this);

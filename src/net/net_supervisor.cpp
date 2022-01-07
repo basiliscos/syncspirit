@@ -1,5 +1,5 @@
-#include "../config/utils.h"
-#include "../utils/error_code.h"
+#include "config/utils.h"
+#include "utils/error_code.h"
 #include "net_supervisor.h"
 #include "global_discovery_actor.h"
 #include "local_discovery_actor.h"
@@ -122,7 +122,7 @@ void net_supervisor_t::load_db() noexcept {
 }
 
 void net_supervisor_t::seed_model() noexcept {
-    send<payload::model_update_t>(address, std::move(load_diff), nullptr);
+    send<model::payload::model_update_t>(address, std::move(load_diff), nullptr);
 }
 
 void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message) noexcept {
@@ -138,7 +138,7 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
     }
 }
 
-void net_supervisor_t::on_model_request(message::model_request_t &message) noexcept {
+void net_supervisor_t::on_model_request(model::message::model_request_t &message) noexcept {
     --cluster_copies;
     LOG_TRACE(log, "{}, on_cluster_seed, left = {}", identity, cluster_copies);
     auto my_device = cluster->get_device();
@@ -151,7 +151,7 @@ void net_supervisor_t::on_model_request(message::model_request_t &message) noexc
     }
 }
 
-void net_supervisor_t::on_model_update(message::model_update_t &message) noexcept {
+void net_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto& diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
@@ -166,7 +166,7 @@ void net_supervisor_t::on_model_update(message::model_update_t &message) noexcep
     }
 }
 
-void net_supervisor_t::on_block_update(message::block_update_t &message) noexcept {
+void net_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_block_update", identity);
     auto& diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
@@ -176,7 +176,7 @@ void net_supervisor_t::on_block_update(message::block_update_t &message) noexcep
     }
 }
 
-void net_supervisor_t::on_contact_update(message::contact_update_t &message) noexcept {
+void net_supervisor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_contact_update", identity);
     auto& diff = *message.payload.diff;
     auto r = diff.apply(*cluster);

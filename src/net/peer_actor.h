@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../config/bep.h"
-#include "../transport/stream.h"
-#include "../proto/bep_support.h"
-#include "../utils/log.h"
+#include "config/bep.h"
+#include "transport/stream.h"
+#include "proto/bep_support.h"
+#include "utils/log.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>
@@ -105,8 +105,6 @@ struct peer_actor_t : public r::actor_base_t {
     void on_termination(message::termination_signal_t &) noexcept;
     void on_block_request(message::block_request_t &) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
-    void on_file_update(message::file_update_notify_t &) noexcept;
-    void on_folder_update(message::folder_update_notify_t &) noexcept;
 
     void on_connect(resolve_it_t) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;
@@ -130,9 +128,6 @@ struct peer_actor_t : public r::actor_base_t {
     void reset_tx_timer() noexcept;
     void reset_rx_timer() noexcept;
     void read_hello(proto::message::message_t &&msg) noexcept;
-#if 0
-    void read_cluster_config(proto::message::message_t &&msg) noexcept;
-#endif
     void read_controlled(proto::message::message_t &&msg) noexcept;
 
     void handle_ping(proto::message::Ping &&) noexcept;

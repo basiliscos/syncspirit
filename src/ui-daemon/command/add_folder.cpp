@@ -88,7 +88,7 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
     }
 
     auto diff = cluster_diff_ptr_t(new modify::create_folder_t(folder));
-    actor.send<net::payload::model_update_t>(actor.coordinator, std::move(diff), &actor);
+    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(diff), &actor);
     return true;
 }
 

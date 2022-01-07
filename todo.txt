@@ -9,7 +9,6 @@
 
  -- cluster, deleted_xxx (deleted_blocks, etc.) - убрать?
  -- убрать mark_modified()
- -- убрать/переместить http/transport/private мессаджи в net/net_messages.h
 
 
 - make fs-actor smart (clone model)

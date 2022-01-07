@@ -1,6 +1,6 @@
 #include "fs_supervisor.h"
-#include "../net/names.h"
-#include "../hasher/hasher_proxy_actor.h"
+#include "net/names.h"
+#include "hasher/hasher_proxy_actor.h"
 //#include "scan_actor.h"
 #include "file_actor.h"
 
@@ -28,7 +28,7 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&fs_supervisor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&fs_supervisor_t::on_block_update, coordinator);
-                request<net::payload::model_request_t>(coordinator).send(init_timeout);
+                request<model::payload::model_request_t>(coordinator).send(init_timeout);
                 resources->acquire(resource::model);
             }
         });
@@ -62,7 +62,7 @@ void fs_supervisor_t::launch() noexcept {
 #endif
 }
 
-void fs_supervisor_t::on_model_request(net::message::model_response_t &res) noexcept {
+void fs_supervisor_t::on_model_request(model::message::model_response_t &res) noexcept {
     LOG_TRACE(log, "{}, on_model_request", identity);
     resources->release(resource::model);
     auto ee = res.payload.ee;
@@ -79,7 +79,7 @@ void fs_supervisor_t::on_start() noexcept {
     r::actor_base_t::on_start();
 }
 
-void fs_supervisor_t::on_model_update(net::message::model_update_t &message) noexcept {
+void fs_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto& diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
@@ -89,7 +89,7 @@ void fs_supervisor_t::on_model_update(net::message::model_update_t &message) noe
     }
 }
 
-void fs_supervisor_t::on_block_update(net::message::block_update_t &message) noexcept {
+void fs_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_block_update", identity);
     auto& diff = *message.payload.diff;
     auto r = diff.apply(*cluster);

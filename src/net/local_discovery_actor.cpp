@@ -3,6 +3,7 @@
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "model/diff/modify/update_contact.h"
+#include "model/messages.h"
 
 using namespace syncspirit::net;
 
@@ -150,7 +151,7 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
                     using namespace model::diff;
                     auto diff = model::diff::contact_diff_ptr_t{};
                     diff = new modify::update_contact_t(*cluster, device_id.value(), uris);
-                    send<payload::contact_update_t>(coordinator, std::move(diff), this);
+                    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
                 } else {
                     LOG_WARN(log, "{}, on_read, no valid uris from: {}", identity, peer_endpoint);
                 }

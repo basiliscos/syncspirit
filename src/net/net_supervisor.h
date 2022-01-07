@@ -1,7 +1,7 @@
 #pragma once
 
+#include "model/messages.h"
 #include "model/device.h"
-#include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/block_visitor.h"
 #include "utils/log.h"
@@ -53,10 +53,10 @@ struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::clu
 
   private:
     void on_load_cluster(message::load_cluster_response_t &message) noexcept;
-    void on_model_update(message::model_update_t &message) noexcept;
-    void on_block_update(message::block_update_t &message) noexcept;
-    void on_contact_update(message::contact_update_t &message) noexcept;
-    void on_model_request(message::model_request_t &message) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_block_update(model::message::block_update_t &message) noexcept;
+    void on_contact_update(model::message::contact_update_t &message) noexcept;
+    void on_model_request(model::message::model_request_t &message) noexcept;
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
     void launch_early() noexcept;

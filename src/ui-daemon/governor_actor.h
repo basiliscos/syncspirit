@@ -2,10 +2,9 @@
 
 #include <rotor.hpp>
 #include "command.h"
-#include "../net/messages.h"
-#include "../utils/log.h"
-#include "../model/cluster.h"
+#include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
+#include "utils/log.h"
 
 namespace syncspirit::daemon {
 
@@ -43,8 +42,8 @@ struct governor_actor_t : public r::actor_base_t, private model::diff::cluster_v
 
   private:
     void process() noexcept;
-    void on_model_update(net::message::model_update_t &message) noexcept;
-    void on_model_response(net::message::model_response_t& reply) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_model_response(model::message::model_response_t& reply) noexcept;
 
     outcome::result<void> operator()(const model::diff::load::load_cluster_t &) noexcept override;
 };

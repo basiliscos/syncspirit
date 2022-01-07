@@ -6,6 +6,7 @@
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/new_file.h"
+#include "net/messages.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -23,7 +24,7 @@ namespace bfs = boost::filesystem;
 namespace  {
 
 struct fixture_t {
-    using msg_t = message::load_cluster_response_t;
+    using msg_t = net::message::load_cluster_response_t;
     using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
 
 
@@ -71,7 +72,7 @@ struct fixture_t {
         db_folder.set_label("my-label");
         db_folder.set_path(root_path.string());
         auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-        sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+        sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
         sup->do_process();
 
         main();
@@ -108,7 +109,7 @@ void test_new_files() {
 
             SECTION("empty regular file") {
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_fi, {}));
-                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                 sup->do_process();
 
                 auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
@@ -123,7 +124,7 @@ void test_new_files() {
             SECTION("empty regular file a subdir") {
                 pr_fi.set_name("a/b/c/d/e.txt");
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_fi, {}));
-                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                 sup->do_process();
 
                 auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
@@ -140,7 +141,7 @@ void test_new_files() {
                 pr_fi.set_block_size(5);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_fi, {}));
-                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                 sup->do_process();
 
                 auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
@@ -157,7 +158,7 @@ void test_new_files() {
                 pr_fi.set_type(proto::FileInfoType::DIRECTORY);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_fi, {}));
-                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                 sup->do_process();
 
                 auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
@@ -176,7 +177,7 @@ void test_new_files() {
                 pr_fi.set_symlink_target(target.string());
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_fi, {}));
-                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                 sup->do_process();
 
                 auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
@@ -196,7 +197,7 @@ void test_new_files() {
                 REQUIRE(bfs::exists(target));
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_fi, {}));
-                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                 sup->do_process();
 
                 auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
@@ -230,7 +231,7 @@ void test_append_block() {
                 pr_source.set_size(5ul);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_source, {bi1}));
-                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                 sup->do_process();
 
                 auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
@@ -238,7 +239,7 @@ void test_append_block() {
                 auto file = files_info.by_name(pr_source.name());
 
                 auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 0, "12345"));
-                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                 sup->do_process();
 
                 auto path = root_path / std::string(file->get_name());
@@ -258,7 +259,7 @@ void test_append_block() {
                 bi2.set_offset(0);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_source, {bi1, bi2}));
-                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                 sup->do_process();
 
                 auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
@@ -266,7 +267,7 @@ void test_append_block() {
                 auto file = files_info.by_name(pr_source.name());
 
                 auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 0, "12345"));
-                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                 sup->do_process();
 
                 auto filename = std::string(file->get_name()) + ".syncspirit-tmp";
@@ -278,7 +279,7 @@ void test_append_block() {
 
                 SECTION("add 2nd block") {
                     bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 1, "67890"));
-                    sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                     sup->do_process();
                     filename = std::string(file->get_name());
                     path = root_path / filename;
@@ -291,7 +292,7 @@ void test_append_block() {
                 SECTION("remove folder (simulate err)") {
                     bfs::remove_all(root_path);
                     bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 1, "67890"));
-                    sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                     sup->do_process();
                     CHECK(static_cast<r::actor_base_t*>(file_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
                 }
@@ -330,7 +331,7 @@ void test_clone_block() {
                     diffs.push_back(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_target, {bi1}));
 
                     auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-                    sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                     sup->do_process();
 
                     auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
@@ -339,12 +340,12 @@ void test_clone_block() {
                     auto target_file = files_info.by_name(pr_target.name());
 
                     auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*source_file, 0, "12345"));
-                    sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                     sup->do_process();
 
                     auto block = source_file->get_blocks()[0];
                     bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *block));
-                    sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                     sup->do_process();
 
                     auto path = root_path / std::string(target_file->get_name());
@@ -363,7 +364,7 @@ void test_clone_block() {
                     diffs.push_back(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_target, {bi1, bi1}));
 
                     auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-                    sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                     sup->do_process();
 
                     auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
@@ -372,12 +373,12 @@ void test_clone_block() {
                     auto target_file = files_info.by_name(pr_target.name());
 
                     auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*source_file, 0, "12345"));
-                    sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                     sup->do_process();
 
                     auto block = source_file->get_blocks()[0];
                     bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *block));
-                    sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                     sup->do_process();
 
                     auto filename = std::string(target_file->get_name()) + ".syncspirit-tmp";
@@ -396,7 +397,7 @@ void test_clone_block() {
                 diffs.push_back(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_source, {bi1, bi1}));
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-                sup->send<payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                 sup->do_process();
 
                 auto& folders_info  = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
@@ -405,12 +406,12 @@ void test_clone_block() {
                 auto target_file = source_file;
 
                 auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*source_file, 0, "12345"));
-                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                 sup->do_process();
 
                 auto block = source_file->get_blocks()[0];
                 bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *block));
-                sup->send<payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                 sup->do_process();
 
                 auto path = root_path / std::string(target_file->get_name());

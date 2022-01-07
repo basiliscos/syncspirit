@@ -91,7 +91,7 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
     }
 }
 
-void dialer_actor_t::on_model_update(net::message::model_update_t& msg) noexcept {
+void dialer_actor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto& diff = *msg.payload.diff;
     auto r = diff.visit(*this);

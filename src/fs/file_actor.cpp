@@ -35,7 +35,7 @@ void file_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
 }
 
-void file_actor_t::on_model_update(net::message::model_update_t &message) noexcept {
+void file_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto& diff = *message.payload.diff;
     auto r = diff.visit(*this);
@@ -46,7 +46,7 @@ void file_actor_t::on_model_update(net::message::model_update_t &message) noexce
 }
 
 
-void file_actor_t::on_block_update(net::message::block_update_t &message) noexcept {
+void file_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_block_update", identity);
     auto& diff = *message.payload.diff;
     auto r = diff.visit(*this);

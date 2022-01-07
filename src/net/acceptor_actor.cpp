@@ -1,6 +1,7 @@
 #include "acceptor_actor.h"
 #include "names.h"
 #include "utils/error_code.h"
+#include "model/messages.h"
 #include "model/diff/contact_diff.h"
 #include "model/diff/modify/connect_request.h"
 #include "model/diff/modify/update_contact.h"
@@ -67,7 +68,7 @@ void acceptor_actor_t::on_start() noexcept {
 
     auto diff = model::diff::contact_diff_ptr_t{};
     diff = new modify::update_contact_t(*cluster, cluster->get_device()->device_id(), uris);
-    send<payload::contact_update_t>(coordinator, std::move(diff), this);
+    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     accept_next();
     r::actor_base_t::on_start();
 }
@@ -110,6 +111,6 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
 
     auto diff = model::diff::contact_diff_ptr_t{};
     diff = new modify::connect_request_t(std::move(peer), remote);
-    send<payload::contact_update_t>(coordinator, std::move(diff), this);
+    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     accept_next();
 }

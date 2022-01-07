@@ -4,6 +4,7 @@
 #include "utils/tls.h"
 #include "utils/error_code.h"
 #include "proto/bep_support.h"
+#include "model/messages.h"
 #include "model/diff/peer/peer_state.h"
 #include <boost/core/demangle.hpp>
 
@@ -66,8 +67,6 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&peer_actor_t::on_termination);
         p.subscribe_actor(&peer_actor_t::on_block_request);
         p.subscribe_actor(&peer_actor_t::on_forward);
-        p.subscribe_actor(&peer_actor_t::on_file_update);
-        p.subscribe_actor(&peer_actor_t::on_folder_update);
         instantiate_transport();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
@@ -455,7 +454,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
                           msg->client_version());
                 auto diff = cluster_diff_ptr_t();
                 diff = new peer::peer_state_t(peer_device_id.get_sha256(), get_address(), true, cert_name, peer_endpoint, msg->client_name());
-                send<payload::model_update_t>(coordinator, std::move(diff));
+                send<model::payload::model_update_t>(coordinator, std::move(diff));
             } else {
                 LOG_WARN(log, "{}, read_hello, unexpected_message", identity);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
@@ -590,9 +589,9 @@ void peer_actor_t::on_rx_timeout(r::request_id_t, bool cancelled) noexcept {
     }
 }
 
+#if 0
 void peer_actor_t::on_file_update(message::file_update_notify_t &msg) noexcept {
     std::abort();
-#if 0
     auto &file = msg.payload.file;
     LOG_TRACE(log, "{}, on_file_update, file = {}", identity, file->get_full_name());
     proto::IndexUpdate iu;
@@ -602,17 +601,15 @@ void peer_actor_t::on_file_update(message::file_update_notify_t &msg) noexcept {
     fmt::memory_buffer buff;
     proto::serialize(buff, iu);
     push_write(std::move(buff), false);
-#endif
 }
 
 void peer_actor_t::on_folder_update(message::folder_update_notify_t &msg) noexcept {
-#if 0
     auto &folder = msg.payload.folder;
     LOG_TRACE(log, "{}, on_folder_update, folder = {}", identity, folder->get_label());
     auto index = folder->generate();
     fmt::memory_buffer buff;
     proto::serialize(buff, index);
     push_write(std::move(buff), false);
-#endif
     std::abort();
 }
+#endif

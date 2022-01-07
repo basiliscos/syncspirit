@@ -1,12 +1,12 @@
 #pragma once
 
 #include "model/cluster.h"
+#include "model/messages.h"
 #include "model/diff/block_visitor.h"
 #include "model/misc/lru_cache.hpp"
 #include "config/main.h"
 #include "utils/log.h"
 #include "utils.h"
-#include "net/messages.h"
 #include <rotor.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 
@@ -60,8 +60,8 @@ struct file_actor_t : public r::actor_base_t, private model::diff::block_visitor
   private:
     using cache_t = model::mru_list_t<mmaped_file_ptr_t>;
 
-    void on_model_update(net::message::model_update_t &message) noexcept;
-    void on_block_update(net::message::block_update_t &message) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_block_update(model::message::block_update_t &message) noexcept;
 
     outcome::result<mmaped_file_ptr_t> open_file(const bfs::path& path, bool temporal, size_t size) noexcept;
     outcome::result<mmaped_file_t::backend_t> open_file(const bfs::path& path, const bio::mapped_file_params& params) noexcept;

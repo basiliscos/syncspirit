@@ -1,18 +1,19 @@
 #pragma once
 
-#include "../config/bep.h"
-#include "../model/cluster.h"
-#include "../model/folder.h"
-#include "../fs/messages.h"
-#include "../utils/log.h"
-#include "messages.h"
+#include "config/bep.h"
+#include "model/cluster.h"
+#include "model/folder.h"
+#include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
+#include "utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 
 namespace syncspirit {
 namespace net {
 
+namespace r = rotor;
+namespace ra = r::asio;
 namespace bfs = boost::filesystem;
 namespace outcome = boost::outcome_v2;
 
@@ -57,7 +58,7 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t, private model::diff:
     void shutdown_start() noexcept override;
 
   private:
-    void on_model_update(message::model_update_t &message) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
 
     outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
 

@@ -183,7 +183,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     reply_to(request, r);
 }
 
-void db_actor_t::on_model_update(message::model_update_t &message) noexcept {
+void db_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto& diff = *message.payload.diff;
     auto r = diff.visit(*this);

@@ -1,11 +1,11 @@
 #pragma once
 
 #include "messages.h"
-#include "../model/misc/file_iterator.h"
-#include "../model/misc/block_iterator.h"
-#include "../fs/messages.h"
-#include "../hasher/messages.h"
-#include "../utils/log.h"
+#include "model/misc/file_iterator.h"
+#include "model/misc/block_iterator.h"
+#include "model/messages.h"
+#include "hasher/messages.h"
+#include "utils/log.h"
 #include <unordered_set>
 #include <optional>
 
@@ -106,9 +106,8 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     void on_block(message::block_response_t &message) noexcept;
     void on_validation(hasher::message::validation_response_t &res) noexcept;
     void preprocess_block(model::file_block_t& block) noexcept;
-    void on_file_update(message::file_update_notify_t &message) noexcept;
-    void on_model_update(message::model_update_t &message) noexcept;
-    void on_block_update(net::message::block_update_t &message) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_block_update(model::message::block_update_t &message) noexcept;
 
     void on_message(proto::message::ClusterConfig &message) noexcept;
     void on_message(proto::message::Index &message) noexcept;
@@ -121,11 +120,6 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     outcome::result<void> locally_unlock_file(std::string_view folder_id, std::string_view file_name) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::new_file_t &) noexcept override;
-#if 0
-    outcome::result<void> operator()(const model::diff::modify::lock_file_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::cluster_update_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::update_folder_t &) noexcept override;
-#endif
 
 
     model::cluster_ptr_t cluster;

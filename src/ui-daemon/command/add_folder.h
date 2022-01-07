@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../command.h"
-#include "../../model/folder.h"
+#include "model/folder.h"
 
 namespace syncspirit::daemon::command {
 

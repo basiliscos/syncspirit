@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../config/dialer.h"
-#include "../config/bep.h"
-#include "../utils/log.h"
-#include "model/cluster.h"
+#include "config/dialer.h"
+#include "config/bep.h"
+#include "utils/log.h"
+#include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
 #include "messages.h"
 #include <optional>
@@ -50,7 +50,7 @@ struct dialer_actor_t : public r::actor_base_t, private model::diff::cluster_vis
     using clock_t = std::chrono::steady_clock;
     using redial_map_t = std::unordered_map<model::device_ptr_t, rotor::request_id_t>;
     void on_announce(message::announce_notification_t &message) noexcept;
-    void on_model_update(net::message::model_update_t& ) noexcept;
+    void on_model_update(model::message::model_update_t& ) noexcept;
 
     void discover(const model::device_ptr_t &device) noexcept;
     void remove(const model::device_ptr_t &device) noexcept;

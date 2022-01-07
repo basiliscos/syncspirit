@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rotor/supervisor.h"
-#include "net/messages.h"
+#include "model/messages.h"
 #include "utils/log.h"
 
 namespace syncspirit::test {
@@ -20,9 +20,9 @@ struct supervisor_t final: r::supervisor_t {
     void shutdown() noexcept override;
     void enqueue(r::message_ptr_t message) noexcept override;
 
-    void on_model_update(net::message::model_update_t& ) noexcept;
-    void on_block_update(net::message::block_update_t& ) noexcept;
-    void on_contact_update(net::message::contact_update_t &) noexcept;
+    void on_model_update(model::message::model_update_t& ) noexcept;
+    void on_block_update(model::message::block_update_t& ) noexcept;
+    void on_contact_update(model::message::contact_update_t &) noexcept;
     void do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept override;
     void do_invoke_timer(r::request_id_t timer_id) noexcept;
     void do_cancel_timer(r::request_id_t timer_id) noexcept override;

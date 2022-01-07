@@ -19,7 +19,7 @@ using namespace syncspirit::net;
 namespace  {
 
 struct fixture_t {
-    using discovery_msg_t = message::discovery_notify_t;
+    using discovery_msg_t = net::message::discovery_notify_t;
     using discovery_ptr_t = r::intrusive_ptr_t<discovery_msg_t>;
 
     fixture_t() noexcept {
@@ -89,7 +89,7 @@ struct fixture_t {
 void test_dialer() {
     struct F : fixture_t {
         void main() noexcept override {
-            sup->send<payload::announce_notification_t>(sup->get_address());
+            sup->send<net::payload::announce_notification_t>(sup->get_address());
             sup->do_process();
             CHECK(discovery);
 
@@ -108,14 +108,14 @@ void test_dialer() {
                 auto sample_addr = sup->get_address();
                 auto peer_id = peer_device->device_id().get_sha256();
                 diff = new model::diff::peer::peer_state_t(peer_id, sample_addr, true);
-                sup->send<payload::model_update_t>(sup->get_address(), diff);
+                sup->send<model::payload::model_update_t>(sup->get_address(), diff);
 
                 sup->do_process();
                 CHECK(!discovery);
                 CHECK(sup->timers.size() == 0);
 
                 diff = new model::diff::peer::peer_state_t(peer_id, sample_addr, false);
-                sup->send<payload::model_update_t>(sup->get_address(), diff);
+                sup->send<model::payload::model_update_t>(sup->get_address(), diff);
 
                 sup->do_process();
                 CHECK(!discovery);

@@ -84,7 +84,7 @@ void supervisor_t::enqueue(r::message_ptr_t message) noexcept {
     locality_leader->access<to::queue>().emplace_back(std::move(message));
 }
 
-void supervisor_t::on_model_update(net::message::model_update_t& msg) noexcept {
+void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, updating model", identity);
     auto& diff = msg.payload.diff;
     auto r = diff->apply(*cluster);
@@ -94,7 +94,7 @@ void supervisor_t::on_model_update(net::message::model_update_t& msg) noexcept {
     }
 }
 
-void supervisor_t::on_block_update(net::message::block_update_t& msg) noexcept {
+void supervisor_t::on_block_update(model::message::block_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, updating block", identity);
     auto& diff = msg.payload.diff;
     auto r = diff->apply(*cluster);
@@ -104,7 +104,7 @@ void supervisor_t::on_block_update(net::message::block_update_t& msg) noexcept {
     }
 }
 
-void supervisor_t::on_contact_update(net::message::contact_update_t& msg) noexcept {
+void supervisor_t::on_contact_update(model::message::contact_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, updating contact", identity);
     auto& diff = msg.payload.diff;
     auto r = diff->apply(*cluster);
