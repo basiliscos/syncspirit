@@ -1,8 +1,6 @@
 - uuid model
  - controller_actor
    -- частота запросов снижается
-   -- tests
-   -- не падать, если пришла ошибка на запрос блока
  - перезапускать gda, lda, backoff: min, max
  - scan_actor
   -- кластер не стартует, если нажать ctrl+c крэш (незкарыта транзакция)
@@ -19,7 +17,12 @@
 не работает, когда подключаются к нам?
 [2021-12-18 17:18:43.152] [T/15077] net::accceptor, on_accept, peer = 127.0.0.1:22000, sock = 11
 
+- controller: частота запросов снижается?
+
+
 ===================
+
+- controller: не падать, если пришла ошибка на запрос блока
 
 - https://docs.syncthing.net/users/faq.html#what-things-are-synced
 - test: validation happens before opening file?
