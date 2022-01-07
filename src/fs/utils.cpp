@@ -54,17 +54,19 @@ outcome::result<void> mmaped_file_t::close() noexcept {
 }
 
 
-
-static std::size_t block_sizes[] = {
+static std::size_t _block_sizes[] = {
     (1 << 7) * 1024,  (1 << 8) * 1024,  (1 << 9) * 1024,  (1 << 10) * 1024,
     (1 << 11) * 1024, (1 << 12) * 1024, (1 << 13) * 1024, (1 << 14) * 1024,
 };
-static const constexpr size_t block_sizes_count = sizeof(block_sizes) / sizeof(block_sizes[0]);
+
+std::size_t block_sizes_sz = 8;
+std::size_t *block_sizes = _block_sizes;
+
 static const constexpr size_t max_blocks_count = 2000;
 
 std::pair<size_t, size_t> get_block_size(size_t sz) noexcept {
     size_t bs = 0;
-    for (size_t i = 0; i < block_sizes_count; ++i) {
+    for (size_t i = 0; i < block_sizes_sz; ++i) {
         if (block_sizes[i] * max_blocks_count >= sz) {
             bs = block_sizes[i];
             if (bs > sz) {
@@ -74,7 +76,7 @@ std::pair<size_t, size_t> get_block_size(size_t sz) noexcept {
         }
     }
     if (bs == 0 && sz) {
-        bs = block_sizes[block_sizes_count - 1];
+        bs = block_sizes[block_sizes_sz - 1];
     }
 
     size_t count = 0;

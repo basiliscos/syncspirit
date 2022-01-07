@@ -51,5 +51,8 @@ struct relative_result_t {
 
 relative_result_t relative(const bfs::path &path, const bfs::path &root) noexcept;
 
+extern std::size_t block_sizes_sz;
+extern std::size_t* block_sizes;
+
 } // namespace fs
 } // namespace syncspirit

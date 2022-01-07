@@ -565,7 +565,7 @@ void test_downloading() {
                 file_2->set_name("some-file");
                 file_2->set_type(proto::FileInfoType::FILE);
                 file_2->set_sequence(3ul);
-                file_2->set_block_size(5);
+                file_2->set_block_size(128 * 1024);
                 file_2->set_size(5);
                 auto v2 = file_2->mutable_version();
                 auto c2 = v2->add_counters();

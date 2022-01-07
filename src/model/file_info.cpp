@@ -3,7 +3,8 @@
 #include "cluster.h"
 #include "misc/error_code.h"
 #include "misc/version_utils.h"
-#include "../db/prefix.h"
+#include "db/prefix.h"
+#include "fs/utils.h"
 #include <algorithm>
 #include <spdlog/spdlog.h>
 
@@ -170,7 +171,7 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
 outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
     size_t count = 0;
     if (!block_count && !(flags & f_deleted) && !(flags & f_invalid)) {
-        if (size < block_size) {
+        if ((size < block_size) && (size >= fs::block_sizes[0])) {
             return make_error_code(error_code_t::invalid_block_size);
         }
         if (size) {
