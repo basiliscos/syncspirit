@@ -1,4 +1,5 @@
 - uuid model
+ - controller: do not re-download file if only meta has been chnaged
  - перезапускать gda, lda, backoff: min, max
  - scan_actor
   -- кластер не стартует, если нажать ctrl+c крэш (незкарыта транзакция)

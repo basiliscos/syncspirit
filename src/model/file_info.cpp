@@ -205,7 +205,7 @@ void file_info_t::mark_local_available(size_t block_index) noexcept {
     --missing_blocks;
 }
 
-bool file_info_t::is_locally_available() noexcept {
+bool file_info_t::is_locally_available() const noexcept {
     return missing_blocks == 0;
 }
 

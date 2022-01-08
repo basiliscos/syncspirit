@@ -388,6 +388,11 @@ void test_downloading() {
                 file->set_sequence(1ul);
                 file->set_block_size(5);
                 file->set_size(5);
+                auto version = file->mutable_version();
+                auto counter = version->add_counters();
+                counter->set_id(1ul);
+                counter->set_value(1ul);
+
                 auto b1 = file->add_blocks();
                 b1->set_hash(utils::sha256_digest("12345").value());
                 b1->set_offset(0);
@@ -410,6 +415,23 @@ void test_downloading() {
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_locked());
+                CHECK(peer_actor->blocks_requested == 1);
+
+                SECTION("dont redownload file only if metadata has changed") {
+                    auto index_update = proto::IndexUpdate{};
+                    index_update.set_folder(index.folder());
+                    file->set_sequence(2ul);
+                    counter->set_value(2ul);
+
+                    *index_update.add_files() = *file;
+                    peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
+                    sup->do_process();
+                    CHECK(peer_actor->blocks_requested == 1);
+                    CHECK(folder_my->get_max_sequence() == 2ul);
+                    f = folder_my->get_file_infos().begin()->item;
+                    CHECK(f->is_locally_available());
+                    CHECK(f->get_sequence() == 2ul);
+                }
             }
 
             SECTION("cluster config is the same, but there are non-downloaded files") {

@@ -18,6 +18,7 @@ struct new_file_t final : cluster_diff_t {
     proto::FileInfo file;
     blocks_t blocks;
     new_blocks_t new_blocks;
+    bool identical_data;
 };
 
 }

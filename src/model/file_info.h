@@ -82,7 +82,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 
     void mark_local_available(size_t block_index) noexcept;
-    bool is_locally_available() noexcept;
+    bool is_locally_available() const noexcept;
 
     const std::string &get_link_target() const noexcept { return symlink_target; }
 

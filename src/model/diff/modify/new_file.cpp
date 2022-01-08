@@ -6,7 +6,7 @@
 using namespace syncspirit::model::diff::modify;
 
 new_file_t::new_file_t(const model::cluster_t& cluster, std::string_view folder_id_, proto::FileInfo file_, blocks_t blocks_) noexcept:
-    folder_id{folder_id_}, file{std::move(file_)}, blocks{std::move(blocks_)}
+    folder_id{folder_id_}, file{std::move(file_)}, blocks{std::move(blocks_)}, identical_data{false}
 {
     auto &block_map = cluster.get_blocks();
     for(size_t i = 0; i < blocks.size(); ++i) {
@@ -16,6 +16,28 @@ new_file_t::new_file_t(const model::cluster_t& cluster, std::string_view folder_
             new_blocks.push_back(i);
         }
     }
+    if (!new_blocks.empty() || blocks.empty()) {
+        return;
+    }
+
+    auto folder = cluster.get_folders().by_id(folder_id);
+    auto file_infos = folder->get_folder_infos().by_device(cluster.get_device());
+    auto prev_file  = file_infos->get_file_infos().by_name(file.name());
+    if (!prev_file) {
+        return;
+    }
+    auto& prev_blocks = prev_file->get_blocks();
+    if (prev_blocks.size() != blocks.size()) {
+        return;
+    }
+    for(size_t i = 0; i < prev_blocks.size(); ++i) {
+        auto& bp = prev_blocks[i];
+        auto& bn = blocks[i];
+        if (bp->get_hash() != bn.hash()) {
+            return;
+        }
+    }
+    identical_data = true;
 }
 
 auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
@@ -48,6 +70,9 @@ auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resul
         auto block = blocks_map.get(b.hash());
         assert(block);
         fi->assign_block(block, i);
+        if (identical_data) {
+            fi->mark_local_available(i);
+        }
     }
     folder_info->get_file_infos().put(fi);
 

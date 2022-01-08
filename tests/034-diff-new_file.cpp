@@ -71,4 +71,33 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(cluster->get_blocks().size() == 1);
         REQUIRE(cluster->get_blocks().get(bi.hash()));
     }
+
+    SECTION("identical blocks") {
+        pr_file_info.set_type(proto::FileInfoType::FILE);
+        pr_file_info.set_size(5ul);
+        pr_file_info.set_block_size(5ul);
+        pr_file_info.set_sequence(1ul);
+
+        auto bi = proto::BlockInfo();
+        bi.set_size(5);
+        bi.set_weak_hash(12);
+        bi.set_hash(utils::sha256_digest("12345").value());
+        bi.set_offset(0);
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {bi}));
+        REQUIRE(diff->apply(*cluster));
+
+        auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
+        auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        REQUIRE(file->get_sequence() == 1);
+        CHECK(!file->is_locally_available());
+        file->mark_local_available(0);
+        CHECK(file->is_locally_available());
+
+        pr_file_info.set_sequence(2ul);
+        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {bi}));
+        REQUIRE(diff->apply(*cluster));
+        file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        REQUIRE(file->get_sequence() == 2);
+        CHECK(file->is_locally_available());
+    }
 }

@@ -87,6 +87,10 @@ auto file_actor_t::reflect(const model::file_info_t& file) noexcept -> outcome::
 
     if (file.is_file()) {
         auto sz = file.get_size();
+        if (file.is_locally_available() && sz) {
+            return outcome::success();
+        }
+
         bool temporal = sz > 0;
         if (temporal) {
             LOG_TRACE(log, "{}, touching file {} ({} bytes)", identity, path.string(), sz);
@@ -110,14 +114,14 @@ auto file_actor_t::reflect(const model::file_info_t& file) noexcept -> outcome::
         }
     }
     else if (file.is_dir()) {
-        LOG_TRACE(log, "{}, creating directory {}", identity, path.string());
+        LOG_DEBUG(log, "{}, creating directory {}", identity, path.string());
         bfs::create_directory(path, ec);
         if (ec) {
             return ec;
         }
     } else if (file.is_link()) {
         auto target = bfs::path(file.get_link_target());
-        LOG_TRACE(log, "{}, creating symlink {} -> {}", identity, path.string(), target.string());
+        LOG_DEBUG(log, "{}, creating symlink {} -> {}", identity, path.string(), target.string());
 
         bool attempt_create =
             !bfs::exists(path, ec) || !bfs::is_symlink(path, ec) || (bfs::read_symlink(path, ec) != target);
