@@ -88,9 +88,8 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
 
     const bfs::path &get_path() const noexcept;
     bool need_download(const file_info_t& other) noexcept;
-#if 0
-    bool is_older(const file_info_t &other) noexcept;
-#endif
+
+    inline std::int64_t get_modified_s() const noexcept { return modified_s; }
 
     bool is_incomplete() const noexcept;
     void mark_complete() noexcept;

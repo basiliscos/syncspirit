@@ -25,9 +25,6 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
-
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-    });
 }
 
 void file_actor_t::on_start() noexcept {
@@ -56,7 +53,8 @@ void file_actor_t::on_block_update(model::message::block_update_t &message) noex
     }
 }
 
-auto file_actor_t::reflect(const model::file_info_t& file) noexcept -> outcome::result<void> {
+auto file_actor_t::reflect(model::file_info_ptr_t& file_ptr) noexcept -> outcome::result<void> {
+    auto& file = *file_ptr;
     auto& path = file.get_path();
     sys::error_code ec;
 
@@ -94,13 +92,12 @@ auto file_actor_t::reflect(const model::file_info_t& file) noexcept -> outcome::
         bool temporal = sz > 0;
         if (temporal) {
             LOG_TRACE(log, "{}, touching file {} ({} bytes)", identity, path.string(), sz);
-            auto file_opt = open_file(path, temporal, sz);
+            auto file_opt = open_file(path, temporal, &file);
             if (!file_opt) {
                 auto& err = file_opt.assume_error();
                 LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path.string(), err.message());
                 return err;
             }
-            auto& f = file_opt.assume_value();
         } else {
             LOG_TRACE(log, "{}, touching empty file {}", identity, path.string());
             std::ofstream out;
@@ -110,6 +107,13 @@ auto file_actor_t::reflect(const model::file_info_t& file) noexcept -> outcome::
             } catch (const std::ios_base::failure &e) {
                 LOG_ERROR(log, "{}, error creating {} : {}", identity, path.string(), e.code().message());
                 return sys::errc::make_error_code(sys::errc::io_error);
+            }
+            out.close();
+
+            std::time_t modified = file.get_modified_s();
+            bfs::last_write_time(path, modified, ec);
+            if (ec) {
+                return ec;
             }
         }
     }
@@ -145,7 +149,7 @@ auto file_actor_t::operator()(const model::diff::modify::new_file_t &diff) noexc
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
     auto file = file_info->get_file_infos().by_name(diff.file.name());
-    return reflect(*file);
+    return reflect(file);
 }
 
 
@@ -155,7 +159,7 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
     auto file = file_info->get_file_infos().by_name(diff.file_name);
     auto& path = file->get_path();
     auto& path_str = path.string();
-    auto file_opt = open_file(path, true, file->get_size());
+    auto file_opt = open_file(path, true, file);
     if (!file_opt) {
         auto& err = file_opt.assume_error();
         LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path_str, err.message());
@@ -193,7 +197,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
     auto source = source_folder_info->get_file_infos().by_name(diff.source_file_name);
 
     auto& target_path = target->get_path();
-    auto file_opt = open_file(target_path, true, target->get_size());
+    auto file_opt = open_file(target_path, true, target);
     if (!file_opt) {
         auto& err = file_opt.assume_error();
         LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, target_path.string(), err.message());
@@ -241,12 +245,13 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
     return outcome::success();
 }
 
-auto file_actor_t::open_file(const boost::filesystem::path &path, bool temporal, size_t size) noexcept -> outcome::result<mmaped_file_ptr_t> {
+auto file_actor_t::open_file(const boost::filesystem::path &path, bool temporal, model::file_info_ptr_t info) noexcept -> outcome::result<mmaped_file_ptr_t> {
     auto item = files_cache.get(path.string());
     if (item) {
         return item;
     }
 
+    auto size = info->get_size();
     LOG_TRACE(log, "{}, open_file, path = {} ({} bytes)", identity, path.string(), size);
     bfs::path operational_path = temporal ? make_temporal(path) : path;
 
@@ -274,7 +279,7 @@ auto file_actor_t::open_file(const boost::filesystem::path &path, bool temporal,
     }
 
     auto& backend = backend_opt.assume_value();
-    item = new mmaped_file_t(path, std::move(std::move(backend)), temporal);
+    item = new mmaped_file_t(path, std::move(std::move(backend)), temporal, std::move(info));
     files_cache.put(item);
     return std::move(item);
 }

@@ -105,7 +105,9 @@ void test_new_files() {
     struct F : fixture_t {
         void main() noexcept override {
             proto::FileInfo pr_fi;
+            std::int64_t modified = 1641828421;
             pr_fi.set_name("q.txt");
+            pr_fi.set_modified_s(modified);
 
             SECTION("empty regular file") {
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_fi, {}));
@@ -119,6 +121,7 @@ void test_new_files() {
                 auto& path = file->get_path();
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
+                REQUIRE(bfs::last_write_time(path) == 1641828421);
             }
 
             SECTION("empty regular file a subdir") {
@@ -208,7 +211,6 @@ void test_new_files() {
                 auto& path = file->get_path();
                 REQUIRE(!bfs::exists(target));
             }
-
         }
     };
     F().run();
@@ -217,9 +219,11 @@ void test_new_files() {
 void test_append_block() {
     struct F : fixture_t {
         void main() noexcept override {
+            std::int64_t modified = 1641828421;
             proto::FileInfo pr_source;
             pr_source.set_name("q.txt");
             pr_source.set_block_size(5ul);
+            pr_source.set_modified_s(modified);
 
             auto bi1 = proto::BlockInfo();
             bi1.set_size(5);
@@ -247,6 +251,7 @@ void test_append_block() {
                 REQUIRE(bfs::file_size(path) == 5);
                 auto data = read_file(path);
                 CHECK(data == "12345");
+                CHECK(bfs::last_write_time(path) == 1641828421);
             }
 
             SECTION("file with 2 different blocks") {
@@ -287,6 +292,7 @@ void test_append_block() {
                     REQUIRE(bfs::file_size(path) == 10);
                     data = read_file(path);
                     CHECK(data == "1234567890");
+                    CHECK(bfs::last_write_time(path) == 1641828421);
                 }
 
                 SECTION("remove folder (simulate err)") {
@@ -313,9 +319,11 @@ void test_clone_block() {
             bi1.set_hash(utils::sha256_digest("12345").value());
             bi1.set_offset(0);
 
+            std::int64_t modified = 1641828421;
             proto::FileInfo pr_source;
             pr_source.set_name("a.txt");
             pr_source.set_block_size(5ul);
+            pr_source.set_modified_s(modified);
 
             SECTION("source & target are different files") {
                 proto::FileInfo pr_target;
@@ -325,6 +333,7 @@ void test_clone_block() {
                 SECTION("single block target file") {
                     pr_source.set_size(5ul);
                     pr_target.set_size(5ul);
+                    pr_target.set_modified_s(modified);
 
                     auto diffs = diff::aggregate_t::diffs_t{};
                     diffs.push_back(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_source, {bi1}));
@@ -353,6 +362,7 @@ void test_clone_block() {
                     REQUIRE(bfs::file_size(path) == 5);
                     auto data = read_file(path);
                     CHECK(data == "12345");
+                    CHECK(bfs::last_write_time(path) == 1641828421);
                 }
 
                 SECTION("multi block target file") {
@@ -419,12 +429,12 @@ void test_clone_block() {
                 REQUIRE(bfs::file_size(path) == 10);
                 auto data = read_file(path);
                 CHECK(data == "1234512345");
+                CHECK(bfs::last_write_time(path) == 1641828421);
             }
         }
     };
     F().run();
 }
-
 
 
 REGISTER_TEST_CASE(test_new_files, "test_new_files", "[fs]");

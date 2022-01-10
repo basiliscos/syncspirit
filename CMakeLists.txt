@@ -33,7 +33,8 @@ add_library(syncspirit_lib
     src/db/utils.cpp
     src/fs/file_actor.cpp
     src/fs/fs_supervisor.cpp
-    src/fs/scan_actor.cpp
+    #src/fs/scan_actor.cpp
+    src/fs/scan_task.cpp
     src/fs/utils.cpp
     src/hasher/hasher_actor.cpp
     src/hasher/hasher_proxy_actor.cpp

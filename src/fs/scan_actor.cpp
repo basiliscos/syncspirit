@@ -1,27 +1,33 @@
-#if 0
 #include "scan_actor.h"
-#include "../net/names.h"
-#include "../utils/error_code.h"
-#include "../utils/tls.h"
+#include "net/names.h"
+#include "utils/error_code.h"
+#include "utils/tls.h"
 #include "utils.h"
 #include <fstream>
 
 namespace sys = boost::system;
 using namespace syncspirit::fs;
 
-scan_actor_t::scan_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, fs_config{cfg.fs_config}, hasher_proxy{cfg.hasher_proxy}, requested_hashes_limit{
-                                                                                          cfg.requested_hashes_limit} {
+scan_actor_t::scan_actor_t(config_t &cfg) : r::actor_base_t{cfg},  cluster{cfg.cluster},
+    fs_config{cfg.fs_config}, hasher_proxy{cfg.hasher_proxy}, requested_hashes_limit{cfg.requested_hashes_limit} {
     log = utils::get_logger("scan::actor");
 }
 
 void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>(
-        [&](auto &p) { p.set_identity(net::names::scan_actor, false); });
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.register_name(net::names::scan_actor, get_address()); });
+        [&](auto &p) { p.set_identity("fs.scan_actor", false); });
+    plugin.with_casted<r::plugin::registry_plugin_t>( [&](auto &p) {
+        p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&scan_actor_t::on_model_update, coordinator);
+            }
+        });
+    });
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(hasher_proxy, false); });
+#if 0
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&scan_actor_t::on_scan_request);
         p.subscribe_actor(&scan_actor_t::on_scan_cancel);
@@ -29,6 +35,7 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&scan_actor_t::on_process);
         p.subscribe_actor(&scan_actor_t::on_hash);
     });
+#endif
 }
 
 void scan_actor_t::on_start() noexcept {
@@ -302,4 +309,3 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     }
     intrusive_ptr_release(scan);
 }
-#endif

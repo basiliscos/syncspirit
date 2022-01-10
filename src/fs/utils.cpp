@@ -1,6 +1,6 @@
 #include "utils.h"
+#include "utils/tls.h"
 #include <zlib.h>
-#include "../utils/tls.h"
 
 namespace syncspirit::fs {
 
@@ -8,9 +8,13 @@ static const std::string_view tmp_suffix = ".syncspirit-tmp";
 
 mmaped_file_t::mmaped_file_t() noexcept {}
 
-mmaped_file_t::mmaped_file_t(const bfs::path& path_, backend_t backend_, bool temporal_) noexcept:
-    path{path_}, backend{std::move(backend_)}, temporal{temporal_}
+mmaped_file_t::mmaped_file_t(const bfs::path& path_, backend_t backend_, bool temporal_, model::file_info_ptr_t info_) noexcept:
+    path{path_}, backend{std::move(backend_)}, info{std::move(info_)}, temporal{temporal_}
 {}
+
+mmaped_file_t::~mmaped_file_t() {
+}
+
 
 const bfs::path& mmaped_file_t::get_path() const noexcept {
     assert(backend);
@@ -42,14 +46,22 @@ outcome::result<void> mmaped_file_t::close() noexcept {
         return ec;
     }
 
+    sys::error_code ec;
     if (temporal) {
-        sys::error_code ec;
         auto tmp_path = make_temporal(path);
         bfs::rename(tmp_path, path, ec);
         if (ec) {
             return ec;
         }
     }
+
+    std::time_t modified = info->get_modified_s();
+    bfs::last_write_time(path, modified, ec);
+
+    if (ec) {
+        return ec;
+    }
+
     return outcome::success();
 }
 

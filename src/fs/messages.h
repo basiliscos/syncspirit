@@ -2,6 +2,27 @@
 
 
 #include <rotor.hpp>
+
+namespace syncspirit::fs {
+
+namespace r = rotor;
+
+namespace payload {
+
+struct scan_folder_t {
+    std::string folder_id;
+};
+
+};
+
+namespace message {
+
+using scan_folder_t = r::message_t<payload::scan_folder_t>;
+
+}
+
+}
+
 #if 0
 
 #include <memory>

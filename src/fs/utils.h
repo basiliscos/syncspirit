@@ -6,7 +6,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <boost/smart_ptr/local_shared_ptr.hpp>
-
+#include "model/file_info.h"
 
 namespace syncspirit {
 namespace fs {
@@ -20,7 +20,8 @@ struct mmaped_file_t: boost::intrusive_ref_counter<mmaped_file_t, boost::thread_
     using backend_t = boost::local_shared_ptr<bio::mapped_file>;
 
     mmaped_file_t() noexcept;
-    mmaped_file_t(const bfs::path&, backend_t backend, bool temporal) noexcept;
+    mmaped_file_t(const bfs::path&, backend_t backend, bool temporal, model::file_info_ptr_t info) noexcept;
+    ~mmaped_file_t();
 
     const bfs::path& get_path() const noexcept;
     operator bool() const noexcept;
@@ -34,6 +35,7 @@ struct mmaped_file_t: boost::intrusive_ref_counter<mmaped_file_t, boost::thread_
 private:
     bfs::path path;
     backend_t backend;
+    model::file_info_ptr_t info;
     bool temporal;
 };
 

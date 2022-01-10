@@ -63,20 +63,14 @@ struct file_actor_t : public r::actor_base_t, private model::diff::block_visitor
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
 
-    outcome::result<mmaped_file_ptr_t> open_file(const bfs::path& path, bool temporal, size_t size) noexcept;
+    outcome::result<mmaped_file_ptr_t> open_file(const bfs::path& path, bool temporal, model::file_info_ptr_t info) noexcept;
     outcome::result<mmaped_file_t::backend_t> open_file(const bfs::path& path, const bio::mapped_file_params& params) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::new_file_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::append_block_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &) noexcept override;
 
-    outcome::result<void> reflect(const model::file_info_t& file) noexcept;
-
-#if 0
-    void on_open(message::open_request_t &req) noexcept;
-    void on_close(message::close_request_t &req) noexcept;
-    void on_clone(message::clone_request_t &req) noexcept;
-#endif
+    outcome::result<void> reflect(model::file_info_ptr_t &file) noexcept;
 
     model::cluster_ptr_t cluster;
     utils::logger_t log;

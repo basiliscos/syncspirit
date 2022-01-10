@@ -1,14 +1,17 @@
 - uuid model
- - controller: do not re-download file if only meta has been chnaged
- - перезапускать gda, lda, backoff: min, max
  - scan_actor
-  -- кластер не стартует, если нажать ctrl+c крэш (незкарыта транзакция)
+   -- очередь из scan_request
+   -- в свою очередь, там scan_task (замыкает? scan_request_ptr)
+    -- итерируем по файлам, те которые не local_locked()
+    -- файл: ммапим, + считаем хэш
+
+ - перезапускать gda, lda, backoff: min, max
 
  -- cluster, deleted_xxx (deleted_blocks, etc.) - убрать?
  -- убрать mark_modified()
 
-
 - scan_actor:
+    -- кластер не стартует, если нажать ctrl+c крэш (незкарыта транзакция)
     -- если file_info.seq = folder_info.seq и файла нет, не считать что он удалён, а считать что был крэш
     -- делать start++ и finish++ , иначе считать крешем
 
