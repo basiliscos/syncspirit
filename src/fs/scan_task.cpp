@@ -87,17 +87,27 @@ scan_result_t scan_task_t::advance_dir(const bfs::path& dir) noexcept {
             if (!is_temporal(child_path)) {
                 push(child_path);
             } else {
+                auto remove_it = [&]() {
+                    LOG_DEBUG(log, "removing outdated temporally {}", child_path.string());
+                    bfs::remove(child_path, ec);
+                    if (ec) {
+                        errors.push_back(scan_error_t{child_path, scan_context_t::removing_temporal,  ec});
+                    }
+                };
+
+                auto rp = relativize(child_path, root);
+                if (bfs::exists(root / rp.path)) {
+                    remove_it();
+                    continue;
+                }
+
                 auto modified_at = bfs::last_write_time(child_path, ec);
                 if (ec) {
                     errors.push_back(scan_error_t{child_path, scan_context_t::modification_times,  ec});
                 } else {
                     auto now = std::time(nullptr);
                     if (modified_at + config.temporally_timeout <= now) {
-                        LOG_DEBUG(log, "removing outdated temporally {}", child_path.string());
-                        bfs::remove(child_path, ec);
-                        if (ec) {
-                            errors.push_back(scan_error_t{child_path, scan_context_t::removing_temporal,  ec});
-                        }
+                        remove_it();
                     } else {
                         push(child_path);
                     }
@@ -144,6 +154,13 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
     }
 
     if (sz != file->get_size()) {
+        LOG_DEBUG(log, "removing size-mismatched temporally {}", path.string());
+        bfs::remove(path, ec);
+        if (ec) {
+            errors_t errors;
+            errors.push_back(scan_error_t{path, scan_context_t::removing_temporal,  ec});
+            return errors;
+        }
         // ignore tmp file
         return true;
     }

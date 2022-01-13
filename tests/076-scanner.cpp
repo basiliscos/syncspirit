@@ -204,7 +204,7 @@ TEST_CASE("scan_task", "[fs]") {
                 CHECK(*std::get_if<bool>(&r) == false);
             }
 
-            SECTION("size mismatch -> ignore") {
+            SECTION("size mismatch -> remove & ignore") {
                 write_file(path, "123456");
 
                 auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info).value();
@@ -222,7 +222,38 @@ TEST_CASE("scan_task", "[fs]") {
                 r = task.advance();
                 CHECK(std::get_if<bool>(&r));
                 CHECK(*std::get_if<bool>(&r) == false);
+                CHECK(!bfs::exists(path));
             }
+        }
+
+        SECTION("tmp & non-tmp: tmp is ignored & removed") {
+            pr_file.set_block_size(5);
+            pr_file.set_size(5);
+            pr_file.set_modified_s(modified);
+
+            auto path = root_path / "a.txt";
+            auto path_tmp = root_path / "a.txt.syncspirit-tmp";
+            write_file(path, "12345");
+            write_file(path_tmp, "12345");
+            bfs::last_write_time(path, modified);
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info).value();
+            folder_info->get_file_infos().put(file);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+            CHECK(!bfs::exists(path_tmp));
         }
     }
 }

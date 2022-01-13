@@ -4,7 +4,6 @@
    -- в свою очередь, там scan_task (замыкает? scan_request_ptr)
     -- итерируем по файлам, те которые не local_locked()
     -- файл: ммапим, + считаем хэш
-    -- если файл .tmp и все блоки доступны
 
  - перезапускать gda, lda, backoff: min, max
 
@@ -28,7 +27,6 @@
 - model: когда добавляется symlink, папка
 - store_new_folder_request_t: выкинуть peer, peer_source?
 - send indices deltas (after restart detects changes)
-- scan_task: существует file.ext & file.ext-syncspirit.tmp?
 - когда нам прислали update, но нету sequence/устаревшая инфа, нужно апдейтить бд, но не запрашивать файлы
 - test: fs_actor, deleted file from index
 - test: controller, share folder -> index is sent
