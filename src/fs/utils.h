@@ -51,7 +51,7 @@ struct relative_result_t {
     bool temp;
 };
 
-relative_result_t relative(const bfs::path &path, const bfs::path &root) noexcept;
+relative_result_t relativize(const bfs::path &path, const bfs::path &root) noexcept;
 
 extern std::size_t block_sizes_sz;
 extern std::size_t* block_sizes;

@@ -117,7 +117,7 @@ bool is_temporal(const bfs::path &path) noexcept {
     return (pos != name.npos);
 }
 
-relative_result_t relative(const bfs::path &path, const boost::filesystem::path &root) noexcept {
+relative_result_t relativize(const bfs::path &path, const boost::filesystem::path &root) noexcept {
     auto sub = bfs::relative(path, root);
     if (!is_temporal(path)) {
         return {sub, false};

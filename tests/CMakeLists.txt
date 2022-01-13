@@ -135,6 +135,10 @@ add_executable(075-controller 075-controller.cpp)
 target_link_libraries(075-controller syncspirit_test_lib)
 add_test(075-controller "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/075-controller")
 
+add_executable(076-scanner 076-scanner.cpp)
+target_link_libraries(076-scanner syncspirit_test_lib)
+add_test(076-scanner "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/076-scanner")
+
 #add_executable(080-fs 080-fs.cpp)
 #target_link_libraries(080-fs syncspirit_test_lib)
 #add_test(080-fs "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/080-fs")
