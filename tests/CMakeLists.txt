@@ -107,6 +107,10 @@ add_executable(052-file_info 052-file_info.cpp)
 target_link_libraries(052-file_info syncspirit_test_lib)
 add_test(052-file_info "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/052-file_info")
 
+add_executable(053-scan_task 053-scan_task.cpp)
+target_link_libraries(053-scan_task syncspirit_test_lib)
+add_test(053-scan_task "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/053-scan_task")
+
 add_executable(060-bep 060-bep.cpp)
 target_link_libraries(060-bep syncspirit_test_lib)
 add_test(060-bep "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/060-bep")
@@ -134,10 +138,6 @@ add_test(074-hasher "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/074-hasher")
 add_executable(075-controller 075-controller.cpp)
 target_link_libraries(075-controller syncspirit_test_lib)
 add_test(075-controller "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/075-controller")
-
-add_executable(076-scanner 076-scanner.cpp)
-target_link_libraries(076-scanner syncspirit_test_lib)
-add_test(076-scanner "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/076-scanner")
 
 #add_executable(080-fs 080-fs.cpp)
 #target_link_libraries(080-fs syncspirit_test_lib)
