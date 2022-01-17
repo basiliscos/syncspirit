@@ -84,10 +84,10 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
     auto predicate = [&](const value_t &val) -> bool { return val.second == request_id; };
     auto it = std::find_if(redial_map.begin(), redial_map.end(), predicate);
     assert(it != redial_map.end());
+    auto peer = it->first;
+    redial_map.erase(it);
     if (!cancelled) {
-        discover(it->first);
-    } else {
-        redial_map.erase(it);
+        discover(peer);
     }
 }
 
