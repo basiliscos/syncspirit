@@ -15,7 +15,7 @@
     -- делать start++ и finish++ , иначе считать крешем
 
 - controller: частота запросов снижается?
-
+- syncspirit-daemon: dialer_actor.cpp:86: void syncspirit::net::dialer_actor_t::on_timer(rotor::request_id_t, bool): Assertion `it != redial_map.end()' failed.
 
 ===================
 

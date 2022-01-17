@@ -77,6 +77,7 @@ add_library(syncspirit_lib
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/storeable.cpp
+    src/model/misc/uuid.cpp
     src/model/misc/version_utils.cpp
     src/model/block_info.cpp
     src/model/cluster.cpp

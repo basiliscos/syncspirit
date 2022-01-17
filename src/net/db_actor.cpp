@@ -398,6 +398,7 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff) noex
     auto& files_map = folder_info->get_file_infos();
     for (const auto& f: diff.files) {
         auto file = files_map.by_name(f.name());
+        LOG_TRACE(log, "{}, saving {}, seq = {}", identity, file->get_full_name(), file->get_sequence());
         auto key = file->get_key();
         auto data = file->serialize();
         auto r = db::save({key, data}, txn);

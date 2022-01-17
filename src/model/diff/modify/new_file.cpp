@@ -6,7 +6,7 @@
 using namespace syncspirit::model::diff::modify;
 
 new_file_t::new_file_t(const model::cluster_t& cluster, std::string_view folder_id_, proto::FileInfo file_, blocks_t blocks_) noexcept:
-    folder_id{folder_id_}, file{std::move(file_)}, blocks{std::move(blocks_)}, identical_data{false}
+    folder_id{folder_id_}, file{std::move(file_)}, blocks{std::move(blocks_)}, identical_data{false}, new_uuid{true}
 {
     auto &block_map = cluster.get_blocks();
     for(size_t i = 0; i < blocks.size(); ++i) {
@@ -16,9 +16,6 @@ new_file_t::new_file_t(const model::cluster_t& cluster, std::string_view folder_
             new_blocks.push_back(i);
         }
     }
-    if (!new_blocks.empty() || blocks.empty()) {
-        return;
-    }
 
     auto folder = cluster.get_folders().by_id(folder_id);
     auto file_infos = folder->get_folder_infos().by_device(cluster.get_device());
@@ -26,6 +23,12 @@ new_file_t::new_file_t(const model::cluster_t& cluster, std::string_view folder_
     if (!prev_file) {
         return;
     }
+    new_uuid = false;
+
+    if (!new_blocks.empty() || blocks.empty()) {
+        return;
+    }
+
     auto& prev_blocks = prev_file->get_blocks();
     if (prev_blocks.size() != blocks.size()) {
         return;
@@ -53,13 +56,21 @@ auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resul
 
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device(cluster.get_device());
+    auto& files = folder_info->get_file_infos();
 
     auto file = this->file;
     auto seq = folder_info->get_max_sequence() + 1;
     folder_info->set_max_sequence(seq);
     file.set_sequence(seq);
 
-    auto opt = file_info_t::create(cluster.next_uuid(), file, folder_info);
+    uuid_t file_uuid;
+    if (new_uuid) {
+        file_uuid = cluster.next_uuid();
+    } else {
+        auto prev_file = files.by_name(file.name());
+        assign(file_uuid, prev_file->get_uuid());
+    }
+    auto opt = file_info_t::create(file_uuid, file, folder_info);
     if (!opt) {
         return opt.assume_error();
     }
@@ -74,8 +85,8 @@ auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resul
             fi->mark_local_available(i);
         }
     }
-    folder_info->get_file_infos().put(fi);
 
+    files.put(fi);
     return outcome::success();
 }
 

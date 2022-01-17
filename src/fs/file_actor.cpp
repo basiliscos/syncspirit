@@ -182,7 +182,7 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
             LOG_ERROR(log, "{}, cannot close file (after appending block): {}: {}", identity, path.string(), ec.message());
             return ec;
         }
-        LOG_INFO(log, "{}, file {} is now locally available", identity, path_str);
+        LOG_INFO(log, "{}, file {} ({}) is now locally available", identity, path_str, file->get_size());
     }
 
     return outcome::success();
@@ -239,7 +239,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
             LOG_ERROR(log, "{}, cannot close file (after appending block): {}: {}", identity, target_path.string(), ec.message());
             return ec;
         }
-        LOG_INFO(log, "{}, file {} is now locally available", identity, target_path.string());
+        LOG_INFO(log, "{}, file {} ({} bytes) is now locally available", identity, target_path.string(), target->get_size());
     }
 
     return outcome::success();

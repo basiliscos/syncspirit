@@ -19,6 +19,7 @@ struct new_file_t final : cluster_diff_t {
     blocks_t blocks;
     new_blocks_t new_blocks;
     bool identical_data;
+    bool new_uuid;
 };
 
 }

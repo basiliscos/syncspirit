@@ -375,11 +375,11 @@ void test_new_file() {
             pr_file.set_size(5);
             pr_file.set_block_size(5);
 
-            auto diffs = diff::aggregate_t::diffs_t{};
-            diffs.push_back(new diff::modify::create_folder_t(db_folder));
-            diffs.push_back(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file, {bi1}));
+            auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
+            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->do_process();
 
-            auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
+            diff = new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file, {bi1});
             sup->send<model::payload::model_update_t>(sup->get_address(),  diff, nullptr);
             sup->do_process();
 

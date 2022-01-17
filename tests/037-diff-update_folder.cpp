@@ -41,7 +41,6 @@ TEST_CASE("update folder (via Index)", "[model]") {
     REQUIRE(diff->apply(*cluster));
 
     auto folder = folders.by_id(db_folder_1.id());
-
     diff = diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder_1.id()));
     REQUIRE(diff->apply(*cluster));
 
@@ -54,6 +53,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
         file->set_sequence(10ul);
         file->set_size(5ul);
         file->set_block_size(5ul);
+        file->set_modified_s(1);
         auto b = file->add_blocks();
         b->set_hash("123");
 
@@ -61,8 +61,30 @@ TEST_CASE("update folder (via Index)", "[model]") {
         REQUIRE(diff->apply(*cluster));
 
         auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
-        REQUIRE(peer_folder_info->get_file_infos().size() == 1);
+        auto& peer_files = peer_folder_info->get_file_infos();
+        REQUIRE(peer_files.size() == 1);
         CHECK(peer_folder_info->is_actual());
+        auto f = peer_files.by_name(file->name());
+        REQUIRE(f);
+
+        auto key = std::string(f->get_key());
+
+        SECTION("when a file with existing name is added, key is kept") {
+            auto index_update = proto::IndexUpdate{};
+            index_update.set_folder(pr_index.folder());
+            auto same_file = index_update.add_files();
+            *same_file = *file;
+            same_file->set_modified_s(2);
+            same_file->set_sequence(11ul);
+
+            diff = diff::peer::update_folder_t::create(*cluster, *peer_device, index_update).value();
+            REQUIRE(diff->apply(*cluster));
+
+            REQUIRE(peer_files.size() == 1);
+            auto same_f = peer_files.by_name(file->name());
+            CHECK(same_f.get() != f.get());
+            CHECK(same_f->get_key() == f->get_key());
+        }
     }
 
     SECTION("folder does not exists") {

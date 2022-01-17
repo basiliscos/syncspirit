@@ -1,6 +1,6 @@
 #include "update_folder.h"
 #include "model/diff/cluster_visitor.h"
-#include "../../misc/error_code.h"
+#include "model/misc/error_code.h"
 
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff::peer;
@@ -25,12 +25,22 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
 
     auto max_seq = folder_info->get_max_sequence();
     auto files_map = file_infos_map_t();
+    auto& fm = folder_info->get_file_infos();
     for(const auto& f: files) {
-        auto opt = file_info_t::create(cluster.next_uuid(), f, folder_info);
+        auto file = file_info_ptr_t{};
+        uuid_t file_uuid;
+        auto prev_file = fm.by_name(f.name());
+        if (prev_file) {
+            assign(file_uuid, prev_file->get_uuid());
+        }
+        else {
+            file_uuid = cluster.next_uuid();
+        }
+        auto opt = file_info_t::create(file_uuid, f, folder_info);
         if (!opt) {
             return opt.assume_error();
         }
-        auto& file = opt.value();
+        file = std::move(opt.assume_value());
         files_map.put(file);
         max_seq = std::max(max_seq, file->get_sequence());
 
@@ -52,7 +62,6 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     }
 
     // all ok, commit
-    auto& fm = folder_info->get_file_infos();
     for(auto& it: blocks_map) {
         bm.put(it.item);
     }
@@ -95,7 +104,7 @@ static auto instantiate(const cluster_t &cluster, const device_t& source, const 
         auto& f = message.files(i);
         if (f.deleted() && f.blocks_size()) {
             auto log = update_folder_t::get_log();
-            LOG_WARN(log, "file {}, should not have blocks");
+            LOG_WARN(log, "file {}, should not have blocks", f.name());
             return make_error_code(error_code_t::unexpected_blocks);
         }
         for(int j = 0; j < f.blocks_size(); ++j) {

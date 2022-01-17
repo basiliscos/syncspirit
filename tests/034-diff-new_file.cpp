@@ -36,13 +36,25 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(diff->apply(*cluster));
 
         auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
-        auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        auto& files = folder_info->get_file_infos();
+        auto file = files.by_name(pr_file_info.name());
         REQUIRE(file);
         REQUIRE(file->get_name() == "a.txt");
         REQUIRE(file->get_link_target() == "/some/where");
         REQUIRE(file->is_link());
         REQUIRE(file->get_sequence() == 1);
         REQUIRE(folder_info->get_max_sequence() == 1);
+
+        SECTION("update it") {
+            pr_file_info.set_symlink_target("/new/location");
+            diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {}));
+            REQUIRE(diff->apply(*cluster));
+            REQUIRE(files.size() == 1);
+            auto new_file = files.by_name(file->get_name());
+            REQUIRE(new_file);
+            CHECK(new_file.get() != file.get());
+            CHECK(new_file->get_key() == file->get_key());
+        }
     }
 
     SECTION("file, no inc, with blocks") {
