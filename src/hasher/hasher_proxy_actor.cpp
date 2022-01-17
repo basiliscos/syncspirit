@@ -104,7 +104,7 @@ void hasher_proxy_actor_t::on_digest_request(hasher::message::digest_request_t &
     LOG_TRACE(log, "{}, on_digest_request", identity);
     auto hasher = find_next_hasher();
     auto &p = req.payload.request_payload;
-    request<hasher::payload::digest_request_t>(hasher, p.data, &req).send(init_timeout);
+    request<hasher::payload::digest_request_t>(hasher, p.data, p.block_index, &req).send(init_timeout);
 }
 
 void hasher_proxy_actor_t::on_digest_response(hasher::message::digest_response_t &res) noexcept {

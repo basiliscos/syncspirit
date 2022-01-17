@@ -60,11 +60,11 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
     std::string_view get_name() const noexcept;
     inline const std::string &get_full_name() const noexcept { return full_name; }
+    inline const proto::Vector& get_version() const noexcept { return version; };
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     void set_sequence(std::int64_t value) noexcept;
 
-    // inline blocks_t &aget_blocks() noexcept { return blocks; }
     inline const blocks_t &get_blocks() const noexcept { return blocks; }
 
     void remove_blocks() noexcept;
@@ -82,6 +82,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 
     void mark_local_available(size_t block_index) noexcept;
+    bool is_locally_available(size_t block_index) const noexcept;
     bool is_locally_available() const noexcept;
 
     const std::string &get_link_target() const noexcept { return symlink_target; }

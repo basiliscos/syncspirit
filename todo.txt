@@ -1,9 +1,8 @@
 - uuid model
  - scan_actor
-   -- очередь из scan_request
-   -- в свою очередь, там scan_task (замыкает? scan_request_ptr)
+    -- block_availability_t тесты
     -- итерируем по файлам, те которые не local_locked()
-    -- файл: ммапим, + считаем хэш
+ - ui: подписаться на io_error
 
  - перезапускать gda, lda, backoff: min, max
 

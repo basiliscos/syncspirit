@@ -1,7 +1,7 @@
 #include "fs_supervisor.h"
 #include "net/names.h"
 #include "hasher/hasher_proxy_actor.h"
-//#include "scan_actor.h"
+#include "scan_actor.h"
 #include "file_actor.h"
 
 using namespace syncspirit::fs;
@@ -52,14 +52,13 @@ void fs_supervisor_t::launch() noexcept {
                            .timeout(timeout)
                            .finish()
                            ->get_address();
-#if 0
     scan_actor = create_actor<scan_actor_t>()
                      .fs_config(fs_config)
+                     .cluster(cluster)
                      .hasher_proxy(hasher_addr)
                      .requested_hashes_limit(hasher_threads * 2)
                      .timeout(timeout)
                      .finish();
-#endif
 }
 
 void fs_supervisor_t::on_model_request(model::message::model_response_t &res) noexcept {

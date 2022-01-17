@@ -18,6 +18,7 @@ namespace modify {
     struct create_folder_t;
     struct share_folder_t;
     struct update_peer_t;
+    struct file_availability_t;
     struct new_file_t;
     struct local_update_t;
     struct lock_file_t;
@@ -35,6 +36,7 @@ struct generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const modify::create_folder_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::share_folder_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::update_peer_t &) noexcept;
+    virtual outcome::result<void> operator()(const modify::file_availability_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::new_file_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::local_update_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::lock_file_t &) noexcept;

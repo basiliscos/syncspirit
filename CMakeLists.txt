@@ -33,7 +33,7 @@ add_library(syncspirit_lib
     src/db/utils.cpp
     src/fs/file_actor.cpp
     src/fs/fs_supervisor.cpp
-    #src/fs/scan_actor.cpp
+    src/fs/scan_actor.cpp
     src/fs/scan_task.cpp
     src/fs/utils.cpp
     src/hasher/hasher_actor.cpp
@@ -57,9 +57,11 @@ add_library(syncspirit_lib
     src/model/diff/load/ignored_folders.cpp
     src/model/diff/load/load_cluster.cpp
     src/model/diff/modify/append_block.cpp
+    src/model/diff/modify/blocks_availability.cpp
     src/model/diff/modify/clone_block.cpp
     src/model/diff/modify/connect_request.cpp
     src/model/diff/modify/create_folder.cpp
+    src/model/diff/modify/file_availability.cpp
     src/model/diff/modify/local_update.cpp
     src/model/diff/modify/lock_file.cpp
     src/model/diff/modify/new_file.cpp

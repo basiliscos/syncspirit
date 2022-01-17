@@ -45,14 +45,13 @@ TEST_CASE("scan_task", "[fs]") {
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();
-            CHECK(std::get_if<errors_t>(&r));
+            CHECK(std::get_if<io_errors_t>(&r));
 
-            auto errs = std::get_if<errors_t>(&r);
+            auto errs = std::get_if<io_errors_t>(&r);
             REQUIRE(errs->size() == 1);
 
             auto& err = errs->at(0);
             CHECK(err.ec);
-            CHECK(err.context == scan_context_t::enter_dir);
             CHECK(err.path.string() == db_folder.path());
         }
 

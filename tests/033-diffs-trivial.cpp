@@ -4,6 +4,7 @@
 #include "model/cluster.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/lock_file.h"
+#include "model/diff/modify/file_availability.h"
 #include "model/diff/modify/new_file.h"
 #include "model/diff/peer/peer_state.h"
 #include "model/diff/cluster_visitor.h"
@@ -36,7 +37,7 @@ TEST_CASE("peer state update", "[model]") {
     CHECK(peer_device->is_online() == false);
 }
 
-TEST_CASE("lock file", "[model]") {
+TEST_CASE("with file", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device =  device_t::create(my_id, "my-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
@@ -55,15 +56,33 @@ TEST_CASE("lock file", "[model]") {
     pr_file_info.set_name("a.txt");
     pr_file_info.set_type(proto::FileInfoType::SYMLINK);
     pr_file_info.set_symlink_target("/some/where");
-    diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {}));
-    REQUIRE(diff->apply(*cluster));
+    pr_file_info.set_block_size(5);
+    pr_file_info.set_size(5);
+    auto b1 = pr_file_info.add_blocks();
+    b1->set_hash(utils::sha256_digest("12345").value());
+    b1->set_offset(0);
+    b1->set_size(5);
 
-    diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(db_folder.id(), pr_file_info.name(), true));
+    diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {*b1}));
     REQUIRE(diff->apply(*cluster));
-    auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
-    REQUIRE(file->is_locked());
+    auto file = folder_info->get_file_infos().by_name("a.txt");
+    REQUIRE(file);
 
-    diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(db_folder.id(), pr_file_info.name(), false));
-    REQUIRE(diff->apply(*cluster));
-    REQUIRE(!file->is_locked());
+    SECTION("lock/unlock") {
+        diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(db_folder.id(), pr_file_info.name(), true));
+        REQUIRE(diff->apply(*cluster));
+        auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        REQUIRE(file->is_locked());
+
+        diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(db_folder.id(), pr_file_info.name(), false));
+        REQUIRE(diff->apply(*cluster));
+        REQUIRE(!file->is_locked());
+    }
+
+    SECTION("file_availability") {
+        REQUIRE(!file->is_locally_available());
+        diff = diff::cluster_diff_ptr_t(new diff::modify::file_availability_t(file));
+        REQUIRE(diff->apply(*cluster));
+        REQUIRE(file->is_locally_available());
+    }
 }

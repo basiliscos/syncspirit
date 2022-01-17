@@ -34,6 +34,10 @@ auto cluster_visitor_t::operator()(const modify::update_peer_t &) noexcept -> ou
     return outcome::success();
 }
 
+auto cluster_visitor_t::operator()(const modify::file_availability_t &) noexcept ->  outcome::result<void> {
+    return outcome::success();
+}
+
 auto cluster_visitor_t::operator()(const modify::new_file_t &) noexcept -> outcome::result<void>  {
     return outcome::success();
 }
@@ -45,3 +49,4 @@ auto cluster_visitor_t::operator()(const modify::local_update_t &) noexcept -> o
 auto cluster_visitor_t::operator()(const modify::lock_file_t &) noexcept -> outcome::result<void>  {
     return outcome::success();
 }
+

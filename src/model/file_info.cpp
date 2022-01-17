@@ -198,12 +198,18 @@ std::string file_info_t::serialize(bool include_blocks) const noexcept {
 }
 
 void file_info_t::mark_local_available(size_t block_index) noexcept {
+    assert(block_index < blocks.size());
     assert(!marks[block_index]);
-    assert(block_index < block_size);
     blocks[block_index]->mark_local_available(this);
     marks[block_index] = true;
     --missing_blocks;
 }
+
+bool file_info_t::is_locally_available(size_t block_index) const noexcept {
+    assert(block_index < blocks.size());
+    return marks[block_index];
+}
+
 
 bool file_info_t::is_locally_available() const noexcept {
     return missing_blocks == 0;
