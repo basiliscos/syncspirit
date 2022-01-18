@@ -30,7 +30,6 @@ struct fixture_t {
 
     fixture_t() noexcept: root_path{ bfs::unique_path() }, path_quard{root_path} {
         utils::set_default("trace");
-        root_path = bfs::unique_path();
         bfs::create_directory(root_path);
     }
 

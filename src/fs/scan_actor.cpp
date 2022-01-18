@@ -86,10 +86,10 @@ void scan_actor_t::process_queue() noexcept {
 
 
 void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_scan", identity);
     auto gen = message.payload.generation;
     auto& task = message.payload.task;
     auto folder_id = task->get_folder_id();
+    LOG_TRACE(log, "{}, on_scan, folder = {}", identity, folder_id);
     if (gen != generation) {
         LOG_TRACE(log, "{}, outdated generation ({} vs {}), will renew scan_task", identity, gen, generation);
         auto new_task = scan_task_ptr_t(new scan_task_t(cluster, folder_id, fs_config));
