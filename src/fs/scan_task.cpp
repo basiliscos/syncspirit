@@ -68,7 +68,8 @@ scan_result_t scan_task_t::advance_dir(const bfs::path& dir) noexcept {
     };
 
     scan_errors_t errors;
-    for (auto it = bfs::directory_iterator(dir); it != bfs::directory_iterator(); ++it) {
+    for (auto it = bfs::directory_iterator(dir, ec); it != bfs::directory_iterator(); ++it) {
+        sys::error_code ec;
         auto &child = *it;
         bool is_dir = bfs::is_directory(child, ec);
         if (ec) {
@@ -119,7 +120,9 @@ scan_result_t scan_task_t::advance_dir(const bfs::path& dir) noexcept {
             }
             continue;
         }
-
+    }
+    if (ec) {
+        errors.push_back(scan_error_t{dir,  ec});
     }
 
     if (!errors.empty()) {

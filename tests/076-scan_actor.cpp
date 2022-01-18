@@ -105,15 +105,22 @@ struct fixture_t {
 void test_meta_changes() {
     struct F : fixture_t {
         void main() noexcept override {
-
+            sys::error_code ec;
             SECTION("no files"){
                 sup->do_process();
                 CHECK(folder_info->get_file_infos().size() == 0);
             }
             SECTION("just 1 dir"){
-                bfs::create_directories(root_path / "abc");
+                CHECK(bfs::create_directories(root_path / "abc"));
                 sup->do_process();
                 CHECK(folder_info->get_file_infos().size() == 0);
+            }
+            SECTION("just 1 subdir, which cannot be read"){
+                CHECK(bfs::create_directories(root_path / "abc" / "def", ec));
+                bfs::permissions(root_path / "abc", bfs::perms::no_perms);
+                sup->do_process();
+                CHECK(folder_info->get_file_infos().size() == 0);
+                bfs::permissions(root_path / "abc", bfs::perms::all_all);
             }
 
             proto::FileInfo pr_fi;
