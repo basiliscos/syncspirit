@@ -161,7 +161,7 @@ void test_meta_changes() {
                 CHECK(!file->is_locally_available());
             }
 
-            SECTION("complete file exists"){
+            SECTION("complete file exists") {
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, folder->get_id(), pr_fi, {bi}));
                 REQUIRE(diff->apply(*cluster));
                 auto file = files->by_name(pr_fi.name());
@@ -187,9 +187,66 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     CHECK(!file->is_locally_available());
                 }
+            }
+            SECTION("incomplete file exists") {
+
+                pr_fi.set_size(10ul);
+                auto bi_2 = proto::BlockInfo();
+                bi_2.set_size(5);
+                bi_2.set_weak_hash(12);
+                bi_2.set_hash(utils::sha256_digest("67890").value());
+                bi_2.set_offset(5);
+
+
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, folder->get_id(), pr_fi, {bi, bi_2}));
+                REQUIRE(diff->apply(*cluster));
+                auto file = files->by_name(pr_fi.name());
+                auto path = file->get_path().string() + ".syncspirit-tmp";
+                auto content = "12345\0\0\0\0\0";
+                write_file(path, std::string(content, 10));
+
+                SECTION("outdated -> just remove") {
+                    bfs::last_write_time(path, modified - 24 * 3600);
+                    sup->do_process();
+                    CHECK(!file->is_locally_available());
+                    CHECK(!bfs::exists(path));
+                }
+
+                SECTION("just 1st block is valid, tmp is kept") {
+                    sup->do_process();
+                    CHECK(!file->is_locally_available());
+                    CHECK(file->is_locally_available(0));
+                    CHECK(!file->is_locally_available(1));
+                    CHECK(bfs::exists(path));
+                }
+
+                SECTION("corrupted content") {
+                    SECTION("1st block") {
+                        write_file(path, "2234567890");
+                    }
+                    SECTION("2nd block") {
+                        write_file(path, "1234567899");
+                    }
+                    sup->do_process();
+                    CHECK(!file->is_locally_available(0));
+                    CHECK(!file->is_locally_available(1));
+                    CHECK(!bfs::exists(path));
+                }
+
+                SECTION("error on reading -> remove") {
+                    bfs::permissions(path, bfs::perms::no_perms);
+                    sup->do_process();
+                    CHECK(!file->is_locally_available());
+                    CHECK(!bfs::exists(path));
+
+                    REQUIRE(errors.size() == 1);
+                    auto& errs = errors.at(0)->payload.errors;
+                    REQUIRE(errs.size() == 1);
+                    CHECK(errs.at(0).path == path);
+                    CHECK(errs.at(0).ec);
+                }
 
             }
-
         }
     };
     F().run();

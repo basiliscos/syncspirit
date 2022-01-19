@@ -64,7 +64,7 @@ struct scan_actor_t : public r::actor_base_t {
     using scan_queue_t = std::list<scan_request_t>;
 
     void initiate_scan(std::string_view folder_id) noexcept;
-    outcome::result<void> initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t file) noexcept;
+    model::io_errors_t initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t file) noexcept;
     bool rehash_next(message::rehash_needed_t &message) noexcept;
     void process_queue() noexcept;
 

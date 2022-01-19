@@ -120,13 +120,11 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
             LOG_WARN(log, "{}, changes in '{}' are ignored (not implemented)", identity, r.file->get_full_name());
         }
         else if constexpr (std::is_same_v<T, incomplete_t>) {
-            auto ir = initiate_rehash(task, r.file);
-            if (ir) {
+            auto errs = initiate_rehash(task, r.file);
+            if (errs.empty()) {
                 stop_processing = true;
             } else {
-                auto& path = r.file->get_path();
-                model::io_errors_t errors{model::io_error_t{path, ir.assume_error()}};
-                send<model::payload::io_error_t>(coordinator, std::move(errors));
+                send<model::payload::io_error_t>(coordinator, std::move(errs));
             }
         } else {
             static_assert(always_false_v<T>, "non-exhaustive visitor!");
@@ -142,24 +140,30 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
     }
 }
 
-auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t file) noexcept -> outcome::result<void> {
+auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t file) noexcept -> model::io_errors_t {
     bio::mapped_file_params params;
-    params.path = file->get_path().string();
+    auto path = make_temporal(file->get_path());
+    params.path = path.string();
     params.flags = bio::mapped_file::mapmode::readonly;
     auto bio_file = bio_file_t{ new bio::mapped_file()};
 
     try {
         bio_file->open(params);
     }  catch (std::exception& ex) {
-        LOG_WARN(log, "{}, error opening file: {}", identity, ex.what());
+        LOG_WARN(log, "{}, error opening file {}: {}", identity, params.path, ex.what());
+        model::io_errors_t errs;
         auto ec = sys::errc::make_error_code(sys::errc::io_error);
-        return ec;
+        errs.push_back(model::io_error_t{path, ec});
+        auto removed = bfs::remove(path, ec);
+        if (ec) {
+            errs.push_back(model::io_error_t{path, ec});
+        }
+        return errs;
     };
 
-
-    send<payload::rehash_needed_t>(coordinator, std::move(task), generation, std::move(file), std::move(bio_file),
+    send<payload::rehash_needed_t>(address, std::move(task), generation, std::move(file), std::move(bio_file),
                                    int64_t{0}, int64_t{-1}, size_t{0}, std::set<std::int64_t>{}, false, false);
-    return outcome::success();
+    return {};
 }
 
 
@@ -190,13 +194,14 @@ bool scan_actor_t::rehash_next(message::rehash_needed_t &message) noexcept {
             auto it = std::find_if(begin, end, non_zero);
             if (it == end) { // we have only zeroes
                 info.abandoned = true;
+            } else {
+                auto block = std::string_view(begin, next_size );
+                using request_t = hasher::payload::digest_request_t;
+                request<request_t>(hasher_proxy, block, (size_t)i, r::message_ptr_t(&message)).send(init_timeout);
+                ++info.queue_size;
+                ++requested_hashes;
             }
-            auto block = std::string_view(begin, next_size );
-            using request_t = hasher::payload::digest_request_t;
-            request<request_t>(hasher_proxy, block, (size_t)i, r::message_ptr_t(&message)).send(init_timeout);
-            ++info.queue_size;
             ++i;
-            ++requested_hashes;
         }
     }
     return requested_hashes < requested_hashes_limit;
