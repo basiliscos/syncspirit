@@ -21,6 +21,9 @@ using namespace syncspirit::hasher;
 
 struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::scan_actor_t>;
+    using error_msg_t = model::message::io_error_t;
+    using error_msg_ptr_t = r::intrusive_ptr_t<error_msg_t>;
+    using errors_container_t = std::vector<error_msg_ptr_t>;
 
     fixture_t() noexcept: root_path{ bfs::unique_path() }, path_quard{root_path} {
         utils::set_default("trace");
@@ -50,6 +53,12 @@ struct fixture_t {
         folder = cluster->get_folders().by_id(db_folder.id());
         folder_info = folder->get_folder_infos().by_device(my_device);
         files = &folder_info->get_file_infos();
+
+        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin){
+            plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+                p.subscribe_actor(r::lambda<error_msg_t>(
+                    [&](error_msg_t &msg) { errors.push_back(&msg); }));
+        });};
 
         sup->start();
         sup->do_process();
@@ -100,6 +109,7 @@ struct fixture_t {
     model::folder_ptr_t folder;
     model::folder_info_ptr_t folder_info;
     model::file_infos_map_t* files;
+    errors_container_t errors;
 };
 
 void test_meta_changes() {
@@ -121,6 +131,11 @@ void test_meta_changes() {
                 sup->do_process();
                 CHECK(folder_info->get_file_infos().size() == 0);
                 bfs::permissions(root_path / "abc", bfs::perms::all_all);
+                REQUIRE(errors.size() == 1);
+                auto& errs = errors.at(0)->payload.errors;
+                REQUIRE(errs.size() == 1);
+                REQUIRE(errs.at(0).path == (root_path / "abc"));
+                REQUIRE(errs.at(0).ec);
             }
 
             proto::FileInfo pr_fi;

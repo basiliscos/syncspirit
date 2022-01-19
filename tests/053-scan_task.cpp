@@ -254,5 +254,34 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == false);
             CHECK(!bfs::exists(path_tmp));
         }
+
+        SECTION("cannot read dir, error") {
+            pr_file.set_name("some/a.txt");
+            auto path = root_path / "some" / "a.txt";
+            auto parent = path.parent_path();
+            write_file(path, "12345");
+            bfs::permissions(parent, bfs::perms::no_perms);
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info).value();
+            folder_info->get_file_infos().put(file);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<scan_errors_t>(&r));
+            auto errs = std::get_if<scan_errors_t>(&r);
+            REQUIRE(errs);
+            REQUIRE(errs->size() == 1);
+            REQUIRE(errs->at(0).path == parent);
+            REQUIRE(errs->at(0).ec);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+            bfs::permissions(parent, bfs::perms::all_all);
+        }
     }
 }
