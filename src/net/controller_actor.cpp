@@ -1,9 +1,12 @@
 #include "controller_actor.h"
 #include "names.h"
+#include "model/diff/aggregate.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
-#include "model/diff/modify/new_file.h"
+#include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/lock_file.h"
+#include "model/diff/modify/finish_file.h"
+#include "model/diff/modify/flush_file.h"
 #include "utils/error_code.h"
 #include <fstream>
 
@@ -131,24 +134,8 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
             if (!file->local_file()) {
                 LOG_DEBUG(log, "{}, next_file = {}", identity, file->get_name());
                 file->locally_lock();
-                using blocks_t = std::vector<proto::BlockInfo>;
                 auto diff = model::diff::cluster_diff_ptr_t{};
-                auto info = file->as_proto(false);
-                auto& source_blocks = file->get_blocks();
-                auto blocks = blocks_t();
-                blocks.reserve(source_blocks.size());
-                for(auto& b: source_blocks) {
-                    proto::BlockInfo bi;
-                    bi.set_hash(std::string(b->get_hash()));
-                    blocks.emplace_back(std::move(bi));
-                }
-
-                diff = new model::diff::modify::new_file_t(
-                    *cluster,
-                    file->get_folder_info()->get_folder()->get_id(),
-                    std::move(info),
-                    std::move(blocks)
-                );
+                diff = new model::diff::modify::clone_file_t(*file);
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             } else {
                 ready();
@@ -209,16 +196,20 @@ auto controller_actor_t::locally_unlock_file(std::string_view folder_id, std::st
     return outcome::success();
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::new_file_t& diff) noexcept -> outcome::result<void> {
+auto controller_actor_t::operator()(const model::diff::modify::clone_file_t& diff) noexcept -> outcome::result<void> {
     return locally_unlock_file(diff.folder_id, diff.file.name());
 }
 
-/*
-auto controller_actor_t::operator()(const model::diff::modify::lock_file_t& diff) noexcept -> outcome::result<void> {
-    return locally_unlock_file(diff.folder_id, diff.file_name);
+auto controller_actor_t::operator()(const model::diff::modify::finish_file_t& diff) noexcept -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_info = folder->get_folder_infos().by_device(peer);
+    auto file = folder_info->get_file_infos().by_name(diff.file_name);
+    assert(file);
+    auto update = model::diff::cluster_diff_ptr_t{};
+    update = new model::diff::modify::flush_file_t(*file);
+    send<model::payload::model_update_t>(coordinator, std::move(update), this);
     return outcome::success();
 }
-*/
 
 
 void controller_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
@@ -226,12 +217,17 @@ void controller_actor_t::on_block_update(model::message::block_update_t &message
         LOG_TRACE(log, "{}, on_block_update", identity);
         auto& d = *message.payload.diff;
         auto folder = cluster->get_folders().by_id(d.folder_id);
-        auto folder_info = folder->get_folder_infos().by_device(cluster->get_device());
-        auto file = folder_info->get_file_infos().by_name(d.file_name);
-        if (file->is_locally_available()) {
+        auto folder_info = folder->get_folder_infos().by_device_id(d.device_id);
+        auto source_file = folder_info->get_file_infos().by_name(d.file_name);
+        if (source_file->is_locally_available()) {
+            using diffs_t = model::diff::aggregate_t::diffs_t;
             LOG_TRACE(log, "{}, on_block_update, finalizing", identity);
+            auto my_file = source_file->local_file();
+            auto diffs = diffs_t{};
+            diffs.push_back(new model::diff::modify::lock_file_t(d.folder_id, d.file_name, false));
+            diffs.push_back(new model::diff::modify::finish_file_t(*my_file));
             auto diff = model::diff::cluster_diff_ptr_t{};
-            diff = new model::diff::modify::lock_file_t(d.folder_id, d.file_name, false);
+            diff = new model::diff::aggregate_t(std::move(diffs));
             send<model::payload::model_update_t>(coordinator, std::move(diff), this);
         }
     }

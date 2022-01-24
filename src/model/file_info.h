@@ -109,6 +109,8 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     void locally_unlock() noexcept;
 
     proto::FileInfo get() const noexcept;
+    file_info_ptr_t get_source() const noexcept;
+    void set_source(const file_info_ptr_t& peer_file) noexcept;
 
     static const constexpr auto data_length = 1 + uuid_length * 2;
 
@@ -139,6 +141,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
 
     int flags = 0;
     proto::Vector version;
+    proto::Vector source_version;
     std::int64_t sequence;
     std::int32_t block_size;
     std::string symlink_target;
@@ -147,6 +150,7 @@ struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
     std::string full_name;
     marks_vector_t marks;
     size_t missing_blocks;
+    std::string source_device;
 
     friend struct blocks_interator_t;
 };

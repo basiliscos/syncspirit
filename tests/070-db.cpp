@@ -1,13 +1,14 @@
 #include "catch.hpp"
 #include "test-utils.h"
-//#include "test-db.h"
 #include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/new_file.h"
+#include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/diff/peer/cluster_remove.h"
 #include "model/diff/aggregate.h"
+#include "model/misc/version_utils.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -58,7 +59,7 @@ struct fixture_t {
 
     cluster_ptr_t make_cluster() noexcept {
         auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-        auto my_device =  device_t::create(my_id, "my-device").value();
+        my_device =  device_t::create(my_id, "my-device").value();
 
         return cluster_ptr_t(new cluster_t(my_device, 1));
     }
@@ -102,6 +103,7 @@ struct fixture_t {
     r::pt::time_duration timeout = r::pt::millisec{10};
     cluster_ptr_t cluster;
     device_ptr_t peer_device;
+    device_ptr_t my_device;
     r::intrusive_ptr_t<supervisor_t> sup;
     r::intrusive_ptr_t<net::db_actor_t> db_actor;
     bfs::path root_path;
@@ -357,56 +359,147 @@ void test_cluster_update_and_remove() {
     F().run();
 }
 
-void test_new_file() {
+void test_clone_file() {
     struct F : fixture_t {
         void main() noexcept override {
             db::Folder db_folder;
             db_folder.set_id("some-id");
             db_folder.set_label("some-label");
 
-            auto bi1 = proto::BlockInfo();
-            bi1.set_size(5);
-            bi1.set_weak_hash(12);
-            bi1.set_hash(utils::sha256_digest("12345").value());
-            bi1.set_offset(0);
-
-            auto pr_file = proto::FileInfo();
-            pr_file.set_name("a.bin");
-            pr_file.set_size(5);
-            pr_file.set_block_size(5);
-
             auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
             sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
             sup->do_process();
 
-            diff = new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file, {bi1});
-            sup->send<model::payload::model_update_t>(sup->get_address(),  diff, nullptr);
+            uint64_t peer_index = 5;
+
+            auto diffs = diff::aggregate_t::diffs_t{};
+            auto peer_id = peer_device->device_id().get_sha256();
+            db::Device db_peer;
+            db_peer.set_name("some_name");
+            diffs.emplace_back(new diff::modify::update_peer_t(db_peer, peer_id));
+            diffs.emplace_back(new diff::modify::share_folder_t(peer_id, db_folder.id(), peer_index));
+
+            diff = new diff::aggregate_t(std::move(diffs));
+            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
             sup->do_process();
 
-            REQUIRE(cluster->get_blocks().size() == 1);
-            REQUIRE(cluster->get_blocks().get(bi1.hash()));
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
-            sup->do_process();
-            REQUIRE(reply);
-            REQUIRE(!reply->payload.ee);
+            proto::Index idx;
+            idx.set_folder(db_folder.id());
+            auto file = idx.add_files();
+            file->set_name("a.bin");
+            file->set_sequence(6ul);
+            auto version = file->mutable_version();
+            auto counter = version->add_counters();
+            counter->set_id(1);
+            counter->set_value(peer_device->as_uint());
 
-            auto cluster_clone = make_cluster();
-            {
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-                REQUIRE(cluster_clone->get_blocks().size() == 1);
-                auto& fis = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos();
-                REQUIRE(fis.size() == 1);
-                auto folder_info_clone = fis.by_device(cluster_clone->get_device());
-                auto file_clone = folder_info_clone->get_file_infos().by_name(pr_file.name());
-                REQUIRE(file_clone);
-                REQUIRE(file_clone->get_name() == pr_file.name());
-                REQUIRE(file_clone->get_size() == 5);
-                REQUIRE(file_clone->get_block_size() == 5);
-                REQUIRE(file_clone->get_blocks().size() == 1);
-                REQUIRE(file_clone->get_blocks()[0]->get_hash() == bi1.hash());
-                REQUIRE(file_clone->get_sequence() == 1);
-                REQUIRE(folder_info_clone->get_max_sequence() == 1);
+            SECTION("file without blocks") {
+                diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
+                sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
+                sup->do_process();
+
+                auto folder = cluster->get_folders().by_id(db_folder.id());
+                auto folder_my = folder->get_folder_infos().by_device(my_device);
+                auto folder_peer = folder->get_folder_infos().by_device(peer_device);
+                auto file_peer = folder_peer->get_file_infos().by_name(file->name());
+                REQUIRE(file_peer);
+                diff = new diff::modify::clone_file_t(*file_peer);
+                sup->send<model::payload::model_update_t>(sup->get_address(),  diff, nullptr);
+                sup->do_process();
+
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                REQUIRE(!reply->payload.ee);
+
+                auto cluster_clone = make_cluster();
+                {
+                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                    REQUIRE(cluster_clone->get_blocks().size() == 0);
+                    auto& fis = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos();
+                    REQUIRE(fis.size() == 2);
+                    auto folder_info_clone = fis.by_device(cluster_clone->get_device());
+                    auto file_clone = folder_info_clone->get_file_infos().by_name(file->name());
+                    REQUIRE(file_clone);
+                    REQUIRE(file_clone->get_name() == file->name());
+                    REQUIRE(file_clone->get_blocks().size() == 0);
+                    REQUIRE(file_clone->get_sequence() == 1);
+                    REQUIRE(!file_clone->get_source());
+                    REQUIRE(folder_info_clone->get_max_sequence() == 1);
+                }
+            }
+
+            SECTION("file with blocks") {
+                file->set_size(5ul);
+                file->set_block_size(5ul);
+                auto b = file->add_blocks();
+                b->set_size(5ul);
+                b->set_hash(utils::sha256_digest("12345").value());
+
+                diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
+                sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
+                sup->do_process();
+
+                auto folder = cluster->get_folders().by_id(db_folder.id());
+                auto folder_my = folder->get_folder_infos().by_device(my_device);
+                auto folder_peer = folder->get_folder_infos().by_device(peer_device);
+                auto file_peer = folder_peer->get_file_infos().by_name(file->name());
+                REQUIRE(file_peer);
+                diff = new diff::modify::clone_file_t(*file_peer);
+                sup->send<model::payload::model_update_t>(sup->get_address(),  diff, nullptr);
+                sup->do_process();
+                REQUIRE(folder_my->get_max_sequence() == 0);
+
+                {
+                    sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                    sup->do_process();
+                    REQUIRE(reply);
+                    REQUIRE(!reply->payload.ee);
+
+                    auto cluster_clone = make_cluster();
+                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                    REQUIRE(cluster_clone->get_blocks().size() == 1);
+                    auto& fis = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos();
+                    REQUIRE(fis.size() == 2);
+                    auto folder_info_clone = fis.by_device(cluster_clone->get_device());
+                    auto file_clone = folder_info_clone->get_file_infos().by_name(file->name());
+                    REQUIRE(file_clone);
+                    REQUIRE(file_clone->get_name() == file->name());
+                    REQUIRE(file_clone->get_blocks().size() == 1);
+                    REQUIRE(file_clone->get_sequence() == 0);
+                    REQUIRE(folder_info_clone->get_max_sequence() == 0);
+                }
+
+                file_peer = folder_peer->get_file_infos().by_name(file->name());
+                file_peer->mark_local_available(0);
+                REQUIRE(file_peer->is_locally_available());
+
+                auto file_my = folder_my->get_file_infos().by_name(file->name());
+                diff = new diff::modify::finish_file_t(*file_my);
+                sup->send<model::payload::model_update_t>(sup->get_address(),  diff, nullptr);
+                sup->do_process();
+
+                {
+                    sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                    sup->do_process();
+                    REQUIRE(reply);
+                    REQUIRE(!reply->payload.ee);
+
+                    auto cluster_clone = make_cluster();
+                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                    REQUIRE(cluster_clone->get_blocks().size() == 1);
+                    auto& fis = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos();
+                    REQUIRE(fis.size() == 2);
+                    auto folder_info_clone = fis.by_device(cluster_clone->get_device());
+                    auto file_clone = folder_info_clone->get_file_infos().by_name(file->name());
+                    REQUIRE(file_clone);
+                    REQUIRE(file_clone->get_name() == file->name());
+                    REQUIRE(file_clone->get_blocks().size() == 1);
+                    REQUIRE(file_clone->get_blocks().at(0));
+                    REQUIRE(file_clone->get_sequence() == 1);
+                    REQUIRE(folder_info_clone->get_max_sequence() == 1);
+                }
             }
         }
     };
@@ -419,4 +512,4 @@ REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
 REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
 REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
 REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
-REGISTER_TEST_CASE(test_new_file, "test_new_file", "[db]");
+REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");

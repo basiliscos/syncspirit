@@ -59,9 +59,12 @@ add_library(syncspirit_lib
     src/model/diff/modify/append_block.cpp
     src/model/diff/modify/blocks_availability.cpp
     src/model/diff/modify/clone_block.cpp
+    src/model/diff/modify/clone_file.cpp
     src/model/diff/modify/connect_request.cpp
     src/model/diff/modify/create_folder.cpp
     src/model/diff/modify/file_availability.cpp
+    src/model/diff/modify/finish_file.cpp
+    src/model/diff/modify/flush_file.cpp
     src/model/diff/modify/local_update.cpp
     src/model/diff/modify/lock_file.cpp
     src/model/diff/modify/new_file.cpp

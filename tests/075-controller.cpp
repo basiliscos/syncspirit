@@ -444,6 +444,10 @@ void test_downloading() {
                 pr_fi.set_sequence(1ul);
                 pr_fi.set_block_size(5);
                 pr_fi.set_size(5);
+                auto version = pr_fi.mutable_version();
+                auto counter = version->add_counters();
+                counter->set_id(1);
+                counter->set_value(peer_device->as_uint());
                 auto b1 = pr_fi.add_blocks();
                 b1->set_hash(utils::sha256_digest("12345").value());
                 b1->set_offset(0);
@@ -541,6 +545,11 @@ void test_downloading() {
                 file->set_sequence(1ul);
                 file->set_block_size(5);
                 file->set_size(5);
+                auto version = file->mutable_version();
+                auto counter = version->add_counters();
+                counter->set_id(1);
+                counter->set_value(peer_device->as_uint());
+
                 auto b1 = file->add_blocks();
                 b1->set_hash(utils::sha256_digest("12345").value());
                 b1->set_offset(0);

@@ -56,6 +56,15 @@ void device_t::update(const db::Device &source) noexcept {
     assign(source);
 }
 
+uint64_t device_t::as_uint() noexcept {
+    auto device_id = id.get_sha256();
+    uint64_t id;
+    auto ptr = device_id.data();
+    std::copy(ptr, ptr + sizeof (id), reinterpret_cast<char *>(&id));
+    return id;
+}
+
+
 std::string device_t::serialize() noexcept {
     db::Device r;
     r.set_name(name);

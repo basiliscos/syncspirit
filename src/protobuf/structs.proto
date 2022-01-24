@@ -53,29 +53,31 @@ enum PullOrder {
 
 message FolderInfo {
     uint64 index_id     = 1;
-    int64  max_sequence = 4;
+    int64  max_sequence = 2;
 }
 
 message FileInfo {
-    string       name                   = 1;
-    syncspirit.proto.FileInfoType type  = 2;
-    int64        size                   = 3;
-    uint32       permissions            = 4;
-    int64        modified_s             = 5;
-    int32        modified_ns            = 11;
-    uint64       modified_by            = 12;
-    bool         deleted                = 6;
-    bool         invalid                = 7;
-    bool         no_permissions         = 8;
-    syncspirit.proto.Vector version     = 9;
-    int64        sequence               = 10;
-    int32        block_size             = 13;
-    string       symlink_target         = 16;
-    repeated     bytes blocks           = 17;
+    string                          name           = 1;
+    syncspirit.proto.FileInfoType   type           = 2;
+    int64                           size           = 3;
+    uint32                          permissions    = 4;
+    int64                           modified_s     = 5;
+    int32                           modified_ns    = 11;
+    uint64                          modified_by    = 12;
+    bool                            deleted        = 6;
+    bool                            invalid        = 7;
+    bool                            no_permissions = 8;
+    syncspirit.proto.Vector         version        = 9;
+    int64                           sequence       = 10;
+    int32                           block_size     = 13;
+    string                          symlink_target = 16;
+    repeated                        bytes blocks   = 17;
+    syncspirit.proto.Vector         source_version = 18;
+    bytes                           source_device  = 19;
 }
 
 message IngoredFolder {
-    string label = 2;
+    string label = 1;
 }
 
 message BlockInfo {

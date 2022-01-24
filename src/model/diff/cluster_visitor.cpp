@@ -26,6 +26,10 @@ auto cluster_visitor_t::operator()(const modify::create_folder_t &) noexcept -> 
     return outcome::success();
 }
 
+auto cluster_visitor_t::operator()(const modify::clone_file_t &) noexcept -> outcome::result<void>  {
+    return outcome::success();
+}
+
 auto cluster_visitor_t::operator()(const modify::share_folder_t &) noexcept -> outcome::result<void>  {
     return outcome::success();
 }
@@ -35,6 +39,14 @@ auto cluster_visitor_t::operator()(const modify::update_peer_t &) noexcept -> ou
 }
 
 auto cluster_visitor_t::operator()(const modify::file_availability_t &) noexcept ->  outcome::result<void> {
+    return outcome::success();
+}
+
+auto cluster_visitor_t::operator()(const modify::finish_file_t &) noexcept ->  outcome::result<void> {
+    return outcome::success();
+}
+
+auto cluster_visitor_t::operator()(const modify::flush_file_t &) noexcept ->  outcome::result<void> {
     return outcome::success();
 }
 

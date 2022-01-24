@@ -1,7 +1,13 @@
 - uuid model
+    -- scan_actor, .tmp файлы грузит в "чужую" модель
+    -- когда файл загружен, source_version обнулять, и обновлять мою версию
  - scan_actor
     -- block_availability_t тесты
     -- итерируем по файлам, те которые не local_locked()
+    -- tests:
+       incomplete is actually complete
+       !!! incomplete & complete files -> main case!
+
  - ui: подписаться на io_error
 
  - перезапускать gda, lda, backoff: min, max
@@ -13,9 +19,6 @@
     -- кластер не стартует, если нажать ctrl+c крэш (незкарыта транзакция)
     -- если file_info.seq = folder_info.seq и файла нет, не считать что он удалён, а считать что был крэш
     -- делать start++ и finish++ , иначе считать крешем
-
-- controller: частота запросов снижается?
-- syncspirit-daemon: dialer_actor.cpp:86: void syncspirit::net::dialer_actor_t::on_timer(rotor::request_id_t, bool): Assertion `it != redial_map.end()' failed.
 
 ===================
 

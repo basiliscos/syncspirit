@@ -41,10 +41,12 @@ struct device_t : arc_base_t<device_t> {
     inline bool get_skip_introduction_removals() const noexcept { return skip_introduction_removals; }
 
     inline const uris_t& get_uris() const noexcept { return uris; }
+
     void assing_uris(const uris_t& uris) noexcept;
 
 
     void update(const db::Device& source) noexcept;
+    uint64_t as_uint() noexcept;
 
     protected:
     device_t(const device_id_t& device_id, std::string_view name, std::string_view cert_name) noexcept;

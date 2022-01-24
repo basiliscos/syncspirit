@@ -2,7 +2,8 @@
 #include "net/names.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
-#include "model/diff/modify/new_file.h"
+#include "model/diff/modify/clone_file.h"
+#include "model/diff/modify/flush_file.h"
 #include "utils.h"
 
 using namespace syncspirit::fs;
@@ -145,17 +146,43 @@ auto file_actor_t::reflect(model::file_info_ptr_t& file_ptr) noexcept -> outcome
 }
 
 
-auto file_actor_t::operator()(const model::diff::modify::new_file_t &diff) noexcept -> outcome::result<void> {
+auto file_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexcept -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = file_info->get_file_infos().by_name(diff.file.name());
     return reflect(file);
+}
+
+auto file_actor_t::operator()(const model::diff::modify::flush_file_t& diff) noexcept -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
+    auto file = file_info->get_file_infos().by_name(diff.file_name);
+    assert(file->is_locally_available());
+
+    auto& path = file->get_path().string();
+    auto mmaped_file = files_cache.get(path);
+    if (!mmaped_file) {
+        LOG_ERROR(log, "{}, attempt to flush non-opend file {}", identity, path);
+        auto ec = sys::errc::make_error_code(sys::errc::io_error);
+        return ec;
+    }
+
+    files_cache.remove(mmaped_file);
+    auto ok = mmaped_file->close();
+    if (!ok) {
+        auto& ec = ok.assume_error();
+        LOG_ERROR(log, "{}, cannot close file: {}: {}", identity, path, ec.message());
+        return ec;
+    }
+
+    LOG_INFO(log, "{}, file {} ({} bytes) is now locally available", identity, path, file->get_size());
+    return outcome::success();
 }
 
 
 auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) noexcept -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = file_info->get_file_infos().by_name(diff.file_name);
     auto& path = file->get_path();
     auto& path_str = path.string();
@@ -174,23 +201,12 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
     auto offset = file->get_block_offset(block_index);
     std::copy(data.begin(), data.end(), disk_view + offset);
 
-    if (file->is_locally_available()) {
-        files_cache.remove(mmaped_file);
-        auto ok = mmaped_file->close();
-        if (!ok) {
-            auto& ec = ok.assume_error();
-            LOG_ERROR(log, "{}, cannot close file (after appending block): {}: {}", identity, path.string(), ec.message());
-            return ec;
-        }
-        LOG_INFO(log, "{}, file {} ({}) is now locally available", identity, path_str, file->get_size());
-    }
-
     return outcome::success();
 }
 
 auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) noexcept -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto target_folder_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto target_folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto target = target_folder_info->get_file_infos().by_name(diff.file_name);
 
     auto source_folder_info = folder->get_folder_infos().by_device_id(diff.source_device_id);
@@ -206,7 +222,10 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
     auto target_mmap = std::move(file_opt.assume_value());
     auto source_mmap = mmaped_file_t::backend_t();
 
-    auto& source_path = source->get_path();
+    auto source_path = source->get_path();
+    if (!source->is_locally_available()) {
+        source_path = make_temporal(source_path);
+    }
     if (source_path == target_path) {
         source_mmap = target_mmap->get_backend();
     } else {
@@ -230,17 +249,6 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
     auto source_begin = source_view + source_offset;
     auto source_end = source_begin + block->get_size();
     std::copy(source_begin, source_end, target_view + target_offset);
-
-    if (target->is_locally_available()) {
-        files_cache.remove(target_mmap);
-        auto ok = target_mmap->close();
-        if (!ok) {
-            auto& ec = ok.assume_error();
-            LOG_ERROR(log, "{}, cannot close file (after appending block): {}: {}", identity, target_path.string(), ec.message());
-            return ec;
-        }
-        LOG_INFO(log, "{}, file {} ({} bytes) is now locally available", identity, target_path.string(), target->get_size());
-    }
 
     return outcome::success();
 }

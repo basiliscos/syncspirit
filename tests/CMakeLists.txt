@@ -95,6 +95,10 @@ add_executable(037-diff-update_folder 037-diff-update_folder.cpp)
 target_link_libraries(037-diff-update_folder syncspirit_test_lib)
 add_test(037-diff-update_folder "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/037-diff-update_folder")
 
+add_executable(038-diff-clone_finish-file 038-diff-clone_finish-file.cpp)
+target_link_libraries(038-diff-clone_finish-file syncspirit_test_lib)
+add_test(038-diff-clone_finish-file "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/038-diff-clone_finish-file")
+
 add_executable(050-file_iterator 050-file_iterator.cpp)
 target_link_libraries(050-file_iterator syncspirit_test_lib)
 add_test(050-file_iterator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-file_iterator")

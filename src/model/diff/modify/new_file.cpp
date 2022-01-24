@@ -1,5 +1,4 @@
 #include "new_file.h"
-#include "db/prefix.h"
 #include "../cluster_visitor.h"
 #include "../../cluster.h"
 
