@@ -160,7 +160,19 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
         return unchanged_meta_t{info.file};
     }
 
-    if (sz != file->get_size()) {
+    auto source = file->get_source();
+    if (!source) {
+        LOG_DEBUG(log, "source file missing for {}, removing", path.string());
+        bfs::remove(path, ec);
+        if (ec) {
+            scan_errors_t errors;
+            errors.push_back(scan_error_t{path, ec});
+            return errors;
+        }
+        // ignore tmp file
+        return true;
+    }
+    if (sz != source->get_size()) {
         LOG_DEBUG(log, "removing size-mismatched temporally {}", path.string());
         bfs::remove(path, ec);
         if (ec) {

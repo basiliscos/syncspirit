@@ -1,7 +1,4 @@
 - uuid model
-    -- scan_actor, .tmp файлы грузит в "чужую" модель
-    -- если нету source_file, удалять .tmp
-    -- размер .tmp сверять с source_file
     -- block_availability_t тесты
     -- итерируем по файлам, те которые не local_locked() ?
 

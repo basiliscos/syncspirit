@@ -18,7 +18,12 @@ TEST_CASE("scan_task", "[fs]") {
     config::fs_config_t config{0 , 3600};
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto peer_device =  device_t::create(peer_id, "peer-device").value();
+
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
 
     auto db_folder = db::Folder();
     db_folder.set_id("some-id");
@@ -30,8 +35,10 @@ TEST_CASE("scan_task", "[fs]") {
     db::FolderInfo db_folder_info;
     db_folder_info.set_index_id(1234);
     db_folder_info.set_max_sequence(3);
-    auto folder_info = folder_info_t::create(cluster->next_uuid(), db_folder_info, my_device, folder).value();
-    folder->get_folder_infos().put(folder_info);
+    auto folder_my = folder_info_t::create(cluster->next_uuid(), db_folder_info, my_device, folder).value();
+    auto folder_peer = folder_info_t::create(cluster->next_uuid(), db_folder_info, peer_device, folder).value();
+    folder->get_folder_infos().put(folder_my);
+    folder->get_folder_infos().put(folder_peer);
 
     SECTION("without files") {
         SECTION("non-existing dir => err") {
@@ -101,6 +108,10 @@ TEST_CASE("scan_task", "[fs]") {
         auto pr_file = proto::FileInfo{};
         pr_file.set_name("a.txt");
         pr_file.set_sequence(2);
+        auto version = pr_file.mutable_version();
+        auto counter = version->add_counters();
+        counter->set_id(1);
+        counter->set_value(peer_device->as_uint());
 
         SECTION("meta is not changed") {
             pr_file.set_block_size(5);
@@ -111,8 +122,8 @@ TEST_CASE("scan_task", "[fs]") {
             write_file(path, "12345");
             bfs::last_write_time(path, modified);
 
-            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info).value();
-            folder_info->get_file_infos().put(file);
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->get_file_infos().put(file);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();
@@ -142,8 +153,8 @@ TEST_CASE("scan_task", "[fs]") {
                 write_file(path, "12345");
                 bfs::last_write_time(path, modified);
 
-                file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info).value();
-                folder_info->get_file_infos().put(file);
+                file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+                folder_my->get_file_infos().put(file);
             }
 
             SECTION("modification time differs") {
@@ -155,8 +166,8 @@ TEST_CASE("scan_task", "[fs]") {
                 write_file(path, "12345");
                 bfs::last_write_time(path, modified);
 
-                file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info).value();
-                folder_info->get_file_infos().put(file);
+                file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+                folder_my->get_file_infos().put(file);
 
             }
             task = new scan_task_t(cluster, folder->get_id(), config);
@@ -185,8 +196,11 @@ TEST_CASE("scan_task", "[fs]") {
             SECTION("size match -> ok, will recalc") {
                 write_file(path, "12345");
 
-                auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info).value();
-                folder_info->get_file_infos().put(file);
+                auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
+                folder_my->get_file_infos().put(file_my);
+                folder_peer->get_file_infos().put(file_peer);
+                file_my->set_source(file_peer);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
                 auto r = task.advance();
@@ -203,11 +217,34 @@ TEST_CASE("scan_task", "[fs]") {
                 CHECK(*std::get_if<bool>(&r) == false);
             }
 
+            SECTION("source is missing") {
+                write_file(path, "12345");
+
+                auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+                folder_my->get_file_infos().put(file_my);
+
+                auto task = scan_task_t(cluster, folder->get_id(), config);
+                auto r = task.advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task.advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task.advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == false);
+            }
+
             SECTION("size mismatch -> remove & ignore") {
                 write_file(path, "123456");
 
-                auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info).value();
-                folder_info->get_file_infos().put(file);
+                auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
+                folder_my->get_file_infos().put(file_my);
+                folder_peer->get_file_infos().put(file_peer);
+                file_my->set_source(file_peer);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
                 auto r = task.advance();
@@ -236,8 +273,8 @@ TEST_CASE("scan_task", "[fs]") {
             write_file(path_tmp, "12345");
             bfs::last_write_time(path, modified);
 
-            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info).value();
-            folder_info->get_file_infos().put(file);
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->get_file_infos().put(file);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();
@@ -262,8 +299,8 @@ TEST_CASE("scan_task", "[fs]") {
             write_file(path, "12345");
             bfs::permissions(parent, bfs::perms::no_perms);
 
-            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info).value();
-            folder_info->get_file_infos().put(file);
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->get_file_infos().put(file);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();

@@ -267,6 +267,9 @@ void test_meta_changes() {
                     SECTION("2nd block") {
                         write_file(path, "1234567899");
                     }
+                    SECTION("missing source file") {
+                        file->set_source(nullptr);
+                    }
                     sup->do_process();
                     CHECK(!file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
