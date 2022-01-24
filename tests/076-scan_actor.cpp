@@ -4,8 +4,10 @@
 #include "test_supervisor.h"
 
 #include "model/cluster.h"
+#include "model/diff/aggregate.h"
 #include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/new_file.h"
+#include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/clone_file.h"
 #include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
 #include "fs/scan_actor.h"
@@ -33,9 +35,13 @@ struct fixture_t {
     void run() noexcept {
         auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
         my_device =  device_t::create(my_id, "my-device").value();
+        auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+        peer_device =  device_t::create(peer_id, "peer-device").value();
+
         cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
+        cluster->get_devices().put(peer_device);
 
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
@@ -46,13 +52,17 @@ struct fixture_t {
         db_folder.set_label("my-f1");
         db_folder.set_path(root_path.string());
 
-        auto diff = diff::cluster_diff_ptr_t();
-        diff = new diff::modify::create_folder_t(db_folder);
+        auto diffs = diff::aggregate_t::diffs_t{};
+        diffs.push_back(new diff::modify::create_folder_t(db_folder));
+        diffs.push_back(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id(), 123ul));
+        auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
         REQUIRE(diff->apply(*cluster));
 
         folder = cluster->get_folders().by_id(db_folder.id());
         folder_info = folder->get_folder_infos().by_device(my_device);
         files = &folder_info->get_file_infos();
+        folder_info_peer = folder->get_folder_infos().by_device(peer_device);
+        files_peer = &folder_info_peer->get_file_infos();
 
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin){
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -108,8 +118,11 @@ struct fixture_t {
     target_ptr_t target;
     model::folder_ptr_t folder;
     model::folder_info_ptr_t folder_info;
+    model::folder_info_ptr_t folder_info_peer;
     model::file_infos_map_t* files;
+    model::file_infos_map_t* files_peer;
     errors_container_t errors;
+    model::device_ptr_t peer_device;
 };
 
 void test_meta_changes() {
@@ -145,14 +158,25 @@ void test_meta_changes() {
             pr_fi.set_block_size(5ul);
             pr_fi.set_size(5ul);
 
+            auto version = pr_fi.mutable_version();
+            auto counter = version->add_counters();
+            counter->set_id(1);
+            counter->set_value(peer_device->as_uint());
+
             auto bi = proto::BlockInfo();
             bi.set_size(5);
             bi.set_weak_hash(12);
             bi.set_hash(utils::sha256_digest("12345").value());
             bi.set_offset(0);
 
+            auto b = block_info_t::create(bi).value();
+
             SECTION("a file does not physically exists"){
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, folder->get_id(), pr_fi, {bi}));
+                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
+                file_peer->assign_block(b, 0);
+                files_peer->put(file_peer);
+
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));
                 auto file = files->by_name(pr_fi.name());
 
@@ -162,9 +186,15 @@ void test_meta_changes() {
             }
 
             SECTION("complete file exists") {
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, folder->get_id(), pr_fi, {bi}));
+                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
+                file_peer->assign_block(b, 0);
+                files_peer->put(file_peer);
+
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));
                 auto file = files->by_name(pr_fi.name());
+                file->assign_block(b, 0);
+                file->set_source(nullptr);
                 auto path = file->get_path();
 
                 SECTION("meta is not changed") {
@@ -188,17 +218,24 @@ void test_meta_changes() {
                     CHECK(!file->is_locally_available());
                 }
             }
-            SECTION("incomplete file exists") {
 
+            SECTION("incomplete file exists") {
                 pr_fi.set_size(10ul);
+                pr_fi.set_block_size(5ul);
+
                 auto bi_2 = proto::BlockInfo();
                 bi_2.set_size(5);
                 bi_2.set_weak_hash(12);
                 bi_2.set_hash(utils::sha256_digest("67890").value());
                 bi_2.set_offset(5);
+                auto b2 = block_info_t::create(bi_2).value();
 
+                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
+                file_peer->assign_block(b, 0);
+                file_peer->assign_block(b2, 1);
+                files_peer->put(file_peer);
 
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, folder->get_id(), pr_fi, {bi, bi_2}));
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));
                 auto file = files->by_name(pr_fi.name());
                 auto path = file->get_path().string() + ".syncspirit-tmp";
@@ -215,8 +252,11 @@ void test_meta_changes() {
                 SECTION("just 1st block is valid, tmp is kept") {
                     sup->do_process();
                     CHECK(!file->is_locally_available());
-                    CHECK(file->is_locally_available(0));
+                    CHECK(!file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
+                    CHECK(!file_peer->is_locally_available());
+                    CHECK(file_peer->is_locally_available(0));
+                    CHECK(!file_peer->is_locally_available(1));
                     CHECK(bfs::exists(path));
                 }
 
@@ -230,6 +270,8 @@ void test_meta_changes() {
                     sup->do_process();
                     CHECK(!file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
+                    CHECK(!file_peer->is_locally_available(0));
+                    CHECK(!file_peer->is_locally_available(1));
                     CHECK(!bfs::exists(path));
                 }
 

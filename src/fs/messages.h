@@ -27,6 +27,7 @@ struct rehash_needed_t {
     scan_task_ptr_t task;
     std::uint32_t generation;
     model::file_info_ptr_t file;
+    model::file_info_ptr_t source_file;
     bio_file_t mmaped_file;
     int64_t last_queued_block;
     int64_t valid_blocks;

@@ -161,8 +161,9 @@ auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t 
         return errs;
     };
 
-    send<payload::rehash_needed_t>(address, std::move(task), generation, std::move(file), std::move(bio_file),
-                                   int64_t{0}, int64_t{-1}, size_t{0}, std::set<std::int64_t>{}, false, false);
+    assert(file->get_source());
+    send<payload::rehash_needed_t>(address, std::move(task), generation, std::move(file), file->get_source(),
+                                   std::move(bio_file), int64_t{0}, int64_t{-1}, size_t{0}, std::set<std::int64_t>{}, false, false);
     return {};
 }
 
@@ -227,7 +228,8 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     if (!info.invalid) {
         auto& digest = res.payload.res.digest;
         auto block_index = rp.block_index;
-        auto& orig_block = file->get_blocks().at(block_index);
+        auto& source_file = info.source_file;
+        auto& orig_block = info.source_file->get_blocks().at(block_index);
         if (orig_block->get_hash() == digest) {
             auto& ooo = info.out_of_order;
             if (block_index == info.valid_blocks + 1) {
@@ -245,7 +247,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
             bool complete = (info.queue_size == 0) && (info.abandoned || ((size_t)info.valid_blocks == info.file->get_blocks().size()));
             if (complete) {
                 auto diff = model::diff::block_diff_ptr_t{};
-                diff = new model::diff::modify::blocks_availability_t(*file, (size_t)info.valid_blocks);
+                diff = new model::diff::modify::blocks_availability_t(*source_file, (size_t)info.valid_blocks);
                 send<model::payload::block_update_t>(coordinator, std::move(diff), this);
             }
         } else {
