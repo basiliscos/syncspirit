@@ -83,9 +83,6 @@ auto block_info_t::unlink(file_info_t *file_info, bool deletion) noexcept -> rem
         }
     }
     assert(!r.empty() && "at least one block has been removed");
-    if (deletion && file_blocks.empty()) {
-        mark_deleted();
-    }
     return r;
 }
 

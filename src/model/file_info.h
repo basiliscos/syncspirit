@@ -7,7 +7,6 @@
 #include <boost/outcome.hpp>
 #include "misc/arc.hpp"
 #include "misc/map.hpp"
-#include "misc/storeable.h"
 #include "misc/uuid.h"
 #include "block_info.h"
 #include "device.h"
@@ -28,7 +27,7 @@ struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
 
-struct file_info_t final : arc_base_t<file_info_t>, storeable_t {
+struct file_info_t final : arc_base_t<file_info_t> {
 
     enum flags_t {
         f_deleted = 1 << 0,

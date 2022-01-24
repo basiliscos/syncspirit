@@ -77,34 +77,11 @@ bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
 
 void folder_info_t::add(const file_info_ptr_t &file_info) noexcept {
     file_infos.put(file_info);
-    mark_dirty();
 }
-
-#if 0
-bool folder_info_t::update(const proto::Device &device) noexcept {
-    bool update = false;
-    bool new_index = false;
-    if (index != device.index_id()) {
-        index = device.index_id();
-        new_index = true;
-    }
-    if (max_sequence != device.max_sequence()) {
-        max_sequence = device.max_sequence();
-        update = true;
-    }
-    if (update || new_index) {
-        spdlog::trace("folder_info_t::update, folder = {}, index = {:#x}, max seq = {}", folder->get_label(), index,
-                      max_sequence);
-        mark_dirty();
-    }
-    return new_index;
-}
-#endif
 
 void folder_info_t::set_max_sequence(int64_t value) noexcept {
     assert(max_sequence < value);
     remote_max_sequence = max_sequence = value;
-    mark_dirty();
 }
 
 std::string folder_info_t::serialize() noexcept {

@@ -3,7 +3,7 @@
     -- итерируем по файлам, те которые не local_locked() ?
 
     -- tests:
-       incomplete is actually complete
+       - incomplete & complete together
        !!! incomplete & complete files -> main case!
 
  - ui: подписаться на io_error

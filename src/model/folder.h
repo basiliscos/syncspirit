@@ -10,7 +10,6 @@
 #include "bep.pb.h"
 #include "structs.pb.h"
 #include "folder_info.h"
-#include "misc/storeable.h"
 #include "misc/local_file.h"
 #include "misc/uuid.h"
 
@@ -27,7 +26,7 @@ struct folder_t;
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
 
-struct folder_t final : arc_base_t<folder_t>, storeable_t {
+struct folder_t final : arc_base_t<folder_t> {
 
     enum class foldet_type_t { send = 0, receive, send_and_receive };
     enum class pull_order_t { random = 0, alphabetic, largest, oldest, newest };

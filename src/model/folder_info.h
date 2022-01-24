@@ -4,7 +4,6 @@
 #include "device.h"
 #include "file_info.h"
 #include "misc/local_file.h"
-#include "misc/storeable.h"
 #include "structs.pb.h"
 #include <boost/outcome.hpp>
 
@@ -18,7 +17,7 @@ using folder_ptr_t = intrusive_ptr_t<folder_t>;
 struct folder_info_t;
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
-struct folder_info_t final : arc_base_t<folder_info_t>, storeable_t {
+struct folder_info_t final : arc_base_t<folder_info_t> {
 
     static outcome::result<folder_info_ptr_t> create(std::string_view key, const db::FolderInfo& data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
     static outcome::result<folder_info_ptr_t> create(const uuid_t& uuid, const db::FolderInfo& data, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;

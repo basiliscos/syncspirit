@@ -6,7 +6,6 @@
 #include "misc/arc.hpp"
 #include "misc/map.hpp"
 #include "misc/file_block.h"
-#include "misc/storeable.h"
 #include "bep.pb.h"
 #include "structs.pb.h"
 #include <boost/outcome.hpp>
@@ -17,12 +16,11 @@ namespace outcome = boost::outcome_v2;
 
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
-struct file_block_t;
 struct block_info_t;
 using block_info_ptr_t = intrusive_ptr_t<block_info_t>;
 
 
-struct block_info_t final : arc_base_t<block_info_t>, storeable_t {
+struct block_info_t final : arc_base_t<block_info_t> {
     using removed_incides_t = std::vector<size_t>;
     using file_blocks_t = std::vector<file_block_t>;
     static const constexpr size_t digest_length = 32;
