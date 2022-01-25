@@ -43,6 +43,7 @@ struct governor_actor_t : public r::actor_base_t, private model::diff::cluster_v
   private:
     void process() noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_block_update(model::message::block_update_t &message) noexcept;
     void on_model_response(model::message::model_response_t& reply) noexcept;
 
     outcome::result<void> operator()(const model::diff::load::load_cluster_t &) noexcept override;

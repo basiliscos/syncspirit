@@ -13,6 +13,7 @@ auto append_block_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device_id(device_id);
     auto file = folder_info->get_file_infos().by_name(file_name);
+    LOG_TRACE(log, "append_block_t append_block_t, appending block {} to {}", block_index, file->get_full_name());
     file->mark_local_available(block_index);
     return outcome::success();
 }

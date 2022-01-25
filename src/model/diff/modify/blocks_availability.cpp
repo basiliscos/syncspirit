@@ -20,7 +20,7 @@ auto blocks_availability_t::apply_impl(cluster_t &cluster) const noexcept -> out
     auto ok = file && (compare(version, file->get_version()) == version_relation_t::identity);
     if (ok) {
         for (size_t i = 0; i <= block_index; ++i) {
-            file->mark_local_available(block_index);
+            file->mark_local_available(i);
         }
     }
     return outcome::success();

@@ -19,6 +19,8 @@ auto finish_file_t::apply_impl(cluster_t &cluster) const noexcept-> outcome::res
     auto folder_info = folder->get_folder_infos().by_device(cluster.get_device());
     auto& files = folder_info->get_file_infos();
     auto file = files.by_name(file_name);
+    LOG_TRACE(log, "finish_file_t for {}", file->get_full_name());
+
     auto source = file->get_source();
     assert(source->is_locally_available());
 
