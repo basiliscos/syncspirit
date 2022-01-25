@@ -1,7 +1,4 @@
 - uuid model
-    -- block_availability_t тесты
-    -- итерируем по файлам, те которые не local_locked() ?
-
     -- tests:
        - incomplete & complete together
        !!! incomplete & complete files -> main case!

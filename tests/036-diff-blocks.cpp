@@ -3,6 +3,7 @@
 #include "access.h"
 #include "model/cluster.h"
 #include "model/diff/modify/append_block.h"
+#include "model/diff/modify/blocks_availability.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/local_update.h"
@@ -90,6 +91,13 @@ TEST_CASE("various block diffs", "[model]") {
         CHECK(lf1.get_offset() == 5);
         CHECK(lf1.is_locally_available());
         CHECK(!file->is_locally_available());
+    }
+
+    SECTION("availability") {
+        auto bdiff = diff::block_diff_ptr_t(new diff::modify::blocks_availability_t(*file, 1));
+        REQUIRE(bdiff->apply(*cluster));
+        auto& blocks = file->get_blocks();
+        CHECK(file->is_locally_available());
     }
 
 
