@@ -244,7 +244,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
             }
             bool ok = rehash_next(*msg);
             queued_next = ok;
-            bool complete = (info.queue_size == 0) && (info.abandoned || ((size_t)info.valid_blocks == info.file->get_blocks().size()));
+            bool complete = (info.queue_size == 0);
             if (complete) {
                 auto diff = model::diff::block_diff_ptr_t{};
                 diff = new model::diff::modify::blocks_availability_t(*source_file, (size_t)info.valid_blocks);

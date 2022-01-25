@@ -129,6 +129,7 @@ void test_meta_changes() {
     struct F : fixture_t {
         void main() noexcept override {
             sys::error_code ec;
+
             SECTION("no files"){
                 sup->do_process();
                 CHECK(folder_info->get_file_infos().size() == 0);
@@ -290,7 +291,49 @@ void test_meta_changes() {
                     CHECK(errs.at(0).path == path);
                     CHECK(errs.at(0).ec);
                 }
+            }
 
+            SECTION("local (previous) file exists") {
+                pr_fi.set_size(10ul);
+                pr_fi.set_block_size(5ul);
+
+                auto bi_2 = proto::BlockInfo();
+                bi_2.set_size(5);
+                bi_2.set_weak_hash(12);
+                bi_2.set_hash(utils::sha256_digest("67890").value());
+                bi_2.set_offset(5);
+                auto b2 = block_info_t::create(bi_2).value();
+
+                pr_fi.set_size(5ul);
+                auto file_my = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info).value();
+                file_my->assign_block(b, 0);
+                files->put(file_my);
+
+                pr_fi.set_size(10ul);
+                counter->set_id(2);
+
+                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
+                file_peer->assign_block(b, 0);
+                file_peer->assign_block(b2, 1);
+                files_peer->put(file_peer);
+
+                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
+                REQUIRE(diff->apply(*cluster));
+                auto file = files->by_name(pr_fi.name());
+                auto path_my = file->get_path().string();
+                auto path_peer = file->get_path().string() + ".syncspirit-tmp";
+                write_file(path_my, "12345");
+                bfs::last_write_time(path_my, modified);
+
+                auto content = "12345\0\0\0\0\0";
+                write_file(path_peer, std::string(content, 10));
+                sup->do_process();
+
+                CHECK(file_my->is_locally_available());
+                CHECK(file_my->get_source() == file_peer);
+                CHECK(!file_peer->is_locally_available());
+                CHECK(file_peer->is_locally_available(0));
+                CHECK(!file_peer->is_locally_available(1));
             }
         }
     };

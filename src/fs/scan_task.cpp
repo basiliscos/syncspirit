@@ -101,10 +101,6 @@ scan_result_t scan_task_t::advance_dir(const bfs::path& dir) noexcept {
                 };
 
                 auto rp = relativize(child_path, root);
-                if (bfs::exists(root / rp.path)) {
-                    remove_it();
-                    continue;
-                }
 
                 auto modified_at = bfs::last_write_time(child_path, ec);
                 if (ec) {

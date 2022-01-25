@@ -1,9 +1,10 @@
 - uuid model
     -- tests:
        - incomplete & complete together
-       !!! incomplete & complete files -> main case!
+        - controller
 
  - ui: подписаться на io_error
+ - ui-daemon: шарить модель с governor?
 
  - перезапускать gda, lda, backoff: min, max
 
