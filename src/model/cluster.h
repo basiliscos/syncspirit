@@ -62,7 +62,6 @@ struct cluster_t final : arc_base_t<cluster_t> {
     device_ptr_t device;
     folders_map_t folders;
     block_infos_map_t blocks;
-    block_infos_map_t deleted_blocks;
     devices_map_t devices;
     ignored_devices_map_t ignored_devices;
     ignored_folders_map_t ignored_folders;

@@ -7,9 +7,6 @@
 
  - перезапускать gda, lda, backoff: min, max
 
- -- cluster, deleted_xxx (deleted_blocks, etc.) - убрать?
- -- убрать mark_modified()
-
 - scan_actor:
     -- кластер не стартует, если нажать ctrl+c крэш (незкарыта транзакция)
     -- если file_info.seq = folder_info.seq и файла нет, не считать что он удалён, а считать что был крэш
