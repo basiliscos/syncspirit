@@ -24,7 +24,7 @@ r::plugin::resource_id_t finalization = 6;
 } // namespace
 
 peer_actor_t::peer_actor_t(config_t &config)
-    : r::actor_base_t{config}, device_name{config.device_name}, bep_config{config.bep_config},
+    : r::actor_base_t{config}, cluster{config.cluster}, device_name{config.device_name}, bep_config{config.bep_config},
       coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, uris{config.uris},
       sock(std::move(config.sock)), ssl_pair{*config.ssl_pair} {
     rx_buff.resize(config.bep_config.rx_buff_size);
@@ -453,7 +453,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
                 LOG_TRACE(log, "{}, read_hello, from {} ({} {})", identity, msg->device_name(), msg->client_name(),
                           msg->client_version());
                 auto diff = cluster_diff_ptr_t();
-                diff = new peer::peer_state_t(peer_device_id.get_sha256(), get_address(), true, cert_name, peer_endpoint, msg->client_name());
+                diff = new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), true, cert_name, peer_endpoint, msg->client_name());
                 send<model::payload::model_update_t>(coordinator, std::move(diff));
             } else {
                 LOG_WARN(log, "{}, read_hello, unexpected_message", identity);

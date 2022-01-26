@@ -23,6 +23,7 @@ struct peer_actor_config_t : public r::actor_config_t {
     const utils::key_pair_t *ssl_pair;
     config::bep_config_t bep_config;
     r::address_ptr_t coordinator;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -62,6 +63,11 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
 
     builder_t &&sock(std::optional<tcp_socket_t> &&value) &&noexcept {
         parent_t::config.sock = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+        parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -134,6 +140,7 @@ struct peer_actor_t : public r::actor_base_t {
     void handle_close(proto::message::Close &&) noexcept;
     void handle_response(proto::message::Response &&) noexcept;
 
+    model::cluster_ptr_t cluster;
     utils::logger_t log;
     std::string_view device_name;
     config::bep_config_t bep_config;

@@ -1,6 +1,3 @@
-
-syncspirit-daemon: /home/b/development/cpp/syncspirit/src/model/diff/peer/peer_state.cpp:10: virtual boost::outcome_v2::result<void> syncspirit::model::diff::peer::peer_state_t::apply_impl(syncspirit::model::cluster_t&) const: Assertion `peer' failed.
-
  - перезапускать gda, lda, backoff: min, max
 
 ===================

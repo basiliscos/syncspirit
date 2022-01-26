@@ -7,6 +7,7 @@ namespace syncspirit::model {
 
 enum class error_code_t {
     success = 0,
+    unknown_device,
     no_such_device,
     no_such_folder,
     invalid_block_prefix,

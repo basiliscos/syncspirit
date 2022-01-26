@@ -14,6 +14,9 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::success:
         r = "success";
         break;
+    case error_code_t::unknown_device:
+        r = "peer device is unknown";
+        break;
     case error_code_t::no_such_device:
         r = "no such device";
         break;

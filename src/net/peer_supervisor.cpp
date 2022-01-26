@@ -5,6 +5,7 @@
 #include "model/diff/peer/peer_state.h"
 #include "model/diff/modify/connect_request.h"
 #include "model/diff/modify/update_contact.h"
+#include "model/misc/error_code.h"
 
 using namespace syncspirit::net;
 
@@ -40,7 +41,7 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     if (it != addr2id.end()) {
         auto &device_id = it->second;
         auto diff = cluster_diff_ptr_t();
-        diff = new peer::peer_state_t(device_id, peer_addr, false);
+        diff = new peer::peer_state_t(*cluster, device_id, peer_addr, false);
         send<model::payload::model_update_t>(coordinator, std::move(diff));
         auto it_id = id2addr.find(device_id);
         id2addr.erase(it_id);
@@ -75,11 +76,16 @@ void peer_supervisor_t::on_contact_update(model::message::contact_update_t &msg)
 }
 
 auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &state) noexcept -> outcome::result<void>{
+    auto &peer_addr = state.peer_addr;
     if(state.online) {
-        auto &peer_addr = state.peer_addr;
         auto &peer_id = state.peer_id;
         addr2id.emplace(peer_addr, peer_id);
         id2addr.emplace(peer_id, peer_addr);
+    }
+    if (!state.known && state.online) {
+        auto ec = model::make_error_code(model::error_code_t::unknown_device);
+        auto ee = make_error(ec);
+        send<r::payload::shutdown_trigger_t>(address, peer_addr, ee);
     }
     return outcome::success();
 }
@@ -98,6 +104,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t 
            .coordinator(coordinator)
            .timeout(timeout)
            .sock(std::optional(std::move(sock)))
+           .cluster(cluster)
            .finish()
            ->get_address();
     return outcome::success();
@@ -118,6 +125,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &
                .timeout(timeout)
                .peer_device_id(diff.device)
                .uris(diff.uris)
+               .cluster(cluster)
                .finish()
                ->get_address();
         }

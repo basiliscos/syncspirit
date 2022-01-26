@@ -103,17 +103,19 @@ void dialer_actor_t::on_model_update(model::message::model_update_t &msg) noexce
 
 
 auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &state) noexcept -> outcome::result<void>{
-    auto& devices = cluster->get_devices();
-    auto peer = devices.by_sha256(state.peer_id);
+    if (state.known) {
+        auto& devices = cluster->get_devices();
+        auto peer = devices.by_sha256(state.peer_id);
 
-    if (peer) {
-        if (!state.online) {
-            schedule_redial(peer);
-        }
-        else {
-            auto it = redial_map.find(peer);
-            if (it != redial_map.end()) {
-                cancel_timer(it->second);
+        if (peer) {
+            if (!state.online) {
+                schedule_redial(peer);
+            }
+            else {
+                auto it = redial_map.find(peer);
+                if (it != redial_map.end()) {
+                    cancel_timer(it->second);
+                }
             }
         }
     }

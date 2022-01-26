@@ -58,7 +58,7 @@ void cluster_supervisor_t::on_model_update(model::message::model_update_t &messa
 }
 
 auto cluster_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff) noexcept -> outcome::result<void> {
-    if (!cluster->is_tainted()) {
+    if (!cluster->is_tainted() && diff.known) {
         auto peer = cluster->get_devices().by_sha256(diff.peer_id);
         LOG_TRACE(log, "{}, visiting peer_state_t, {} is online: {}", identity, peer->device_id(), (diff.online? "yes": "no"));
         if (diff.online) {
