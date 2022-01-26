@@ -285,16 +285,23 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == true);
 
-            r = task.advance();
-            REQUIRE(std::get_if<unchanged_meta_t>(&r));
-            auto ref = std::get_if<unchanged_meta_t>(&r);
-            CHECK(ref->file == file_my);
-
-            r = task.advance();
-            REQUIRE(std::get_if<incomplete_t>(&r));
-            auto ref2 = std::get_if<incomplete_t>(&r);
-            CHECK(ref2->file);
-
+            unchanged_meta_t unchanged;
+            incomplete_t incomplete;
+            for(int i = 0; i < 2; ++i) {
+                r = task.advance();
+                std::visit([&](auto&& it){
+                    using T = std::decay_t<decltype(it)>;
+                    if constexpr (std::is_same_v<T, unchanged_meta_t>) {
+                        unchanged = it;
+                    } else if constexpr (std::is_same_v<T, incomplete_t>) {
+                        incomplete = it;
+                    } else {
+                        REQUIRE((0 && "unexpected result"));
+                    }
+                }, r);
+            }
+            CHECK(unchanged.file == file_my);
+            CHECK(incomplete.file);
             r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);

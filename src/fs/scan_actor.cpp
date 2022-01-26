@@ -242,8 +242,8 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
                 ++info.valid_blocks;
                 it = ooo.erase(it);
             }
-            bool ok = rehash_next(*msg);
-            queued_next = ok;
+            bool can_process_more = rehash_next(*msg);
+            queued_next = !can_process_more;
             bool complete = (info.queue_size == 0);
             if (complete) {
                 auto diff = model::diff::block_diff_ptr_t{};
@@ -267,6 +267,6 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     }
 
     if (!queued_next) {
-        process_queue();
+        send<payload::scan_progress_t>(address, info.task, info.generation);
     }
 }
