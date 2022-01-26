@@ -41,7 +41,10 @@ struct fs_supervisor_t : rth::supervisor_thread_t {
     void on_start() noexcept override;
 
   private:
-    void on_model_request(model::message::model_response_t& res) noexcept;
+    using model_request_ptr_t = r::intrusive_ptr_t<model::message::model_request_t>;
+
+    void on_model_request(model::message::model_request_t& req) noexcept;
+    void on_model_response(model::message::model_response_t& res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
     void launch() noexcept;
@@ -53,6 +56,7 @@ struct fs_supervisor_t : rth::supervisor_thread_t {
     r::address_ptr_t coordinator;
     r::actor_ptr_t scan_actor;
     r::actor_ptr_t file_actor;
+    model_request_ptr_t model_request;
 };
 
 } // namespace fs

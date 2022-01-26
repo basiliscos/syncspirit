@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
         auto strand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
 
-        auto cluster_copies = 2ul;
+        auto cluster_copies = 1ul;
 
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                            .app_config(cfg)

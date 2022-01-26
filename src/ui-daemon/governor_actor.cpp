@@ -16,8 +16,9 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             if (!ec && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&governor_actor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&governor_actor_t::on_block_update, coordinator);
+                auto sup = supervisor->get_address();
+                plugin->subscribe_actor(&governor_actor_t::on_model_update, sup);
+                plugin->subscribe_actor(&governor_actor_t::on_io_error, coordinator);
             }
         });
     });
@@ -27,13 +28,13 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void governor_actor_t::on_start() noexcept {
-    log->trace("{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start", identity);
     r::actor_base_t::on_start();
-    request<model::payload::model_request_t>(coordinator).send(init_timeout);
+    request<model::payload::model_request_t>(supervisor->get_address()).send(init_timeout);
 }
 
 void governor_actor_t::shutdown_start() noexcept {
-    log->trace("{}, shutdown_start", identity);
+    LOG_TRACE(log, "{}, shutdown_start", identity);
     r::actor_base_t::shutdown_start();
 }
 
@@ -43,47 +44,27 @@ void governor_actor_t::on_model_response(model::message::model_response_t &reply
         LOG_ERROR(log, "{}, on_cluster_seed: {},", ee->message());
         return do_shutdown(ee);
     }
-    log->trace("{}, on_model_response", identity);
+    LOG_TRACE(log, "{}, on_model_response", identity);
     cluster = std::move(reply.payload.res.cluster);
+    process();
 }
 
-void governor_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
+
+void governor_actor_t::on_model_update(model::message::forwarded_model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
-    auto& payload = message.payload;
-    auto& diff = *message.payload.diff;
-    auto r = diff.apply(*cluster);
-    if (!r) {
-        LOG_ERROR(log, "{}, on_model_update (apply): {}", identity, r.assume_error().message());
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
-    }
-    r = diff.visit(*this);
-    if (!r) {
-        LOG_ERROR(log, "{}, on_model_update (visit): {}", r.assume_error().message());
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
-    }
+    auto& payload = message.payload.message->payload;
     if (payload.custom == this) {
         process();
     }
 }
 
-void governor_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_block_update", identity);
-    auto& diff = *message.payload.diff;
-    auto r = diff.apply(*cluster);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
+void governor_actor_t::on_io_error(model::message::io_error_t& reply) noexcept {
+    auto& errs = reply.payload.errors;
+    LOG_TRACE(log, "{}, on_io_error, count = {}", identity, errs.size());
+    for(auto& err: errs) {
+        LOG_WARN(log, "{}, on_io_error (ignored) path: {}, problem: {}", identity, err.path, err.ec.message());
     }
 }
-
-
-auto governor_actor_t::operator()(const model::diff::load::load_cluster_t &) noexcept -> outcome::result<void>{
-    process();
-    return outcome::success();
-}
-
 
 void governor_actor_t::process() noexcept {
     LOG_DEBUG(log, "{}, process", identity);

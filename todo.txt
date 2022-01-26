@@ -1,17 +1,7 @@
-- uuid model
-    -- tests:
-       - incomplete & complete together
-        - controller
 
- - ui: подписаться на io_error
- - ui-daemon: шарить модель с governor?
+syncspirit-daemon: /home/b/development/cpp/syncspirit/src/model/diff/peer/peer_state.cpp:10: virtual boost::outcome_v2::result<void> syncspirit::model::diff::peer::peer_state_t::apply_impl(syncspirit::model::cluster_t&) const: Assertion `peer' failed.
 
  - перезапускать gda, lda, backoff: min, max
-
-- scan_actor:
-    -- кластер не стартует, если нажать ctrl+c крэш (незкарыта транзакция)
-    -- если file_info.seq = folder_info.seq и файла нет, не считать что он удалён, а считать что был крэш
-    -- делать start++ и finish++ , иначе считать крешем
 
 ===================
 

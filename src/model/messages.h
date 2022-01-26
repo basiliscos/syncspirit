@@ -59,4 +59,20 @@ using model_response_t = r::request_traits_t<payload::model_request_t>::response
 
 }
 
+namespace payload {
+
+struct forwarded_model_update_t {
+    using message_t = r::intrusive_ptr_t<message::model_update_t>;
+    message_t message;
+};
+
+}
+
+namespace message {
+
+using forwarded_model_update_t = r::message_t<payload::forwarded_model_update_t>;
+
+}
+
+
 }

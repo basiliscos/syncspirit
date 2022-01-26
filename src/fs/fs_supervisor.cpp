@@ -36,6 +36,7 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&fs_supervisor_t::on_model_request);
+        p.subscribe_actor(&fs_supervisor_t::on_model_response);
     }, r::plugin::config_phase_t::PREINIT );
 }
 
@@ -61,8 +62,19 @@ void fs_supervisor_t::launch() noexcept {
                      .finish();
 }
 
-void fs_supervisor_t::on_model_request(model::message::model_response_t &res) noexcept {
+void fs_supervisor_t::on_model_request(model::message::model_request_t &req) noexcept {
     LOG_TRACE(log, "{}, on_model_request", identity);
+    if (cluster) {
+        LOG_TRACE(log, "{}, already have cluster, share it", identity);
+        reply_to(req, cluster);
+        return;
+    }
+    LOG_TRACE(log, "{}, no cluster, delaying response", identity);
+    model_request = &req;
+}
+
+void fs_supervisor_t::on_model_response(model::message::model_response_t &res) noexcept {
+    LOG_TRACE(log, "{}, on_model_response", identity);
     resources->release(resource::model);
     auto ee = res.payload.ee;
     if (ee) {
@@ -70,6 +82,9 @@ void fs_supervisor_t::on_model_request(model::message::model_response_t &res) no
         return do_shutdown(ee);
     }
     cluster = std::move(res.payload.res.cluster);
+    if (model_request) {
+        reply_to(*model_request, cluster);
+    }
     launch();
 }
 
@@ -84,8 +99,9 @@ void fs_supervisor_t::on_model_update(model::message::model_update_t &message) n
     auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
+        return do_shutdown(ee);
     }
+    send<model::payload::forwarded_model_update_t>(address, &message);
 }
 
 void fs_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
