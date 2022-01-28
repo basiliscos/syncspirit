@@ -86,6 +86,6 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         auto r = diff->apply(*cluster);
         REQUIRE(!r);
         auto err = r.error();
-        CHECK(err.message() == "device id is malformed (28)");
+        CHECK(err.message() == "device id is malformed (29)");
     }
 }
