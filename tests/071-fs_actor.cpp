@@ -24,35 +24,33 @@ using namespace syncspirit::net;
 
 namespace bfs = boost::filesystem;
 
-namespace  {
+namespace {
 
 struct fixture_t {
     using msg_t = net::message::load_cluster_response_t;
     using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
 
-
-    fixture_t() noexcept: root_path{ bfs::unique_path() }, path_quard{root_path} {
+    fixture_t() noexcept : root_path{bfs::unique_path()}, path_quard{root_path} {
         utils::set_default("trace");
         bfs::create_directory(root_path);
     }
 
     virtual supervisor_t::configure_callback_t configure() noexcept {
-        return [&](r::plugin::plugin_base_t &plugin){
-            plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                p.subscribe_actor(r::lambda<msg_t>(
-                    [&](msg_t &msg) { reply = &msg; }));
-            });
+        return [&](r::plugin::plugin_base_t &plugin) {
+            plugin.template with_casted<r::plugin::starter_plugin_t>(
+                [&](auto &p) { p.subscribe_actor(r::lambda<msg_t>([&](msg_t &msg) { reply = &msg; })); });
         };
     }
 
-
     virtual void run() noexcept {
-        auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-        auto my_device =  device_t::create(my_id, "my-device").value();
+        auto my_id =
+            device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+        auto my_device = device_t::create(my_id, "my-device").value();
 
         cluster = new cluster_t(my_device, 1);
-        auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-        peer_device =  device_t::create(peer_id, "peer-device").value();
+        auto peer_id =
+            device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+        peer_device = device_t::create(peer_id, "peer-device").value();
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
@@ -64,12 +62,11 @@ struct fixture_t {
 
         sup->start();
         sup->do_process();
-        CHECK(static_cast<r::actor_base_t*>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
-
+        CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         file_actor = sup->create_actor<fs::file_actor_t>().mru_size(2).cluster(cluster).timeout(timeout).finish();
         sup->do_process();
-        CHECK(static_cast<r::actor_base_t*>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         file_addr = file_actor->get_address();
 
         db_folder.set_id("1234-5678");
@@ -88,18 +85,16 @@ struct fixture_t {
         folder_my = folder->get_folder_infos().by_device(my_device);
         folder_peer = folder->get_folder_infos().by_device(peer_device);
 
-
         main();
         reply.reset();
 
         sup->shutdown();
         sup->do_process();
 
-        CHECK(static_cast<r::actor_base_t*>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+        CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual void main() noexcept {
-    }
+    virtual void main() noexcept {}
 
     r::address_ptr_t file_addr;
     r::pt::time_duration timeout = r::pt::millisec{10};
@@ -116,8 +111,7 @@ struct fixture_t {
     msg_ptr_t reply;
     db::Folder db_folder;
 };
-}
-
+} // namespace
 
 void test_clone_file() {
     struct F : fixture_t {
@@ -137,7 +131,6 @@ void test_clone_file() {
                 return file;
             };
 
-
             SECTION("empty regular file") {
                 auto peer_file = make_file();
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
@@ -146,7 +139,7 @@ void test_clone_file() {
 
                 auto my_file = folder_my->get_file_infos().by_name(peer_file->get_name());
 
-                auto& path = my_file->get_path();
+                auto &path = my_file->get_path();
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
                 REQUIRE(bfs::last_write_time(path) == 1641828421);
@@ -161,7 +154,7 @@ void test_clone_file() {
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
-                auto& path = file->get_path();
+                auto &path = file->get_path();
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
             }
@@ -193,7 +186,7 @@ void test_clone_file() {
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
-                auto& path = file->get_path();
+                auto &path = file->get_path();
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::is_directory(path));
             }
@@ -211,7 +204,7 @@ void test_clone_file() {
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
-                auto& path = file->get_path();
+                auto &path = file->get_path();
                 CHECK(!bfs::exists(path));
                 CHECK(bfs::is_symlink(path));
                 CHECK(bfs::read_symlink(path) == target);
@@ -231,7 +224,7 @@ void test_clone_file() {
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
                 CHECK(file->is_deleted());
 
-                auto& path = file->get_path();
+                auto &path = file->get_path();
                 REQUIRE(!bfs::exists(target));
             }
         }
@@ -268,11 +261,11 @@ void test_append_block() {
 
             cluster->get_blocks().put(b);
             cluster->get_blocks().put(b2);
-            auto blocks = std::vector<block_info_ptr_t> {b, b2};
+            auto blocks = std::vector<block_info_ptr_t>{b, b2};
 
             auto make_file = [&](size_t count) {
                 auto file = file_info_t::create(cluster->next_uuid(), pr_source, folder_peer).value();
-                for(size_t i = 0; i < count; ++i) {
+                for (size_t i = 0; i < count; ++i) {
                     file->assign_block(blocks[i], i);
                 }
                 folder_peer->get_file_infos().put(file);
@@ -307,7 +300,6 @@ void test_append_block() {
 
             SECTION("file with 2 different blocks") {
                 pr_source.set_size(10ul);
-
 
                 auto peer_file = make_file(2);
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
@@ -350,7 +342,8 @@ void test_append_block() {
                     diff = new diff::modify::flush_file_t(*peer_file);
                     sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                     sup->do_process();
-                    CHECK(static_cast<r::actor_base_t*>(file_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+                    CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() ==
+                          r::state_t::SHUT_DOWN);
                 }
             }
         }
@@ -378,7 +371,7 @@ void test_clone_block() {
 
             cluster->get_blocks().put(b);
             cluster->get_blocks().put(b2);
-            auto blocks = std::vector<block_info_ptr_t> {b, b2};
+            auto blocks = std::vector<block_info_ptr_t>{b, b2};
 
             std::int64_t modified = 1641828421;
             proto::FileInfo pr_source;
@@ -390,9 +383,9 @@ void test_clone_block() {
             counter->set_id(1);
             counter->set_value(peer_device->as_uint());
 
-            auto make_file = [&](const proto::FileInfo& fi, size_t count) {
+            auto make_file = [&](const proto::FileInfo &fi, size_t count) {
                 auto file = file_info_t::create(cluster->next_uuid(), fi, folder_peer).value();
-                for(size_t i = 0; i < count; ++i) {
+                for (size_t i = 0; i < count; ++i) {
                     file->assign_block(blocks[i], i);
                 }
                 folder_peer->get_file_infos().put(file);

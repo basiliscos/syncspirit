@@ -4,31 +4,30 @@
 namespace syncspirit::model::diff {
 
 namespace load {
-    struct load_cluster_t;
+struct load_cluster_t;
 }
 
 namespace peer {
-    struct cluster_remove_t;
-    struct cluster_update_t;
-    struct peer_state_t;
-    struct update_folder_t;
-}
+struct cluster_remove_t;
+struct cluster_update_t;
+struct peer_state_t;
+struct update_folder_t;
+} // namespace peer
 
 namespace modify {
-    struct clone_file_t;
-    struct create_folder_t;
-    struct file_availability_t;
-    struct finish_file_t;
-    struct flush_file_t;
-    struct local_update_t;
-    struct lock_file_t;
-    struct new_file_t;
-    struct share_folder_t;
-    struct update_peer_t;
-}
+struct clone_file_t;
+struct create_folder_t;
+struct file_availability_t;
+struct finish_file_t;
+struct flush_file_t;
+struct local_update_t;
+struct lock_file_t;
+struct new_file_t;
+struct share_folder_t;
+struct update_peer_t;
+} // namespace modify
 
-template<>
-struct generic_visitor_t<tag::cluster> {
+template <> struct generic_visitor_t<tag::cluster> {
     virtual ~generic_visitor_t() = default;
 
     virtual outcome::result<void> operator()(const load::load_cluster_t &) noexcept;
@@ -50,6 +49,5 @@ struct generic_visitor_t<tag::cluster> {
 };
 
 using cluster_visitor_t = generic_visitor_t<tag::cluster>;
-
 
 } // namespace syncspirit::model::diff

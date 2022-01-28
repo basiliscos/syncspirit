@@ -8,4 +8,4 @@ struct load_cluster_t final : aggregate_t {
     outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
 };
 
-}
+} // namespace syncspirit::model::diff::load

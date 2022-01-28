@@ -11,10 +11,9 @@ using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
-
 TEST_CASE("new file diff", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device =  device_t::create(my_id, "my-device").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
@@ -24,7 +23,6 @@ TEST_CASE("new file diff", "[model]") {
     db_folder.set_label("my-label");
     auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
     REQUIRE(diff->apply(*cluster));
-
 
     proto::FileInfo pr_file_info;
     pr_file_info.set_name("a.txt");
@@ -36,7 +34,7 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(diff->apply(*cluster));
 
         auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
-        auto& files = folder_info->get_file_infos();
+        auto &files = folder_info->get_file_infos();
         auto file = files.by_name(pr_file_info.name());
         REQUIRE(file);
         REQUIRE(file->get_name() == "a.txt");

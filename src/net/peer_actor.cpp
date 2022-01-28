@@ -362,7 +362,7 @@ void peer_actor_t::shutdown_start() noexcept {
 
 void peer_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "{}, shutdown_finish", identity);
-    for(auto& it: block_requests) {
+    for (auto &it : block_requests) {
         auto ec = r::make_error_code(r::error_code_t::cancelled);
         reply_with_error(*it, make_error(ec));
     }
@@ -392,7 +392,7 @@ void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept 
 
 void peer_actor_t::on_termination(message::termination_signal_t &message) noexcept {
     if (!shutdown_reason) {
-        auto& ee = message.payload.ee;
+        auto &ee = message.payload.ee;
         auto reason = ee->message();
         LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
         do_shutdown(ee);
@@ -424,9 +424,7 @@ void peer_actor_t::on_forward(message::forwarded_message_t &message) noexcept {
     LOG_TRACE(log, "{}, on_forward", identity);
     fmt::memory_buffer buff;
 
-    std::visit([&](auto &&msg) {
-        proto::serialize(buff, *msg);
-    }, message.payload);
+    std::visit([&](auto &&msg) { proto::serialize(buff, *msg); }, message.payload);
 
     push_write(std::move(buff), false);
 }
@@ -441,7 +439,8 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
                 LOG_TRACE(log, "{}, read_hello, from {} ({} {})", identity, msg->device_name(), msg->client_name(),
                           msg->client_version());
                 auto diff = cluster_diff_ptr_t();
-                diff = new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), true, cert_name, peer_endpoint, msg->client_name());
+                diff = new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), true, cert_name,
+                                              peer_endpoint, msg->client_name());
                 send<model::payload::model_update_t>(coordinator, std::move(diff));
             } else {
                 LOG_WARN(log, "{}, read_hello, unexpected_message", identity);

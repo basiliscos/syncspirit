@@ -5,7 +5,6 @@
 #include "model/messages.h"
 #include "model/diff/modify/update_contact.h"
 
-
 using namespace syncspirit::net;
 using namespace syncspirit::utils;
 using namespace syncspirit::proto;
@@ -18,7 +17,8 @@ r::plugin::resource_id_t http_req = 1;
 } // namespace
 
 upnp_actor_t::upnp_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, cluster{cfg.cluster}, main_url{cfg.descr_url}, rx_buff_size{cfg.rx_buff_size}, external_port(cfg.external_port) {
+    : r::actor_base_t{cfg}, cluster{cfg.cluster}, main_url{cfg.descr_url}, rx_buff_size{cfg.rx_buff_size},
+      external_port(cfg.external_port) {
     log = utils::get_logger("net.upnp");
 }
 
@@ -165,8 +165,8 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
     }
 
     auto local_port = 0;
-    for(auto& uri: cluster->get_device()->get_uris()) {
-        if(uri.port) {
+    for (auto &uri : cluster->get_device()->get_uris()) {
+        if (uri.port) {
             local_port = uri.port;
             break;
         }
@@ -216,7 +216,7 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     if (ok) {
         using namespace model::diff;
         auto diff = model::diff::contact_diff_ptr_t{};
-        diff = new modify::update_contact_t(*cluster, {external_addr.to_string(), local_address.to_string() });
+        diff = new modify::update_contact_t(*cluster, {external_addr.to_string(), local_address.to_string()});
         send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     }
 }

@@ -57,13 +57,13 @@ void global_discovery_actor_t::on_start() noexcept {
 void global_discovery_actor_t::announce() noexcept {
     LOG_TRACE(log, "{}, announce", identity);
 
-    auto& uris = cluster->get_device()->get_uris();
+    auto &uris = cluster->get_device()->get_uris();
     if (uris.empty()) {
         return;
     }
 
     bool has_new = false;
-    for(auto& uri: uris) {
+    for (auto &uri : uris) {
         if (!announced_uris.count(uri.full)) {
             has_new = true;
             break;
@@ -73,12 +73,12 @@ void global_discovery_actor_t::announce() noexcept {
         return;
     }
 
-    for(auto& uri: uris) {
+    for (auto &uri : uris) {
         announced_uris.emplace(uri.full);
     }
     if (log->level() <= spdlog::level::debug) {
         std::string joint_uris;
-        for(size_t i = 0; i < uris.size(); ++i) {
+        for (size_t i = 0; i < uris.size(); ++i) {
             joint_uris += uris[i].full;
             if (i + 1 < uris.size()) {
                 joint_uris += ", ";
@@ -138,23 +138,21 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     LOG_TRACE(log, "{}, on_discovery_response", identity);
     resources->release(resource::http);
     http_request.reset();
-    auto msg = (message::discovery_notify_t*) message.payload.req->payload.request_payload->custom;
+    auto msg = (message::discovery_notify_t *)message.payload.req->payload.request_payload->custom;
 
     auto &ee = message.payload.ee;
     if (ee) {
         LOG_WARN(log, "{}, discovery faield = {}, body({}):\n {}", identity, ee->message());
-    }
-    else {
+    } else {
         auto &http_res = message.payload.res->response;
         auto res = proto::parse_contact(http_res);
         if (!res) {
             auto reason = res.error().message();
             auto &body = http_res.body();
             LOG_WARN(log, "{}, parsing discovery error = {}, body({}):\n {}", identity, reason, body.size(), body);
-        }
-        else {
-            auto& uris = res.value();
-            auto& device_id = msg->payload.device_id;
+        } else {
+            auto &uris = res.value();
+            auto &device_id = msg->payload.device_id;
             if (!uris.empty()) {
                 using namespace model::diff;
                 auto diff = model::diff::contact_diff_ptr_t{};
@@ -174,7 +172,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
 void global_discovery_actor_t::on_discovery(message::discovery_notify_t &req) noexcept {
     LOG_TRACE(log, "{}, on_discovery", identity);
 
-    auto& device_id = req.payload.device_id;
+    auto &device_id = req.payload.device_id;
     auto sha256 = std::string(device_id.get_sha256());
     if (discovering_devices.count(sha256)) {
         LOG_TRACE(log, "{}, device '{}' is already discovering, skip", identity, device_id.get_sha256());
@@ -194,14 +192,13 @@ void global_discovery_actor_t::on_discovery(message::discovery_notify_t &req) no
 
 void global_discovery_actor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_contact_update", identity);
-    auto& diff = *message.payload.diff;
+    auto &diff = *message.payload.diff;
     auto r = diff.visit(*this);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
 }
-
 
 void global_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::timer);
@@ -211,16 +208,15 @@ void global_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcep
     }
 }
 
-void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri,
-                                            fmt::memory_buffer &&tx_buff, message::discovery_notify_t *msg) noexcept {
+void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
+                                            message::discovery_notify_t *msg) noexcept {
     auto timeout = r::pt::millisec{io_timeout};
     transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true, ""};
-    const void * custom;
+    const void *custom;
     if (msg) {
         intrusive_ptr_add_ref(msg);
         custom = msg;
-    }
-    else {
+    } else {
         custom = nullptr;
     }
 
@@ -243,9 +239,10 @@ void global_discovery_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
-auto global_discovery_actor_t::operator()(const model::diff::modify::update_contact_t &diff) noexcept -> outcome::result<void> {
+auto global_discovery_actor_t::operator()(const model::diff::modify::update_contact_t &diff) noexcept
+    -> outcome::result<void> {
     if (diff.self && state == r::state_t::OPERATIONAL) {
-        auto& uris = diff.uris;
+        auto &uris = diff.uris;
         if (resources->has(resource::timer)) {
             cancel_timer(*timer_request);
         } else {

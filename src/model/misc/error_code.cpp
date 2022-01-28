@@ -4,9 +4,7 @@ namespace syncspirit::model {
 
 namespace detail {
 
-const char *error_code_category_t::name() const noexcept {
-    return "model error";
-}
+const char *error_code_category_t::name() const noexcept { return "model error"; }
 
 std::string error_code_category_t::message(int c) const {
     std::string r;
@@ -125,11 +123,10 @@ std::string error_code_category_t::message(int c) const {
     return r;
 }
 
-}
-
+} // namespace detail
 
 const static detail::error_code_category_t category;
 
 const detail::error_code_category_t &error_code_category() { return category; }
 
-}
+} // namespace syncspirit::model

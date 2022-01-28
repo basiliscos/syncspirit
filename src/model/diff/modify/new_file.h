@@ -22,4 +22,4 @@ struct new_file_t final : cluster_diff_t {
     bool new_uuid;
 };
 
-}
+} // namespace syncspirit::model::diff::modify

@@ -5,8 +5,8 @@
 using namespace syncspirit::model::diff::load;
 
 auto folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto& map = cluster.get_folders();
-    for(auto& pair:folders) {
+    auto &map = cluster.get_folders();
+    for (auto &pair : folders) {
         auto data = pair.value;
         auto db = db::Folder();
         auto ok = db.ParseFromArray(data.data(), data.size());
@@ -18,7 +18,7 @@ auto folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result
         if (!option) {
             return option.assume_error();
         }
-        auto& folder = option.value();
+        auto &folder = option.value();
         map.put(folder);
         folder->assign_cluster(&cluster);
     }

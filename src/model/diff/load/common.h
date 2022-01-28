@@ -14,4 +14,4 @@ struct pair_t {
 
 using container_t = std::vector<pair_t>;
 
-}
+} // namespace syncspirit::model::diff::load

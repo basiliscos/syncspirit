@@ -18,9 +18,9 @@ auto create_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     if (!folder_opt) {
         return folder_opt.assume_error();
     }
-    auto& folder = folder_opt.value();
+    auto &folder = folder_opt.value();
 
-    auto& my_device = cluster.get_device();
+    auto &my_device = cluster.get_device();
     db::FolderInfo db_fi_my;
     db_fi_my.set_index_id(cluster.next_uint64());
 
@@ -28,9 +28,9 @@ auto create_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     if (!fi_my_opt) {
         return fi_my_opt.assume_error();
     }
-    auto& fi_my = fi_my_opt.value();
+    auto &fi_my = fi_my_opt.value();
 
-    auto& folder_infos = folder->get_folder_infos();
+    auto &folder_infos = folder->get_folder_infos();
     folder_infos.put(fi_my);
     folders.put(folder);
     folder->assign_cluster(&cluster);

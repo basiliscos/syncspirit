@@ -16,4 +16,4 @@ struct lock_file_t final : cluster_diff_t {
     bool locked;
 };
 
-}
+} // namespace syncspirit::model::diff::modify

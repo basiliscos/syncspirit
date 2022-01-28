@@ -43,8 +43,8 @@ struct governor_actor_t : public r::actor_base_t, private model::diff::cluster_v
   private:
     void process() noexcept;
     void on_model_update(model::message::forwarded_model_update_t &message) noexcept;
-    void on_model_response(model::message::model_response_t& res) noexcept;
-    void on_io_error(model::message::io_error_t& reply) noexcept;
+    void on_model_response(model::message::model_response_t &res) noexcept;
+    void on_io_error(model::message::io_error_t &reply) noexcept;
 };
 
 } // namespace syncspirit::daemon

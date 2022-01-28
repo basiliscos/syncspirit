@@ -14,7 +14,6 @@
 #include "net/names.h"
 #include "utils/error_code.h"
 
-
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
@@ -27,16 +26,18 @@ struct fixture_t {
     using error_msg_ptr_t = r::intrusive_ptr_t<error_msg_t>;
     using errors_container_t = std::vector<error_msg_ptr_t>;
 
-    fixture_t() noexcept: root_path{ bfs::unique_path() }, path_quard{root_path} {
+    fixture_t() noexcept : root_path{bfs::unique_path()}, path_quard{root_path} {
         utils::set_default("trace");
         bfs::create_directory(root_path);
     }
 
     void run() noexcept {
-        auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-        my_device =  device_t::create(my_id, "my-device").value();
-        auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-        peer_device =  device_t::create(peer_id, "peer-device").value();
+        auto my_id =
+            device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+        my_device = device_t::create(my_id, "my-device").value();
+        auto peer_id =
+            device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+        peer_device = device_t::create(peer_id, "peer-device").value();
 
         cluster = new cluster_t(my_device, 1);
 
@@ -64,38 +65,35 @@ struct fixture_t {
         folder_info_peer = folder->get_folder_infos().by_device(peer_device);
         files_peer = &folder_info_peer->get_file_infos();
 
-        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin){
+        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                p.subscribe_actor(r::lambda<error_msg_t>(
-                    [&](error_msg_t &msg) { errors.push_back(&msg); }));
-        });};
+                p.subscribe_actor(r::lambda<error_msg_t>([&](error_msg_t &msg) { errors.push_back(&msg); }));
+            });
+        };
 
         sup->start();
         sup->do_process();
-        CHECK(static_cast<r::actor_base_t*>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         sup->create_actor<hasher_actor_t>().index(1).timeout(timeout).finish();
         auto proxy_addr = sup->create_actor<hasher::hasher_proxy_actor_t>()
-            .timeout(timeout)
-            .hasher_threads(1)
-            .name(net::names::hasher_proxy)
-            .finish()
-            ->get_address();
+                              .timeout(timeout)
+                              .hasher_threads(1)
+                              .name(net::names::hasher_proxy)
+                              .finish()
+                              ->get_address();
 
         sup->do_process();
 
-        auto fs_config = config::fs_config_t {
-            0,
-            3600
-        };
+        auto fs_config = config::fs_config_t{0, 3600};
 
         target = sup->create_actor<fs::scan_actor_t>()
-                .timeout(timeout)
-                .cluster(cluster)
-                .hasher_proxy(proxy_addr)
-                .fs_config(fs_config)
-                .requested_hashes_limit(2ul)
-                .finish();
+                     .timeout(timeout)
+                     .cluster(cluster)
+                     .hasher_proxy(proxy_addr)
+                     .fs_config(fs_config)
+                     .requested_hashes_limit(2ul)
+                     .finish();
 
         main();
 
@@ -103,11 +101,10 @@ struct fixture_t {
         sup->shutdown();
         sup->do_process();
 
-        CHECK(static_cast<r::actor_base_t*>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+        CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual void main() noexcept {
-    }
+    virtual void main() noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::intrusive_ptr_t<supervisor_t> sup;
@@ -119,8 +116,8 @@ struct fixture_t {
     model::folder_ptr_t folder;
     model::folder_info_ptr_t folder_info;
     model::folder_info_ptr_t folder_info_peer;
-    model::file_infos_map_t* files;
-    model::file_infos_map_t* files_peer;
+    model::file_infos_map_t *files;
+    model::file_infos_map_t *files_peer;
     errors_container_t errors;
     model::device_ptr_t peer_device;
 };
@@ -130,23 +127,23 @@ void test_meta_changes() {
         void main() noexcept override {
             sys::error_code ec;
 
-            SECTION("no files"){
+            SECTION("no files") {
                 sup->do_process();
                 CHECK(folder_info->get_file_infos().size() == 0);
             }
-            SECTION("just 1 dir"){
+            SECTION("just 1 dir") {
                 CHECK(bfs::create_directories(root_path / "abc"));
                 sup->do_process();
                 CHECK(folder_info->get_file_infos().size() == 0);
             }
-            SECTION("just 1 subdir, which cannot be read"){
+            SECTION("just 1 subdir, which cannot be read") {
                 CHECK(bfs::create_directories(root_path / "abc" / "def", ec));
                 bfs::permissions(root_path / "abc", bfs::perms::no_perms);
                 sup->do_process();
                 CHECK(folder_info->get_file_infos().size() == 0);
                 bfs::permissions(root_path / "abc", bfs::perms::all_all);
                 REQUIRE(errors.size() == 1);
-                auto& errs = errors.at(0)->payload.errors;
+                auto &errs = errors.at(0)->payload.errors;
                 REQUIRE(errs.size() == 1);
                 REQUIRE(errs.at(0).path == (root_path / "abc"));
                 REQUIRE(errs.at(0).ec);
@@ -172,7 +169,7 @@ void test_meta_changes() {
 
             auto b = block_info_t::create(bi).value();
 
-            SECTION("a file does not physically exists"){
+            SECTION("a file does not physically exists") {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 files_peer->put(file_peer);
@@ -262,15 +259,9 @@ void test_meta_changes() {
                 }
 
                 SECTION("corrupted content") {
-                    SECTION("1st block") {
-                        write_file(path, "2234567890");
-                    }
-                    SECTION("2nd block") {
-                        write_file(path, "1234567899");
-                    }
-                    SECTION("missing source file") {
-                        file->set_source(nullptr);
-                    }
+                    SECTION("1st block") { write_file(path, "2234567890"); }
+                    SECTION("2nd block") { write_file(path, "1234567899"); }
+                    SECTION("missing source file") { file->set_source(nullptr); }
                     sup->do_process();
                     CHECK(!file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
@@ -286,7 +277,7 @@ void test_meta_changes() {
                     CHECK(!bfs::exists(path));
 
                     REQUIRE(errors.size() == 1);
-                    auto& errs = errors.at(0)->payload.errors;
+                    auto &errs = errors.at(0)->payload.errors;
                     REQUIRE(errs.size() == 1);
                     CHECK(errs.at(0).path == path);
                     CHECK(errs.at(0).ec);
@@ -339,6 +330,5 @@ void test_meta_changes() {
     };
     F().run();
 }
-
 
 REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");

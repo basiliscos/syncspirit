@@ -9,7 +9,7 @@ namespace syncspirit::model {
 struct folder_info_t;
 struct file_info_t;
 
-struct blocks_interator_t: arc_base_t<blocks_interator_t> {
+struct blocks_interator_t : arc_base_t<blocks_interator_t> {
     using blocks_t = std::vector<block_info_ptr_t>;
 
     blocks_interator_t(file_info_t &source) noexcept;
@@ -33,6 +33,5 @@ struct blocks_interator_t: arc_base_t<blocks_interator_t> {
 };
 
 using block_iterator_ptr_t = intrusive_ptr_t<blocks_interator_t>;
-
 
 } // namespace syncspirit::model

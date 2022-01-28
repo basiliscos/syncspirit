@@ -25,7 +25,7 @@ template <typename Actor> struct ssdp_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&upnp_config(const config::upnp_config_t& value) &&noexcept {
+    builder_t &&upnp_config(const config::upnp_config_t &value) &&noexcept {
         parent_t::config.upnp_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -48,7 +48,7 @@ struct ssdp_actor_t : public r::actor_base_t {
     void on_discovery_received(std::size_t bytes) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void timer_cancel() noexcept;
-    void launch_upnp(const utils::URI& igd_uri) noexcept;
+    void launch_upnp(const utils::URI &igd_uri) noexcept;
 
     model::cluster_ptr_t cluster;
     utils::logger_t log;

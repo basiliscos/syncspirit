@@ -12,15 +12,15 @@ using namespace syncspirit::model;
 
 TEST_CASE("file iterator", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device =  device_t::create(my_id, "my-device").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
-    auto peer_device =  device_t::create(peer_id, "peer-device").value();
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
-    auto& folders = cluster->get_folders();
+    auto &folders = cluster->get_folders();
     db::Folder db_folder;
     db_folder.set_id("1234-5678");
     db_folder.set_label("my-label");
@@ -80,7 +80,7 @@ TEST_CASE("file iterator", "[model]") {
             }
 
             SECTION("one file is already exists on my side") {
-                auto& folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
                 auto my_folder = folder_infos.by_device(my_device);
                 auto pr_file = proto::FileInfo();
                 pr_file.set_name("a.txt");
@@ -107,7 +107,7 @@ TEST_CASE("file iterator", "[model]") {
             diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
             REQUIRE(diff->apply(*cluster));
 
-            auto& folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+            auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
             proto::Vector my_version;
             auto my_folder = folder_infos.by_device(my_device);
             auto pr_file = proto::FileInfo();
@@ -129,7 +129,7 @@ TEST_CASE("file iterator", "[model]") {
             diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
             REQUIRE(diff->apply(*cluster));
 
-            auto& folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+            auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
             auto my_folder = folder_infos.by_device(my_device);
             my_folder->add(file_info_t::create(cluster->next_uuid(), *file_1, my_folder).value());
 
@@ -146,7 +146,7 @@ TEST_CASE("file iterator", "[model]") {
             diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
             REQUIRE(diff->apply(*cluster));
 
-            auto& folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+            auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
             auto peer_folder = folder_infos.by_device(peer_device);
             peer_folder->add(file_info_t::create(cluster->next_uuid(), *file_1, peer_folder).value());
             peer_folder->set_remote_max_sequence(peer_folder->get_max_sequence() + 1);

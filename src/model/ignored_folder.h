@@ -12,7 +12,7 @@ struct ignored_folder_t;
 
 using ignored_folder_ptr_t = intrusive_ptr_t<ignored_folder_t>;
 
-struct ignored_folder_t final: arc_base_t<ignored_folder_t> {
+struct ignored_folder_t final : arc_base_t<ignored_folder_t> {
     static outcome::result<ignored_folder_ptr_t> create(std::string folder_id, std::string_view label) noexcept;
     static outcome::result<ignored_folder_ptr_t> create(std::string_view key, std::string_view data) noexcept;
 
@@ -21,7 +21,7 @@ struct ignored_folder_t final: arc_base_t<ignored_folder_t> {
     std::string_view get_label() const noexcept;
     std::string serialize() noexcept;
 
-private:
+  private:
     ignored_folder_t(std::string_view folder_id, std::string_view label) noexcept;
     ignored_folder_t(std::string_view key) noexcept;
     outcome::result<void> assign_fields(std::string_view data) noexcept;
@@ -32,4 +32,4 @@ private:
 
 using ignored_folders_map_t = generic_map_t<ignored_folder_ptr_t, 1>;
 
-}
+} // namespace syncspirit::model

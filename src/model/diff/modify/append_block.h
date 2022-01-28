@@ -7,7 +7,7 @@ namespace syncspirit::model::diff::modify {
 
 struct append_block_t final : block_diff_t {
 
-    append_block_t(const file_info_t& file, size_t block_index, std::string data) noexcept;
+    append_block_t(const file_info_t &file, size_t block_index, std::string data) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(block_visitor_t &) const noexcept override;
@@ -15,4 +15,4 @@ struct append_block_t final : block_diff_t {
     std::string data;
 };
 
-}
+} // namespace syncspirit::model::diff::modify

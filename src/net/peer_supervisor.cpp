@@ -12,7 +12,8 @@ using namespace syncspirit::net;
 template <class> inline constexpr bool always_false_v = false;
 
 peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
-    : parent_t{cfg}, cluster{cfg.cluster}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair}, bep_config(cfg.bep_config) {
+    : parent_t{cfg}, cluster{cfg.cluster}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair},
+      bep_config(cfg.bep_config) {
     log = utils::get_logger("net.peer_supervisor");
 }
 
@@ -57,7 +58,7 @@ void peer_supervisor_t::on_start() noexcept {
 
 void peer_supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
-    auto& diff = *msg.payload.diff;
+    auto &diff = *msg.payload.diff;
     auto r = diff.visit(*this);
     if (!r) {
         auto ee = make_error(r.assume_error());
@@ -67,7 +68,7 @@ void peer_supervisor_t::on_model_update(model::message::model_update_t &msg) noe
 
 void peer_supervisor_t::on_contact_update(model::message::contact_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_contact_update", identity);
-    auto& diff = *msg.payload.diff;
+    auto &diff = *msg.payload.diff;
     auto r = diff.visit(*this);
     if (!r) {
         auto ee = make_error(r.assume_error());
@@ -75,9 +76,9 @@ void peer_supervisor_t::on_contact_update(model::message::contact_update_t &msg)
     }
 }
 
-auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &state) noexcept -> outcome::result<void>{
+auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &state) noexcept -> outcome::result<void> {
     auto &peer_addr = state.peer_addr;
-    if(state.online) {
+    if (state.online) {
         auto &peer_id = state.peer_id;
         addr2id.emplace(peer_addr, peer_id);
         id2addr.emplace(peer_id, peer_addr);
@@ -90,44 +91,46 @@ auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &state)
     return outcome::success();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t &diff) noexcept -> outcome::result<void> {
+auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t &diff) noexcept
+    -> outcome::result<void> {
 
     auto lock = std::unique_lock(diff.mutex);
-    auto sock  = std::move(*diff.sock);
+    auto sock = std::move(*diff.sock);
     diff.sock.reset();
 
     auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
-    auto peer_addr =  create_actor<peer_actor_t>()
-           .ssl_pair(&ssl_pair)
-           .device_name(device_name)
-           .bep_config(bep_config)
-           .coordinator(coordinator)
-           .timeout(timeout)
-           .sock(std::optional(std::move(sock)))
-           .cluster(cluster)
-           .finish()
-           ->get_address();
+    auto peer_addr = create_actor<peer_actor_t>()
+                         .ssl_pair(&ssl_pair)
+                         .device_name(device_name)
+                         .bep_config(bep_config)
+                         .coordinator(coordinator)
+                         .timeout(timeout)
+                         .sock(std::optional(std::move(sock)))
+                         .cluster(cluster)
+                         .finish()
+                         ->get_address();
     return outcome::success();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &diff) noexcept -> outcome::result<void> {
+auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &diff) noexcept
+    -> outcome::result<void> {
     if (!diff.self && diff.known) {
-        auto& devices = cluster->get_devices();
+        auto &devices = cluster->get_devices();
         auto peer = devices.by_sha256(diff.device.get_sha256());
         if (!peer->is_online()) {
             auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
             LOG_DEBUG(log, "{} initiating connection with {}", identity, peer->device_id());
-            auto peer_addr =  create_actor<peer_actor_t>()
-               .ssl_pair(&ssl_pair)
-               .device_name(device_name)
-               .bep_config(bep_config)
-               .coordinator(coordinator)
-               .timeout(timeout)
-               .peer_device_id(diff.device)
-               .uris(diff.uris)
-               .cluster(cluster)
-               .finish()
-               ->get_address();
+            auto peer_addr = create_actor<peer_actor_t>()
+                                 .ssl_pair(&ssl_pair)
+                                 .device_name(device_name)
+                                 .bep_config(bep_config)
+                                 .coordinator(coordinator)
+                                 .timeout(timeout)
+                                 .peer_device_id(diff.device)
+                                 .uris(diff.uris)
+                                 .cluster(cluster)
+                                 .finish()
+                                 ->get_address();
         }
     }
     return outcome::success();

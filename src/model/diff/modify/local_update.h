@@ -10,7 +10,7 @@ namespace syncspirit::model::diff::modify {
 struct local_update_t final : cluster_diff_t {
     using blocks_t = std::vector<proto::BlockInfo>;
 
-    local_update_t(const file_info_t& file, db::FileInfo current, blocks_t current_blocks) noexcept;
+    local_update_t(const file_info_t &file, db::FileInfo current, blocks_t current_blocks) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
@@ -28,4 +28,4 @@ struct local_update_t final : cluster_diff_t {
     std::unordered_set<std::string> removed_blocks;
 };
 
-}
+} // namespace syncspirit::model::diff::modify

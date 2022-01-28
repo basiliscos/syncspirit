@@ -10,16 +10,16 @@ auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     static const constexpr char block_prefix = (char)(db::prefix::block_info);
 
     folder_infos_map_t all_fi;
-    auto& folders = cluster.get_folders();
-    for(auto f:folders) {
-        for(auto fi:f.item->get_folder_infos()) {
+    auto &folders = cluster.get_folders();
+    for (auto f : folders) {
+        for (auto fi : f.item->get_folder_infos()) {
             all_fi.put(fi.item);
         }
     }
 
-    auto& blocks = cluster.get_blocks();
+    auto &blocks = cluster.get_blocks();
 
-    for(auto& pair:container) {
+    for (auto &pair : container) {
         auto key = pair.key;
         auto folder_info_uuid = key.substr(1, uuid_length);
         auto folder_info = all_fi.get(folder_info_uuid);
@@ -36,11 +36,11 @@ auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
         if (!option) {
             return option.assume_error();
         }
-        auto& fi = option.assume_value();
-        auto& map = folder_info->get_file_infos();
+        auto &fi = option.assume_value();
+        auto &map = folder_info->get_file_infos();
         map.put(fi);
 
-        for(int i = 0; i < db.blocks_size(); ++i){
+        for (int i = 0; i < db.blocks_size(); ++i) {
             auto block_hash = db.blocks(i);
             auto block = blocks.get(block_hash);
             assert(block);

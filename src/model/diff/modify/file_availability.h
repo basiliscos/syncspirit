@@ -17,4 +17,4 @@ struct file_availability_t final : cluster_diff_t {
     proto::Vector version;
 };
 
-}
+} // namespace syncspirit::model::diff::modify

@@ -9,15 +9,13 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::block_info);
 
-block_info_t::block_info_t(std::string_view key) noexcept {
-    std::copy(key.begin(), key.end(), hash);
-}
+block_info_t::block_info_t(std::string_view key) noexcept { std::copy(key.begin(), key.end(), hash); }
 
-block_info_t::block_info_t(const proto::BlockInfo &block) noexcept: weak_hash{block.weak_hash()}, size{block.size()} {
+block_info_t::block_info_t(const proto::BlockInfo &block) noexcept : weak_hash{block.weak_hash()}, size{block.size()} {
     hash[0] = prefix;
 }
 
-template<> void block_info_t::assign<db::BlockInfo>(const db::BlockInfo& item) noexcept {
+template <> void block_info_t::assign<db::BlockInfo>(const db::BlockInfo &item) noexcept {
     weak_hash = item.weak_hash();
     size = item.size();
 }
@@ -42,7 +40,7 @@ outcome::result<block_info_ptr_t> block_info_t::create(const proto::BlockInfo &b
     }
 
     auto ptr = block_info_ptr_t(new block_info_t(block));
-    auto& h_ptr = ptr->hash;
+    auto &h_ptr = ptr->hash;
     std::copy(h.begin(), h.end(), h_ptr + 1);
     auto left = digest_length - h.length();
     if (left) {
@@ -102,18 +100,10 @@ file_block_t block_info_t::local_file() noexcept {
     return {};
 }
 
-void block_info_t::lock() noexcept {
-    locked = true;
-}
+void block_info_t::lock() noexcept { locked = true; }
 
-void block_info_t::unlock() noexcept {
-    locked = false;
-}
+void block_info_t::unlock() noexcept { locked = false; }
 
-
-template<> std::string_view get_index<0>(const block_info_ptr_t& item) noexcept { return item->get_hash(); }
-
+template <> std::string_view get_index<0>(const block_info_ptr_t &item) noexcept { return item->get_hash(); }
 
 } // namespace syncspirit::model
-
-

@@ -13,7 +13,7 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
         return make_error_code(error_code_t::folder_already_exists);
     }
 
-    auto& devices = cluster.get_devices();
+    auto &devices = cluster.get_devices();
     auto peer = devices.by_sha256(peer_id);
     if (!peer) {
         return make_error_code(error_code_t::device_does_not_exist);
@@ -32,7 +32,7 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
         return fi_opt.assume_error();
     }
 
-    auto& fi = fi_opt.value();
+    auto &fi = fi_opt.value();
     folder->add(fi);
 
     return outcome::success();

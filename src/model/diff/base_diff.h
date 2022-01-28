@@ -21,11 +21,11 @@ struct base_diff_t : boost::intrusive_ref_counter<base_diff_t, boost::thread_uns
 
     static utils::logger_t get_log() noexcept;
 
- protected:
+  protected:
     virtual outcome::result<void> apply_impl(cluster_t &) const noexcept = 0;
     utils::logger_t log;
 };
 
-}
+} // namespace diff
 
-} // namespace syncspirit::model::diff
+} // namespace syncspirit::model

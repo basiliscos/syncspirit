@@ -10,7 +10,7 @@ struct clone_file_t final : cluster_diff_t {
     using blocks_t = std::vector<proto::BlockInfo>;
     using new_blocks_t = std::vector<size_t>;
 
-    clone_file_t(const model::file_info_t& source) noexcept;
+    clone_file_t(const model::file_info_t &source) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
@@ -24,4 +24,4 @@ struct clone_file_t final : cluster_diff_t {
     bool identical;
 };
 
-}
+} // namespace syncspirit::model::diff::modify

@@ -20,8 +20,9 @@
 namespace bfs = boost::filesystem;
 using namespace syncspirit::net;
 
-net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg) : parent_t{cfg}, cluster_copies{cfg.cluster_copies}, app_config{cfg.app_config} {
-    seed = (size_t) std::time(nullptr);
+net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
+    : parent_t{cfg}, cluster_copies{cfg.cluster_copies}, app_config{cfg.app_config} {
+    seed = (size_t)std::time(nullptr);
     log = utils::get_logger("net.coordinator");
     auto &files_cfg = app_config.global_announce_config;
     auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
@@ -73,8 +74,8 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     auto &reason = actor->get_shutdown_reason();
     LOG_TRACE(log, "{}, on_child_shutdown, '{}' due to {} ", identity, actor->get_identity(), reason->message());
     if (actor->get_identity() == "peer_supervisor") {
-        auto aaa = static_cast<peer_supervisor_t*>(actor);
-        //LOG_ERROR(log, "zzz, qs = {}, iq = {}",   aaa->queue.size(), aaa->inbound_queue.empty());
+        auto aaa = static_cast<peer_supervisor_t *>(actor);
+        // LOG_ERROR(log, "zzz, qs = {}, iq = {}",   aaa->queue.size(), aaa->inbound_queue.empty());
     }
     auto &child_addr = actor->get_address();
     if (ssdp_addr && child_addr == ssdp_addr) {
@@ -104,16 +105,12 @@ void net_supervisor_t::shutdown_finish() noexcept {
     ra::supervisor_asio_t::shutdown_finish();
 }
 
-
 void net_supervisor_t::launch_early() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     bfs::path path(app_config.config_path);
     auto db_dir = path.append("mbdx-db");
-    db_addr = create_actor<db_actor_t>()
-            .timeout(timeout).db_dir(db_dir.string())
-            .cluster(cluster)
-            .finish()
-            ->get_address();
+    db_addr =
+        create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).cluster(cluster).finish()->get_address();
 }
 
 void net_supervisor_t::load_db() noexcept {
@@ -153,7 +150,7 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
 
 void net_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
-    auto& diff = *message.payload.diff;
+    auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());
@@ -168,7 +165,7 @@ void net_supervisor_t::on_model_update(model::message::model_update_t &message) 
 
 void net_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_block_update", identity);
-    auto& diff = *message.payload.diff;
+    auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());
@@ -178,7 +175,7 @@ void net_supervisor_t::on_block_update(model::message::block_update_t &message) 
 
 void net_supervisor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_contact_update", identity);
-    auto& diff = *message.payload.diff;
+    auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());
@@ -189,13 +186,13 @@ void net_supervisor_t::on_contact_update(model::message::contact_update_t &messa
 auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noexcept -> outcome::result<void> {
     if (!cluster->is_tainted()) {
 
-        auto& ignored_devices = cluster->get_ignored_devices();
-        auto& ignored_folders = cluster->get_ignored_folders();
-        auto& devices = cluster->get_devices();
-        auto& folders = cluster->get_folders();
+        auto &ignored_devices = cluster->get_ignored_devices();
+        auto &ignored_folders = cluster->get_ignored_folders();
+        auto &devices = cluster->get_devices();
+        auto &folders = cluster->get_folders();
         size_t files = 0;
-        for(const auto& it: folders) {
-            auto& folder_info = it.item;
+        for (const auto &it : folders) {
+            auto &folder_info = it.item;
             if (!folder_info) {
                 continue;
             }
@@ -203,17 +200,18 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noe
             files += fi->get_file_infos().size();
         }
         LOG_DEBUG(log,
-                  "{}, load cluster, devices = {}, folders = {}, local files = {}, blocks = {}, ignored devices = {}, ignored folders = {}",
-                  identity, devices.size(), folders.size(), files, cluster->get_blocks().size(),
-                  ignored_devices.size(), ignored_folders.size());
+                  "{}, load cluster, devices = {}, folders = {}, local files = {}, blocks = {}, ignored devices = {}, "
+                  "ignored folders = {}",
+                  identity, devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
+                  ignored_folders.size());
 
         cluster_sup = create_actor<cluster_supervisor_t>()
-                           .timeout(shutdown_timeout * 9 / 10)
-                           .strand(strand)
-                           .cluster(cluster)
-                           .bep_config(app_config.bep_config)
-                           .hasher_threads(app_config.hasher_threads)
-                           .finish();
+                          .timeout(shutdown_timeout * 9 / 10)
+                          .strand(strand)
+                          .cluster(cluster)
+                          .bep_config(app_config.bep_config)
+                          .hasher_threads(app_config.hasher_threads)
+                          .finish();
 
         launch_ssdp();
         launch_net();
@@ -221,20 +219,19 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noe
     return outcome::success();
 }
 
-
 void net_supervisor_t::launch_net() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     LOG_INFO(log, "{}, launching network services", identity);
 
     create_actor<acceptor_actor_t>().cluster(cluster).timeout(timeout).finish();
     peers_sup = create_actor<peer_supervisor_t>()
-                     .cluster(cluster)
-                     .ssl_pair(&ssl_pair)
-                     .device_name(app_config.device_name)
-                     .strand(strand)
-                     .timeout(timeout)
-                     .bep_config(app_config.bep_config)
-                     .finish();
+                    .cluster(cluster)
+                    .ssl_pair(&ssl_pair)
+                    .device_name(app_config.device_name)
+                    .strand(strand)
+                    .timeout(timeout)
+                    .bep_config(app_config.bep_config)
+                    .finish();
 
     auto &local_cfg = app_config.local_announce_config;
     if (local_cfg.enabled) {
@@ -280,14 +277,9 @@ void net_supervisor_t::launch_net() noexcept {
 
     auto dcfg = app_config.dialer_config;
     if (dcfg.enabled) {
-        create_actor<dialer_actor_t>()
-            .timeout(timeout)
-            .dialer_config(dcfg)
-            .cluster(cluster)
-            .finish();
+        create_actor<dialer_actor_t>().timeout(timeout).dialer_config(dcfg).cluster(cluster).finish();
     }
 }
-
 
 void net_supervisor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
@@ -309,7 +301,8 @@ void net_supervisor_t::launch_ssdp() noexcept {
     auto &cfg = app_config.upnp_config;
     if (cfg.enabled && ssdp_attempts < cfg.discovery_attempts) {
         auto timeout = shutdown_timeout / 2;
-        ssdp_addr = create_actor<ssdp_actor_t>().timeout(timeout).upnp_config(cfg).cluster(cluster).finish()->get_address();
+        ssdp_addr =
+            create_actor<ssdp_actor_t>().timeout(timeout).upnp_config(cfg).cluster(cluster).finish()->get_address();
         ++ssdp_attempts;
         LOG_TRACE(log, "{}, launching ssdp, attempt #{}", identity, ssdp_attempts);
     }

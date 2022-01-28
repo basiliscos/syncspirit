@@ -19,7 +19,7 @@ outcome::result<URI> make_announce_request(fmt::memory_buffer &buff, const URI &
                                            const utils::uri_container_t &listening_uris) noexcept {
     json payload = json::object();
     json addresses = json::array();
-    for(auto& uri: listening_uris) {
+    for (auto &uri : listening_uris) {
         addresses.push_back(uri.full);
     }
     payload["addresses"] = addresses;

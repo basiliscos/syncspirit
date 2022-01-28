@@ -35,7 +35,6 @@ template <typename Actor> struct local_discovery_actor_config_builder_t : r::act
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
 };
 
 struct local_discovery_actor_t final : public r::actor_base_t {

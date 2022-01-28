@@ -7,7 +7,7 @@
 using namespace syncspirit::model::diff::modify;
 
 auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto& devices = cluster.get_devices();
+    auto &devices = cluster.get_devices();
     auto peer = devices.by_sha256(peer_id);
     if (!peer) {
         auto prefix = (char)db::prefix::device;

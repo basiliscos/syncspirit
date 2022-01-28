@@ -19,8 +19,8 @@ struct cluster_update_t final : cluster_diff_t {
     using modified_folders_t = std::vector<update_info_t>;
     using keys_t = std::set<std::string>;
 
-
-    static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, const model::device_t& source, const message_t& message) noexcept;
+    static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, const model::device_t &source,
+                                                      const message_t &message) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
@@ -33,8 +33,9 @@ struct cluster_update_t final : cluster_diff_t {
     keys_t removed_files;
     keys_t removed_blocks;
 
-private:
-    cluster_update_t(unknown_folders_t unknown_folders, modified_folders_t reset_folders, modified_folders_t updated_folders, keys_t removed_blocks) noexcept;
+  private:
+    cluster_update_t(unknown_folders_t unknown_folders, modified_folders_t reset_folders,
+                     modified_folders_t updated_folders, keys_t removed_blocks) noexcept;
 };
 
-}
+} // namespace syncspirit::model::diff::peer

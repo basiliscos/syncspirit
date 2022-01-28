@@ -13,19 +13,17 @@
 #include "net/names.h"
 #include "utils/error_code.h"
 
-
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
 using namespace syncspirit::hasher;
 
-namespace  {
+namespace {
 
 struct sample_peer_config_t : public r::actor_config_t {
     model::device_id_t peer_device_id;
 };
-
 
 template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_builder_t<Actor> {
     using builder_t = typename Actor::template config_builder_t<Actor>;
@@ -53,15 +51,13 @@ struct sample_peer_t : r::actor_base_t {
     using block_request_t = r::intrusive_ptr_t<net::message::block_request_t>;
     using block_requests_t = std::list<block_request_t>;
 
-    sample_peer_t(config_t& config): r::actor_base_t{config}, peer_device{config.peer_device_id} {
+    sample_peer_t(config_t &config) : r::actor_base_t{config}, peer_device{config.peer_device_id} {
         log = utils::get_logger("test.sample_peer");
     }
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override {
         r::actor_base_t::configure(plugin);
-        plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-            p.set_identity("sample_peer", false);
-        });
+        plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("sample_peer", false); });
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
             p.subscribe_actor(&sample_peer_t::on_start_reading);
             p.subscribe_actor(&sample_peer_t::on_termination);
@@ -96,7 +92,7 @@ struct sample_peer_t : r::actor_base_t {
         LOG_TRACE(log, "{}, on_termination", identity);
 
         if (!shutdown_reason) {
-            auto& ee = msg.payload.ee;
+            auto &ee = msg.payload.ee;
             auto reason = ee->message();
             LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
 
@@ -112,13 +108,15 @@ struct sample_peer_t : r::actor_base_t {
     void on_block_request(net::message::block_request_t &req) noexcept {
         block_requests.push_front(&req);
         ++blocks_requested;
-        log->debug("{}, requesting block # {}", identity, block_requests.front()->payload.request_payload.block.block_index());
+        log->debug("{}, requesting block # {}", identity,
+                   block_requests.front()->payload.request_payload.block.block_index());
         if (block_responses.size()) {
             log->debug("{}, top response block # {}", identity, block_responses.front().block_index);
         }
         auto condition = [&]() -> bool {
             return block_requests.size() && block_responses.size() &&
-                   block_requests.front()->payload.request_payload.block.block_index() == block_responses.front().block_index;
+                   block_requests.front()->payload.request_payload.block.block_index() ==
+                       block_responses.front().block_index;
         };
         while (condition()) {
             log->debug("{}, matched replying...", identity);
@@ -127,7 +125,6 @@ struct sample_peer_t : r::actor_base_t {
             block_requests.pop_front();
         }
     }
-
 
     void forward(net::payload::forwarded_message_t payload) noexcept {
         send<net::payload::forwarded_message_t>(controller, std::move(payload));
@@ -156,17 +153,16 @@ struct fixture_t {
     using peer_ptr_t = r::intrusive_ptr_t<sample_peer_t>;
     using target_ptr_t = r::intrusive_ptr_t<net::controller_actor_t>;
 
-    fixture_t(bool auto_start_) noexcept: auto_start{auto_start_} {
-        utils::set_default("trace");
-    }
-
+    fixture_t(bool auto_start_) noexcept : auto_start{auto_start_} { utils::set_default("trace"); }
 
     virtual void run() noexcept {
-        auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-        peer_device =  device_t::create(peer_id, "peer-device").value();
+        auto peer_id =
+            device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+        peer_device = device_t::create(peer_id, "peer-device").value();
 
-        auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-        my_device =  device_t::create(my_id, "my-device").value();
+        auto my_id =
+            device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+        my_device = device_t::create(my_id, "my-device").value();
         cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
@@ -187,7 +183,7 @@ struct fixture_t {
         auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
         REQUIRE(diff->apply(*cluster));
 
-        auto& folders = cluster->get_folders();
+        auto &folders = cluster->get_folders();
         folder_1 = folders.by_id(db_folder_1.id());
         folder_2 = folders.by_id(db_folder_2.id());
 
@@ -198,7 +194,7 @@ struct fixture_t {
         sup->start();
         sup->do_process();
 
-        CHECK(static_cast<r::actor_base_t*>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
         sup->create_actor<hasher_actor_t>().index(1).timeout(timeout).finish();
         sup->create_actor<hasher::hasher_proxy_actor_t>()
             .timeout(timeout)
@@ -206,31 +202,28 @@ struct fixture_t {
             .name(net::names::hasher_proxy)
             .finish();
 
-        peer_actor = sup->create_actor<sample_peer_t>()
-            .timeout(timeout)
-            .finish();
-
+        peer_actor = sup->create_actor<sample_peer_t>().timeout(timeout).finish();
 
         sup->do_process();
 
         target = sup->create_actor<controller_actor_t>()
-                .peer(peer_device)
-                .peer_addr(peer_actor->get_address())
-                .request_pool(1024)
-                .cluster(cluster)
-                .timeout(timeout)
-                .request_timeout(timeout)
-                .finish();
+                     .peer(peer_device)
+                     .peer_addr(peer_actor->get_address())
+                     .request_pool(1024)
+                     .cluster(cluster)
+                     .timeout(timeout)
+                     .request_timeout(timeout)
+                     .finish();
 
         sup->do_process();
 
-        CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
         target_addr = target->get_address();
 
         if (auto_start) {
             REQUIRE(peer_actor->reading);
             REQUIRE(peer_actor->messages.size() == 1);
-            auto& msg = (*peer_actor->messages.front()).payload;
+            auto &msg = (*peer_actor->messages.front()).payload;
             REQUIRE(std::get_if<proto::message::ClusterConfig>(&msg));
             peer_actor->messages.pop_front();
         }
@@ -239,11 +232,10 @@ struct fixture_t {
         sup->shutdown();
         sup->do_process();
 
-        CHECK(static_cast<r::actor_base_t*>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+        CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual void main() noexcept {
-    }
+    virtual void main() noexcept {}
 
     bool auto_start;
     peer_ptr_t peer_actor;
@@ -259,7 +251,7 @@ struct fixture_t {
     model::folder_ptr_t folder_2;
 };
 
-}
+} // namespace
 
 void test_startup() {
     struct F : fixture_t {
@@ -267,7 +259,7 @@ void test_startup() {
         void main() noexcept override {
             REQUIRE(peer_actor->reading);
             REQUIRE(peer_actor->messages.size() == 1);
-            auto& msg = (*peer_actor->messages.front()).payload;
+            auto &msg = (*peer_actor->messages.front()).payload;
             CHECK(std::get_if<proto::message::ClusterConfig>(&msg));
 
             auto cc = proto::ClusterConfig{};
@@ -275,7 +267,7 @@ void test_startup() {
             peer_actor->forward(std::move(payload));
             sup->do_process();
 
-            CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
         }
     };
     F(false).run();
@@ -296,8 +288,8 @@ void test_index() {
                 peer_actor->forward(proto::message::Index(new proto::Index(index)));
                 sup->do_process();
 
-                CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
-                CHECK(static_cast<r::actor_base_t*>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+                CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+                CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
             }
 
             SECTION("index is applied") {
@@ -317,10 +309,10 @@ void test_index() {
                 peer_actor->forward(proto::message::Index(new proto::Index(index)));
                 sup->do_process();
 
-                CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
-                CHECK(static_cast<r::actor_base_t*>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+                CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+                CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-                auto& folder_infos = folder_1->get_folder_infos();
+                auto &folder_infos = folder_1->get_folder_infos();
 
                 auto folder_peer = folder_infos.by_device(peer_device);
                 REQUIRE(folder_peer);
@@ -344,8 +336,9 @@ void test_index() {
                     peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
 
                     sup->do_process();
-                    CHECK(static_cast<r::actor_base_t*>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
-                    CHECK(static_cast<r::actor_base_t*>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+                    CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+                    CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() ==
+                          r::state_t::OPERATIONAL);
 
                     CHECK(folder_peer->get_max_sequence() == 3ul);
                     REQUIRE(folder_peer->get_file_infos().size() == 2);
@@ -366,7 +359,7 @@ void test_downloading() {
         using fixture_t::fixture_t;
         void main() noexcept override {
 
-            auto& folder_infos = folder_1->get_folder_infos();
+            auto &folder_infos = folder_1->get_folder_infos();
             auto folder_my = folder_infos.by_device(my_device);
 
             auto cc = proto::ClusterConfig{};

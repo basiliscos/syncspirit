@@ -14,13 +14,13 @@ using namespace syncspirit::model;
 
 TEST_CASE("block iterator", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device =  device_t::create(my_id, "my-device").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
 
-    auto& folders = cluster->get_folders();
+    auto &folders = cluster->get_folders();
     db::Folder db_folder;
     db_folder.set_id("1234-5678");
     db_folder.set_label("my-label");
@@ -30,7 +30,7 @@ TEST_CASE("block iterator", "[model]") {
     REQUIRE(diff->apply(*cluster));
 
     auto folder = folders.by_id(db_folder.id());
-    auto& folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
+    auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
     auto my_folder = folder_infos.by_device(my_device);
 
     auto pr_index = proto::Index();
@@ -39,7 +39,6 @@ TEST_CASE("block iterator", "[model]") {
     auto p_file = pr_index.add_files();
     p_file->set_name("a.txt");
     p_file->set_sequence(2ul);
-
 
     SECTION("no blocks") {
         diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file, {}));
@@ -70,7 +69,8 @@ TEST_CASE("block iterator", "[model]") {
         SECTION("no iteration upon deleted file") {
             p_file->set_deleted(true);
 
-            diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file, {bi1, bi2}));
+            diff =
+                diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file, {bi1, bi2}));
             REQUIRE(diff->apply(*cluster));
 
             auto my_file = my_folder->get_file_infos().by_name(p_file->name());
@@ -78,7 +78,8 @@ TEST_CASE("block iterator", "[model]") {
         }
 
         SECTION("normal iteration") {
-            diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file, {bi1, bi2}));
+            diff =
+                diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file, {bi1, bi2}));
             REQUIRE(diff->apply(*cluster));
 
             auto my_file = my_folder->get_file_infos().by_name(p_file->name());

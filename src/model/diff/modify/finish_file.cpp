@@ -5,7 +5,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-finish_file_t::finish_file_t(const model::file_info_t& file) noexcept {
+finish_file_t::finish_file_t(const model::file_info_t &file) noexcept {
     assert(file.get_source());
     auto fi = file.get_folder_info();
     auto folder = fi->get_folder();
@@ -14,10 +14,10 @@ finish_file_t::finish_file_t(const model::file_info_t& file) noexcept {
     assert(fi->get_device() == folder->get_cluster()->get_device().get());
 }
 
-auto finish_file_t::apply_impl(cluster_t &cluster) const noexcept-> outcome::result<void> {
+auto finish_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device(cluster.get_device());
-    auto& files = folder_info->get_file_infos();
+    auto &files = folder_info->get_file_infos();
     auto file = files.by_name(file_name);
     LOG_TRACE(log, "finish_file_t for {}", file->get_full_name());
 
@@ -36,9 +36,9 @@ auto finish_file_t::apply_impl(cluster_t &cluster) const noexcept-> outcome::res
     }
     auto new_file = std::move(opt.assume_value());
 
-    auto& blocks = source->get_blocks();
-    for(size_t i = 0; i < blocks.size(); ++i) {
-        auto& b = blocks[i];
+    auto &blocks = source->get_blocks();
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        auto &b = blocks[i];
         assert(b);
         new_file->assign_block(b, i);
         new_file->mark_local_available(i);
@@ -52,4 +52,3 @@ auto finish_file_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome:
     LOG_TRACE(log, "visiting finish_file_t, folder = {}, file = {}", folder_id, file_name);
     return visitor(*this);
 }
-

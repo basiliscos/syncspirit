@@ -49,14 +49,14 @@ bool operator==(const log_config_t &lhs, const log_config_t &rhs) noexcept {
 bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
     return lhs.local_announce_config == rhs.local_announce_config && lhs.upnp_config == rhs.upnp_config &&
            lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
-           lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
-           lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs &&
-           lhs.hasher_threads == rhs.hasher_threads;
+           lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name && lhs.config_path == rhs.config_path &&
+           lhs.log_configs == rhs.log_configs && lhs.hasher_threads == rhs.hasher_threads;
 }
 
 bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.discovery_attempts == rhs.discovery_attempts && lhs.max_wait == rhs.max_wait &&
-           lhs.timeout == rhs.timeout && lhs.external_port == rhs.external_port && lhs.rx_buff_size == rhs.rx_buff_size;
+    return lhs.enabled == rhs.enabled && lhs.discovery_attempts == rhs.discovery_attempts &&
+           lhs.max_wait == rhs.max_wait && lhs.timeout == rhs.timeout && lhs.external_port == rhs.external_port &&
+           lhs.rx_buff_size == rhs.rx_buff_size;
 }
 
 using device_name_t = outcome::result<std::string>;

@@ -5,9 +5,9 @@
 using namespace syncspirit::model::diff::load;
 
 auto devices_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto& device_map = cluster.get_devices();
-    auto& local_device = cluster.get_device();
-    for(auto& pair:devices) {
+    auto &device_map = cluster.get_devices();
+    auto &local_device = cluster.get_device();
+    for (auto &pair : devices) {
         auto device = device_ptr_t();
         if (pair.key == local_device->get_key()) {
             device = local_device;

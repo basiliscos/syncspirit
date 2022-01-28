@@ -39,7 +39,7 @@ struct transaction_t {
 };
 
 outcome::result<transaction_t> make_transaction(transaction_type_t type, MDBX_env *env_) noexcept;
-outcome::result<transaction_t> make_transaction(transaction_type_t type, transaction_t& prev) noexcept;
+outcome::result<transaction_t> make_transaction(transaction_type_t type, transaction_t &prev) noexcept;
 
 } // namespace db
 } // namespace syncspirit

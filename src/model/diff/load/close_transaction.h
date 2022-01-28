@@ -9,9 +9,9 @@ struct close_transaction_t final : cluster_diff_t {
     close_transaction_t(db::transaction_t txn) noexcept;
     ~close_transaction_t() noexcept;
 
-    outcome::result<void> apply_impl(cluster_t&) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
 
     db::transaction_t txn;
 };
 
-} // namespace syncspirit::model::diff::cluster
+} // namespace syncspirit::model::diff::load

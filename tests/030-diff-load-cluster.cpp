@@ -17,10 +17,9 @@ using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
-
 TEST_CASE("loading cluster (base)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device =  device_t::create(my_id, "my-device").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     CHECK(cluster);
 
@@ -32,7 +31,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
         devices.emplace_back(diff::load::pair_t{self_key, self_data});
         auto diff = diff::cluster_diff_ptr_t(new diff::load::devices_t(devices));
         REQUIRE(diff->apply(*cluster));
-        auto& devices_map = cluster->get_devices();
+        auto &devices_map = cluster->get_devices();
         REQUIRE(devices_map.size() == 1);
         auto self = devices_map.get(self_key);
         auto self_2 = devices_map.by_sha256(my_id.get_sha256());
@@ -52,9 +51,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
         device_ptr_t peer;
 
-        SECTION("directly") {
-            peer = device_t::create(key, db_device).value();
-        }
+        SECTION("directly") { peer = device_t::create(key, db_device).value(); }
 
         SECTION("via diff (+ local device)") {
             std::string data = db_device.SerializeAsString();
@@ -63,7 +60,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             devices.emplace_back(diff::load::pair_t{self_key, self_data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::devices_t(devices));
             REQUIRE(diff->apply(*cluster));
-            auto& devices_map = cluster->get_devices();
+            auto &devices_map = cluster->get_devices();
             REQUIRE(devices_map.size() == 2);
             peer = devices_map.get(key);
             auto peer_2 = devices_map.by_sha256(device_id);
@@ -91,14 +88,13 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
         auto target_block = block_info_ptr_t();
 
-
         SECTION("via diff") {
             auto data = block->serialize();
             diff::load::container_t blocks;
             blocks.emplace_back(diff::load::pair_t{key, data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::blocks_t(blocks));
             REQUIRE(diff->apply(*cluster));
-            auto& blocks_map = cluster->get_blocks();
+            auto &blocks_map = cluster->get_blocks();
             REQUIRE(blocks_map.size() == 1);
             target_block = blocks_map.get(bi.hash());
         }
@@ -111,7 +107,8 @@ TEST_CASE("loading cluster (base)", "[model]") {
     }
 
     SECTION("ignored_devices") {
-        auto device_id = device_id_t::from_string("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7").value();
+        auto device_id =
+            device_id_t::from_string("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7").value();
 
         auto id = ignored_device_t::create(device_id).value();
         auto key = id->get_key();
@@ -119,16 +116,14 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
         auto target = ignored_device_ptr_t();
 
-        SECTION("directly") {
-            target = ignored_device_t::create(key, data).value();
-        }
+        SECTION("directly") { target = ignored_device_t::create(key, data).value(); }
 
         SECTION("via diff") {
             diff::load::container_t devices;
             devices.emplace_back(diff::load::pair_t{key, data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::ignored_devices_t(devices));
             REQUIRE(diff->apply(*cluster));
-            auto& map = cluster->get_ignored_devices();
+            auto &map = cluster->get_ignored_devices();
             REQUIRE(map.size() == 1);
             target = map.get(device_id.get_sha256());
         }
@@ -156,7 +151,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             folders.emplace_back(diff::load::pair_t{key, data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::folders_t(folders));
             REQUIRE(diff->apply(*cluster));
-            auto& map = cluster->get_folders();
+            auto &map = cluster->get_folders();
             REQUIRE(map.size() == 1);
             auto f1 = map.begin()->item;
             folder = map.get(key);
@@ -176,21 +171,19 @@ TEST_CASE("loading cluster (base)", "[model]") {
         db_folder.set_label("my-label");
 
         auto folder = ignored_folder_t::create(std::string("folder-id"), "my-label").value();
-        auto key = folder ->get_key();
-        auto data = folder ->serialize();
+        auto key = folder->get_key();
+        auto data = folder->serialize();
 
         auto target = ignored_folder_ptr_t();
 
-        SECTION("directly") {
-            target = ignored_folder_t::create(key, data).value();
-        }
+        SECTION("directly") { target = ignored_folder_t::create(key, data).value(); }
 
         SECTION("via diff") {
             diff::load::container_t folders;
             folders.emplace_back(diff::load::pair_t{key, data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::ignored_folders_t(folders));
             REQUIRE(diff->apply(*cluster));
-            auto& map = cluster->get_ignored_folders();
+            auto &map = cluster->get_ignored_folders();
             REQUIRE(map.size() == 1);
             target = map.get(folder->get_id());
         }
@@ -205,7 +198,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
 TEST_CASE("loading cluster (folder info)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device =  device_t::create(my_id, "my-device").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     CHECK(cluster);
     cluster->get_devices().put(my_device);
@@ -235,7 +228,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
         folders.emplace_back(diff::load::pair_t{fi->get_key(), data});
         auto diff = diff::cluster_diff_ptr_t(new diff::load::folder_infos_t(folders));
         REQUIRE(diff->apply(*cluster));
-        auto& map = folder->get_folder_infos();
+        auto &map = folder->get_folder_infos();
         REQUIRE(map.size() == 1);
         target = map.get(fi->get_uuid());
         REQUIRE(map.by_device(my_device));
@@ -252,7 +245,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
 
 TEST_CASE("loading cluster (file info + block)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device =  device_t::create(my_id, "my-device").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     CHECK(cluster);
     cluster->get_devices().put(my_device);
@@ -261,7 +254,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     bi.set_size(5);
     bi.set_hash(utils::sha256_digest("12345").value());
     auto block = block_info_t::create(bi).assume_value();
-    auto& blocks_map = cluster->get_blocks();
+    auto &blocks_map = cluster->get_blocks();
     blocks_map.put(block);
 
     db::Folder db_folder;
@@ -286,9 +279,9 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     pr_fi.set_name("a/b.txt");
     pr_fi.set_size(55ul);
     pr_fi.set_block_size(5ul);
-    auto fi = file_info_t::create(cluster->next_uuid(),  pr_fi, folder_info).value();
+    auto fi = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info).value();
     CHECK(fi);
-    for(size_t i = 0; i < 11; ++i) {
+    for (size_t i = 0; i < 11; ++i) {
         fi->assign_block(block, i);
     }
 
@@ -311,7 +304,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         container.emplace_back(diff::load::pair_t{fi->get_key(), data});
         auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(container));
         REQUIRE(diff->apply(*cluster));
-        auto& map = folder_info->get_file_infos();
+        auto &map = folder_info->get_file_infos();
         REQUIRE(map.size() == 1);
         target = map.get(fi->get_uuid());
         REQUIRE(target);

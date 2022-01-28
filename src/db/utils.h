@@ -24,10 +24,8 @@ outcome::result<std::uint32_t> get_version(transaction_t &txn) noexcept;
 outcome::result<void> migrate(std::uint32_t from, model::device_ptr_t device, transaction_t &txn) noexcept;
 
 outcome::result<container_t> load(discr_t prefix, transaction_t &txn) noexcept;
-outcome::result<void> save(const pair_t& container, transaction_t &txn) noexcept;
+outcome::result<void> save(const pair_t &container, transaction_t &txn) noexcept;
 outcome::result<void> remove(std::string_view key, transaction_t &txn) noexcept;
-
-
 
 } // namespace db
 } // namespace syncspirit

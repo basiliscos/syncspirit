@@ -12,7 +12,6 @@ r::plugin::resource_id_t model = 0;
 }
 } // namespace
 
-
 fs_supervisor_t::fs_supervisor_t(config_t &cfg)
     : parent_t(cfg), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {
     log = utils::get_logger("fs.supervisor");
@@ -34,19 +33,18 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         });
     });
 
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&fs_supervisor_t::on_model_request);
-        p.subscribe_actor(&fs_supervisor_t::on_model_response);
-    }, r::plugin::config_phase_t::PREINIT );
+    plugin.with_casted<r::plugin::starter_plugin_t>(
+        [&](auto &p) {
+            p.subscribe_actor(&fs_supervisor_t::on_model_request);
+            p.subscribe_actor(&fs_supervisor_t::on_model_response);
+        },
+        r::plugin::config_phase_t::PREINIT);
 }
 
 void fs_supervisor_t::launch() noexcept {
     auto &timeout = shutdown_timeout;
     LOG_WARN(log, "{}, mru_size hardcoded");
-    create_actor<file_actor_t>()
-            .cluster(cluster)
-            .mru_size(10)
-            .timeout(timeout).finish();
+    create_actor<file_actor_t>().cluster(cluster).mru_size(10).timeout(timeout).finish();
     auto hasher_addr = create_actor<hasher::hasher_proxy_actor_t>()
                            .hasher_threads(hasher_threads)
                            .name("fs::hasher_proxy")
@@ -95,7 +93,7 @@ void fs_supervisor_t::on_start() noexcept {
 
 void fs_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
-    auto& diff = *message.payload.diff;
+    auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());
@@ -106,7 +104,7 @@ void fs_supervisor_t::on_model_update(model::message::model_update_t &message) n
 
 void fs_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_block_update", identity);
-    auto& diff = *message.payload.diff;
+    auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());

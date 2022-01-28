@@ -25,4 +25,4 @@ struct cluster_remove_t final : cluster_diff_t {
     keys_t removed_blocks;
 };
 
-}
+} // namespace syncspirit::model::diff::peer

@@ -77,7 +77,8 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
             return false;
         }
         if (f->get_label() == folder.label()) {
-            log->warn("{}, folder with label = {} is alredy present is the cluster", actor.get_identity(), f->get_label());
+            log->warn("{}, folder with label = {} is alredy present is the cluster", actor.get_identity(),
+                      f->get_label());
             return false;
         }
         if (f->get_path().string() == folder.path()) {

@@ -7,8 +7,7 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::device);
 
-template<>
-void device_t::assign(const db::Device& d) noexcept {
+template <> void device_t::assign(const db::Device &d) noexcept {
     name = d.name();
     compression = d.compression();
     cert_name = d.cert_name();
@@ -25,7 +24,6 @@ void device_t::assign(const db::Device& d) noexcept {
     }
 }
 
-
 outcome::result<device_ptr_t> device_t::create(std::string_view key, const db::Device &data) noexcept {
     if (key[0] != prefix) {
         return make_error_code(error_code_t::invalid_device_prefix);
@@ -41,29 +39,25 @@ outcome::result<device_ptr_t> device_t::create(std::string_view key, const db::D
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<device_ptr_t> device_t::create(const device_id_t& device_id, std::string_view name, std::string_view cert_name) noexcept{
+outcome::result<device_ptr_t> device_t::create(const device_id_t &device_id, std::string_view name,
+                                               std::string_view cert_name) noexcept {
     auto ptr = device_ptr_t(new device_t(device_id, name, cert_name));
     return outcome::success(std::move(ptr));
 }
 
-device_t::device_t(const device_id_t &device_id_, std::string_view name_, std::string_view cert_name_) noexcept:
-    id(std::move(device_id_)), name{name_}, compression{proto::Compression::METADATA}, cert_name{cert_name_},
-    introducer{false}, auto_accept{false}, paused{false}, skip_introduction_removals{false}, online{false}
-{
-}
+device_t::device_t(const device_id_t &device_id_, std::string_view name_, std::string_view cert_name_) noexcept
+    : id(std::move(device_id_)), name{name_}, compression{proto::Compression::METADATA}, cert_name{cert_name_},
+      introducer{false}, auto_accept{false}, paused{false}, skip_introduction_removals{false}, online{false} {}
 
-void device_t::update(const db::Device &source) noexcept {
-    assign(source);
-}
+void device_t::update(const db::Device &source) noexcept { assign(source); }
 
 uint64_t device_t::as_uint() noexcept {
     auto device_id = id.get_sha256();
     uint64_t id;
     auto ptr = device_id.data();
-    std::copy(ptr, ptr + sizeof (id), reinterpret_cast<char *>(&id));
+    std::copy(ptr, ptr + sizeof(id), reinterpret_cast<char *>(&id));
     return id;
 }
-
 
 std::string device_t::serialize() noexcept {
     db::Device r;
@@ -79,7 +73,7 @@ std::string device_t::serialize() noexcept {
 
     int i = 0;
     for (auto &address : static_uris) {
-        *r.add_addresses() =  address.full;
+        *r.add_addresses() = address.full;
     }
 
     return r.SerializeAsString();
@@ -89,31 +83,19 @@ void device_t::mark_online(bool value) noexcept { online = value; }
 
 std::string_view device_t::get_key() const noexcept { return id.get_key(); }
 
-void device_t::assing_uris(const uris_t& uris_) noexcept {
-    uris = uris_;
-}
+void device_t::assing_uris(const uris_t &uris_) noexcept { uris = uris_; }
 
-local_device_t::local_device_t(const device_id_t& device_id, std::string_view name, std::string_view cert_name) noexcept:
-    device_t(device_id, name, cert_name) {
-
-}
+local_device_t::local_device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept
+    : device_t(device_id, name, cert_name) {}
 
 std::string_view local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
 
+template <> std::string_view get_index<0, device_ptr_t>(const device_ptr_t &item) noexcept { return item->get_key(); }
 
-template<>
-std::string_view get_index<0, device_ptr_t>(const device_ptr_t& item) noexcept {
-    return item->get_key();
-}
-
-template<>
-std::string_view get_index<1, device_ptr_t>(const device_ptr_t& item) noexcept {
+template <> std::string_view get_index<1, device_ptr_t>(const device_ptr_t &item) noexcept {
     return item->device_id().get_sha256();
 }
 
-device_ptr_t devices_map_t::by_sha256(std::string_view device_id) const noexcept {
-    return get<1>(device_id);
-}
+device_ptr_t devices_map_t::by_sha256(std::string_view device_id) const noexcept { return get<1>(device_id); }
 
-
-}
+} // namespace syncspirit::model

@@ -25,16 +25,15 @@ struct folder_t;
 
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
-
 struct folder_t final : arc_base_t<folder_t> {
 
     enum class foldet_type_t { send = 0, receive, send_and_receive };
     enum class pull_order_t { random = 0, alphabetic, largest, oldest, newest };
 
-    static outcome::result<folder_ptr_t> create(std::string_view key, const db::Folder& folder) noexcept;
-    static outcome::result<folder_ptr_t> create(const uuid_t& uuid, const db::Folder& folder) noexcept;
+    static outcome::result<folder_ptr_t> create(std::string_view key, const db::Folder &folder) noexcept;
+    static outcome::result<folder_ptr_t> create(const uuid_t &uuid, const db::Folder &folder) noexcept;
 
-    void assign_cluster(const cluster_ptr_t& cluster) noexcept;
+    void assign_cluster(const cluster_ptr_t &cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
     std::string serialize() noexcept;
 
@@ -52,7 +51,7 @@ struct folder_t final : arc_base_t<folder_t> {
 
     inline const bfs::path &get_path() noexcept { return path; }
     void update(local_file_map_t &local_files) noexcept;
-    std::optional<proto::Folder> generate(const model::device_t& device) const noexcept;
+    std::optional<proto::Folder> generate(const model::device_t &device) const noexcept;
     proto::Index generate() noexcept;
 
     template <typename T> auto &access() noexcept;
@@ -61,9 +60,8 @@ struct folder_t final : arc_base_t<folder_t> {
     static const constexpr size_t data_length = uuid_length + 1;
 
   private:
-
     folder_t(std::string_view key) noexcept;
-    folder_t(const uuid_t& uuid) noexcept;
+    folder_t(const uuid_t &uuid) noexcept;
     void assign_fields(const db::Folder &item) noexcept;
 
     std::string id;
@@ -84,8 +82,7 @@ struct folder_t final : arc_base_t<folder_t> {
     char key[data_length];
 };
 
-
-struct folders_map_t: generic_map_t<folder_ptr_t, 2> {
+struct folders_map_t : generic_map_t<folder_ptr_t, 2> {
     folder_ptr_t by_id(std::string_view id) const noexcept;
 };
 

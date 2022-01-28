@@ -28,9 +28,8 @@ local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
 void local_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("local_discovery", false); });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(names::coordinator, coordinator, true).link(false);
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>(
+        [&](auto &p) { p.discover_name(names::coordinator, coordinator, true).link(false); });
 }
 
 void local_discovery_actor_t::init() noexcept {
@@ -79,13 +78,12 @@ void local_discovery_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
-
 void local_discovery_actor_t::announce() noexcept {
     static const constexpr std::uint64_t instance = 0;
     // LOG_TRACE(log, "local_discovery_actor_t::announce", (void *)address.get());
 
     auto device = cluster->get_device();
-    auto& uris = device->get_uris();
+    auto &uris = device->get_uris();
     if (!uris.empty()) {
         auto digest = device->device_id().get_sha256();
         auto sz = proto::make_announce_message(tx_buff, digest, uris, instance);

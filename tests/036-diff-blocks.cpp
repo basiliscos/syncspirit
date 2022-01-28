@@ -15,14 +15,13 @@ using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
-
 TEST_CASE("various block diffs", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device =  device_t::create(my_id, "my-device").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
-    auto& blocks_map = cluster->get_blocks();
+    auto &blocks_map = cluster->get_blocks();
 
     db::Folder db_folder;
     db_folder.set_id("1234-5678");
@@ -59,7 +58,7 @@ TEST_CASE("various block diffs", "[model]") {
     SECTION("append") {
         auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 0, "12345"));
         REQUIRE(bdiff->apply(*cluster));
-        auto& blocks = file->get_blocks();
+        auto &blocks = file->get_blocks();
 
         auto lf1 = blocks[0]->local_file();
         REQUIRE(lf1);
@@ -83,7 +82,7 @@ TEST_CASE("various block diffs", "[model]") {
 
         auto bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*file, *b2));
         REQUIRE(bdiff->apply(*cluster));
-        auto& blocks = file->get_blocks();
+        auto &blocks = file->get_blocks();
 
         auto lf1 = blocks[1]->local_file();
         REQUIRE(lf1);
@@ -96,9 +95,7 @@ TEST_CASE("various block diffs", "[model]") {
     SECTION("availability") {
         auto bdiff = diff::block_diff_ptr_t(new diff::modify::blocks_availability_t(*file, 1));
         REQUIRE(bdiff->apply(*cluster));
-        auto& blocks = file->get_blocks();
+        auto &blocks = file->get_blocks();
         CHECK(file->is_locally_available());
     }
-
-
 }

@@ -43,7 +43,6 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
 };
 
 struct cluster_supervisor_t : public ra::supervisor_asio_t, private model::diff::cluster_visitor_t {

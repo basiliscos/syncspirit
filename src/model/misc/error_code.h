@@ -49,7 +49,7 @@ class error_code_category_t : public boost::system::error_category {
     virtual std::string message(int c) const override;
 };
 
-}
+} // namespace detail
 
 const detail::error_code_category_t &error_code_category();
 
@@ -57,9 +57,7 @@ inline boost::system::error_code make_error_code(error_code_t e) {
     return {static_cast<int>(e), error_code_category()};
 }
 
-}
-
-
+} // namespace syncspirit::model
 
 namespace boost {
 namespace system {
@@ -68,6 +66,5 @@ template <> struct is_error_code_enum<syncspirit::model::error_code_t> : std::tr
     static const bool value = true;
 };
 
-}
-}
-
+} // namespace system
+} // namespace boost

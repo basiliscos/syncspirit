@@ -37,7 +37,7 @@ bool share_folder_t::execute(governor_actor_t &actor) noexcept {
     log = actor.log;
     model::folder_ptr_t folder;
     for (auto it : actor.cluster->get_folders()) {
-        auto& f = it.item;
+        auto &f = it.item;
         if ((f->get_id() == this->folder)) {
             folder = f;
             break;
@@ -61,7 +61,7 @@ bool share_folder_t::execute(governor_actor_t &actor) noexcept {
         } else if (d->device_id().get_value() == this->peer) {
             device = d;
             break;
-        } else if (d->get_name()== this->peer) {
+        } else if (d->get_name() == this->peer) {
             device = d;
             break;
         }

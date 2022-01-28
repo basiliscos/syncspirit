@@ -23,8 +23,7 @@ using namespace syncspirit::net;
 namespace http = boost::beast::http;
 using json = nlohmann::json;
 
-
-namespace  {
+namespace {
 
 static auto ssl_pair = utils::generate_pair("sample").value();
 
@@ -41,14 +40,13 @@ struct dummy_http_actor_t : r::actor_base_t {
             p.subscribe_actor(&dummy_http_actor_t::on_request);
             p.subscribe_actor(&dummy_http_actor_t::on_close_connection);
         });
-        plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-            p.register_name(names::http11_gda, get_address());
-        });
+        plugin.with_casted<r::plugin::registry_plugin_t>(
+            [&](auto &p) { p.register_name(names::http11_gda, get_address()); });
     }
 
     void on_request(net::message::http_request_t &req) noexcept {
         if (!responses.empty()) {
-            auto& res = *responses.front();
+            auto &res = *responses.front();
             reply_to(req, std::move(res.response), res.bytes, std::move(res.local_addr));
             connected = true;
             responses.pop_front();
@@ -58,9 +56,7 @@ struct dummy_http_actor_t : r::actor_base_t {
         }
     }
 
-    void on_close_connection(net::message::http_close_connection_t &) noexcept {
-        closed = true;
-    }
+    void on_close_connection(net::message::http_close_connection_t &) noexcept { closed = true; }
 
     queue_t responses;
     bool connected = false;
@@ -72,17 +68,16 @@ struct fixture_t {
     using announce_msg_t = net::message::announce_notification_t;
     using announce_ptr_t = r::intrusive_ptr_t<announce_msg_t>;
 
-    fixture_t() noexcept {
-        utils::set_default("trace");
-    }
-
+    fixture_t() noexcept { utils::set_default("trace"); }
 
     virtual void run() noexcept {
-        auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-        peer_device =  device_t::create(peer_id, "peer-device").value();
+        auto peer_id =
+            device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+        peer_device = device_t::create(peer_id, "peer-device").value();
 
-        auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-        auto my_device =  device_t::create(my_id, "my-device").value();
+        auto my_id =
+            device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+        auto my_device = device_t::create(my_id, "my-device").value();
         cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
@@ -91,31 +86,34 @@ struct fixture_t {
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
         sup->cluster = cluster;
-        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin){
+        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                p.subscribe_actor(r::lambda<announce_msg_t>(
-                    [&](announce_msg_t &msg) { announce = &msg; }));
-        });};
+                p.subscribe_actor(r::lambda<announce_msg_t>([&](announce_msg_t &msg) { announce = &msg; }));
+            });
+        };
         sup->start();
         http_actor = sup->create_actor<dummy_http_actor_t>().timeout(timeout).finish();
         sup->do_process();
 
-        CHECK(static_cast<r::actor_base_t*>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        auto global_device_id = model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW");
+        auto global_device_id =
+            model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW");
 
-        gda = sup->create_actor<global_discovery_actor_t>().cluster(cluster)
-                .ssl_pair(&ssl_pair)
-                .announce_url(utils::parse("https://discovery.syncthing.net/").value())
-                .device_id(std::move(global_device_id.value()))
-                .rx_buff_size(32768ul)
-                .io_timeout(5ul)
-                .timeout(timeout).finish();
+        gda = sup->create_actor<global_discovery_actor_t>()
+                  .cluster(cluster)
+                  .ssl_pair(&ssl_pair)
+                  .announce_url(utils::parse("https://discovery.syncthing.net/").value())
+                  .device_id(std::move(global_device_id.value()))
+                  .rx_buff_size(32768ul)
+                  .io_timeout(5ul)
+                  .timeout(timeout)
+                  .finish();
         bool started = preprocess();
         sup->do_process();
 
         if (started) {
-            CHECK(static_cast<r::actor_base_t*>(gda.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            CHECK(static_cast<r::actor_base_t *>(gda.get())->access<to::state>() == r::state_t::OPERATIONAL);
             target_addr = gda->get_address();
             main();
         }
@@ -124,15 +122,12 @@ struct fixture_t {
         sup->do_process();
 
         CHECK(http_actor->closed);
-        CHECK(static_cast<r::actor_base_t*>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+        CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual bool preprocess() noexcept {
-        return true;
-    }
+    virtual bool preprocess() noexcept { return true; }
 
-    virtual void main() noexcept {
-    }
+    virtual void main() noexcept {}
 
     http_actor_ptr_t http_actor;
     r::address_ptr_t target_addr;
@@ -145,7 +140,7 @@ struct fixture_t {
     r::system_context_t ctx;
 };
 
-}
+} // namespace
 
 void test_succesfull_announcement() {
     struct F : fixture_t {
@@ -182,7 +177,7 @@ void test_failded_announcement() {
                 sup->do_process();
                 CHECK(http_actor->connected);
                 CHECK(!announce);
-                CHECK(static_cast<r::actor_base_t*>(gda.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+                CHECK(static_cast<r::actor_base_t *>(gda.get())->access<to::state>() == r::state_t::SHUT_DOWN);
             }
 
             return false;
@@ -215,7 +210,7 @@ void test_peer_discovery() {
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
                 sup->do_process();
                 REQUIRE(peer_device->get_uris().size() == 0);
-                CHECK(static_cast<r::actor_base_t*>(gda.get())->access<to::state>() == r::state_t::OPERATIONAL);
+                CHECK(static_cast<r::actor_base_t *>(gda.get())->access<to::state>() == r::state_t::OPERATIONAL);
             }
         }
     };

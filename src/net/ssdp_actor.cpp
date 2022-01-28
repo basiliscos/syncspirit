@@ -3,7 +3,6 @@
 #include "proto/upnp_support.h"
 #include "names.h"
 
-
 using namespace syncspirit::net;
 using namespace syncspirit::utils;
 using namespace syncspirit::proto;
@@ -19,10 +18,8 @@ r::plugin::resource_id_t timer = 2;
 } // namespace
 
 ssdp_actor_t::ssdp_actor_t(ssdp_actor_config_t &cfg)
-    : r::actor_base_t::actor_base_t(cfg),
-      cluster{cfg.cluster},
-      strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()},
-      upnp_config{cfg.upnp_config} {
+    : r::actor_base_t::actor_base_t(cfg), cluster{cfg.cluster},
+      strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, upnp_config{cfg.upnp_config} {
     log = utils::get_logger("net.ssdp");
     rx_buff.resize(RX_BUFF_SIZE);
 }
@@ -149,13 +146,13 @@ void ssdp_actor_t::launch_upnp(const URI &igd_uri) noexcept {
     LOG_DEBUG(log, "{}, launching upnp", identity);
     auto timeout = shutdown_timeout * 9 / 10;
 
-    auto& sup = get_supervisor();
+    auto &sup = get_supervisor();
     sup.create_actor<upnp_actor_t>()
-                    .cluster(cluster)
-                    .timeout(timeout)
-                    .descr_url(igd_uri)
-                    .rx_buff_size(upnp_config.rx_buff_size)
-                    .external_port(upnp_config.external_port)
-                    .finish()
-                    ->get_address();
+        .cluster(cluster)
+        .timeout(timeout)
+        .descr_url(igd_uri)
+        .rx_buff_size(upnp_config.rx_buff_size)
+        .external_port(upnp_config.external_port)
+        .finish()
+        ->get_address();
 }

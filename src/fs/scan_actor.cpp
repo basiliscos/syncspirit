@@ -11,18 +11,18 @@
 namespace sys = boost::system;
 using namespace syncspirit::fs;
 
-template<class> inline constexpr bool always_false_v = false;
+template <class> inline constexpr bool always_false_v = false;
 
-scan_actor_t::scan_actor_t(config_t &cfg) : r::actor_base_t{cfg},  cluster{cfg.cluster},
-    fs_config{cfg.fs_config}, hasher_proxy{cfg.hasher_proxy}, requested_hashes_limit{cfg.requested_hashes_limit} {
+scan_actor_t::scan_actor_t(config_t &cfg)
+    : r::actor_base_t{cfg}, cluster{cfg.cluster}, fs_config{cfg.fs_config}, hasher_proxy{cfg.hasher_proxy},
+      requested_hashes_limit{cfg.requested_hashes_limit} {
     log = utils::get_logger("scan::actor");
 }
 
 void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>(
-        [&](auto &p) { p.set_identity("fs::scan_actor", false); });
-    plugin.with_casted<r::plugin::registry_plugin_t>( [&](auto &p) {
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("fs::scan_actor", false); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
@@ -42,7 +42,7 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void scan_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
-    for(auto it : cluster->get_folders()) {
+    for (auto it : cluster->get_folders()) {
         send<payload::scan_folder_t>(address, std::string(it.item->get_id()));
     }
     r::actor_base_t::on_start();
@@ -67,7 +67,6 @@ void scan_actor_t::initiate_scan(std::string_view folder_id) noexcept {
     send<payload::scan_progress_t>(address, std::move(task), generation);
 }
 
-
 void scan_actor_t::on_initiate_scan(message::scan_folder_t &message) noexcept {
     if (!generation) {
         initiate_scan(message.payload.folder_id);
@@ -78,16 +77,15 @@ void scan_actor_t::on_initiate_scan(message::scan_folder_t &message) noexcept {
 
 void scan_actor_t::process_queue() noexcept {
     if (!queue.empty() && state == r::state_t::OPERATIONAL) {
-        auto& msg = queue.front();
+        auto &msg = queue.front();
         initiate_scan(msg->payload.folder_id);
         queue.pop_front();
     }
 }
 
-
 void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
     auto gen = message.payload.generation;
-    auto& task = message.payload.task;
+    auto &task = message.payload.task;
     auto folder_id = task->get_folder_id();
     LOG_TRACE(log, "{}, on_scan, folder = {}", identity, folder_id);
     if (gen != generation) {
@@ -100,40 +98,38 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
     auto r = task->advance();
     bool stop_processing = false;
     bool completed = false;
-    std::visit([&](auto&& r){
-        using T = std::decay_t<decltype(r)>;
-        if constexpr (std::is_same_v<T, bool>) {
-            stop_processing = !r;
-            if (stop_processing) {
-                completed = true;
-            }
-        }
-        else if constexpr (std::is_same_v<T, scan_errors_t>) {
-            send<model::payload::io_error_t>(coordinator, std::move(r));
-        }
-        else if constexpr (std::is_same_v<T, unchanged_meta_t>) {
-            auto diff = model::diff::cluster_diff_ptr_t{};
-            diff = new model::diff::modify::file_availability_t(r.file);
-            send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-        }
-        else if constexpr (std::is_same_v<T, changed_meta_t>) {
-            LOG_WARN(log, "{}, changes in '{}' are ignored (not implemented)", identity, r.file->get_full_name());
-        }
-        else if constexpr (std::is_same_v<T, incomplete_t>) {
-            auto errs = initiate_rehash(task, r.file);
-            if (errs.empty()) {
-                stop_processing = true;
+    std::visit(
+        [&](auto &&r) {
+            using T = std::decay_t<decltype(r)>;
+            if constexpr (std::is_same_v<T, bool>) {
+                stop_processing = !r;
+                if (stop_processing) {
+                    completed = true;
+                }
+            } else if constexpr (std::is_same_v<T, scan_errors_t>) {
+                send<model::payload::io_error_t>(coordinator, std::move(r));
+            } else if constexpr (std::is_same_v<T, unchanged_meta_t>) {
+                auto diff = model::diff::cluster_diff_ptr_t{};
+                diff = new model::diff::modify::file_availability_t(r.file);
+                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+            } else if constexpr (std::is_same_v<T, changed_meta_t>) {
+                LOG_WARN(log, "{}, changes in '{}' are ignored (not implemented)", identity, r.file->get_full_name());
+            } else if constexpr (std::is_same_v<T, incomplete_t>) {
+                auto errs = initiate_rehash(task, r.file);
+                if (errs.empty()) {
+                    stop_processing = true;
+                } else {
+                    send<model::payload::io_error_t>(coordinator, std::move(errs));
+                }
             } else {
-                send<model::payload::io_error_t>(coordinator, std::move(errs));
+                static_assert(always_false_v<T>, "non-exhaustive visitor!");
             }
-        } else {
-            static_assert(always_false_v<T>, "non-exhaustive visitor!");
-        }
-    }, r);
+        },
+        r);
 
     if (!stop_processing) {
         send<payload::scan_progress_t>(address, std::move(task), gen);
-    }  else if(completed) {
+    } else if (completed) {
         LOG_DEBUG(log, "{}, completed scanning of {}", identity, folder_id);
         generation = 0;
         process_queue();
@@ -145,11 +141,11 @@ auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t 
     auto path = make_temporal(file->get_path());
     params.path = path.string();
     params.flags = bio::mapped_file::mapmode::readonly;
-    auto bio_file = bio_file_t{ new bio::mapped_file()};
+    auto bio_file = bio_file_t{new bio::mapped_file()};
 
     try {
         bio_file->open(params);
-    }  catch (std::exception& ex) {
+    } catch (std::exception &ex) {
         LOG_WARN(log, "{}, error opening file {}: {}", identity, params.path, ex.what());
         model::io_errors_t errs;
         auto ec = sys::errc::make_error_code(sys::errc::io_error);
@@ -163,10 +159,10 @@ auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t 
 
     assert(file->get_source());
     send<payload::rehash_needed_t>(address, std::move(task), generation, std::move(file), file->get_source(),
-                                   std::move(bio_file), int64_t{0}, int64_t{-1}, size_t{0}, std::set<std::int64_t>{}, false, false);
+                                   std::move(bio_file), int64_t{0}, int64_t{-1}, size_t{0}, std::set<std::int64_t>{},
+                                   false, false);
     return {};
 }
-
 
 void scan_actor_t::on_rehash(message::rehash_needed_t &message) noexcept {
     LOG_TRACE(log, "{}, on_rehash", identity);
@@ -177,7 +173,7 @@ void scan_actor_t::on_rehash(message::rehash_needed_t &message) noexcept {
 }
 
 bool scan_actor_t::rehash_next(message::rehash_needed_t &message) noexcept {
-    auto& info = message.payload;
+    auto &info = message.payload;
     if (!info.abandoned && !info.invalid) {
         auto condition = [&]() {
             return requested_hashes < requested_hashes_limit && info.last_queued_block < info.file->get_blocks().size();
@@ -185,18 +181,18 @@ bool scan_actor_t::rehash_next(message::rehash_needed_t &message) noexcept {
 
         auto block_sz = info.file->get_block_size();
         auto file_sz = info.file->get_size();
-        auto non_zero = [](char it) { return it != 0;};
-        while(condition()) {
-            auto& i = info.last_queued_block;
+        auto non_zero = [](char it) { return it != 0; };
+        while (condition()) {
+            auto &i = info.last_queued_block;
             auto next_size = ((i + 1) * block_sz) > file_sz ? file_sz - (i * block_sz) : block_sz;
             auto ptr = info.mmaped_file->const_data() + (i * block_sz);
-            auto begin = (char*) ptr;
+            auto begin = (char *)ptr;
             auto end = begin + next_size;
             auto it = std::find_if(begin, end, non_zero);
             if (it == end) { // we have only zeroes
                 info.abandoned = true;
             } else {
-                auto block = std::string_view(begin, next_size );
+                auto block = std::string_view(begin, next_size);
                 using request_t = hasher::payload::digest_request_t;
                 request<request_t>(hasher_proxy, block, (size_t)i, r::message_ptr_t(&message)).send(init_timeout);
                 ++info.queue_size;
@@ -211,11 +207,11 @@ bool scan_actor_t::rehash_next(message::rehash_needed_t &message) noexcept {
 void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     --requested_hashes;
 
-    auto& ee = res.payload.ee;
-    auto& rp = res.payload.req->payload.request_payload;
-    auto msg = static_cast<message::rehash_needed_t*>(rp.custom.get());
-    auto& info = msg->payload;
-    auto& file = info.file;
+    auto &ee = res.payload.ee;
+    auto &rp = res.payload.req->payload.request_payload;
+    auto msg = static_cast<message::rehash_needed_t *>(rp.custom.get());
+    auto &info = msg->payload;
+    auto &file = info.file;
     --info.queue_size;
 
     if (res.payload.ee) {
@@ -226,19 +222,19 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
 
     bool queued_next = false;
     if (!info.invalid) {
-        auto& digest = res.payload.res.digest;
+        auto &digest = res.payload.res.digest;
         auto block_index = rp.block_index;
-        auto& source_file = info.source_file;
-        auto& orig_block = info.source_file->get_blocks().at(block_index);
+        auto &source_file = info.source_file;
+        auto &orig_block = info.source_file->get_blocks().at(block_index);
         if (orig_block->get_hash() == digest) {
-            auto& ooo = info.out_of_order;
+            auto &ooo = info.out_of_order;
             if (block_index == info.valid_blocks + 1) {
                 ++info.valid_blocks;
             } else {
                 ooo.insert((int64_t)block_index);
             }
             auto it = ooo.begin();
-            while(*it == info.valid_blocks + 1) {
+            while (*it == info.valid_blocks + 1) {
                 ++info.valid_blocks;
                 it = ooo.erase(it);
             }

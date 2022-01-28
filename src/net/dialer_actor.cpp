@@ -11,9 +11,8 @@ r::plugin::resource_id_t timer = 0;
 } // namespace
 
 dialer_actor_t::dialer_actor_t(config_t &config)
-    : r::actor_base_t{config}, cluster{config.cluster},
-      redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}}
-      {
+    : r::actor_base_t{config}, cluster{config.cluster}, redial_timeout{
+                                                            r::pt::milliseconds{config.dialer_config.redial_timeout}} {
     log = utils::get_logger("net.acceptor");
 }
 
@@ -52,7 +51,7 @@ void dialer_actor_t::shutdown_start() noexcept {
 
 void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
     LOG_TRACE(log, "{}, on_announce", identity);
-    auto& devices = cluster->get_devices();
+    auto &devices = cluster->get_devices();
     for (auto it : devices) {
         auto &d = it.item;
         if (d != cluster->get_device()) {
@@ -93,7 +92,7 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
 
 void dialer_actor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
-    auto& diff = *msg.payload.diff;
+    auto &diff = *msg.payload.diff;
     auto r = diff.visit(*this);
     if (!r) {
         auto ee = make_error(r.assume_error());
@@ -101,17 +100,15 @@ void dialer_actor_t::on_model_update(model::message::model_update_t &msg) noexce
     }
 }
 
-
-auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &state) noexcept -> outcome::result<void>{
+auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &state) noexcept -> outcome::result<void> {
     if (state.known) {
-        auto& devices = cluster->get_devices();
+        auto &devices = cluster->get_devices();
         auto peer = devices.by_sha256(state.peer_id);
 
         if (peer) {
             if (!state.online) {
                 schedule_redial(peer);
-            }
-            else {
+            } else {
                 auto it = redial_map.find(peer);
                 if (it != redial_map.end()) {
                     cancel_timer(it->second);
@@ -121,6 +118,5 @@ auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &state) no
     }
     return outcome::success();
 }
-
 
 } // namespace syncspirit::net

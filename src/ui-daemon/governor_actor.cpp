@@ -22,9 +22,8 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&governor_actor_t::on_model_response);
-    });
+    plugin.with_casted<r::plugin::starter_plugin_t>(
+        [&](auto &p) { p.subscribe_actor(&governor_actor_t::on_model_response); });
 }
 
 void governor_actor_t::on_start() noexcept {
@@ -39,7 +38,7 @@ void governor_actor_t::shutdown_start() noexcept {
 }
 
 void governor_actor_t::on_model_response(model::message::model_response_t &reply) noexcept {
-    auto& ee = reply.payload.ee;
+    auto &ee = reply.payload.ee;
     if (ee) {
         LOG_ERROR(log, "{}, on_cluster_seed: {},", ee->message());
         return do_shutdown(ee);
@@ -49,19 +48,18 @@ void governor_actor_t::on_model_response(model::message::model_response_t &reply
     process();
 }
 
-
 void governor_actor_t::on_model_update(model::message::forwarded_model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
-    auto& payload = message.payload.message->payload;
+    auto &payload = message.payload.message->payload;
     if (payload.custom == this) {
         process();
     }
 }
 
-void governor_actor_t::on_io_error(model::message::io_error_t& reply) noexcept {
-    auto& errs = reply.payload.errors;
+void governor_actor_t::on_io_error(model::message::io_error_t &reply) noexcept {
+    auto &errs = reply.payload.errors;
     LOG_TRACE(log, "{}, on_io_error, count = {}", identity, errs.size());
-    for(auto& err: errs) {
+    for (auto &err : errs) {
         LOG_WARN(log, "{}, on_io_error (ignored) path: {}, problem: {}", identity, err.path, err.ec.message());
     }
 }

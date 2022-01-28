@@ -14,7 +14,7 @@ struct connect_request_t final : contact_diff_t {
     using socket_ptr_t = std::unique_ptr<tcp::socket>;
     using mutex_t = std::mutex;
 
-    connect_request_t(tcp::socket sock, const tcp::endpoint& remote) noexcept;
+    connect_request_t(tcp::socket sock, const tcp::endpoint &remote) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(contact_visitor_t &) const noexcept override;
@@ -24,4 +24,4 @@ struct connect_request_t final : contact_diff_t {
     mutable socket_ptr_t sock;
 };
 
-}
+} // namespace syncspirit::model::diff::modify

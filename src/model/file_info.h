@@ -26,7 +26,6 @@ struct blocks_interator_t;
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
-
 struct file_info_t final : arc_base_t<file_info_t> {
 
     enum flags_t {
@@ -39,9 +38,11 @@ struct file_info_t final : arc_base_t<file_info_t> {
 
     using blocks_t = std::vector<block_info_ptr_t>;
 
-    static outcome::result<file_info_ptr_t> create(std::string_view key, const db::FileInfo& data, const folder_info_ptr_t& folder_info_) noexcept;
-    static outcome::result<file_info_ptr_t> create(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept;
-    static std::string create_key(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept;
+    static outcome::result<file_info_ptr_t> create(std::string_view key, const db::FileInfo &data,
+                                                   const folder_info_ptr_t &folder_info_) noexcept;
+    static outcome::result<file_info_ptr_t> create(const uuid_t &uuid, const proto::FileInfo &info_,
+                                                   const folder_info_ptr_t &folder_info_) noexcept;
+    static std::string create_key(const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept;
 
     ~file_info_t();
 
@@ -59,7 +60,7 @@ struct file_info_t final : arc_base_t<file_info_t> {
     inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
     std::string_view get_name() const noexcept;
     inline const std::string &get_full_name() const noexcept { return full_name; }
-    inline const proto::Vector& get_version() const noexcept { return version; };
+    inline const proto::Vector &get_version() const noexcept { return version; };
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     void set_sequence(std::int64_t value) noexcept;
@@ -69,7 +70,7 @@ struct file_info_t final : arc_base_t<file_info_t> {
     void remove_blocks() noexcept;
     void assign_block(const model::block_info_ptr_t &block, size_t index) noexcept;
 
-    inline bool is_file() const  noexcept { return type == proto::FileInfoType::FILE; }
+    inline bool is_file() const noexcept { return type == proto::FileInfoType::FILE; }
     inline bool is_dir() const noexcept { return type == proto::FileInfoType::DIRECTORY; }
     inline bool is_link() const noexcept { return type == proto::FileInfoType::SYMLINK; }
     inline bool is_deleted() const noexcept { return flags & f_deleted; }
@@ -87,7 +88,7 @@ struct file_info_t final : arc_base_t<file_info_t> {
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
     const bfs::path &get_path() const noexcept;
-    bool need_download(const file_info_t& other) noexcept;
+    bool need_download(const file_info_t &other) noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
 
@@ -109,20 +110,20 @@ struct file_info_t final : arc_base_t<file_info_t> {
 
     proto::FileInfo get() const noexcept;
     file_info_ptr_t get_source() const noexcept;
-    void set_source(const file_info_ptr_t& peer_file) noexcept;
+    void set_source(const file_info_ptr_t &peer_file) noexcept;
 
     static const constexpr auto data_length = 1 + uuid_length * 2;
 
+    outcome::result<void> fields_update(const db::FileInfo &) noexcept;
 
-    outcome::result<void> fields_update(const db::FileInfo&) noexcept;
   private:
     using marks_vector_t = std::vector<bool>;
 
-    template <typename Source> outcome::result<void>  fields_update(const Source &s, size_t block_count) noexcept;
-    template<typename T> T as() const noexcept;
+    template <typename Source> outcome::result<void> fields_update(const Source &s, size_t block_count) noexcept;
+    template <typename T> T as() const noexcept;
 
-    file_info_t(std::string_view key, const folder_info_ptr_t& folder_info_) noexcept;
-    file_info_t(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept;
+    file_info_t(std::string_view key, const folder_info_ptr_t &folder_info_) noexcept;
+    file_info_t(const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept;
     outcome::result<void> reserve_blocks(size_t block_count) noexcept;
 
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
@@ -154,7 +155,7 @@ struct file_info_t final : arc_base_t<file_info_t> {
     friend struct blocks_interator_t;
 };
 
-struct file_infos_map_t: public generic_map_t<file_info_ptr_t, 2> {
+struct file_infos_map_t : public generic_map_t<file_info_ptr_t, 2> {
     file_info_ptr_t by_name(std::string_view name) noexcept;
 };
 
@@ -167,4 +168,4 @@ template <> struct hash<syncspirit::model::file_info_ptr_t> {
         return reinterpret_cast<size_t>(file.get());
     }
 };
-}
+} // namespace std

@@ -40,7 +40,6 @@ template <typename Actor> struct upnp_actor_config_builder_t : r::actor_config_b
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
 };
 
 struct upnp_actor_t : public r::actor_base_t {

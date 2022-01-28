@@ -6,7 +6,7 @@
 namespace syncspirit::model::diff::modify {
 
 struct flush_file_t final : cluster_diff_t {
-    flush_file_t(const model::file_info_t& file) noexcept;
+    flush_file_t(const model::file_info_t &file) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
@@ -16,4 +16,4 @@ struct flush_file_t final : cluster_diff_t {
     std::string file_name;
 };
 
-}
+} // namespace syncspirit::model::diff::modify

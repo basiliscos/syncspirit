@@ -37,7 +37,7 @@ struct rehash_needed_t {
     bool invalid;
 };
 
-};
+}; // namespace payload
 
 namespace message {
 
@@ -45,7 +45,6 @@ using scan_folder_t = r::message_t<payload::scan_folder_t>;
 using scan_progress_t = r::message_t<payload::scan_progress_t>;
 using rehash_needed_t = r::message_t<payload::rehash_needed_t>;
 
-}
+} // namespace message
 
-
-}
+} // namespace syncspirit::fs

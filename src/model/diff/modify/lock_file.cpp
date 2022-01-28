@@ -5,10 +5,8 @@
 
 using namespace syncspirit::model::diff::modify;
 
-lock_file_t::lock_file_t(std::string_view folder_id_, std::string_view file_name_, bool locked_) noexcept:
- folder_id{folder_id_}, file_name{file_name_}, locked{locked_} {
-
-}
+lock_file_t::lock_file_t(std::string_view folder_id_, std::string_view file_name_, bool locked_) noexcept
+    : folder_id{folder_id_}, file_name{file_name_}, locked{locked_} {}
 
 auto lock_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);

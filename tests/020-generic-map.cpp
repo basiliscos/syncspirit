@@ -13,7 +13,7 @@ namespace bfs = boost::filesystem;
 
 TEST_CASE("generic map", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device =  device_t::create(my_id, "my-device").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
     auto map = devices_map_t();
     map.put(my_device);
     REQUIRE(map.by_sha256(my_id.get_sha256()));
@@ -26,17 +26,11 @@ TEST_CASE("generic map", "[model]") {
 
 namespace syncspirit::model::details {
 
-template<>
-inline std::string_view get_lru_key<std::string>(const std::string& key) {
-    return key;
-}
+template <> inline std::string_view get_lru_key<std::string>(const std::string &key) { return key; }
 
-template<>
-inline std::string_view get_lru_key<bfs::path>(const bfs::path& key) {
-    return key.string();
-}
+template <> inline std::string_view get_lru_key<bfs::path>(const bfs::path &key) { return key.string(); }
 
-}
+} // namespace syncspirit::model::details
 
 TEST_CASE("lru cache", "[model]") {
     SECTION("string item") {
@@ -106,15 +100,14 @@ using item_map_t = syncspirit::model::generic_map_t<item_t, 1>;
 
 namespace syncspirit::model {
 
-template<>
-inline std::string_view get_index<0>(const item_t& item) noexcept { return item.key; }
+template <> inline std::string_view get_index<0>(const item_t &item) noexcept { return item.key; }
 
-}
+} // namespace syncspirit::model
 
 TEST_CASE("generic map ops") {
     item_map_t map;
-    auto i1 = item_t {"k", 1};
-    auto i2 = item_t {"k", 2};
+    auto i1 = item_t{"k", 1};
+    auto i2 = item_t{"k", 2};
 
     map.put(i1);
     CHECK(map.get("k").value == 1);

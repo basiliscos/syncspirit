@@ -19,14 +19,13 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 struct block_info_t;
 using block_info_ptr_t = intrusive_ptr_t<block_info_t>;
 
-
 struct block_info_t final : arc_base_t<block_info_t> {
     using removed_incides_t = std::vector<size_t>;
     using file_blocks_t = std::vector<file_block_t>;
     static const constexpr size_t digest_length = 32;
     static const constexpr size_t data_length = digest_length + 1;
 
-    static outcome::result<block_info_ptr_t> create(std::string_view key, const db::BlockInfo& data) noexcept;
+    static outcome::result<block_info_ptr_t> create(std::string_view key, const db::BlockInfo &data) noexcept;
     static outcome::result<block_info_ptr_t> create(const proto::BlockInfo &block) noexcept;
 
     inline std::string_view get_hash() const noexcept { return std::string_view(hash + 1, digest_length); }
@@ -34,8 +33,8 @@ struct block_info_t final : arc_base_t<block_info_t> {
     inline std::uint32_t get_weak_hash() const noexcept { return weak_hash; }
     inline std::uint32_t get_size() const noexcept { return size; }
     inline size_t usages() const noexcept { return file_blocks.size(); }
-    inline file_blocks_t& get_file_blocks() { return file_blocks; }
-    inline const file_blocks_t& get_file_blocks() const { return file_blocks; }
+    inline file_blocks_t &get_file_blocks() { return file_blocks; }
+    inline const file_blocks_t &get_file_blocks() const { return file_blocks; }
 
     proto::BlockInfo as_bep(size_t offset) const noexcept;
     std::string serialize() const noexcept;
@@ -54,7 +53,7 @@ struct block_info_t final : arc_base_t<block_info_t> {
     inline bool operator!=(const block_info_t &right) const noexcept { return !(get_hash() == right.get_hash()); }
 
   private:
-    template<typename T> void assign(const T& item) noexcept;
+    template <typename T> void assign(const T &item) noexcept;
     block_info_t(std::string_view key) noexcept;
     block_info_t(const proto::BlockInfo &block) noexcept;
 

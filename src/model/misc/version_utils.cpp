@@ -32,7 +32,7 @@ version_relation_t compare(const proto::Vector &lhs, const proto::Vector &rhs) n
         case version_relation_t::conflict:
             return version_relation_t::conflict;
         default:
-            if (i == (lhs_sz -1) && (i == (rhs_sz - 1))) {
+            if (i == (lhs_sz - 1) && (i == (rhs_sz - 1))) {
                 return r;
             } else {
                 return version_relation_t::conflict;

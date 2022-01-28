@@ -49,7 +49,9 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
     }
 };
 
-struct peer_supervisor_t : public ra::supervisor_asio_t, private model::diff::cluster_visitor_t, private model::diff::contact_visitor_t {
+struct peer_supervisor_t : public ra::supervisor_asio_t,
+                           private model::diff::cluster_visitor_t,
+                           private model::diff::contact_visitor_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = peer_supervisor_config_t;
     template <typename Actor> using config_builder_t = peer_supervisor_config_builder_t<Actor>;
@@ -63,13 +65,13 @@ struct peer_supervisor_t : public ra::supervisor_asio_t, private model::diff::cl
     using id2addr_t = std::map<std::string, r::address_ptr_t>;
     using addr2id_t = std::map<r::address_ptr_t, std::string>;
 
-    void on_model_update(model::message::model_update_t& ) noexcept;
-    void on_contact_update(model::message::contact_update_t& ) noexcept;
+    void on_model_update(model::message::model_update_t &) noexcept;
+    void on_contact_update(model::message::contact_update_t &) noexcept;
 
     outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_contact_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::connect_request_t &) noexcept override;
-    
+
     model::cluster_ptr_t cluster;
     utils::logger_t log;
     r::address_ptr_t coordinator;

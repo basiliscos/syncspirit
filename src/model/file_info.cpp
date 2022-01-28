@@ -12,7 +12,8 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
 
-outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const db::FileInfo &data, const folder_info_ptr_t& folder_info_) noexcept {
+outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const db::FileInfo &data,
+                                                     const folder_info_ptr_t &folder_info_) noexcept {
     if (key.size() != data_length) {
         return make_error_code(error_code_t::invalid_file_info_key_length);
     }
@@ -33,7 +34,8 @@ outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<file_info_ptr_t> file_info_t::create(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept {
+outcome::result<file_info_ptr_t> file_info_t::create(const uuid_t &uuid, const proto::FileInfo &info_,
+                                                     const folder_info_ptr_t &folder_info_) noexcept {
     auto ptr = file_info_ptr_t();
     ptr = new file_info_t(uuid, folder_info_);
 
@@ -45,26 +47,27 @@ outcome::result<file_info_ptr_t> file_info_t::create(const uuid_t& uuid, const p
     return outcome::success(std::move(ptr));
 }
 
-file_info_t::file_info_t(std::string_view key_, const folder_info_ptr_t& folder_info_) noexcept : folder_info{folder_info_.get()} {
+file_info_t::file_info_t(std::string_view key_, const folder_info_ptr_t &folder_info_) noexcept
+    : folder_info{folder_info_.get()} {
     assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
     std::copy(key_.begin(), key_.end(), key);
 }
 
-static void fill(char* key, const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept {
+static void fill(char *key, const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept {
     key[0] = prefix;
     auto fi_key = folder_info_->get_uuid();
     std::copy(fi_key.begin(), fi_key.end(), key + 1);
     std::copy(uuid.begin(), uuid.end(), key + 1 + fi_key.size());
 }
 
-std::string file_info_t::create_key(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept {
+std::string file_info_t::create_key(const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept {
     std::string key;
     key.resize(data_length);
     fill(key.data(), uuid, folder_info_);
     return key;
 }
 
-file_info_t::file_info_t(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept
+file_info_t::file_info_t(const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept
     : folder_info{folder_info_.get()} {
     fill(key, uuid, folder_info_);
 }
@@ -81,16 +84,15 @@ file_info_t::~file_info_t() {
     }
 }
 
-std::string_view file_info_t::get_name() const noexcept {
-    return name;
-}
+std::string_view file_info_t::get_name() const noexcept { return name; }
 
 std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     assert(!blocks.empty());
     return block_size * block_index;
 }
 
-template <typename Source> outcome::result<void> file_info_t::fields_update(const Source &s, size_t block_count) noexcept {
+template <typename Source>
+outcome::result<void> file_info_t::fields_update(const Source &s, size_t block_count) noexcept {
     name = s.name();
     sequence = s.sequence();
     type = s.type();
@@ -120,20 +122,15 @@ template <typename Source> outcome::result<void> file_info_t::fields_update(cons
     return reserve_blocks(block_count);
 }
 
-auto file_info_t::fields_update(const db::FileInfo& source) noexcept -> outcome::result<void> {
+auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome::result<void> {
     return fields_update<db::FileInfo>(source, source.blocks_size());
 }
 
+std::string_view file_info_t::get_uuid() const noexcept { return std::string_view(key + 1 + uuid_length, uuid_length); }
 
-std::string_view file_info_t::get_uuid() const noexcept {
-     return std::string_view(key + 1 + uuid_length, uuid_length);
-}
+void file_info_t::set_sequence(std::int64_t value) noexcept { sequence = value; }
 
-void file_info_t::set_sequence(std::int64_t value) noexcept {
-    sequence = value;
-}
-
-template<typename T> T file_info_t::as() const noexcept {
+template <typename T> T file_info_t::as() const noexcept {
     T r;
     auto name = get_name();
     r.set_name(name.data(), name.size());
@@ -174,7 +171,6 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     assert(!include_blocks && "TODO");
     return as<proto::FileInfo>();
 }
-
 
 outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
     size_t count = 0;
@@ -218,17 +214,14 @@ bool file_info_t::is_locally_available(size_t block_index) const noexcept {
     return marks[block_index];
 }
 
+bool file_info_t::is_locally_available() const noexcept { return missing_blocks == 0; }
 
-bool file_info_t::is_locally_available() const noexcept {
-    return missing_blocks == 0;
-}
-
-void file_info_t::set_source(const file_info_ptr_t& peer_file) noexcept {
+void file_info_t::set_source(const file_info_ptr_t &peer_file) noexcept {
     if (peer_file) {
-        auto& version = peer_file->get_version();
+        auto &version = peer_file->get_version();
         auto sz = version.counters_size();
         assert(sz && "source file should have some version");
-        auto& couter = version.counters(sz - 1);
+        auto &couter = version.counters(sz - 1);
         assert(couter.id());
         auto peer = peer_file->get_folder_info()->get_device();
         source_device = peer->device_id().get_sha256();
@@ -269,9 +262,10 @@ const boost::filesystem::path &file_info_t::get_path() const noexcept {
 
 bool file_info_t::is_incomplete() const noexcept {
     if (blocks.empty()) {
-        return false;;
+        return false;
+        ;
     }
-    for(auto it = blocks.rbegin(); it != blocks.rend(); ++it) {
+    for (auto it = blocks.rbegin(); it != blocks.rend(); ++it) {
         if (!*it) {
             return true;
         }
@@ -282,7 +276,7 @@ bool file_info_t::is_incomplete() const noexcept {
 auto file_info_t::local_file() noexcept -> file_info_ptr_t {
     auto device = folder_info->get_device();
     auto cluster = folder_info->get_folder()->get_cluster();
-    auto& my_device = cluster->get_device();
+    auto &my_device = cluster->get_device();
     assert(*device != *my_device);
     auto my_folder_info = folder_info->get_folder()->get_folder_infos().by_device(my_device);
     if (!my_folder_info) {
@@ -313,7 +307,6 @@ void file_info_t::locally_unlock() noexcept { flags = flags & ~flags_t::f_local_
 void file_info_t::locally_lock() noexcept { flags |= flags_t::f_local_locked; }
 
 bool file_info_t::is_locally_locked() const noexcept { return flags & flags_t::f_local_locked; }
-
 
 void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t index) noexcept {
     assert(index < blocks.size() && "blocks should be reserve enough space");
@@ -362,11 +355,9 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
     }
 }
 
-template<> std::string_view get_index<0>(const file_info_ptr_t& item) noexcept { return item->get_uuid(); }
-template<> std::string_view get_index<1>(const file_info_ptr_t& item) noexcept { return item->get_name(); }
+template <> std::string_view get_index<0>(const file_info_ptr_t &item) noexcept { return item->get_uuid(); }
+template <> std::string_view get_index<1>(const file_info_ptr_t &item) noexcept { return item->get_name(); }
 
-file_info_ptr_t file_infos_map_t:: by_name(std::string_view name) noexcept {
-    return get<1>(name);
-}
+file_info_ptr_t file_infos_map_t::by_name(std::string_view name) noexcept { return get<1>(name); }
 
 } // namespace syncspirit::model

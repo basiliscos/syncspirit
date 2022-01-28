@@ -58,9 +58,7 @@ TRY_ANEW:
     goto TRY_ANEW;
 }
 
-void file_interator_t::reset() noexcept {
-    cluster = nullptr;
-}
+void file_interator_t::reset() noexcept { cluster = nullptr; }
 
 file_info_ptr_t file_interator_t::next() noexcept {
     auto r = file_info_ptr_t(file);

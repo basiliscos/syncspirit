@@ -4,14 +4,13 @@
 
 using namespace syncspirit::model::diff::modify;
 
-
-clone_file_t::clone_file_t(const model::file_info_t& source) noexcept:
-    file{source.as_proto(false)}, has_blocks{!source.get_blocks().empty()} {
+clone_file_t::clone_file_t(const model::file_info_t &source) noexcept
+    : file{source.as_proto(false)}, has_blocks{!source.get_blocks().empty()} {
 
     auto peer_folder_info = source.get_folder_info();
     auto folder = peer_folder_info->get_folder();
-    folder_id =  folder->get_id();
-    device_id =  folder->get_cluster()->get_device()->device_id().get_sha256();
+    folder_id = folder->get_id();
+    device_id = folder->get_cluster()->get_device()->device_id().get_sha256();
     peer_id = peer_folder_info->get_device()->device_id().get_sha256();
     assert(peer_id != device_id);
 
@@ -23,16 +22,16 @@ clone_file_t::clone_file_t(const model::file_info_t& source) noexcept:
         identical = false;
     } else if (has_blocks) {
         create_new_file = false;
-        auto& my_blocks = my_file->get_blocks();
-        auto& peer_blocks = source.get_blocks();
+        auto &my_blocks = my_file->get_blocks();
+        auto &peer_blocks = source.get_blocks();
 
         if (my_blocks.size() != peer_blocks.size()) {
             identical = false;
         } else {
             identical = true;
-            for(size_t i = 0; i < my_blocks.size(); ++i) {
-                auto& bm = my_blocks[i];
-                auto& bp = peer_blocks[i];
+            for (size_t i = 0; i < my_blocks.size(); ++i) {
+                auto &bm = my_blocks[i];
+                auto &bp = peer_blocks[i];
                 if (bm->get_hash() != bp->get_hash()) {
                     identical = false;
                     break;
@@ -43,12 +42,12 @@ clone_file_t::clone_file_t(const model::file_info_t& source) noexcept:
 }
 
 auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto& blocks_map = cluster.get_blocks();
+    auto &blocks_map = cluster.get_blocks();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_my = folder->get_folder_infos().by_device_id(device_id);
     auto folder_peer = folder->get_folder_infos().by_device_id(peer_id);
     assert(folder_peer);
-    auto& files = folder_my->get_file_infos();
+    auto &files = folder_my->get_file_infos();
     auto prev_file = file_info_ptr_t{};
     auto new_file = file_info_ptr_t{};
     uuid_t file_uuid;
@@ -81,8 +80,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
             return opt.assume_error();
         }
         new_file = std::move(opt.value());
-    }
-    else {
+    } else {
         if (create_new_file) {
             auto opt = create_file(false);
             if (!opt) {
@@ -96,9 +94,9 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
                 return opt.assume_error();
             }
             new_file = std::move(opt.value());
-            auto& blocks = prev_file->get_blocks();
-            for(size_t i = 0; i < blocks.size(); ++i) {
-                auto& b = blocks[i];
+            auto &blocks = prev_file->get_blocks();
+            for (size_t i = 0; i < blocks.size(); ++i) {
+                auto &b = blocks[i];
                 assert(b);
                 new_file->assign_block(b, i);
                 new_file->mark_local_available(i);
@@ -112,7 +110,6 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
         files.put(new_file);
     }
     return outcome::success();
-
 }
 
 auto clone_file_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {

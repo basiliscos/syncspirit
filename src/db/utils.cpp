@@ -67,13 +67,12 @@ static outcome::result<void> migrate0(model::device_ptr_t &device, transaction_t
     auto device_data = device->serialize();
 
     MDBX_val device_db_key;
-    device_db_key.iov_base = (void*) device_key.data();
+    device_db_key.iov_base = (void *)device_key.data();
     device_db_key.iov_len = device_key.size();
 
     MDBX_val device_db_value;
     device_db_value.iov_base = device_data.data();
     device_db_value.iov_len = device_data.size();
-
 
     r = mdbx_put(txn.txn, txn.dbi, &device_db_key, &device_db_value, MDBX_UPSERT);
     if (r != MDBX_SUCCESS) {
@@ -105,7 +104,6 @@ outcome::result<void> migrate(uint32_t from, model::device_ptr_t device, transac
     return outcome::success();
 }
 
-
 outcome::result<container_t> load(discr_t prefix, transaction_t &txn) noexcept {
     char prefix_val = (char)prefix;
     std::string_view prefix_mask(&prefix_val, 1);
@@ -125,13 +123,13 @@ outcome::result<container_t> load(discr_t prefix, transaction_t &txn) noexcept {
     return outcome::success(std::move(container));
 }
 
-outcome::result<void> save(const pair_t& container, transaction_t &txn) noexcept {
+outcome::result<void> save(const pair_t &container, transaction_t &txn) noexcept {
     MDBX_val key;
-    key.iov_base = (void*)container.key.data();
+    key.iov_base = (void *)container.key.data();
     key.iov_len = container.key.size();
 
     MDBX_val value;
-    value.iov_base = (void*)container.value.data();
+    value.iov_base = (void *)container.value.data();
     value.iov_len = container.value.size();
 
     auto r = mdbx_put(txn.txn, txn.dbi, &key, &value, MDBX_UPSERT);
@@ -143,7 +141,7 @@ outcome::result<void> save(const pair_t& container, transaction_t &txn) noexcept
 
 outcome::result<void> remove(std::string_view key_, transaction_t &txn) noexcept {
     MDBX_val key;
-    key.iov_base = (void*)key_.data();
+    key.iov_base = (void *)key_.data();
     key.iov_len = key_.size();
 
     auto r = mdbx_del(txn.txn, txn.dbi, &key, nullptr);

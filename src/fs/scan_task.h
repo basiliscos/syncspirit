@@ -17,10 +17,8 @@ namespace r = rotor;
 namespace bfs = boost::filesystem;
 namespace sys = boost::system;
 
-
 using scan_error_t = model::io_error_t;
 using scan_errors_t = model::io_errors_t;
-
 
 struct unchanged_meta_t {
     model::file_info_ptr_t file;
@@ -36,7 +34,7 @@ struct incomplete_t {
 
 using scan_result_t = std::variant<bool, scan_errors_t, changed_meta_t, unchanged_meta_t, incomplete_t>;
 
-struct scan_task_t: boost::intrusive_ref_counter<scan_task_t, boost::thread_unsafe_counter> {
+struct scan_task_t : boost::intrusive_ref_counter<scan_task_t, boost::thread_unsafe_counter> {
     struct file_info_t {
         model::file_info_ptr_t file;
         bool temp;
@@ -45,19 +43,19 @@ struct scan_task_t: boost::intrusive_ref_counter<scan_task_t, boost::thread_unsa
     using path_queue_t = std::list<bfs::path>;
     using files_queue_t = std::list<file_info_t>;
 
-    scan_task_t(model::cluster_ptr_t cluster, std::string_view folder_id, const config::fs_config_t& config) noexcept;
+    scan_task_t(model::cluster_ptr_t cluster, std::string_view folder_id, const config::fs_config_t &config) noexcept;
     ~scan_task_t();
 
     scan_result_t advance() noexcept;
     std::string_view get_folder_id() const noexcept;
 
   private:
-    scan_result_t advance_dir(const bfs::path& dir) noexcept;
-    scan_result_t advance_file(const file_info_t& file) noexcept;
+    scan_result_t advance_dir(const bfs::path &dir) noexcept;
+    scan_result_t advance_file(const file_info_t &file) noexcept;
 
     std::string folder_id;
     model::cluster_ptr_t cluster;
-    model::file_infos_map_t* files;
+    model::file_infos_map_t *files;
     utils::logger_t log;
     config::fs_config_t config;
 
@@ -68,4 +66,4 @@ struct scan_task_t: boost::intrusive_ref_counter<scan_task_t, boost::thread_unsa
 
 using scan_task_ptr_t = boost::intrusive_ptr<scan_task_t>;
 
-}
+} // namespace syncspirit::fs

@@ -3,7 +3,4 @@
 
 using namespace syncspirit::model::diff;
 
-auto cluster_diff_t::visit(cluster_visitor_t &) const noexcept -> outcome::result<void> {
-    return outcome::success();
-}
-
+auto cluster_diff_t::visit(cluster_visitor_t &) const noexcept -> outcome::result<void> { return outcome::success(); }

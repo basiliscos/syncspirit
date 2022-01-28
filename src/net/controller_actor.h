@@ -19,7 +19,7 @@ namespace payload {
 
 struct ready_signal_t {};
 
-}
+} // namespace payload
 
 namespace message {
 using ready_signal_t = r::message_t<payload::ready_signal_t>;
@@ -92,7 +92,6 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     };
 
   private:
-
     enum substate_t { none = 0, iterating_files, iterating_blocks };
 
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
@@ -100,12 +99,12 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     using unlink_request_ptr_t = r::intrusive_ptr_t<unlink_request_t>;
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
 
-    void on_termination(message::termination_signal_t& message) noexcept;
+    void on_termination(message::termination_signal_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_ready(message::ready_signal_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
     void on_validation(hasher::message::validation_response_t &res) noexcept;
-    void preprocess_block(model::file_block_t& block) noexcept;
+    void preprocess_block(model::file_block_t &block) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
 
@@ -121,7 +120,6 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
 
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::finish_file_t &) noexcept override;
-
 
     model::cluster_ptr_t cluster;
     model::device_ptr_t peer;

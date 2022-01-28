@@ -9,9 +9,9 @@ namespace syncspirit::model {
 
 struct cluster_t;
 
-struct file_interator_t: arc_base_t<file_interator_t> {
+struct file_interator_t : arc_base_t<file_interator_t> {
     file_interator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
-    file_interator_t(const file_interator_t&) = delete;
+    file_interator_t(const file_interator_t &) = delete;
 
     inline operator bool() noexcept { return cluster != nullptr; }
 
@@ -25,7 +25,7 @@ struct file_interator_t: arc_base_t<file_interator_t> {
     void prepare() noexcept;
 
     cluster_t *cluster;
-    folders_map_t& folders;
+    folders_map_t &folders;
     device_ptr_t peer;
     folder_info_ptr_t local_folder_info;
     it_folder_t it_folder;

@@ -14,12 +14,11 @@ namespace syncspirit {
 
 namespace model::details {
 
-template<>
-inline std::string_view get_lru_key<fs::mmaped_file_ptr_t>(const fs::mmaped_file_ptr_t& item) {
+template <> inline std::string_view get_lru_key<fs::mmaped_file_ptr_t>(const fs::mmaped_file_ptr_t &item) {
     return item->get_path().string();
 }
 
-}
+} // namespace model::details
 
 namespace fs {
 
@@ -47,8 +46,9 @@ template <typename Actor> struct file_actor_config_builder_t : r::actor_config_b
     }
 };
 
-
-struct file_actor_t : public r::actor_base_t, private model::diff::block_visitor_t, private model::diff::cluster_visitor_t {
+struct file_actor_t : public r::actor_base_t,
+                      private model::diff::block_visitor_t,
+                      private model::diff::cluster_visitor_t {
     using config_t = file_actor_config_t;
     template <typename Actor> using config_builder_t = file_actor_config_builder_t<Actor>;
 
@@ -63,8 +63,10 @@ struct file_actor_t : public r::actor_base_t, private model::diff::block_visitor
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
 
-    outcome::result<mmaped_file_ptr_t> open_file(const bfs::path& path, bool temporal, model::file_info_ptr_t info) noexcept;
-    outcome::result<mmaped_file_t::backend_t> open_file(const bfs::path& path, const bio::mapped_file_params& params) noexcept;
+    outcome::result<mmaped_file_ptr_t> open_file(const bfs::path &path, bool temporal,
+                                                 model::file_info_ptr_t info) noexcept;
+    outcome::result<mmaped_file_t::backend_t> open_file(const bfs::path &path,
+                                                        const bio::mapped_file_params &params) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::flush_file_t &) noexcept override;

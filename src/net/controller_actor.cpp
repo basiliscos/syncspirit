@@ -14,7 +14,6 @@ using namespace syncspirit;
 using namespace syncspirit::net;
 namespace bfs = boost::filesystem;
 
-
 namespace {
 namespace resource {
 r::plugin::resource_id_t peer = 0;
@@ -23,10 +22,9 @@ r::plugin::resource_id_t hash = 1;
 } // namespace
 
 controller_actor_t::controller_actor_t(config_t &config)
-    : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer},
-      peer_addr{config.peer_addr}, request_timeout{config.request_timeout},
-      request_pool{config.request_pool},
-      blocks_max_requested{config.blocks_max_requested} {
+    : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer}, peer_addr{config.peer_addr},
+      request_timeout{config.request_timeout}, request_pool{config.request_pool}, blocks_max_requested{
+                                                                                      config.blocks_max_requested} {
     log = utils::get_logger("net.controller_actor");
 }
 
@@ -85,26 +83,23 @@ void controller_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
-void controller_actor_t::on_termination(message::termination_signal_t& message) noexcept {
+void controller_actor_t::on_termination(message::termination_signal_t &message) noexcept {
     resources->release(resource::peer);
     if (resources->has(resource::peer)) {
-        auto& ee = message.payload.ee;
+        auto &ee = message.payload.ee;
         LOG_TRACE(log, "{}, on_termination reason: {}", identity, ee->message());
         do_shutdown(ee);
     }
 }
 
-void controller_actor_t::ready() noexcept {
-    send<payload::ready_signal_t>(get_address());
-}
-
+void controller_actor_t::ready() noexcept { send<payload::ready_signal_t>(get_address()); }
 
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     LOG_TRACE(log, "{}, on_ready, blocks requested = {}", identity, blocks_requested);
     bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
-                  || (state != r::state_t::OPERATIONAL)                         // wrequest pool sz = 32505856e are shutting down
-            ;
-                  //|| (!file_iterator && !block_iterator && blocks_requested)    // done
+                  || (state != r::state_t::OPERATIONAL) // wrequest pool sz = 32505856e are shutting down
+        ;
+    //|| (!file_iterator && !block_iterator && blocks_requested)    // done
 
     if (ignore) {
         return;
@@ -154,13 +149,12 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
     if (file_block.is_locally_available()) {
         auto diff = block_diff_ptr_t(new modify::clone_block_t(*target_file, *file_block.block()));
         send<model::payload::block_update_t>(coordinator, std::move(diff), this);
-    }
-    else {
+    } else {
         auto block = file_block.block();
         block->lock();
         auto sz = block->get_size();
-        LOG_TRACE(log, "{} request_block, file = {}, block index = {}, sz = {}, request pool sz = {}",
-                  identity, file->get_full_name(), file_block.block_index(), sz, request_pool);
+        LOG_TRACE(log, "{} request_block, file = {}, block index = {}, sz = {}, request pool sz = {}", identity,
+                  file->get_full_name(), file_block.block_index(), sz, request_pool);
         request<payload::block_request_t>(peer_addr, file, file_block).send(request_timeout);
         ++blocks_requested;
         request_pool -= (int64_t)sz;
@@ -178,7 +172,7 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
 void controller_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     if (message.payload.custom == this) {
         LOG_TRACE(log, "{}, on_model_update", identity);
-        auto& diff = *message.payload.diff;
+        auto &diff = *message.payload.diff;
         auto r = diff.visit(*this);
         if (!r) {
             auto ee = make_error(r.assume_error());
@@ -188,7 +182,8 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
     }
 }
 
-auto controller_actor_t::locally_unlock_file(std::string_view folder_id, std::string_view file_name) noexcept -> outcome::result<void> {
+auto controller_actor_t::locally_unlock_file(std::string_view folder_id, std::string_view file_name) noexcept
+    -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device(peer);
     auto file = folder_info->get_file_infos().by_name(file_name);
@@ -196,11 +191,11 @@ auto controller_actor_t::locally_unlock_file(std::string_view folder_id, std::st
     return outcome::success();
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::clone_file_t& diff) noexcept -> outcome::result<void> {
+auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexcept -> outcome::result<void> {
     return locally_unlock_file(diff.folder_id, diff.file.name());
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::finish_file_t& diff) noexcept -> outcome::result<void> {
+auto controller_actor_t::operator()(const model::diff::modify::finish_file_t &diff) noexcept -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(peer);
     auto file = folder_info->get_file_infos().by_name(diff.file_name);
@@ -211,11 +206,10 @@ auto controller_actor_t::operator()(const model::diff::modify::finish_file_t& di
     return outcome::success();
 }
 
-
 void controller_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
     if (message.payload.custom == this) {
         LOG_TRACE(log, "{}, on_block_update", identity);
-        auto& d = *message.payload.diff;
+        auto &d = *message.payload.diff;
         auto folder = cluster->get_folders().by_id(d.folder_id);
         auto folder_info = folder->get_folder_infos().by_device_id(d.device_id);
         auto source_file = folder_info->get_file_infos().by_name(d.file_name);
@@ -233,12 +227,11 @@ void controller_actor_t::on_block_update(model::message::block_update_t &message
     }
 }
 
-
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
     LOG_DEBUG(log, "{}, on_message (ClusterConfig)", identity);
     auto diff_opt = cluster->process(*message, *peer);
     if (!diff_opt) {
-        auto& ec = diff_opt.assume_error();
+        auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
@@ -249,7 +242,7 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
     LOG_DEBUG(log, "{}, on_message (Index)", identity);
     auto diff_opt = cluster->process(*message, *peer);
     if (!diff_opt) {
-        auto& ec = diff_opt.assume_error();
+        auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
@@ -260,7 +253,7 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
     LOG_DEBUG(log, "{}, on_message (IndexUpdate)", identity);
     auto diff_opt = cluster->process(*message, *peer);
     if (!diff_opt) {
-        auto& ec = diff_opt.assume_error();
+        auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
@@ -270,7 +263,6 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
 void controller_actor_t::on_message(proto::message::Request &message) noexcept { std::abort(); }
 
 void controller_actor_t::on_message(proto::message::DownloadProgress &message) noexcept { std::abort(); }
-
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     --blocks_requested;
@@ -313,8 +305,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
             LOG_WARN(log, "{}, check_digest, digest mismatch: {}", identity, context);
             auto ee = r::make_error(context, ec);
             do_shutdown(ee);
-        }
-        else {
+        } else {
             auto &data = block_res->payload.res.data;
             auto index = payload.block.block_index();
 

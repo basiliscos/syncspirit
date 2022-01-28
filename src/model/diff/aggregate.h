@@ -5,7 +5,7 @@
 
 namespace syncspirit::model::diff {
 
-struct aggregate_t: cluster_diff_t {
+struct aggregate_t : cluster_diff_t {
     using diffs_t = std::vector<cluster_diff_ptr_t>;
 
     template <typename T> aggregate_t(T &&diffs_) noexcept : diffs(std::forward<T>(diffs_)) {}
@@ -16,4 +16,4 @@ struct aggregate_t: cluster_diff_t {
     diffs_t diffs;
 };
 
-} // namespace syncspirit::model::diff::cluster
+} // namespace syncspirit::model::diff

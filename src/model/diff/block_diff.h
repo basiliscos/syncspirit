@@ -9,8 +9,8 @@ struct file_info_t;
 
 namespace diff {
 
-struct block_diff_t: generic_diff_t<tag::block> {
-    block_diff_t(const file_info_t& file, size_t block_index = 0) noexcept;
+struct block_diff_t : generic_diff_t<tag::block> {
+    block_diff_t(const file_info_t &file, size_t block_index = 0) noexcept;
     virtual outcome::result<void> visit(block_visitor_t &) const noexcept override;
 
     std::string file_name;
@@ -21,5 +21,5 @@ struct block_diff_t: generic_diff_t<tag::block> {
 
 using block_diff_ptr_t = boost::intrusive_ptr<block_diff_t>;
 
-}
-}
+} // namespace diff
+} // namespace syncspirit::model

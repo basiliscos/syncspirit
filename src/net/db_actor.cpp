@@ -67,7 +67,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void db_actor_t::open() noexcept {
     resources->acquire(resource::db);
-    auto& my_device = cluster->get_device();
+    auto &my_device = cluster->get_device();
     /* enable automatic size management */
     auto r = mdbx_env_set_geometry(env, 0, -1, 0, -1, -1, 0);
     if (r != MDBX_SUCCESS) {
@@ -98,7 +98,6 @@ void db_actor_t::open() noexcept {
     }
     auto version = db_ver.value();
     LOG_DEBUG(log, "got db version: {}, expected : {} ", version, db::version);
-
 
     if (!txn) {
         LOG_ERROR(log, "{}, open, cannot create transaction {}", identity, txn.error().message());
@@ -186,7 +185,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
 
 void db_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
-    auto& diff = *message.payload.diff;
+    auto &diff = *message.payload.diff;
     auto r = diff.visit(*this);
     if (!r) {
         auto ee = make_error(r.assume_error());
@@ -194,12 +193,11 @@ void db_actor_t::on_model_update(model::message::model_update_t &message) noexce
     }
 }
 
-
-auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) noexcept -> outcome::result<void>  {
+auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-    auto& folder_id = diff.item.id();
+    auto &folder_id = diff.item.id();
     auto folder = cluster->get_folders().by_id(folder_id);
     assert(folder);
     auto f_key = folder->get_key();
@@ -227,7 +225,7 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) no
     return outcome::success();
 }
 
-auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff) noexcept -> outcome::result<void>  {
+auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -256,12 +254,12 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff) noe
     return outcome::success();
 }
 
-auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff) noexcept -> outcome::result<void>  {
+auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
 
-    auto& device_id = diff.peer_id;
+    auto &device_id = diff.peer_id;
     auto device = cluster->get_devices().by_sha256(device_id);
     assert(device);
 
@@ -282,7 +280,7 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff) noex
     return outcome::success();
 }
 
-auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexcept -> outcome::result<void>  {
+auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -320,7 +318,7 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexc
     return outcome::success();
 }
 
-auto db_actor_t::operator()(const model::diff::modify::finish_file_t &diff) noexcept -> outcome::result<void>  {
+auto db_actor_t::operator()(const model::diff::modify::finish_file_t &diff) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -368,19 +366,19 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_remove_t &diff) noe
     }
     auto &txn = txn_opt.value();
 
-    for(auto& key:diff.removed_folder_infos) {
+    for (auto &key : diff.removed_folder_infos) {
         auto r = db::remove(key, txn);
         if (!r) {
             return r.assume_error();
         }
     }
-    for(auto& key:diff.removed_files) {
+    for (auto &key : diff.removed_files) {
         auto r = db::remove(key, txn);
         if (!r) {
             return r.assume_error();
         }
     }
-    for(auto& key:diff.removed_blocks) {
+    for (auto &key : diff.removed_blocks) {
         auto r = db::remove(key, txn);
         if (!r) {
             return r.assume_error();
@@ -390,7 +388,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_remove_t &diff) noe
     return outcome::success();
 }
 
-auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff) noexcept -> outcome::result<void>  {
+auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -411,8 +409,8 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff) noex
         return r.assume_error();
     }
 
-    auto& blocks_map = cluster->get_blocks();
-    for (const auto& b: diff.blocks) {
+    auto &blocks_map = cluster->get_blocks();
+    for (const auto &b : diff.blocks) {
         auto block = blocks_map.get(b.hash());
         auto key = block->get_key();
         auto data = block->serialize();
@@ -422,8 +420,8 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff) noex
         }
     }
 
-    auto& files_map = folder_info->get_file_infos();
-    for (const auto& f: diff.files) {
+    auto &files_map = folder_info->get_file_infos();
+    for (const auto &f : diff.files) {
         auto file = files_map.by_name(f.name());
         LOG_TRACE(log, "{}, saving {}, seq = {}", identity, file->get_full_name(), file->get_sequence());
         auto key = file->get_key();

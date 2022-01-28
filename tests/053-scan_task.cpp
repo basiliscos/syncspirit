@@ -15,11 +15,11 @@ TEST_CASE("scan_task", "[fs]") {
     bfs::create_directories(root_path);
     path_guard_t path_quard{root_path};
 
-    config::fs_config_t config{0 , 3600};
+    config::fs_config_t config{0, 3600};
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-    auto peer_device =  device_t::create(peer_id, "peer-device").value();
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
@@ -57,7 +57,7 @@ TEST_CASE("scan_task", "[fs]") {
             auto errs = std::get_if<io_errors_t>(&r);
             REQUIRE(errs->size() == 1);
 
-            auto& err = errs->at(0);
+            auto &err = errs->at(0);
             CHECK(err.ec);
             CHECK(err.path.string() == db_folder.path());
         }
@@ -168,13 +168,11 @@ TEST_CASE("scan_task", "[fs]") {
 
                 file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
                 folder_my->get_file_infos().put(file);
-
             }
             task = new scan_task_t(cluster, folder->get_id(), config);
             auto r = task->advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == true);
-
 
             r = task->advance();
             REQUIRE(std::get_if<changed_meta_t>(&r));
@@ -287,18 +285,20 @@ TEST_CASE("scan_task", "[fs]") {
 
             unchanged_meta_t unchanged;
             incomplete_t incomplete;
-            for(int i = 0; i < 2; ++i) {
+            for (int i = 0; i < 2; ++i) {
                 r = task.advance();
-                std::visit([&](auto&& it){
-                    using T = std::decay_t<decltype(it)>;
-                    if constexpr (std::is_same_v<T, unchanged_meta_t>) {
-                        unchanged = it;
-                    } else if constexpr (std::is_same_v<T, incomplete_t>) {
-                        incomplete = it;
-                    } else {
-                        REQUIRE((0 && "unexpected result"));
-                    }
-                }, r);
+                std::visit(
+                    [&](auto &&it) {
+                        using T = std::decay_t<decltype(it)>;
+                        if constexpr (std::is_same_v<T, unchanged_meta_t>) {
+                            unchanged = it;
+                        } else if constexpr (std::is_same_v<T, incomplete_t>) {
+                            incomplete = it;
+                        } else {
+                            REQUIRE((0 && "unexpected result"));
+                        }
+                    },
+                    r);
             }
             CHECK(unchanged.file == file_my);
             CHECK(incomplete.file);

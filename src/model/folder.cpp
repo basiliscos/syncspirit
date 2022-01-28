@@ -5,7 +5,6 @@
 #include <spdlog.h>
 #include "misc/error_code.h"
 
-
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder);
@@ -18,37 +17,33 @@ outcome::result<folder_ptr_t> folder_t::create(std::string_view key, const db::F
         return make_error_code(error_code_t::invalid_folder_prefix);
     }
 
-
     auto ptr = folder_ptr_t();
     ptr = new folder_t(key);
     ptr->assign_fields(folder);
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<folder_ptr_t> folder_t::create(const uuid_t& uuid, const db::Folder &folder) noexcept {
+outcome::result<folder_ptr_t> folder_t::create(const uuid_t &uuid, const db::Folder &folder) noexcept {
     auto ptr = folder_ptr_t();
     ptr = new folder_t(uuid);
     ptr->assign_fields(folder);
     return outcome::success(std::move(ptr));
 }
 
-folder_t::folder_t(std::string_view key_) noexcept {
-    std::copy(key_.begin(), key_.end(), key);
-}
+folder_t::folder_t(std::string_view key_) noexcept { std::copy(key_.begin(), key_.end(), key); }
 
-folder_t::folder_t(const uuid_t& uuid) noexcept {
+folder_t::folder_t(const uuid_t &uuid) noexcept {
     key[0] = prefix;
     std::copy(uuid.begin(), uuid.end(), key + 1);
 }
 
-
-void folder_t::assign_fields(const db::Folder& item) noexcept {
+void folder_t::assign_fields(const db::Folder &item) noexcept {
     id = item.id();
     label = item.label();
     path = item.path();
     folder_type = (foldet_type_t)item.folder_type();
     rescan_interval = item.rescan_interval();
-    pull_order = (pull_order_t) item.pull_order();
+    pull_order = (pull_order_t)item.pull_order();
     watched = item.watched();
     read_only = item.read_only();
     ignore_permissions = item.ignore_permissions();
@@ -56,7 +51,6 @@ void folder_t::assign_fields(const db::Folder& item) noexcept {
     disable_temp_indixes = item.disable_temp_indexes();
     paused = item.paused();
 }
-
 
 void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
 
@@ -78,7 +72,6 @@ std::string folder_t::serialize() noexcept {
     r.set_rescan_interval(rescan_interval);
     return r.SerializeAsString();
 }
-
 
 bool folder_t::is_shared_with(const model::device_t &device) const noexcept {
     return (bool)folder_infos.by_device_id(device.device_id().get_sha256());
@@ -118,12 +111,9 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
     return r;
 }
 
-template<> std::string_view get_index<0>(const folder_ptr_t& item) noexcept { return item->get_key(); }
-template<> std::string_view get_index<1>(const folder_ptr_t& item) noexcept { return item->get_id(); }
+template <> std::string_view get_index<0>(const folder_ptr_t &item) noexcept { return item->get_key(); }
+template <> std::string_view get_index<1>(const folder_ptr_t &item) noexcept { return item->get_id(); }
 
-folder_ptr_t folders_map_t::by_id(std::string_view id) const noexcept {
-    return get<1>(id);
-}
+folder_ptr_t folders_map_t::by_id(std::string_view id) const noexcept { return get<1>(id); }
 
-
-}
+} // namespace syncspirit::model

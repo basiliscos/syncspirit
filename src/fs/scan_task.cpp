@@ -3,9 +3,10 @@
 
 using namespace syncspirit::fs;
 
-scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_id_, const config::fs_config_t& config_) noexcept:
-    folder_id{folder_id_}, cluster{cluster_}, config{config_} {
-    auto& fm = cluster->get_folders();
+scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_id_,
+                         const config::fs_config_t &config_) noexcept
+    : folder_id{folder_id_}, cluster{cluster_}, config{config_} {
+    auto &fm = cluster->get_folders();
     auto folder = fm.by_id(folder_id);
     if (!folder) {
         return;
@@ -25,25 +26,19 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
     log = utils::get_logger("fs.scan");
 }
 
-scan_task_t::~scan_task_t() {
+scan_task_t::~scan_task_t() {}
 
-}
-
-
-std::string_view scan_task_t::get_folder_id() const noexcept {
-    return folder_id;
-}
+std::string_view scan_task_t::get_folder_id() const noexcept { return folder_id; }
 
 scan_result_t scan_task_t::advance() noexcept {
     if (!files_queue.empty()) {
-        auto& file = files_queue.front();
-        auto&& r = advance_file(file);
+        auto &file = files_queue.front();
+        auto &&r = advance_file(file);
         files_queue.pop_front();
         return r;
-    }
-    else if (!dirs_queue.empty()) {
-        auto& path = dirs_queue.front();
-        auto&& r = advance_dir(path);
+    } else if (!dirs_queue.empty()) {
+        auto &path = dirs_queue.front();
+        auto &&r = advance_dir(path);
         dirs_queue.pop_front();
         return r;
     }
@@ -51,15 +46,15 @@ scan_result_t scan_task_t::advance() noexcept {
     return !dirs_queue.empty();
 }
 
-scan_result_t scan_task_t::advance_dir(const bfs::path& dir) noexcept {
+scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
     sys::error_code ec;
 
     bool exists = bfs::exists(dir, ec);
     if (ec || !exists) {
-        return scan_errors_t{ scan_error_t{dir, ec}};
+        return scan_errors_t{scan_error_t{dir, ec}};
     }
 
-    auto push = [this](const bfs::path& path) noexcept {
+    auto push = [this](const bfs::path &path) noexcept {
         auto rp = relativize(path, root);
         auto file = files->by_name(rp.path.string());
         if (file) {
@@ -96,7 +91,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path& dir) noexcept {
                     LOG_DEBUG(log, "removing outdated temporally {}", child_path.string());
                     bfs::remove(child_path, ec);
                     if (ec) {
-                        errors.push_back(scan_error_t{child_path,  ec});
+                        errors.push_back(scan_error_t{child_path, ec});
                     }
                 };
 
@@ -118,7 +113,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path& dir) noexcept {
         }
     }
     if (ec) {
-        errors.push_back(scan_error_t{dir,  ec});
+        errors.push_back(scan_error_t{dir, ec});
     }
 
     if (!errors.empty()) {
@@ -138,7 +133,7 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
 
     auto sz = bfs::file_size(path, ec);
     if (ec) {
-        return scan_errors_t{ scan_error_t{path,  ec}};
+        return scan_errors_t{scan_error_t{path, ec}};
     }
 
     if (!info.temp) {
@@ -148,7 +143,7 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
 
         auto modified = bfs::last_write_time(path, ec);
         if (ec) {
-            return scan_errors_t{ scan_error_t{path, ec}};
+            return scan_errors_t{scan_error_t{path, ec}};
         }
         if (modified != file->get_modified_s()) {
             return changed_meta_t{info.file};
