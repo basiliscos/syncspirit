@@ -2,8 +2,26 @@
 #include "names.h"
 #include <cstddef>
 #include <string_view>
-#include "../db/utils.h"
-#include "../db/error_code.h"
+#include "db/prefix.h"
+#include "db/utils.h"
+#include "db/error_code.h"
+#include "model/diff/load/blocks.h"
+#include "model/diff/load/close_transaction.h"
+#include "model/diff/load/devices.h"
+#include "model/diff/load/file_infos.h"
+#include "model/diff/load/folder_infos.h"
+#include "model/diff/load/folders.h"
+#include "model/diff/load/ignored_devices.h"
+#include "model/diff/load/ignored_folders.h"
+#include "model/diff/load/load_cluster.h"
+#include "model/diff/modify/create_folder.h"
+#include "model/diff/modify/clone_file.h"
+#include "model/diff/modify/finish_file.h"
+#include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/update_peer.h"
+#include "model/diff/peer/cluster_remove.h"
+#include "model/diff/peer/update_folder.h"
+#include "model/diff/cluster_visitor.h"
 
 namespace syncspirit::net {
 
@@ -11,15 +29,14 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t db = 0;
 }
-
 } // namespace
 
 db_actor_t::db_actor_t(config_t &config)
-    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, device{config.device}, generator(rd()) {
+    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, cluster{config.cluster} {
     log = utils::get_logger("net.db");
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
-        LOG_CRITICAL(log, "{}, mbdx environment creation error ({}): {}", r, mdbx_strerror(r), names::db);
+        LOG_CRITICAL(log, "{}, mbdx environment creation error ({}): {}", log->name(), r, mdbx_strerror(r));
         throw std::runtime_error(std::string(mdbx_strerror(r)));
     }
 }
@@ -32,25 +49,35 @@ db_actor_t::~db_actor_t() {
 
 void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::db, false); });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::db, get_address()); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("net::db", false); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&db_actor_t::on_model_update, coordinator);
+            }
+        });
+    });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         open();
         p.subscribe_actor(&db_actor_t::on_cluster_load);
-        p.subscribe_actor(&db_actor_t::on_store_ignored_device);
-        p.subscribe_actor(&db_actor_t::on_store_device);
-        p.subscribe_actor(&db_actor_t::on_store_ignored_folder);
-        p.subscribe_actor(&db_actor_t::on_store_new_folder);
-        p.subscribe_actor(&db_actor_t::on_store_folder);
-        p.subscribe_actor(&db_actor_t::on_store_folder_info);
-        p.subscribe_actor(&db_actor_t::on_store_file);
     });
 }
 
 void db_actor_t::open() noexcept {
     resources->acquire(resource::db);
-    auto flags = MDBX_WRITEMAP | MDBX_NOTLS | MDBX_COALESCE | MDBX_LIFORECLAIM;
-    auto r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
+    auto& my_device = cluster->get_device();
+    /* enable automatic size management */
+    auto r = mdbx_env_set_geometry(env, 0, -1, 0, -1, -1, 0);
+    if (r != MDBX_SUCCESS) {
+        LOG_ERROR(log, "{}, open, mbdx set geometry error ({}): {}", identity, r, mdbx_strerror(r));
+        resources->release(resource::db);
+        return do_shutdown(make_error(db::make_error_code(r)));
+    }
+
+    auto flags = MDBX_WRITEMAP | MDBX_COALESCE | MDBX_LIFORECLAIM | MDBX_EXCLUSIVE | MDBX_NOTLS;
+    r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
     if (r != MDBX_SUCCESS) {
         LOG_ERROR(log, "{}, open, mbdx open environment error ({}): {}", identity, r, mdbx_strerror(r));
         resources->release(resource::db);
@@ -72,14 +99,15 @@ void db_actor_t::open() noexcept {
     auto version = db_ver.value();
     LOG_DEBUG(log, "got db version: {}, expected : {} ", version, db::version);
 
-    txn = db::make_transaction(db::transaction_type_t::RW, env);
+
     if (!txn) {
         LOG_ERROR(log, "{}, open, cannot create transaction {}", identity, txn.error().message());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
     if (db_ver.value() != db::version) {
-        auto r = db::migrate(version, device, txn.value());
+        txn = db::make_transaction(db::transaction_type_t::RW, txn.value());
+        auto r = db::migrate(version, my_device, txn.value());
         if (!r) {
             LOG_ERROR(log, "{}, open, cannot migrate db {}", identity, r.error().message());
             resources->release(resource::db);
@@ -95,446 +123,318 @@ void db_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
 }
 
-void db_actor_t::on_cluster_load(message::load_cluster_request_t &message) noexcept {
+void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {
+    LOG_TRACE(log, "{}, on_cluster_load", identity);
+    using namespace model::diff;
+    using container_t = aggregate_t::diffs_t;
+
     auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn_opt) {
-        return reply_with_error(message, make_error(txn_opt.error()));
+        return reply_with_error(request, make_error(txn_opt.error()));
     }
     auto &txn = txn_opt.value();
 
-    auto devices_opt = db::load_devices(txn);
+    auto devices_opt = db::load(db::prefix::device, txn);
     if (!devices_opt) {
-        return reply_with_error(message, make_error(devices_opt.error()));
+        return reply_with_error(request, make_error(devices_opt.error()));
     }
 
-    bool local_fix = false;
-    auto &devices = devices_opt.value();
-    for (auto &it : devices) {
-        auto &d = it.second;
-        if (d->get_id() == device->get_id()) {
-            local_fix = true;
-            device->set_db_key(d->get_db_key());
-            devices.remove(d);
-            devices.put(device);
-            break;
-        }
-    }
-    if (!local_fix) {
-        auto ec = db::make_error_code(db::error_code::local_device_not_found);
-        return reply_with_error(message, make_error(ec));
-    }
-
-    auto blocks_opt = db::load_block_infos(txn);
+    auto blocks_opt = db::load(db::prefix::block_info, txn);
     if (!blocks_opt) {
-        return reply_with_error(message, make_error(blocks_opt.error()));
+        return reply_with_error(request, make_error(blocks_opt.error()));
     }
-    auto &blocks = blocks_opt.value();
-    LOG_TRACE(log, "{}, on_cluster_load, blocks count =  {}", identity, blocks.size());
 
-    auto ignored_devices_opt = db::load_ignored_devices(txn);
+    auto ignored_devices_opt = db::load(db::prefix::ignored_device, txn);
     if (!ignored_devices_opt) {
-        return reply_with_error(message, make_error(ignored_devices_opt.error()));
+        return reply_with_error(request, make_error(ignored_devices_opt.error()));
     }
-    auto &ignored_devices = ignored_devices_opt.value();
 
-    auto ignored_folders_opt = db::load_ignored_folders(txn);
+    auto ignored_folders_opt = db::load(db::prefix::ignored_folder, txn);
     if (!ignored_folders_opt) {
-        return reply_with_error(message, make_error(ignored_folders_opt.error()));
+        return reply_with_error(request, make_error(ignored_folders_opt.error()));
     }
-    auto &ignored_folders = ignored_folders_opt.value();
 
-    auto folders_opt = db::load_folders(txn_opt.value());
+    auto folders_opt = db::load(db::prefix::folder, txn);
     if (!folders_opt) {
-        return reply_with_error(message, make_error(folders_opt.error()));
+        return reply_with_error(request, make_error(folders_opt.error()));
     }
-    auto &folders = folders_opt.value();
 
-    auto folder_infos_opt = db::load_folder_infos(devices, folders, txn);
+    auto folder_infos_opt = db::load(db::prefix::folder_info, txn);
     if (!folder_infos_opt) {
-        return reply_with_error(message, make_error(folder_infos_opt.error()));
-    }
-    auto &folder_infos = folder_infos_opt.value();
-
-    /* should be assigned earlier before file_infos are loaded */
-    auto cluster = model::cluster_ptr_t(new model::cluster_t(device));
-    cluster->assign_folders(folders);
-    cluster->assign_blocks(std::move(blocks));
-
-    for (auto &it : folder_infos) {
-        auto &fi = it.second;
-        auto folder = fi->get_folder();
-        LOG_TRACE(log, "{}, on_cluster_load: {} on {}, idx = {},  max seq = {}", identity, folder->label(),
-                  fi->get_device()->device_id, fi->get_index(), fi->get_max_sequence());
-        folder->add(fi);
+        return reply_with_error(request, make_error(folder_infos_opt.error()));
     }
 
-    for (auto &it : folders) {
-        auto &folder_infos_map = it.second->get_folder_infos();
-        auto file_infos_opt = db::load_file_infos(folder_infos_map, txn);
-        if (!file_infos_opt) {
-            return reply_with_error(message, make_error(file_infos_opt.error()));
-        }
-        auto &file_infos = file_infos_opt.value();
-
-        // correctly link
-        for (auto &it : file_infos) {
-            auto &fi = it.second;
-            auto folder_info = fi->get_folder_info();
-            LOG_TRACE(log, "{}, on_cluster_load {}:{}:{} (seq = {}, blocks = {})", identity,
-                      folder_info->get_folder()->label(), folder_info->get_device()->device_id.get_short(),
-                      fi->get_name(), fi->get_sequence(), fi->get_blocks().size());
-            folder_info->add(fi);
-        }
+    auto file_infos_opt = db::load(db::prefix::file_info, txn);
+    if (!file_infos_opt) {
+        return reply_with_error(request, make_error(file_infos_opt.error()));
     }
 
-    if (auto my_d = devices.by_id(device->get_id()); !my_d) {
-        devices.put(device);
-    }
+    container_t container;
+    container.emplace_back(new load::devices_t(std::move(devices_opt.value())));
+    container.emplace_back(new load::blocks_t(std::move(blocks_opt.value())));
+    container.emplace_back(new load::ignored_devices_t(std::move(ignored_devices_opt.value())));
+    container.emplace_back(new load::ignored_folders_t(std::move(ignored_folders_opt.value())));
+    container.emplace_back(new load::folders_t(std::move(folders_opt.value())));
+    container.emplace_back(new load::folder_infos_t(std::move(folder_infos_opt.value())));
+    container.emplace_back(new load::file_infos_t(std::move(file_infos_opt.value())));
+    container.emplace_back(new load::close_transaction_t(std::move(txn)));
 
-    blocks = cluster->get_blocks();
-    size_t orphaned_blocks = 0;
-    for (auto &it : blocks) {
-        if (!it.second->usages()) {
-            ++orphaned_blocks;
-        }
-    }
-    if (orphaned_blocks) {
-        LOG_WARN(log, "{}, {} orphaned blocks has been detected", identity, orphaned_blocks);
-    }
+    cluster_diff_ptr_t r = cluster_diff_ptr_t(new load::load_cluster_t(std::move(container)));
 
-    reply_to(message, std::move(cluster), std::move(devices), std::move(ignored_devices), std::move(ignored_folders));
+    reply_to(request, r);
 }
 
-void db_actor_t::on_store_ignored_device(message::store_ignored_device_request_t &message) noexcept {
+void db_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_model_update", identity);
+    auto& diff = *message.payload.diff;
+    auto r = diff.visit(*this);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+}
+
+
+auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) noexcept -> outcome::result<void>  {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+    auto& folder_id = diff.item.id();
+    auto folder = cluster->get_folders().by_id(folder_id);
+    assert(folder);
+    auto f_key = folder->get_key();
+    auto f_data = folder->serialize();
+
     auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
     if (!txn_opt) {
-        return reply_with_error(message, make_error(txn_opt.error()));
+        return txn_opt.assume_error();
     }
     auto &txn = txn_opt.value();
-    auto &peer_device = message.payload.request_payload.device;
-    auto r = db::store_ignored_device(peer_device, txn);
+
+    auto r = db::save({f_key, f_data}, txn);
     if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
+        return r.assume_error();
     }
 
-    r = txn.commit();
+    auto folder_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto fi_key = folder_info->get_key();
+    auto fi_data = folder_info->serialize();
+    r = db::save({fi_key, fi_data}, txn);
     if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
+        return r.assume_error();
     }
 
-    reply_to(message);
-}
-
-void db_actor_t::on_store_device(message::store_device_request_t &message) noexcept {
-    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
-    if (!txn_opt) {
-        return reply_with_error(message, make_error(txn_opt.error()));
-    }
-    auto &txn = txn_opt.value();
-    auto &peer_device = message.payload.request_payload.device;
-    auto r = db::store_device(peer_device, txn);
-    if (!r) {
-        reply_with_error(message, make_error(r.assume_error()));
-        return;
-    }
-
-    r = txn.commit();
-    if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
-    }
-
-    reply_to(message);
-}
-
-void db_actor_t::on_store_ignored_folder(message::store_ignored_folder_request_t &message) noexcept {
-    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
-    if (!txn_opt) {
-        return reply_with_error(message, make_error(txn_opt.error()));
-    }
-    auto &txn = txn_opt.value();
-    auto &folder = message.payload.request_payload.folder;
-    auto r = db::store_ignored_folder(folder, txn);
-    if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
-    }
-
-    r = txn.commit();
-    if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
-    }
-
-    reply_to(message);
-}
-
-void db_actor_t::on_store_new_folder(message::store_new_folder_request_t &message) noexcept {
-    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
-    if (!txn_opt) {
-        return reply_with_error(message, make_error(txn_opt.error()));
-    }
-    auto &txn = txn_opt.value();
-    auto &db_folder = message.payload.request_payload.folder;
-    auto folder = model::folder_ptr_t(new model::folder_t(db_folder));
-
-    auto r = db::store_folder(folder, txn);
-    if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
-    }
-
-    // local
-    auto key_option = txn.next_sequence();
-    if (!key_option) {
-        reply_with_error(message, make_error(key_option.error()));
-        return;
-    }
-    auto key_local = key_option.value();
-    db::FolderInfo db_fi_local;
-    db_fi_local.set_index_id(distribution(generator));
-    db_fi_local.set_max_sequence(0);
-    auto src_local = device.get();
-    auto fi_local = model::folder_info_ptr_t(new model::folder_info_t(db_fi_local, src_local, folder.get(), key_local));
-
-    r = db::store_folder_info(fi_local, txn);
-    if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
-    }
-
-    // remote
-    auto fi_source = model::folder_info_ptr_t{};
-    auto &src_index = message.payload.request_payload.source_index;
-    auto &source = message.payload.request_payload.source;
-    if (src_index) {
-        assert(source);
-        db::FolderInfo db_fi_source;
-        db_fi_source.set_index_id(src_index);
-        db_fi_source.set_max_sequence(0); // always start afresh
-        auto src = message.payload.request_payload.source.get();
-
-        key_option = txn.next_sequence();
-        if (!key_option) {
-            reply_with_error(message, make_error(key_option.error()));
-            return;
-        }
-        auto key_source = key_option.value();
-        fi_source = model::folder_info_ptr_t(new model::folder_info_t(db_fi_source, src, folder.get(), key_source));
-
-        r = db::store_folder_info(fi_source, txn);
-        if (!r) {
-            reply_with_error(message, make_error(r.error()));
-            return;
-        }
-    }
-
-    r = txn.commit();
-    if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
-    }
-
-    folder->add(fi_local);
-    if (fi_source) {
-        folder->add(fi_source);
-    }
-
-    auto &cluster = message.payload.request_payload.cluster;
-    auto &folders = cluster->get_folders();
-    folders.put(folder);
-    folder->assign_cluster(cluster.get());
-    folder->assign_device(device);
-
-    reply_to(message, std::move(folder));
-}
-
-void db_actor_t::on_store_folder(message::store_folder_request_t &message) noexcept {
-    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
-    if (!txn_opt) {
-        return reply_with_error(message, make_error(txn_opt.error()));
-    }
-    auto &txn = txn_opt.value();
-    auto &folder = message.payload.request_payload.folder;
-    auto r = db::store_folder(folder, txn);
-    if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
-    }
-    folder->unmark_dirty();
-
-    for (auto &it : folder->get_folder_infos()) {
-        auto &fi = it.second;
-        if (!fi->is_dirty()) {
-            continue;
-        }
-        r = db::store_folder_info(fi, txn);
-        LOG_TRACE(log, "{}, on_store_folder folder_info = {} max seq = {}", identity, fi->get_db_key(),
-                  fi->get_max_sequence());
-        if (!r) {
-            reply_with_error(message, make_error(r.error()));
-            return;
-        }
-        fi->unmark_dirty();
-        folder->add(fi);
-    }
-
-    for (auto &it : folder->get_folder_infos()) {
-        auto &fi = it.second;
-        if (!fi->is_dirty()) {
-            continue;
-        }
-        auto r = save(txn, fi);
-        if (!r) {
-            reply_with_error(message, make_error(r.error()));
-            return;
-        }
-    }
-
-    r = txn.commit();
-    if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
-    }
-
-    reply_to(message);
-}
-
-outcome::result<void> db_actor_t::save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept {
-    auto r = db::store_folder_info(folder_info, txn);
-    if (!r) {
-        return r;
-    }
-
-    auto &folder = *folder_info->get_folder();
-    auto &cluster = *folder.get_cluster();
-    auto &blocks_map = cluster.get_blocks();
-    auto file_infos = model::file_infos_map_t();
-    for (auto &it : folder_info->get_file_infos()) {
-        auto &fi = it.second;
-        if (!fi->is_dirty()) {
-            continue;
-        }
-
-        for (auto &block : fi->get_blocks()) {
-            if (!block->is_dirty()) {
-                continue;
-            }
-            r = db::store_block_info(block, txn);
-            if (!r) {
-                return r;
-            }
-            block->unmark_dirty();
-            blocks_map.put(block);
-        }
-
-        r = db::store_file_info(it.second, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-        fi->unmark_dirty();
-        file_infos.put(fi);
-    }
-
-    auto &native_file_infos = folder_info->get_file_infos();
-    for (auto it : file_infos) {
-        native_file_infos.put(it.second);
-    }
-
-    auto &deleted_blocks_map = cluster.get_deleted_blocks();
-    r = db::remove(deleted_blocks_map, txn);
-    if (!r) {
-        return r;
-    }
-    deleted_blocks_map.clear();
-
-    folder.get_folder_infos().put(folder_info);
     return outcome::success();
 }
 
-void db_actor_t::on_store_folder_info(message::store_folder_info_request_t &message) noexcept {
-    auto &fi = message.payload.request_payload.folder_info;
-    LOG_TRACE(log, "{}, on_store_folder_info folder_info = {}", identity, fi->get_db_key());
-    if (!fi->is_dirty()) {
-        LOG_WARN(log, "{}, folder_info = {}  (from {}) is not dirty, no need to save", identity, fi->get_db_key(),
-                 fi->get_folder()->label());
-        reply_to(message);
-        return;
+auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff) noexcept -> outcome::result<void>  {
+    if (cluster->is_tainted()) {
+        return outcome::success();
     }
+
+    auto peer = cluster->get_devices().by_sha256(diff.peer_id);
+    assert(peer);
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    assert(folder);
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
     if (!txn_opt) {
-        return reply_with_error(message, make_error(txn_opt.error()));
+        return txn_opt.assume_error();
     }
     auto &txn = txn_opt.value();
-    auto r = save(txn, fi);
+
+    auto folder_info = folder->get_folder_infos().by_device(peer);
+    assert(folder_info);
+
+    auto fi_key = folder_info->get_key();
+    auto fi_data = folder_info->serialize();
+    auto r = db::save({fi_key, fi_data}, txn);
     if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
+        return r.assume_error();
     }
 
-    r = txn.commit();
-    if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
-    }
-
-    fi->unmark_dirty();
-    reply_to(message);
+    return outcome::success();
 }
 
-void db_actor_t::on_store_file(message::store_file_request_t &message) noexcept {
-    auto &file = message.payload.request_payload.file;
-    LOG_TRACE(log, "{}, on_store_file file = {}", identity, file->get_full_name());
-    assert(file->is_dirty() && "file should be marked dirty");
+auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff) noexcept -> outcome::result<void>  {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto& device_id = diff.peer_id;
+    auto device = cluster->get_devices().by_sha256(device_id);
+    assert(device);
+
+    auto key = device->get_key();
+    auto data = device->serialize();
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
     if (!txn_opt) {
-        return reply_with_error(message, make_error(txn_opt.error()));
+        return txn_opt.assume_error();
     }
     auto &txn = txn_opt.value();
 
-    auto r = db::store_file_info(file, txn);
+    auto r = db::save({key, data}, txn);
     if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
+        return r.assume_error();
     }
-    file->unmark_dirty();
 
-    auto folder_info = file->get_folder_info();
-    if (folder_info->is_dirty()) {
-        auto fi = model::folder_info_ptr_t(folder_info);
-        r = db::store_folder_info(fi, txn);
+    return outcome::success();
+}
+
+auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexcept -> outcome::result<void>  {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto file = file_info->get_file_infos().by_name(diff.file.name());
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = txn_opt.value();
+
+    {
+        auto key = file->get_key();
+        auto data = file->serialize();
+        auto r = db::save({key, data}, txn);
         if (!r) {
-            reply_with_error(message, make_error(r.error()));
-            return;
+            return r.assume_error();
         }
-        fi->unmark_dirty();
     }
 
-    auto &folder = *folder_info->get_folder();
-    auto &cluster = *folder.get_cluster();
-    auto &deleted_blocks_map = cluster.get_deleted_blocks();
-    r = db::remove(deleted_blocks_map, txn);
+    bool save_fi = diff.identical || diff.create_new_file;
+    if (save_fi) {
+        auto key = file_info->get_key();
+        auto data = file_info->serialize();
+
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    return outcome::success();
+}
+
+auto db_actor_t::operator()(const model::diff::modify::finish_file_t &diff) noexcept -> outcome::result<void>  {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto file = file_info->get_file_infos().by_name(diff.file_name);
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = txn_opt.value();
+
+    {
+        auto key = file->get_key();
+        auto data = file->serialize();
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    {
+        auto key = file_info->get_key();
+        auto data = file_info->serialize();
+
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    return outcome::success();
+}
+
+auto db_actor_t::operator()(const model::diff::peer::cluster_remove_t &diff) noexcept -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = txn_opt.value();
+
+    for(auto& key:diff.removed_folder_infos) {
+        auto r = db::remove(key, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+    for(auto& key:diff.removed_files) {
+        auto r = db::remove(key, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+    for(auto& key:diff.removed_blocks) {
+        auto r = db::remove(key, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    return outcome::success();
+}
+
+auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff) noexcept -> outcome::result<void>  {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto txn_opt = db::make_transaction(db::transaction_type_t::RW, env);
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = txn_opt.value();
+
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_info = folder->get_folder_infos().by_device_id(diff.peer_id);
+
+    auto fi_key = folder_info->get_key();
+    auto fi_data = folder_info->serialize();
+    auto r = db::save({fi_key, fi_data}, txn);
     if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
+        return r.assume_error();
     }
 
-    r = txn.commit();
-    if (!r) {
-        reply_with_error(message, make_error(r.error()));
-        return;
+    auto& blocks_map = cluster->get_blocks();
+    for (const auto& b: diff.blocks) {
+        auto block = blocks_map.get(b.hash());
+        auto key = block->get_key();
+        auto data = block->serialize();
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
     }
 
-    deleted_blocks_map.clear();
+    auto& files_map = folder_info->get_file_infos();
+    for (const auto& f: diff.files) {
+        auto file = files_map.by_name(f.name());
+        LOG_TRACE(log, "{}, saving {}, seq = {}", identity, file->get_full_name(), file->get_sequence());
+        auto key = file->get_key();
+        auto data = file->serialize();
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
 
-    auto &map = folder_info->get_file_infos();
-    map.put(file);
-
-    reply_to(message);
+    return outcome::success();
 }
 
 } // namespace syncspirit::net

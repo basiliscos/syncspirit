@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../config/bep.h"
-#include "../transport/stream.h"
-#include "../proto/bep_support.h"
-#include "../utils/log.h"
+#include "config/bep.h"
+#include "transport/stream.h"
+#include "proto/bep_support.h"
+#include "utils/log.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>
@@ -23,6 +23,7 @@ struct peer_actor_config_t : public r::actor_config_t {
     const utils::key_pair_t *ssl_pair;
     config::bep_config_t bep_config;
     r::address_ptr_t coordinator;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -64,6 +65,11 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         parent_t::config.sock = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+        parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct peer_actor_t : public r::actor_base_t {
@@ -73,6 +79,7 @@ struct peer_actor_t : public r::actor_base_t {
     peer_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void shutdown_start() noexcept override;
+    void shutdown_finish() noexcept override;
 
   private:
     struct confidential {
@@ -92,7 +99,7 @@ struct peer_actor_t : public r::actor_base_t {
     };
 
     using resolve_it_t = payload::address_response_t::resolve_results_t::iterator;
-    using tx_item_t = r::intrusive_ptr_t<confidential::payload::tx_item_t>;
+    using tx_item_t = model::intrusive_ptr_t<confidential::payload::tx_item_t>;
     using tx_message_t = confidential::message::tx_item_t;
     using tx_queue_t = std::list<tx_item_t>;
     using read_action_t = void (peer_actor_t::*)(proto::message::message_t &&msg);
@@ -100,13 +107,10 @@ struct peer_actor_t : public r::actor_base_t {
     using block_requests_t = std::list<block_request_ptr_t>;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
-    void on_auth(message::auth_response_t &res) noexcept;
     void on_start_reading(message::start_reading_t &) noexcept;
     void on_termination(message::termination_signal_t &) noexcept;
     void on_block_request(message::block_request_t &) noexcept;
-    void on_cluster_config(message::cluster_config_t &) noexcept;
-    void on_file_update(message::file_update_notify_t &) noexcept;
-    void on_folder_update(message::folder_update_notify_t &) noexcept;
+    void on_forward(message::forwarded_message_t &message) noexcept;
 
     void on_connect(resolve_it_t) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;
@@ -130,13 +134,13 @@ struct peer_actor_t : public r::actor_base_t {
     void reset_tx_timer() noexcept;
     void reset_rx_timer() noexcept;
     void read_hello(proto::message::message_t &&msg) noexcept;
-    void read_cluster_config(proto::message::message_t &&msg) noexcept;
     void read_controlled(proto::message::message_t &&msg) noexcept;
 
     void handle_ping(proto::message::Ping &&) noexcept;
     void handle_close(proto::message::Close &&) noexcept;
     void handle_response(proto::message::Response &&) noexcept;
 
+    model::cluster_ptr_t cluster;
     utils::logger_t log;
     std::string_view device_name;
     config::bep_config_t bep_config;

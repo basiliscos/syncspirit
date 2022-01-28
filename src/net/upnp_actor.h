@@ -1,7 +1,7 @@
 #pragma once
 
 #include "messages.h"
-#include "../utils/log.h"
+#include "utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>
 #include <optional>
@@ -13,6 +13,7 @@ struct upnp_actor_config_t : r::actor_config_t {
     utils::URI descr_url;
     std::uint32_t rx_buff_size;
     std::uint16_t external_port;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Actor> struct upnp_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -34,6 +35,12 @@ template <typename Actor> struct upnp_actor_config_builder_t : r::actor_config_b
         parent_t::config.rx_buff_size = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+        parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
 };
 
 struct upnp_actor_t : public r::actor_base_t {
@@ -51,7 +58,6 @@ struct upnp_actor_t : public r::actor_base_t {
     using unlink_request_t = r::intrusive_ptr_t<r::message::unlink_request_t>;
     using request_option_t = std::optional<r::request_id_t>;
 
-    void on_endpoint(message::endpoint_response_t &res) noexcept;
     void on_igd_description(message::http_response_t &res) noexcept;
     void on_external_ip(message::http_response_t &res) noexcept;
     void on_mapping_port(message::http_response_t &res) noexcept;
@@ -60,12 +66,12 @@ struct upnp_actor_t : public r::actor_base_t {
                       bool get_local_address = false) noexcept;
     void request_finish() noexcept;
 
+    model::cluster_ptr_t cluster;
     utils::logger_t log;
     asio::ip::address local_address;
     utils::URI main_url;
     utils::URI igd_control_url;
     r::address_ptr_t http_client;
-    r::address_ptr_t acceptor;
     r::address_ptr_t coordinator;
     r::address_ptr_t addr_description; /* for routing */
     r::address_ptr_t addr_external_ip; /* for routing */
@@ -74,7 +80,7 @@ struct upnp_actor_t : public r::actor_base_t {
     rx_buff_t rx_buff;
     std::uint32_t rx_buff_size;
     std::uint16_t external_port;
-    tcp::endpoint accepting_endpoint;
+    std::uint16_t local_port;
     asio::ip::address external_addr;
     unlink_request_t unlink_request;
     request_option_t http_request;

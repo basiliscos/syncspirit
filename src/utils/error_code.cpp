@@ -89,6 +89,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::already_shared:
         r = "folder is already shared with the peer";
         break;
+    case error_code_t::connection_impossible:
+        r = "cannot establish connection to the peer";
+        break;
     default:
         r = "unknown";
     }

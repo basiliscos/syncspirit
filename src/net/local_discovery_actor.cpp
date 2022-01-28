@@ -1,7 +1,9 @@
 #include "local_discovery_actor.h"
 #include "names.h"
-#include "../proto/bep_support.h"
-#include "../utils/error_code.h"
+#include "proto/bep_support.h"
+#include "utils/error_code.h"
+#include "model/diff/modify/update_contact.h"
+#include "model/messages.h"
 
 using namespace syncspirit::net;
 
@@ -11,15 +13,14 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t io = 0;
 r::plugin::resource_id_t timer = 1;
-r::plugin::resource_id_t req_acceptor = 2;
 } // namespace resource
 } // namespace
 
 local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, frequency{r::pt::seconds(cfg.frequency)}, device{cfg.device},
+    : r::actor_base_t{cfg}, frequency{r::pt::seconds(cfg.frequency)},
       strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, sock{strand.context()},
-      bc_endpoint(udp::v4(), cfg.port) {
-    log = utils::get_logger("net.acceptor");
+      bc_endpoint(udp::v4(), cfg.port), cluster{cfg.cluster} {
+    log = utils::get_logger("net.local_discovery");
     rx_buff.resize(BUFF_SZ);
     tx_buff.resize(BUFF_SZ);
 }
@@ -27,15 +28,7 @@ local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
 void local_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("local_discovery", false); });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        init();
-        p.subscribe_actor(&local_discovery_actor_t::on_endpoint);
-        auto timeout = shutdown_timeout / 2;
-        endpoint_request = request<payload::endpoint_request_t>(acceptor).send(timeout);
-        resources->acquire(resource::req_acceptor);
-    });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(names::acceptor, acceptor, true).link(true);
         p.discover_name(names::coordinator, coordinator, true).link(false);
     });
 }
@@ -64,25 +57,10 @@ void local_discovery_actor_t::init() noexcept {
     }
 }
 
-void local_discovery_actor_t::on_endpoint(message::endpoint_response_t &res) noexcept {
-    LOG_TRACE(log, "{}, on_endpoint", identity);
-    endpoint_request.reset();
-    resources->release(resource::req_acceptor);
-
-    auto &ee = res.payload.ee;
-    if (ee) {
-        LOG_WARN(log, "{}, on_endpoint, cannot get acceptor endpoint :: {}", identity, ee->message());
-        auto inner = utils::make_error_code(utils::error_code_t::endpoint_failed);
-        return do_shutdown(make_error(inner, ee));
-    }
-    auto &ep = res.payload.res.local_endpoint;
-    std::string my_url = fmt::format("tcp://{}:{}", ep.address().to_string(), ep.port());
-    uris.emplace_back(std::move(utils::parse(my_url).value()));
-}
-
 void local_discovery_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
     r::actor_base_t::on_start();
+    init();
     do_read();
     announce();
 }
@@ -101,17 +79,25 @@ void local_discovery_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
+
 void local_discovery_actor_t::announce() noexcept {
     static const constexpr std::uint64_t instance = 0;
     // LOG_TRACE(log, "local_discovery_actor_t::announce", (void *)address.get());
 
-    auto &digest = device->device_id.get_sha256();
-    auto sz = proto::make_announce_message(tx_buff, digest, uris, instance);
-    auto buff = asio::buffer(tx_buff.data(), sz);
-    auto fwd_send =
-        ra::forwarder_t(*this, &local_discovery_actor_t::on_write, &local_discovery_actor_t::on_write_error);
-    sock.async_send_to(buff, bc_endpoint, std::move(fwd_send));
-    resources->acquire(resource::io);
+    auto device = cluster->get_device();
+    auto& uris = device->get_uris();
+    if (!uris.empty()) {
+        auto digest = device->device_id().get_sha256();
+        auto sz = proto::make_announce_message(tx_buff, digest, uris, instance);
+        auto buff = asio::buffer(tx_buff.data(), sz);
+        auto fwd_send =
+            ra::forwarder_t(*this, &local_discovery_actor_t::on_write, &local_discovery_actor_t::on_write_error);
+        sock.async_send_to(buff, bc_endpoint, std::move(fwd_send));
+        resources->acquire(resource::io);
+        LOG_TRACE(log, "{}, announce has been sent", identity);
+    } else {
+        LOG_TRACE(log, "{}, announce() skipping", identity);
+    }
 
     timer_request = start_timer(frequency, *this, &local_discovery_actor_t::on_timer);
     resources->acquire(resource::timer);
@@ -147,7 +133,7 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
         auto &sha = msg->id();
         auto device_id = model::device_id_t::from_sha256(sha);
         if (device_id) {
-            if (device_id != device->device_id) { // skip "self" discovery via network
+            if (device_id != cluster->get_device()->device_id()) { // skip "self" discovery via network
                 utils::uri_container_t uris;
                 for (int i = 0; i < msg->addresses_size(); ++i) {
                     auto uri = utils::parse(msg->addresses(i).c_str());
@@ -160,10 +146,12 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
                     for (auto &uri : uris) {
                         LOG_TRACE(log, "{}, on_read, peer is available via {}", identity, uri.full);
                     }
-                    boost::posix_time::ptime now(boost::posix_time::microsec_clock::local_time());
-                    model::peer_contact_t contact{std::move(now), std::move(uris)};
-                    send<payload::discovery_notification_t>(coordinator, std::move(device_id.value()),
-                                                            std::move(contact), std::move(peer_endpoint));
+                    pt::ptime now(pt::microsec_clock::local_time());
+
+                    using namespace model::diff;
+                    auto diff = model::diff::contact_diff_ptr_t{};
+                    diff = new modify::update_contact_t(*cluster, device_id.value(), uris);
+                    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
                 } else {
                     LOG_WARN(log, "{}, on_read, no valid uris from: {}", identity, peer_endpoint);
                 }

@@ -34,11 +34,8 @@ TEST_CASE("parse valid announce sample", "[support]") {
     REQUIRE((bool)r);
 
     auto &o = r.value();
-    REQUIRE((bool)o);
-
-    auto &c = o.value();
-    CHECK(c.uris.size() == 9);
-    CHECK(c.uris[0].full == "quic://192.168.100.15:22000");
+    CHECK(o.size() == 9);
+    CHECK(o[0].full == "quic://192.168.100.15:22000");
 }
 
 TEST_CASE("malformed url", "[support]") {
@@ -80,6 +77,6 @@ TEST_CASE("malformed url", "[support]") {
         res.result(404);
         auto r = parse_contact(res);
         REQUIRE((bool)r);
-        CHECK(!(bool)r.value());
+        CHECK(r.value().empty());
     }
 }

@@ -1,6 +1,6 @@
 #pragma once
 #include "../utils/uri.h"
-#include "../model/upnp.h"
+#include "../model/misc/upnp.h"
 #include <fmt/fmt.h>
 #include <string>
 #include <vector>

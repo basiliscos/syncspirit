@@ -1,65 +1,72 @@
 #include "folder_info.h"
 #include "file_info.h"
 #include "cluster.h"
-#include "block_iterator.h"
+#include "misc/error_code.h"
+#include "misc/version_utils.h"
+#include "db/prefix.h"
+#include "fs/utils.h"
 #include <algorithm>
-#include <boost/mpl/pair.hpp>
 #include <spdlog/spdlog.h>
 
 namespace syncspirit::model {
 
-file_info_t::file_info_t(const db::FileInfo &info_, folder_info_t *folder_info_) noexcept : folder_info{folder_info_} {
-    db_key = generate_db_key(info_.name(), *folder_info);
-    fields_update(info_);
-    auto &blocks_map = folder_info->get_folder()->get_cluster()->get_blocks();
-    for (int i = 0; i < info_.blocks_keys_size(); ++i) {
-        auto key = info_.blocks_keys(i);
-        auto block = blocks_map.by_key(key);
-        assert(block);
-        block->link(this, i);
-        blocks.emplace_back(std::move(block));
+static const constexpr char prefix = (char)(db::prefix::file_info);
+
+outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const db::FileInfo &data, const folder_info_ptr_t& folder_info_) noexcept {
+    if (key.size() != data_length) {
+        return make_error_code(error_code_t::invalid_file_info_key_length);
     }
-    version = info_.version();
-    full_name = fmt::format("{}/{}", folder_info->get_folder()->label(), get_name());
+    if (key[0] != prefix) {
+        return make_error_code(error_code_t::invalid_file_info_prefix);
+    }
+
+    auto ptr = file_info_ptr_t();
+    ptr = new file_info_t(key, folder_info_);
+
+    auto r = ptr->fields_update(data);
+    if (!r) {
+        return r.assume_error();
+    }
+    ptr->source_device = data.source_device();
+    ptr->source_version = data.source_version();
+
+    return outcome::success(std::move(ptr));
 }
 
-file_info_t::file_info_t(const proto::FileInfo &info_, folder_info_t *folder_info_) noexcept
-    : folder_info{folder_info_} {
-    db_key = generate_db_key(info_.name(), *folder_info);
-    fields_update(info_);
-    update_blocks(info_);
-    version = info_.version();
-    mark_dirty();
-    full_name = fmt::format("{}/{}", folder_info->get_folder()->label(), get_name());
+outcome::result<file_info_ptr_t> file_info_t::create(const uuid_t& uuid, const proto::FileInfo &info_, const folder_info_ptr_t& folder_info_) noexcept {
+    auto ptr = file_info_ptr_t();
+    ptr = new file_info_t(uuid, folder_info_);
+
+    auto r = ptr->fields_update(info_, info_.blocks_size());
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return outcome::success(std::move(ptr));
 }
 
-template <typename Source> void file_info_t::fields_update(const Source &s) noexcept {
-    sequence = s.sequence();
-    type = s.type();
-    set_size(s.size());
-    permissions = s.permissions();
-    modified_s = s.modified_s();
-    modified_ns = s.modified_ns();
-    modified_by = s.modified_by();
-    deleted = s.deleted();
-    invalid = s.invalid();
-    no_permissions = s.no_permissions();
-    version = s.version();
-    block_size = s.block_size();
-    symlink_target = s.symlink_target();
+file_info_t::file_info_t(std::string_view key_, const folder_info_ptr_t& folder_info_) noexcept : folder_info{folder_info_.get()} {
+    assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
+    std::copy(key_.begin(), key_.end(), key);
 }
 
-std::string file_info_t::generate_db_key(const std::string &name, const folder_info_t &fi) noexcept {
-    std::string dbk;
-    auto fi_key = fi.get_db_key();
-    assert(fi_key);
-    dbk.resize(sizeof(fi_key) + name.size());
-    char *ptr = dbk.data();
-    auto fi_key_ptr = reinterpret_cast<char *>(&fi_key);
-    std::copy(fi_key_ptr, fi_key_ptr + sizeof(fi_key), ptr);
-    ptr += sizeof(fi_key);
-    std::copy(name.begin(), name.end(), ptr);
-    return dbk;
+static void fill(char* key, const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept {
+    key[0] = prefix;
+    auto fi_key = folder_info_->get_uuid();
+    std::copy(fi_key.begin(), fi_key.end(), key + 1);
+    std::copy(uuid.begin(), uuid.end(), key + 1 + fi_key.size());
+}
+
+std::string file_info_t::create_key(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept {
+    std::string key;
+    key.resize(data_length);
+    fill(key.data(), uuid, folder_info_);
+    return key;
+}
+
+file_info_t::file_info_t(const uuid_t& uuid, const folder_info_ptr_t& folder_info_) noexcept
+    : folder_info{folder_info_.get()} {
+    fill(key, uuid, folder_info_);
 }
 
 file_info_t::~file_info_t() {
@@ -75,13 +82,59 @@ file_info_t::~file_info_t() {
 }
 
 std::string_view file_info_t::get_name() const noexcept {
-    const char *ptr = db_key.data();
-    ptr += sizeof(std::uint64_t);
-    return std::string_view(ptr, db_key.size() - sizeof(std::uint64_t));
+    return name;
 }
 
-db::FileInfo file_info_t::serialize(bool include_blocks) noexcept {
-    db::FileInfo r;
+std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
+    assert(!blocks.empty());
+    return block_size * block_index;
+}
+
+template <typename Source> outcome::result<void> file_info_t::fields_update(const Source &s, size_t block_count) noexcept {
+    name = s.name();
+    sequence = s.sequence();
+    type = s.type();
+    set_size(s.size());
+    permissions = s.permissions();
+    modified_s = s.modified_s();
+    modified_ns = s.modified_ns();
+    modified_by = s.modified_by();
+    if (s.deleted()) {
+        flags |= flags_t::f_deleted;
+    }
+    if (s.invalid()) {
+        flags |= flags_t::f_invalid;
+    }
+    if (s.no_permissions()) {
+        flags |= flags_t::f_no_permissions;
+    }
+    version = s.version();
+    block_size = s.block_size();
+    symlink_target = s.symlink_target();
+    version = s.version();
+    full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
+    if constexpr (std::is_same_v<Source, db::FileInfo>) {
+        source_device = s.source_device();
+        source_version = s.source_version();
+    }
+    return reserve_blocks(block_count);
+}
+
+auto file_info_t::fields_update(const db::FileInfo& source) noexcept -> outcome::result<void> {
+    return fields_update<db::FileInfo>(source, source.blocks_size());
+}
+
+
+std::string_view file_info_t::get_uuid() const noexcept {
+     return std::string_view(key + 1 + uuid_length, uuid_length);
+}
+
+void file_info_t::set_sequence(std::int64_t value) noexcept {
+    sequence = value;
+}
+
+template<typename T> T file_info_t::as() const noexcept {
+    T r;
     auto name = get_name();
     r.set_name(name.data(), name.size());
     r.set_sequence(sequence);
@@ -91,281 +144,229 @@ db::FileInfo file_info_t::serialize(bool include_blocks) noexcept {
     r.set_modified_s(modified_s);
     r.set_modified_ns(modified_ns);
     r.set_modified_by(modified_by);
-    r.set_deleted(deleted);
-    r.set_invalid(invalid);
-    r.set_no_permissions(no_permissions);
+    r.set_deleted(flags & f_deleted);
+    r.set_invalid(flags & f_invalid);
+    r.set_no_permissions(flags & f_no_permissions);
     *r.mutable_version() = version;
     r.set_block_size(block_size);
     r.set_symlink_target(symlink_target);
+    return r;
+}
+
+db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
+    auto r = as<db::FileInfo>();
 
     if (include_blocks) {
         for (auto &block : blocks) {
             if (!block) {
                 continue;
             }
-            auto db_key = block->get_db_key();
-            assert(db_key && "block have to be persisted first");
-            r.mutable_blocks_keys()->Add(db_key);
+            auto db_key = block->get_hash();
+            r.mutable_blocks()->Add(std::string(db_key));
         }
     }
+    r.set_source_device(source_device);
+    (*r.mutable_source_version()) = source_version;
     return r;
 }
 
-void file_info_t::update(const proto::FileInfo &remote_info) noexcept {
-    if (remote_info.sequence() > sequence) {
-        fields_update(remote_info);
-        update_blocks(remote_info);
-        mark_dirty();
-    }
+proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
+    assert(!include_blocks && "TODO");
+    return as<proto::FileInfo>();
 }
 
-bool file_info_t::update(const local_file_t &local_file) noexcept {
-    auto local_blocks = local_file.blocks;
-    bool matched = local_blocks.size() == blocks.size();
-    auto limit = std::min(local_blocks.size(), blocks.size());
-    size_t i = 0;
-    for (; i < limit; ++i) {
-        auto &lb = local_blocks[i];
-        auto &sb = blocks[i];
-        if (!(*lb == *sb)) {
-            matched = false;
-            break;
-        }
-    }
 
-    if (matched) {
-        for (auto &b : blocks) {
-            b->mark_local_available(this);
-            ++i;
+outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
+    size_t count = 0;
+    if (!block_count && !(flags & f_deleted) && !(flags & f_invalid)) {
+        if ((size < block_size) && (size >= fs::block_sizes[0])) {
+            return make_error_code(error_code_t::invalid_block_size);
+        }
+        if (size) {
+            if (!block_size) {
+                return make_error_code(error_code_t::invalid_block_size);
+            }
+            count = size / block_size;
+            if (block_size * count != size) {
+                ++count;
+            }
         }
     } else {
-        size_t j = 0;
-        if (!local_file.temp) {
-            for (auto &b : blocks) {
-                b->unlink(this, true);
-            }
-            blocks = local_blocks;
-            for (auto &b : blocks) {
-                b->link(this, j++);
-                b->mark_local_available(this);
-            }
-        } else {
-            for (j = 0; j < i; ++j) {
-                auto &b = blocks[j];
-                b->link(this, j++);
-                b->mark_local_available(this);
-            }
-            for (j = i; j < blocks.size(); ++j) {
-                blocks[j]->unlink(this, true);
-                blocks[j] = nullptr;
-            }
-            mark_incomplete();
-            matched = true;
-        }
-        mark_dirty();
+        count = block_count;
     }
-    return !matched;
+    remove_blocks();
+    blocks.resize(count);
+    marks.resize(count);
+    missing_blocks = !(flags & f_deleted) && !(flags & f_invalid) ? count : 0;
+    return outcome::success();
 }
 
-bool file_info_t::is_incomplete() const noexcept { return incomplete; }
-
-void file_info_t::mark_complete() noexcept { incomplete = false; }
-
-void file_info_t::mark_incomplete() noexcept { incomplete = true; }
-
-void file_info_t::update_blocks(const proto::FileInfo &remote_info) noexcept {
-    auto &cluster = *folder_info->get_folder()->get_cluster();
-    auto &blocks_map = cluster.get_blocks();
-
-    auto ex_blocks = block_infos_map_t();
-    for (auto &block : blocks) {
-        ex_blocks.put(block);
-    }
-
-    blocks.resize(0);
-    for (int i = 0; i < remote_info.blocks_size(); ++i) {
-        auto &b = remote_info.blocks(i);
-        auto &hash = b.hash();
-        auto block = blocks_map.by_id(hash);
-        if (!block) {
-            block = new block_info_t(b);
-            blocks_map.put(block);
-            block->link(this, i);
-        } else {
-            auto ex_block = ex_blocks.by_id(hash);
-            if (ex_block) {
-                ex_blocks.remove(ex_block);
-            } else {
-                block->link(this, i);
-            }
-        }
-        blocks.emplace_back(std::move(block));
-    }
-    auto &deleted_blocks_map = cluster.get_deleted_blocks();
-    for (auto &it : ex_blocks) {
-        remove_block(it.second, blocks_map, deleted_blocks_map, false);
-    }
-}
-
-void file_info_t::remove_block(block_info_ptr_t &block, block_infos_map_t &cluster_blocks,
-                               block_infos_map_t &deleted_blocks, bool zero_indices) noexcept {
-    if (!block) {
-        return;
-    }
-    auto indices = block->unlink(this, true);
-    if (block->is_deleted()) {
-        deleted_blocks.put(block);
-        cluster_blocks.remove(block);
-    }
-    if (zero_indices) {
-        for (auto i : indices) {
-            blocks[i] = nullptr;
-        }
-    }
-}
-
-void file_info_t::remove_blocks() noexcept {
-    auto &cluster = *folder_info->get_folder()->get_cluster();
-    auto &blocks_map = cluster.get_blocks();
-    auto &deleted_blocks_map = cluster.get_deleted_blocks();
-    for (auto &it : blocks) {
-        remove_block(it, blocks_map, deleted_blocks_map);
-    }
-    if (blocks.size()) {
-        mark_dirty();
-    }
-    blocks.clear();
-}
-
-void file_info_t::append_block(const model::block_info_ptr_t &block, size_t index) noexcept {
-    assert(index < blocks.size() && "blocks should be reserve enough space");
-    blocks[index] = block;
-    block->link(this, index);
-    mark_dirty();
-}
-
-std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
-    assert(!blocks.empty());
-    return block_size * block_index;
+std::string file_info_t::serialize(bool include_blocks) const noexcept {
+    return as_db(include_blocks).SerializeAsString();
 }
 
 void file_info_t::mark_local_available(size_t block_index) noexcept {
+    assert(block_index < blocks.size());
+    assert(!marks[block_index]);
     blocks[block_index]->mark_local_available(this);
-    mark_dirty();
+    marks[block_index] = true;
+    --missing_blocks;
 }
 
-const boost::filesystem::path &file_info_t::get_path() noexcept {
+bool file_info_t::is_locally_available(size_t block_index) const noexcept {
+    assert(block_index < blocks.size());
+    return marks[block_index];
+}
+
+
+bool file_info_t::is_locally_available() const noexcept {
+    return missing_blocks == 0;
+}
+
+void file_info_t::set_source(const file_info_ptr_t& peer_file) noexcept {
+    if (peer_file) {
+        auto& version = peer_file->get_version();
+        auto sz = version.counters_size();
+        assert(sz && "source file should have some version");
+        auto& couter = version.counters(sz - 1);
+        assert(couter.id());
+        auto peer = peer_file->get_folder_info()->get_device();
+        source_device = peer->device_id().get_sha256();
+        source_version = peer_file->get_version();
+
+    } else {
+        source_device = {};
+        source_version = {};
+    }
+}
+
+file_info_ptr_t file_info_t::get_source() const noexcept {
+    if (!source_device.empty()) {
+        auto folder = get_folder_info()->get_folder();
+        auto cluster = folder->get_cluster();
+        auto peer_folder = folder->get_folder_infos().by_device_id(source_device);
+        if (!peer_folder) {
+            return {};
+        }
+        auto peer_file = peer_folder->get_file_infos().by_name(get_name());
+        if (!peer_file) {
+            return {};
+        }
+        if (compare(peer_file->version, source_version) != version_relation_t::identity) {
+            return {};
+        }
+        return peer_file;
+    }
+    return {};
+}
+
+const boost::filesystem::path &file_info_t::get_path() const noexcept {
     if (!path) {
         path = folder_info->get_folder()->get_path() / std::string(get_name());
     }
     return path.value();
 }
 
-void file_info_t::record_update(const device_t &source) noexcept {
-    uint64_t value = version.counters_size() + 1;
-    auto &device_id = source.device_id.get_sha256();
-    uint64_t id;
-    std::copy(device_id.data(), device_id.data() + sizeof(id), reinterpret_cast<char *>(&id));
-
-    auto counter = version.add_counters();
-    counter->set_id(id);
-    counter->set_value(value);
-}
-
-bool file_info_t::is_older(const file_info_t &other) noexcept { return sequence < other.sequence; }
-
-file_info_ptr_t file_info_t::link(const device_ptr_t &target) noexcept {
-    auto fi = folder_info->get_folder()->get_folder_info(target);
-    assert(fi);
-
-    auto &full_name = get_full_name();
-    auto local_folder_info = fi->get_folder()->get_folder_info(target);
-    auto &local_file_infos = local_folder_info->get_file_infos();
-    auto local_file = local_file_infos.by_id(full_name);
-    if (local_file) {
-        assert(local_file->get_sequence() <= sequence);
-        /* is being synced */
-        bool match =
-            (local_file->get_sequence() == sequence) && (local_file->size == size) && local_file->is_incomplete();
-        if (match) {
-            local_file->locked = true;
-            auto &cluster = *folder_info->get_folder()->get_cluster();
-            auto &blocks_map = cluster.get_blocks();
-            auto &deleted_blocks_map = cluster.get_deleted_blocks();
-            auto &local_blocks = local_file->get_blocks();
-            size_t j = 0;
-            for (; j < blocks.size() && j < local_blocks.size(); ++j) {
-                auto &lb = local_blocks[j];
-                if (!lb || (*lb != *blocks[j])) {
-                    break;
-                }
-            }
-            for (; j < local_blocks.size(); ++j) {
-                local_file->remove_block(local_blocks[j], blocks_map, deleted_blocks_map);
-            }
-            local_blocks.resize(blocks.size());
-            return local_file;
+bool file_info_t::is_incomplete() const noexcept {
+    if (blocks.empty()) {
+        return false;;
+    }
+    for(auto it = blocks.rbegin(); it != blocks.rend(); ++it) {
+        if (!*it) {
+            return true;
         }
-        local_file->remove_blocks();
-        local_file_infos.remove(local_file);
     }
-    auto db = serialize(false);
-    local_file = new file_info_t(db, local_folder_info.get());
-    local_file_infos.put(local_file);
-    local_file->mark_dirty();
-    local_file->locked = true;
-    local_file->blocks.resize(blocks.size());
-    if (blocks.size()) {
-        local_file->mark_incomplete();
-    }
-    return local_file;
+    return false;
 }
 
-void file_info_t::after_sync() noexcept {
-    assert(locked);
-    locked = false;
-    if (sequence > folder_info->get_max_sequence()) {
-        folder_info->set_max_sequence(sequence);
+auto file_info_t::local_file() noexcept -> file_info_ptr_t {
+    auto device = folder_info->get_device();
+    auto cluster = folder_info->get_folder()->get_cluster();
+    auto& my_device = cluster->get_device();
+    assert(*device != *my_device);
+    auto my_folder_info = folder_info->get_folder()->get_folder_infos().by_device(my_device);
+    if (!my_folder_info) {
+        return {};
+    }
+
+    auto local_file = my_folder_info->get_file_infos().by_name(get_name());
+    if (!local_file) {
+        return {};
+    }
+
+    auto source = local_file->get_source();
+    if (source.get() == this) {
+        return local_file;
+    }
+
+    return {};
+}
+
+void file_info_t::unlock() noexcept { flags = flags & ~flags_t::f_locked; }
+
+void file_info_t::lock() noexcept { flags |= flags_t::f_locked; }
+
+bool file_info_t::is_locked() const noexcept { return flags & flags_t::f_locked; }
+
+void file_info_t::locally_unlock() noexcept { flags = flags & ~flags_t::f_local_locked; }
+
+void file_info_t::locally_lock() noexcept { flags |= flags_t::f_local_locked; }
+
+bool file_info_t::is_locally_locked() const noexcept { return flags & flags_t::f_local_locked; }
+
+
+void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t index) noexcept {
+    assert(index < blocks.size() && "blocks should be reserve enough space");
+    assert(!blocks[index]);
+    blocks[index] = block;
+    block->link(this, index);
+}
+
+void file_info_t::remove_blocks() noexcept {
+    for (auto &it : blocks) {
+        remove_block(it);
+    }
+    std::fill_n(marks.begin(), blocks.size(), false);
+    missing_blocks = blocks.size();
+}
+
+void file_info_t::remove_block(block_info_ptr_t &block) noexcept {
+    if (!block) {
+        return;
+    }
+    auto indices = block->unlink(this, true);
+    for (auto i : indices) {
+        blocks[i] = nullptr;
     }
 }
 
-void file_info_t::unlock() noexcept { locked = false; }
-
-void file_info_t::lock() noexcept { locked = true; }
-
-proto::FileInfo file_info_t::get() const noexcept {
-    proto::FileInfo r;
-    r.set_name(std::string(get_name()));
-    r.set_type(type);
-    r.set_size(size);
-    r.set_permissions(permissions);
-    r.set_modified_s(modified_s);
-    r.set_modified_ns(modified_ns);
-    r.set_modified_by(modified_by);
-    r.set_deleted(deleted);
-    r.set_invalid(invalid);
-    r.set_permissions(permissions);
-
-    auto v = r.mutable_version();
-    for (size_t i = 0; i < version.counters_size(); ++i) {
-        *v->add_counters() = version.counters(i);
+bool file_info_t::need_download(const file_info_t &other) noexcept {
+    assert(folder_info->get_device() == folder_info->get_folder()->get_cluster()->get_device().get());
+    assert(other.folder_info->get_device() != folder_info->get_folder()->get_cluster()->get_device().get());
+    assert(name == other.name);
+    if (is_locked()) {
+        return false;
     }
-    r.set_sequence(sequence);
-    r.set_size(size);
-
-    auto r_blocks = r.mutable_blocks();
-    for (size_t i = 0; i < blocks.size(); ++i) {
-        auto tb = r_blocks->Add();
-        auto &sb = blocks[i];
-        tb->set_offset(get_block_offset(i));
-        tb->set_size(sb->get_size());
-        tb->set_hash(sb->get_hash());
-        tb->set_weak_hash(sb->get_weak_hash());
+    auto r = compare(version, other.version);
+    if (r == version_relation_t::identity) {
+        return !is_locally_available();
+    } else if (r == version_relation_t::older) {
+        return true;
+    } else if (r == version_relation_t::newer) {
+        return false;
+    } else {
+        assert(r == version_relation_t::conflict);
+        auto log = utils::get_logger("model");
+        LOG_CRITICAL(log, "conflict handling is not available");
+        return false;
     }
+}
 
-    r.set_symlink_target(symlink_target);
+template<> std::string_view get_index<0>(const file_info_ptr_t& item) noexcept { return item->get_uuid(); }
+template<> std::string_view get_index<1>(const file_info_ptr_t& item) noexcept { return item->get_name(); }
 
-    return r;
+file_info_ptr_t file_infos_map_t:: by_name(std::string_view name) noexcept {
+    return get<1>(name);
 }
 
 } // namespace syncspirit::model

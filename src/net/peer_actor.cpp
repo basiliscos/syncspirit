@@ -1,9 +1,11 @@
 #include "peer_actor.h"
 #include "names.h"
-#include "../constants.h"
-#include "../utils/tls.h"
-#include "../utils/error_code.h"
-#include "../proto/bep_support.h"
+#include "constants.h"
+#include "utils/tls.h"
+#include "utils/error_code.h"
+#include "proto/bep_support.h"
+#include "model/messages.h"
+#include "model/diff/peer/peer_state.h"
 #include <boost/core/demangle.hpp>
 
 using namespace syncspirit::net;
@@ -17,12 +19,12 @@ r::plugin::resource_id_t io = 2;
 r::plugin::resource_id_t io_timer = 3;
 r::plugin::resource_id_t tx_timer = 4;
 r::plugin::resource_id_t rx_timer = 5;
-r::plugin::resource_id_t controller = 6;
+r::plugin::resource_id_t finalization = 6;
 } // namespace resource
 } // namespace
 
 peer_actor_t::peer_actor_t(config_t &config)
-    : r::actor_base_t{config}, device_name{config.device_name}, bep_config{config.bep_config},
+    : r::actor_base_t{config}, cluster{config.cluster}, device_name{config.device_name}, bep_config{config.bep_config},
       coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, uris{config.uris},
       sock(std::move(config.sock)), ssl_pair{*config.ssl_pair} {
     rx_buff.resize(config.bep_config.rx_buff_size);
@@ -61,13 +63,10 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&peer_actor_t::on_resolve);
-        p.subscribe_actor(&peer_actor_t::on_auth);
         p.subscribe_actor(&peer_actor_t::on_start_reading);
         p.subscribe_actor(&peer_actor_t::on_termination);
         p.subscribe_actor(&peer_actor_t::on_block_request);
-        p.subscribe_actor(&peer_actor_t::on_cluster_config);
-        p.subscribe_actor(&peer_actor_t::on_file_update);
-        p.subscribe_actor(&peer_actor_t::on_folder_update);
+        p.subscribe_actor(&peer_actor_t::on_forward);
         instantiate_transport();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
@@ -167,17 +166,22 @@ void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
             resources->acquire(resource::uris);
             try_next_uri();
         } else {
+            connected = false;
+            LOG_DEBUG(log, "{}, on_io_error, initiating shutdown...", identity);
             do_shutdown(make_error(ec));
         }
     } else {
         // forsing shutdown
-        if (resources->has(resource::controller)) {
-            resources->release(resource::controller);
+        if (resources->has(resource::finalization)) {
+            resources->release(resource::finalization);
         }
     }
 }
 
 void peer_actor_t::process_tx_queue() noexcept {
+    if (finished) {
+        return;
+    }
     assert(!tx_item);
     if (!tx_queue.empty() && !finished) {
         auto &item = tx_queue.front();
@@ -206,6 +210,9 @@ void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
     tx_queue.emplace_back(std::move(item));
     if (!tx_item) {
         process_tx_queue();
+    }
+    if (final) {
+        resources->acquire(resource::finalization);
     }
 }
 
@@ -265,6 +272,7 @@ void peer_actor_t::read_more() noexcept {
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     resources->acquire(resource::io);
     auto buff = asio::buffer(rx_buff.data() + rx_idx, rx_buff.size() - rx_idx);
+    LOG_TRACE(log, "{}, read_more", identity);
     transport->async_recv(buff, on_read, on_error);
 }
 
@@ -274,11 +282,10 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
     assert(tx_item);
     if (tx_item->final) {
         LOG_TRACE(log, "{}, process_tx_queue, final message has been sent, shutting down", identity);
-        if (resources->has(resource::controller)) {
-            resources->release(resource::controller);
-        } else {
-            auto ec = r::make_error_code(r::shutdown_code_t::normal);
-            do_shutdown(make_error(ec));
+        resources->release(resource::finalization);
+        if (resources->has(resource::io)) {
+            LOG_TRACE(log, "{}, cancelling transport...", identity);
+            transport->cancel();
         }
     } else {
         tx_item.reset();
@@ -290,7 +297,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     assert(read_action);
     resources->release(resource::io);
     rx_idx += bytes;
-    // log->trace("{}, on_read, {} bytes, total = {}", identity, bytes, rx_idx);
+    LOG_TRACE(log, "{}, on_read, {} bytes, total = {}", identity, bytes, rx_idx);
     auto buff = asio::buffer(rx_buff.data(), rx_idx);
     auto result = proto::parse_bep(buff);
     if (result.has_error()) {
@@ -317,7 +324,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
 
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::io_timer);
-    // log->trace("peer_actor_t::on_timer_trigger, peer = {}, cancelled = {}", peer_identity, cancelled);
+    LOG_TRACE(log, "{}, on_timer_trigger, cancelled = {}", identity, cancelled);
     if (!cancelled) {
         if (connected) {
             auto ec = r::make_error_code(r::shutdown_code_t::normal);
@@ -329,11 +336,8 @@ void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 }
 
 void peer_actor_t::shutdown_start() noexcept {
-    r::actor_base_t::shutdown_start();
+    LOG_TRACE(log, "{}, shutdown_start", identity);
     cancel_timer();
-    if (resources->has(resource::io)) {
-        transport->cancel();
-    }
     if (tx_timer_request) {
         r::actor_base_t::cancel_timer(*tx_timer_request);
     }
@@ -341,9 +345,32 @@ void peer_actor_t::shutdown_start() noexcept {
         r::actor_base_t::cancel_timer(*rx_timer_request);
     }
     if (controller) {
-        // wait termination
-        resources->acquire(resource::controller);
+        send<payload::termination_t>(controller, shutdown_reason);
     }
+
+    if (connected) {
+        fmt::memory_buffer buff;
+        proto::Close close;
+        close.set_reason(shutdown_reason->message());
+        proto::serialize(buff, close);
+        tx_queue.clear();
+        push_write(std::move(buff), true);
+    }
+
+    r::actor_base_t::shutdown_start();
+}
+
+void peer_actor_t::shutdown_finish() noexcept {
+    LOG_TRACE(log, "{}, shutdown_finish", identity);
+    for(auto& it: block_requests) {
+        auto ec = r::make_error_code(r::error_code_t::cancelled);
+        reply_with_error(*it, make_error(ec));
+    }
+    block_requests.clear();
+    if (controller) {
+        send<payload::termination_t>(controller, shutdown_reason);
+    }
+    r::actor_base_t::shutdown_finish();
 }
 
 void peer_actor_t::cancel_timer() noexcept {
@@ -353,51 +380,23 @@ void peer_actor_t::cancel_timer() noexcept {
     }
 }
 
-void peer_actor_t::on_auth(message::auth_response_t &res) noexcept {
-    auto &cluster = res.payload.res->cluster_config;
-    bool ok = (bool)cluster;
-    LOG_TRACE(log, "{}, on_auth, value = {}", identity, ok);
-    if (!ok) {
-        LOG_DEBUG(log, "{}, on_auth, peer has been rejected in authorization, disconnecting", identity);
-        auto ec = utils::make_error_code(utils::error_code_t::non_authorized);
-        return do_shutdown(make_error(ec));
-    }
-
-    /*
-    for (int i = 0; i < cluster->folders_size(); ++i) {
-        auto &f = cluster->folders(i);
-        for (auto j = 0; j < f.devices_size(); ++j) {
-            auto &d = f.devices(j);
-            log->debug(">> {}, folder {}, for device {} has index/max_seq = {}/{} ", identity, f.id(), d.id(),
-                          d.index_id(), d.max_sequence());
-        }
-    }
-    */
-
-    fmt::memory_buffer buff;
-    serialize(buff, *cluster);
-    push_write(std::move(buff), false);
-
-    read_action = &peer_actor_t::read_cluster_config;
-    read_more();
-}
-
 void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_start_reading", identity);
+    bool start = message.payload.start;
+    LOG_TRACE(log, "{}, on_start_reading, start = ", identity, start);
     controller = message.payload.controller;
-    read_action = &peer_actor_t::read_controlled;
-    read_more();
+    if (start) {
+        read_action = &peer_actor_t::read_controlled;
+        read_more();
+    }
 }
 
 void peer_actor_t::on_termination(message::termination_signal_t &message) noexcept {
-    auto reason = message.payload.ee->message();
-    LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
-    fmt::memory_buffer buff;
-    proto::Close close;
-    close.set_reason(reason);
-    proto::serialize(buff, close);
-    push_write(std::move(buff), true);
-    controller.reset();
+    if (!shutdown_reason) {
+        auto& ee = message.payload.ee;
+        auto reason = ee->message();
+        LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
+        do_shutdown(ee);
+    }
 }
 
 void peer_actor_t::on_block_request(message::block_request_t &message) noexcept {
@@ -408,7 +407,7 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     auto &file_block = p.block;
     auto &block = *file_block.block();
     req.set_id(req_id);
-    *req.mutable_folder() = file->get_folder_info()->get_folder()->id();
+    *req.mutable_folder() = file->get_folder_info()->get_folder()->get_id();
     *req.mutable_name() = file->get_name();
 
     req.set_offset(file_block.get_offset());
@@ -421,47 +420,31 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     block_requests.emplace_back(&message);
 }
 
-void peer_actor_t::on_cluster_config(message::cluster_config_t &msg) noexcept {
-    LOG_TRACE(log, "{}, on_cluster_config", identity);
+void peer_actor_t::on_forward(message::forwarded_message_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_forward", identity);
     fmt::memory_buffer buff;
-    proto::serialize(buff, *msg.payload.config);
+
+    std::visit([&](auto &&msg) {
+        proto::serialize(buff, *msg);
+    }, message.payload);
+
     push_write(std::move(buff), false);
 }
 
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
+    using namespace model::diff;
     LOG_TRACE(log, "{}, read_hello", identity);
     std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
-                LOG_TRACE(log, "{}, read_hello,  from {} ({} {})", identity, msg->device_name(), msg->client_name(),
+                LOG_TRACE(log, "{}, read_hello, from {} ({} {})", identity, msg->device_name(), msg->client_name(),
                           msg->client_version());
-                request<payload::auth_request_t>(coordinator, get_address(), peer_endpoint, peer_device_id, cert_name,
-                                                 std::move(*msg))
-                    .send(init_timeout / 2);
+                auto diff = cluster_diff_ptr_t();
+                diff = new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), true, cert_name, peer_endpoint, msg->client_name());
+                send<model::payload::model_update_t>(coordinator, std::move(diff));
             } else {
                 LOG_WARN(log, "{}, read_hello, unexpected_message", identity);
-                auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
-                do_shutdown(make_error(ec));
-            }
-        },
-        msg);
-}
-
-void peer_actor_t::read_cluster_config(proto::message::message_t &&msg) noexcept {
-    LOG_TRACE(log, "{}, read_cluster_config", identity);
-    std::visit(
-        [&](auto &&msg) {
-            using T = std::decay_t<decltype(msg)>;
-            if constexpr (std::is_same_v<T, proto::message::ClusterConfig>) {
-                proto::ClusterConfig &config = *msg;
-                auto config_ptr = payload::cluster_config_ptr_t{new proto::ClusterConfig(std::move(config))};
-                send<payload::connect_notify_t>(supervisor->get_address(), get_address(), peer_device_id,
-                                                std::move(config_ptr));
-                reset_tx_timer();
-                reset_rx_timer();
-            } else {
-                LOG_WARN(log, "{}, read_cluster_config: unexpected_message", identity);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 do_shutdown(make_error(ec));
             }
@@ -522,26 +505,30 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
     auto predicate = [id = id](const block_request_ptr_t &it) { return ((std::int32_t)it->payload.id) == id; };
     auto it = std::find_if(block_requests.begin(), block_requests.end(), predicate);
     if (it == block_requests.end()) {
-        LOG_WARN(log, "{}, response for unexpected request id {}", identity, id);
-        auto ec = utils::make_error_code(utils::bep_error_code_t::response_mismatch);
-        return do_shutdown(make_error(ec));
+        if (!shutdown_reason) {
+            LOG_WARN(log, "{}, response for unexpected request id {}", identity, id);
+            auto ec = utils::make_error_code(utils::bep_error_code_t::response_mismatch);
+            do_shutdown(make_error(ec));
+        }
     }
 
     auto error = message->code();
     auto &block_request = *it;
-    if (error) {
-        auto ec = utils::make_error_code((utils::request_error_code_t)error);
-        LOG_WARN(log, "{}, block request error: {}", identity, ec.message());
-        reply_with_error(*block_request, make_error(ec));
-    } else {
-        auto &data = message->data();
-        auto request_sz = block_request->payload.request_payload.block.block()->get_size();
-        if (data.size() != request_sz) {
-            LOG_WARN(log, "{}, got {} bytes, but requested {}", identity, data.size(), request_sz);
-            auto ec = utils::make_error_code(utils::bep_error_code_t::response_missize);
-            return do_shutdown(make_error(ec));
+    if (!shutdown_reason) {
+        if (error) {
+            auto ec = utils::make_error_code((utils::request_error_code_t)error);
+            LOG_WARN(log, "{}, block request error: {}", identity, ec.message());
+            reply_with_error(*block_request, make_error(ec));
+        } else {
+            auto &data = message->data();
+            auto request_sz = block_request->payload.request_payload.block.block()->get_size();
+            if (data.size() != request_sz) {
+                LOG_WARN(log, "{}, got {} bytes, but requested {}", identity, data.size(), request_sz);
+                auto ec = utils::make_error_code(utils::bep_error_code_t::response_missize);
+                return do_shutdown(make_error(ec));
+            }
+            reply_to(*block_request, std::move(data));
         }
-        reply_to(*block_request, std::move(data));
     }
     block_requests.erase(it);
 }
@@ -588,24 +575,4 @@ void peer_actor_t::on_rx_timeout(r::request_id_t, bool cancelled) noexcept {
         auto reason = make_error(ec);
         do_shutdown(reason);
     }
-}
-
-void peer_actor_t::on_file_update(message::file_update_notify_t &msg) noexcept {
-    auto &file = msg.payload.file;
-    LOG_TRACE(log, "{}, on_file_update, file = {}", identity, file->get_full_name());
-    proto::IndexUpdate iu;
-    iu.set_folder(file->get_folder_info()->get_folder()->id());
-    *iu.add_files() = file->get();
-    fmt::memory_buffer buff;
-    proto::serialize(buff, iu);
-    push_write(std::move(buff), false);
-}
-
-void peer_actor_t::on_folder_update(message::folder_update_notify_t &msg) noexcept {
-    auto &folder = msg.payload.folder;
-    LOG_TRACE(log, "{}, on_folder_update, folder = {}", identity, folder->label());
-    auto index = folder->generate();
-    fmt::memory_buffer buff;
-    proto::serialize(buff, index);
-    push_write(std::move(buff), false);
 }

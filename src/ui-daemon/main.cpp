@@ -38,6 +38,7 @@ int main(int argc, char **argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
     struct sigaction act;
+    memset(&act, 0, sizeof(act));
     act.sa_handler = [](int) { shutdown_flag = true; };
     if (sigaction(SIGINT, &act, nullptr) != 0) {
         spdlog::critical("cannot set signal handler");
@@ -165,12 +166,16 @@ int main(int argc, char **argv) {
         ra::system_context_ptr_t sys_context{new ra::system_context_asio_t{io_context}};
         auto strand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
+
+        auto cluster_copies = 1ul;
+
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                            .app_config(cfg)
                            .strand(strand)
                            .timeout(timeout)
                            .create_registry()
                            .guard_context(true)
+                           .cluster_copies(cluster_copies)
                            .finish();
         sup_net->start();
 
@@ -191,7 +196,7 @@ int main(int argc, char **argv) {
             hasher_ctxs.push_back(new rth::system_context_thread_t{});
             auto &ctx = hasher_ctxs.back();
             ctx->create_supervisor<hasher::hasher_supervisor_t>()
-                .timeout(timeout)
+                .timeout(timeout / 2)
                 .registry_address(sup_net->get_registry_address())
                 .index(i)
                 .finish();

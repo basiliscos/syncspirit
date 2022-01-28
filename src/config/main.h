@@ -7,7 +7,6 @@
 #include "global_announce.h"
 #include "local_announce.h"
 #include "log.h"
-#include "tui.h"
 #include "upnp.h"
 #include <boost/filesystem.hpp>
 
@@ -27,7 +26,6 @@ struct main_t {
     bep_config_t bep_config;
     dialer_config_t dialer_config;
     fs_config_t fs_config;
-    tui_config_t tui_config;
 
     std::uint32_t timeout;
     std::string device_name;

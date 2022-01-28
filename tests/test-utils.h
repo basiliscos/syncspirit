@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/filesystem.hpp>
+#include "model/device.h"
 
 namespace syncspirit::test {
 
@@ -20,7 +21,8 @@ bfs::path file_path(const char* test_file);
 std::string read_file(const char* test_file);
 std::string read_file(const bfs::path& path);
 void write_file(const bfs::path& path, std::string_view content);
-std::string device_id2sha256(const char* device_id);
+std::string device_id2sha256(std::string_view device_id);
+model::device_ptr_t make_device(std::string_view device_id, std::string_view name = "");
 std::string hash_string(const std::string_view &hash) noexcept;
 
 }

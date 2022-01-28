@@ -71,4 +71,20 @@ outcome::result<std::uint64_t> transaction_t::next_sequence() noexcept {
     return s;
 }
 
+outcome::result<transaction_t> make_transaction(transaction_type_t type, MDBX_env *env_) noexcept {
+    return transaction_t::make(type, env_);
+}
+
+outcome::result<transaction_t> make_transaction(transaction_type_t type, transaction_t& prev) noexcept {
+    assert(prev.txn);
+    auto env = mdbx_txn_env(prev.txn);
+    auto r = prev.commit();
+    if (!r) {
+        return r.assume_error();
+    }
+    return make_transaction(type, env);
+}
+
+
+
 } // namespace syncspirit::db

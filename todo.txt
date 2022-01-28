@@ -1,7 +1,10 @@
-- auto cleanup db: remove orphaned blocks
- - during new sequence receiving
+ - перезапускать gda, lda, backoff: min, max
 
-- https://docs.syncthing.net/users/faq.html#is-it-syncthing-syncthing-or-syncthing
+===================
+
+- controller: не падать, если пришла ошибка на запрос блока
+
+- https://docs.syncthing.net/users/faq.html#what-things-are-synced
 - test: validation happens before opening file?
 - model: когда добавляется symlink, папка
 - store_new_folder_request_t: выкинуть peer, peer_source?
@@ -14,6 +17,7 @@
 - inactivity-shutdowner
 - when file downloading complete, update in DB it's sequence
 - start syncing folder when new folder has been added, нужно слать cancel{}
+- backpressue on controller by file-actor?
 - Canonicalize, TempNameWithPrefix, TempName
 - локальные таймстемпы?
 - metadata (timestamp, etc.)
@@ -24,7 +28,7 @@
 - https://github.com/wheybags/glibc_version_header
 
 ./src/ui-daemon/syncspirit-daemon --log_level trace --config_dir=../  --command add_peer:zzz:KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7  --command add_folder:label=my_label:id=nagkw-srrjz:path=/tmp/syncspirit --command share:folder=my_label:device=KUEQE66
-
+- https://docs.0install.net/about/faq/
 
 3. use wxWidgets
 

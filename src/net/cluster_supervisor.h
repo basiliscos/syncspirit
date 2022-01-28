@@ -1,26 +1,26 @@
 #pragma once
 
-#include "../config/bep.h"
-#include "../model/cluster.h"
-#include "../model/folder.h"
-#include "../fs/messages.h"
-#include "../ui/messages.hpp"
-#include "../utils/log.h"
+#include "config/bep.h"
+#include "model/cluster.h"
+#include "model/folder.h"
+#include "model/messages.h"
+#include "model/diff/cluster_visitor.h"
+#include "utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 
 namespace syncspirit {
 namespace net {
 
+namespace r = rotor;
+namespace ra = r::asio;
 namespace bfs = boost::filesystem;
+namespace outcome = boost::outcome_v2;
 
 struct cluster_supervisor_config_t : ra::supervisor_config_asio_t {
     config::bep_config_t bep_config;
     std::uint32_t hasher_threads;
-    model::device_ptr_t device;
     model::cluster_ptr_t cluster;
-    model::devices_map_t *devices;
-    model::ignored_folders_map_t *ignored_folders;
 };
 
 template <typename Supervisor>
@@ -39,28 +39,14 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&device(const model::device_ptr_t &value) &&noexcept {
-        parent_t::config.device = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
     builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&devices(model::devices_map_t *value) &&noexcept {
-        parent_t::config.devices = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&ignored_folders(model::ignored_folders_map_t *value) &&noexcept {
-        parent_t::config.ignored_folders = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
 };
 
-struct cluster_supervisor_t : public ra::supervisor_asio_t {
+struct cluster_supervisor_t : public ra::supervisor_asio_t, private model::diff::cluster_visitor_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = cluster_supervisor_config_t;
     template <typename Actor> using config_builder_t = cluster_supervisor_config_builder_t<Actor>;
@@ -72,51 +58,15 @@ struct cluster_supervisor_t : public ra::supervisor_asio_t {
     void shutdown_start() noexcept override;
 
   private:
-    struct scan_info_t {
-        model::folder_ptr_t folder;
-        r::request_id_t request_id;
-    };
+    void on_model_update(model::message::model_update_t &message) noexcept;
 
-    using device2addr_map_t = std::unordered_map<std::string, r::address_ptr_t>; // device_id: controller
-    using addr2device_map_t = std::unordered_map<r::address_ptr_t, std::string>; // reverse
-    using create_folder_req_t = r::intrusive_ptr_t<ui::message::create_folder_request_t>;
-    using share_folder_req_t = r::intrusive_ptr_t<ui::message::share_folder_request_t>;
-    using scan_folders_map_t = std::unordered_map<bfs::path, scan_info_t>;
-    using scan_foders_it = typename scan_folders_map_t::iterator;
-
-    void on_create_folder(ui::message::create_folder_request_t &message) noexcept;
-    void on_share_folder(ui::message::share_folder_request_t &message) noexcept;
-    void on_update_peer(ui::message::update_peer_request_t &message) noexcept;
-    void on_connect(message::connect_notify_t &message) noexcept;
-    void on_disconnect(message::disconnect_notify_t &message) noexcept;
-    void on_store_device(message::store_device_response_t &message) noexcept;
-    void on_store_new_folder(message::store_new_folder_response_t &message) noexcept;
-    void on_store_folder_info(message::store_folder_info_response_t &message) noexcept;
-    void on_scan_complete_initial(fs::message::scan_response_t &message) noexcept;
-    void on_scan_complete_new(fs::message::scan_response_t &message) noexcept;
-    scan_foders_it on_scan_complete(fs::message::scan_response_t &message) noexcept;
-    void on_scan_error(fs::message::scan_error_t &message) noexcept;
-    void on_file_update(message::file_update_notify_t &message) noexcept;
-    void scan(const model::folder_ptr_t &folder, r::address_ptr_t &via) noexcept;
+    outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
 
     utils::logger_t log;
     r::address_ptr_t coordinator;
-    r::address_ptr_t scan_addr;
-    r::address_ptr_t db;
-    r::address_ptr_t scan_initial; // for routing
-    r::address_ptr_t scan_new;     // for routing
     config::bep_config_t bep_config;
     std::uint32_t hasher_threads;
-    model::device_ptr_t device;
     model::cluster_ptr_t cluster;
-    model::devices_map_t *devices;
-    model::folders_map_t &folders;
-    model::ignored_folders_map_t *ignored_folders;
-    device2addr_map_t device2addr_map;
-    addr2device_map_t addr2device_map;
-    create_folder_req_t create_folder_req;
-    share_folder_req_t share_folder_req;
-    scan_folders_map_t scan_folders_map;
 };
 
 } // namespace net

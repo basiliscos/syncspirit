@@ -5,7 +5,6 @@ package syncspirit.db;
 import "bep.proto";
 
 message Device {
-    bytes           id                          = 1;
     string          name                        = 2;
     repeated string addresses                   = 3;
     syncspirit.proto.Compression    compression = 4;
@@ -54,36 +53,34 @@ enum PullOrder {
 
 message FolderInfo {
     uint64 index_id     = 1;
-    uint64 device_key   = 2;
-    uint64 folder_key   = 3;
-    int64  max_sequence = 4;
+    int64  max_sequence = 2;
 }
 
 message FileInfo {
-    string       name                   = 1;
-    syncspirit.proto.FileInfoType type  = 2;
-    int64        size                   = 3;
-    uint32       permissions            = 4;
-    int64        modified_s             = 5;
-    int32        modified_ns            = 11;
-    uint64       modified_by            = 12;
-    bool         deleted                = 6;
-    bool         invalid                = 7;
-    bool         no_permissions         = 8;
-    syncspirit.proto.Vector version     = 9;
-    int64        sequence               = 10;
-    int32        block_size             = 13;
-    string       symlink_target         = 16;
-    repeated     uint64 blocks_keys     = 17;
+    string                          name           = 1;
+    syncspirit.proto.FileInfoType   type           = 2;
+    int64                           size           = 3;
+    uint32                          permissions    = 4;
+    int64                           modified_s     = 5;
+    int32                           modified_ns    = 11;
+    uint64                          modified_by    = 12;
+    bool                            deleted        = 6;
+    bool                            invalid        = 7;
+    bool                            no_permissions = 8;
+    syncspirit.proto.Vector         version        = 9;
+    int64                           sequence       = 10;
+    int32                           block_size     = 13;
+    string                          symlink_target = 16;
+    repeated                        bytes blocks   = 17;
+    syncspirit.proto.Vector         source_version = 18;
+    bytes                           source_device  = 19;
 }
 
 message IngoredFolder {
-    string  id    = 1;
-    string  label = 2;
+    string label = 1;
 }
 
 message BlockInfo {
-    bytes           hash        = 1;
-    uint32          weak_hash   = 2;
-    int32           size        = 3;
+    uint32          weak_hash   = 1;
+    int32           size        = 2;
 }

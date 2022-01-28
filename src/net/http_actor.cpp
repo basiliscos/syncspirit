@@ -8,6 +8,7 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t io = 0;
 r::plugin::resource_id_t request_timer = 1;
+r::plugin::resource_id_t resolver = 2;
 } // namespace resource
 } // namespace
 
@@ -101,6 +102,7 @@ void http_actor_t::process() noexcept {
     } else {
         auto port = std::to_string(url.port);
         resolve_request = request<payload::address_request_t>(resolver, url.host, port).send(resolve_timeout);
+        resources->acquire(resource::resolver);
     }
 }
 
@@ -111,8 +113,14 @@ void http_actor_t::spawn_timer() noexcept {
 }
 
 void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
+    resources->release(resource::resolver);
     resolve_request.reset();
     auto &ee = res.payload.ee;
+
+    if (state != r::state_t::OPERATIONAL) {
+        return;
+    }
+
     if (ee) {
         LOG_WARN(log, "{}, on_resolve error: {}", identity, ee->message());
         reply_with_error(*queue.front(), ee);

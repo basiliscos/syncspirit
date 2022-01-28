@@ -1,16 +1,13 @@
 #include "global_discovery_actor.h"
 #include "names.h"
 #include <nlohmann/json.hpp>
-#include "../proto/discovery_support.h"
-#include "../utils/beast_support.h"
-#include "../utils/error_code.h"
+#include "proto/discovery_support.h"
+#include "utils/beast_support.h"
+#include "utils/error_code.h"
 #include "http_actor.h"
+#include "model/diff/modify/update_contact.h"
 
 using namespace syncspirit::net;
-
-namespace private_names {
-const char *https = "net::gda::https";
-}
 
 namespace {
 namespace resource {
@@ -20,9 +17,9 @@ r::plugin::resource_id_t http = 1;
 } // namespace
 
 global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, endpoint{cfg.endpoint}, announce_url{cfg.announce_url},
+    : r::actor_base_t{cfg}, device_id{cfg.device_id}, announce_url{cfg.announce_url},
       dicovery_device_id{std::move(cfg.device_id)}, ssl_pair{*cfg.ssl_pair}, rx_buff_size{cfg.rx_buff_size},
-      io_timeout(cfg.io_timeout) {
+      io_timeout(cfg.io_timeout), cluster{cfg.cluster} {
     log = utils::get_logger("net.gda");
     rx_buff = std::make_shared<rx_buff_t::element_type>(rx_buff_size);
 }
@@ -32,26 +29,20 @@ void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexc
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         addr_announce = p.create_address();
         addr_discovery = p.create_address();
-        p.set_identity(names::global_discovery, false);
+        p.set_identity("net::global_discovery", false);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        auto timeout = (shutdown_timeout * 9) / 10;
-        auto io_timeout = (shutdown_timeout * 8) / 10;
-        get_supervisor()
-            .create_actor<http_actor_t>()
-            .timeout(timeout)
-            .request_timeout(io_timeout)
-            .resolve_timeout(io_timeout)
-            .registry_name(private_names::https)
-            .keep_alive(true)
-            .finish();
-
-        p.discover_name(private_names::https, http_client, true).link(true);
-        p.discover_name(names::coordinator, coordinator, false).link();
-        p.register_name(names::global_discovery, get_address());
+        p.discover_name(names::http11_gda, http_client, true).link(true);
+        p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&global_discovery_actor_t::on_contact_update, coordinator);
+                plugin->subscribe_actor(&global_discovery_actor_t::on_discovery, coordinator);
+            }
+        });
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&global_discovery_actor_t::on_discovery);
         p.subscribe_actor(&global_discovery_actor_t::on_announce_response, addr_announce);
         p.subscribe_actor(&global_discovery_actor_t::on_discovery_response, addr_discovery);
     });
@@ -66,13 +57,43 @@ void global_discovery_actor_t::on_start() noexcept {
 void global_discovery_actor_t::announce() noexcept {
     LOG_TRACE(log, "{}, announce", identity);
 
+    auto& uris = cluster->get_device()->get_uris();
+    if (uris.empty()) {
+        return;
+    }
+
+    bool has_new = false;
+    for(auto& uri: uris) {
+        if (!announced_uris.count(uri.full)) {
+            has_new = true;
+            break;
+        }
+    }
+    if (!has_new) {
+        return;
+    }
+
+    for(auto& uri: uris) {
+        announced_uris.emplace(uri.full);
+    }
+    if (log->level() <= spdlog::level::debug) {
+        std::string joint_uris;
+        for(size_t i = 0; i < uris.size(); ++i) {
+            joint_uris += uris[i].full;
+            if (i + 1 < uris.size()) {
+                joint_uris += ", ";
+            }
+        }
+        LOG_DEBUG(log, "{}, announcing accessibility via {}", identity, joint_uris);
+    }
+
     fmt::memory_buffer tx_buff;
-    auto res = proto::make_announce_request(tx_buff, announce_url, endpoint);
+    auto res = proto::make_announce_request(tx_buff, announce_url, uris);
     if (!res) {
         LOG_TRACE(log, "{}, error making announce request :: {}", identity, res.error().message());
         return do_shutdown(make_error(res.error()));
     }
-    make_request(addr_announce, res.value(), std::move(tx_buff));
+    make_request(addr_announce, res.value(), std::move(tx_buff), nullptr);
 }
 
 void global_discovery_actor_t::on_announce_response(message::http_response_t &message) noexcept {
@@ -99,6 +120,10 @@ void global_discovery_actor_t::on_announce_response(message::http_response_t &me
     auto reannounce = res.value();
     LOG_DEBUG(log, "{}, will reannounce after {} seconds", identity, reannounce);
 
+    if (resources->has(resource::timer)) {
+        cancel_timer(*timer_request);
+    }
+
     auto timeout = pt::seconds(reannounce);
     timer_request = start_timer(timeout, *this, &global_discovery_actor_t::on_timer);
     resources->acquire(resource::timer);
@@ -113,63 +138,94 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     LOG_TRACE(log, "{}, on_discovery_response", identity);
     resources->release(resource::http);
     http_request.reset();
+    auto msg = (message::discovery_notify_t*) message.payload.req->payload.request_payload->custom;
 
     auto &ee = message.payload.ee;
-    auto orig_req = discovery_queue.front();
-    discovery_queue.pop_front();
     if (ee) {
-        auto inner = utils::make_error_code(utils::error_code_t::discovery_failed);
-        return reply_with_error(*orig_req, make_error(inner, ee));
+        LOG_WARN(log, "{}, discovery faield = {}, body({}):\n {}", identity, ee->message());
     }
-
-    auto &http_res = message.payload.res->response;
-    auto res = proto::parse_contact(http_res);
-    if (!res) {
-        auto reason = res.error().message();
-        auto &body = http_res.body();
-        LOG_WARN(log, "{}, parsing discovery error = {}, body({}):\n {}", identity, reason, body.size(), body);
-        return reply_with_error(*orig_req, make_error(res.error()));
-    }
-
-#if 0
-    if (res && res.value()) {
-        auto& uris = res.value().value().uris;
-        auto& id = orig_req->payload.request_payload->device_id;
-        for(auto uri: uris) {
-            LOG_TRACE(log, "global_discovery_actor_t::on_discovery_response, {} reacheable via {}", id, uri.full);
+    else {
+        auto &http_res = message.payload.res->response;
+        auto res = proto::parse_contact(http_res);
+        if (!res) {
+            auto reason = res.error().message();
+            auto &body = http_res.body();
+            LOG_WARN(log, "{}, parsing discovery error = {}, body({}):\n {}", identity, reason, body.size(), body);
+        }
+        else {
+            auto& uris = res.value();
+            auto& device_id = msg->payload.device_id;
+            if (!uris.empty()) {
+                using namespace model::diff;
+                auto diff = model::diff::contact_diff_ptr_t{};
+                diff = new modify::update_contact_t(*cluster, device_id, uris);
+                send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+                LOG_DEBUG(log, "{}, on_discovery_response, found some URIs for {}", identity, device_id);
+            } else {
+                LOG_DEBUG(log, "{}, on_discovery_response, no known URIs for {}", identity, device_id);
+            }
         }
     }
-#endif
-    reply_to(*orig_req, std::move(res.value()));
+    if (msg) {
+        intrusive_ptr_release(msg);
+    }
 }
 
-void global_discovery_actor_t::on_discovery(message::discovery_request_t &req) noexcept {
+void global_discovery_actor_t::on_discovery(message::discovery_notify_t &req) noexcept {
     LOG_TRACE(log, "{}, on_discovery", identity);
 
+    auto& device_id = req.payload.device_id;
+    auto sha256 = std::string(device_id.get_sha256());
+    if (discovering_devices.count(sha256)) {
+        LOG_TRACE(log, "{}, device '{}' is already discovering, skip", identity, device_id.get_sha256());
+        return;
+    }
+
     fmt::memory_buffer tx_buff;
-    auto r = proto::make_discovery_request(tx_buff, announce_url, req.payload.request_payload->device_id);
+    auto r = proto::make_discovery_request(tx_buff, announce_url, req.payload.device_id);
     if (!r) {
         LOG_TRACE(log, "{}, error making discovery request :: {}", identity, r.error().message());
         return do_shutdown(make_error(r.error()));
     }
 
-    make_request(addr_discovery, r.value(), std::move(tx_buff));
-    discovery_queue.emplace_back(&req);
+    discovering_devices.emplace(std::move(sha256));
+    make_request(addr_discovery, r.value(), std::move(tx_buff), &req);
 }
+
+void global_discovery_actor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_contact_update", identity);
+    auto& diff = *message.payload.diff;
+    auto r = diff.visit(*this);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+}
+
 
 void global_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::timer);
-    if (!cancelled) {
+    announced_uris.clear();
+    if (!cancelled && (state == r::state_t::OPERATIONAL)) {
         announce();
     }
 }
 
 void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri,
-                                            fmt::memory_buffer &&tx_buff) noexcept {
+                                            fmt::memory_buffer &&tx_buff, message::discovery_notify_t *msg) noexcept {
     auto timeout = r::pt::millisec{io_timeout};
     transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true, ""};
+    const void * custom;
+    if (msg) {
+        intrusive_ptr_add_ref(msg);
+        custom = msg;
+    }
+    else {
+        custom = nullptr;
+    }
+
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
-                                                        rx_buff_size, std::move(ssl))
+                                                        rx_buff_size, std::move(ssl), custom)
                        .send(timeout);
     resources->acquire(resource::http);
 }
@@ -185,4 +241,16 @@ void global_discovery_actor_t::shutdown_start() noexcept {
         cancel_timer(*timer_request);
     }
     r::actor_base_t::shutdown_start();
+}
+
+auto global_discovery_actor_t::operator()(const model::diff::modify::update_contact_t &diff) noexcept -> outcome::result<void> {
+    if (diff.self && state == r::state_t::OPERATIONAL) {
+        auto& uris = diff.uris;
+        if (resources->has(resource::timer)) {
+            cancel_timer(*timer_request);
+        } else {
+            announce();
+        }
+    }
+    return outcome::success();
 }

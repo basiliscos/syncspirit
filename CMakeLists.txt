@@ -34,21 +34,62 @@ add_library(syncspirit_lib
     src/fs/file_actor.cpp
     src/fs/fs_supervisor.cpp
     src/fs/scan_actor.cpp
+    src/fs/scan_task.cpp
     src/fs/utils.cpp
     src/hasher/hasher_actor.cpp
     src/hasher/hasher_proxy_actor.cpp
     src/hasher/hasher_supervisor.cpp
+    src/model/diff/aggregate.cpp
+    src/model/diff/base_diff.cpp
+    src/model/diff/block_diff.cpp
+    src/model/diff/block_visitor.cpp
+    src/model/diff/contact_diff.cpp
+    src/model/diff/contact_visitor.cpp
+    src/model/diff/cluster_diff.cpp
+    src/model/diff/cluster_visitor.cpp
+    src/model/diff/load/blocks.cpp
+    src/model/diff/load/close_transaction.cpp
+    src/model/diff/load/devices.cpp
+    src/model/diff/load/file_infos.cpp
+    src/model/diff/load/folder_infos.cpp
+    src/model/diff/load/folders.cpp
+    src/model/diff/load/ignored_devices.cpp
+    src/model/diff/load/ignored_folders.cpp
+    src/model/diff/load/load_cluster.cpp
+    src/model/diff/modify/append_block.cpp
+    src/model/diff/modify/blocks_availability.cpp
+    src/model/diff/modify/clone_block.cpp
+    src/model/diff/modify/clone_file.cpp
+    src/model/diff/modify/connect_request.cpp
+    src/model/diff/modify/create_folder.cpp
+    src/model/diff/modify/file_availability.cpp
+    src/model/diff/modify/finish_file.cpp
+    src/model/diff/modify/flush_file.cpp
+    src/model/diff/modify/local_update.cpp
+    src/model/diff/modify/lock_file.cpp
+    src/model/diff/modify/new_file.cpp
+    src/model/diff/modify/share_folder.cpp
+    src/model/diff/modify/update_contact.cpp
+    src/model/diff/modify/update_peer.cpp
+    src/model/diff/peer/peer_state.cpp
+    src/model/diff/peer/cluster_remove.cpp
+    src/model/diff/peer/cluster_update.cpp
+    src/model/diff/peer/update_folder.cpp
+    src/model/misc/block_iterator.cpp
+    src/model/misc/error_code.cpp
+    src/model/misc/file_block.cpp
+    src/model/misc/file_iterator.cpp
+    src/model/misc/uuid.cpp
+    src/model/misc/version_utils.cpp
     src/model/block_info.cpp
-    src/model/block_iterator.cpp
     src/model/cluster.cpp
     src/model/device.cpp
     src/model/device_id.cpp
-    src/model/file_block.cpp
     src/model/file_info.cpp
-    src/model/file_iterator.cpp
     src/model/folder.cpp
     src/model/folder_info.cpp
-    src/model/storeable.cpp
+    src/model/ignored_device.cpp
+    src/model/ignored_folder.cpp
     src/net/acceptor_actor.cpp
     src/net/cluster_supervisor.cpp
     src/net/controller_actor.cpp
@@ -61,7 +102,6 @@ add_library(syncspirit_lib
     src/net/peer_actor.cpp
     src/net/peer_supervisor.cpp
     src/net/resolver_actor.cpp
-    src/net/messages.cpp
     src/net/names.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
@@ -115,6 +155,7 @@ target_include_directories(syncspirit_lib PUBLIC
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}
+    ${syncspirit_SOURCE_DIR}/src
 )
 
 target_link_libraries(syncspirit_lib
@@ -130,9 +171,6 @@ target_link_libraries(syncspirit_lib
     ZLIB::ZLIB
     mdbx-static
 )
-
-#target_link_libraries(syncspirit_console syncspirit_lib)
-#target_link_libraries(syncspirit syncspirit_lib syncspirit_console)
 
 enable_testing()
 add_subdirectory("tests")

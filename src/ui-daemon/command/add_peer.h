@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../command.h"
-#include "../../model/device_id.h"
+#include "model/device_id.h"
 
 namespace syncspirit::daemon::command {
 
