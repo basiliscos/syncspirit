@@ -1,6 +1,6 @@
 #include "folder.h"
-#include "../db/utils.h"
-#include "../db/prefix.h"
+#include "db/utils.h"
+#include "db/prefix.h"
 #include "structs.pb.h"
 #include <spdlog.h>
 #include "misc/error_code.h"
@@ -117,64 +117,6 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
     }
     return r;
 }
-
-#if 0
-int64_t folder_t::score(const device_ptr_t &peer_device) noexcept {
-    std::int64_t r = 0;
-    std::int64_t my_seq = 0;
-    std::int64_t peer_seq = 0;
-    for (auto it : folder_infos) {
-        auto& fi = it.item;
-        auto &d = *fi->get_device();
-        if (d == *device) {
-            my_seq = fi->get_max_sequence();
-        } else if (d == *peer_device) {
-            peer_seq = fi->get_max_sequence();
-        }
-        if (my_seq && peer_seq) {
-            break;
-        }
-    }
-    if (peer_seq > my_seq) {
-        return peer_seq - my_seq;
-    }
-    return r;
-}
-
-bool folder_t::update(const proto::Folder &remote) noexcept {
-    for (int i = 0; i < remote.devices_size(); ++i) {
-        auto &d = remote.devices(i);
-        for (auto it : folder_infos) {
-            auto &fi = it.item;
-            if (fi->get_device()->device_id.get_sha256() == d.id()) {
-                return fi->update(d);
-            }
-        }
-    }
-    return false;
-}
-
-void folder_t::update(local_file_map_t &local_files) noexcept {
-    auto folder_info = folder_infos.by_device(device);
-    assert(folder_info);
-    folder_info->update(local_files);
-}
-
-folder_info_ptr_t folder_t::get_folder_info(const device_ptr_t &device) noexcept {
-    return folder_infos.by_device(device);
-}
-
-proto::Index folder_t::generate() noexcept {
-    proto::Index r;
-    r.set_folder(std::string(get_id()));
-    auto fi = get_folder_info(device);
-    for (auto it : fi->get_file_infos()) {
-        auto &file = *it.item;
-        *r.add_files() = file.get();
-    }
-    return r;
-}
-#endif
 
 template<> std::string_view get_index<0>(const folder_ptr_t& item) noexcept { return item->get_key(); }
 template<> std::string_view get_index<1>(const folder_ptr_t& item) noexcept { return item->get_id(); }

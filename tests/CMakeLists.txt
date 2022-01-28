@@ -11,9 +11,6 @@ find_package(
 find_package(OpenSSL REQUIRED)
 
 add_library(syncspirit_test_lib
-#    fixture.cpp
-#    sample_db.cpp
-#    sample_peer.cpp
     test_supervisor.cpp
     test-db.cpp
     test-main.cpp
@@ -146,36 +143,3 @@ add_test(075-controller "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/075-controller")
 add_executable(076-scan_actor 076-scan_actor.cpp)
 target_link_libraries(076-scan_actor syncspirit_test_lib)
 add_test(076-scan_actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/076-scan_actor")
-
-#add_executable(080-fs 080-fs.cpp)
-#target_link_libraries(080-fs syncspirit_test_lib)
-#add_test(080-fs "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/080-fs")
-
-#add_executable(082-db-actor 082-db-actor.cpp)
-#target_link_libraries(082-db-actor syncspirit_test_lib)
-#add_test(082-db-actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/082-db-actor")
-
-#add_executable(083-scan-actor 083-scan-actor.cpp)
-#target_link_libraries(083-scan-actor syncspirit_test_lib)
-#add_test(083-scan-actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/083-scan-actor")
-
-#add_executable(125-cluster-supervisor 125-cluster-supervisor.cpp)
-#target_link_libraries(125-cluster-supervisor syncspirit_test_lib)
-#add_test(125-cluster-supervisor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/125-cluster-supervisor")
-
-#add_executable(130-controller-cluster 130-controller-cluster.cpp)
-#target_link_libraries(130-controller-cluster syncspirit_test_lib)
-#add_test(130-controller-cluster "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/130-controller-cluster")
-
-#add_executable(131-controller-indexupdate 131-controller-indexupdate.cpp)
-#target_link_libraries(131-controller-indexupdate syncspirit_test_lib)
-#add_test(131-controller-indexupdate "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/131-controller-indexupdate")
-
-#add_executable(132-controller-resume 132-controller-resume.cpp)
-#target_link_libraries(132-controller-resume syncspirit_test_lib)
-#add_test(132-controller-resume "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/132-controller-resume")
-
-#add_executable(133-controller-download 133-controller-download.cpp)
-#target_link_libraries(133-controller-download syncspirit_test_lib)
-#add_test(133-controller-download "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/133-controller-download")
-

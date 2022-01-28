@@ -37,9 +37,6 @@ struct folder_info_t final : arc_base_t<folder_info_t> {
     inline device_t *get_device() const noexcept { return device; }
     inline folder_t *get_folder() const noexcept { return folder; }
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
-    void update(const proto::Index &data, const device_ptr_t &peer) noexcept;
-    void update(const proto::IndexUpdate &data, const device_ptr_t &peer) noexcept;
-    void update(local_file_map_t &local_files) noexcept;
     void set_remote_max_sequence(std::int64_t value) noexcept { remote_max_sequence = value; }
     void remove() noexcept;
     void set_max_sequence(std::int64_t value) noexcept;
@@ -50,8 +47,6 @@ struct folder_info_t final : arc_base_t<folder_info_t> {
     folder_info_t(std::string_view key, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
     folder_info_t(const uuid_t& uuid, const device_ptr_t& device_, const folder_ptr_t& folder_) noexcept;
     void assign_fields(const db::FolderInfo& data) noexcept;
-
-    template <typename Message> void update_generic(const Message &data, const device_ptr_t &peer) noexcept;
 
     static const constexpr auto data_length = uuid_length * 2 + device_id_t::digest_length + 1;
 

@@ -287,18 +287,6 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
             LOG_TRACE(log, "{}, cancelling transport...", identity);
             transport->cancel();
         }
-#if 0
-        else {
-            auto ec = r::make_error_code(r::shutdown_code_t::normal);
-            do_shutdown(make_error(ec));
-        }
-#endif
-#if 0
-        if (controller && state == r::state_t::OPERATIONAL) {
-            auto ec = r::make_error_code(r::shutdown_code_t::normal);
-            do_shutdown(make_error(ec));
-        }
-#endif
     } else {
         tx_item.reset();
         process_tx_queue();
@@ -588,28 +576,3 @@ void peer_actor_t::on_rx_timeout(r::request_id_t, bool cancelled) noexcept {
         do_shutdown(reason);
     }
 }
-
-#if 0
-void peer_actor_t::on_file_update(message::file_update_notify_t &msg) noexcept {
-    std::abort();
-    auto &file = msg.payload.file;
-    LOG_TRACE(log, "{}, on_file_update, file = {}", identity, file->get_full_name());
-    proto::IndexUpdate iu;
-    auto folder_id = file->get_folder_info()->get_folder()->get_id();
-    iu.set_folder(std::string(folder_id));
-    *iu.add_files() = file->get();
-    fmt::memory_buffer buff;
-    proto::serialize(buff, iu);
-    push_write(std::move(buff), false);
-}
-
-void peer_actor_t::on_folder_update(message::folder_update_notify_t &msg) noexcept {
-    auto &folder = msg.payload.folder;
-    LOG_TRACE(log, "{}, on_folder_update, folder = {}", identity, folder->get_label());
-    auto index = folder->generate();
-    fmt::memory_buffer buff;
-    proto::serialize(buff, index);
-    push_write(std::move(buff), false);
-    std::abort();
-}
-#endif

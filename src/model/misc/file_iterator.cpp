@@ -60,10 +60,6 @@ TRY_ANEW:
 
 void file_interator_t::reset() noexcept {
     cluster = nullptr;
-#if 0
-    auto folders = cluster->folders;
-    f_local_it = f_local_end = it_file_t{};
-#endif
 }
 
 file_info_ptr_t file_interator_t::next() noexcept {

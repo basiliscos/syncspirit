@@ -91,87 +91,9 @@ std::string folder_info_t::serialize() noexcept {
     return r.SerializeAsString();
 }
 
-template <typename Message> void folder_info_t::update_generic(const Message &data, const device_ptr_t &peer) noexcept {
-    std::abort();
-#if 0
-    std::int64_t max_sequence = get_max_sequence();
-    for (int i = 0; i < data.files_size(); ++i) {
-        auto &file = data.files(i);
-        auto seq = file.sequence();
-        spdlog::trace("folder_info_t::update, folder = {}, device = {}, file = {}, seq = {}", folder->label(),
-                      device->device_id, file.name(), seq);
-
-        auto file_key = file_info_t::generate_db_key(file.name(), *this);
-        auto fi = file_infos.by_key(file_key);
-        if (fi) {
-            fi->update(file);
-        } else {
-            fi = file_info_ptr_t(new file_info_t(file, this));
-            add(fi);
-            mark_dirty();
-        }
-        if (seq > max_sequence) {
-            max_sequence = seq;
-        }
-    }
-    if (get_max_sequence() < max_sequence) {
-        this->max_sequence = max_sequence;
-        mark_dirty();
-    }
-
-    spdlog::debug("folder_info_t::update, folder_info = {} max seq = {}, device = {}", get_db_key(), max_sequence,
-                  peer->device_id);
-    /*
-    auto local_folder_info = folder_infos.by_id(device->device_id.get_sha256());
-    if (local_folder_info->get_max_sequence() < max_sequence) {
-        local_folder_info->set_max_sequence(max_sequence);
-        spdlog::trace("folder_t::update, folder_info = {} max seq = {}, device = {} (local)",
-                      local_folder_info->get_db_key(), max_sequence, device->device_id);
-    }
-    */
-#endif
-}
-
-void folder_info_t::update(const proto::IndexUpdate &data, const device_ptr_t &peer) noexcept {
-    update_generic(data, peer);
-}
-
-void folder_info_t::update(const proto::Index &data, const device_ptr_t &peer) noexcept { update_generic(data, peer); }
-
 bool folder_info_t::is_actual() noexcept {
     return max_sequence == remote_max_sequence;
 }
-
-
-#if 0
-void folder_info_t::update(local_file_map_t &local_files) noexcept {
-    std::abort();
-    auto file_infos_copy = file_infos;
-    for (auto it : local_files.map) {
-        auto file_key = file_info_t::generate_db_key(it.first.string(), *this);
-        auto cluster_file = file_infos_copy.by_key(file_key);
-        if (cluster_file) {
-            auto updated = cluster_file->update(it.second);
-            file_infos_copy.remove(cluster_file);
-            if (updated) {
-                std::abort();
-            }
-        }
-    }
-    for (auto it : file_infos_copy) {
-        auto &file = it.second;
-        if (file->is_deleted()) {
-            // no-op, file is deleted in local index and does not present in filesystem
-        } else {
-#if 0
-            auto key = file->get_path();
-            auto &local_file = local_files.map.at(key);
-#endif
-            std::abort();
-        }
-    }
-}
-#endif
 
 folder_info_ptr_t folder_infos_map_t::by_device(const device_ptr_t& device) const noexcept {
     return get<1>(device->device_id().get_sha256());

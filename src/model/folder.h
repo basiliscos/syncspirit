@@ -51,7 +51,6 @@ struct folder_t final : arc_base_t<folder_t> {
     inline cluster_t *&get_cluster() noexcept { return cluster; }
 
     inline const bfs::path &get_path() noexcept { return path; }
-    //bool update(const proto::Folder &remote) noexcept;
     void update(local_file_map_t &local_files) noexcept;
     std::optional<proto::Folder> generate(const model::device_t& device) const noexcept;
     proto::Index generate() noexcept;
