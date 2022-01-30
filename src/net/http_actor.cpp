@@ -237,7 +237,7 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     kept_alive = false;
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "{}, on_io_error :: {}", identity, ec.message());
+        LOG_DEBUG(log, "{}, on_io_error :: {}", identity, ec.message());
     }
     if (resources->has(resource::request_timer)) {
         cancel_timer(*timer_request);

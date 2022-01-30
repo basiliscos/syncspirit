@@ -78,10 +78,7 @@ struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::clu
     model::cluster_ptr_t cluster;
     utils::key_pair_t ssl_pair;
 
-    r::address_ptr_t lda_addr;
-    r::address_ptr_t gda_addr;
-    r::address_ptr_t ssdp_addr;
-
+    // for debug
     r::supervisor_ptr_t cluster_sup;
     r::supervisor_ptr_t peers_sup;
 };

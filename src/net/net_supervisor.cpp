@@ -84,17 +84,6 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
     LOG_TRACE(log, "{}, on_child_shutdown, '{}' due to {} ", identity, actor->get_identity(), reason->message());
-    auto &child_addr = actor->get_address();
-    bool ignore = (ssdp_addr && child_addr == ssdp_addr) || (gda_addr && child_addr == gda_addr) ||
-                  (lda_addr && child_addr == lda_addr);
-
-    if (ignore) {
-        return;
-    }
-    if (state == r::state_t::OPERATIONAL) {
-        auto inner = r::make_error_code(r::shutdown_code_t::child_down);
-        do_shutdown(make_error(inner, reason));
-    }
 }
 
 void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
@@ -108,8 +97,6 @@ void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_erro
 
 void net_supervisor_t::shutdown_finish() noexcept {
     db_addr.reset();
-    lda_addr.reset();
-    ssdp_addr.reset();
     cluster_sup.reset();
     peers_sup.reset();
     ra::supervisor_asio_t::shutdown_finish();
@@ -119,8 +106,13 @@ void net_supervisor_t::launch_early() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     bfs::path path(app_config.config_path);
     auto db_dir = path.append("mbdx-db");
-    db_addr =
-        create_actor<db_actor_t>().timeout(timeout).db_dir(db_dir.string()).cluster(cluster).finish()->get_address();
+    db_addr = create_actor<db_actor_t>()
+                  .timeout(timeout)
+                  .db_dir(db_dir.string())
+                  .cluster(cluster)
+                  .escalate_failure()
+                  .finish()
+                  ->get_address();
 }
 
 void net_supervisor_t::load_db() noexcept {
@@ -221,6 +213,7 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noe
                           .cluster(cluster)
                           .bep_config(app_config.bep_config)
                           .hasher_threads(app_config.hasher_threads)
+                          .escalate_failure()
                           .finish();
         launch_net();
     }
@@ -233,14 +226,12 @@ void net_supervisor_t::launch_net() noexcept {
     if (app_config.upnp_config.enabled) {
         auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto timeout = shutdown_timeout * 9 / 10;
-            auto actor = create_actor<ssdp_actor_t>()
-                             .timeout(timeout)
-                             .upnp_config(app_config.upnp_config)
-                             .cluster(cluster)
-                             .spawner_address(spawner)
-                             .finish();
-            ssdp_addr = actor->get_address();
-            return actor;
+            return create_actor<ssdp_actor_t>()
+                .timeout(timeout)
+                .upnp_config(app_config.upnp_config)
+                .cluster(cluster)
+                .spawner_address(spawner)
+                .finish();
         };
     }
 
@@ -248,15 +239,13 @@ void net_supervisor_t::launch_net() noexcept {
         auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto timeout = shutdown_timeout * 9 / 10;
             auto &cfg = app_config.local_announce_config;
-            auto actor = create_actor<local_discovery_actor_t>()
-                             .port(cfg.port)
-                             .frequency(cfg.frequency)
-                             .cluster(cluster)
-                             .timeout(timeout)
-                             .spawner_address(spawner)
-                             .finish();
-            lda_addr = actor->get_address();
-            return actor;
+            return create_actor<local_discovery_actor_t>()
+                .port(cfg.port)
+                .frequency(cfg.frequency)
+                .cluster(cluster)
+                .timeout(timeout)
+                .spawner_address(spawner)
+                .finish();
         };
     }
 
@@ -269,30 +258,33 @@ void net_supervisor_t::launch_net() noexcept {
             .resolve_timeout(io_timeout)
             .registry_name(names::http11_gda)
             .keep_alive(true)
+            .escalate_failure()
             .finish();
 
         auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto &gcfg = app_config.global_announce_config;
             auto port = app_config.upnp_config.external_port;
             auto timeout = shutdown_timeout * 9 / 10;
-            auto actor = create_actor<global_discovery_actor_t>()
-                             .timeout(timeout)
-                             .cluster(cluster)
-                             .ssl_pair(&ssl_pair)
-                             .announce_url(gcfg.announce_url)
-                             .device_id(std::move(global_device))
-                             .rx_buff_size(gcfg.rx_buff_size)
-                             .io_timeout(gcfg.timeout)
-                             .spawner_address(spawner)
-                             .finish();
-            gda_addr = actor->get_address();
-            return actor;
+            return create_actor<global_discovery_actor_t>()
+                .timeout(timeout)
+                .cluster(cluster)
+                .ssl_pair(&ssl_pair)
+                .announce_url(gcfg.announce_url)
+                .device_id(std::move(global_device))
+                .rx_buff_size(gcfg.rx_buff_size)
+                .io_timeout(gcfg.timeout)
+                .spawner_address(spawner)
+                .finish();
         };
-        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
+        spawn(factory)
+            .restart_period(pt::seconds{5})
+            .restart_period(r::pt::seconds{10})
+            .restart_policy(r::restart_policy_t::fail_only)
+            .spawn();
     }
 
     auto timeout = shutdown_timeout * 9 / 10;
-    create_actor<acceptor_actor_t>().cluster(cluster).timeout(timeout).finish();
+    create_actor<acceptor_actor_t>().cluster(cluster).timeout(timeout).escalate_failure().finish();
     create_actor<peer_supervisor_t>()
         .cluster(cluster)
         .ssl_pair(&ssl_pair)
@@ -300,6 +292,7 @@ void net_supervisor_t::launch_net() noexcept {
         .strand(strand)
         .timeout(timeout)
         .bep_config(app_config.bep_config)
+        .escalate_failure()
         .finish();
 
     auto dcfg = app_config.dialer_config;
@@ -321,5 +314,6 @@ void net_supervisor_t::on_start() noexcept {
         .resolve_timeout(io_timeout)
         .registry_name(names::http10)
         .keep_alive(false)
+        .escalate_failure()
         .finish();
 }

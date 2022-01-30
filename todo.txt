@@ -1,4 +1,4 @@
- - перезапускать gda, lda, backoff: min, max
+ - проверить lda
  - inactivity-shutdowner
 
 ===================
