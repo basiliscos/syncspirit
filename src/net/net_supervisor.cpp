@@ -233,6 +233,11 @@ void net_supervisor_t::launch_net() noexcept {
                 .spawner_address(spawner)
                 .finish();
         };
+        spawn(factory)
+            .restart_period(pt::seconds{5})
+            .restart_period(r::pt::seconds{10})
+            .restart_policy(r::restart_policy_t::fail_only)
+            .spawn();
     }
 
     if (app_config.local_announce_config.enabled) {
@@ -247,6 +252,11 @@ void net_supervisor_t::launch_net() noexcept {
                 .spawner_address(spawner)
                 .finish();
         };
+        spawn(factory)
+            .restart_period(pt::seconds{5})
+            .restart_period(r::pt::seconds{10})
+            .restart_policy(r::restart_policy_t::fail_only)
+            .spawn();
     }
 
     if (app_config.global_announce_config.enabled) {
