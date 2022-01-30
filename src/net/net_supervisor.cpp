@@ -49,9 +49,20 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
         LOG_CRITICAL(log, "cannot get common name from certificate");
         throw "cannot get common name from certificate";
     }
+
     auto device = model::device_ptr_t();
     device = new model::local_device_t(device_id.value(), app_config.device_name, cn.value());
     cluster = new model::cluster_t(device, seed);
+
+    auto &gcfg = app_config.global_announce_config;
+    if (gcfg.enabled) {
+        auto global_device_opt = model::device_id_t::from_string(gcfg.device_id);
+        if (!global_device_opt) {
+            LOG_CRITICAL(log, "invalid global device id :: {}", gcfg.device_id);
+            throw "invalid global device id";
+        }
+        global_device = std::move(global_device_opt.value());
+    }
 }
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -73,12 +84,11 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
     LOG_TRACE(log, "{}, on_child_shutdown, '{}' due to {} ", identity, actor->get_identity(), reason->message());
-    if (actor->get_identity() == "peer_supervisor") {
-        auto aaa = static_cast<peer_supervisor_t *>(actor);
-        // LOG_ERROR(log, "zzz, qs = {}, iq = {}",   aaa->queue.size(), aaa->inbound_queue.empty());
-    }
     auto &child_addr = actor->get_address();
-    if (ssdp_addr && child_addr == ssdp_addr) {
+    bool ignore = (ssdp_addr && child_addr == ssdp_addr) || (gda_addr && child_addr == gda_addr) ||
+                  (lda_addr && child_addr == lda_addr);
+
+    if (ignore) {
         return;
     }
     if (state == r::state_t::OPERATIONAL) {
@@ -98,7 +108,7 @@ void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_erro
 
 void net_supervisor_t::shutdown_finish() noexcept {
     db_addr.reset();
-    local_discovery_addr.reset();
+    lda_addr.reset();
     ssdp_addr.reset();
     cluster_sup.reset();
     peers_sup.reset();
@@ -212,47 +222,45 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noe
                           .bep_config(app_config.bep_config)
                           .hasher_threads(app_config.hasher_threads)
                           .finish();
-
-        launch_ssdp();
         launch_net();
     }
     return outcome::success();
 }
 
 void net_supervisor_t::launch_net() noexcept {
-    auto timeout = shutdown_timeout * 9 / 10;
     LOG_INFO(log, "{}, launching network services", identity);
 
-    create_actor<acceptor_actor_t>().cluster(cluster).timeout(timeout).finish();
-    peers_sup = create_actor<peer_supervisor_t>()
-                    .cluster(cluster)
-                    .ssl_pair(&ssl_pair)
-                    .device_name(app_config.device_name)
-                    .strand(strand)
-                    .timeout(timeout)
-                    .bep_config(app_config.bep_config)
-                    .finish();
-
-    auto &local_cfg = app_config.local_announce_config;
-    if (local_cfg.enabled) {
-        local_discovery_addr = create_actor<local_discovery_actor_t>()
-                                   .port(local_cfg.port)
-                                   .frequency(local_cfg.frequency)
-                                   .cluster(cluster)
-                                   .timeout(timeout)
-                                   .finish()
-                                   ->get_address();
+    if (app_config.upnp_config.enabled) {
+        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+            auto timeout = shutdown_timeout * 9 / 10;
+            auto actor = create_actor<ssdp_actor_t>()
+                             .timeout(timeout)
+                             .upnp_config(app_config.upnp_config)
+                             .cluster(cluster)
+                             .spawner_address(spawner)
+                             .finish();
+            ssdp_addr = actor->get_address();
+            return actor;
+        };
     }
 
-    auto &gcfg = app_config.global_announce_config;
-    if (gcfg.enabled) {
-        auto global_device_id = model::device_id_t::from_string(gcfg.device_id);
-        if (!global_device_id) {
-            LOG_ERROR(log, "{}, on_port_mapping invalid global device id :: {} global discovery will not be used",
-                      identity, gcfg.device_id);
-            return;
-        }
+    if (app_config.local_announce_config.enabled) {
+        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+            auto timeout = shutdown_timeout * 9 / 10;
+            auto &cfg = app_config.local_announce_config;
+            auto actor = create_actor<local_discovery_actor_t>()
+                             .port(cfg.port)
+                             .frequency(cfg.frequency)
+                             .cluster(cluster)
+                             .timeout(timeout)
+                             .spawner_address(spawner)
+                             .finish();
+            lda_addr = actor->get_address();
+            return actor;
+        };
+    }
 
+    if (app_config.global_announce_config.enabled) {
         auto timeout = shutdown_timeout * 9 / 10;
         auto io_timeout = shutdown_timeout * 8 / 10;
         create_actor<http_actor_t>()
@@ -263,17 +271,36 @@ void net_supervisor_t::launch_net() noexcept {
             .keep_alive(true)
             .finish();
 
-        auto port = app_config.upnp_config.external_port;
-        create_actor<global_discovery_actor_t>()
-            .timeout(timeout)
-            .cluster(cluster)
-            .ssl_pair(&ssl_pair)
-            .announce_url(gcfg.announce_url)
-            .device_id(std::move(global_device_id.value()))
-            .rx_buff_size(gcfg.rx_buff_size)
-            .io_timeout(gcfg.timeout)
-            .finish();
+        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+            auto &gcfg = app_config.global_announce_config;
+            auto port = app_config.upnp_config.external_port;
+            auto timeout = shutdown_timeout * 9 / 10;
+            auto actor = create_actor<global_discovery_actor_t>()
+                             .timeout(timeout)
+                             .cluster(cluster)
+                             .ssl_pair(&ssl_pair)
+                             .announce_url(gcfg.announce_url)
+                             .device_id(std::move(global_device))
+                             .rx_buff_size(gcfg.rx_buff_size)
+                             .io_timeout(gcfg.timeout)
+                             .spawner_address(spawner)
+                             .finish();
+            gda_addr = actor->get_address();
+            return actor;
+        };
+        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
     }
+
+    auto timeout = shutdown_timeout * 9 / 10;
+    create_actor<acceptor_actor_t>().cluster(cluster).timeout(timeout).finish();
+    create_actor<peer_supervisor_t>()
+        .cluster(cluster)
+        .ssl_pair(&ssl_pair)
+        .device_name(app_config.device_name)
+        .strand(strand)
+        .timeout(timeout)
+        .bep_config(app_config.bep_config)
+        .finish();
 
     auto dcfg = app_config.dialer_config;
     if (dcfg.enabled) {
@@ -295,15 +322,4 @@ void net_supervisor_t::on_start() noexcept {
         .registry_name(names::http10)
         .keep_alive(false)
         .finish();
-}
-
-void net_supervisor_t::launch_ssdp() noexcept {
-    auto &cfg = app_config.upnp_config;
-    if (cfg.enabled && ssdp_attempts < cfg.discovery_attempts) {
-        auto timeout = shutdown_timeout / 2;
-        ssdp_addr =
-            create_actor<ssdp_actor_t>().timeout(timeout).upnp_config(cfg).cluster(cluster).finish()->get_address();
-        ++ssdp_attempts;
-        LOG_TRACE(log, "{}, launching ssdp, attempt #{}", identity, ssdp_attempts);
-    }
 }

@@ -61,7 +61,6 @@ struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::clu
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
     void launch_early() noexcept;
     void launch_cluster() noexcept;
-    void launch_ssdp() noexcept;
     void launch_net() noexcept;
     void load_db() noexcept;
     void seed_model() noexcept;
@@ -74,12 +73,14 @@ struct net_supervisor_t : public ra::supervisor_asio_t, private model::diff::clu
     size_t seed;
     size_t cluster_copies;
     model::diff::cluster_diff_ptr_t load_diff;
+    model::device_id_t global_device;
     r::address_ptr_t db_addr;
-    r::address_ptr_t local_discovery_addr;
-    r::address_ptr_t ssdp_addr;
-    std::uint32_t ssdp_attempts = 0;
     model::cluster_ptr_t cluster;
     utils::key_pair_t ssl_pair;
+
+    r::address_ptr_t lda_addr;
+    r::address_ptr_t gda_addr;
+    r::address_ptr_t ssdp_addr;
 
     r::supervisor_ptr_t cluster_sup;
     r::supervisor_ptr_t peers_sup;

@@ -54,9 +54,8 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
 }
 
 bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.discovery_attempts == rhs.discovery_attempts &&
-           lhs.max_wait == rhs.max_wait && lhs.timeout == rhs.timeout && lhs.external_port == rhs.external_port &&
-           lhs.rx_buff_size == rhs.rx_buff_size;
+    return lhs.enabled == rhs.enabled && lhs.max_wait == rhs.max_wait && lhs.timeout == rhs.timeout &&
+           lhs.external_port == rhs.external_port && lhs.rx_buff_size == rhs.rx_buff_size;
 }
 
 using device_name_t = outcome::result<std::string>;
@@ -255,12 +254,6 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.max_wait = max_wait.value();
 
-        auto discovery_attempts = t["discovery_attempts"].value<std::uint32_t>();
-        if (!discovery_attempts) {
-            return "global_discovery/discovery_attempts is incorrect or missing";
-        }
-        c.discovery_attempts = discovery_attempts.value();
-
         auto timeout = t["timeout"].value<std::uint32_t>();
         if (!timeout) {
             return "upnp/timeout is incorrect or missing";
@@ -416,7 +409,6 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                              }}},
         {"upnp", toml::table{{
                      {"enabled", cfg.upnp_config.enabled},
-                     {"discovery_attempts", cfg.upnp_config.discovery_attempts},
                      {"max_wait", cfg.upnp_config.max_wait},
                      {"timeout", cfg.upnp_config.timeout},
                      {"external_port", cfg.upnp_config.external_port},
@@ -498,7 +490,6 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     };
     cfg.upnp_config = upnp_config_t {
         true,       /* enabled */
-        2,          /* discovery_attempts */
         1,          /* max_wait */
         10,         /* timeout */
         22001,      /* external port */
