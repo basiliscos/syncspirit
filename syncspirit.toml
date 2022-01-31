@@ -12,6 +12,7 @@ redial_timeout = 300000
 [fs]
 batch_dirs_count = 10
 temporally_timeout = 86400000
+mru_size = 10
 
 [global_discovery]
 announce_url = 'https://discovery.syncthing.net/'
@@ -49,6 +50,7 @@ default_location = '/tmp/syncspirit'
 device_name = 'hp-note'
 timeout = 5000
 hasher_threads = 3
+db_upper_limit = 0x400000000
 
 [upnp]
 enabled = true

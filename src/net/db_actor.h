@@ -15,6 +15,7 @@ namespace outcome = boost::outcome_v2;
 
 struct db_actor_config_t : r::actor_config_t {
     std::string db_dir;
+    long db_upper_limit;
     model::cluster_ptr_t cluster;
 };
 
@@ -30,6 +31,11 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
 
     builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
         parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&db_upper_limit(long value) &&noexcept {
+        parent_t::config.db_upper_limit = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -65,6 +71,7 @@ struct db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor
     utils::logger_t log;
     MDBX_env *env;
     std::string db_dir;
+    long upper_limit;
     model::cluster_ptr_t cluster;
 };
 

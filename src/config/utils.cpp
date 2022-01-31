@@ -29,7 +29,8 @@ bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept
 }
 
 bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
-    return lhs.batch_dirs_count == rhs.batch_dirs_count && lhs.temporally_timeout == rhs.temporally_timeout;
+    return lhs.batch_dirs_count == rhs.batch_dirs_count && lhs.temporally_timeout == rhs.temporally_timeout &&
+           lhs.mru_size == rhs.mru_size;
 }
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
@@ -50,7 +51,8 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
     return lhs.local_announce_config == rhs.local_announce_config && lhs.upnp_config == rhs.upnp_config &&
            lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
            lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name && lhs.config_path == rhs.config_path &&
-           lhs.log_configs == rhs.log_configs && lhs.hasher_threads == rhs.hasher_threads;
+           lhs.log_configs == rhs.log_configs && lhs.hasher_threads == rhs.hasher_threads &&
+           lhs.db_upper_limit == rhs.db_upper_limit;
 }
 
 bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept {
@@ -119,6 +121,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "main/hasher_threads is incorrect or missing";
         }
         c.hasher_threads = hasher_threads.value();
+
+        auto db_upper_limit = t["db_upper_limit"].value<long>();
+        if (!db_upper_limit) {
+            return "main/db_upper_limit is incorrect or missing";
+        }
+        c.db_upper_limit = db_upper_limit.value();
     };
 
     // log
@@ -342,6 +350,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "fs/temporally_timeout is incorrect or missing";
         }
         c.temporally_timeout = temporally_timeout.value();
+
+        auto mru_size = t["mru_size"].value<std::uint32_t>();
+        if (!mru_size) {
+            return "fs/mru_size is incorrect or missing";
+        }
+        c.mru_size = temporally_timeout.value();
     }
 
     return std::move(cfg);
@@ -391,6 +405,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                      {"timeout", cfg.timeout},
                      {"device_name", cfg.device_name},
                      {"default_location", cfg.default_location.c_str()},
+                     {"db_upper_limit", cfg.db_upper_limit},
                  }}},
         {"log", logs},
         {"local_discovery", toml::table{{
@@ -428,6 +443,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"fs", toml::table{{
                    {"batch_dirs_count", cfg.fs_config.batch_dirs_count},
                    {"temporally_timeout", cfg.fs_config.temporally_timeout},
+                   {"mru_size", cfg.fs_config.mru_size},
                }}},
     }};
     // clang-format on
@@ -468,6 +484,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     cfg.timeout = 5000;
     cfg.device_name = device;
     cfg.hasher_threads = 3;
+    cfg.db_upper_limit = 0x400000000; // 16 GB
     cfg.log_configs = {
         log_config_t {
             "default", spdlog::level::level_enum::info, {"stdout"}
@@ -508,7 +525,8 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     };
     cfg.fs_config = fs_config_t {
         10,         /* batch_dirs_count */
-        86400000    /* temporally_timeout, 24h default */ 
+        86400000,   /* temporally_timeout, 24h default */
+        10,         /* mru_size max number of opend files for reading and writing */
     };
     return cfg;
 }

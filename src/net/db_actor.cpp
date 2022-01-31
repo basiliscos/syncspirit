@@ -32,7 +32,8 @@ r::plugin::resource_id_t db = 0;
 } // namespace
 
 db_actor_t::db_actor_t(config_t &config)
-    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, cluster{config.cluster} {
+    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir},
+      upper_limit{config.db_upper_limit}, cluster{config.cluster} {
     log = utils::get_logger("net.db");
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
@@ -69,7 +70,8 @@ void db_actor_t::open() noexcept {
     resources->acquire(resource::db);
     auto &my_device = cluster->get_device();
     /* enable automatic size management */
-    auto r = mdbx_env_set_geometry(env, 0, -1, 0, -1, -1, 0);
+    LOG_TRACE(log, "{}, open, db upper limit = {}", identity, upper_limit);
+    auto r = mdbx_env_set_geometry(env, -1, -1, upper_limit, -1, -1, -1);
     if (r != MDBX_SUCCESS) {
         LOG_ERROR(log, "{}, open, mbdx set geometry error ({}): {}", identity, r, mdbx_strerror(r));
         resources->release(resource::db);
@@ -189,6 +191,7 @@ void db_actor_t::on_model_update(model::message::model_update_t &message) noexce
     auto r = diff.visit(*this);
     if (!r) {
         auto ee = make_error(r.assume_error());
+        LOG_ERROR(log, "{}, on_model_update error: {}", identity, r.assume_error().message());
         do_shutdown(ee);
     }
 }

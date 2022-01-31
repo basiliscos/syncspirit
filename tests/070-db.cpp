@@ -78,8 +78,12 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        db_actor =
-            sup->create_actor<db_actor_t>().cluster(cluster).db_dir(root_path.string()).timeout(timeout).finish();
+        db_actor = sup->create_actor<db_actor_t>()
+                .cluster(cluster)
+                .db_dir(root_path.string())
+                .db_upper_limit(1024 * 1024)
+                .timeout(timeout)
+                .finish();
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         db_addr = db_actor->get_address();

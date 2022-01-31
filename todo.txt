@@ -1,4 +1,10 @@
- - проверить lda
+ - получить локальный IP, вместо 0.0.0.0
+ - app-image : ./linuxdeploy-x86_64.AppImage --appdir AppDir -e bin/eratosthenes -d my.desktop -i /usr/share/icons/hicolor/48x48/apps/claws-mail.png --output appimage
+ - image icon: https://www.stockio.com/free-icons/?q=sync, https://www.freepik.com/free-vector/settings-icons-flat_1530486.htm#query=sync%20icon&position=1&from_view=search
+ - https://www.freepik.com/free-vector/settings-icons-flat_1530486.htm#query=sync%20icon&position=1&from_view=search
+ - проболема: реконнект при долгом скачивании (проверять в peer_sup)
+ - проболема: auto source = file->get_source(); - source пуст.  (FlushFile?)
+
  - inactivity-shutdowner
 
 ===================

@@ -43,8 +43,7 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void fs_supervisor_t::launch() noexcept {
     auto &timeout = shutdown_timeout;
-    LOG_WARN(log, "{}, mru_size hardcoded");
-    create_actor<file_actor_t>().cluster(cluster).mru_size(10).timeout(timeout).finish();
+    create_actor<file_actor_t>().cluster(cluster).mru_size(fs_config.mru_size).timeout(timeout).finish();
     auto hasher_addr = create_actor<hasher::hasher_proxy_actor_t>()
                            .hasher_threads(hasher_threads)
                            .name("fs::hasher_proxy")
