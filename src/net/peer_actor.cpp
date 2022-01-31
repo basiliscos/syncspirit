@@ -438,6 +438,11 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
                 LOG_TRACE(log, "{}, read_hello, from {} ({} {})", identity, msg->device_name(), msg->client_name(),
                           msg->client_version());
+                auto peer = cluster->get_devices().by_sha256(peer_device_id.get_sha256());
+                if (peer && peer->is_online()) {
+                    auto ec = utils::make_error_code(utils::error_code_t::already_connected);
+                    return do_shutdown(make_error(ec));
+                }
                 auto diff = cluster_diff_ptr_t();
                 diff = new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), true, cert_name,
                                               peer_endpoint, msg->client_name());
@@ -445,7 +450,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
             } else {
                 LOG_WARN(log, "{}, read_hello, unexpected_message", identity);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
-                do_shutdown(make_error(ec));
+                return do_shutdown(make_error(ec));
             }
         },
         msg);

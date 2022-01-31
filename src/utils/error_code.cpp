@@ -92,6 +92,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::connection_impossible:
         r = "cannot establish connection to the peer";
         break;
+    case error_code_t::already_connected:
+        r = "peer is already connected";
+        break;
     default:
         r = "unknown";
     }

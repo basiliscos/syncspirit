@@ -62,6 +62,7 @@ enum class error_code_t {
     already_shared,
     unknown_sink,
     misconfigured_default_logger,
+    already_connected,
 };
 
 enum class bep_error_code_t {
