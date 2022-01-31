@@ -1,6 +1,7 @@
 #include "acceptor_actor.h"
 #include "names.h"
 #include "utils/error_code.h"
+#include "utils/network_interface.h"
 #include "model/messages.h"
 #include "model/diff/contact_diff.h"
 #include "model/diff/modify/connect_request.h"
@@ -60,10 +61,12 @@ void acceptor_actor_t::on_start() noexcept {
         return do_shutdown(make_error(ec));
     }
 
-    auto uri_str = fmt::format("tcp://{0}:{1}/", endpoint.address().to_string(), endpoint.port());
-    auto uri = utils::parse(uri_str).value();
-    auto uris = utils::uri_container_t{uri};
-    LOG_TRACE(log, "{}, accepting on {}", identity, uri.full);
+    auto uris = utils::local_interfaces(endpoint, log);
+    if (log->level() <= spdlog::level::debug) {
+        for (auto &uri : uris) {
+            log->debug("{}, accepting on {}", identity, uri.full);
+        }
+    }
 
     auto diff = model::diff::contact_diff_ptr_t{};
     diff = new modify::update_contact_t(*cluster, cluster->get_device()->device_id(), uris);
