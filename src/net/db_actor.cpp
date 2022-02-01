@@ -78,7 +78,7 @@ void db_actor_t::open() noexcept {
         return do_shutdown(make_error(db::make_error_code(r)));
     }
 
-    auto flags = MDBX_WRITEMAP | MDBX_COALESCE | MDBX_LIFORECLAIM | MDBX_EXCLUSIVE | MDBX_NOTLS;
+    auto flags = MDBX_WRITEMAP | MDBX_COALESCE | MDBX_LIFORECLAIM | MDBX_EXCLUSIVE | MDBX_NOTLS | MDBX_SAFE_NOSYNC;
     r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
     if (r != MDBX_SUCCESS) {
         LOG_ERROR(log, "{}, open, mbdx open environment error ({}): {}", identity, r, mdbx_strerror(r));
