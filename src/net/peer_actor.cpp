@@ -312,11 +312,11 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     }
 
     cancel_timer();
+    assert(value.consumed <= rx_idx);
     rx_idx -= value.consumed;
-    if (value.consumed < rx_idx) {
-        auto tail = rx_idx - value.consumed;
-        rx_idx -= tail;
-        std::memcpy(rx_buff.data(), rx_buff.data() + value.consumed, tail);
+    if (rx_idx) {
+        auto ptr = rx_buff.data();
+        std::memcpy(ptr, ptr + value.consumed, rx_idx);
     }
     (this->*read_action)(std::move(value.message));
     LOG_TRACE(log, "{}, on_read,  rx_idx = {} ", identity, rx_idx);

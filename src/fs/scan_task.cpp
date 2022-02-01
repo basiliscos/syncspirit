@@ -83,32 +83,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             continue;
         }
         if (is_reg) {
-            auto &child_path = child.path();
-            if (!is_temporal(child_path)) {
-                push(child_path);
-            } else {
-                auto remove_it = [&]() {
-                    LOG_DEBUG(log, "removing outdated temporally {}", child_path.string());
-                    bfs::remove(child_path, ec);
-                    if (ec) {
-                        errors.push_back(scan_error_t{child_path, ec});
-                    }
-                };
-
-                auto rp = relativize(child_path, root);
-
-                auto modified_at = bfs::last_write_time(child_path, ec);
-                if (ec) {
-                    errors.push_back(scan_error_t{child_path, ec});
-                } else {
-                    auto now = std::time(nullptr);
-                    if (modified_at + config.temporally_timeout <= now) {
-                        remove_it();
-                    } else {
-                        push(child_path);
-                    }
-                }
-            }
+            push(child.path());
             continue;
         }
     }
@@ -133,7 +108,7 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
 
     auto sz = bfs::file_size(path, ec);
     if (ec) {
-        return scan_errors_t{scan_error_t{path, ec}};
+        return file_error_t{file, ec};
     }
 
     if (!info.temp) {
@@ -143,7 +118,7 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
 
         auto modified = bfs::last_write_time(path, ec);
         if (ec) {
-            return scan_errors_t{scan_error_t{path, ec}};
+            return file_error_t{file, ec};
         }
         if (modified != file->get_modified_s()) {
             return changed_meta_t{info.file};
@@ -151,28 +126,38 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
         return unchanged_meta_t{info.file};
     }
 
+    auto modified_at = bfs::last_write_time(path, ec);
+    if (ec) {
+        return file_error_t{file, ec};
+    }
+
+    auto now = std::time(nullptr);
+    if (modified_at + config.temporally_timeout <= now) {
+        LOG_DEBUG(log, "removing outdated temporally {}", path.string());
+        bfs::remove(path, ec);
+        if (ec) {
+            return file_error_t{file, ec};
+        }
+        return incomplete_removed_t{file};
+    }
+
     auto source = file->get_source();
     if (!source) {
         LOG_DEBUG(log, "source file missing for {}, removing", path.string());
         bfs::remove(path, ec);
         if (ec) {
-            scan_errors_t errors;
-            errors.push_back(scan_error_t{path, ec});
-            return errors;
+            return file_error_t{file, ec};
         }
-        // ignore tmp file
-        return true;
+        return incomplete_removed_t{file};
     }
+
     if (sz != source->get_size()) {
         LOG_DEBUG(log, "removing size-mismatched temporally {}", path.string());
         bfs::remove(path, ec);
         if (ec) {
-            scan_errors_t errors;
-            errors.push_back(scan_error_t{path, ec});
-            return errors;
+            return file_error_t{file, ec};
         }
-        // ignore tmp file
-        return true;
+        return incomplete_removed_t{file};
     }
 
     return incomplete_t{info.file};

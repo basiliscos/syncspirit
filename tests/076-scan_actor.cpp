@@ -237,6 +237,7 @@ void test_meta_changes() {
                 REQUIRE(diff->apply(*cluster));
                 auto file = files->by_name(pr_fi.name());
                 auto path = file->get_path().string() + ".syncspirit-tmp";
+                file->lock(); // should be locked on db, as there is a source
                 auto content = "12345\0\0\0\0\0";
                 write_file(path, std::string(content, 10));
 
@@ -244,6 +245,7 @@ void test_meta_changes() {
                     bfs::last_write_time(path, modified - 24 * 3600);
                     sup->do_process();
                     CHECK(!file->is_locally_available());
+                    CHECK(!file->is_locked());
                     CHECK(!bfs::exists(path));
                 }
 
@@ -252,6 +254,7 @@ void test_meta_changes() {
                     CHECK(!file->is_locally_available());
                     CHECK(!file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
+                    CHECK(!file->is_locked());
                     CHECK(!file_peer->is_locally_available());
                     CHECK(file_peer->is_locally_available(0));
                     CHECK(!file_peer->is_locally_available(1));
@@ -265,6 +268,7 @@ void test_meta_changes() {
                     sup->do_process();
                     CHECK(!file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
+                    CHECK(!file->is_locked());
                     CHECK(!file_peer->is_locally_available(0));
                     CHECK(!file_peer->is_locally_available(1));
                     CHECK(!bfs::exists(path));
@@ -274,6 +278,7 @@ void test_meta_changes() {
                     bfs::permissions(path, bfs::perms::no_perms);
                     sup->do_process();
                     CHECK(!file->is_locally_available());
+                    CHECK(file->is_locked());
                     CHECK(!bfs::exists(path));
 
                     REQUIRE(errors.size() == 1);
@@ -298,6 +303,7 @@ void test_meta_changes() {
                 pr_fi.set_size(5ul);
                 auto file_my = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info).value();
                 file_my->assign_block(b, 0);
+                file_my->lock();
                 files->put(file_my);
 
                 pr_fi.set_size(10ul);

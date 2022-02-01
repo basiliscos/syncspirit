@@ -96,8 +96,6 @@ struct file_info_t final : arc_base_t<file_info_t> {
     void mark_complete() noexcept;
     void mark_incomplete() noexcept;
 
-    void record_update(const device_t &source) noexcept;
-    void after_sync() noexcept;
     file_info_ptr_t local_file() noexcept;
 
     bool is_locked() const noexcept;

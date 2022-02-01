@@ -46,6 +46,10 @@ auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
             assert(block);
             fi->assign_block(block, (size_t)i);
         }
+
+        if (!db.source_device().empty()) {
+            fi->lock();
+        }
     }
     return outcome::success();
 }

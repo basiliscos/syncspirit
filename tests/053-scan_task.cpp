@@ -227,8 +227,8 @@ TEST_CASE("scan_task", "[fs]") {
                 CHECK(*std::get_if<bool>(&r) == true);
 
                 r = task.advance();
-                CHECK(std::get_if<bool>(&r));
-                CHECK(*std::get_if<bool>(&r) == true);
+                CHECK(std::get_if<incomplete_removed_t>(&r));
+                CHECK(std::get_if<incomplete_removed_t>(&r)->file == file_my);
 
                 r = task.advance();
                 CHECK(std::get_if<bool>(&r));
@@ -250,8 +250,8 @@ TEST_CASE("scan_task", "[fs]") {
                 CHECK(*std::get_if<bool>(&r) == true);
 
                 r = task.advance();
-                CHECK(std::get_if<bool>(&r));
-                CHECK(*std::get_if<bool>(&r) == true);
+                CHECK(std::get_if<incomplete_removed_t>(&r));
+                CHECK(std::get_if<incomplete_removed_t>(&r)->file == file_my);
 
                 r = task.advance();
                 CHECK(std::get_if<bool>(&r));

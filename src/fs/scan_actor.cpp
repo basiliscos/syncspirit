@@ -1,5 +1,6 @@
 #include "scan_actor.h"
 #include "model/diff/modify/file_availability.h"
+#include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/blocks_availability.h"
 #include "net/names.h"
 #include "utils/error_code.h"
@@ -121,6 +122,17 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                 } else {
                     send<model::payload::io_error_t>(coordinator, std::move(errs));
                 }
+            } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
+                auto diff = model::diff::cluster_diff_ptr_t{};
+                diff = new model::diff::modify::lock_file_t(*r.file, false);
+                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+            } else if constexpr (std::is_same_v<T, file_error_t>) {
+                auto diff = model::diff::cluster_diff_ptr_t{};
+                diff = new model::diff::modify::lock_file_t(*r.file, false);
+                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+                auto path = make_temporal(r.file->get_path());
+                scan_errors_t errors{scan_error_t{path, r.ec}};
+                send<model::payload::io_error_t>(coordinator, std::move(errors));
             } else {
                 static_assert(always_false_v<T>, "non-exhaustive visitor!");
             }
@@ -242,9 +254,12 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
             queued_next = !can_process_more;
             bool complete = (info.queue_size == 0);
             if (complete) {
-                auto diff = model::diff::block_diff_ptr_t{};
-                diff = new model::diff::modify::blocks_availability_t(*source_file, (size_t)info.valid_blocks);
-                send<model::payload::block_update_t>(coordinator, std::move(diff), this);
+                auto bdiff = model::diff::block_diff_ptr_t{};
+                bdiff = new model::diff::modify::blocks_availability_t(*source_file, (size_t)info.valid_blocks);
+                send<model::payload::block_update_t>(coordinator, std::move(bdiff), this);
+                auto diff = model::diff::cluster_diff_ptr_t{};
+                diff = new model::diff::modify::lock_file_t(*file, false);
+                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             }
         } else {
             info.invalid = true;
@@ -252,6 +267,10 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     }
 
     if (info.invalid && info.queue_size == 0) {
+        auto diff = model::diff::cluster_diff_ptr_t{};
+        diff = new model::diff::modify::lock_file_t(*file, false);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+
         LOG_DEBUG(log, "{}, removing temporal of '{}' as it corrupted", identity, file->get_full_name());
         auto path = make_temporal(file->get_path());
         sys::error_code ec;

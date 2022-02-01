@@ -135,7 +135,7 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
                 utils::uri_container_t uris;
                 for (int i = 0; i < msg->addresses_size(); ++i) {
                     auto uri = utils::parse(msg->addresses(i).c_str());
-                    if (uri) {
+                    if (uri && uri->port) {
                         uris.emplace_back(std::move(uri.value()));
                     }
                 }
