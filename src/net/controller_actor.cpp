@@ -112,8 +112,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
             substate |= substate_t::iterating_blocks;
             if (reset_block) {
                 auto diff = model::diff::cluster_diff_ptr_t{};
-                auto folder_id = file->get_folder_info()->get_folder()->get_id();
-                diff = new model::diff::modify::lock_file_t(folder_id, file->get_name(), true);
+                diff = new model::diff::modify::lock_file_t(*file, true);
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             }
             preprocess_block(block);
@@ -218,7 +217,7 @@ void controller_actor_t::on_block_update(model::message::block_update_t &message
             LOG_TRACE(log, "{}, on_block_update, finalizing", identity);
             auto my_file = source_file->local_file();
             auto diffs = diffs_t{};
-            diffs.push_back(new model::diff::modify::lock_file_t(d.folder_id, d.file_name, false));
+            diffs.push_back(new model::diff::modify::lock_file_t(*my_file, false));
             diffs.push_back(new model::diff::modify::finish_file_t(*my_file));
             auto diff = model::diff::cluster_diff_ptr_t{};
             diff = new model::diff::aggregate_t(std::move(diffs));

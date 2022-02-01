@@ -68,12 +68,12 @@ TEST_CASE("with file", "[model]") {
     REQUIRE(file);
 
     SECTION("lock/unlock") {
-        diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(db_folder.id(), pr_file_info.name(), true));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, true));
         REQUIRE(diff->apply(*cluster));
         auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
         REQUIRE(file->is_locked());
 
-        diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(db_folder.id(), pr_file_info.name(), false));
+        diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, false));
         REQUIRE(diff->apply(*cluster));
         REQUIRE(!file->is_locked());
     }

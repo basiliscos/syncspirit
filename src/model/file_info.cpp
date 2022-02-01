@@ -28,8 +28,6 @@ outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const
     if (!r) {
         return r.assume_error();
     }
-    ptr->source_device = data.source_device();
-    ptr->source_version = data.source_version();
 
     return outcome::success(std::move(ptr));
 }
