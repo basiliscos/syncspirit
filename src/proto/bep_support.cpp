@@ -96,9 +96,10 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
     if (sz < 4)
         return wrap(message::message_t(), 0u);
 
-    const std::uint32_t *ptr_32 = reinterpret_cast<const std::uint32_t *>(buff.data());
+    const char* ptr = reinterpret_cast<const char*>(buff.data());
+    const std::uint32_t *ptr_32 = reinterpret_cast<const std::uint32_t *>(ptr);
     if (be::big_to_native(*ptr_32) == constants::bep_magic) {
-        return parse_hello(asio::buffer(reinterpret_cast<const char *>(buff.data()) + 4, sz - 4));
+        return parse_hello(asio::buffer(ptr + 4, sz - 4));
     } else {
         auto ptr_16 = reinterpret_cast<const std::uint16_t *>(buff.data());
         auto header_sz = be::big_to_native(*ptr_16++);
@@ -115,8 +116,8 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
         be::big_to_native_inplace(message_sz);
         ++ptr_32;
 
-        auto tail = static_cast<const std::uint32_t *>(buff.data()) + sz;
-        if (ptr_32 + message_sz > tail) {
+        auto tail = ptr + sz;
+        if (reinterpret_cast<const char*>(ptr_32) + message_sz > tail) {
             return wrap(message::message_t(), 0u);
         }
 
