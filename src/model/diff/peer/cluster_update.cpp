@@ -53,7 +53,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
             if (!device) {
                 continue;
             }
-            if ( device != &source) {
+            if (device != &source) {
                 continue;
             }
 

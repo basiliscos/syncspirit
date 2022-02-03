@@ -31,7 +31,7 @@ struct controller_actor_config_t : r::actor_config_t {
     model::device_ptr_t peer;
     r::address_ptr_t peer_addr;
     pt::time_duration request_timeout;
-    size_t blocks_max_requested = 8;
+    uint32_t blocks_max_requested = 8;
 };
 
 template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -135,8 +135,8 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     std::uint_fast32_t blocks_requested = 0;
 
     int64_t request_pool;
-    size_t blocks_max_kept;
-    size_t blocks_max_requested;
+    uint32_t blocks_max_kept;
+    uint32_t blocks_max_requested;
     utils::logger_t log;
     unlink_requests_t unlink_requests;
     model::file_info_ptr_t file;

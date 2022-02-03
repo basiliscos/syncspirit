@@ -1,11 +1,9 @@
 #pragma once
 
 #include <cstdint>
-#include <set>
 #include <optional>
 #include <boost/filesystem.hpp>
 #include <boost/outcome.hpp>
-#include "../config/main.h"
 #include "device.h"
 #include "bep.pb.h"
 #include "structs.pb.h"

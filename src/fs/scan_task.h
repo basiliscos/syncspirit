@@ -2,6 +2,7 @@
 
 #include "model/cluster.h"
 #include "model/messages.h"
+#include "config/fs.h"
 #include "utils/log.h"
 #include <rotor.hpp>
 #include <boost/intrusive_ptr.hpp>

@@ -21,7 +21,7 @@ namespace syncspirit::config {
 bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
     return lhs.rx_buff_size == rhs.rx_buff_size && lhs.connect_timeout == rhs.connect_timeout &&
            lhs.request_timeout == rhs.request_timeout && lhs.tx_timeout == rhs.tx_timeout &&
-           lhs.rx_timeout == rhs.rx_timeout;
+           lhs.rx_timeout == rhs.rx_timeout && lhs.blocks_max_requested == rhs.blocks_max_requested;
 }
 
 bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept {
@@ -314,6 +314,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "bep/rx_timeout is incorrect or missing";
         }
         c.rx_timeout = rx_timeout.value();
+
+        auto blocks_max_requested = t["blocks_max_requested"].value<std::uint32_t>();
+        if (!blocks_max_requested) {
+            return "bep/blocks_max_requested is incorrect or missing";
+        }
+        c.blocks_max_requested = blocks_max_requested.value();
     }
 
     // dialer
@@ -435,6 +441,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                     {"request_timeout", cfg.bep_config.request_timeout},
                     {"tx_timeout", cfg.bep_config.tx_timeout},
                     {"rx_timeout", cfg.bep_config.rx_timeout},
+                    {"blocks_max_requested", cfg.bep_config.blocks_max_requested},
                 }}},
         {"dialer", toml::table{{
                        {"enabled", cfg.dialer_config.enabled},
@@ -518,6 +525,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         60000,              /* request_timeout */
         90000,              /* tx_timeout */
         300000,             /* rx_timeout */
+        16,                 /* blocks_max_requested */
     };
     cfg.dialer_config = dialer_config_t {
         true,       /* enabled */

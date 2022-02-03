@@ -64,6 +64,7 @@ auto cluster_supervisor_t::operator()(const model::diff::peer::peer_state_t &dif
             /* auto addr = */
             create_actor<controller_actor_t>()
                 .request_pool(bep_config.rx_buff_size)
+                .blocks_max_requested(bep_config.blocks_max_requested)
                 .timeout(init_timeout * 7 / 9)
                 .peer(peer)
                 .peer_addr(diff.peer_addr)
