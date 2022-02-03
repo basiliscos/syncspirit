@@ -70,7 +70,7 @@ void db_actor_t::open() noexcept {
     resources->acquire(resource::db);
     auto &my_device = cluster->get_device();
     /* enable automatic size management */
-    LOG_TRACE(log, "{}, open, db upper limit = {}", identity, upper_limit);
+    LOG_INFO(log, "{}, open, db upper limit = {}", identity, upper_limit);
     auto r = mdbx_env_set_geometry(env, -1, -1, upper_limit, -1, -1, -1);
     if (r != MDBX_SUCCESS) {
         LOG_ERROR(log, "{}, open, mbdx set geometry error ({}): {}", identity, r, mdbx_strerror(r));

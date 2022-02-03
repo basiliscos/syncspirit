@@ -15,7 +15,7 @@ namespace outcome = boost::outcome_v2;
 
 struct db_actor_config_t : r::actor_config_t {
     std::string db_dir;
-    long db_upper_limit;
+    std::int64_t db_upper_limit;
     model::cluster_ptr_t cluster;
 };
 
@@ -71,7 +71,7 @@ struct db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor
     utils::logger_t log;
     MDBX_env *env;
     std::string db_dir;
-    long upper_limit;
+    std::int64_t upper_limit;
     model::cluster_ptr_t cluster;
 };
 

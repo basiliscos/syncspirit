@@ -30,7 +30,7 @@ struct main_t {
     std::uint32_t timeout;
     std::string device_name;
     std::uint32_t hasher_threads;
-    long db_upper_limit;
+    std::int64_t db_upper_limit;
 };
 
 } // namespace syncspirit::config

@@ -122,7 +122,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.hasher_threads = hasher_threads.value();
 
-        auto db_upper_limit = t["db_upper_limit"].value<long>();
+        auto db_upper_limit = t["db_upper_limit"].value<std::int64_t>();
         if (!db_upper_limit) {
             return "main/db_upper_limit is incorrect or missing";
         }
