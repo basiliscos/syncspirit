@@ -2,6 +2,7 @@
 #include "sink.h"
 #include "error_code.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <memory>
 #include <unordered_map>
 #include <string_view>
@@ -36,6 +37,9 @@ static sink_option_t make_sink(std::string_view name) noexcept {
         return std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     } else if (name == "stderr") {
         return std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+    } else if (name.size() > 5 && name.substr(0, 5) == "file:") {
+        auto path = std::string(name.substr(5));
+        return std::make_shared<spdlog::sinks::basic_file_sink_mt>(path);
     }
     return utils::make_error_code(error_code_t::unknown_sink);
 }

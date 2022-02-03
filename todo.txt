@@ -1,6 +1,4 @@
 - unhardcode: blocks_max_requested
-- clone_block по 1 делается, хотелось бы пачкой
-- log to file
 - MDBX_NOTLS | MDBX_SAFE_NOSYNC + не закрывать транзакцию
 
 - inactivity-shutdowner
