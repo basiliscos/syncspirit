@@ -390,3 +390,63 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
     REQUIRE(!diff_opt);
 }
+
+TEST_CASE("cluster update with unknown devices", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id_1 = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto peer_id_2 = device_id_t::from_string("EAMTZPW-Q4QYERN-D57DHFS-AUP2OMG-PAHOR3R-ZWLKGAA-WQC5SVW-UJ5NXQA").value();
+
+    auto peer_device = device_t::create(peer_id_1, "peer-device").value();
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+
+    db::Folder db_folder;
+    db_folder.set_id("1234-5678");
+    db_folder.set_label("my-label");
+    db_folder.set_path("/my/path");
+    auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+
+    cluster->get_folders().put(folder);
+
+    auto folder_info_my = folder_info_ptr_t();
+    auto folder_info_peer = folder_info_ptr_t();
+    {
+        db::FolderInfo db_fi;
+        db_fi.set_index_id(5ul);
+        db_fi.set_max_sequence(10l);
+        folder_info_my = folder_info_t::create(cluster->next_uuid(), db_fi, my_device, folder).value();
+        folder->get_folder_infos().put(folder_info_my);
+    }
+    {
+        db::FolderInfo db_fi;
+        db_fi.set_index_id(6ul);
+        db_fi.set_max_sequence(0l);
+        folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi, peer_device, folder).value();
+        folder->get_folder_infos().put(folder_info_my);
+    }
+    folder->get_folder_infos().put(folder_info_my);
+    folder->get_folder_infos().put(folder_info_peer);
+
+
+
+    auto cc = std::make_unique<proto::ClusterConfig>();
+    auto p_folder = cc->add_folders();
+    p_folder->set_id(std::string(folder->get_id()));
+    p_folder->set_label(std::string(folder->get_label()));
+    auto p_peer_1 = p_folder->add_devices();
+    p_peer_1->set_id(std::string(peer_id_1.get_sha256()));
+    p_peer_1->set_name(std::string(peer_device->get_name()));
+    p_peer_1->set_max_sequence(123456u);
+    p_peer_1->set_index_id(7ul);
+
+    auto p_peer_2 = p_folder->add_devices();
+    p_peer_2->set_id(std::string(peer_id_2.get_sha256()));
+    p_peer_2->set_name(std::string(peer_device->get_name()));
+    p_peer_2->set_max_sequence(123456u);
+    p_peer_2->set_index_id(7ul);
+
+    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+    REQUIRE(diff_opt);
+}

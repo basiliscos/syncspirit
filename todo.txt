@@ -1,7 +1,7 @@
-- проболема: auto source = file->get_source(); - source пуст.  (finish_file_t?)
-- модель: игнорить неизвестные девайсы в index
 - unhardcode: blocks_max_requested
 - clone_block по 1 делается, хотелось бы пачкой
+- log to file
+- MDBX_NOTLS | MDBX_SAFE_NOSYNC + не закрывать транзакцию
 
 - inactivity-shutdowner
 - app-image : ./linuxdeploy-x86_64.AppImage --appdir AppDir -e bin/eratosthenes -d my.desktop -i /usr/share/icons/hicolor/48x48/apps/claws-mail.png --output appimage

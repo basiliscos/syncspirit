@@ -50,8 +50,10 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
             auto &d = f.devices(j);
             auto device_sha = d.id();
             auto device = devices.by_sha256(device_sha);
-            assert(device);
-            if (device != &source) {
+            if (!device) {
+                continue;
+            }
+            if ( device != &source) {
                 continue;
             }
 
