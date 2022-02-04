@@ -82,6 +82,7 @@ struct fixture_t {
                        .cluster(cluster)
                        .db_dir(root_path.string())
                        .db_upper_limit(1024 * 1024)
+                       .uncommited_threshold(0)
                        .timeout(timeout)
                        .finish();
         sup->do_process();

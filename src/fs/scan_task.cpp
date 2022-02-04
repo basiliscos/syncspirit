@@ -67,10 +67,6 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
         sys::error_code ec;
         auto &child = *it;
         bool is_dir = bfs::is_directory(child, ec);
-        if (ec) {
-            errors.push_back(scan_error_t{child, ec});
-            continue;
-        }
 
         if (is_dir) {
             dirs_queue.push_back(child);
@@ -78,10 +74,6 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
         }
 
         bool is_reg = bfs::is_regular_file(child, ec);
-        if (ec) {
-            errors.push_back(scan_error_t{child, ec});
-            continue;
-        }
         if (is_reg) {
             push(child.path());
             continue;

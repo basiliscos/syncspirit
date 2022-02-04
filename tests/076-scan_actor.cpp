@@ -261,6 +261,18 @@ void test_meta_changes() {
                     CHECK(bfs::exists(path));
                 }
 
+                 SECTION("source is missing -> tmp is removed") {
+                    file->set_source({});
+                    file->unlock();
+                    sup->do_process();
+                    CHECK(!file->is_locally_available());
+                    CHECK(!file->is_locked());
+                    CHECK(!file_peer->is_locally_available());
+                    CHECK(!file_peer->is_locally_available(0));
+                    CHECK(!file_peer->is_locally_available(1));
+                    CHECK(!bfs::exists(path));
+                }
+
                 SECTION("corrupted content") {
                     SECTION("1st block") { write_file(path, "2234567890"); }
                     SECTION("2nd block") { write_file(path, "1234567899"); }
