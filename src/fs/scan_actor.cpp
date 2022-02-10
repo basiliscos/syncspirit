@@ -123,7 +123,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     send<model::payload::io_error_t>(coordinator, std::move(errs));
                 }
             } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
-                auto& file = *r.file;
+                auto &file = *r.file;
                 if (file.is_locked()) {
                     auto diff = model::diff::cluster_diff_ptr_t{};
                     diff = new model::diff::modify::lock_file_t(file, false);

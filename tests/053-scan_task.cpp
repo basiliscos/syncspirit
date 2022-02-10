@@ -307,12 +307,10 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == false);
         }
 
-        SECTION("cannot read dir, error") {
-            pr_file.set_name("some/a.txt");
-            auto path = root_path / "some" / "a.txt";
-            auto parent = path.parent_path();
+        SECTION("cannot read file error") {
+            pr_file.set_name("a.txt");
+            auto path = root_path / "a.txt";
             write_file(path, "12345");
-            bfs::permissions(parent, bfs::perms::no_perms);
 
             auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
             folder_my->get_file_infos().put(file);
@@ -322,18 +320,48 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == true);
 
+            bfs::remove(path);
             r = task.advance();
-            REQUIRE(std::get_if<scan_errors_t>(&r));
-            auto errs = std::get_if<scan_errors_t>(&r);
-            REQUIRE(errs);
-            REQUIRE(errs->size() == 1);
-            REQUIRE(errs->at(0).path == parent);
-            REQUIRE(errs->at(0).ec);
+            REQUIRE(std::get_if<file_error_t>(&r));
+            auto err = std::get_if<file_error_t>(&r);
+            REQUIRE(err->file == file);
+            REQUIRE(err->ec);
 
             r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
-            bfs::permissions(parent, bfs::perms::all_all);
+        }
+
+        SECTION("cannot read dir, error") {
+            pr_file.set_name("some/a.txt");
+            auto path = root_path / "some" / "a.txt";
+            auto parent = path.parent_path();
+            write_file(path, "12345");
+            sys::error_code ec;
+            bfs::permissions(parent, bfs::perms::no_perms, ec);
+            bfs::permissions(path, bfs::perms::owner_read, ec);
+            if (ec) {
+                auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+                folder_my->get_file_infos().put(file);
+
+                auto task = scan_task_t(cluster, folder->get_id(), config);
+                auto r = task.advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task.advance();
+                REQUIRE(std::get_if<scan_errors_t>(&r));
+                auto errs = std::get_if<scan_errors_t>(&r);
+                REQUIRE(errs);
+                REQUIRE(errs->size() == 1);
+                REQUIRE(errs->at(0).path == parent);
+                REQUIRE(errs->at(0).ec);
+
+                r = task.advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == false);
+                bfs::permissions(parent, bfs::perms::all_all);
+            }
         }
     }
 }

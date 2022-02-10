@@ -119,7 +119,7 @@ void db_actor_t::open() noexcept {
     resources->release(resource::db);
 }
 
-auto db_actor_t::get_txn() noexcept -> outcome::result<db::transaction_t*> {
+auto db_actor_t::get_txn() noexcept -> outcome::result<db::transaction_t *> {
     if (!txn_holder) {
         auto txn = db::make_transaction(db::transaction_type_t::RW, env);
         if (!txn) {
@@ -131,7 +131,7 @@ auto db_actor_t::get_txn() noexcept -> outcome::result<db::transaction_t*> {
     return txn_holder.get();
 }
 
-auto db_actor_t::commit(bool force) noexcept  -> outcome::result<void> {
+auto db_actor_t::commit(bool force) noexcept -> outcome::result<void> {
     assert(txn_holder);
     if (force) {
         auto r = txn_holder->commit();
@@ -145,7 +145,6 @@ auto db_actor_t::commit(bool force) noexcept  -> outcome::result<void> {
     }
     return outcome::success();
 }
- 
 
 void db_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
@@ -157,7 +156,7 @@ void db_actor_t::shutdown_finish() noexcept {
     if (txn_holder) {
         auto r = commit(true);
         if (!r) {
-            auto& err = r.assume_error();
+            auto &err = r.assume_error();
             LOG_ERROR(log, "{}, cannot commit tx: {}", identity, err.message());
         }
     }

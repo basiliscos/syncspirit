@@ -1,5 +1,4 @@
 #include "log.h"
-#include "sink.h"
 #include "error_code.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>

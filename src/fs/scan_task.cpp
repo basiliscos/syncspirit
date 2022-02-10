@@ -63,26 +63,27 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
     };
 
     scan_errors_t errors;
-    for (auto it = bfs::directory_iterator(dir, ec); it != bfs::directory_iterator(); ++it) {
-        sys::error_code ec;
-        auto &child = *it;
-        bool is_dir = bfs::is_directory(child, ec);
-
-        if (is_dir) {
-            dirs_queue.push_back(child);
-            continue;
-        }
-
-        bool is_reg = bfs::is_regular_file(child, ec);
-        if (is_reg) {
-            push(child.path());
-            continue;
-        }
-    }
+    auto it = bfs::directory_iterator(dir, ec);
     if (ec) {
         errors.push_back(scan_error_t{dir, ec});
-    }
+    } else {
+        for (; it != bfs::directory_iterator(); ++it) {
+            sys::error_code ec;
+            auto &child = *it;
+            bool is_dir = bfs::is_directory(child, ec);
 
+            if (is_dir) {
+                dirs_queue.push_back(child);
+                continue;
+            }
+
+            bool is_reg = bfs::is_regular_file(child, ec);
+            if (is_reg) {
+                push(child.path());
+                continue;
+            }
+        }
+    }
     if (!errors.empty()) {
         return std::move(errors);
     }

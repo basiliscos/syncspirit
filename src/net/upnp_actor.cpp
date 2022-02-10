@@ -82,7 +82,7 @@ void upnp_actor_t::request_finish() noexcept {
 }
 
 void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
-    LOG_TRACE(log, "{}, on_igd_description", identity);
+    LOG_TRACE(log, "{}, on_igd_description, state = {}", identity, state);
     request_finish();
 
     auto &ee = msg.payload.ee;
@@ -91,7 +91,7 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
         LOG_WARN(log, "{}, get IGD description: {}", identity, ee->message());
         return do_shutdown(make_error(inner, ee));
     }
-    if (state != r::state_t::OPERATIONAL) {
+    if (state > r::state_t::OPERATIONAL) {
         return;
     }
 
@@ -140,7 +140,7 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
         auto inner = utils::make_error_code(utils::error_code_t::external_ip_failed);
         return do_shutdown(make_error(inner, ee));
     }
-    if (state != r::state_t::OPERATIONAL) {
+    if (state > r::state_t::OPERATIONAL) {
         return;
     }
 

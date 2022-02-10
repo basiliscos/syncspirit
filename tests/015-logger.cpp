@@ -44,7 +44,6 @@ TEST_CASE("hierarcy", "[log]") {
     }
 }
 
-
 TEST_CASE("file sink", "[log]") {
     auto dir = bfs::path{bfs::unique_path()};
     auto path_guard = st::path_guard_t{dir};

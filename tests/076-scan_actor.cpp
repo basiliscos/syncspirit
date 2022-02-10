@@ -137,16 +137,20 @@ void test_meta_changes() {
                 CHECK(folder_info->get_file_infos().size() == 0);
             }
             SECTION("just 1 subdir, which cannot be read") {
-                CHECK(bfs::create_directories(root_path / "abc" / "def", ec));
-                bfs::permissions(root_path / "abc", bfs::perms::no_perms);
-                sup->do_process();
-                CHECK(folder_info->get_file_infos().size() == 0);
-                bfs::permissions(root_path / "abc", bfs::perms::all_all);
-                REQUIRE(errors.size() == 1);
-                auto &errs = errors.at(0)->payload.errors;
-                REQUIRE(errs.size() == 1);
-                REQUIRE(errs.at(0).path == (root_path / "abc"));
-                REQUIRE(errs.at(0).ec);
+                auto subdir = root_path / "abc";
+                CHECK(bfs::create_directories(subdir / "def", ec));
+                bfs::permissions(subdir, bfs::perms::no_perms);
+                bfs::permissions(subdir, bfs::perms::owner_read, ec);
+                if (ec) {
+                    sup->do_process();
+                    CHECK(folder_info->get_file_infos().size() == 0);
+                    bfs::permissions(subdir, bfs::perms::all_all);
+                    REQUIRE(errors.size() == 1);
+                    auto &errs = errors.at(0)->payload.errors;
+                    REQUIRE(errs.size() == 1);
+                    REQUIRE(errs.at(0).path == (subdir));
+                    REQUIRE(errs.at(0).ec);
+                }
             }
 
             proto::FileInfo pr_fi;
@@ -261,7 +265,7 @@ void test_meta_changes() {
                     CHECK(bfs::exists(path));
                 }
 
-                 SECTION("source is missing -> tmp is removed") {
+                SECTION("source is missing -> tmp is removed") {
                     file->set_source({});
                     file->unlock();
                     sup->do_process();
@@ -288,16 +292,19 @@ void test_meta_changes() {
 
                 SECTION("error on reading -> remove") {
                     bfs::permissions(path, bfs::perms::no_perms);
-                    sup->do_process();
-                    CHECK(!file->is_locally_available());
-                    CHECK(file->is_locked());
-                    CHECK(!bfs::exists(path));
+                    bfs::permissions(path, bfs::perms::owner_read, ec);
+                    if (ec) {
+                        sup->do_process();
+                        CHECK(!file->is_locally_available());
+                        CHECK(file->is_locked());
+                        CHECK(!bfs::exists(path));
 
-                    REQUIRE(errors.size() == 1);
-                    auto &errs = errors.at(0)->payload.errors;
-                    REQUIRE(errs.size() == 1);
-                    CHECK(errs.at(0).path == path);
-                    CHECK(errs.at(0).ec);
+                        REQUIRE(errors.size() == 1);
+                        auto &errs = errors.at(0)->payload.errors;
+                        REQUIRE(errs.size() == 1);
+                        CHECK(errs.at(0).path == path);
+                        CHECK(errs.at(0).ec);
+                    }
                 }
             }
 

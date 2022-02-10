@@ -35,7 +35,6 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-
     builder_t &&db_upper_limit(std::int64_t value) &&noexcept {
         parent_t::config.db_upper_limit = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
@@ -63,11 +62,11 @@ struct db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor
 
   private:
     using transaction_ptr_t = std::unique_ptr<db::transaction_t>;
-      
+
     void open() noexcept;
-    outcome::result<db::transaction_t*> get_txn() noexcept;
+    outcome::result<db::transaction_t *> get_txn() noexcept;
     outcome::result<void> commit(bool force = false) noexcept;
-    
+
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;

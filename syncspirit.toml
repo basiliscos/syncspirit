@@ -4,6 +4,7 @@ connect_timeout = 5000
 request_timeout = 60000
 rx_timeout = 300000
 tx_timeout = 10000
+blocks_max_requested = 16
 
 [dialer]
 enabled = true
