@@ -109,7 +109,7 @@ void net_supervisor_t::launch_early() noexcept {
     db_addr = create_actor<db_actor_t>()
                   .timeout(timeout)
                   .db_dir(db_dir.string())
-                  .db_upper_limit(app_config.db_upper_limit)
+                  .db_config(app_config.db_config)
                   .cluster(cluster)
                   .escalate_failure()
                   .finish()

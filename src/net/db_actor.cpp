@@ -32,8 +32,8 @@ r::plugin::resource_id_t db = 0;
 } // namespace
 
 db_actor_t::db_actor_t(config_t &config)
-    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir},
-      upper_limit{config.db_upper_limit}, cluster{config.cluster}, uncommited_threshold(config.uncommited_threshold) {
+    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, db_config{config.db_config}, cluster{
+                                                                                                     config.cluster} {
     log = utils::get_logger("net.db");
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
@@ -138,7 +138,7 @@ auto db_actor_t::commit(bool force) noexcept -> outcome::result<void> {
         txn_holder.reset();
         return r;
     }
-    if (++uncommited >= uncommited_threshold) {
+    if (++uncommited >= db_config.uncommited_threshold) {
         auto r = txn_holder->commit();
         txn_holder.reset();
         return r;

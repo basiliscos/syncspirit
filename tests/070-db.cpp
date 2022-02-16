@@ -78,11 +78,15 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
+
+        auto db_config = config::db_config_t {
+            1024 * 1024,
+            0
+        };
         db_actor = sup->create_actor<db_actor_t>()
                        .cluster(cluster)
                        .db_dir(root_path.string())
-                       .db_upper_limit(1024 * 1024)
-                       .uncommited_threshold(0)
+                       .db_config(db_config)
                        .timeout(timeout)
                        .finish();
         sup->do_process();

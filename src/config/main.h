@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <map>
 #include "bep.h"
+#include "db.h"
 #include "dialer.h"
 #include "fs.h"
 #include "global_announce.h"
@@ -26,11 +27,11 @@ struct main_t {
     bep_config_t bep_config;
     dialer_config_t dialer_config;
     fs_config_t fs_config;
+    db_config_t db_config;
 
     std::uint32_t timeout;
     std::string device_name;
     std::uint32_t hasher_threads;
-    std::int64_t db_upper_limit;
 };
 
 } // namespace syncspirit::config

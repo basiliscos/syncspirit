@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages.h"
+#include "config/db.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
 #include "mdbx.h"
@@ -15,7 +16,7 @@ namespace outcome = boost::outcome_v2;
 
 struct db_actor_config_t : r::actor_config_t {
     std::string db_dir;
-    std::int64_t db_upper_limit;
+    config::db_config_t db_config;
     model::cluster_ptr_t cluster;
     size_t uncommited_threshold = {100};
 };
@@ -35,13 +36,8 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&db_upper_limit(std::int64_t value) &&noexcept {
-        parent_t::config.db_upper_limit = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&uncommited_threshold(size_t value) &&noexcept {
-        parent_t::config.uncommited_threshold = value;
+    builder_t &&db_config(const config::db_config_t &value) &&noexcept {
+        parent_t::config.db_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -82,11 +78,11 @@ struct db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor
     utils::logger_t log;
     MDBX_env *env;
     std::string db_dir;
+    config::db_config_t db_config;
     std::int64_t upper_limit;
     model::cluster_ptr_t cluster;
     transaction_ptr_t txn_holder;
     size_t uncommited;
-    size_t uncommited_threshold;
 };
 
 } // namespace net
