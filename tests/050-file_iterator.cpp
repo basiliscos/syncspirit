@@ -2,6 +2,7 @@
 #include "test-utils.h"
 #include "model/cluster.h"
 #include "model/diff/modify/create_folder.h"
+#include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
@@ -53,6 +54,25 @@ TEST_CASE("file iterator", "[model]") {
 
     proto::Index idx;
     idx.set_folder(db_folder.id());
+
+    SECTION("file locking") {
+        auto file = idx.add_files();
+        file->set_name("a.txt");
+        file->set_sequence(10ul);
+
+        diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
+        REQUIRE(diff->apply(*cluster));
+        auto peer_folder = folder->get_folder_infos().by_device(peer_device);
+        auto peer_file = peer_folder->get_file_infos().by_name("a.txt");
+
+        peer_file->lock();
+        auto f = cluster->next_file(peer_device, true);
+        REQUIRE(!f);
+
+        peer_file->unlock();
+        f = cluster->next_file(peer_device, true);
+        REQUIRE(f);
+    }
 
     SECTION("2 files at peer") {
         auto file_1 = idx.add_files();
@@ -152,6 +172,67 @@ TEST_CASE("file iterator", "[model]") {
             peer_folder->set_remote_max_sequence(peer_folder->get_max_sequence() + 1);
             REQUIRE(!peer_folder->is_actual());
             REQUIRE(!cluster->next_file(peer_device, true));
+        }
+    }
+
+    SECTION("file priorities") {
+        auto file_1 = idx.add_files();
+        file_1->set_name("a.txt");
+        file_1->set_sequence(10ul);
+        file_1->set_size(10ul);
+        file_1->set_block_size(5ul);
+        auto version_1 = file_1->mutable_version();
+        auto counter_1 = version_1->add_counters();
+        counter_1->set_id(14ul);
+        counter_1->set_value(1ul);
+
+        auto file_2 = idx.add_files();
+        file_2->set_name("b.txt");
+        file_2->set_sequence(9ul);
+        file_2->set_size(10ul);
+        file_2->set_block_size(5ul);
+        auto version_2 = file_2->mutable_version();
+        auto counter_2 = version_2->add_counters();
+        counter_2->set_id(15ul);
+        counter_2->set_value(1ul);
+
+        diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
+        REQUIRE(diff->apply(*cluster));
+
+        auto peer_folder = folder->get_folder_infos().by_device(peer_device);
+        auto &peer_files = peer_folder->get_file_infos();
+        auto f1 = peer_files.by_name(file_1->name());
+        auto f2 = peer_files.by_name(file_2->name());
+
+        SECTION("non-downloaded file takes priority over non-existing") {
+            diff = new diff::modify::clone_file_t(*f2);
+            REQUIRE(diff->apply(*cluster));
+
+            REQUIRE(cluster->next_file(peer_device, true) == f2);
+            REQUIRE(cluster->next_file(peer_device, false) == f1);
+            REQUIRE(!cluster->next_file(peer_device, false));
+        }
+
+        SECTION("partly-downloaded file takes priority over non-downloaded") {
+            auto &blocks_map = cluster->get_blocks();
+            diff = new diff::modify::clone_file_t(*f2);
+            REQUIRE(diff->apply(*cluster));
+
+            diff = new diff::modify::clone_file_t(*f1);
+            REQUIRE(diff->apply(*cluster));
+
+            auto f2_local = f2->local_file();
+            REQUIRE(f2_local);
+
+            auto b = proto::BlockInfo();
+            auto bi = model::block_info_t::create(b).value();
+            blocks_map.put(bi);
+            f2_local->assign_block(bi, 0);
+            f2_local->mark_local_available(0ul);
+
+            REQUIRE(cluster->next_file(peer_device, true) == f2);
+            REQUIRE(cluster->next_file(peer_device, false) == f1);
+            REQUIRE(!cluster->next_file(peer_device, false));
         }
     }
 }

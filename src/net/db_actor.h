@@ -79,7 +79,6 @@ struct db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor
     MDBX_env *env;
     std::string db_dir;
     config::db_config_t db_config;
-    std::int64_t upper_limit;
     model::cluster_ptr_t cluster;
     transaction_ptr_t txn_holder;
     size_t uncommited;

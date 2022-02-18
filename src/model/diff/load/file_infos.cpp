@@ -37,8 +37,7 @@ auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
             return option.assume_error();
         }
         auto &fi = option.assume_value();
-        auto &map = folder_info->get_file_infos();
-        map.put(fi);
+        folder_info->add(fi);
 
         for (int i = 0; i < db.blocks_size(); ++i) {
             auto block_hash = db.blocks(i);

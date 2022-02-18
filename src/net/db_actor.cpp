@@ -69,6 +69,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void db_actor_t::open() noexcept {
     resources->acquire(resource::db);
     auto &my_device = cluster->get_device();
+    auto upper_limit = db_config.upper_limit;
     /* enable automatic size management */
     LOG_INFO(log, "{}, open, db upper limit = {}", identity, upper_limit);
     auto r = mdbx_env_set_geometry(env, -1, -1, upper_limit, -1, -1, -1);

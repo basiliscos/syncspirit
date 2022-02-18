@@ -84,6 +84,7 @@ struct file_info_t final : arc_base_t<file_info_t> {
     void mark_local_available(size_t block_index) noexcept;
     bool is_locally_available(size_t block_index) const noexcept;
     bool is_locally_available() const noexcept;
+    bool is_partly_available() const noexcept;
 
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
@@ -91,10 +92,6 @@ struct file_info_t final : arc_base_t<file_info_t> {
     bool need_download(const file_info_t &other) noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
-
-    bool is_incomplete() const noexcept;
-    void mark_complete() noexcept;
-    void mark_incomplete() noexcept;
 
     file_info_ptr_t local_file() noexcept;
 
@@ -154,6 +151,7 @@ struct file_info_t final : arc_base_t<file_info_t> {
 };
 
 struct file_infos_map_t : public generic_map_t<file_info_ptr_t, 2> {
+    using parent_t = generic_map_t<file_info_ptr_t, 2>;
     file_info_ptr_t by_name(std::string_view name) noexcept;
 };
 

@@ -46,7 +46,7 @@ TEST_CASE("new file diff", "[model]") {
     SECTION("trivial cases") {
         SECTION("no file on my side, clone blockless file") {
             auto file_peer = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
-            folder_peer->get_file_infos().put(file_peer);
+            folder_peer->add(file_peer);
             diff = new diff::modify::clone_file_t(*file_peer);
             REQUIRE(diff->apply(*cluster));
             auto file_my = folder_my->get_file_infos().by_name(file_info.name());
@@ -70,11 +70,11 @@ TEST_CASE("new file diff", "[model]") {
             auto file_my = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
             file_my->assign_block(bi, 0);
             file_my->mark_local_available(0);
-            folder_my->get_file_infos().put(file_my);
+            folder_my->add(file_my);
 
             file_info.set_modified_s(123);
             auto file_peer = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
-            folder_peer->get_file_infos().put(file_peer);
+            folder_peer->add(file_peer);
             file_peer->assign_block(bi, 0);
             diff = new diff::modify::clone_file_t(*file_peer);
             REQUIRE(diff->apply(*cluster));
@@ -106,7 +106,7 @@ TEST_CASE("new file diff", "[model]") {
             file_info.set_modified_s(123);
             file_peer = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
             file_peer->assign_block(bi, 0);
-            folder_peer->get_file_infos().put(file_peer);
+            folder_peer->add(file_peer);
             diff = new diff::modify::clone_file_t(*file_peer);
             REQUIRE(diff->apply(*cluster));
 
@@ -124,7 +124,7 @@ TEST_CASE("new file diff", "[model]") {
             file_my = file_info_t::create(cluster->next_uuid(), file_info, folder_my).value();
             file_my->assign_block(bi, 0);
             file_my->mark_local_available(0);
-            folder_my->get_file_infos().put(file_my);
+            folder_my->add(file_my);
 
             file_info.set_modified_s(123);
             file_peer = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
@@ -136,7 +136,7 @@ TEST_CASE("new file diff", "[model]") {
             blocks_map.put(bi2);
 
             file_peer->assign_block(bi2, 0);
-            folder_peer->get_file_infos().put(file_peer);
+            folder_peer->add(file_peer);
             diff = new diff::modify::clone_file_t(*file_peer);
             REQUIRE(diff->apply(*cluster));
 

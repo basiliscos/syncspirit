@@ -214,6 +214,8 @@ bool file_info_t::is_locally_available(size_t block_index) const noexcept {
 
 bool file_info_t::is_locally_available() const noexcept { return missing_blocks == 0; }
 
+bool file_info_t::is_partly_available() const noexcept { return missing_blocks < blocks.size(); }
+
 void file_info_t::set_source(const file_info_ptr_t &peer_file) noexcept {
     if (peer_file) {
         auto &version = peer_file->get_version();
@@ -256,19 +258,6 @@ const boost::filesystem::path &file_info_t::get_path() const noexcept {
         path = folder_info->get_folder()->get_path() / std::string(get_name());
     }
     return path.value();
-}
-
-bool file_info_t::is_incomplete() const noexcept {
-    if (blocks.empty()) {
-        return false;
-        ;
-    }
-    for (auto it = blocks.rbegin(); it != blocks.rend(); ++it) {
-        if (!*it) {
-            return true;
-        }
-    }
-    return false;
 }
 
 auto file_info_t::local_file() noexcept -> file_info_ptr_t {

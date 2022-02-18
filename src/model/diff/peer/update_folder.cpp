@@ -67,7 +67,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         bm.put(it.item);
     }
     for (auto &it : files_map) {
-        fm.put(it.item);
+        folder_info->add(it.item);
     }
     if (max_seq) {
         folder_info->set_max_sequence(max_seq);

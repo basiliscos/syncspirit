@@ -278,14 +278,14 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     pr_fi_my.set_size(5ul);
     pr_fi_my.set_block_size(5ul);
     auto fi_my = file_info_t::create(cluster->next_uuid(), pr_fi_my, folder_info_my).value();
-    folder_info_my->get_file_infos().put(fi_my);
+    folder_info_my->add(fi_my);
 
     proto::FileInfo pr_fi_peer1;
     pr_fi_peer1.set_name("a/c.txt");
     pr_fi_peer1.set_size(5ul);
     pr_fi_peer1.set_block_size(5ul);
     auto fi_peer1 = file_info_t::create(cluster->next_uuid(), pr_fi_peer1, folder_info_peer).value();
-    folder_info_peer->get_file_infos().put(fi_peer1);
+    folder_info_peer->add(fi_peer1);
     REQUIRE(folder_info_peer->get_file_infos().size() == 1);
 
     proto::FileInfo pr_fi_peer2;
@@ -293,7 +293,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     pr_fi_peer2.set_size(10ul);
     pr_fi_peer2.set_block_size(5ul);
     auto fi_peer2 = file_info_t::create(cluster->next_uuid(), pr_fi_peer2, folder_info_peer).value();
-    folder_info_peer->get_file_infos().put(fi_peer2);
+    folder_info_peer->add(fi_peer2);
     REQUIRE(folder_info_peer->get_file_infos().size() == 2);
 
     fi_my->assign_block(b1, 0);

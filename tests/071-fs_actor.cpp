@@ -127,7 +127,7 @@ void test_clone_file() {
 
             auto make_file = [&]() {
                 auto file = file_info_t::create(cluster->next_uuid(), pr_fi, folder_peer).value();
-                folder_peer->get_file_infos().put(file);
+                folder_peer->add(file);
                 return file;
             };
 
@@ -268,7 +268,7 @@ void test_append_block() {
                 for (size_t i = 0; i < count; ++i) {
                     file->assign_block(blocks[i], i);
                 }
-                folder_peer->get_file_infos().put(file);
+                folder_peer->add(file);
                 return file;
             };
 
@@ -388,7 +388,7 @@ void test_clone_block() {
                 for (size_t i = 0; i < count; ++i) {
                     file->assign_block(blocks[i], i);
                 }
-                folder_peer->get_file_infos().put(file);
+                folder_peer->add(file);
                 return file;
             };
 
@@ -481,7 +481,7 @@ void test_clone_block() {
                 auto source = file_info_t::create(cluster->next_uuid(), pr_source, folder_peer).value();
                 source->assign_block(blocks[0], 0);
                 source->assign_block(blocks[0], 1);
-                folder_peer->get_file_infos().put(source);
+                folder_peer->add(source);
 
                 auto diffs = diff::aggregate_t::diffs_t{};
                 diffs.push_back(new diff::modify::clone_file_t(*source));

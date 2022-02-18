@@ -4,61 +4,81 @@
 using namespace syncspirit::model;
 
 file_interator_t::file_interator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
-    : cluster{&cluster_}, peer{peer_}, folders{cluster->get_folders()} {
-    it_folder = folders.begin();
-    if (it_folder == folders.end()) {
-        cluster = nullptr;
-        return;
-    }
-    f_peer_it = f_peer_end = it_file_t{};
+    : cluster{cluster_}, peer{peer_} {
+    reset();
     prepare();
 }
 
-void file_interator_t::prepare() noexcept {
-TRY_ANEW:
-    if (f_peer_it == f_peer_end) {
-        for (;; ++it_folder) {
-            if (it_folder == folders.end()) {
-                cluster = nullptr;
-                return;
-            }
-            auto &folder = it_folder->item;
-            auto &folder_infos_map = folder->get_folder_infos();
-
-            auto peer_folder_info = folder_infos_map.by_device(peer);
-            if (!peer_folder_info || !peer_folder_info->is_actual())
-                continue;
-
-            auto &peer_file_infos = peer_folder_info->get_file_infos();
-            f_peer_it = peer_file_infos.begin();
-            f_peer_end = peer_file_infos.end();
-
-            local_folder_info = folder_infos_map.by_device(cluster->get_device());
-
-            ++it_folder;
-            break;
-        }
+void file_interator_t::append(file_info_t &file) noexcept {
+    if (file.is_locally_locked() || file.is_locked()) {
+        return;
     }
 
-    while (f_peer_it != f_peer_end) {
-        file = f_peer_it->item;
-        ++f_peer_it;
-        if (file->is_locally_locked()) {
-            continue;
+    auto &folder_infos = file.get_folder_info()->get_folder()->get_folder_infos();
+    auto local_folder = folder_infos.by_device(cluster.get_device());
+    auto local_file = local_folder->get_file_infos().by_name(file.get_name());
+    if (!local_file) {
+        if (!missing_done.count(&file)) {
+            missing_done.emplace(&file);
+            missing.push_back(&file);
         }
-        auto local_file = local_folder_info->get_file_infos().by_name(file->get_name());
-        if (!local_file) {
-            return;
+        return;
+    }
+    bool needs_download = local_file->need_download(file);
+    if (!needs_download) {
+        return;
+    }
+    if (local_file->is_partly_available()) {
+        if (!incomplete_done.count(&file)) {
+            incomplete.push_back(&file);
+            incomplete_done.emplace(&file);
         }
-        bool needs_download = local_file->need_download(*file);
-        if (needs_download) {
-            return;
+    } else {
+        if (!needed_done.count(&file)) {
+            needed.push_back(&file);
+            needed_done.emplace(&file);
         }
     }
-    goto TRY_ANEW;
 }
 
-void file_interator_t::reset() noexcept { cluster = nullptr; }
+void file_interator_t::reset() noexcept {
+    auto &folders = cluster.get_folders();
+    for (auto &it : folders) {
+        auto &folder = *it.item;
+        auto peer_folder = folder.get_folder_infos().by_device(peer);
+        if (!peer_folder || !peer_folder->is_actual()) {
+            continue;
+        }
+        auto my_folder = folder.get_folder_infos().by_device(cluster.get_device());
+        if (!my_folder) {
+            continue;
+        }
+        for (auto &fit : peer_folder->get_file_infos()) {
+            append(*fit.item);
+        }
+    }
+}
+
+void file_interator_t::prepare() noexcept {
+    if (!incomplete.empty()) {
+        file = incomplete.front();
+        incomplete.pop_front();
+        return;
+    }
+    if (!needed.empty()) {
+        file = needed.front();
+        needed.pop_front();
+        return;
+    }
+    while (!missing.empty()) {
+        file = missing.front();
+        missing.pop_front();
+        return;
+    }
+    file = nullptr;
+}
+
+file_interator_t::operator bool() const noexcept { return (bool)file; }
 
 file_info_ptr_t file_interator_t::next() noexcept {
     auto r = file_info_ptr_t(file);

@@ -1,6 +1,16 @@
-- db_cfg : uncommited_threshold, upper_limit
-- check 4 symlinks test (scaner)
+- переделать file-iterator, чтобы было (вектора):
+    file_info_t -> unlock - должен file_iterator тюнить, iterator->append() тест
+    clone_file_t -> ... iterator->append()
+      after local_locck -> iterator->append()
+      
+    file_availability_t -> iterator->append() - no need, as the file is totally 
+      locally available;
+    blocks_availability_t -> iterator->append()
+      - listen in controller
+
+- file iterator test: iterate over 2 folders
 - идёт много file_clone, но нету скачки файла
+- check 4 symlinks test (scaner) ?
 
 
 - inactivity-shutdowner

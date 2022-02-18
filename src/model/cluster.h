@@ -39,8 +39,8 @@ struct cluster_t final : arc_base_t<cluster_t> {
     uuid_t next_uuid() noexcept;
     uint64_t next_uint64() noexcept;
     file_info_ptr_t next_file(const device_ptr_t &device, bool reset = false) noexcept;
+    void update_iterator(file_info_t &file) noexcept;
     file_block_t next_block(const file_info_ptr_t &source, bool reset = false) noexcept;
-
     inline bool is_tainted() const noexcept { return tainted; }
     inline void mark_tainted() noexcept { tainted = true; }
 

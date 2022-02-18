@@ -61,6 +61,16 @@ auto cluster_t::process(proto::IndexUpdate &msg, const device_t &peer) const noe
     return diff::peer::update_folder_t::create(*this, peer, msg);
 }
 
+void cluster_t::update_iterator(file_info_t &file) noexcept {
+    auto device = file.get_folder_info()->get_device();
+    auto it = file_iterator_map.find(device);
+    if (it == file_iterator_map.end()) {
+        return;
+    }
+    auto &fit = *it;
+    fit.second->append(file);
+}
+
 auto cluster_t::next_file(const device_ptr_t &peer, bool reset) noexcept -> file_info_ptr_t {
     assert(peer != device);
     if (reset) {

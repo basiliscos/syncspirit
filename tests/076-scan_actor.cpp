@@ -176,7 +176,7 @@ void test_meta_changes() {
             SECTION("a file does not physically exists") {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
-                files_peer->put(file_peer);
+                folder_info_peer->add(file_peer);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));
@@ -190,7 +190,7 @@ void test_meta_changes() {
             SECTION("complete file exists") {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
-                files_peer->put(file_peer);
+                folder_info_peer->add(file_peer);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));
@@ -235,7 +235,7 @@ void test_meta_changes() {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 file_peer->assign_block(b2, 1);
-                files_peer->put(file_peer);
+                folder_info_peer->add(file_peer);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));
@@ -323,7 +323,7 @@ void test_meta_changes() {
                 auto file_my = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info).value();
                 file_my->assign_block(b, 0);
                 file_my->lock();
-                files->put(file_my);
+                folder_info->add(file_my);
 
                 pr_fi.set_size(10ul);
                 counter->set_id(2);
@@ -331,7 +331,7 @@ void test_meta_changes() {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 file_peer->assign_block(b2, 1);
-                files_peer->put(file_peer);
+                folder_info_peer->add(file_peer);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));
