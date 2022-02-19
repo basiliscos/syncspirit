@@ -107,6 +107,7 @@ void fs_supervisor_t::on_block_update(model::message::block_update_t &message) n
     auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
+        return do_shutdown(ee);
     }
+    send<model::payload::forwarded_block_update_t>(address, &message);
 }

@@ -2,7 +2,6 @@
 - check 4 symlinks test (scaner) ?
 
 
-- inactivity-shutdowner
 - app-image : ./linuxdeploy-x86_64.AppImage --appdir AppDir -e bin/eratosthenes -d my.desktop -i /usr/share/icons/hicolor/48x48/apps/claws-mail.png --output appimage
 - image icon:
     https://www.stockio.com/free-icons/?q=sync,

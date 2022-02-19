@@ -66,12 +66,18 @@ struct forwarded_model_update_t {
     message_t message;
 };
 
+struct forwarded_block_update_t {
+    using message_t = r::intrusive_ptr_t<message::block_update_t>;
+    message_t message;
+};
+
 } // namespace payload
 
 namespace message {
 
 using forwarded_model_update_t = r::message_t<payload::forwarded_model_update_t>;
+using forwarded_block_update_t = r::message_t<payload::forwarded_block_update_t>;
 
-}
+} // namespace message
 
 } // namespace syncspirit::model

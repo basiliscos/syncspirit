@@ -18,6 +18,7 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 auto sup = supervisor->get_address();
                 plugin->subscribe_actor(&governor_actor_t::on_model_update, sup);
+                plugin->subscribe_actor(&governor_actor_t::on_block_update, sup);
                 plugin->subscribe_actor(&governor_actor_t::on_io_error, coordinator);
             }
         });
@@ -52,7 +53,26 @@ void governor_actor_t::on_model_update(model::message::forwarded_model_update_t 
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto &payload = message.payload.message->payload;
     if (payload.custom == this) {
-        process();
+        return process();
+    }
+    if (!cluster->is_tainted()) {
+        auto &diff = *message.payload.message->payload.diff;
+        auto r = diff.visit(*this);
+        if (!r) {
+            LOG_WARN(log, "{}, model visiting error: {}", identity, r.assume_error().message());
+        }
+    }
+}
+
+void governor_actor_t::on_block_update(model::message::forwarded_block_update_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_block_update", identity);
+    auto &payload = message.payload.message->payload;
+    if (!cluster->is_tainted()) {
+        auto &diff = *message.payload.message->payload.diff;
+        auto r = diff.visit(*this);
+        if (!r) {
+            LOG_WARN(log, "{}, block visiting error: {}", identity, r.assume_error().message());
+        }
     }
 }
 
@@ -77,4 +97,62 @@ NEXT:
     if (!ok) {
         goto NEXT;
     }
+}
+
+void governor_actor_t::track_inactivity() noexcept {
+    LOG_DEBUG(log, "{}, will track inactivity for the next {} seconds", identity, inactivity_seconds);
+    assert(inactivity_seconds);
+    auto timeout = r::pt::seconds(inactivity_seconds);
+    auto now = clock_t::local_time();
+    deadline = now + timeout;
+    start_timer(timeout, *this, &governor_actor_t::on_inacitvity_timer);
+}
+
+void governor_actor_t::on_inacitvity_timer(r::request_id_t, bool cancelled) noexcept {
+    LOG_DEBUG(log, "{}, on_inacitvity_timer", identity);
+    if (cancelled) {
+        if (state == r::state_t::OPERATIONAL) {
+            track_inactivity();
+        }
+        return;
+    }
+
+    auto now = clock_t::local_time();
+    if (now < deadline) {
+        return track_inactivity();
+    }
+    LOG_INFO(log, "inactivity timeout, exiting...", identity);
+    do_shutdown();
+}
+
+void governor_actor_t::refresh_deadline() noexcept {
+    LOG_DEBUG(log, "{}, refresh_deadline", identity);
+    auto timeout = r::pt::seconds(inactivity_seconds);
+    auto now = clock_t::local_time();
+    deadline = now + timeout;
+}
+
+auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &) noexcept -> outcome::result<void> {
+    refresh_deadline();
+    return outcome::success();
+}
+
+auto governor_actor_t::operator()(const model::diff::peer::cluster_update_t &) noexcept -> outcome::result<void> {
+    refresh_deadline();
+    return outcome::success();
+}
+
+auto governor_actor_t::operator()(const model::diff::peer::update_folder_t &) noexcept -> outcome::result<void> {
+    refresh_deadline();
+    return outcome::success();
+}
+
+auto governor_actor_t::operator()(const model::diff::modify::append_block_t &) noexcept -> outcome::result<void> {
+    refresh_deadline();
+    return outcome::success();
+}
+
+auto governor_actor_t::operator()(const model::diff::modify::clone_block_t &) noexcept -> outcome::result<void> {
+    refresh_deadline();
+    return outcome::success();
 }

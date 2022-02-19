@@ -14,6 +14,7 @@ enum class error_code_t {
     missing_folder,
     missing_device,
     missing_folder_path,
+    incorrect_number,
 };
 
 namespace detail {
