@@ -15,6 +15,10 @@ batch_dirs_count = 10
 temporally_timeout = 86400000
 mru_size = 10
 
+[db]
+upper_limit = 0x400000000
+uncommited_threshold = 150
+
 [global_discovery]
 announce_url = 'https://discovery.syncthing.net/'
 cert_file = '/home/b/.config/syncthing/cert.pem'
@@ -51,7 +55,6 @@ default_location = '/tmp/syncspirit'
 device_name = 'hp-note'
 timeout = 5000
 hasher_threads = 3
-db_upper_limit = 0x400000000
 
 [upnp]
 enabled = true

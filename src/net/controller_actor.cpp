@@ -210,6 +210,9 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
     auto folder_info = folder->get_folder_infos().by_device(peer);
     auto file = folder_info->get_file_infos().by_name(file_name);
     file->locally_unlock();
+    if (file_iterator) {
+        file_iterator->renew(*file);
+    }
     return outcome::success();
 }
 

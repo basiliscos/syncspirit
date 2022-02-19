@@ -19,13 +19,14 @@ struct file_iterator_t : arc_base_t<file_iterator_t> {
 
     file_info_ptr_t next() noexcept;
     void reset() noexcept;
-    void append(file_info_t &file) noexcept;
+    void renew(file_info_t &file) noexcept;
 
   private:
     using queue_t = std::deque<file_info_ptr_t>;
     using set_t = std::unordered_set<file_info_ptr_t>;
 
     void prepare() noexcept;
+    void append(file_info_t &file) noexcept;
 
     cluster_t &cluster;
     device_ptr_t peer;
