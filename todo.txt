@@ -8,7 +8,6 @@
     blocks_availability_t -> iterator->append()
       - listen in controller
 
-- file iterator test: iterate over 2 folders
 - идёт много file_clone, но нету скачки файла
 - check 4 symlinks test (scaner) ?
 

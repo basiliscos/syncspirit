@@ -116,7 +116,6 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
 
     void request_block(const model::file_block_t &block) noexcept;
     void ready() noexcept;
-    outcome::result<void> locally_unlock_file(std::string_view folder_id, std::string_view file_name) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::finish_file_t &) noexcept override;

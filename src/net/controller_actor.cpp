@@ -181,17 +181,14 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
     }
 }
 
-auto controller_actor_t::locally_unlock_file(std::string_view folder_id, std::string_view file_name) noexcept
-    -> outcome::result<void> {
+auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexcept -> outcome::result<void> {
+    auto folder_id = diff.folder_id;
+    auto file_name = diff.file.name();
     auto folder = cluster->get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device(peer);
     auto file = folder_info->get_file_infos().by_name(file_name);
     file->locally_unlock();
     return outcome::success();
-}
-
-auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexcept -> outcome::result<void> {
-    return locally_unlock_file(diff.folder_id, diff.file.name());
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::finish_file_t &diff) noexcept -> outcome::result<void> {
