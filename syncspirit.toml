@@ -39,15 +39,7 @@ level = 'trace'
 sinks = ['stdout']
 
 [[log]]
-name = 'net.peer_actor'
-level = 'debug'
-
-[[log]]
-name = 'net.hasher_proxy_actor'
-level = 'debug'
-
-[[log]]
-name = 'hasher.actor'
+name = 'net.db'
 level = 'debug'
 
 [main]

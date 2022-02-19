@@ -135,11 +135,13 @@ auto db_actor_t::get_txn() noexcept -> outcome::result<db::transaction_t *> {
 auto db_actor_t::commit(bool force) noexcept -> outcome::result<void> {
     assert(txn_holder);
     if (force) {
+        LOG_INFO(log, "{}, commiting tx", identity);
         auto r = txn_holder->commit();
         txn_holder.reset();
         return r;
     }
     if (++uncommited >= db_config.uncommited_threshold) {
+        LOG_INFO(log, "{}, commiting tx", identity);
         auto r = txn_holder->commit();
         txn_holder.reset();
         return r;
