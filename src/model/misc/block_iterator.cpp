@@ -4,7 +4,7 @@
 
 using namespace syncspirit::model;
 
-blocks_interator_t::blocks_interator_t(file_info_t &source_) noexcept : i{0}, source{&source_} {
+blocks_iterator_t::blocks_iterator_t(file_info_t &source_) noexcept : i{0}, source{&source_} {
     auto &sb = source->get_blocks();
 
     if (i == sb.size()) {
@@ -14,7 +14,7 @@ blocks_interator_t::blocks_interator_t(file_info_t &source_) noexcept : i{0}, so
     advance();
 }
 
-void blocks_interator_t::advance() noexcept {
+void blocks_iterator_t::advance() noexcept {
     auto &sb = source->get_blocks();
     auto max = sb.size();
     while (i < max && sb[i]) {
@@ -27,21 +27,17 @@ void blocks_interator_t::advance() noexcept {
     prepare();
 }
 
-void blocks_interator_t::prepare() noexcept {
+void blocks_iterator_t::prepare() noexcept {
     if (source) {
         if (i >= source->blocks.size()) {
-            auto &cluster = source->get_folder_info()->get_folder()->get_cluster();
-            auto &map = cluster->block_iterator_map;
-            auto src = source;
             source = nullptr;
-            map.erase(src);
         }
     }
 }
 
-void blocks_interator_t::reset() noexcept { source.reset(); }
+void blocks_iterator_t::reset() noexcept { source.reset(); }
 
-file_block_t blocks_interator_t::next() noexcept {
+file_block_t blocks_iterator_t::next() noexcept {
     assert(source);
     auto src = source.get();
     auto &sb = src->get_blocks();

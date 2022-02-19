@@ -20,6 +20,19 @@ TEST_CASE("block iterator", "[model]") {
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
 
+    auto block_iterator = block_iterator_ptr_t();
+    auto next = [&](file_info_ptr_t source, bool reset = false) -> file_block_t {
+        if (source && source->is_file() && !source->is_deleted()) {
+            if (reset) {
+                block_iterator = new blocks_iterator_t(*source);
+            }
+            if (block_iterator && *block_iterator) {
+                return block_iterator->next();
+            }
+        }
+        return {};
+    };
+
     auto &folders = cluster->get_folders();
     db::Folder db_folder;
     db_folder.set_id("1234-5678");
@@ -45,7 +58,7 @@ TEST_CASE("block iterator", "[model]") {
         REQUIRE(diff->apply(*cluster));
 
         auto my_file = my_folder->get_file_infos().by_name(p_file->name());
-        REQUIRE(!cluster->next_block(my_file, true));
+        REQUIRE(!next(my_file, true));
     }
 
     auto bi1 = proto::BlockInfo();
@@ -74,7 +87,7 @@ TEST_CASE("block iterator", "[model]") {
             REQUIRE(diff->apply(*cluster));
 
             auto my_file = my_folder->get_file_infos().by_name(p_file->name());
-            CHECK(!cluster->next_block(my_file, true));
+            CHECK(!next(my_file, true));
         }
 
         SECTION("normal iteration") {
@@ -84,19 +97,19 @@ TEST_CASE("block iterator", "[model]") {
 
             auto my_file = my_folder->get_file_infos().by_name(p_file->name());
 
-            auto fb1 = cluster->next_block(my_file, true);
+            auto fb1 = next(my_file, true);
             REQUIRE(fb1);
             CHECK(fb1.block()->get_hash() == bi1.hash());
             CHECK(fb1.block_index() == 0);
             CHECK(fb1.file() == my_file.get());
 
-            auto fb2 = cluster->next_block(my_file);
+            auto fb2 = next(my_file);
             REQUIRE(fb2);
             CHECK(fb2.block()->get_hash() == bi2.hash());
             CHECK(fb2.block_index() == 1);
             CHECK(fb2.file() == my_file.get());
 
-            REQUIRE(!cluster->next_block(my_file));
+            REQUIRE(!next(my_file));
         }
     }
 
@@ -109,14 +122,14 @@ TEST_CASE("block iterator", "[model]") {
         REQUIRE(diff->apply(*cluster));
         auto my_file = my_folder->get_file_infos().by_name(p_file->name());
 
-        auto fb = cluster->next_block(my_file, true);
+        auto fb = next(my_file, true);
         REQUIRE(fb);
         auto block = fb.block();
 
         block->lock();
-        REQUIRE(!cluster->next_block(my_file, true));
+        REQUIRE(!next(my_file, true));
 
         block->unlock();
-        REQUIRE(cluster->next_block(my_file, true));
+        REQUIRE(next(my_file, true));
     }
 }

@@ -1,6 +1,4 @@
 #include "cluster.h"
-#include "misc/file_iterator.h"
-#include "misc/block_iterator.h"
 #include "diff/peer/cluster_update.h"
 #include "diff/peer/update_folder.h"
 #include <spdlog/spdlog.h>
@@ -59,39 +57,4 @@ auto cluster_t::process(proto::Index &msg, const device_t &peer) const noexcept
 auto cluster_t::process(proto::IndexUpdate &msg, const device_t &peer) const noexcept
     -> outcome::result<diff::cluster_diff_ptr_t> {
     return diff::peer::update_folder_t::create(*this, peer, msg);
-}
-
-void cluster_t::update_iterator(file_info_t &file) noexcept {
-    auto device = file.get_folder_info()->get_device();
-    auto it = file_iterator_map.find(device);
-    if (it == file_iterator_map.end()) {
-        return;
-    }
-    auto &fit = *it;
-    fit.second->append(file);
-}
-
-auto cluster_t::next_file(const device_ptr_t &peer, bool reset) noexcept -> file_info_ptr_t {
-    assert(peer != device);
-    if (reset) {
-        file_iterator_map[peer] = new file_interator_t(*this, peer);
-    }
-    auto &it = file_iterator_map[peer];
-    if (it && *it) {
-        return it->next();
-    }
-    return {};
-}
-
-auto cluster_t::next_block(const file_info_ptr_t &source, bool reset) noexcept -> file_block_t {
-    if (source->is_file() && !source->is_deleted()) {
-        if (reset) {
-            block_iterator_map[source] = new blocks_interator_t(*source);
-        }
-        auto &it = block_iterator_map[source];
-        if (it && *it) {
-            return it->next();
-        }
-    }
-    return {};
 }

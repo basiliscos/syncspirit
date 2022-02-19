@@ -15,12 +15,6 @@
 
 namespace syncspirit::model {
 
-struct file_interator_t;
-struct block_interator_t;
-
-using block_iterator_ptr_t = intrusive_ptr_t<blocks_interator_t>;
-using file_iterator_ptr_t = intrusive_ptr_t<file_interator_t>;
-
 struct cluster_t final : arc_base_t<cluster_t> {
 
     cluster_t(device_ptr_t device_, size_t seed) noexcept;
@@ -38,9 +32,6 @@ struct cluster_t final : arc_base_t<cluster_t> {
     const folders_map_t &get_folders() const noexcept;
     uuid_t next_uuid() noexcept;
     uint64_t next_uint64() noexcept;
-    file_info_ptr_t next_file(const device_ptr_t &device, bool reset = false) noexcept;
-    void update_iterator(file_info_t &file) noexcept;
-    file_block_t next_block(const file_info_ptr_t &source, bool reset = false) noexcept;
     inline bool is_tainted() const noexcept { return tainted; }
     inline void mark_tainted() noexcept { tainted = true; }
 
@@ -52,8 +43,6 @@ struct cluster_t final : arc_base_t<cluster_t> {
     using rng_engine_t = std::mt19937;
     using uuid_generator_t = boost::uuids::basic_random_generator<rng_engine_t>;
     using uint64_generator_t = std::uniform_int_distribution<uint64_t>;
-    using file_iterator_map_t = std::unordered_map<device_ptr_t, file_iterator_ptr_t>;
-    using block_iterator_map_t = std::unordered_map<file_info_ptr_t, block_iterator_ptr_t>;
 
     rng_engine_t rng_engine;
     uuid_generator_t uuid_generator;
@@ -65,11 +54,6 @@ struct cluster_t final : arc_base_t<cluster_t> {
     ignored_devices_map_t ignored_devices;
     ignored_folders_map_t ignored_folders;
     bool tainted = false;
-    file_iterator_map_t file_iterator_map;
-    block_iterator_map_t block_iterator_map;
-
-    friend struct file_interator_t;
-    friend struct blocks_interator_t;
 };
 
 using cluster_ptr_t = intrusive_ptr_t<cluster_t>;

@@ -21,7 +21,7 @@ struct folder_info_t;
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
 struct local_file_t;
-struct blocks_interator_t;
+struct blocks_iterator_t;
 
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
@@ -147,7 +147,7 @@ struct file_info_t final : arc_base_t<file_info_t> {
     size_t missing_blocks;
     std::string source_device;
 
-    friend struct blocks_interator_t;
+    friend struct blocks_iterator_t;
 };
 
 struct file_infos_map_t : public generic_map_t<file_info_ptr_t, 2> {

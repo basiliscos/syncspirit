@@ -94,6 +94,28 @@ void controller_actor_t::on_termination(message::termination_signal_t &message) 
 
 void controller_actor_t::ready() noexcept { send<payload::ready_signal_t>(get_address()); }
 
+model::file_info_ptr_t controller_actor_t::next_file(bool reset) noexcept {
+    if (reset) {
+        file_iterator = new model::file_iterator_t(*cluster, peer);
+    }
+    if (file_iterator && *file_iterator) {
+        return file_iterator->next();
+    }
+    return {};
+}
+
+model::file_block_t controller_actor_t::next_block(bool reset) noexcept {
+    if (file->is_file() && !file->is_deleted()) {
+        if (reset) {
+            block_iterator = new model::blocks_iterator_t(*file);
+        }
+        if (block_iterator && *block_iterator) {
+            return block_iterator->next();
+        }
+    }
+    return {};
+}
+
 void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     LOG_TRACE(log, "{}, on_ready, blocks requested = {}", identity, blocks_requested);
     bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
@@ -107,7 +129,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
 
     if (file && file->get_size() && file->local_file()) {
         auto reset_block = !(substate & substate_t::iterating_blocks);
-        auto block = cluster->next_block(file, reset_block);
+        auto block = next_block(reset_block);
         if (block) {
             substate |= substate_t::iterating_blocks;
             if (reset_block) {
@@ -122,7 +144,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
     }
     if (!(substate & substate_t::iterating_blocks)) {
         bool reset_file = !(substate & substate_t::iterating_files) && !blocks_requested;
-        file = cluster->next_file(peer, reset_file);
+        file = next_file(reset_file);
         if (file) {
             substate |= substate_t::iterating_files;
             if (!file->local_file()) {

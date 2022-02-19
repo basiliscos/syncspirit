@@ -9,10 +9,11 @@
 namespace syncspirit::model {
 
 struct cluster_t;
+struct blocks_iterator_t;
 
-struct file_interator_t : arc_base_t<file_interator_t> {
-    file_interator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
-    file_interator_t(const file_interator_t &) = delete;
+struct file_iterator_t : arc_base_t<file_iterator_t> {
+    file_iterator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
+    file_iterator_t(const file_iterator_t &) = delete;
 
     operator bool() const noexcept;
 
@@ -37,6 +38,6 @@ struct file_interator_t : arc_base_t<file_interator_t> {
     set_t needed_done;
 };
 
-using file_iterator_ptr_t = intrusive_ptr_t<file_interator_t>;
+using file_iterator_ptr_t = intrusive_ptr_t<file_iterator_t>;
 
 } // namespace syncspirit::model

@@ -1,6 +1,7 @@
 #include "catch.hpp"
 #include "test-utils.h"
 #include "model/cluster.h"
+#include "model/misc/file_iterator.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/share_folder.h"
@@ -22,6 +23,17 @@ TEST_CASE("file iterator", "[model]") {
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
+    auto file_iterator = file_iterator_ptr_t();
+    auto next = [&](bool reset = false) -> file_info_ptr_t {
+        if (reset) {
+            file_iterator = new file_iterator_t(*cluster, peer_device);
+        }
+        if (file_iterator) {
+            return file_iterator->next();
+        }
+        return {};
+    };
+
     auto &folders = cluster->get_folders();
     db::Folder db_folder;
     db_folder.set_id("1234-5678");
@@ -36,8 +48,8 @@ TEST_CASE("file iterator", "[model]") {
     REQUIRE(diff->apply(*cluster));
 
     SECTION("check when no files") {
-        CHECK(!cluster->next_file(peer_device));
-        CHECK(!cluster->next_file(peer_device, true));
+        CHECK(!next());
+        CHECK(!next(true));
     }
 
     auto cc = std::make_unique<proto::ClusterConfig>();
@@ -67,11 +79,11 @@ TEST_CASE("file iterator", "[model]") {
         auto peer_file = peer_folder->get_file_infos().by_name("a.txt");
 
         peer_file->lock();
-        auto f = cluster->next_file(peer_device, true);
+        auto f = next(true);
         REQUIRE(!f);
 
         peer_file->unlock();
-        f = cluster->next_file(peer_device, true);
+        f = next(true);
         REQUIRE(f);
     }
 
@@ -89,15 +101,15 @@ TEST_CASE("file iterator", "[model]") {
             REQUIRE(diff->apply(*cluster));
 
             SECTION("files are missing at my side") {
-                auto f1 = cluster->next_file(peer_device, true);
+                auto f1 = next(true);
                 REQUIRE(f1);
                 CHECK(f1->get_name() == "a.txt");
 
-                auto f2 = cluster->next_file(peer_device);
+                auto f2 = next();
                 REQUIRE(f2);
                 CHECK(f2->get_name() == "b.txt");
 
-                REQUIRE(!cluster->next_file(peer_device));
+                REQUIRE(!next());
             }
 
             SECTION("one file is already exists on my side") {
@@ -111,11 +123,11 @@ TEST_CASE("file iterator", "[model]") {
                 auto peer_folder = folder_infos.by_device(peer_device);
                 REQUIRE(peer_folder->get_file_infos().size() == 2);
 
-                auto f2 = cluster->next_file(peer_device, true);
+                auto f2 = next(true);
                 REQUIRE(f2);
                 CHECK(f2->get_name() == "b.txt");
 
-                REQUIRE(!cluster->next_file(peer_device));
+                REQUIRE(!next());
             }
         }
 
@@ -135,10 +147,10 @@ TEST_CASE("file iterator", "[model]") {
             pr_file.set_name("a.txt");
             my_folder->add(file_info_t::create(cluster->next_uuid(), pr_file, my_folder).value());
 
-            auto f = cluster->next_file(peer_device, true);
+            auto f = next(true);
             REQUIRE(f);
             CHECK(f->get_name() == "a.txt");
-            REQUIRE(!cluster->next_file(peer_device));
+            REQUIRE(!next());
         }
 
         SECTION("a file on peer side is incomplete") {
@@ -154,10 +166,10 @@ TEST_CASE("file iterator", "[model]") {
             auto my_folder = folder_infos.by_device(my_device);
             my_folder->add(file_info_t::create(cluster->next_uuid(), *file_1, my_folder).value());
 
-            auto f = cluster->next_file(peer_device, true);
+            auto f = next(true);
             REQUIRE(f);
             CHECK(f->get_name() == "a.txt");
-            REQUIRE(!cluster->next_file(peer_device));
+            REQUIRE(!next());
         }
 
         SECTION("folder info is non-actual") {
@@ -172,7 +184,7 @@ TEST_CASE("file iterator", "[model]") {
             peer_folder->add(file_info_t::create(cluster->next_uuid(), *file_1, peer_folder).value());
             peer_folder->set_remote_max_sequence(peer_folder->get_max_sequence() + 1);
             REQUIRE(!peer_folder->is_actual());
-            REQUIRE(!cluster->next_file(peer_device, true));
+            REQUIRE(!next(true));
         }
     }
 
@@ -208,10 +220,9 @@ TEST_CASE("file iterator", "[model]") {
         SECTION("non-downloaded file takes priority over non-existing") {
             diff = new diff::modify::clone_file_t(*f2);
             REQUIRE(diff->apply(*cluster));
-
-            REQUIRE(cluster->next_file(peer_device, true) == f2);
-            REQUIRE(cluster->next_file(peer_device, false) == f1);
-            REQUIRE(!cluster->next_file(peer_device, false));
+            REQUIRE(next(true) == f2);
+            REQUIRE(next(false) == f1);
+            REQUIRE(!next(false));
         }
 
         SECTION("partly-downloaded file takes priority over non-downloaded") {
@@ -231,9 +242,9 @@ TEST_CASE("file iterator", "[model]") {
             f2_local->assign_block(bi, 0);
             f2_local->mark_local_available(0ul);
 
-            REQUIRE(cluster->next_file(peer_device, true) == f2);
-            REQUIRE(cluster->next_file(peer_device, false) == f1);
-            REQUIRE(!cluster->next_file(peer_device, false));
+            REQUIRE(next(true) == f2);
+            REQUIRE(next(false) == f1);
+            REQUIRE(!next(false));
         }
     }
 }
@@ -247,6 +258,17 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
+
+    auto file_iterator = file_iterator_ptr_t();
+    auto next = [&](bool reset = false) -> file_info_ptr_t {
+        if (reset) {
+            file_iterator = new file_iterator_t(*cluster, peer_device);
+        }
+        if (file_iterator && *file_iterator) {
+            return file_iterator->next();
+        }
+        return {};
+    };
 
     auto &folders = cluster->get_folders();
     db::Folder db_folder1;
@@ -315,15 +337,15 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     REQUIRE(diff->apply(*cluster));
 
     auto files = std::unordered_set<std::string>{};
-    auto f = cluster->next_file(peer_device, true);
+    auto f = next(true);
     REQUIRE(f);
     files.emplace(f->get_full_name());
 
-    f = cluster->next_file(peer_device);
+    f = next();
     REQUIRE(f);
     files.emplace(f->get_full_name());
 
-    REQUIRE(!cluster->next_file(peer_device));
+    REQUIRE(!next());
     CHECK(files.size() == 2);
     CHECK(files.count("my-label-1/a.txt"));
     CHECK(files.count("my-label-2/b.txt"));

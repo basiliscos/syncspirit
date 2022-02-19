@@ -3,13 +3,13 @@
 
 using namespace syncspirit::model;
 
-file_interator_t::file_interator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
+file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
     : cluster{cluster_}, peer{peer_} {
     reset();
     prepare();
 }
 
-void file_interator_t::append(file_info_t &file) noexcept {
+void file_iterator_t::append(file_info_t &file) noexcept {
     if (file.is_locally_locked() || file.is_locked()) {
         return;
     }
@@ -41,7 +41,7 @@ void file_interator_t::append(file_info_t &file) noexcept {
     }
 }
 
-void file_interator_t::reset() noexcept {
+void file_iterator_t::reset() noexcept {
     auto &folders = cluster.get_folders();
     for (auto &it : folders) {
         auto &folder = *it.item;
@@ -59,7 +59,7 @@ void file_interator_t::reset() noexcept {
     }
 }
 
-void file_interator_t::prepare() noexcept {
+void file_iterator_t::prepare() noexcept {
     if (!incomplete.empty()) {
         file = incomplete.front();
         incomplete.pop_front();
@@ -78,9 +78,9 @@ void file_interator_t::prepare() noexcept {
     file = nullptr;
 }
 
-file_interator_t::operator bool() const noexcept { return (bool)file; }
+file_iterator_t::operator bool() const noexcept { return (bool)file; }
 
-file_info_ptr_t file_interator_t::next() noexcept {
+file_info_ptr_t file_iterator_t::next() noexcept {
     auto r = file_info_ptr_t(file);
     prepare();
     return r;

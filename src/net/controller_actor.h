@@ -117,6 +117,9 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     void request_block(const model::file_block_t &block) noexcept;
     void ready() noexcept;
 
+    model::file_info_ptr_t next_file(bool reset) noexcept;
+    model::file_block_t next_block(bool reset) noexcept;
+
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::finish_file_t &) noexcept override;
 
@@ -139,6 +142,8 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     utils::logger_t log;
     unlink_requests_t unlink_requests;
     model::file_info_ptr_t file;
+    model::file_iterator_ptr_t file_iterator;
+    model::block_iterator_ptr_t block_iterator;
     int substate = substate_t::none;
 };
 
