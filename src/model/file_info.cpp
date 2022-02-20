@@ -8,6 +8,10 @@
 #include <algorithm>
 #include <spdlog/spdlog.h>
 
+#ifdef uuid_t
+#undef uuid_t
+#endif
+
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
@@ -32,10 +36,10 @@ outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<file_info_ptr_t> file_info_t::create(const uuid_t &uuid, const proto::FileInfo &info_,
-                                                     const folder_info_ptr_t &folder_info_) noexcept {
+auto file_info_t::create(const uuid_t &uuid_, const proto::FileInfo &info_,
+                         const folder_info_ptr_t &folder_info_) noexcept -> outcome::result<file_info_ptr_t> {
     auto ptr = file_info_ptr_t();
-    ptr = new file_info_t(uuid, folder_info_);
+    ptr = new file_info_t(uuid_, folder_info_);
 
     auto r = ptr->fields_update(info_, info_.blocks_size());
     if (!r) {

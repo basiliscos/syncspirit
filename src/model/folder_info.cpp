@@ -5,6 +5,10 @@
 #include "misc/error_code.h"
 #include <spdlog.h>
 
+#ifdef uuid_t
+#undef uuid_t
+#endif
+
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder_info);

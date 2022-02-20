@@ -98,7 +98,7 @@ bfs::path make_temporal(const bfs::path &path) noexcept {
 }
 
 bool is_temporal(const bfs::path &path) noexcept {
-    auto &name = path.string();
+    auto name = path.string();
     if (name.length() < tmp_suffix.length()) {
         return false;
     }
@@ -111,7 +111,7 @@ relative_result_t relativize(const bfs::path &path, const boost::filesystem::pat
     if (!is_temporal(path)) {
         return {sub, false};
     }
-    auto &str = sub.string();
+    auto str = sub.string();
     auto new_path = str.substr(0, str.size() - tmp_suffix.size());
     return {bfs::path(new_path), true};
 }

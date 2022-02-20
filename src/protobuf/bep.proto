@@ -161,7 +161,7 @@ message Response {
 }
 
 enum ErrorCode {
-    NO_ERROR     = 0;
+    NO_BEP_ERROR = 0;
     GENERIC      = 1;
     NO_SUCH_FILE = 2;
     INVALID_FILE = 3;

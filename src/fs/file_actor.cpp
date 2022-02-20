@@ -154,7 +154,7 @@ auto file_actor_t::operator()(const model::diff::modify::flush_file_t &diff) noe
     auto file = file_info->get_file_infos().by_name(diff.file_name);
     assert(file->is_locally_available());
 
-    auto &path = file->get_path().string();
+    auto path = file->get_path().string();
     auto mmaped_file = files_cache.get(path);
     if (!mmaped_file) {
         LOG_ERROR(log, "{}, attempt to flush non-opend file {}", identity, path);
@@ -179,7 +179,7 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
     auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = file_info->get_file_infos().by_name(diff.file_name);
     auto &path = file->get_path();
-    auto &path_str = path.string();
+    auto path_str = path.string();
     auto file_opt = open_file(path, true, file);
     if (!file_opt) {
         auto &err = file_opt.assume_error();
