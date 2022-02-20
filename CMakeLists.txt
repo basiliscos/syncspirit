@@ -117,6 +117,7 @@ add_library(syncspirit_lib
     src/utils/location.cpp
     src/utils/log.cpp
     src/utils/network_interface.cpp
+    src/utils/platform.cpp
     src/utils/tls.cpp
     src/utils/uri.cpp
     ${PROTO_SRCS}

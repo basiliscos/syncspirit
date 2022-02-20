@@ -11,6 +11,7 @@
 #include "config/utils.h"
 #include "utils/location.h"
 #include "utils/log.h"
+#include "utils/platform.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"
 #include "hasher/hasher_supervisor.h"
@@ -46,6 +47,7 @@ int main(int argc, char **argv) {
     }
 
     try {
+        utils::platform_t::startup();
 
 #if defined(__linux__)
         pthread_setname_np(pthread_self(), "ss/main");
@@ -272,6 +274,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    utils::platform_t::shutdhown();
     google::protobuf::ShutdownProtobufLibrary();
     /* exit */
 
