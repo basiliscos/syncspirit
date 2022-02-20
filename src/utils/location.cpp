@@ -21,7 +21,7 @@ outcome::result<fs::path> get_default_config_dir() noexcept {
     } else if (auto app_data = std::getenv("AppData")) {
         return fs::path(app_data).append("syncspirit");
     }
-    return error_code::cant_determine_config_dir;
+    return error_code_t::cant_determine_config_dir;
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
     auto *pw = getpwuid(getuid());
     if (!pw) {

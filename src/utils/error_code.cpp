@@ -44,6 +44,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::service_not_available:
         r = "service not available";
         break;
+    case error_code_t::cant_determine_config_dir:
+        r = "config dir cannot be determined";
+        break;
     case error_code_t::unexpected_response_code:
         r = "unexpected response code";
         break;
