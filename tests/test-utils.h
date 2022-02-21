@@ -23,7 +23,6 @@ struct path_guard_t {
 };
 
 bfs::path file_path(const char *test_file);
-std::string read_file(const char *test_file);
 std::string read_file(const bfs::path &path);
 void write_file(const bfs::path &path, std::string_view content);
 std::string device_id2sha256(std::string_view device_id);

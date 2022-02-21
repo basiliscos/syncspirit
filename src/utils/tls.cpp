@@ -104,9 +104,6 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     }
     auto group_guard = make_guard(group, [](auto *ptr) { EC_GROUP_free(ptr); });
 
-    auto ec_key = EVP_PKEY_get0_EC_KEY(pkey);
-    EC_KEY_set_group(ec_key, group);
-
     X509 *cert = X509_new();
     // cert->ex_kusage = X509v3_KU_KEY_ENCIPHERMENT | X509v3_KU_DIGITAL_SIGNATURE;
     auto cert_guard = make_guard(cert, [](auto *ptr) { X509_free(ptr); });
@@ -261,6 +258,7 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
 
 outcome::result<std::string> sha256_digest(const std::string &data) noexcept {
     unsigned char buff[SHA256_DIGEST_LENGTH];
+#if 0
     SHA256_CTX sha256;
     if (1 != SHA256_Init(&sha256)) {
         return error_code_t::tls_sha256_init_failure;
@@ -271,6 +269,22 @@ outcome::result<std::string> sha256_digest(const std::string &data) noexcept {
     }
 
     SHA256_Final(buff, &sha256);
+    return std::string(buff, buff + SHA256_DIGEST_LENGTH);
+#endif
+    auto ctx = EVP_MD_CTX_create();
+    auto ctx_guard = make_guard(ctx, [](auto *ptr) { EVP_MD_CTX_free(ptr); });
+
+    auto digester = EVP_get_digestbyname("sha256");
+    if (!digester) {
+        return error_code_t::tls_sha256_init_failure;
+    }
+    if (1 != EVP_DigestInit_ex(ctx, digester, NULL) ) {
+        return error_code_t::tls_sha256_failure;
+    }
+    if (1 != EVP_DigestUpdate(ctx, data.c_str(), data.size())) {
+        return error_code_t::tls_sha256_failure;
+    }
+    EVP_DigestFinal_ex(ctx, buff, NULL);
     return std::string(buff, buff + SHA256_DIGEST_LENGTH);
 }
 

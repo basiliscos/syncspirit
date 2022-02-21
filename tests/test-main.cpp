@@ -19,17 +19,12 @@ int main(int argc, char *argv[]) {
 
 namespace syncspirit::test {
 
-boost::filesystem::path file_path(const char* test_file) {
-    auto self_file = __FILE__;
-    bfs::path self(self_file);
-    self.remove_filename();
-    return self /  test_file;
-}
 
 std::string read_file(const bfs::path& path) {
     sys::error_code ec;
     auto filesize = bfs::file_size(path, ec);
-    auto file_path_c = path.c_str();
+    auto file_path = path.string();
+    auto file_path_c = file_path.c_str();
     auto in = fopen(file_path_c, "rb");
     if (!in) {
         auto ec = sys::error_code{errno, sys::generic_category()};
@@ -44,17 +39,13 @@ std::string read_file(const bfs::path& path) {
     return std::string(buffer.data(), filesize);
 }
 
-std::string read_file(const char* test_file) {
-    return read_file(file_path(test_file));
-}
-
 void write_file(const bfs::path& path, std::string_view content) {
     bfs::create_directories(path.parent_path());
-    auto file_path_c = path.c_str();
-    auto out = fopen(file_path_c, "wb");
+    auto file_path = path.string();
+    auto out = fopen(file_path.c_str(), "wb");
     if (!out) {
         auto ec = sys::error_code{errno, sys::generic_category()};
-        std::cout << "can't open " << file_path_c << " : " << ec.message() << "\n";
+        std::cout << "can't open " << file_path << " : " << ec.message() << "\n";
         std::abort();
     }
     if (content.size()) {

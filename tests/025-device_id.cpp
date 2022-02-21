@@ -9,7 +9,7 @@ using namespace syncspirit::utils;
 using namespace syncspirit::model;
 using namespace syncspirit::proto;
 
-namespace fs = boost::filesystem;
+namespace bfs = boost::filesystem;
 using l32 = luhn32;
 
 TEST_CASE("luhn32", "[model]") {
@@ -24,9 +24,9 @@ TEST_CASE("luhn32", "[model]") {
 }
 
 TEST_CASE("device_id", "[model]") {
-    auto cert_path = file_path("/data/sample-cert.pem");
-    auto key_path = file_path("/data/sample-key.pem");
-    auto load_result = load_pair(cert_path.c_str(), key_path.c_str());
+    auto cert_path = bfs::path("data/sample-cert.pem");
+    auto key_path =  bfs::path("data/sample-key.pem");
+    auto load_result = load_pair(cert_path.string().c_str(), key_path.string().c_str());
     REQUIRE(load_result);
     auto &pair = load_result.value();
     auto opt_device_id = device_id_t::from_cert(pair.cert_data);

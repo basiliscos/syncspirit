@@ -20,6 +20,11 @@ target_include_directories(syncspirit_test_lib PUBLIC
     "${syncspirit_SOURCE_DIR}/src"
 )
 
+add_custom_command(TARGET syncspirit_test_lib PRE_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory
+                   ${CMAKE_SOURCE_DIR}/tests/data ${CMAKE_BINARY_DIR}/data)
+
+
 add_executable(009-uri 009-uri.cpp)
 target_link_libraries(009-uri syncspirit_test_lib)
 add_test(009-uri "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/009-uri")

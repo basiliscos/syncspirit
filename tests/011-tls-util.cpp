@@ -10,7 +10,7 @@
 using namespace syncspirit::utils;
 using namespace syncspirit::test;
 
-namespace fs = boost::filesystem;
+namespace bfs = boost::filesystem;
 
 TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     auto pair = generate_pair("sample");
@@ -26,15 +26,17 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     X509_print_fp(stdout, value.cert.get());
 
     auto cert_file = bfs::unique_path();
+    auto cert_file_path = cert_file.string();
     auto cert_file_guard = path_guard_t(cert_file);
 
     auto key_file = bfs::unique_path();
+    auto key_file_path = key_file.string();
     auto key_file_guard = path_guard_t(key_file);
-    auto save_result = value.save(cert_file.c_str(), key_file.c_str());
+    auto save_result = value.save(cert_file_path.c_str(), key_file_path.c_str());
     REQUIRE((bool)save_result);
-    printf("cert has been saved as %s\n", cert_file.c_str());
+    printf("cert has been saved as %s\n", cert_file_path.c_str());
 
-    auto load_result = load_pair(cert_file.c_str(), key_file.c_str());
+    auto load_result = load_pair(cert_file_path.c_str(), key_file_path.c_str());
     REQUIRE((bool)load_result);
     REQUIRE(load_result.value().cert_data.bytes.size() == pair.value().cert_data.bytes.size());
 
@@ -47,7 +49,7 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
 }
 
 TEST_CASE("sha256 for certificate", "[support][tls]") {
-    auto cert = read_file("/data/cert.der");
+    auto cert = read_file(bfs::path("data/cert.der"));
     auto sha_result = sha256_digest(cert);
     REQUIRE((bool)sha_result);
     auto &sha = sha_result.value();

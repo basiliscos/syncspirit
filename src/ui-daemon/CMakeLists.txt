@@ -12,7 +12,11 @@ add_executable(syncspirit-daemon
     main.cpp
 )
 
-target_link_libraries(syncspirit-daemon syncspirit_lib)
+target_link_libraries(syncspirit-daemon
+    syncspirit_lib
+    $<$<PLATFORM_ID:Windows>:ws2_32>
+    $<$<PLATFORM_ID:Windows>:wsock32>
+)
 target_include_directories(syncspirit-daemon PUBLIC ${syncspirit_SOURCE_DIR}/src)
 
 message(STATUS "build type ${CMAKE_BUILD_TYPE}")

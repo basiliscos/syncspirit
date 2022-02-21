@@ -38,6 +38,7 @@ static std::atomic_bool shutdown_flag = false;
 int main(int argc, char **argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
+#if defined(__linux__)
     struct sigaction act;
     memset(&act, 0, sizeof(act));
     act.sa_handler = [](int) { shutdown_flag = true; };
@@ -45,6 +46,7 @@ int main(int argc, char **argv) {
         spdlog::critical("cannot set signal handler");
         return 1;
     }
+#endif
 
     try {
         utils::platform_t::startup();
@@ -93,7 +95,7 @@ int main(int argc, char **argv) {
         config_file_path.append("syncspirit.toml");
         bool populate = !bfs::exists(config_file_path);
         if (populate) {
-            spdlog::info("Config {} seems does not exit, creating default one...", config_file_path.c_str());
+            spdlog::info("Config {} seems does not exit, creating default one...", config_file_path.string());
             auto cfg_opt = config::generate_config(config_file_path);
             if (!cfg_opt) {
                 spdlog::error("cannot generate default config: {}", cfg_opt.error().message());
@@ -107,16 +109,16 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
-        auto config_file_path_c = config_file_path.c_str();
-        std::ifstream config_file(config_file_path_c);
+        auto config_file_path_str = config_file_path.string();
+        std::ifstream config_file(config_file_path_str);
         if (!config_file) {
-            spdlog::error("Cannot open config file {}", config_file_path_c);
+            spdlog::error("Cannot open config file {}", config_file_path_str);
             return 1;
         }
 
         config::config_result_t cfg_option = config::get_config(config_file, config_file_path.parent_path());
         if (!cfg_option) {
-            spdlog::error("Config file {} is incorrect :: {}", config_file_path_c, cfg_option.error());
+            spdlog::error("Config file {} is incorrect :: {}", config_file_path_str, cfg_option.error());
             return 1;
         }
         auto &cfg = cfg_option.value();
@@ -237,7 +239,9 @@ int main(int argc, char **argv) {
 #endif
                 ctx->run();
                 shutdown_flag = true;
+#if defined(__linux__)
                 spdlog::trace("{} thread has been terminated", name);
+#endif
             });
             hasher_threads.emplace_back(std::move(thread));
         }

@@ -17,7 +17,7 @@ env_t mk_env() {
     assert(r == MDBX_SUCCESS);
     MDBX_env_flags_t flags =
         MDBX_EXCLUSIVE | MDBX_SAFE_NOSYNC | MDBX_WRITEMAP | MDBX_COALESCE | MDBX_LIFORECLAIM;
-    r = mdbx_env_open(env, path.c_str(), flags, 0664);
+    r = mdbx_env_open(env, path.string().c_str(), flags, 0664);
     assert(r == MDBX_SUCCESS);
     // std::cout << path.c_str() << "\n";
     return env_t{env, std::move(path)};

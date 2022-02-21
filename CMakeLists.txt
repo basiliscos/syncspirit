@@ -171,6 +171,7 @@ target_link_libraries(syncspirit_lib
     lz4_static
     ZLIB::ZLIB
     mdbx-static
+    $<$<PLATFORM_ID:Windows>:iphlpapi ws2_32>
 )
 
 enable_testing()
