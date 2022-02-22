@@ -278,7 +278,7 @@ outcome::result<std::string> sha256_digest(const std::string &data) noexcept {
     if (!digester) {
         return error_code_t::tls_sha256_init_failure;
     }
-    if (1 != EVP_DigestInit_ex(ctx, digester, NULL) ) {
+    if (1 != EVP_DigestInit_ex(ctx, digester, NULL)) {
         return error_code_t::tls_sha256_failure;
     }
     if (1 != EVP_DigestUpdate(ctx, data.c_str(), data.size())) {

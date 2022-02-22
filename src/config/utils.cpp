@@ -5,8 +5,9 @@
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <spdlog/spdlog.h>
-#include "../model/device_id.h"
-#include "../utils/log.h"
+#include "model/device_id.h"
+#include "utils/log.h"
+#include "utils/location.h"
 
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.h>
@@ -483,9 +484,15 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     }
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
-    auto home = std::getenv("HOME");
-    auto config_dir = bfs::path(home).append(".config").append("syncthing");
-    bool is_home = dir == bfs::path(config_dir);
+    auto config_dir_opt = utils::get_default_config_dir();
+    if (!config_dir_opt) {
+        auto ec = config_dir_opt.assume_error();
+        auto msg = ec.message();
+        spdlog::warn("cannot get config dir: {}", msg);
+        return ec;
+    }
+    auto &config_dir = config_dir_opt.assume_value();
+    bool is_home = dir == config_dir;
     if (!is_home) {
         using boost::algorithm::replace_all_copy;
         cert_file = replace_all_copy(cert_file, home_path, dir.string());
@@ -498,7 +505,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     // clang-format off
     main_t cfg;
     cfg.config_path = config_path;
-    cfg.default_location = bfs::path(home);
+    cfg.default_location = config_dir;
     cfg.timeout = 5000;
     cfg.device_name = device;
     cfg.hasher_threads = 3;

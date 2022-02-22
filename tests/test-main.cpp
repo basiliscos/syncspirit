@@ -19,6 +19,19 @@ int main(int argc, char *argv[]) {
 
 namespace syncspirit::test {
 
+bfs::path locate_path(const char *test_file) {
+    auto path = bfs::path(test_file);
+    if (bfs::exists(path)) {
+        return path;
+    }
+    path = bfs::path("../") / path;
+    if (bfs::exists(path)) {
+        return path;
+    }
+    std::string err = "path not found: ";
+    err += test_file;
+    throw std::runtime_error(err);
+}
 
 std::string read_file(const bfs::path& path) {
     sys::error_code ec;
