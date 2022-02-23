@@ -13,7 +13,7 @@ namespace details {
 
 namespace mi = boost::multi_index;
 
-template <typename T> std::string_view get_lru_key(const T &key);
+template <typename T> std::string get_lru_key(const T &key);
 
 // https://www.boost.org/doc/libs/1_45_0/libs/multi_index/example/serialization.cpp
 template <typename Item> class mru_list_t {
@@ -22,9 +22,9 @@ template <typename Item> class mru_list_t {
     struct tag_hash {};
 
     using item_list_t = mi::multi_index_container<
-        Item, mi::indexed_by<mi::sequenced<mi::tag<tag_seq>>,
-                             mi::hashed_unique<mi::tag<tag_hash>,
-                                               mi::global_fun<const Item &, std::string_view, &get_lru_key<Item>>>>>;
+        Item, mi::indexed_by<
+                  mi::sequenced<mi::tag<tag_seq>>,
+                  mi::hashed_unique<mi::tag<tag_hash>, mi::global_fun<const Item &, std::string, &get_lru_key<Item>>>>>;
 
   public:
     using item_t = Item;
@@ -51,7 +51,7 @@ template <typename Item> class mru_list_t {
         }
     }
 
-    item_t get(std::string_view key) {
+    item_t get(const std::string &key) {
         auto &projection = il.template get<1>();
         auto it = projection.find(key);
         if (it != projection.end()) {

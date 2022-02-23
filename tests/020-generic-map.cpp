@@ -26,9 +26,9 @@ TEST_CASE("generic map", "[model]") {
 
 namespace syncspirit::model::details {
 
-template <> inline std::string_view get_lru_key<std::string>(const std::string &key) { return key; }
+template <> inline std::string get_lru_key<std::string>(const std::string &key) { return key; }
 
-template <> inline std::string_view get_lru_key<bfs::path>(const bfs::path &key) { return key.string(); }
+template <> inline std::string get_lru_key<bfs::path>(const bfs::path &key) { return key.string(); }
 
 } // namespace syncspirit::model::details
 

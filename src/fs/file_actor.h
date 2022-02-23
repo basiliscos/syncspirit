@@ -14,7 +14,7 @@ namespace syncspirit {
 
 namespace model::details {
 
-template <> inline std::string_view get_lru_key<fs::mmaped_file_ptr_t>(const fs::mmaped_file_ptr_t &item) {
+template <> inline std::string get_lru_key<fs::mmaped_file_ptr_t>(const fs::mmaped_file_ptr_t &item) {
     return item->get_path().string();
 }
 
