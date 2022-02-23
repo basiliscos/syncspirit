@@ -212,7 +212,7 @@ outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_k
         const char *structure = "PrivateKeyInfo"; /* PKCS#8 structure */
 
         auto flags = OSSL_KEYMGMT_SELECT_KEYPAIR | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS;
-        auto ectx = OSSL_ENCODER_CTX_new_for_pkey(private_key.get(), flags, format, structure,NULL);
+        auto ectx = OSSL_ENCODER_CTX_new_for_pkey(private_key.get(), flags, format, structure, NULL);
         if (!ectx) {
             return error_code_t::tls_cert_save_failure;
         }
@@ -255,11 +255,11 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
         return sys::error_code{errno, sys::generic_category()};
     }
     auto pk_file_guard = make_guard(pk_file, [](auto *ptr) { fclose(ptr); });
-    EVP_PKEY *pkey = EVP_PKEY_new();
-    auto pkey_quard = make_guard(pkey, [](auto *ptr) { EVP_PKEY_free(ptr); });
-    if (!PEM_read_PrivateKey(pk_file, &pkey, nullptr, nullptr)) {
-        return error_code_t::tls_cert_load_failure;
+    auto pkey = PEM_read_PrivateKey(pk_file, nullptr, nullptr, nullptr);
+    if (!pkey) {
+        return error_code_t::tls_key_load_failure;
     }
+    auto pkey_quard = make_guard(pkey, [](auto *ptr) { EVP_PKEY_free(ptr); });
 
     auto cert_container = as_der(cert);
     if (!cert_container) {

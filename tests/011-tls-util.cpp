@@ -38,14 +38,6 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
 
     auto load_result = load_pair(cert_file_path.c_str(), key_file_path.c_str());
     REQUIRE((bool)load_result);
-#if 0
-    printf("zzzc1\n");
-    auto& r = load_result.value();
-    r.cert.release();
-    printf("zzzc2\n");
-    r.private_key.release();
-    printf("zzzc3\n");
-#endif
     REQUIRE(load_result.value().cert_data.bytes.size() == pair.value().cert_data.bytes.size());
 
     bool bytes_equal = load_result.value().cert_data.bytes == pair.value().cert_data.bytes;

@@ -3,6 +3,9 @@ project (syncspirit)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+cmake_policy(SET CMP0063 NEW)
 
 find_package(
     Boost
