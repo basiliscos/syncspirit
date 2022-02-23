@@ -41,7 +41,7 @@ struct x509_t {
 
 outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept;
 
-outcome::result<key_pair_t> load_pair(const char *cert, const char *priv_key) noexcept;
+outcome::result<key_pair_t> load_pair(const char *cert, const char *priv_key);
 
 outcome::result<std::string> sha256_digest(const std::string &data) noexcept;
 

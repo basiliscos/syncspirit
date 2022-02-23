@@ -9,6 +9,10 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
+#ifdef OSSL_DEPRECATEDIN_3_0
+#include <openssl/encoder.h>
+#endif
+
 namespace sys = boost::system;
 
 namespace syncspirit::utils {
@@ -179,7 +183,7 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
 
 outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_key_path) const noexcept {
     do {
-        auto cert_file = fopen(cert_path, "w");
+        auto cert_file = fopen(cert_path, "wb");
         if (!cert_file) {
             return sys::error_code{errno, sys::generic_category()};
         }
@@ -191,25 +195,40 @@ outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_k
     } while (0);
 
     do {
-        auto pk_file = fopen(priv_key_path, "w");
+        auto pk_file = fopen(priv_key_path, "wb");
         if (!pk_file) {
             return sys::error_code{errno, sys::generic_category()};
         }
         auto pk_file_guard = make_guard(pk_file, [](auto *ptr) { fclose(ptr); });
 
+#ifndef OSSL_DEPRECATEDIN_3_0
         auto ec_key = EVP_PKEY_get1_EC_KEY(private_key.get());
         auto ec_key_guard = make_guard(ec_key, [](auto *ptr) { EC_KEY_free(ptr); });
         if (1 != PEM_write_ECPrivateKey(pk_file, ec_key, nullptr, nullptr, 0, nullptr, nullptr)) {
             return error_code_t::tls_key_save_failure;
         }
+#else
+        const char *format = "PEM";
+        const char *structure = "PrivateKeyInfo"; /* PKCS#8 structure */
+
+        auto flags = OSSL_KEYMGMT_SELECT_KEYPAIR | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS;
+        auto ectx = OSSL_ENCODER_CTX_new_for_pkey(private_key.get(), flags, format, structure,NULL);
+        if (!ectx) {
+            return error_code_t::tls_cert_save_failure;
+        }
+        auto ectx_guard = make_guard(ectx, [](auto *ptr) { OSSL_ENCODER_CTX_free(ptr); });
+        if (1 != OSSL_ENCODER_to_fp(ectx, pk_file)) {
+            return error_code_t::tls_key_save_failure;
+        }
+#endif
     } while (0);
 
     return outcome::success();
 }
 
-outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_key_path) noexcept {
+outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_key_path) {
     /* read certificate in memory, then load it va openssl */
-    auto cert_file = fopen(cert_path, "r");
+    auto cert_file = fopen(cert_path, "rb");
     if (!cert_file) {
         return sys::error_code{errno, sys::system_category()};
     }
@@ -231,7 +250,7 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
     }
 
     /* read private key */
-    auto pk_file = fopen(priv_key_path, "r");
+    auto pk_file = fopen(priv_key_path, "rb");
     if (!pk_file) {
         return sys::error_code{errno, sys::generic_category()};
     }
