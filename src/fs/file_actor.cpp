@@ -129,7 +129,7 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome
         if (attempt_create) {
             bfs::create_symlink(target, path, ec);
             if (ec) {
-                LOG_WARN(log, "{}, error symlinking {} -> {} {} : {}", identity, path.string(), target.string(),
+                LOG_WARN(log, "{}, error symlinking {} -> {} : {}", identity, path.string(), target.string(),
                          ec.message());
                 return ec;
             }
