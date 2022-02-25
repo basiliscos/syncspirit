@@ -32,6 +32,12 @@ void file_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
 }
 
+void file_actor_t::shutdown_start() noexcept {
+    LOG_TRACE(log, "{}, shutdown_start", identity);
+    r::actor_base_t::shutdown_start();
+    files_cache.clear();
+}
+
 void file_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto &diff = *message.payload.diff;
@@ -216,12 +222,15 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
     auto source_mmap = mmaped_file_t::backend_t();
 
     auto source_path = source->get_path();
-    if (!source->is_locally_available()) {
-        source_path = make_temporal(source_path);
-    }
     if (source_path == target_path) {
         source_mmap = target_mmap->get_backend();
+    } else if (auto cached_source = files_cache.get(source_path.string()); cached_source) {
+        source_mmap = cached_source->get_backend();
     } else {
+        if (!source->is_locally_available()) {
+            assert(source->is_partly_available());
+            source_path = make_temporal(source_path);
+        }
         bio::mapped_file_params params;
         params.path = source_path.string();
         params.flags = bio::mapped_file::mapmode::readonly;
@@ -254,7 +263,7 @@ auto file_actor_t::open_file(const boost::filesystem::path &path, bool temporal,
     }
 
     auto size = info->get_size();
-    LOG_TRACE(log, "{}, open_file, path = {} ({} bytes)", identity, path.string(), size);
+    LOG_TRACE(log, "{}, open_file (model), path = {} ({} bytes)", identity, path.string(), size);
     bfs::path operational_path = temporal ? make_temporal(path) : path;
 
     auto parent = operational_path.parent_path();
@@ -289,10 +298,12 @@ auto file_actor_t::open_file(const boost::filesystem::path &path, bool temporal,
 auto file_actor_t::open_file(const boost::filesystem::path &path, const bio::mapped_file_params &params) noexcept
     -> outcome::result<mmaped_file_t::backend_t> {
     auto file = mmaped_file_t::backend_t(new bio::mapped_file());
+    auto &path_str = params.path;
+    LOG_TRACE(log, "{}, open_file (by path), path = {}", identity, path_str);
     try {
         file->open(params);
     } catch (const std::exception &ex) {
-        LOG_ERROR(log, "{}, error opening file {}: {}", identity, params.path, ex.what());
+        LOG_ERROR(log, "{}, error opening file {}: {}", identity, path_str, ex.what());
         auto ec = sys::errc::make_error_code(sys::errc::io_error);
         return ec;
     }

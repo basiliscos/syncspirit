@@ -16,6 +16,10 @@
 #include "access.h"
 #include <boost/filesystem.hpp>
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#define SYNCSPIRIT_WIN
+#endif
+
 using namespace syncspirit;
 using namespace syncspirit::db;
 using namespace syncspirit::test;
@@ -191,8 +195,10 @@ void test_clone_file() {
                 REQUIRE(bfs::is_directory(path));
             }
 
+#ifndef SYNCSPIRIT_WIN
             SECTION("symlink") {
-                bfs::path target = root_path / "not-existing";
+                bfs::path target = root_path / "some-existing-file";
+                write_file(target, "zzz");
 
                 pr_fi.set_type(proto::FileInfoType::SYMLINK);
                 pr_fi.set_symlink_target(target.string());
@@ -209,6 +215,7 @@ void test_clone_file() {
                 CHECK(bfs::is_symlink(path));
                 CHECK(bfs::read_symlink(path) == target);
             }
+#endif
 
             SECTION("deleted file") {
                 pr_fi.set_deleted(true);
@@ -337,6 +344,7 @@ void test_append_block() {
                     CHECK(bfs::last_write_time(path) == 1641828421);
                 }
 
+#ifndef SYNCSPIRIT_WIN
                 SECTION("remove folder (simulate err)") {
                     bfs::remove_all(root_path);
                     diff = new diff::modify::flush_file_t(*peer_file);
@@ -345,6 +353,7 @@ void test_append_block() {
                     CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() ==
                           r::state_t::SHUT_DOWN);
                 }
+#endif
             }
         }
     };

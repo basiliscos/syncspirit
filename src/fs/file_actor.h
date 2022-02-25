@@ -55,6 +55,7 @@ struct file_actor_t : public r::actor_base_t,
     explicit file_actor_t(config_t &cfg);
 
     void on_start() noexcept override;
+    void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:

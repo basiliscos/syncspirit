@@ -31,7 +31,7 @@ template <typename Item> class mru_list_t {
 
     mru_list_t(size_t max_items_) : max_items(max_items_) {}
 
-    void put(const Item &item) {
+    void put(const Item &item) noexcept {
         auto p = il.push_front(item);
 
         if (!p.second) {                      /* duplicate item */
@@ -41,7 +41,7 @@ template <typename Item> class mru_list_t {
         }
     }
 
-    void remove(const Item &item) {
+    void remove(const Item &item) noexcept {
         auto &projection = il.template get<1>();
         auto key = get_lru_key(item);
         auto it = projection.find(key);
@@ -51,7 +51,7 @@ template <typename Item> class mru_list_t {
         }
     }
 
-    item_t get(const std::string &key) {
+    item_t get(const std::string &key) noexcept {
         auto &projection = il.template get<1>();
         auto it = projection.find(key);
         if (it != projection.end()) {
@@ -61,6 +61,8 @@ template <typename Item> class mru_list_t {
         }
         return {};
     }
+
+    void clear() noexcept { il.clear(); }
 
   private:
     item_list_t il;
