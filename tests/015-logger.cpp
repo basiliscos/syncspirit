@@ -57,6 +57,7 @@ TEST_CASE("file sink", "[log]") {
     l->info("lorem ipsum dolor");
     l->flush();
 
+    spdlog::drop_all(); // to cleanup on win32
     auto data = st::read_file(bfs::path(file_path));
     CHECK(!data.empty());
     CHECK(data.find("lorem ipsum dolor") != std::string::npos);

@@ -155,14 +155,19 @@ void db_actor_t::on_start() noexcept {
 }
 
 void db_actor_t::shutdown_finish() noexcept {
-    r::actor_base_t::shutdown_finish();
     if (txn_holder) {
         auto r = commit(true);
         if (!r) {
             auto &err = r.assume_error();
             LOG_ERROR(log, "{}, cannot commit tx: {}", identity, err.message());
         }
+        txn_holder.reset();
     }
+    auto r = mdbx_env_close(env);
+    if (r != MDBX_SUCCESS) {
+        LOG_ERROR(log, "{}, open, mbdx close error ({}): {}", identity, r, mdbx_strerror(r));
+    }
+    r::actor_base_t::shutdown_finish();
 }
 
 void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {
