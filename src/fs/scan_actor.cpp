@@ -275,9 +275,10 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 
         LOG_DEBUG(log, "{}, removing temporal of '{}' as it corrupted", identity, file->get_full_name());
+        info.mmaped_file.reset(); // for win32, we need to close the file
         auto path = make_temporal(file->get_path());
         sys::error_code ec;
-        bfs::remove(path);
+        bfs::remove(path, ec);
         if (ec) {
             model::io_errors_t errors{model::io_error_t{path, ec}};
             send<model::payload::io_error_t>(coordinator, std::move(errors));
