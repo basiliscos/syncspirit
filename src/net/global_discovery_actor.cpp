@@ -175,7 +175,7 @@ void global_discovery_actor_t::on_discovery(message::discovery_notify_t &req) no
     auto &device_id = req.payload.device_id;
     auto sha256 = std::string(device_id.get_sha256());
     if (discovering_devices.count(sha256)) {
-        LOG_TRACE(log, "{}, device '{}' is already discovering, skip", identity, device_id.get_sha256());
+        LOG_TRACE(log, "{}, device '{}' is already discovering, skip", identity, device_id.get_short());
         return;
     }
 
