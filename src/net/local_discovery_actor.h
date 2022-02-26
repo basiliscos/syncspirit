@@ -65,7 +65,7 @@ struct local_discovery_actor_t final : public r::actor_base_t {
     r::address_ptr_t coordinator;
     fmt::memory_buffer rx_buff;
     fmt::memory_buffer tx_buff;
-    udp::endpoint bc_endpoint;
+    std::uint16_t port;
     udp::endpoint peer_endpoint;
     std::optional<r::request_id_t> timer_request;
     std::optional<r::request_id_t> endpoint_request;

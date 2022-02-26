@@ -19,7 +19,7 @@ r::plugin::resource_id_t timer = 1;
 local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, frequency{r::pt::seconds(cfg.frequency)},
       strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, sock{strand.context()},
-      bc_endpoint(udp::v4(), cfg.port), cluster{cfg.cluster} {
+      port{cfg.port}, cluster{cfg.cluster} {
     log = utils::get_logger("net.local_discovery");
     rx_buff.resize(BUFF_SZ);
     tx_buff.resize(BUFF_SZ);
@@ -33,17 +33,19 @@ void local_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexce
 }
 
 void local_discovery_actor_t::init() noexcept {
-    LOG_TRACE(log, "{}, init, will announce to port = {}", identity, bc_endpoint.port());
+    LOG_TRACE(log, "{}, init, will announce to port = {}", identity, port);
 
     sys::error_code ec;
 
+    auto bc_endpoint = udp::endpoint(asio::ip::address_v4::broadcast(), port);
     sock.open(bc_endpoint.protocol(), ec);
     if (ec) {
         LOG_WARN(log, "{}, init, can't open socket :: {}", identity, ec.message());
         return do_shutdown(make_error(ec));
     }
 
-    sock.bind(bc_endpoint, ec);
+    auto listen_endpoint = udp::endpoint{asio::ip::address_v4::loopback(), port};
+    sock.bind(listen_endpoint, ec);
     if (ec) {
         LOG_WARN(log, "{}, init, can't bind socket :: {}", identity, ec.message());
         return do_shutdown(make_error(ec));
@@ -54,6 +56,8 @@ void local_discovery_actor_t::init() noexcept {
         LOG_WARN(log, "{}, init, can't set broadcast option :: {}", identity, ec.message());
         return do_shutdown(make_error(ec));
     }
+
+
 }
 
 void local_discovery_actor_t::on_start() noexcept {
@@ -90,6 +94,7 @@ void local_discovery_actor_t::announce() noexcept {
         auto buff = asio::buffer(tx_buff.data(), sz);
         auto fwd_send =
             ra::forwarder_t(*this, &local_discovery_actor_t::on_write, &local_discovery_actor_t::on_write_error);
+        auto bc_endpoint = udp::endpoint(asio::ip::address_v4::broadcast(), port);
         sock.async_send_to(buff, bc_endpoint, std::move(fwd_send));
         resources->acquire(resource::io);
         LOG_TRACE(log, "{}, announce has been sent", identity);
