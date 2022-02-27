@@ -59,9 +59,11 @@ void file_iterator_t::reset() noexcept {
     }
 }
 
-void file_iterator_t::renew(file_info_t &file) noexcept {
-    append(file);
-    prepare();
+void file_iterator_t::renew(file_info_t &f) noexcept {
+    append(f);
+    if (!file) {
+        prepare();
+    }
 }
 
 void file_iterator_t::prepare() noexcept {

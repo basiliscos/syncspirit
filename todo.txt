@@ -2,11 +2,9 @@
 - check 4 symlinks test (scaner) ?
 - win32 build
   -- simulate file failure on win32 (open file before it will be opened in fs_actor)
-
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
-
-
+- проверить логирование в файл
+- выставить дефолтную локаль?
+- отказаться от mmaped_file под win32?
 
 - app-image : ./linuxdeploy-x86_64.AppImage --appdir AppDir -e bin/eratosthenes -d my.desktop -i /usr/share/icons/hicolor/48x48/apps/claws-mail.png --output appimage
 - image icon:
