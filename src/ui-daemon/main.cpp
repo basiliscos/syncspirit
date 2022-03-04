@@ -41,14 +41,13 @@ using namespace syncspirit::daemon;
 static std::atomic_bool shutdown_flag = false;
 
 #ifdef _WIN32
-BOOL WINAPI consoleHandler(DWORD signal){
-    if (signal == CTRL_C_EVENT)  {
+BOOL WINAPI consoleHandler(DWORD signal) {
+    if (signal == CTRL_C_EVENT) {
         shutdown_flag = true;
     }
     return TRUE; /* ignore */
 }
 #endif
-
 
 int main(int argc, char **argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -63,8 +62,7 @@ int main(int argc, char **argv) {
     }
 #endif
 #ifdef _WIN32
-    if (!SetConsoleCtrlHandler(consoleHandler, true))
-    {
+    if (!SetConsoleCtrlHandler(consoleHandler, true)) {
         spdlog::critical("ERROR: Could not set control handler");
         return -1;
     }

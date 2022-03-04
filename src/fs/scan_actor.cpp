@@ -152,29 +152,25 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
 }
 
 auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t file) noexcept -> model::io_errors_t {
-    bio::mapped_file_params params;
-    auto path = make_temporal(file->get_path());
-    params.path = path.string();
-    params.flags = bio::mapped_file::mapmode::readonly;
-    auto bio_file = bio_file_t{new bio::mapped_file()};
-
-    try {
-        bio_file->open(params);
-    } catch (std::exception &ex) {
-        LOG_WARN(log, "{}, error opening file {}: {}", identity, params.path, ex.what());
+    auto orig_path = file->get_path();
+    auto path = make_temporal(orig_path);
+    auto opt = file_t::open_read(path);
+    if (!opt) {
+        auto &ec = opt.assume_error();
+        LOG_WARN(log, "{}, error opening file {}: {}", identity, path.string(), ec.message());
         model::io_errors_t errs;
-        auto ec = sys::errc::make_error_code(sys::errc::io_error);
-        errs.push_back(model::io_error_t{path, ec});
-        auto removed = bfs::remove(path, ec);
+        errs.push_back(model::io_error_t{orig_path, ec});
+        auto removed = bfs::remove(orig_path, ec);
         if (ec) {
-            errs.push_back(model::io_error_t{path, ec});
+            errs.push_back(model::io_error_t{orig_path, ec});
         }
         return errs;
-    };
+    }
 
     assert(file->get_source());
+    auto file_ptr = file_ptr_t(new file_t(std::move(opt.value())));
     send<payload::rehash_needed_t>(address, std::move(task), generation, std::move(file), file->get_source(),
-                                   std::move(bio_file), int64_t{0}, int64_t{-1}, size_t{0}, std::set<std::int64_t>{},
+                                   std::move(file_ptr), int64_t{0}, int64_t{-1}, size_t{0}, std::set<std::int64_t>{},
                                    false, false);
     return {};
 }
@@ -191,25 +187,33 @@ bool scan_actor_t::rehash_next(message::rehash_needed_t &message) noexcept {
     auto &info = message.payload;
     if (!info.abandoned && !info.invalid) {
         auto condition = [&]() {
-            return requested_hashes < requested_hashes_limit && info.last_queued_block < info.file->get_blocks().size();
+            return requested_hashes < requested_hashes_limit &&
+                   info.last_queued_block < info.file->get_blocks().size() && !info.abandoned;
         };
 
         auto block_sz = info.file->get_block_size();
         auto file_sz = info.file->get_size();
         auto non_zero = [](char it) { return it != 0; };
+
         while (condition()) {
             auto &i = info.last_queued_block;
             auto next_size = ((i + 1) * block_sz) > file_sz ? file_sz - (i * block_sz) : block_sz;
-            auto ptr = info.mmaped_file->const_data() + (i * block_sz);
-            auto begin = (char *)ptr;
-            auto end = begin + next_size;
-            auto it = std::find_if(begin, end, non_zero);
-            if (it == end) { // we have only zeroes
+            auto block_opt = info.backend->read(i * block_sz, next_size);
+            if (!block_opt) {
+                auto ec = block_opt.assume_error();
+                model::io_errors_t errs;
+                errs.push_back(model::io_error_t{info.backend->get_path(), ec});
+                send<model::payload::io_error_t>(coordinator, std::move(errs));
+                info.abandoned = true;
+            }
+            auto &block = block_opt.value();
+            auto it = std::find_if(block.begin(), block.end(), non_zero);
+            if (it == block.end()) { // we have only zeroes
                 info.abandoned = true;
             } else {
-                auto block = std::string_view(begin, next_size);
                 using request_t = hasher::payload::digest_request_t;
-                request<request_t>(hasher_proxy, block, (size_t)i, r::message_ptr_t(&message)).send(init_timeout);
+                request<request_t>(hasher_proxy, std::move(block), (size_t)i, r::message_ptr_t(&message))
+                    .send(init_timeout);
                 ++info.queue_size;
                 ++requested_hashes;
             }
@@ -275,12 +279,10 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 
         LOG_DEBUG(log, "{}, removing temporal of '{}' as it corrupted", identity, file->get_full_name());
-        info.mmaped_file.reset(); // for win32, we need to close the file
-        auto path = make_temporal(file->get_path());
-        sys::error_code ec;
-        bfs::remove(path, ec);
-        if (ec) {
-            model::io_errors_t errors{model::io_error_t{path, ec}};
+        auto &backend = *info.backend;
+        auto r = backend.remove();
+        if (r) {
+            model::io_errors_t errors{model::io_error_t{backend.get_path(), r.assume_error()}};
             send<model::payload::io_error_t>(coordinator, std::move(errors));
         }
     }

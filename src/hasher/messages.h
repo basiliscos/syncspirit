@@ -18,7 +18,7 @@ struct digest_response_t {
 
 struct digest_request_t {
     using response_t = digest_response_t;
-    std::string_view data;
+    std::string data;
     size_t block_index;
     r::message_ptr_t custom;
 };

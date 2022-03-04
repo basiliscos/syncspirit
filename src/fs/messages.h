@@ -1,16 +1,12 @@
 #pragma once
 
 #include <rotor.hpp>
-#include <boost/iostreams/device/mapped_file.hpp>
-
 #include "scan_task.h"
+#include "file.h"
 
 namespace syncspirit::fs {
 
 namespace r = rotor;
-namespace bio = boost::iostreams;
-
-using bio_file_t = std::unique_ptr<bio::mapped_file>;
 
 namespace payload {
 
@@ -28,7 +24,7 @@ struct rehash_needed_t {
     std::uint32_t generation;
     model::file_info_ptr_t file;
     model::file_info_ptr_t source_file;
-    bio_file_t mmaped_file;
+    file_ptr_t backend;
     int64_t last_queued_block;
     int64_t valid_blocks;
     size_t queue_size;

@@ -112,7 +112,6 @@ TEST_CASE("file iterator", "[model]") {
                 REQUIRE(!next());
             }
 
-
             SECTION("appending already visited file") {
                 auto f1 = next(true);
                 REQUIRE(f1);

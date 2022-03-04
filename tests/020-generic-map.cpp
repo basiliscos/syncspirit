@@ -26,9 +26,7 @@ TEST_CASE("generic map", "[model]") {
 
 namespace syncspirit::model::details {
 
-template <> inline std::string get_lru_key<std::string>(const std::string &key) { return key; }
-
-template <> inline std::string get_lru_key<bfs::path>(const bfs::path &key) { return key.string(); }
+template <> inline std::string_view get_lru_key<std::string>(const std::string &key) { return key; }
 
 } // namespace syncspirit::model::details
 
@@ -78,16 +76,6 @@ TEST_CASE("lru cache", "[model]") {
         CHECK(list.get("c") == "c");
         CHECK(list.get("d") == "");
         CHECK(list.get("e") == "e");
-    }
-
-    SECTION("string item") {
-        mru_list_t<bfs::path> list(3);
-        list.put("a");
-        list.put("b");
-        list.remove("b");
-
-        CHECK(list.get("a") == bfs::path("a"));
-        CHECK(list.get("b") == bfs::path());
     }
 }
 

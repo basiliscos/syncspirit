@@ -25,7 +25,7 @@ TEST_CASE("luhn32", "[model]") {
 
 TEST_CASE("device_id", "[model]") {
     auto cert_path = locate_path("data/sample-cert.pem");
-    auto key_path =  locate_path("data/sample-key.pem");
+    auto key_path = locate_path("data/sample-key.pem");
     auto load_result = load_pair(cert_path.string().c_str(), key_path.string().c_str());
     REQUIRE(load_result);
     auto &pair = load_result.value();

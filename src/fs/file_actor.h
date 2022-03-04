@@ -1,5 +1,6 @@
 #pragma once
 
+#include "file.h"
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "model/diff/block_visitor.h"
@@ -8,14 +9,13 @@
 #include "utils/log.h"
 #include "utils.h"
 #include <rotor.hpp>
-#include <boost/iostreams/device/mapped_file.hpp>
 
 namespace syncspirit {
 
 namespace model::details {
 
-template <> inline std::string get_lru_key<fs::mmaped_file_ptr_t>(const fs::mmaped_file_ptr_t &item) {
-    return item->get_path().string();
+template <> inline std::string_view get_lru_key<fs::file_ptr_t>(const fs::file_ptr_t &item) {
+    return item->get_path_view();
 }
 
 } // namespace model::details
@@ -59,15 +59,13 @@ struct file_actor_t : public r::actor_base_t,
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:
-    using cache_t = model::mru_list_t<mmaped_file_ptr_t>;
+    using cache_t = model::mru_list_t<file_ptr_t>;
 
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
 
-    outcome::result<mmaped_file_ptr_t> open_file(const bfs::path &path, bool temporal,
-                                                 model::file_info_ptr_t info) noexcept;
-    outcome::result<mmaped_file_t::backend_t> open_file(const bfs::path &path,
-                                                        const bio::mapped_file_params &params) noexcept;
+    outcome::result<file_ptr_t> open_file_rw(const bfs::path &path, model::file_info_ptr_t info) noexcept;
+    outcome::result<file_ptr_t> open_file_ro(const bfs::path &path) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::flush_file_t &) noexcept override;

@@ -6,7 +6,6 @@
 using namespace syncspirit::model::diff::modify;
 
 flush_file_t::flush_file_t(const model::file_info_t &file) noexcept {
-    assert(file.is_locally_available());
     auto fi = file.get_folder_info();
     auto folder = fi->get_folder();
     folder_id = folder->get_id();
@@ -15,7 +14,13 @@ flush_file_t::flush_file_t(const model::file_info_t &file) noexcept {
 }
 
 auto flush_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    // NO-OP
+    assert(cluster.get_folders()
+               .by_id(folder_id)
+               ->get_folder_infos()
+               .by_device_id(device_id)
+               ->get_file_infos()
+               .by_name(file_name)
+               ->is_locally_available());
     return outcome::success();
 }
 

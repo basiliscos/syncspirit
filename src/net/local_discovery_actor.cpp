@@ -56,8 +56,6 @@ void local_discovery_actor_t::init() noexcept {
         LOG_WARN(log, "{}, init, can't set broadcast option :: {}", identity, ec.message());
         return do_shutdown(make_error(ec));
     }
-
-
 }
 
 void local_discovery_actor_t::on_start() noexcept {

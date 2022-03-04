@@ -34,6 +34,7 @@ add_library(syncspirit_lib
     src/db/prefix.cpp
     src/db/transaction.cpp
     src/db/utils.cpp
+    src/fs/file.cpp
     src/fs/file_actor.cpp
     src/fs/fs_supervisor.cpp
     src/fs/scan_actor.cpp

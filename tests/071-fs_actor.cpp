@@ -321,10 +321,12 @@ void test_append_block() {
 
                 auto filename = std::string(file->get_name()) + ".syncspirit-tmp";
                 auto path = root_path / filename;
+#ifndef SYNCSPIRIT_WIN
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 10);
                 auto data = read_file(path);
                 CHECK(data.substr(0, 5) == "12345");
+#endif
 
                 bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*peer_file, 1, "67890"));
                 sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
@@ -339,7 +341,7 @@ void test_append_block() {
                     path = root_path / filename;
                     REQUIRE(bfs::exists(path));
                     REQUIRE(bfs::file_size(path) == 10);
-                    data = read_file(path);
+                    auto data = read_file(path);
                     CHECK(data == "1234567890");
                     CHECK(bfs::last_write_time(path) == 1641828421);
                 }
@@ -468,19 +470,25 @@ void test_clone_block() {
 
                     auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*source_file, 0, "12345"));
                     sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                    sup->do_process();
-
-                    auto block = source_file->get_blocks()[0];
-                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *block));
+                    bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*source_file, 1, "67890"));
                     sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                     sup->do_process();
 
-                    auto filename = std::string(target_file->get_name()) + ".syncspirit-tmp";
+                    auto blocks = source_file->get_blocks();
+                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *blocks[0]));
+                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *blocks[1]));
+                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
+                    diff = new diff::modify::flush_file_t(*target_file);
+                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                    sup->do_process();
+
+                    auto filename = std::string(target_file->get_name());
                     auto path = root_path / filename;
                     REQUIRE(bfs::exists(path));
                     REQUIRE(bfs::file_size(path) == 10);
                     auto data = read_file(path);
-                    CHECK(data.substr(0, 5) == "12345");
+                    CHECK(data == "1234567890");
                 }
             }
 

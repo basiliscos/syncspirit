@@ -96,7 +96,7 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome
         bool temporal = sz > 0;
         if (temporal) {
             LOG_TRACE(log, "{}, touching file {} ({} bytes)", identity, path.string(), sz);
-            auto file_opt = open_file(path, temporal, &file);
+            auto file_opt = open_file_rw(path, &file);
             if (!file_opt) {
                 auto &err = file_opt.assume_error();
                 LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path.string(), err.message());
@@ -161,15 +161,15 @@ auto file_actor_t::operator()(const model::diff::modify::flush_file_t &diff) noe
     assert(file->is_locally_available());
 
     auto path = file->get_path().string();
-    auto mmaped_file = files_cache.get(path);
-    if (!mmaped_file) {
+    auto backend = files_cache.get(path);
+    if (!backend) {
         LOG_ERROR(log, "{}, attempt to flush non-opend file {}", identity, path);
         auto ec = sys::errc::make_error_code(sys::errc::io_error);
         return ec;
     }
 
-    files_cache.remove(mmaped_file);
-    auto ok = mmaped_file->close();
+    files_cache.remove(backend);
+    auto ok = backend->close(true);
     if (!ok) {
         auto &ec = ok.assume_error();
         LOG_ERROR(log, "{}, cannot close file: {}: {}", identity, path, ec.message());
@@ -186,21 +186,17 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
     auto file = file_info->get_file_infos().by_name(diff.file_name);
     auto &path = file->get_path();
     auto path_str = path.string();
-    auto file_opt = open_file(path, true, file);
+    auto file_opt = open_file_rw(path, file);
     if (!file_opt) {
         auto &err = file_opt.assume_error();
         LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path_str, err.message());
         return err;
     }
 
-    auto &mmaped_file = file_opt.assume_value();
-    auto disk_view = mmaped_file->data();
-    auto &data = diff.data;
     auto block_index = diff.block_index;
     auto offset = file->get_block_offset(block_index);
-    std::copy(data.begin(), data.end(), disk_view + offset);
-
-    return outcome::success();
+    auto &backend = file_opt.value();
+    return backend->write(offset, diff.data);
 }
 
 auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) noexcept -> outcome::result<void> {
@@ -212,51 +208,43 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
     auto source = source_folder_info->get_file_infos().by_name(diff.source_file_name);
 
     auto &target_path = target->get_path();
-    auto file_opt = open_file(target_path, true, target);
+    auto file_opt = open_file_rw(target_path, target);
     if (!file_opt) {
         auto &err = file_opt.assume_error();
         LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, target_path.string(), err.message());
         return err;
     }
-    auto target_mmap = std::move(file_opt.assume_value());
-    auto source_mmap = mmaped_file_t::backend_t();
+    auto target_backend = std::move(file_opt.assume_value());
+    auto source_backend = file_ptr_t{};
 
     auto source_path = source->get_path();
     if (source_path == target_path) {
-        source_mmap = target_mmap->get_backend();
+        source_backend = target_backend;
     } else if (auto cached_source = files_cache.get(source_path.string()); cached_source) {
-        source_mmap = cached_source->get_backend();
+        source_backend = cached_source;
     } else {
         if (!source->is_locally_available()) {
             assert(source->is_partly_available());
             source_path = make_temporal(source_path);
         }
-        bio::mapped_file_params params;
-        params.path = source_path.string();
-        params.flags = bio::mapped_file::mapmode::readonly;
-        auto source_opt = open_file(source_path, params);
+
+        auto source_opt = open_file_ro(source_path);
         if (!source_opt) {
             auto &ec = source_opt.assume_error();
-            LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, params.path, ec.message());
+            LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, source_path.string(), ec.message());
             return ec;
         }
-        source_mmap = std::move(source_opt.assume_value());
+        source_backend = std::move(source_opt.assume_value());
     }
 
-    auto target_view = target_mmap->data();
-    auto &block = target->get_blocks()[diff.block_index];
+    auto &block = source->get_blocks()[diff.block_index];
     auto target_offset = target->get_block_offset(diff.block_index);
-    auto source_view = source_mmap->const_data();
     auto source_offset = source->get_block_offset(diff.source_block_index);
-    auto source_begin = source_view + source_offset;
-    auto source_end = source_begin + block->get_size();
-    std::copy(source_begin, source_end, target_view + target_offset);
-
-    return outcome::success();
+    return target_backend->copy(target_offset, *source_backend, source_offset, block->get_size());
 }
 
-auto file_actor_t::open_file(const boost::filesystem::path &path, bool temporal, model::file_info_ptr_t info) noexcept
-    -> outcome::result<mmaped_file_ptr_t> {
+auto file_actor_t::open_file_rw(const boost::filesystem::path &path, model::file_info_ptr_t info) noexcept
+    -> outcome::result<file_ptr_t> {
     auto item = files_cache.get(path.string());
     if (item) {
         return item;
@@ -264,9 +252,10 @@ auto file_actor_t::open_file(const boost::filesystem::path &path, bool temporal,
 
     auto size = info->get_size();
     LOG_TRACE(log, "{}, open_file (model), path = {} ({} bytes)", identity, path.string(), size);
-    bfs::path operational_path = temporal ? make_temporal(path) : path;
+    // auto opt = file_t::open_write(path, )
+    // bfs::path operational_path = temporal ? make_temporal(path) : path;
 
-    auto parent = operational_path.parent_path();
+    auto parent = path.parent_path();
     sys::error_code ec;
 
     bool exists = bfs::exists(parent, ec);
@@ -277,35 +266,25 @@ auto file_actor_t::open_file(const boost::filesystem::path &path, bool temporal,
         }
     }
 
-    bio::mapped_file_params params;
-    params.path = operational_path.string();
-    params.flags = bio::mapped_file::mapmode::readwrite;
-    if (!bfs::exists(operational_path, ec) || bfs::file_size(operational_path, ec) != size) {
-        params.new_file_size = size;
+    auto option = file_t::open_write(info);
+    if (!option) {
+        return option.assume_error();
     }
+    auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
+    files_cache.put(ptr);
+    return std::move(ptr);
 
-    auto backend_opt = open_file(path, params);
-    if (!backend_opt) {
-        return backend_opt.assume_error();
-    }
-
-    auto &backend = backend_opt.assume_value();
-    item = new mmaped_file_t(path, std::move(std::move(backend)), temporal, std::move(info));
     files_cache.put(item);
     return std::move(item);
 }
 
-auto file_actor_t::open_file(const boost::filesystem::path &path, const bio::mapped_file_params &params) noexcept
-    -> outcome::result<mmaped_file_t::backend_t> {
-    auto file = mmaped_file_t::backend_t(new bio::mapped_file());
-    auto &path_str = params.path;
-    LOG_TRACE(log, "{}, open_file (by path), path = {}", identity, path_str);
-    try {
-        file->open(params);
-    } catch (const std::exception &ex) {
-        LOG_ERROR(log, "{}, error opening file {}: {}", identity, path_str, ex.what());
-        auto ec = sys::errc::make_error_code(sys::errc::io_error);
-        return ec;
+auto file_actor_t::open_file_ro(const bfs::path &path) noexcept -> outcome::result<file_ptr_t> {
+    LOG_TRACE(log, "{}, open_file (by path), path = {}", identity, path.string());
+    auto opt = file_t::open_read(path);
+    if (!opt) {
+        auto &ec = opt.assume_error();
+        LOG_ERROR(log, "{}, error opening file {}: {}", identity, path.string(), ec.message());
+        return opt.assume_error();
     }
-    return outcome::success(std::move(file));
+    return file_ptr_t(new file_t(std::move(opt.assume_value())));
 }
