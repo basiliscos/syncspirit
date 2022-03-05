@@ -36,7 +36,7 @@ port = 21026
 [[log]]
 name = 'default'
 level = 'trace'
-sinks = ['stdout']
+sinks = ['stdout', 'file:/tmp/log.txt']
 
 [[log]]
 name = 'net.db'
