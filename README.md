@@ -85,6 +85,10 @@ after the core completion.
 - (may be) *nix
 - (may be) mac os x
 
+# building from source
+
+[see](docs/building.md)
+
 # license
 
 

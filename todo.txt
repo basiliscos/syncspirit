@@ -1,9 +1,5 @@
 - дока
- - build
- - readme
- - limitations
- - plans
- -
+ - configuration
 =====================
 - идёт много file_clone, но нету скачки файла
 - check 4 symlinks test (scaner) ?
