@@ -18,7 +18,6 @@
  - [pugixml](https://github.com/zeux/pugixml)
  - [tomlplusplus](https://github.com/marzer/tomlplusplus)
  - [uriparser](https://github.com/uriparser/uriparser)
- -
 
 # building (linux)
 
