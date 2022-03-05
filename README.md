@@ -12,9 +12,13 @@ program.
 # status
 
 [x] downloading files from peer devices (aka all folders are receive only)
+
 [x] [global peer discovery](https://docs.syncthing.net/specs/globaldisco-v3.html)
+
 [x] [local (LAN) peer discovery](https://docs.syncthing.net/specs/localdisco-v4.html)
+
 [x] upnp & nat passthough
+
 [x] certificates generation
 
 
@@ -23,13 +27,21 @@ program.
 This list is probably incomplete, here are the most important changes
 
 [ ] relay transport
+
 [ ] full-powered files synchronization (aka send and receive)
+
 [ ] conflict resolution
+
 [ ] ingoring files
+
 [ ] [QUIC transport](https://en.wikipedia.org/wiki/QUIC)
+
 [ ] introducer support
+
 [ ] outgoing messages compression
+
 [ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
+
 [ ] ...
 
 # design and ideas
@@ -72,3 +84,27 @@ after the core completion.
 - windows
 - (may be) *nix
 - (may be) mac os x
+
+# license
+
+
+This software is licensed under the [GPLv3 license](https://www.gnu.org/licenses/gpl-3.0.en.html).
+
+    Copyright (C) 2019-2022 Ivan Baidakou (aka basiliscos)
+
+    This file is part of syncspirit.
+
+    syncspirit is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    syncspirit is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with syncspirit.  If not, see <http://www.gnu.org/licenses/>.
+
+[![GPL3 Logo](https://www.gnu.org/graphics/gplv3-127x51.png)](https://www.gnu.org/licenses/gpl-3.0.en.html)
