@@ -11,38 +11,38 @@ program.
 
 # status
 
-[x] downloading files from peer devices (aka all folders are receive only)
+ [x] downloading files from peer devices (aka all folders are receive only)
 
-[x] [global peer discovery](https://docs.syncthing.net/specs/globaldisco-v3.html)
+ [x] [global peer discovery](https://docs.syncthing.net/specs/globaldisco-v3.html)
 
-[x] [local (LAN) peer discovery](https://docs.syncthing.net/specs/localdisco-v4.html)
+ [x] [local (LAN) peer discovery](https://docs.syncthing.net/specs/localdisco-v4.html)
 
-[x] upnp & nat passthough
+ [x] upnp & nat passthough
 
-[x] certificates generation
+ [x] certificates generation
 
 
 # missing features
 
 This list is probably incomplete, here are the most important changes
 
-[ ] relay transport
+ [ ] relay transport
 
-[ ] full-powered files synchronization (aka send and receive)
+ [ ] full-powered files synchronization (aka send and receive)
 
-[ ] conflict resolution
+ [ ] conflict resolution
 
-[ ] ingoring files
+ [ ] ingoring files
 
-[ ] [QUIC transport](https://en.wikipedia.org/wiki/QUIC)
+ [ ] [QUIC transport](https://en.wikipedia.org/wiki/QUIC)
 
-[ ] introducer support
+ [ ] introducer support
 
-[ ] outgoing messages compression
+ [ ] outgoing messages compression
 
-[ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
+ [ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
 
-[ ] ...
+ [ ] ...
 
 # run
 
