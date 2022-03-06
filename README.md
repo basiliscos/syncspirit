@@ -44,6 +44,33 @@ This list is probably incomplete, here are the most important changes
 
 [ ] ...
 
+# run
+
+(headless ui-daemon only, atm)
+
+    syncspirit-daemon --log_level debug \
+        --config_dir=/tmp/my_dir \
+        --command add_peer:peer_label:KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7 \
+        --command add_folder:label=my_folder-label:id=nagkw-srrjz:path=/tmp/my_dir/data \
+        --command share:folder=my_label:device=KUEQE66 \
+        --command inactivate:120
+
+the output should be like
+
+[![asciicast](https://asciinema.org/a/474217.svg)](https://asciinema.org/a/474217)
+
+i.e. it records some peer, adds a folder, then shares the folder with the peer device, connects to
+the peer and downloads all files into `/tmp/my_dir/data` . The peer device Currently can be
+only [syncthing](https://syncthing.net). Then `syncspirit` either exits after 2 minutes of inactivity
+or when you press `ctrl+c`. The output is successful, because I previousy authorized this device
+with [syncthing](https://syncthing.net) web interface, and shared the folder with this device
+(`syncspirit`).
+
+I also assume some familiarity with [syncthing](https://syncthing.net), so you should understand
+whats going on here.
+
+For more details see [ui-daemon](docs/ui-daemon.md) docs and [configuration](docs/config.md) docs.
+
 # design and ideas
 
 [syncthing](https://syncthing.net) is implemented using [go](https://go.dev/) programming
@@ -74,7 +101,7 @@ after the core completion.
 
 # UI
 
-- [daemon](docs/daemon.md)
+- [daemon](docs/ui-daemon.md)
 - [wx-widgets](https://www.wxwidgets.org/) (planned)
 - ...
 
