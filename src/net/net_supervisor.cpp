@@ -34,27 +34,28 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
         throw result.error();
     }
     ssl_pair = std::move(result.value());
-    auto device_id = model::device_id_t::from_cert(ssl_pair.cert_data);
-    if (!device_id) {
+    auto device_id_opt = model::device_id_t::from_cert(ssl_pair.cert_data);
+    if (!device_id_opt) {
         LOG_CRITICAL(log, "cannot create device_id from certificate");
         throw "cannot create device_id from certificate";
     }
+    auto &device_id = device_id_opt.value();
     LOG_INFO(log, "{}, device name = {}, device id = {}", names::coordinator, app_config.device_name,
-             device_id.value());
+             device_id.get_value());
 
     auto cn = utils::get_common_name(ssl_pair.cert.get());
     if (!cn) {
         LOG_CRITICAL(log, "cannot get common name from certificate");
         throw "cannot get common name from certificate";
     }
-    auto device_opt = model::device_t::create(device_id.value(), app_config.device_name, cn.value());
+    auto device_opt = model::device_t::create(device_id, app_config.device_name, cn.value());
     if (!device_opt) {
         LOG_CRITICAL(log, "cannot get common name from certificate");
         throw "cannot get common name from certificate";
     }
 
     auto device = model::device_ptr_t();
-    device = new model::local_device_t(device_id.value(), app_config.device_name, cn.value());
+    device = new model::local_device_t(device_id, app_config.device_name, cn.value());
     cluster = new model::cluster_t(device, seed);
 
     auto &gcfg = app_config.global_announce_config;
