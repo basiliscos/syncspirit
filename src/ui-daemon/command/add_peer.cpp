@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+
 #include "add_peer.h"
 #include "../governor_actor.h"
 #include "../error_code.h"

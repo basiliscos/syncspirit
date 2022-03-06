@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+
+#pragma once
 #include "../aggregate.h"
 
 namespace syncspirit::model::diff::load {

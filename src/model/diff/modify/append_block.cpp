@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+
 #include "append_block.h"
 #include "../block_visitor.h"
 #include "../../cluster.h"

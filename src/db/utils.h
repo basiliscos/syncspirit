@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+
 #pragma once
 
 #include <boost/outcome.hpp>
@@ -5,12 +8,6 @@
 #include "prefix.h"
 #include "../model/diff/load/common.h"
 #include "../model/device.h"
-//#include "../model/block_info.h"
-//#include "../model/device_id.h"
-//#include "../model/folder.h"
-//#include "../model/folder_info.h"
-//#include "../model/file_info.h"
-//#include "bep.pb.h"
 
 namespace syncspirit {
 namespace db {

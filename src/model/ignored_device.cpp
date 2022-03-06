@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+
 #include "ignored_device.h"
 #include "../db/prefix.h"
 #include "misc/error_code.h"

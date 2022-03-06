@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+
 #include "upnp_actor.h"
 #include "proto/upnp_support.h"
 #include "utils/error_code.h"

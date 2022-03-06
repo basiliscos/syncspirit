@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+
 #include "cluster.h"
 #include "diff/peer/cluster_update.h"
 #include "diff/peer/update_folder.h"

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+
 #include "fs_supervisor.h"
 #include "net/names.h"
 #include "hasher/hasher_proxy_actor.h"

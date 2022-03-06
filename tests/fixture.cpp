@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+
 #include "fixture.h"
 #include "test-utils.h"
-//#include "net/db_actor.h"
 #include "sample_db.h"
 #include "net/names.h"
 #include "access.h"
@@ -46,7 +48,6 @@ void Fixture::run() {
         .name(names::hasher_proxy)
         .timeout(timeout)
         .finish();
-    // sup->create_actor<db_actor_t>().db_dir((root_path / "db").string()).device(device_my).timeout(timeout).finish();
     sup->create_actor<sample_db_t>().timeout(timeout).finish();
     peer = sup->create_actor<sample_peer_t>().timeout(timeout).finish();
 

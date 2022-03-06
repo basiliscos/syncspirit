@@ -1,9 +1,5 @@
-//
-// Copyright (c) 2019-2021 Ivan Baidakou (basiliscos) (the dot dmol at gmail dot com)
-//
-// Distributed under the MIT Software License
-//
-
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #define CATCH_CONFIG_RUNNER
 #include "catch.hpp"

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+
 #include "scan_actor.h"
 #include "model/diff/modify/file_availability.h"
 #include "model/diff/modify/lock_file.h"
