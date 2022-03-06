@@ -17,7 +17,7 @@ r::plugin::resource_id_t timer = 1;
 } // namespace
 
 local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, frequency{r::pt::seconds(cfg.frequency)},
+    : r::actor_base_t{cfg}, frequency{r::pt::milliseconds(cfg.frequency)},
       strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, sock{strand.context()},
       port{cfg.port}, cluster{cfg.cluster} {
     log = utils::get_logger("net.local_discovery");

@@ -42,8 +42,8 @@ timeout = 4000
 
 [local_discovery]
 enabled = true
-# how often send announcements in LAN, in seconds`
-frequency = 10
+# how often send announcements in LAN, in milliseconds
+frequency = 10000
 port = 21026
 
 # default log settings
@@ -74,7 +74,6 @@ discovery_attempts = 2
 external_port = 22001
 max_wait = 1
 rx_buff_size = 65536
-timeout = 10
 
 ```
 

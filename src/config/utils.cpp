@@ -60,8 +60,8 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
 }
 
 bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.max_wait == rhs.max_wait && lhs.timeout == rhs.timeout &&
-           lhs.external_port == rhs.external_port && lhs.rx_buff_size == rhs.rx_buff_size;
+    return lhs.enabled == rhs.enabled && lhs.max_wait == rhs.max_wait && lhs.external_port == rhs.external_port &&
+           lhs.rx_buff_size == rhs.rx_buff_size;
 }
 
 using device_name_t = outcome::result<std::string>;
@@ -260,12 +260,6 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.max_wait = max_wait.value();
 
-        auto timeout = t["timeout"].value<std::uint32_t>();
-        if (!timeout) {
-            return "upnp/timeout is incorrect or missing";
-        }
-        c.timeout = timeout.value();
-
         auto external_port = t["external_port"].value<std::uint32_t>();
         if (!external_port) {
             return "upnp/external_port is incorrect or missing";
@@ -440,7 +434,6 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"upnp", toml::table{{
                      {"enabled", cfg.upnp_config.enabled},
                      {"max_wait", cfg.upnp_config.max_wait},
-                     {"timeout", cfg.upnp_config.timeout},
                      {"external_port", cfg.upnp_config.external_port},
                      {"rx_buff_size", cfg.upnp_config.rx_buff_size},
                  }}},
@@ -515,9 +508,9 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         }
     };
     cfg.local_announce_config = local_announce_config_t {
-        true,
-        21027,
-        30
+        true,   /* enabled */
+        21027,  /* port */
+        30000   /* frequency */
     };
     cfg.global_announce_config = global_announce_config_t{
         true,
@@ -532,7 +525,6 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     cfg.upnp_config = upnp_config_t {
         true,       /* enabled */
         1,          /* max_wait */
-        10,         /* timeout */
         22001,      /* external port */
         64 * 1024,  /* rx_buff */
     };
