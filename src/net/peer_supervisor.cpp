@@ -121,7 +121,8 @@ auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &
         auto &devices = cluster->get_devices();
         auto peer = devices.by_sha256(diff.device.get_sha256());
         if (!peer->is_online()) {
-            auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
+            auto &uris = diff.uris;
+            auto timeout = r::pt::milliseconds{bep_config.connect_timeout * uris.size() + 1};
             LOG_DEBUG(log, "{} initiating connection with {}", identity, peer->device_id());
             auto peer_addr = create_actor<peer_actor_t>()
                                  .ssl_pair(&ssl_pair)
@@ -130,7 +131,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &
                                  .coordinator(coordinator)
                                  .timeout(timeout)
                                  .peer_device_id(diff.device)
-                                 .uris(diff.uris)
+                                 .uris(uris)
                                  .cluster(cluster)
                                  .finish()
                                  ->get_address();
