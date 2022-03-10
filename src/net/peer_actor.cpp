@@ -328,11 +328,12 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::io_timer);
     LOG_TRACE(log, "{}, on_timer_trigger, cancelled = {}", identity, cancelled);
-    if (!cancelled) {
+    if (cancelled) {
         if (connected) {
             auto ec = r::make_error_code(r::shutdown_code_t::normal);
             do_shutdown(make_error(ec));
         } else {
+            LOG_TRACE(log, "{}, cancelling transport...", identity, cancelled);
             transport->cancel();
         }
     }
