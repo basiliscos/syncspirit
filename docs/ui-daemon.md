@@ -33,6 +33,9 @@ the speficified peer device. The `$folder` can refer folder label or
 folder id; the `$device` can refer device either via full device id, 
 short device id or via device label.
 
+ - `inactivate:$seconds` shutdown the programs after `$seconds` of
+inactivity (i.e. no traffic between peers).
+
 
 # Launch example
  
