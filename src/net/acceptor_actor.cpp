@@ -21,7 +21,7 @@ r::plugin::resource_id_t accepting = 0;
 
 acceptor_actor_t::acceptor_actor_t(config_t &config)
     : r::actor_base_t{config}, strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()},
-      sock(strand.context()), acceptor(strand.context()), peer(strand.context()), cluster{config.cluster} {
+      acceptor(strand.context()), peer(strand.context()), cluster{config.cluster} {
     log = utils::get_logger("net.acceptor");
 }
 

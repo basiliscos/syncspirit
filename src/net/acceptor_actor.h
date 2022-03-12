@@ -44,7 +44,6 @@ struct acceptor_actor_t : public r::actor_base_t {
 
     utils::logger_t log;
     asio::io_context::strand &strand;
-    tcp_socket_t sock;
     tcp::endpoint endpoint;
     tcp::acceptor acceptor;
     tcp_socket_t peer;
