@@ -65,9 +65,6 @@ struct peer_supervisor_t : public ra::supervisor_asio_t,
     void on_start() noexcept override;
 
   private:
-    using id2addr_t = std::map<std::string, r::address_ptr_t>;
-    using addr2id_t = std::map<r::address_ptr_t, std::string>;
-
     void on_model_update(model::message::model_update_t &) noexcept;
     void on_contact_update(model::message::contact_update_t &) noexcept;
 
@@ -81,8 +78,6 @@ struct peer_supervisor_t : public ra::supervisor_asio_t,
     std::string_view device_name;
     const utils::key_pair_t &ssl_pair;
     config::bep_config_t bep_config;
-    id2addr_t id2addr;
-    addr2id_t addr2id;
 };
 
 } // namespace net

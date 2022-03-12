@@ -40,17 +40,6 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     auto &peer_addr = actor->get_address();
     auto &reason = actor->get_shutdown_reason();
     LOG_TRACE(log, "{}, on_child_shutdown, {} due to {} ", identity, actor->get_identity(), reason->message());
-
-    auto it = addr2id.find(peer_addr);
-    if (it != addr2id.end()) {
-        auto &device_id = it->second;
-        auto diff = cluster_diff_ptr_t();
-        diff = new peer::peer_state_t(*cluster, device_id, peer_addr, false);
-        send<model::payload::model_update_t>(coordinator, std::move(diff));
-        auto it_id = id2addr.find(device_id);
-        id2addr.erase(it_id);
-        addr2id.erase(it);
-    }
     parent_t::on_child_shutdown(actor);
 }
 
@@ -81,11 +70,6 @@ void peer_supervisor_t::on_contact_update(model::message::contact_update_t &msg)
 
 auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &state) noexcept -> outcome::result<void> {
     auto &peer_addr = state.peer_addr;
-    if (state.online) {
-        auto &peer_id = state.peer_id;
-        addr2id.emplace(peer_addr, peer_id);
-        id2addr.emplace(peer_id, peer_addr);
-    }
     if (!state.known && state.online) {
         auto ec = model::make_error_code(model::error_code_t::unknown_device);
         auto ee = make_error(ec);

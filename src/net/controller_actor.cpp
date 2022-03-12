@@ -71,13 +71,14 @@ void controller_actor_t::on_start() noexcept {
     send<payload::forwarded_message_t>(peer_addr, std::move(payload));
 
     resources->acquire(resource::peer);
-    resources->acquire(resource::peer);
     LOG_INFO(log, "{} is online", identity);
 }
 
 void controller_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "{}, shutdown_start", identity);
-    send<payload::termination_t>(peer_addr, shutdown_reason);
+    if (peer_addr) {
+        send<payload::termination_t>(peer_addr, shutdown_reason);
+    }
     r::actor_base_t::shutdown_start();
 }
 
@@ -87,12 +88,13 @@ void controller_actor_t::shutdown_finish() noexcept {
 }
 
 void controller_actor_t::on_termination(message::termination_signal_t &message) noexcept {
-    resources->release(resource::peer);
     if (resources->has(resource::peer)) {
-        auto &ee = message.payload.ee;
-        LOG_TRACE(log, "{}, on_termination reason: {}", identity, ee->message());
-        do_shutdown(ee);
+        resources->release(resource::peer);
+        peer_addr.reset();
     }
+    auto &ee = message.payload.ee;
+    LOG_TRACE(log, "{}, on_termination reason: {}", identity, ee->message());
+    do_shutdown(ee);
 }
 
 void controller_actor_t::ready() noexcept { send<payload::ready_signal_t>(get_address()); }

@@ -18,11 +18,14 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t resolving = 0;
 r::plugin::resource_id_t uris = 1;
-r::plugin::resource_id_t io = 2;
-r::plugin::resource_id_t io_timer = 3;
-r::plugin::resource_id_t tx_timer = 4;
-r::plugin::resource_id_t rx_timer = 5;
-r::plugin::resource_id_t finalization = 6;
+r::plugin::resource_id_t io_handshake = 2;
+r::plugin::resource_id_t io_read = 3;
+r::plugin::resource_id_t io_write = 4;
+r::plugin::resource_id_t io_connect = 5;
+r::plugin::resource_id_t io_timer = 6;
+r::plugin::resource_id_t tx_timer = 7;
+r::plugin::resource_id_t rx_timer = 8;
+r::plugin::resource_id_t finalization = 9;
 } // namespace resource
 } // namespace
 
@@ -83,7 +86,9 @@ void peer_actor_t::instantiate_transport() noexcept {
         auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
         transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup, std::move(sock)};
         transport = transport::initiate_stream(cfg);
-        resources->acquire(resource::io);
+        auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
+        timer_request = start_timer(timeout, *this, &peer_actor_t::on_timer);
+        resources->acquire(resource::io_timer);
         initiate_handshake();
     } else {
         resources->acquire(resource::uris);
@@ -136,9 +141,9 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 
     auto &addresses = res.payload.res->results;
     transport::connect_fn_t on_connect = [&](auto arg) { this->on_connect(arg); };
-    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
+    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg, resource::io_connect); };
     transport->async_connect(addresses, on_connect, on_error);
-    resources->acquire(resource::io);
+    resources->acquire(resource::io_connect);
 
     auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
     timer_request = start_timer(timeout, *this, &peer_actor_t::on_timer);
@@ -148,22 +153,25 @@ void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 void peer_actor_t::on_connect(resolve_it_t) noexcept {
     LOG_TRACE(log, "{}, on_connect, device_id = {}", identity, peer_device_id.get_short());
     initiate_handshake();
+    resources->release(resource::io_connect);
 }
 
 void peer_actor_t::initiate_handshake() noexcept {
     connected = true;
     transport::handshake_fn_t handshake_fn([&](auto &&...args) { on_handshake(args...); });
-    transport::error_fn_t error_fn([&](auto arg) { on_handshake_error(arg); });
+    transport::error_fn_t error_fn([&](auto arg) { on_io_error(arg, resource::io_handshake); });
     transport->async_handshake(handshake_fn, error_fn);
+    resources->acquire(resource::io_handshake);
 }
 
-void peer_actor_t::on_io_error(const sys::error_code &ec) noexcept {
+void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
     LOG_TRACE(log, "{}, on_io_error: {}", identity, ec.message());
-    resources->release(resource::io);
+    resources->release(resource);
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "{}, on_io_error: {}", identity, ec.message());
     }
     cancel_timer();
+    cancel_io();
     if (state < r::state_t::SHUTTING_DOWN) {
         if (!connected) {
             resources->acquire(resource::uris);
@@ -191,11 +199,11 @@ void peer_actor_t::process_tx_queue() noexcept {
         tx_item = std::move(item);
         tx_queue.pop_front();
         transport::io_fn_t on_write = [&](auto arg) { this->on_write(arg); };
-        transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
+        transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg, resource::io_write); };
         auto &tx_buff = tx_item->buff;
 
         if (tx_buff.size()) {
-            resources->acquire(resource::io);
+            resources->acquire(resource::io_write);
             transport->async_send(asio::buffer(tx_buff.data(), tx_buff.size()), on_write, on_error);
         } else {
             LOG_TRACE(log, "peer_actor_t::process_tx_queue, device_id = {}, final empty message, shutting down ",
@@ -221,7 +229,8 @@ void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
 
 void peer_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const tcp::endpoint &peer_endpoint,
                                 const model::device_id_t *peer_device) noexcept {
-    resources->release(resource::io);
+    resources->release(resource::io_handshake);
+    handshaked = true;
     if (!peer_device) {
         LOG_WARN(log, "{}, on_handshake,  missing peer device id", identity);
         auto ec = utils::make_error_code(utils::error_code_t::missing_device_id);
@@ -254,12 +263,14 @@ void peer_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const tcp:
     read_action = &peer_actor_t::read_hello;
 }
 
+#if 0
 void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "{}, on_handshake_error: {}", identity, ec.message());
     }
 }
+#endif
 
 void peer_actor_t::read_more() noexcept {
     if (state > r::state_t::OPERATIONAL) {
@@ -272,24 +283,21 @@ void peer_actor_t::read_more() noexcept {
     }
 
     transport::io_fn_t on_read = [&](auto arg) { this->on_read(arg); };
-    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
-    resources->acquire(resource::io);
+    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg, resource::io_read); };
+    resources->acquire(resource::io_read);
     auto buff = asio::buffer(rx_buff.data() + rx_idx, rx_buff.size() - rx_idx);
     LOG_TRACE(log, "{}, read_more", identity);
     transport->async_recv(buff, on_read, on_error);
 }
 
 void peer_actor_t::on_write(std::size_t sz) noexcept {
-    resources->release(resource::io);
+    resources->release(resource::io_write);
     LOG_TRACE(log, "{}, on_write, {} bytes", identity, sz);
     assert(tx_item);
     if (tx_item->final) {
         LOG_TRACE(log, "{}, process_tx_queue, final message has been sent, shutting down", identity);
         resources->release(resource::finalization);
-        if (resources->has(resource::io)) {
-            LOG_TRACE(log, "{}, cancelling transport...", identity);
-            transport->cancel();
-        }
+        cancel_io();
     } else {
         tx_item.reset();
         process_tx_queue();
@@ -298,7 +306,7 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
 
 void peer_actor_t::on_read(std::size_t bytes) noexcept {
     assert(read_action);
-    resources->release(resource::io);
+    resources->release(resource::io_read);
     rx_idx += bytes;
     LOG_TRACE(log, "{}, on_read, {} bytes, total = {}", identity, bytes, rx_idx);
     auto buff = asio::buffer(rx_buff.data(), rx_idx);
@@ -328,20 +336,20 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::io_timer);
     LOG_TRACE(log, "{}, on_timer_trigger, cancelled = {}", identity, cancelled);
-    if (cancelled) {
+    if (!cancelled) {
+        cancel_io();
         if (connected) {
             auto ec = r::make_error_code(r::shutdown_code_t::normal);
             do_shutdown(make_error(ec));
-        } else {
-            LOG_TRACE(log, "{}, cancelling transport...", identity, cancelled);
-            transport->cancel();
         }
     }
 }
 
 void peer_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "{}, shutdown_start", identity);
-    cancel_timer();
+    if (resources->has(resource::io_timer)) {
+        cancel_timer();
+    }
     if (tx_timer_request) {
         r::actor_base_t::cancel_timer(*tx_timer_request);
     }
@@ -352,13 +360,16 @@ void peer_actor_t::shutdown_start() noexcept {
         send<payload::termination_t>(controller, shutdown_reason);
     }
 
-    if (connected) {
+    if (handshaked) {
         fmt::memory_buffer buff;
         proto::Close close;
         close.set_reason(shutdown_reason->message());
         proto::serialize(buff, close);
         tx_queue.clear();
         push_write(std::move(buff), true);
+        LOG_TRACE(log, "{}, going to send close message", identity);
+    } else {
+        cancel_io();
     }
 
     r::actor_base_t::shutdown_start();
@@ -375,12 +386,44 @@ void peer_actor_t::shutdown_finish() noexcept {
         send<payload::termination_t>(controller, shutdown_reason);
     }
     r::actor_base_t::shutdown_finish();
+    if (handshaked) {
+        auto sha256 = peer_device_id.get_sha256();
+        auto device = cluster->get_devices().by_sha256(sha256);
+        if (device && device->is_online()) {
+            auto diff = model::diff::cluster_diff_ptr_t();
+            diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, false);
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
+        }
+    }
 }
 
 void peer_actor_t::cancel_timer() noexcept {
     if (resources->has(resource::io_timer)) {
         r::actor_base_t::cancel_timer(*timer_request);
         timer_request.reset();
+    }
+}
+
+void peer_actor_t::cancel_io() noexcept {
+    if (resources->has(resource::io_read)) {
+        LOG_TRACE(log, "{}, cancelling I/O (read)", identity);
+        transport->cancel();
+        return;
+    }
+    if (resources->has(resource::io_write)) {
+        LOG_TRACE(log, "{}, cancelling I/O (write)", identity);
+        transport->cancel();
+        return;
+    }
+    if (resources->has(resource::io_connect)) {
+        LOG_TRACE(log, "{}, cancelling I/O (connect)", identity);
+        transport->cancel();
+        return;
+    }
+    if (resources->has(resource::io_handshake)) {
+        LOG_TRACE(log, "{}, cancelling I/O (handshake)", identity);
+        transport->cancel();
+        return;
     }
 }
 

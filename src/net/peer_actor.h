@@ -116,7 +116,7 @@ struct peer_actor_t : public r::actor_base_t {
     void on_forward(message::forwarded_message_t &message) noexcept;
 
     void on_connect(resolve_it_t) noexcept;
-    void on_io_error(const sys::error_code &ec) noexcept;
+    void on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept;
     void on_write(std::size_t bytes) noexcept;
     void on_read(std::size_t bytes) noexcept;
     void try_next_uri() noexcept;
@@ -129,6 +129,7 @@ struct peer_actor_t : public r::actor_base_t {
     void push_write(fmt::memory_buffer &&buff, bool final) noexcept;
     void process_tx_queue() noexcept;
     void cancel_timer() noexcept;
+    void cancel_io() noexcept;
     void instantiate_transport() noexcept;
     void initiate_handshake() noexcept;
     void on_tx_timeout(r::request_id_t, bool cancelled) noexcept;
@@ -163,6 +164,7 @@ struct peer_actor_t : public r::actor_base_t {
     fmt::memory_buffer rx_buff;
     std::size_t rx_idx = 0;
     bool connected = false;
+    bool handshaked = false;
     bool valid_peer = false;
     bool finished = false;
     std::string cert_name;
