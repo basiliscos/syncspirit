@@ -58,6 +58,7 @@ void upnp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void upnp_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
+    r::actor_base_t::on_start();
     rx_buff = std::make_shared<payload::http_request_t::rx_buff_t>();
 
     fmt::memory_buffer tx_buff;
@@ -174,11 +175,11 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
             break;
         }
     }
-    LOG_DEBUG(log, "{}, going to map {}:{} => {}:{}", identity, external_addr.to_string(), external_port, local_address,
-              local_port);
+    LOG_DEBUG(log, "{}, going to map {}:{} => {}:{}", identity, ip_addr, external_port, local_address, local_port);
 
     fmt::memory_buffer tx_buff;
-    auto res = make_mapping_request(tx_buff, igd_control_url, external_port, local_address.to_string(), local_port);
+    auto res =
+        make_mapping_request(tx_buff, igd_control_url, ip_addr, external_port, local_address.to_string(), local_port);
     if (!res) {
         auto &ec = res.error();
         LOG_TRACE(log, "{}, error making port mapping request :: {}", identity, ec.message());
@@ -195,7 +196,7 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     auto &ee = msg.payload.ee;
     if (ee) {
         LOG_WARN(log, "{}, unsuccessfull port mapping: {}", ee->message(), identity);
-    } else if (state != r::state_t::OPERATIONAL) {
+    } else if (state > r::state_t::OPERATIONAL) {
         return;
     }
 
@@ -262,7 +263,7 @@ void upnp_actor_t::shutdown_start() noexcept {
     if (resources->has(resource::external_port)) {
         LOG_TRACE(log, "{}, going to unmap extenal port {}", identity, external_port);
         fmt::memory_buffer tx_buff;
-        auto res = make_unmapping_request(tx_buff, igd_control_url, external_port);
+        auto res = make_unmapping_request(tx_buff, igd_control_url, external_addr.to_string(), external_port);
         if (!res) {
             LOG_WARN(log, "{}, error making port mapping request :: {}", identity, res.error().message());
             resources->release(resource::external_port);
