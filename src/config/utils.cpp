@@ -271,13 +271,13 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
 
         auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
         if (!rx_buff_size) {
-            return "upng/rx_buff_size is incorrect or missing";
+            return "upnp/rx_buff_size is incorrect or missing";
         }
         c.rx_buff_size = rx_buff_size.value();
 
         auto debug = t["debug"].value<bool>();
         if (!debug) {
-            return "upng/debug is incorrect or missing";
+            return "upnp/debug is incorrect or missing";
         }
         c.debug = debug.value();
     };
