@@ -21,7 +21,7 @@ r::plugin::resource_id_t http_req = 1;
 
 upnp_actor_t::upnp_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, cluster{cfg.cluster}, main_url{cfg.descr_url}, rx_buff_size{cfg.rx_buff_size},
-      external_port(cfg.external_port) {
+      external_port(cfg.external_port), debug{cfg.debug} {
     log = utils::get_logger("net.upnp");
 }
 
@@ -101,6 +101,9 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
 
     local_address = msg.payload.res->local_addr.value();
     auto &body = msg.payload.res->response.body();
+    if (debug) {
+        LOG_DEBUG(log, "igd description reply: {}\n", std::string_view(body.data(), body.size()));
+    }
     auto igd_result = parse_igd(body.data(), body.size());
     if (!igd_result) {
         auto &ec = igd_result.error();
@@ -149,6 +152,9 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
     }
 
     auto &body = msg.payload.res->response.body();
+    if (debug) {
+        LOG_DEBUG(log, "external ip reply: {}\n", std::string_view(body.data(), body.size()));
+    }
     auto ip_addr_result = parse_external_ip(body.data(), body.size());
     if (!ip_addr_result) {
         auto &ec = ip_addr_result.error();
@@ -201,6 +207,9 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     }
 
     auto &body = msg.payload.res->response.body();
+    if (debug) {
+        LOG_DEBUG(log, "mapping port reply: {}\n", std::string_view(body.data(), body.size()));
+    }
     auto result = parse_mapping(body.data(), body.size());
     if (!result) {
         LOG_WARN(log, "{}, can't parse port mapping reply : {}", identity, result.error().message());
@@ -236,6 +245,9 @@ void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
         return;
     }
     auto &body = msg.payload.res->response.body();
+    if (debug) {
+        LOG_DEBUG(log, "unmapping port reply: {}\n", std::string_view(body.data(), body.size()));
+    }
     auto result = parse_unmapping(body.data(), body.size());
     if (!result) {
         LOG_WARN(log, "{}, can't parse port unmapping reply : {}", identity, result.error().message());

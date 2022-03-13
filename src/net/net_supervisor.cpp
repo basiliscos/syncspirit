@@ -7,7 +7,6 @@
 #include "global_discovery_actor.h"
 #include "local_discovery_actor.h"
 #include "cluster_supervisor.h"
-#include "upnp_actor.h"
 #include "acceptor_actor.h"
 #include "ssdp_actor.h"
 #include "http_actor.h"

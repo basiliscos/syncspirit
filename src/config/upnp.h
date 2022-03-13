@@ -11,6 +11,7 @@ struct upnp_config_t {
     std::uint32_t max_wait;
     std::uint16_t external_port;
     std::uint32_t rx_buff_size;
+    bool debug;
 };
 
 } // namespace syncspirit::config

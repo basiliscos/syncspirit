@@ -156,6 +156,7 @@ void ssdp_actor_t::launch_upnp(const URI &igd_uri) noexcept {
         .descr_url(igd_uri)
         .rx_buff_size(upnp_config.rx_buff_size)
         .external_port(upnp_config.external_port)
+        .debug(upnp_config.debug)
         .finish()
         ->get_address();
 }

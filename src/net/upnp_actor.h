@@ -17,6 +17,7 @@ struct upnp_actor_config_t : r::actor_config_t {
     std::uint32_t rx_buff_size;
     std::uint16_t external_port;
     model::cluster_ptr_t cluster;
+    bool debug;
 };
 
 template <typename Actor> struct upnp_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -41,6 +42,11 @@ template <typename Actor> struct upnp_actor_config_builder_t : r::actor_config_b
 
     builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
         parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&debug(bool value) &&noexcept {
+        parent_t::config.debug = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -82,6 +88,7 @@ struct upnp_actor_t : public r::actor_base_t {
     rx_buff_t rx_buff;
     std::uint32_t rx_buff_size;
     std::uint16_t external_port;
+    bool debug;
     std::uint16_t local_port;
     asio::ip::address external_addr;
     unlink_request_t unlink_request;

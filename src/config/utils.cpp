@@ -64,7 +64,7 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
 
 bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept {
     return lhs.enabled == rhs.enabled && lhs.max_wait == rhs.max_wait && lhs.external_port == rhs.external_port &&
-           lhs.rx_buff_size == rhs.rx_buff_size;
+           lhs.rx_buff_size == rhs.rx_buff_size && lhs.debug == rhs.debug;
 }
 
 using device_name_t = outcome::result<std::string>;
@@ -274,6 +274,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "upng/rx_buff_size is incorrect or missing";
         }
         c.rx_buff_size = rx_buff_size.value();
+
+        auto debug = t["debug"].value<bool>();
+        if (!debug) {
+            return "upng/debug is incorrect or missing";
+        }
+        c.debug = debug.value();
     };
 
     // bep
@@ -439,6 +445,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                      {"max_wait", cfg.upnp_config.max_wait},
                      {"external_port", cfg.upnp_config.external_port},
                      {"rx_buff_size", cfg.upnp_config.rx_buff_size},
+                     {"debug", cfg.upnp_config.debug},
                  }}},
         {"bep", toml::table{{
                     {"rx_buff_size", cfg.bep_config.rx_buff_size},
@@ -530,6 +537,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         1,          /* max_wait */
         22001,      /* external port */
         64 * 1024,  /* rx_buff */
+        false,      /* debug */
     };
     cfg.bep_config = bep_config_t {
         16 * 1024 * 1024,   /* rx_buff */
