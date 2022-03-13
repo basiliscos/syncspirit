@@ -44,6 +44,6 @@ syncspirit-daemon --log_level info \
     --config_dir=/tmp/my_dir \
     --command add_peer:peer_label=KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7 \
     --command add_folder:label=my_folder-label:id=nagkw-srrjz:path=/tmp/my_dir/data \
-    --command share:folder=my_label:device=KUEQE66 \
+    --command share:folder=my_folder-label:device=KUEQE66 \
     --command inactivate:120
 ```
