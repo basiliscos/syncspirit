@@ -30,9 +30,11 @@ static const char *igd_wan_service = "urn:schemas-upnp-org:service:WANIPConnecti
 static const char *soap_GetExternalIPAddress = "GetExternalIPAddress";
 static const char *soap_AddPortMapping = "AddPortMapping";
 static const char *soap_DeletePortMapping = "DeletePortMapping";
+static const char *soap_GetSpecificPortMappingEntry = "GetSpecificPortMappingEntry";
 static const char *external_ip_xpath = "//NewExternalIPAddress";
-static const char *port_mapping_succes_xpath = "//*[local-name() = 'AddPortMappingResponse']";
-static const char *port_unmapping_succes_xpath = "//*[local-name() = 'DeletePortMappingResponse']";
+static const char *port_mapping_success_xpath = "//*[local-name() = 'AddPortMappingResponse']";
+static const char *port_unmapping_success_xpath = "//*[local-name() = 'DeletePortMappingResponse']";
+static const char *port_mapping_validation_success_xpath = "//*[local-name() = 'GetSpecificPortMappingEntryResponse']";
 
 constexpr unsigned http_version = 11;
 
@@ -111,6 +113,7 @@ outcome::result<void> make_description_request(fmt::memory_buffer &buff, const U
     req.version(http_version);
     req.target(uri.relative());
     req.set(http::field::host, uri.host);
+    req.set(http::field::connection, "close");
 
     return serialize(req, buff);
 }
@@ -140,6 +143,7 @@ outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const U
     req.method(http::verb::post);
     req.version(http_version);
     req.target(uri.relative());
+    req.set(http::field::connection, "close");
     req.set(http::field::host, uri.host);
     req.set(http::field::soapaction, soap_action);
     req.set(http::field::pragma, "no-cache");
@@ -170,49 +174,15 @@ outcome::result<std::string> parse_external_ip(const char *data, std::size_t byt
     return node.node().child_value();
 }
 
-outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &uri, const std::string &external_ip,
-                                           std::uint16_t external_port, const std::string &internal_ip,
-                                           std::uint16_t internal_port) noexcept {
+outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &uri, std::uint16_t external_port,
+                                           const std::string &internal_ip, std::uint16_t internal_port) noexcept {
     http::request<http::string_body> req;
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_AddPortMapping);
     req.method(http::verb::post);
     req.version(http_version);
     req.target(uri.relative());
     req.set(http::field::host, uri.host);
-    req.set(http::field::soapaction, soap_action);
-    req.set(http::field::pragma, "no-cache");
-    req.set(http::field::cache_control, "no-cache");
-    req.set(http::field::content_type, "text/xml");
-
-    std::string body =
-        fmt::format("<?xml version='1.0'?>"
-                    "<s:Envelope xmlns:s='http://schemas.xmlsoap.org/soap/envelope/' "
-                    "s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'>"
-                    "<s:Body><u:{0} xmlns:u='{1}'>"
-                    "<NewRemoteHost>{2}</NewRemoteHost>"
-                    "<NewExternalPort>{3}</NewExternalPort>"
-                    "<NewProtocol>TCP</NewProtocol>"
-                    "<NewInternalPort>{4}</NewInternalPort>"
-                    "<NewInternalClient>{5}</NewInternalClient>"
-                    "<NewEnabled>1</NewEnabled>"
-                    "<NewPortMappingDescription>syncspirit</NewPortMappingDescription>"
-                    "<NewLeaseDuration>0</NewLeaseDuration>"
-                    "</u:{0}></s:Body></s:Envelope>",
-                    soap_AddPortMapping, igd_wan_service, external_ip, external_port, internal_port, internal_ip);
-    req.body() = body;
-    req.prepare_payload();
-
-    return serialize(req, buff);
-}
-
-outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const URI &uri, const std::string &external_ip,
-                                             std::uint16_t external_port) noexcept {
-    http::request<http::string_body> req;
-    std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_DeletePortMapping);
-    req.method(http::verb::post);
-    req.version(http_version);
-    req.target(uri.relative());
-    req.set(http::field::host, uri.host);
+    req.set(http::field::connection, "close");
     req.set(http::field::soapaction, soap_action);
     req.set(http::field::pragma, "no-cache");
     req.set(http::field::cache_control, "no-cache");
@@ -222,11 +192,74 @@ outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const URI
                                    "<s:Envelope xmlns:s='http://schemas.xmlsoap.org/soap/envelope/' "
                                    "s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'>"
                                    "<s:Body><u:{0} xmlns:u='{1}'>"
-                                   "<NewRemoteHost>{2}</NewRemoteHost>"
-                                   "<NewExternalPort>{3}</NewExternalPort>"
+                                   "<NewRemoteHost></NewRemoteHost>"
+                                   "<NewExternalPort>{2}</NewExternalPort>"
+                                   "<NewProtocol>TCP</NewProtocol>"
+                                   "<NewInternalPort>{3}</NewInternalPort>"
+                                   "<NewInternalClient>{4}</NewInternalClient>"
+                                   "<NewEnabled>1</NewEnabled>"
+                                   "<NewPortMappingDescription>syncspirit</NewPortMappingDescription>"
+                                   "<NewLeaseDuration>0</NewLeaseDuration>"
+                                   "</u:{0}></s:Body></s:Envelope>",
+                                   soap_AddPortMapping, igd_wan_service, external_port, internal_port, internal_ip);
+    req.body() = body;
+    req.prepare_payload();
+
+    return serialize(req, buff);
+}
+
+outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const URI &uri,
+                                             std::uint16_t external_port) noexcept {
+    http::request<http::string_body> req;
+    std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_DeletePortMapping);
+    req.method(http::verb::post);
+    req.version(http_version);
+    req.target(uri.relative());
+    req.set(http::field::host, uri.host);
+    req.set(http::field::connection, "close");
+    req.set(http::field::soapaction, soap_action);
+    req.set(http::field::pragma, "no-cache");
+    req.set(http::field::cache_control, "no-cache");
+    req.set(http::field::content_type, "text/xml");
+
+    std::string body = fmt::format("<?xml version='1.0'?>"
+                                   "<s:Envelope xmlns:s='http://schemas.xmlsoap.org/soap/envelope/' "
+                                   "s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'>"
+                                   "<s:Body><u:{0} xmlns:u='{1}'>"
+                                   "<NewRemoteHost></NewRemoteHost>"
+                                   "<NewExternalPort>{2}</NewExternalPort>"
                                    "<NewProtocol>TCP</NewProtocol>"
                                    "</u:{0}></s:Body></s:Envelope>",
-                                   soap_DeletePortMapping, igd_wan_service, external_ip, external_port);
+                                   soap_DeletePortMapping, igd_wan_service, external_port);
+    req.body() = body;
+    req.prepare_payload();
+
+    return serialize(req, buff);
+}
+
+outcome::result<void> make_mappig_validation_request(fmt::memory_buffer &buff, const URI &uri,
+                                                     std::uint16_t external_port) noexcept {
+    http::request<http::string_body> req;
+    std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_GetSpecificPortMappingEntry);
+    req.method(http::verb::post);
+    req.version(http_version);
+    req.target(uri.relative());
+    req.set(http::field::host, uri.host);
+    req.set(http::field::connection, "close");
+    req.set(http::field::soapaction, soap_action);
+    req.set(http::field::pragma, "no-cache");
+    req.set(http::field::cache_control, "no-cache");
+    req.set(http::field::content_type, "text/xml");
+
+    std::string body = fmt::format("<?xml version='1.0'?>"
+                                   "<s:Envelope xmlns:s='http://schemas.xmlsoap.org/soap/envelope/' "
+                                   "s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'>"
+                                   "<s:Body><u:{0} xmlns:u='{1}'>"
+                                   "<NewRemoteHost></NewRemoteHost>"
+                                   "<NewExternalPort>{2}</NewExternalPort>"
+                                   "<NewProtocol>TCP</NewProtocol>"
+                                   "</u:{0}></s:Body></s:Envelope>",
+                                   soap_GetSpecificPortMappingEntry, igd_wan_service, external_port);
     req.body() = body;
     req.prepare_payload();
 
@@ -239,7 +272,7 @@ outcome::result<bool> parse_mapping(const char *data, std::size_t bytes) noexcep
     if (!result) {
         return error_code_t::xml_parse_error;
     }
-    auto node = doc.select_node(port_mapping_succes_xpath);
+    auto node = doc.select_node(port_mapping_success_xpath);
     return static_cast<bool>(node);
 }
 
@@ -249,7 +282,17 @@ outcome::result<bool> parse_unmapping(const char *data, std::size_t bytes) noexc
     if (!result) {
         return error_code_t::xml_parse_error;
     }
-    auto node = doc.select_node(port_unmapping_succes_xpath);
+    auto node = doc.select_node(port_unmapping_success_xpath);
+    return static_cast<bool>(node);
+}
+
+outcome::result<bool> parse_mappig_validation(const char *data, std::size_t bytes) noexcept {
+    pugi::xml_document doc;
+    auto result = doc.load_buffer(data, bytes);
+    if (!result) {
+        return error_code_t::xml_parse_error;
+    }
+    auto node = doc.select_node(port_mapping_validation_success_xpath);
     return static_cast<bool>(node);
 }
 

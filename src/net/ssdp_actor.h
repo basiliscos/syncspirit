@@ -60,6 +60,7 @@ struct ssdp_actor_t : public r::actor_base_t {
     std::unique_ptr<udp_socket_t> sock;
     config::upnp_config_t upnp_config;
     r::address_ptr_t coordinator;
+    udp::endpoint upnp_endpoint;
 
     fmt::memory_buffer tx_buff;
     fmt::memory_buffer rx_buff;

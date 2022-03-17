@@ -35,9 +35,16 @@ TEST_CASE("parse successful port mapping", "[support]") {
     REQUIRE(r.value() == true);
 }
 
-TEST_CASE("parse failede port mapping", "[support]") {
+TEST_CASE("parse failed port mapping", "[support]") {
     auto xml = read_file(locate_path("data/soap-failure.xml"));
     auto r = parse_mapping(xml.c_str(), xml.size());
+    REQUIRE(r);
+    REQUIRE(r.value() == false);
+}
+
+TEST_CASE("parse failed port unmapping", "[support]") {
+    auto xml = read_file(locate_path("data/port-unmapping-failure.xml"));
+    auto r = parse_unmapping(xml.c_str(), xml.size());
     REQUIRE(r);
     REQUIRE(r.value() == false);
 }

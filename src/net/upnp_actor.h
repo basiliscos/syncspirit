@@ -70,6 +70,7 @@ struct upnp_actor_t : public r::actor_base_t {
     void on_external_ip(message::http_response_t &res) noexcept;
     void on_mapping_port(message::http_response_t &res) noexcept;
     void on_unmapping_port(message::http_response_t &res) noexcept;
+    void on_validate(message::http_response_t &res) noexcept;
     void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
                       bool get_local_address = false) noexcept;
     void request_finish() noexcept;
@@ -85,6 +86,7 @@ struct upnp_actor_t : public r::actor_base_t {
     r::address_ptr_t addr_external_ip; /* for routing */
     r::address_ptr_t addr_mapping;     /* for routing */
     r::address_ptr_t addr_unmapping;   /* for routing */
+    r::address_ptr_t addr_validate;    /* for routing */
     rx_buff_t rx_buff;
     std::uint32_t rx_buff_size;
     std::uint16_t external_port;

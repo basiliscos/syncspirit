@@ -33,12 +33,14 @@ void upnp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         addr_external_ip = p.create_address();
         addr_mapping = p.create_address();
         addr_unmapping = p.create_address();
+        addr_validate = p.create_address();
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&upnp_actor_t::on_igd_description, addr_description);
         p.subscribe_actor(&upnp_actor_t::on_external_ip, addr_external_ip);
         p.subscribe_actor(&upnp_actor_t::on_mapping_port, addr_mapping);
         p.subscribe_actor(&upnp_actor_t::on_unmapping_port, addr_unmapping);
+        p.subscribe_actor(&upnp_actor_t::on_validate, addr_validate);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::http10, http_client, true).link(true);
@@ -184,8 +186,7 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
     LOG_DEBUG(log, "{}, going to map {}:{} => {}:{}", identity, ip_addr, external_port, local_address, local_port);
 
     fmt::memory_buffer tx_buff;
-    auto res =
-        make_mapping_request(tx_buff, igd_control_url, ip_addr, external_port, local_address.to_string(), local_port);
+    auto res = make_mapping_request(tx_buff, igd_control_url, external_port, local_address.to_string(), local_port);
     if (!res) {
         auto &ec = res.error();
         LOG_TRACE(log, "{}, error making port mapping request :: {}", identity, ec.message());
@@ -219,18 +220,22 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
         rx_buff->consume(msg.payload.res->bytes);
         if (!result.value()) {
             LOG_WARN(log, "{}, unsuccessfull port mapping", identity);
+            LOG_DEBUG(log, "mapping port reply: {}\n", std::string_view(body.data(), body.size()));
         } else {
             LOG_DEBUG(log, "{}, port mapping succeeded", identity);
             ok = true;
-            resources->acquire(resource::external_port);
         }
     }
 
     if (ok) {
-        using namespace model::diff;
-        auto diff = model::diff::contact_diff_ptr_t{};
-        diff = new modify::update_contact_t(*cluster, {external_addr.to_string(), local_address.to_string()});
-        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+        fmt::memory_buffer tx_buff;
+        auto res = make_mappig_validation_request(tx_buff, igd_control_url, external_port);
+        if (!res) {
+            auto &ec = res.error();
+            LOG_TRACE(log, "{}, error making port mapping validation request :: {}", identity, ec.message());
+            return do_shutdown(make_error(ec));
+        }
+        make_request(addr_validate, igd_control_url, std::move(tx_buff));
     }
 }
 
@@ -245,22 +250,61 @@ void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
         return;
     }
     auto &body = msg.payload.res->response.body();
+    auto content = std::string_view(body.data(), body.size());
     if (debug) {
-        LOG_DEBUG(log, "unmapping port reply: {}\n", std::string_view(body.data(), body.size()));
+        LOG_DEBUG(log, "unmapping port reply: {}\n", content);
     }
     auto result = parse_unmapping(body.data(), body.size());
     if (!result) {
         LOG_WARN(log, "{}, can't parse port unmapping reply : {}", identity, result.error().message());
-        std::string xml(body);
-        LOG_DEBUG(log, "xml:\n{0}\n", xml);
+        LOG_DEBUG(log, "xml:\n{0}\n", content);
+    } else if (!result.value()) {
+        LOG_WARN(log, "{}, port unmapping failed", identity);
+        LOG_DEBUG(log, "xml:\n{0}\n", content);
     } else {
-        LOG_DEBUG(log, "{}, succesfully unmapped external port {}", identity, external_port);
+        LOG_DEBUG(log, "{}, succesfully unmmaped external port {}", identity, external_port);
     }
     if (unlink_request) {
         auto p = get_plugin(r::plugin::link_client_plugin_t::class_identity);
         auto plugin = static_cast<r::plugin::link_client_plugin_t *>(p);
         plugin->forget_link(*unlink_request);
         unlink_request.reset();
+    }
+}
+
+void upnp_actor_t::on_validate(message::http_response_t &msg) noexcept {
+    LOG_TRACE(log, "{}, on_validate", identity);
+    request_finish();
+
+    auto &ee = msg.payload.ee;
+    if (ee) {
+        LOG_WARN(log, "upnp_actor:: unsuccessfull port mapping: {}", ee->message());
+        return;
+    }
+    auto &body = msg.payload.res->response.body();
+    auto content = std::string_view(body.data(), body.size());
+    if (debug) {
+        LOG_DEBUG(log, "validation port reply: {}\n", content);
+    }
+    bool ok = false;
+    auto result = parse_mappig_validation(body.data(), body.size());
+    if (!result) {
+        LOG_WARN(log, "{}, can't parse port mapping validation reply : {}", identity, result.error().message());
+        LOG_DEBUG(log, "xml:\n{0}\n", content);
+    } else if (!result.value()) {
+        LOG_WARN(log, "{}, port mapping validation failed", identity);
+        LOG_DEBUG(log, "xml:\n{0}\n", content);
+    } else {
+        LOG_DEBUG(log, "{}, succesfully validate external port {} mapping", identity, external_port);
+        ok = true;
+    }
+
+    if (ok) {
+        resources->acquire(resource::external_port);
+        using namespace model::diff;
+        auto diff = model::diff::contact_diff_ptr_t{};
+        diff = new modify::update_contact_t(*cluster, {external_addr.to_string(), local_address.to_string()});
+        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     }
 }
 
@@ -275,7 +319,7 @@ void upnp_actor_t::shutdown_start() noexcept {
     if (resources->has(resource::external_port)) {
         LOG_TRACE(log, "{}, going to unmap extenal port {}", identity, external_port);
         fmt::memory_buffer tx_buff;
-        auto res = make_unmapping_request(tx_buff, igd_control_url, external_addr.to_string(), external_port);
+        auto res = make_unmapping_request(tx_buff, igd_control_url, external_port);
         if (!res) {
             LOG_WARN(log, "{}, error making port mapping request :: {}", identity, res.error().message());
             resources->release(resource::external_port);

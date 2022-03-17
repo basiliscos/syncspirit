@@ -49,11 +49,12 @@ port = 21026
 # default log settings
 [[log]]
 name = 'default'
+# possible values: trace, debug, info, warn, error, critical
 level = 'trace'
 # where do output logs
 sinks = ['stdout', 'file:/tmp/log.txt']
 
-# actor specific log
+# actor specific log (for net.db in the case)
 [[log]]
 name = 'net.db'
 level = 'debug'
@@ -69,6 +70,8 @@ hasher_threads = 3
 
 [upnp]
 enabled = true
+# do output of upnp requests
+debug = false
 discovery_attempts = 2
 # external port for communication, opened on router
 external_port = 22001

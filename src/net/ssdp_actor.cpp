@@ -22,7 +22,8 @@ r::plugin::resource_id_t timer = 2;
 
 ssdp_actor_t::ssdp_actor_t(ssdp_actor_config_t &cfg)
     : r::actor_base_t::actor_base_t(cfg), cluster{cfg.cluster},
-      strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, upnp_config{cfg.upnp_config} {
+      strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, upnp_config{cfg.upnp_config},
+      upnp_endpoint(v4::from_string(upnp_addr), upnp_port) {
     log = utils::get_logger("net.ssdp");
     rx_buff.resize(RX_BUFF_SIZE);
 }
@@ -39,7 +40,6 @@ void ssdp_actor_t::on_start() noexcept {
     sock = std::make_unique<udp_socket_t>(strand.context(), udp::endpoint(udp::v4(), 0));
 
     /* broadcast discorvery */
-    auto destination = udp::endpoint(v4::from_string(upnp_addr), upnp_port);
     auto max_wait = upnp_config.max_wait;
     auto request_result = make_discovery_request(tx_buff, max_wait);
     if (!request_result) {
@@ -57,7 +57,7 @@ void ssdp_actor_t::on_start() noexcept {
 
     auto fwd_discovery = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_sent, &ssdp_actor_t::on_udp_send_error);
     auto buff_tx = asio::buffer(tx_buff.data(), tx_buff.size());
-    sock->async_send_to(buff_tx, destination, std::move(fwd_discovery));
+    sock->async_send_to(buff_tx, upnp_endpoint, std::move(fwd_discovery));
     resources->acquire(resource::send);
 
     auto timeout = pt::seconds(max_wait);

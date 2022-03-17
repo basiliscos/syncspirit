@@ -54,3 +54,5 @@ discovery_attempts = 2
 external_port = 22001
 max_wait = 1
 rx_buff_size = 65536
+debug = true
+
