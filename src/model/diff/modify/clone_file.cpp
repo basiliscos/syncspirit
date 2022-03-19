@@ -97,19 +97,21 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
                 return opt.assume_error();
             }
             new_file = std::move(opt.value());
-            auto &blocks = prev_file->get_blocks();
-            for (size_t i = 0; i < blocks.size(); ++i) {
-                auto &b = blocks[i];
-                assert(b);
-                new_file->assign_block(b, i);
-                new_file->mark_local_available(i);
-            }
         } else {
             prev_file->set_source(peer_file);
         }
     }
 
     if (new_file) {
+        auto &blocks = peer_file->get_blocks();
+        for (size_t i = 0; i < blocks.size(); ++i) {
+            auto &b = blocks[i];
+            new_file->assign_block(b, i);
+            if (identical) {
+                new_file->mark_local_available(i);
+            }
+        }
+        assert(new_file->check_consistency());
         folder_my->add(new_file);
     }
 

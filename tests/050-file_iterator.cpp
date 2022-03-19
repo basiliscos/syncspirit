@@ -68,6 +68,13 @@ TEST_CASE("file iterator", "[model]") {
     diff = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc).value();
     REQUIRE(diff->apply(*cluster));
 
+    auto b = proto::BlockInfo();
+    b.set_hash(utils::sha256_digest("12345").value());
+    b.set_weak_hash(555);
+    auto bi = block_info_t::create(b).value();
+    auto &blocks_map = cluster->get_blocks();
+    blocks_map.put(bi);
+
     proto::Index idx;
     idx.set_folder(db_folder.id());
 
@@ -191,6 +198,8 @@ TEST_CASE("file iterator", "[model]") {
         SECTION("folder info is non-actual") {
             file_1->set_size(5ul);
             file_1->set_block_size(5ul);
+            auto b = file_1->add_blocks();
+            b->set_hash("123");
 
             diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
             REQUIRE(diff->apply(*cluster));
@@ -210,6 +219,8 @@ TEST_CASE("file iterator", "[model]") {
         file_1->set_sequence(10ul);
         file_1->set_size(10ul);
         file_1->set_block_size(5ul);
+        *file_1->add_blocks() = b;
+        *file_1->add_blocks() = b;
         auto version_1 = file_1->mutable_version();
         auto counter_1 = version_1->add_counters();
         counter_1->set_id(14ul);
@@ -220,6 +231,8 @@ TEST_CASE("file iterator", "[model]") {
         file_2->set_sequence(9ul);
         file_2->set_size(10ul);
         file_2->set_block_size(5ul);
+        *file_2->add_blocks() = b;
+        *file_2->add_blocks() = b;
         auto version_2 = file_2->mutable_version();
         auto counter_2 = version_2->add_counters();
         counter_2->set_id(15ul);
@@ -252,10 +265,6 @@ TEST_CASE("file iterator", "[model]") {
             auto f2_local = f2->local_file();
             REQUIRE(f2_local);
 
-            auto b = proto::BlockInfo();
-            auto bi = model::block_info_t::create(b).value();
-            blocks_map.put(bi);
-            f2_local->assign_block(bi, 0);
             f2_local->mark_local_available(0ul);
 
             REQUIRE(next(true) == f2);

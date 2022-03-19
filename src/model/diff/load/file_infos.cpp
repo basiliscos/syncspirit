@@ -48,6 +48,11 @@ auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
             assert(block);
             fi->assign_block(block, (size_t)i);
         }
+        if (!fi->check_consistency()) {
+            LOG_ERROR(log, "inconsitency detected for the file {} at folder {}", fi->get_name(),
+                      folder_info->get_folder()->get_label());
+            return make_error_code(error_code_t::inconsistent_file);
+        }
 
         if (!db.source_device().empty()) {
             fi->lock();

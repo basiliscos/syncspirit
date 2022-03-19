@@ -114,6 +114,9 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::unexpected_blocks:
         r = "blocks are not expected (e.g. in deleted file)";
         break;
+    case error_code_t::inconsistent_file:
+        r = "file is inconsistent (missing blocks)";
+        break;
     default:
         r = "unknown";
         break;

@@ -170,7 +170,16 @@ void test_clone_file() {
                 pr_fi.set_size(5);
                 pr_fi.set_block_size(5);
 
+                auto b = proto::BlockInfo();
+                b.set_hash(utils::sha256_digest("12345").value());
+                b.set_weak_hash(555);
+                auto bi = block_info_t::create(b).value();
+                auto &blocks_map = cluster->get_blocks();
+                blocks_map.put(bi);
+
+
                 auto peer_file = make_file();
+                peer_file->assign_block(bi, 0);
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
                 sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
                 sup->do_process();

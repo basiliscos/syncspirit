@@ -309,6 +309,15 @@ void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t inde
     block->link(this, index);
 }
 
+bool file_info_t::check_consistency() noexcept {
+    for (auto &b : blocks) {
+        if (!b) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void file_info_t::remove_blocks() noexcept {
     for (auto &it : blocks) {
         remove_block(it);

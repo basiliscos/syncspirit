@@ -13,7 +13,6 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 
-#if 0
 TEST_CASE("version_utils", "[model]") {
     proto::Vector lhs, rhs;
 
@@ -80,7 +79,6 @@ TEST_CASE("version_utils", "[model]") {
         CHECK(compare(lhs, rhs) == version_relation_t::newer);
     }
 }
-#endif
 
 TEST_CASE("file_info_t::need_download", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -281,4 +279,44 @@ TEST_CASE("source file", "[model]") {
         folder_peer->add(peer_file);
         CHECK(!my_file->get_source());
     }
+}
+
+TEST_CASE("file_info_t::check_consistency", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    cluster->get_devices().put(my_device);
+
+    auto &folders = cluster->get_folders();
+
+    auto db_folder = db::Folder();
+    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
+    REQUIRE(diff->apply(*cluster));
+
+    auto folder = folders.by_id(db_folder.id());
+    auto &folder_infos = folder->get_folder_infos();
+    auto folder_my = folder_infos.by_device(my_device);
+
+    auto pr_file = proto::FileInfo();
+    pr_file.set_name("a.txt");
+    pr_file.set_block_size(5);
+    pr_file.set_size(5);
+
+    auto b = pr_file.add_blocks();
+    b->set_hash(utils::sha256_digest("12345").value());
+    b->set_weak_hash(555);
+    auto bi = block_info_t::create(*b).value();
+    auto &blocks_map = cluster->get_blocks();
+    blocks_map.put(bi);
+    auto bbb = blocks_map.get(b->hash());
+    REQUIRE(bbb);
+
+    diff = new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file, {*b});
+    REQUIRE(diff->apply(*cluster));
+    auto file_my = folder_my->get_file_infos().by_name(pr_file.name());
+    CHECK(file_my->check_consistency());
+
+    file_my->remove_blocks();
+    CHECK(!file_my->check_consistency());
 }

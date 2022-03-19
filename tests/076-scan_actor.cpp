@@ -198,7 +198,6 @@ void test_meta_changes() {
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));
                 auto file = files->by_name(pr_fi.name());
-                file->assign_block(b, 0);
                 file->set_source(nullptr);
                 auto path = file->get_path();
 

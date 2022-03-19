@@ -43,6 +43,7 @@ enum class error_code_t {
     invalid_block_size,
     no_progress,
     unexpected_blocks,
+    inconsistent_file,
 };
 
 namespace detail {
