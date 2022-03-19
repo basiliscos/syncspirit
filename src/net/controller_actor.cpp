@@ -241,7 +241,7 @@ void controller_actor_t::on_block_update(model::message::block_update_t &message
         auto source_file = folder_info->get_file_infos().by_name(d.file_name);
         if (source_file->is_locally_available()) {
             using diffs_t = model::diff::aggregate_t::diffs_t;
-            LOG_TRACE(log, "{}, on_block_update, finalizing", identity);
+            LOG_TRACE(log, "{}, on_block_update, finalizing {}", identity, source_file->get_name());
             auto my_file = source_file->local_file();
             auto diffs = diffs_t{};
             diffs.push_back(new model::diff::modify::lock_file_t(*my_file, false));
