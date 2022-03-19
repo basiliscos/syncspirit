@@ -78,17 +78,17 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     std::size_t rx_buff_size;
     ssl_option_t ssl_context;
     bool local_ip = false;
-    const void *custom;
+    r::message_ptr_t custom;
 
     template <typename URI>
     http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
-                   bool local_ip_, const void *custom_)
+                   bool local_ip_, const r::message_ptr_t& custom_ = {})
         : url{std::forward<URI>(url_)}, data{std::move(data_)}, rx_buff{rx_buff_},
           rx_buff_size{rx_buff_size_}, local_ip{local_ip_}, custom{custom_} {}
 
     template <typename URI>
     http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
-                   transport::ssl_junction_t &&ssl_, const void *custom_)
+                   transport::ssl_junction_t &&ssl_, const r::message_ptr_t& custom_ = {})
         : http_request_t(std::forward<URI>(url_), std::move(data_), rx_buff_, rx_buff_size_, {}, custom_) {
         ssl_context = ssl_option_t(std::move(ssl_));
     }

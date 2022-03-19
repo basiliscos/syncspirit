@@ -96,7 +96,7 @@ void global_discovery_actor_t::announce() noexcept {
         LOG_TRACE(log, "{}, error making announce request :: {}", identity, res.error().message());
         return do_shutdown(make_error(res.error()));
     }
-    make_request(addr_announce, res.value(), std::move(tx_buff), nullptr);
+    make_request(addr_announce, res.value(), std::move(tx_buff));
 }
 
 void global_discovery_actor_t::on_announce_response(message::http_response_t &message) noexcept {
@@ -141,7 +141,12 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     LOG_TRACE(log, "{}, on_discovery_response", identity);
     resources->release(resource::http);
     http_request.reset();
-    auto msg = (message::discovery_notify_t *)message.payload.req->payload.request_payload->custom;
+    auto& custom = message.payload.req->payload.request_payload->custom;
+    auto msg = static_cast<message::discovery_notify_t *>(custom.get());
+    auto &device_id = msg->payload.device_id;
+    auto sha256 = std::string(device_id.get_sha256());
+    auto it = discovering_devices.find(sha256);
+    discovering_devices.erase(it);
 
     auto &ee = message.payload.ee;
     if (ee) {
@@ -155,7 +160,6 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
             LOG_WARN(log, "{}, parsing discovery error = {}, body({}):\n {}", identity, reason, body.size(), body);
         } else {
             auto &uris = res.value();
-            auto &device_id = msg->payload.device_id;
             if (!uris.empty()) {
                 using namespace model::diff;
                 auto diff = model::diff::contact_diff_ptr_t{};
@@ -166,9 +170,6 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
                 LOG_DEBUG(log, "{}, on_discovery_response, no known URIs for {}", identity, device_id);
             }
         }
-    }
-    if (msg) {
-        intrusive_ptr_release(msg);
     }
 }
 
@@ -212,17 +213,9 @@ void global_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcep
 }
 
 void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
-                                            message::discovery_notify_t *msg) noexcept {
+                                            const rotor::message_ptr_t &custom) noexcept {
     auto timeout = r::pt::millisec{io_timeout};
     transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true, ""};
-    const void *custom;
-    if (msg) {
-        intrusive_ptr_add_ref(msg);
-        custom = msg;
-    } else {
-        custom = nullptr;
-    }
-
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
                                                         rx_buff_size, std::move(ssl), custom)
                        .send(timeout);

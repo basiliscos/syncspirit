@@ -196,15 +196,27 @@ void test_peer_discovery() {
             sup->send<net::payload::discovery_notification_t>(sup->get_address(), peer_device->device_id());
             http::response<http::string_body> res;
 
+            auto j = json::object();
+            j["addresses"] = json::array({"tcp://127.0.0.2"});
+            j["seen"] = "2020-10-13T18:41:37.02287354Z";
+
             SECTION("successful case") {
-                auto j = json::object();
-                j["addresses"] = json::array({"tcp://127.0.0.2"});
-                j["seen"] = "2020-10-13T18:41:37.02287354Z";
                 res.body() = j.dump();
 
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
                 sup->do_process();
 
+                REQUIRE(peer_device->get_uris().size() == 1);
+                CHECK(peer_device->get_uris()[0].full == "tcp://127.0.0.2");
+
+                // 2nd attempt
+                peer_device->assing_uris({});
+                res = {};
+                res.body() = j.dump();
+                http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
+                sup->send<net::payload::discovery_notification_t>(sup->get_address(), peer_device->device_id());
+
+                sup->do_process();
                 REQUIRE(peer_device->get_uris().size() == 1);
                 CHECK(peer_device->get_uris()[0].full == "tcp://127.0.0.2");
             }

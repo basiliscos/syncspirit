@@ -78,7 +78,7 @@ void upnp_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri, f
     resources->acquire(resource::http_req);
     auto timeout = shutdown_timeout * 8 / 9;
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
-                                                        rx_buff_size, get_local_address, nullptr)
+                                                        rx_buff_size, get_local_address)
                        .send(timeout);
 }
 

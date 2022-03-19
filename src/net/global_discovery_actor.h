@@ -83,7 +83,7 @@ struct global_discovery_actor_t : public r::actor_base_t, private model::diff::c
     void on_discovery(message::discovery_notify_t &req) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
-                      message::discovery_notify_t *msg) noexcept;
+                      const r::message_ptr_t &custom = {}) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::update_contact_t &) noexcept override;
 
