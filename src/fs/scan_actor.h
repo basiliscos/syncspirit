@@ -71,7 +71,6 @@ struct scan_actor_t : public r::actor_base_t {
     bool rehash_next(message::rehash_needed_t &message) noexcept;
     void process_queue() noexcept;
 
-    void on_model_update(model::message::model_update_t &message) noexcept;
     void on_initiate_scan(message::scan_folder_t &message) noexcept;
     void on_scan(message::scan_progress_t &message) noexcept;
     void on_hash(hasher::message::digest_response_t &res) noexcept;
@@ -84,7 +83,7 @@ struct scan_actor_t : public r::actor_base_t {
     config::fs_config_t fs_config;
     uint32_t requested_hashes_limit;
     uint32_t requested_hashes = 0;
-    std::uint32_t generation = 0;
+    uint32_t progress = 0;
     scan_queue_t queue;
 };
 

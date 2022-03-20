@@ -141,7 +141,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     LOG_TRACE(log, "{}, on_discovery_response", identity);
     resources->release(resource::http);
     http_request.reset();
-    auto& custom = message.payload.req->payload.request_payload->custom;
+    auto &custom = message.payload.req->payload.request_payload->custom;
     auto msg = static_cast<message::discovery_notify_t *>(custom.get());
     auto &device_id = msg->payload.device_id;
     auto sha256 = std::string(device_id.get_sha256());

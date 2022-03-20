@@ -26,15 +26,8 @@ scan_actor_t::scan_actor_t(config_t &cfg)
 void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("fs::scan_actor", false); });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&scan_actor_t::on_model_update, coordinator);
-            }
-        });
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>(
+        [&](auto &p) { p.discover_name(net::names::coordinator, coordinator, true).link(false); });
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(hasher_proxy, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&scan_actor_t::on_scan);
@@ -58,21 +51,24 @@ void scan_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
+#if 0
 void scan_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     if (message.payload.custom != this) {
         ++generation;
+        LOG_CRITICAL(log, "{}, external model update", identity);
     }
 }
+#endif
 
 void scan_actor_t::initiate_scan(std::string_view folder_id) noexcept {
     LOG_DEBUG(log, "{}, initiating scan of {}", identity, folder_id);
-    ++generation;
     auto task = scan_task_ptr_t(new scan_task_t(cluster, folder_id, fs_config));
-    send<payload::scan_progress_t>(address, std::move(task), generation);
+    send<payload::scan_progress_t>(address, std::move(task));
 }
 
 void scan_actor_t::on_initiate_scan(message::scan_folder_t &message) noexcept {
-    if (!generation) {
+    if (!progress) {
+        ++progress;
         initiate_scan(message.payload.folder_id);
     } else {
         queue.emplace_back(&message);
@@ -88,16 +84,9 @@ void scan_actor_t::process_queue() noexcept {
 }
 
 void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
-    auto gen = message.payload.generation;
     auto &task = message.payload.task;
     auto folder_id = task->get_folder_id();
     LOG_TRACE(log, "{}, on_scan, folder = {}", identity, folder_id);
-    if (gen != generation) {
-        LOG_TRACE(log, "{}, outdated generation ({} vs {}), will renew scan_task", identity, gen, generation);
-        auto new_task = scan_task_ptr_t(new scan_task_t(cluster, folder_id, fs_config));
-        send<payload::scan_progress_t>(address, std::move(new_task), generation);
-        return;
-    }
 
     auto r = task->advance();
     bool stop_processing = false;
@@ -146,10 +135,10 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
         r);
 
     if (!stop_processing) {
-        send<payload::scan_progress_t>(address, std::move(task), gen);
+        send<payload::scan_progress_t>(address, std::move(task));
     } else if (completed) {
         LOG_DEBUG(log, "{}, completed scanning of {}", identity, folder_id);
-        generation = 0;
+        --progress;
         process_queue();
     }
 }
@@ -172,9 +161,8 @@ auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t 
 
     assert(file->get_source());
     auto file_ptr = file_ptr_t(new file_t(std::move(opt.value())));
-    send<payload::rehash_needed_t>(address, std::move(task), generation, std::move(file), file->get_source(),
-                                   std::move(file_ptr), int64_t{0}, int64_t{-1}, size_t{0}, std::set<std::int64_t>{},
-                                   false, false);
+    send<payload::rehash_needed_t>(address, std::move(task), std::move(file), file->get_source(), std::move(file_ptr),
+                                   int64_t{0}, int64_t{-1}, size_t{0}, std::set<std::int64_t>{}, false, false);
     return {};
 }
 
@@ -291,6 +279,6 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     }
 
     if (!queued_next) {
-        send<payload::scan_progress_t>(address, info.task, info.generation);
+        send<payload::scan_progress_t>(address, info.task);
     }
 }

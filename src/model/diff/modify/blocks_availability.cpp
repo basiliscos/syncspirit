@@ -12,6 +12,7 @@ using namespace syncspirit::model::diff::modify;
 blocks_availability_t::blocks_availability_t(const file_info_t &file, size_t last_block_index) noexcept
     : block_diff_t{file, last_block_index} {
     version = file.get_version();
+    assert(!file.is_locally_available());
 }
 
 auto blocks_availability_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {

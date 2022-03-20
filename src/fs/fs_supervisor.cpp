@@ -105,8 +105,8 @@ void fs_supervisor_t::on_model_update(model::message::model_update_t &message) n
 }
 
 void fs_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_block_update", identity);
     auto &diff = *message.payload.diff;
+    LOG_TRACE(log, "{}, on_block_update for {}", identity, diff.file_name);
     auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());

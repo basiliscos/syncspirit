@@ -19,12 +19,10 @@ struct scan_folder_t {
 
 struct scan_progress_t {
     scan_task_ptr_t task;
-    std::uint32_t generation;
 };
 
 struct rehash_needed_t {
     scan_task_ptr_t task;
-    std::uint32_t generation;
     model::file_info_ptr_t file;
     model::file_info_ptr_t source_file;
     file_ptr_t backend;
