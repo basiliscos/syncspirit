@@ -79,6 +79,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, bool ov
 
     // init default
     std::vector<spdlog::sink_ptr> default_sinks;
+    auto root_level = spdlog::level::debug;
     for (auto &cfg : configs) {
         auto &name = cfg.name;
         if (name != "default") {
@@ -89,7 +90,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, bool ov
         }
         auto logger = std::make_shared<spdlog::logger>("", default_sinks.begin(), default_sinks.end());
         logger->set_level(cfg.level);
-
+        root_level = cfg.level;
         logger_map[name] = logger;
     }
 
@@ -114,7 +115,8 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, bool ov
 
         auto log_name = (name == "default") ? "" : name;
         auto logger = std::make_shared<spdlog::logger>(log_name, sinks.begin(), sinks.end());
-        logger->set_level(cfg.level);
+        auto level = std::max(cfg.level, root_level);
+        logger->set_level(level);
 
         logger_map[name] = logger;
     }

@@ -265,24 +265,31 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
 }
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
-    LOG_DEBUG(log, "{}, on_message (Index)", identity);
-    auto diff_opt = cluster->process(*message, *peer);
+    auto &msg = *message;
+    LOG_DEBUG(log, "{}, on_message (Index)");
+    auto diff_opt = cluster->process(msg, *peer);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
+    auto folder = cluster->get_folders().by_id(msg.folder());
+    LOG_DEBUG(log, "{}, on_message (Index), folder = {}, files = {}", identity, folder->get_label(), msg.files_size());
     send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 
 void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
-    LOG_DEBUG(log, "{}, on_message (IndexUpdate)", identity);
-    auto diff_opt = cluster->process(*message, *peer);
+    LOG_TRACE(log, "{}, on_message (IndexUpdate)", identity);
+    auto &msg = *message;
+    auto diff_opt = cluster->process(msg, *peer);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
+    auto folder = cluster->get_folders().by_id(msg.folder());
+    LOG_DEBUG(log, "{}, on_message (IndexUpdate), folder = {}, files = {}", identity, folder->get_label(),
+              msg.files_size());
     send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 

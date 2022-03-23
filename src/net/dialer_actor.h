@@ -51,7 +51,13 @@ struct dialer_actor_t : public r::actor_base_t, private model::diff::cluster_vis
 
   private:
     using clock_t = std::chrono::steady_clock;
-    using redial_map_t = std::unordered_map<model::device_ptr_t, rotor::request_id_t>;
+    using timer_option_t = std::optional<rotor::request_id_t>;
+    struct redial_info_t {
+        clock_t::time_point last_attempt;
+        timer_option_t timer_id;
+    };
+    using redial_map_t = std::unordered_map<model::device_ptr_t, redial_info_t>;
+
     void on_announce(message::announce_notification_t &message) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
 

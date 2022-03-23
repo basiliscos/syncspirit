@@ -56,7 +56,7 @@ struct fixture_t {
         auto global_device_id =
             model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW");
 
-        auto cfg = config::dialer_config_t{true, 1};
+        auto cfg = config::dialer_config_t{true, 500};
         auto dialer = sup->create_actor<dialer_actor_t>().cluster(cluster).dialer_config(cfg).timeout(timeout).finish();
         sup->do_process();
 
