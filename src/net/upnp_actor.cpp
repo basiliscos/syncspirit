@@ -203,6 +203,8 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     auto &ee = msg.payload.ee;
     if (ee) {
         LOG_WARN(log, "{}, unsuccessfull port mapping: {}", ee->message(), identity);
+        auto inner = utils::make_error_code(utils::error_code_t::portmapping_failed);
+        return do_shutdown(make_error(inner, ee));
     } else if (state > r::state_t::OPERATIONAL) {
         return;
     }

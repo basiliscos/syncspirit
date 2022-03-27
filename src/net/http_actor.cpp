@@ -104,15 +104,13 @@ void http_actor_t::process() noexcept {
             }
         } else {
             LOG_DEBUG(log, "{} :: different endpoint is used: {}:{} vs {}:{}", identity, resolved_url.host,
-                     resolved_url.port, url.host, url.port);
-
+                      resolved_url.port, url.host, url.port);
         }
         if (reuse) {
             LOG_DEBUG(log, "{} reusing connection", identity);
             spawn_timer();
             write_request();
-        }
-        else {
+        } else {
             LOG_TRACE(log, "{} will use new connection", identity);
             kept_alive = false;
             transport->cancel();
@@ -248,6 +246,11 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     if (resources->has(resource::request_timer)) {
         cancel_timer(*timer_request);
     }
+
+    reply_to(*queue.front(), std::move(http_response), response_size, std::move(local_address));
+    queue.pop_front();
+    need_response = false;
+
     process();
 }
 
@@ -294,23 +297,22 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::request_timer);
     timer_request.reset();
 
-    if (!need_response || stop_io) {
-        return process();
-    }
-
-    if (cancelled) {
-        reply_to(*queue.front(), std::move(http_response), response_size, std::move(local_address));
-    } else {
+    bool do_cancel_io = false;
+    if (!cancelled) {
         auto ec = r::make_error_code(r::error_code_t::request_timeout);
         reply_with_error(*queue.front(), make_error(ec));
+        queue.pop_front();
+        need_response = false;
+        if (!kept_alive) {
+            do_cancel_io = true;
+        }
+    } else {
+        do_cancel_io = true;
     }
-    queue.pop_front();
-    need_response = false;
 
-    if (!kept_alive) {
+    if (do_cancel_io) {
         cancel_io();
     }
-    process();
 }
 
 void http_actor_t::on_start() noexcept {

@@ -96,7 +96,6 @@ struct resolver_actor_t : public r::actor_base_t {
     pt::time_duration io_timeout;
     asio::io_context::strand &strand;
     tcp::resolver backend;
-    //asio::deadline_timer timer;
     std::optional<r::request_id_t> timer_id;
     Queue queue;
     Cache cache;
