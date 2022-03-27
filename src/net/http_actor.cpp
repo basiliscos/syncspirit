@@ -37,11 +37,13 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void http_actor_t::on_request(message::http_request_t &req) noexcept {
+    LOG_TRACE(log, "{}, on request, url = {}", identity, req.payload.request_payload->url.full);
     queue.emplace_back(&req);
     process();
 }
 
 void http_actor_t::on_cancel(message::http_cancel_t &req) noexcept {
+    LOG_TRACE(log, "{}, on on_cancel, queue is empty = {}", identity, queue.empty());
     if (queue.empty()) {
         return;
     }
@@ -91,17 +93,32 @@ void http_actor_t::process() noexcept {
     auto &url = queue.front()->payload.request_payload->url;
 
     if (keep_alive && kept_alive) {
+        bool reuse = false;
         if (url.host == resolved_url.host && url.port == resolved_url.port) {
-            LOG_TRACE(log, "{} reusing connection", identity);
+            if (!last_read) {
+                reuse = true;
+            } else {
+                auto now = clock_t::local_time();
+                auto deadline = *last_read + request_timeout;
+                reuse = deadline > now;
+            }
+        } else {
+            LOG_DEBUG(log, "{} :: different endpoint is used: {}:{} vs {}:{}", identity, resolved_url.host,
+                     resolved_url.port, url.host, url.port);
+
+        }
+        if (reuse) {
+            LOG_DEBUG(log, "{} reusing connection", identity);
             spawn_timer();
             write_request();
-        } else {
-            LOG_WARN(log, "{} :: different endpoint is used: {}:{} vs {}:{}", identity, resolved_url.host,
-                     resolved_url.port, url.host, url.port);
+        }
+        else {
+            LOG_TRACE(log, "{} will use new connection", identity);
             kept_alive = false;
             transport->cancel();
-            return;
+            return process();
         }
+
     } else {
         auto port = std::to_string(url.port);
         resolve_request = request<payload::address_request_t>(resolver, url.host, port).send(resolve_timeout);
@@ -154,6 +171,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 }
 
 void http_actor_t::on_connect(resolve_it_t) noexcept {
+    LOG_TRACE(log, "{}, on_connect", identity);
     resources->release(resource::io);
     if (!need_response || stop_io) {
         return process();
@@ -221,6 +239,7 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     */
     if (keep_alive && http_response.keep_alive()) {
         kept_alive = true;
+        last_read = clock_t::local_time();
     } else {
         kept_alive = false;
         transport.reset();
@@ -238,9 +257,7 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     if (ec != asio::error::operation_aborted) {
         LOG_DEBUG(log, "{}, on_io_error :: {}", identity, ec.message());
     }
-    if (resources->has(resource::request_timer)) {
-        cancel_timer(*timer_request);
-    }
+    cancel_io();
     if (!need_response || stop_io) {
         return process();
     }
@@ -253,7 +270,6 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
 void http_actor_t::on_handshake(bool, utils::x509_t &, const tcp::endpoint &, const model::device_id_t *) noexcept {
     resources->release(resource::io);
     if (!need_response || stop_io) {
-        resources->release(resource::io);
         return process();
     }
     write_request();
@@ -270,9 +286,7 @@ void http_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     reply_with_error(*queue.front(), make_error(ec));
     queue.pop_front();
     need_response = false;
-    if (resources->has(resource::request_timer)) {
-        cancel_timer(*timer_request);
-    }
+    cancel_io();
     process();
 }
 
@@ -311,19 +325,19 @@ void http_actor_t::shutdown_finish() noexcept {
 }
 
 void http_actor_t::on_close_connection(message::http_close_connection_t &) noexcept {
-    if (kept_alive) {
-        stop_io = true;
-        if (queue.empty() && resources->has(resource::io)) {
-            transport->cancel();
-        }
-    }
+    LOG_TRACE(log, "{}, on_close_connection", identity);
+    stop_io = true;
+    cancel_io();
 }
 
 void http_actor_t::cancel_io() noexcept {
     if (resources->has(resource::io)) {
         transport->cancel();
     }
-    if (resources->has(resource::request_timer)) {
+    if (resources->has(resource::resolver)) {
         send<message::resolve_cancel_t::payload_t>(resolver, *resolve_request, get_address());
+    }
+    if (resources->has(resource::request_timer)) {
+        cancel_timer(*timer_request);
     }
 }

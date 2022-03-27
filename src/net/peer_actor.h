@@ -167,6 +167,7 @@ struct peer_actor_t : public r::actor_base_t {
     bool handshaked = false;
     bool valid_peer = false;
     bool finished = false;
+    bool io_error = false;
     std::string cert_name;
     tcp::endpoint peer_endpoint;
     read_action_t read_action;

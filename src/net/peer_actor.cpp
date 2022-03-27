@@ -131,6 +131,9 @@ void peer_actor_t::initiate(transport::stream_sp_t tran, const utils::URI &url) 
 
 void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     resources->release(resource::resolving);
+    if (state > r::state_t::OPERATIONAL) {
+        return;
+    }
 
     auto &ee = res.payload.ee;
     if (ee) {
@@ -172,6 +175,7 @@ void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resourc
     }
     cancel_timer();
     cancel_io();
+    io_error = true;
     if (state < r::state_t::SHUTTING_DOWN) {
         if (!connected) {
             resources->acquire(resource::uris);
@@ -180,11 +184,6 @@ void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resourc
             connected = false;
             LOG_DEBUG(log, "{}, on_io_error, initiating shutdown...", identity);
             do_shutdown(make_error(ec));
-        }
-    } else {
-        // forsing shutdown
-        if (resources->has(resource::finalization)) {
-            resources->release(resource::finalization);
         }
     }
 }
@@ -217,6 +216,9 @@ void peer_actor_t::process_tx_queue() noexcept {
 }
 
 void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
+    if (io_error) {
+        return;
+    }
     tx_item_t item = new confidential::payload::tx_item_t{std::move(buff), final};
     tx_queue.emplace_back(std::move(item));
     if (!tx_item) {

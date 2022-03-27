@@ -67,7 +67,6 @@ struct resolver_actor_t : public r::actor_base_t {
     using Queue = std::list<request_ptr_t>;
     using Cache = std::unordered_map<endpoint_t, resolve_results_t>;
 
-    bool cancel_timer() noexcept;
     void on_request(message::resolve_request_t &req) noexcept;
     void on_cancel(message::resolve_cancel_t &message) noexcept;
     void mass_reply(const endpoint_t &endpoint, const resolve_results_t &results) noexcept;
@@ -76,8 +75,8 @@ struct resolver_actor_t : public r::actor_base_t {
     void resolve_start(request_ptr_t &req) noexcept;
     void on_resolve(resolve_results_t results) noexcept;
     void on_resolve_error(const sys::error_code &ec) noexcept;
-    void on_timer_error(const sys::error_code &ec) noexcept;
-    void on_timer_trigger() noexcept;
+    void on_timer(r::request_id_t, bool cancelled) noexcept;
+    void cancel_timer() noexcept;
 
     template <typename ReplyFn> void reply(const endpoint_t &endpoint, ReplyFn &&fn) noexcept {
         auto it = queue.begin();
@@ -97,7 +96,8 @@ struct resolver_actor_t : public r::actor_base_t {
     pt::time_duration io_timeout;
     asio::io_context::strand &strand;
     tcp::resolver backend;
-    asio::deadline_timer timer;
+    //asio::deadline_timer timer;
+    std::optional<r::request_id_t> timer_id;
     Queue queue;
     Cache cache;
 };

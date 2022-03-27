@@ -129,7 +129,6 @@ void governor_actor_t::on_inacitvity_timer(r::request_id_t, bool cancelled) noex
 }
 
 void governor_actor_t::refresh_deadline() noexcept {
-    LOG_DEBUG(log, "{}, refresh_deadline", identity);
     auto timeout = r::pt::seconds(inactivity_seconds);
     auto now = clock_t::local_time();
     deadline = now + timeout;

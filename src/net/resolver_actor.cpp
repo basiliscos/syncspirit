@@ -16,8 +16,7 @@ r::plugin::resource_id_t timer = 1;
 
 resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
     : r::actor_base_t{config}, io_timeout{config.resolve_timeout},
-      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, backend{strand.context()},
-      timer(strand.context()) {
+      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, backend{strand.context()} {
     log = utils::get_logger("net.resolver");
 }
 
@@ -36,21 +35,9 @@ void resolver_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
 }
 
-bool resolver_actor_t::cancel_timer() noexcept {
-    sys::error_code ec;
-    if (resources->has(resource::timer)) {
-        timer.cancel(ec);
-        if (ec) {
-            do_shutdown(make_error(ec));
-        }
-    }
-    return (bool)ec;
-}
-
 void resolver_actor_t::on_request(message::resolve_request_t &req) noexcept {
     queue.emplace_back(&req);
-    if (!resources->has(resource::io))
-        process();
+    process();
 }
 
 void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
@@ -66,7 +53,6 @@ void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
         assert(resources->has(resource::io));
         backend.cancel();
         cancel_timer();
-        return;
     } else if (queue.size() > 1) {
         auto it = queue.begin();
         std::advance(it, 1);
@@ -90,6 +76,9 @@ void resolver_actor_t::mass_reply(const endpoint_t &endpoint, const std::error_c
 }
 
 void resolver_actor_t::process() noexcept {
+    if (resources->has(resource::io)) {
+        return;
+    }
     if (queue.empty())
         return;
     auto queue_it = queue.begin();
@@ -115,9 +104,7 @@ void resolver_actor_t::resolve_start(request_ptr_t &req) noexcept {
     backend.async_resolve(payload->host, payload->port, std::move(fwd_resolver));
     resources->acquire(resource::io);
 
-    timer.expires_from_now(io_timeout);
-    auto fwd_timer = ra::forwarder_t(*this, &resolver_actor_t::on_timer_trigger, &resolver_actor_t::on_timer_error);
-    timer.async_wait(std::move(fwd_timer));
+    timer_id = start_timer(io_timeout, *this, &resolver_actor_t::on_timer);
     resources->acquire(resource::timer);
 }
 
@@ -131,17 +118,16 @@ void resolver_actor_t::on_resolve(resolve_results_t results) noexcept {
         mass_reply(it->first, it->second);
     }
     cancel_timer();
+    process();
 }
 
 void resolver_actor_t::on_resolve_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
-    cancel_timer();
     if (ec == asio::error::operation_aborted) {
         if (resources->has(resource::io)) {
             auto ec = r::make_error_code(r::error_code_t::cancelled);
             reply_with_error(*queue.front(), make_error(ec));
             queue.pop_front();
-            return;
         }
     } else {
         if (!queue.empty()) {
@@ -151,32 +137,33 @@ void resolver_actor_t::on_resolve_error(const sys::error_code &ec) noexcept {
         }
     }
 
+    cancel_timer();
     process();
 }
 
-void resolver_actor_t::on_timer_error(const sys::error_code &ec) noexcept {
+void resolver_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::timer);
-    if (ec == asio::error::operation_aborted) {
+    if (cancelled) {
         if (resources->has(resource::io)) {
             auto ec = r::make_error_code(r::error_code_t::cancelled);
             reply_with_error(*queue.front(), make_error(ec));
             queue.pop_front();
-            return;
         }
     } else {
-        LOG_WARN(log, "{}, on_timer_error :: {}", identity, ec.message());
+        if (!queue.empty()) {
+            // could be actually some other ec...
+            auto ec = r::make_error_code(r::error_code_t::request_timeout);
+            auto &payload = queue.front()->payload.request_payload;
+            auto endpoint = endpoint_t{payload->host, payload->port};
+            mass_reply(endpoint, ec);
+        }
     }
+    timer_id.reset();
     process();
 }
 
-void resolver_actor_t::on_timer_trigger() noexcept {
-    resources->release(resource::timer);
-    if (!queue.empty()) {
-        // could be actually some other ec...
-        auto ec = r::make_error_code(r::error_code_t::request_timeout);
-        auto &payload = queue.front()->payload.request_payload;
-        auto endpoint = endpoint_t{payload->host, payload->port};
-        mass_reply(endpoint, ec);
+void resolver_actor_t::cancel_timer() noexcept {
+    if (timer_id) {
+        r::actor_base_t::cancel_timer(*timer_id);
     }
-    process();
 }

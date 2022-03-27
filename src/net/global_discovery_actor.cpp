@@ -100,7 +100,7 @@ void global_discovery_actor_t::announce() noexcept {
 }
 
 void global_discovery_actor_t::on_announce_response(message::http_response_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_announce_response", identity);
+    LOG_TRACE(log, "{}, on_announce_response, req = {}", identity, message.payload.request_id());
     resources->release(resource::http);
     http_request.reset();
 
@@ -150,7 +150,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
 
     auto &ee = message.payload.ee;
     if (ee) {
-        LOG_WARN(log, "{}, discovery faield = {}, body({}):\n {}", identity, ee->message());
+        LOG_WARN(log, "{}, discovery faield = {}", identity, ee->message());
     } else {
         auto &http_res = message.payload.res->response;
         auto res = proto::parse_contact(http_res);

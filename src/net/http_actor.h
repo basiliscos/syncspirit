@@ -66,6 +66,7 @@ struct http_actor_t : public r::actor_base_t {
   private:
     using queue_t = std::list<request_ptr_t>;
     using request_option_t = std::optional<r::request_id_t>;
+    using clock_t = r::pt::microsec_clock;
 
     void process() noexcept;
     void spawn_timer() noexcept;
@@ -106,6 +107,7 @@ struct http_actor_t : public r::actor_base_t {
     request_option_t resolve_request;
     request_option_t timer_request;
     request_option_t shutdown_request;
+    std::optional<r::pt::ptime> last_read;
 };
 
 } // namespace net

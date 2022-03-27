@@ -45,8 +45,8 @@ struct file_t : model::arc_base_t<file_t> {
     bfs::path path;
     std::string path_str;
     mutable size_t pos = 0;
-    mutable last_op_t last_op;
-    bool temporal;
+    mutable last_op_t last_op{last_op_t::r};
+    bool temporal{false};
 };
 
 using file_ptr_t = model::intrusive_ptr_t<file_t>;
