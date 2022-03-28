@@ -22,6 +22,8 @@ struct scan_progress_t {
 };
 
 struct rehash_needed_t {
+    rehash_needed_t(scan_task_ptr_t task, model::file_info_ptr_t file, model::file_info_ptr_t source_file, file_ptr_t backend) noexcept;
+
     scan_task_ptr_t task;
     model::file_info_ptr_t file;
     model::file_info_ptr_t source_file;
@@ -29,6 +31,7 @@ struct rehash_needed_t {
     int64_t last_queued_block;
     int64_t valid_blocks;
     size_t queue_size;
+    size_t unhashed_blocks;
     std::set<std::int64_t> out_of_order;
     bool abandoned;
     bool invalid;

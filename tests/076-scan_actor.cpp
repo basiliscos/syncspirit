@@ -311,7 +311,7 @@ void test_meta_changes() {
             }
 
             SECTION("local (previous) file exists") {
-                pr_fi.set_size(10ul);
+                pr_fi.set_size(15ul);
                 pr_fi.set_block_size(5ul);
 
                 auto bi_2 = proto::BlockInfo();
@@ -321,18 +321,26 @@ void test_meta_changes() {
                 bi_2.set_offset(5);
                 auto b2 = block_info_t::create(bi_2).value();
 
+                auto bi_3 = proto::BlockInfo();
+                bi_3.set_size(5);
+                bi_3.set_weak_hash(12);
+                bi_3.set_hash(utils::sha256_digest("abcde").value());
+                bi_3.set_offset(10);
+                auto b3 = block_info_t::create(bi_3).value();
+
                 pr_fi.set_size(5ul);
                 auto file_my = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info).value();
                 file_my->assign_block(b, 0);
                 file_my->lock();
                 folder_info->add(file_my);
 
-                pr_fi.set_size(10ul);
+                pr_fi.set_size(15ul);
                 counter->set_id(2);
 
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 file_peer->assign_block(b2, 1);
+                file_peer->assign_block(b3, 2);
                 folder_info_peer->add(file_peer);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
@@ -343,15 +351,16 @@ void test_meta_changes() {
                 write_file(path_my, "12345");
                 bfs::last_write_time(path_my, modified);
 
-                auto content = "12345\0\0\0\0\0";
-                write_file(path_peer, std::string(content, 10));
+                auto content = "1234567890\0\0\0\0\0";
+                write_file(path_peer, std::string(content, 15));
                 sup->do_process();
 
                 CHECK(file_my->is_locally_available());
                 CHECK(file_my->get_source() == file_peer);
                 CHECK(!file_peer->is_locally_available());
                 CHECK(file_peer->is_locally_available(0));
-                CHECK(!file_peer->is_locally_available(1));
+                CHECK(file_peer->is_locally_available(1));
+                CHECK(!file_peer->is_locally_available(2));
             }
         }
     };

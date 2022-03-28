@@ -98,6 +98,7 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     enum substate_t { none = 0, iterating_files, iterating_blocks };
 
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
+    using locked_files_t = std::unordered_set<model::file_info_ptr_t>;
     using unlink_request_t = r::message::unlink_request_t;
     using unlink_request_ptr_t = r::intrusive_ptr_t<unlink_request_t>;
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
@@ -124,6 +125,7 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     model::file_block_t next_block(bool reset) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::lock_file_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::finish_file_t &) noexcept override;
 
     model::cluster_ptr_t cluster;
@@ -148,6 +150,8 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     model::file_iterator_ptr_t file_iterator;
     model::block_iterator_ptr_t block_iterator;
     int substate = substate_t::none;
+    locked_files_t locked_files;
+    locked_files_t locally_locked_files;
 };
 
 } // namespace net

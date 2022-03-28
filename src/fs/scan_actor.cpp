@@ -161,8 +161,7 @@ auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t 
 
     assert(file->get_source());
     auto file_ptr = file_ptr_t(new file_t(std::move(opt.value())));
-    send<payload::rehash_needed_t>(address, std::move(task), std::move(file), file->get_source(), std::move(file_ptr),
-                                   int64_t{0}, int64_t{-1}, size_t{0}, std::set<std::int64_t>{}, false, false);
+    send<payload::rehash_needed_t>(address, std::move(task), std::move(file), file->get_source(), std::move(file_ptr));
     return {};
 }
 
@@ -179,11 +178,11 @@ bool scan_actor_t::rehash_next(message::rehash_needed_t &message) noexcept {
     if (!info.abandoned && !info.invalid) {
         auto condition = [&]() {
             return requested_hashes < requested_hashes_limit &&
-                   info.last_queued_block < info.file->get_blocks().size() && !info.abandoned;
+                   info.last_queued_block < info.source_file->get_blocks().size() && !info.abandoned;
         };
 
-        auto block_sz = info.file->get_block_size();
-        auto file_sz = info.file->get_size();
+        auto block_sz = info.source_file->get_block_size();
+        auto file_sz = info.source_file->get_size();
         auto non_zero = [](char it) { return it != 0; };
 
         while (condition()) {
@@ -201,6 +200,7 @@ bool scan_actor_t::rehash_next(message::rehash_needed_t &message) noexcept {
             auto it = std::find_if(block.begin(), block.end(), non_zero);
             if (it == block.end()) { // we have only zeroes
                 info.abandoned = true;
+                info.unhashed_blocks -= (info.source_file->get_blocks().size() - i);
             } else {
                 using request_t = hasher::payload::digest_request_t;
                 request<request_t>(hasher_proxy, std::move(block), (size_t)i, r::message_ptr_t(&message))
@@ -223,6 +223,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     auto &info = msg->payload;
     auto &file = info.file;
     --info.queue_size;
+    --info.unhashed_blocks;
 
     if (res.payload.ee) {
         auto &ee = res.payload.ee;
@@ -250,11 +251,14 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
             }
             bool can_process_more = rehash_next(*msg);
             queued_next = !can_process_more;
-            bool complete = (info.queue_size == 0);
+            bool complete = (info.unhashed_blocks == 0);
             if (complete) {
-                auto bdiff = model::diff::block_diff_ptr_t{};
-                bdiff = new model::diff::modify::blocks_availability_t(*source_file, (size_t)info.valid_blocks);
-                send<model::payload::block_update_t>(coordinator, std::move(bdiff), this);
+                if (info.valid_blocks >= 0) {
+                    auto idx = (size_t) info.valid_blocks;
+                    auto bdiff = model::diff::block_diff_ptr_t{};
+                    bdiff = new model::diff::modify::blocks_availability_t(*source_file, idx);
+                    send<model::payload::block_update_t>(coordinator, std::move(bdiff), this);
+                }
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 diff = new model::diff::modify::lock_file_t(*file, false);
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
