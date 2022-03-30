@@ -227,7 +227,8 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
 
     if (res.payload.ee) {
         auto &ee = res.payload.ee;
-        LOG_ERROR(log, "{}, on_hash, file: {}, error: {}", identity, file->get_full_name(), ee->message());
+        LOG_ERROR(log, "{}, on_hash, file: {}, block = {}, error: {}", identity, file->get_full_name(), rp.block_index,
+                  ee->message());
         return do_shutdown(ee);
     }
 
@@ -254,7 +255,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
             bool complete = (info.unhashed_blocks == 0);
             if (complete) {
                 if (info.valid_blocks >= 0) {
-                    auto idx = (size_t) info.valid_blocks;
+                    auto idx = (size_t)info.valid_blocks;
                     auto bdiff = model::diff::block_diff_ptr_t{};
                     bdiff = new model::diff::modify::blocks_availability_t(*source_file, idx);
                     send<model::payload::block_update_t>(coordinator, std::move(bdiff), this);

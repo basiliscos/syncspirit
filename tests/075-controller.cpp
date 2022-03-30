@@ -122,7 +122,7 @@ struct sample_peer_t : r::actor_base_t {
                        block_responses.front().block_index;
         };
         while (condition()) {
-            log->debug("{}, matched replying...", identity);
+            log->debug("{}, matched, replying...", identity);
             reply_to(*block_requests.front(), block_responses.front().data);
             block_responses.pop_front();
             block_requests.pop_front();
@@ -614,6 +614,61 @@ void test_downloading() {
                 CHECK(f->get_name() == file_1->name());
                 CHECK(f->get_size() == 5);
                 CHECK(f->get_blocks().size() == 1);
+                CHECK(f->is_locally_available());
+                CHECK(!f->is_locked());
+            }
+
+            SECTION("download a file, which has the same blocks locally") {
+                auto index = proto::Index{};
+                index.set_folder(std::string(folder_1->get_id()));
+                auto file_1 = index.add_files();
+                file_1->set_name("some-file");
+                file_1->set_type(proto::FileInfoType::FILE);
+                file_1->set_sequence(2ul);
+                auto v1 = file_1->mutable_version();
+                auto c1 = v1->add_counters();
+                c1->set_id(1u);
+                c1->set_value(1u);
+
+                file_1->set_block_size(5);
+                file_1->set_size(10);
+                auto b1 = file_1->add_blocks();
+                b1->set_hash(utils::sha256_digest("12345").value());
+                b1->set_offset(0);
+                b1->set_size(5);
+                auto bi_1 = model::block_info_t::create(*b1).value();
+
+                auto b2 = file_1->add_blocks();
+                b2->set_hash(utils::sha256_digest("67890").value());
+                b2->set_offset(5);
+                b2->set_size(5);
+                auto bi_2 = model::block_info_t::create(*b2).value();
+                auto &blocks = cluster->get_blocks();
+                blocks.put(bi_1);
+                blocks.put(bi_2);
+
+                auto pr_my = proto::FileInfo{};
+                pr_my.set_name("some-file.source");
+                pr_my.set_type(proto::FileInfoType::FILE);
+                pr_my.set_sequence(2ul);
+                pr_my.set_block_size(5);
+                pr_my.set_size(5);
+
+                auto file_my = model::file_info_t::create(cluster->next_uuid(), pr_my, folder_my).value();
+                file_my->assign_block(bi_1, 0);
+                file_my->mark_local_available(0);
+                folder_my->add(file_my);
+
+                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                peer_actor->push_block("67890", 1);
+                sup->do_process();
+
+                REQUIRE(folder_my->get_file_infos().size() == 2);
+                auto f = folder_my->get_file_infos().by_name(file_1->name());
+                REQUIRE(f);
+                CHECK(f->get_name() == file_1->name());
+                CHECK(f->get_size() == 10);
+                CHECK(f->get_blocks().size() == 2);
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_locked());
             }

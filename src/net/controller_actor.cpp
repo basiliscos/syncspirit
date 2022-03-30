@@ -131,7 +131,7 @@ model::file_block_t controller_actor_t::next_block(bool reset) noexcept {
             block_iterator = new model::blocks_iterator_t(*file);
         }
         if (block_iterator && *block_iterator) {
-            return block_iterator->next();
+            return block_iterator->next(!reset);
         }
     }
     return {};
@@ -157,8 +157,9 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 diff = new model::diff::modify::lock_file_t(*file, true);
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+            } else {
+                preprocess_block(block);
             }
-            preprocess_block(block);
         } else {
             substate = substate & ~substate_t::iterating_blocks;
         }
@@ -186,18 +187,18 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
 
 void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexcept {
     using namespace model::diff;
-    auto target_file = file->local_file();
-    assert(target_file);
+    assert(file->local_file());
 
     if (file_block.is_locally_available()) {
-        auto diff = block_diff_ptr_t(new modify::clone_block_t(*target_file, *file_block.block()));
+        LOG_TRACE(log, "{} cloning locally available block, file = {}, block index = {} / {}", identity,
+                  file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1);
+        auto diff = block_diff_ptr_t(new modify::clone_block_t(*file, *file_block.block()));
         send<model::payload::block_update_t>(coordinator, std::move(diff), this);
     } else {
         auto block = file_block.block();
-        block->lock();
         auto sz = block->get_size();
-        LOG_TRACE(log, "{} request_block, file = {}, block index = {}, sz = {}, request pool sz = {}", identity,
-                  file->get_full_name(), file_block.block_index(), sz, request_pool);
+        LOG_TRACE(log, "{} request_block, file = {}, block index = {} / {}, sz = {}, request pool sz = {}", identity,
+                  file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
         request<payload::block_request_t>(peer_addr, file, file_block).send(request_timeout);
         ++blocks_requested;
         request_pool -= (int64_t)sz;
@@ -234,9 +235,6 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
     file->locally_unlock();
     auto it = locally_locked_files.find(file);
     locally_locked_files.erase(it);
-    if (file_iterator) {
-        file_iterator->renew(*file);
-    }
     return outcome::success();
 }
 
@@ -300,7 +298,7 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
     auto &msg = *message;
-    LOG_DEBUG(log, "{}, on_message (Index)");
+    LOG_DEBUG(log, "{}, on_message (Index)", identity);
     auto diff_opt = cluster->process(msg, *peer);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
@@ -376,9 +374,9 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
             auto &data = block_res->payload.res.data;
             auto index = payload.block.block_index();
 
+            LOG_TRACE(log, "{}, {}, got block {}", identity, file->get_name(), index);
             auto diff = block_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
             send<model::payload::block_update_t>(coordinator, std::move(diff), this);
         }
     }
-    block->unlock();
 }

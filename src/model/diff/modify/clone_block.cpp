@@ -8,13 +8,14 @@
 
 using namespace syncspirit::model::diff::modify;
 
-clone_block_t::clone_block_t(const file_info_t &target_file, const block_info_t &block) noexcept
-    : block_diff_t{target_file} {
+clone_block_t::clone_block_t(const file_info_t &target_file, block_info_t &block) noexcept
+    : block_diff_t{target_file}, orig_block{block} {
     const file_info_t *source_file = nullptr;
     for (auto &b : block.get_file_blocks()) {
         if (b.is_locally_available()) {
             source_file = b.file();
             source_block_index = b.block_index();
+            break;
         }
     }
     assert(source_file);
@@ -32,7 +33,10 @@ clone_block_t::clone_block_t(const file_info_t &target_file, const block_info_t 
     source_device_id = source_fi->get_device()->device_id().get_sha256();
     source_folder_id = source_fi->get_folder()->get_id();
     source_file_name = source_file->get_name();
+    orig_block.lock();
 }
+
+clone_block_t::~clone_block_t() { orig_block.unlock(); }
 
 auto clone_block_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto target_folder = cluster.get_folders().by_id(folder_id);

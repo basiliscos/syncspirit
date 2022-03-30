@@ -48,7 +48,7 @@ struct block_info_t final : arc_base_t<block_info_t> {
     void mark_local_available(file_info_t *file_info) noexcept;
     file_block_t local_file() noexcept;
 
-    inline bool is_locked() const noexcept { return locked; }
+    bool is_locked() const noexcept;
     void lock() noexcept;
     void unlock() noexcept;
 
@@ -64,7 +64,7 @@ struct block_info_t final : arc_base_t<block_info_t> {
     std::uint32_t weak_hash = 0;
     std::int32_t size = 0;
     file_blocks_t file_blocks;
-    bool locked = false;
+    std::uint32_t locked = 0;
 };
 
 using block_infos_map_t = generic_map_t<block_info_ptr_t, 1>;

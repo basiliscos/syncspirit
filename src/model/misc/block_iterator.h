@@ -25,7 +25,7 @@ struct blocks_iterator_t : arc_base_t<blocks_iterator_t> {
 
     inline operator bool() noexcept { return source != nullptr; }
 
-    file_block_t next() noexcept;
+    file_block_t next(bool advance) noexcept;
     void reset() noexcept;
 
   private:

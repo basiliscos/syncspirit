@@ -16,9 +16,7 @@ using namespace syncspirit::model;
 TEST_CASE("version_utils", "[model]") {
     proto::Vector lhs, rhs;
 
-    SECTION("empty versions") {
-        CHECK(compare(lhs, rhs) == version_relation_t::identity);
-    }
+    SECTION("empty versions") { CHECK(compare(lhs, rhs) == version_relation_t::identity); }
 
     SECTION("non-empty, identical") {
         auto lc = lhs.add_counters();

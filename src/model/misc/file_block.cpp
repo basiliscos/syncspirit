@@ -8,7 +8,7 @@
 namespace syncspirit::model {
 
 file_block_t::file_block_t(block_info_t *block, file_info_t *file_info_, std::size_t block_index_) noexcept
-    : block_info{block}, file_info{file_info_}, block_idx{block_index_} {}
+    : block_info{block}, file_info{file_info_}, block_idx{block_index_}, local{block->local_file()} {}
 
 bool file_block_t::matches(const block_info_t *block, const file_info_t *file) noexcept {
     return block_info == block && file_info == file;

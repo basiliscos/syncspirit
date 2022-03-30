@@ -133,6 +133,8 @@ struct block_request_t {
     using response_t = block_response_t;
     model::file_info_ptr_t file;
     model::file_block_t block;
+    block_request_t(const model::file_info_ptr_t &file, const model::file_block_t &block) noexcept;
+    ~block_request_t();
 };
 
 } // end of namespace payload

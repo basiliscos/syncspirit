@@ -22,7 +22,8 @@ struct scan_progress_t {
 };
 
 struct rehash_needed_t {
-    rehash_needed_t(scan_task_ptr_t task, model::file_info_ptr_t file, model::file_info_ptr_t source_file, file_ptr_t backend) noexcept;
+    rehash_needed_t(scan_task_ptr_t task, model::file_info_ptr_t file, model::file_info_ptr_t source_file,
+                    file_ptr_t backend) noexcept;
 
     scan_task_ptr_t task;
     model::file_info_ptr_t file;

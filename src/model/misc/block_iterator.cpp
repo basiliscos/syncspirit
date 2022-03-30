@@ -21,8 +21,7 @@ void blocks_iterator_t::advance() noexcept {
     auto &sb = source->get_blocks();
     auto max = sb.size();
     while (i < max && sb[i]) {
-        auto &b = *sb[i];
-        if (!b.local_file() && !b.is_locked()) {
+        if (!source->is_locally_available(i) && !sb[i]->is_locked()) {
             break;
         }
         ++i;
@@ -40,11 +39,14 @@ void blocks_iterator_t::prepare() noexcept {
 
 void blocks_iterator_t::reset() noexcept { source.reset(); }
 
-file_block_t blocks_iterator_t::next() noexcept {
+file_block_t blocks_iterator_t::next(bool advance_) noexcept {
     assert(source);
     auto src = source.get();
     auto &sb = src->get_blocks();
-    auto idx = i++;
-    advance();
+    auto idx = i;
+    if (advance_) {
+        ++i;
+        advance();
+    }
     return {sb[idx].get(), src, idx};
 }

@@ -30,7 +30,7 @@ TEST_CASE("block iterator", "[model]") {
                 block_iterator = new blocks_iterator_t(*source);
             }
             if (block_iterator && *block_iterator) {
-                return block_iterator->next();
+                return block_iterator->next(!reset);
             }
         }
         return {};
@@ -85,8 +85,7 @@ TEST_CASE("block iterator", "[model]") {
         SECTION("no iteration upon deleted file") {
             p_file->set_deleted(true);
 
-            diff =
-                diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file, {bi1, bi2}));
+            diff = new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file, {bi1, bi2});
             REQUIRE(diff->apply(*cluster));
 
             auto my_file = my_folder->get_file_infos().by_name(p_file->name());
@@ -106,6 +105,12 @@ TEST_CASE("block iterator", "[model]") {
             CHECK(fb1.block_index() == 0);
             CHECK(fb1.file() == my_file.get());
 
+            auto fb1_1 = next(my_file);
+            REQUIRE(fb1_1);
+            CHECK(fb1_1.block()->get_hash() == bi1.hash());
+            CHECK(fb1_1.block_index() == 0);
+            CHECK(fb1_1.file() == my_file.get());
+
             auto fb2 = next(my_file);
             REQUIRE(fb2);
             CHECK(fb2.block()->get_hash() == bi2.hash());
@@ -114,6 +119,32 @@ TEST_CASE("block iterator", "[model]") {
 
             REQUIRE(!next(my_file));
         }
+    }
+
+    SECTION("block is available on some other local file") {
+        auto p_file_2 = pr_index.add_files();
+        p_file_2->set_name("b.txt");
+        p_file_2->set_sequence(2ul);
+        *p_file_2->add_blocks() = bi1;
+        *p_file->add_blocks() = bi1;
+
+        diff = new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file_2, {bi1});
+        REQUIRE(diff->apply(*cluster));
+
+        auto my_file_2 = my_folder->get_file_infos().by_name(p_file_2->name());
+        my_file_2->mark_local_available(0);
+        REQUIRE(my_file_2->is_locally_available());
+
+        diff = new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file, {bi1});
+        REQUIRE(diff->apply(*cluster));
+        auto my_file = my_folder->get_file_infos().by_name(p_file->name());
+        REQUIRE(!my_file->is_locally_available());
+
+        auto fb1 = next(my_file, true);
+        REQUIRE(fb1);
+        CHECK(fb1.block()->get_hash() == bi1.hash());
+        CHECK(fb1.block_index() == 0);
+        CHECK(fb1.file() == my_file.get());
     }
 
     SECTION("locked/unlock blocks") {

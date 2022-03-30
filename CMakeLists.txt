@@ -37,6 +37,7 @@ add_library(syncspirit_lib
     src/fs/file.cpp
     src/fs/file_actor.cpp
     src/fs/fs_supervisor.cpp
+    src/fs/messages.cpp
     src/fs/scan_actor.cpp
     src/fs/scan_task.cpp
     src/fs/utils.cpp
@@ -102,6 +103,7 @@ add_library(syncspirit_lib
     src/net/global_discovery_actor.cpp
     src/net/http_actor.cpp
     src/net/local_discovery_actor.cpp
+    src/net/messages.cpp
     src/net/net_supervisor.cpp
     src/net/peer_actor.cpp
     src/net/peer_supervisor.cpp

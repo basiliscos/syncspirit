@@ -177,7 +177,6 @@ void test_clone_file() {
                 auto &blocks_map = cluster->get_blocks();
                 blocks_map.put(bi);
 
-
                 auto peer_file = make_file();
                 peer_file->assign_block(bi, 0);
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
