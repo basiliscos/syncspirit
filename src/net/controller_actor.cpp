@@ -192,7 +192,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
     if (file_block.is_locally_available()) {
         LOG_TRACE(log, "{} cloning locally available block, file = {}, block index = {} / {}", identity,
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1);
-        auto diff = block_diff_ptr_t(new modify::clone_block_t(*file, *file_block.block()));
+        auto diff = block_diff_ptr_t(new modify::clone_block_t(file_block));
         send<model::payload::block_update_t>(coordinator, std::move(diff), this);
     } else {
         auto block = file_block.block();

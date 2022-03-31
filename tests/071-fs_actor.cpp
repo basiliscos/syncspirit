@@ -447,7 +447,8 @@ void test_clone_block() {
                     sup->do_process();
 
                     auto block = source_file->get_blocks()[0];
-                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *block));
+                    auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
+                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(file_block));
                     sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                     sup->do_process();
 
@@ -486,9 +487,11 @@ void test_clone_block() {
                     sup->do_process();
 
                     auto blocks = source_file->get_blocks();
-                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *blocks[0]));
+                    auto fb_1 = model::file_block_t(blocks[0].get(), target_file.get(), 0);
+                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(fb_1));
                     sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *blocks[1]));
+                    auto fb_2 = model::file_block_t(blocks[1].get(), target_file.get(), 1);
+                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(fb_2));
                     sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                     diff = new diff::modify::flush_file_t(*target_file);
                     sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
@@ -525,7 +528,8 @@ void test_clone_block() {
                 sup->do_process();
 
                 auto block = source_file->get_blocks()[0];
-                bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*target_file, *block));
+                auto file_block = model::file_block_t(block.get(), target_file.get(), 1);
+                bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(file_block));
                 sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                 sup->do_process();
 

@@ -240,7 +240,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) no
         source_backend = std::move(source_opt.assume_value());
     }
 
-    auto &block = source->get_blocks()[diff.block_index];
+    auto &block = source->get_blocks().at(diff.block_index);
     auto target_offset = target->get_block_offset(diff.block_index);
     auto source_offset = source->get_block_offset(diff.source_block_index);
     return target_backend->copy(target_offset, *source_backend, source_offset, block->get_size());

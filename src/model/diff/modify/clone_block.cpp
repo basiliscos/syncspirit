@@ -8,10 +8,11 @@
 
 using namespace syncspirit::model::diff::modify;
 
-clone_block_t::clone_block_t(const file_info_t &target_file, block_info_t &block) noexcept
-    : block_diff_t{target_file}, orig_block{block} {
+clone_block_t::clone_block_t(const file_block_t &file_block) noexcept
+    : block_diff_t{*file_block.file(), file_block.block_index()} {
     const file_info_t *source_file = nullptr;
-    for (auto &b : block.get_file_blocks()) {
+    auto &block_pieces = file_block.block()->get_file_blocks();
+    for (auto &b : block_pieces) {
         if (b.is_locally_available()) {
             source_file = b.file();
             source_block_index = b.block_index();
@@ -19,24 +20,13 @@ clone_block_t::clone_block_t(const file_info_t &target_file, block_info_t &block
         }
     }
     assert(source_file);
-    auto &target_blocks = target_file.get_blocks();
-    block_index = target_blocks.size();
-    for (size_t i = 0; i < target_blocks.size(); ++i) {
-        auto &b = target_blocks[i];
-        if (!target_file.is_locally_available(i) && b->get_hash() == block.get_hash()) {
-            block_index = i;
-            break;
-        }
-    }
-    assert((block_index != target_blocks.size()) && "target block found");
+    assert(file_block.file()->get_blocks().at(block_index)->get_hash() ==
+           block_pieces[source_block_index].block()->get_hash());
     auto source_fi = source_file->get_folder_info();
     source_device_id = source_fi->get_device()->device_id().get_sha256();
     source_folder_id = source_fi->get_folder()->get_id();
     source_file_name = source_file->get_name();
-    orig_block.lock();
 }
-
-clone_block_t::~clone_block_t() { orig_block.unlock(); }
 
 auto clone_block_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto target_folder = cluster.get_folders().by_id(folder_id);

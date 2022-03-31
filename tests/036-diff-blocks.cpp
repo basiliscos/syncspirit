@@ -83,7 +83,8 @@ TEST_CASE("various block diffs", "[model]") {
         auto b2 = source->get_blocks().at(0);
         b2->mark_local_available(source.get());
 
-        auto bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(*file, *b2));
+        auto fb = model::file_block_t(b2.get(), file.get(), 1);
+        auto bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(fb));
         REQUIRE(bdiff->apply(*cluster));
         auto &blocks = file->get_blocks();
 
