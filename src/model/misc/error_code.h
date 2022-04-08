@@ -21,7 +21,9 @@ enum class error_code_t {
     device_deserialization_failure,
     invalid_folder_key_length,
     invalid_folder_prefix,
+    invalid_unknown_folder_length,
     folder_deserialization_failure,
+    unknown_folder_deserialization_failure,
     file_info_deserialization_failure,
     invalid_file_info_key_length,
     invalid_file_info_prefix,
@@ -41,7 +43,7 @@ enum class error_code_t {
     malformed_deviceid,
     folder_is_not_shared,
     invalid_block_size,
-    no_progress,
+    exceed_max_sequence,
     unexpected_blocks,
     inconsistent_file,
 };

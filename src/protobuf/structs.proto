@@ -56,6 +56,11 @@ message FolderInfo {
     int64  max_sequence = 2;
 }
 
+message UnknownFolder {
+    Folder folder          = 1;
+    FolderInfo folder_info = 2;
+}
+
 message FileInfo {
     string                          name           = 1;
     syncspirit.proto.FileInfoType   type           = 2;

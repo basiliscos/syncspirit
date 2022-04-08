@@ -5,11 +5,10 @@
 #include "test-utils.h"
 #include "access.h"
 #include "test_supervisor.h"
+#include "diff-builder.h"
 
 #include "model/cluster.h"
 #include "model/diff/aggregate.h"
-#include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/clone_file.h"
 #include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
@@ -51,22 +50,8 @@ struct fixture_t {
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
         sup->cluster = cluster;
 
-        db::Folder db_folder;
-        db_folder.set_id("1234-5678");
-        db_folder.set_label("my-f1");
-        db_folder.set_path(root_path.string());
+        auto folder_id = "1234-5678";
 
-        auto diffs = diff::aggregate_t::diffs_t{};
-        diffs.push_back(new diff::modify::create_folder_t(db_folder));
-        diffs.push_back(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id(), 123ul));
-        auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-        REQUIRE(diff->apply(*cluster));
-
-        folder = cluster->get_folders().by_id(db_folder.id());
-        folder_info = folder->get_folder_infos().by_device(my_device);
-        files = &folder_info->get_file_infos();
-        folder_info_peer = folder->get_folder_infos().by_device(peer_device);
-        files_peer = &folder_info_peer->get_file_infos();
 
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -76,6 +61,16 @@ struct fixture_t {
 
         sup->start();
         sup->do_process();
+        auto builder = diff_builder_t(*cluster);
+        builder.create_folder(folder_id, root_path.string()).share_folder(peer_id.get_sha256(), folder_id).apply(*sup);
+
+        folder = cluster->get_folders().by_id(folder_id);
+        folder_info = folder->get_folder_infos().by_device(my_device);
+        files = &folder_info->get_file_infos();
+        folder_info_peer = folder->get_folder_infos().by_device(peer_device);
+        files_peer = &folder_info_peer->get_file_infos();
+
+
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         sup->create_actor<hasher_actor_t>().index(1).timeout(timeout).finish();
@@ -179,7 +174,7 @@ void test_meta_changes() {
             SECTION("a file does not physically exists") {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
-                folder_info_peer->add(file_peer);
+                folder_info_peer->add(file_peer, false);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));
@@ -193,7 +188,7 @@ void test_meta_changes() {
             SECTION("complete file exists") {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
-                folder_info_peer->add(file_peer);
+                folder_info_peer->add(file_peer, false);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));
@@ -237,7 +232,7 @@ void test_meta_changes() {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 file_peer->assign_block(b2, 1);
-                folder_info_peer->add(file_peer);
+                folder_info_peer->add(file_peer, false);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));
@@ -332,7 +327,7 @@ void test_meta_changes() {
                 auto file_my = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info).value();
                 file_my->assign_block(b, 0);
                 file_my->lock();
-                folder_info->add(file_my);
+                folder_info->add(file_my, false);
 
                 pr_fi.set_size(15ul);
                 counter->set_id(2);
@@ -341,7 +336,7 @@ void test_meta_changes() {
                 file_peer->assign_block(b, 0);
                 file_peer->assign_block(b2, 1);
                 file_peer->assign_block(b3, 2);
-                folder_info_peer->add(file_peer);
+                folder_info_peer->add(file_peer, false);
 
                 auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
                 REQUIRE(diff->apply(*cluster));

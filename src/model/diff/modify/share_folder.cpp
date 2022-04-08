@@ -13,7 +13,7 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     auto &folders = cluster.get_folders();
     auto folder = folders.by_id(folder_id);
     if (!folder) {
-        return make_error_code(error_code_t::folder_already_exists);
+        return make_error_code(error_code_t::folder_does_not_exist);
     }
 
     auto &devices = cluster.get_devices();
@@ -21,7 +21,18 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     if (!peer) {
         return make_error_code(error_code_t::device_does_not_exist);
     }
-    LOG_TRACE(log, "applyging share_folder_t, folder {} with device {}", folder_id, peer->device_id());
+    auto index = uint64_t{0};
+    auto max_sequence = int64_t{0};
+
+    for (auto &uf : cluster.get_unknown_folders()) {
+        if (uf->device_id() == peer->device_id() && uf->get_id() == folder_id) {
+            index = uf->get_index();
+            max_sequence = uf->get_max_sequence();
+            break;
+        }
+    }
+    LOG_TRACE(log, "applyging share_folder_t, folder {} with device {}, index = {}, max sequence = {}", folder_id,
+              peer->device_id(), index, max_sequence);
 
     auto folder_info = folder->get_folder_infos().by_device(peer);
     if (folder_info) {
@@ -30,6 +41,7 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
 
     auto db = db::FolderInfo();
     db.set_index_id(index);
+    db.set_max_sequence(max_sequence);
     auto fi_opt = folder_info_t::create(cluster.next_uuid(), db, peer, folder);
     if (!fi_opt) {
         return fi_opt.assume_error();

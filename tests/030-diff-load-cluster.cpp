@@ -330,7 +330,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         counter->set_id(5);
         counter->set_value(peer_device->as_uint());
         auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_peer).value();
-        folder_peer->add(file_peer);
+        folder_peer->add(file_peer, false);
 
         diff::load::container_t container;
         fi->set_source(file_peer);

@@ -15,9 +15,11 @@ if(MINGW)
 endif()
 
 add_library(syncspirit_test_lib
-    test_supervisor.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>
-    test-db.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>
-    test-main.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>
+    $<$<PLATFORM_ID:Windows>:win32-resource.rc>
+    test_supervisor.cpp
+    test-db.cpp
+    test-main.cpp
+    diff-builder.cpp
 )
 target_link_libraries(syncspirit_test_lib syncspirit_lib)
 target_include_directories(syncspirit_test_lib PUBLIC

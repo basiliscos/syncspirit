@@ -26,15 +26,13 @@ struct folder_info_t final : arc_base_t<folder_info_t> {
                                                      const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     static outcome::result<folder_info_ptr_t> create(const uuid_t &uuid, const db::FolderInfo &data,
                                                      const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
-    ~folder_info_t();
-
     std::string_view get_key() noexcept;
     std::string_view get_uuid() noexcept;
 
     bool operator==(const folder_info_t &other) const noexcept;
     bool operator!=(const folder_info_t &other) const noexcept { return !(*this == other); }
 
-    void add(const file_info_ptr_t &file_info) noexcept;
+    void add(const file_info_ptr_t &file_info, bool inc_max_sequence) noexcept;
     std::string serialize() noexcept;
 
     inline std::uint64_t get_index() const noexcept { return index; }
@@ -42,8 +40,6 @@ struct folder_info_t final : arc_base_t<folder_info_t> {
     inline device_t *get_device() const noexcept { return device; }
     inline folder_t *get_folder() const noexcept { return folder; }
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
-    void set_remote_max_sequence(std::int64_t value) noexcept { remote_max_sequence = value; }
-    void remove() noexcept;
     void set_max_sequence(std::int64_t value) noexcept;
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
     bool is_actual() noexcept;
@@ -59,10 +55,10 @@ struct folder_info_t final : arc_base_t<folder_info_t> {
 
     std::uint64_t index;
     std::int64_t max_sequence;
-    std::int64_t remote_max_sequence;
     device_t *device;
     folder_t *folder;
     file_infos_map_t file_infos;
+    bool actualized;
 };
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;

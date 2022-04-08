@@ -5,13 +5,7 @@
 #include "test-utils.h"
 #include "fs/file_actor.h"
 #include "fs/utils.h"
-#include "model/diff/aggregate.h"
-#include "model/diff/modify/append_block.h"
-#include "model/diff/modify/clone_block.h"
-#include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/share_folder.h"
-#include "model/diff/modify/clone_file.h"
-#include "model/diff/modify/flush_file.h"
+#include "diff-builder.h"
 #include "net/messages.h"
 #include "test_supervisor.h"
 #include "access.h"
@@ -71,24 +65,18 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
+        auto sha256 = peer_device->device_id().get_sha256();
         file_actor = sup->create_actor<fs::file_actor_t>().mru_size(2).cluster(cluster).timeout(timeout).finish();
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         file_addr = file_actor->get_address();
 
-        db_folder.set_id("1234-5678");
-        db_folder.set_label("my-label");
-        db_folder.set_path(root_path.string());
-        auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-        sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-        sup->do_process();
+        auto builder = diff_builder_t(*cluster);
+        builder.create_folder(folder_id, root_path.string(), "my-label").apply(*sup)
+               .update_peer(sha256, "some_name", "some-cn", true).apply(*sup)
+               .share_folder(sha256, folder_id).apply(*sup);
 
-        auto sha256 = peer_device->device_id().get_sha256();
-        diff = diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(sha256, db_folder.id()));
-        sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-        sup->do_process();
-
-        folder = cluster->get_folders().by_id(db_folder.id());
+        folder = cluster->get_folders().by_id(folder_id);
         folder_my = folder->get_folder_infos().by_device(my_device);
         folder_peer = folder->get_folder_infos().by_device(peer_device);
 
@@ -116,7 +104,7 @@ struct fixture_t {
     path_guard_t path_quard;
     r::system_context_t ctx;
     msg_ptr_t reply;
-    db::Folder db_folder;
+    std::string_view folder_id = "1234-5678";
 };
 } // namespace
 
@@ -134,18 +122,15 @@ void test_clone_file() {
 
             auto make_file = [&]() {
                 auto file = file_info_t::create(cluster->next_uuid(), pr_fi, folder_peer).value();
-                folder_peer->add(file);
+                folder_peer->add(file, false);
                 return file;
             };
 
             SECTION("empty regular file") {
                 auto peer_file = make_file();
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                sup->do_process();
+                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
 
                 auto my_file = folder_my->get_file_infos().by_name(peer_file->get_name());
-
                 auto &path = my_file->get_path();
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
@@ -155,12 +140,9 @@ void test_clone_file() {
             SECTION("empty regular file a subdir") {
                 pr_fi.set_name("a/b/c/d/e.txt");
                 auto peer_file = make_file();
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                sup->do_process();
+                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
-
                 auto &path = file->get_path();
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
@@ -179,9 +161,7 @@ void test_clone_file() {
 
                 auto peer_file = make_file();
                 peer_file->assign_block(bi, 0);
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                sup->do_process();
+                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
@@ -195,9 +175,7 @@ void test_clone_file() {
                 pr_fi.set_type(proto::FileInfoType::DIRECTORY);
 
                 auto peer_file = make_file();
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                sup->do_process();
+                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
@@ -215,9 +193,7 @@ void test_clone_file() {
                 pr_fi.set_symlink_target(target.string());
 
                 auto peer_file = make_file();
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                sup->do_process();
+                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
@@ -235,9 +211,7 @@ void test_clone_file() {
                 REQUIRE(bfs::exists(target));
 
                 auto peer_file = make_file();
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                sup->do_process();
+                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
                 CHECK(file->is_deleted());
@@ -286,7 +260,7 @@ void test_append_block() {
                 for (size_t i = 0; i < count; ++i) {
                     file->assign_block(blocks[i], i);
                 }
-                folder_peer->add(file);
+                folder_peer->add(file, false);
                 return file;
             };
 
@@ -294,19 +268,13 @@ void test_append_block() {
                 pr_source.set_size(5ul);
 
                 auto peer_file = make_file(1);
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                sup->do_process();
+                auto builder = diff_builder_t(*cluster);
+                builder.clone_file(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_source.name());
 
-                auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*peer_file, 0, "12345"));
-                sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                sup->do_process();
-
-                diff = new diff::modify::flush_file_t(*peer_file);
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                sup->do_process();
+                builder.append_block(*peer_file, 0, "12345").apply(*sup)
+                    .flush_file(*peer_file).apply(*sup);
 
                 auto path = root_path / std::string(file->get_name());
                 REQUIRE(bfs::exists(path));
@@ -320,15 +288,12 @@ void test_append_block() {
                 pr_source.set_size(10ul);
 
                 auto peer_file = make_file(2);
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*peer_file));
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                sup->do_process();
+                auto builder = diff_builder_t(*cluster);
+                builder.clone_file(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_source.name());
 
-                auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*peer_file, 0, "12345"));
-                sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                sup->do_process();
+                builder.append_block(*peer_file, 0, "12345").apply(*sup);
 
                 auto filename = std::string(file->get_name()) + ".syncspirit-tmp";
                 auto path = root_path / filename;
@@ -338,15 +303,10 @@ void test_append_block() {
                 auto data = read_file(path);
                 CHECK(data.substr(0, 5) == "12345");
 #endif
-
-                bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*peer_file, 1, "67890"));
-                sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                sup->do_process();
+                builder.append_block(*peer_file, 1, "67890").apply(*sup);
 
                 SECTION("add 2nd block") {
-                    diff = new diff::modify::flush_file_t(*peer_file);
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                    sup->do_process();
+                    builder.flush_file(*peer_file).apply(*sup);
 
                     filename = std::string(file->get_name());
                     path = root_path / filename;
@@ -360,9 +320,7 @@ void test_append_block() {
 #ifndef SYNCSPIRIT_WIN
                 SECTION("remove folder (simulate err)") {
                     bfs::remove_all(root_path);
-                    diff = new diff::modify::flush_file_t(*peer_file);
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                    sup->do_process();
+                    diff_builder_t(*cluster).flush_file(*peer_file).apply(*sup);
                     CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() ==
                           r::state_t::SHUT_DOWN);
                 }
@@ -410,9 +368,12 @@ void test_clone_block() {
                 for (size_t i = 0; i < count; ++i) {
                     file->assign_block(blocks[i], i);
                 }
-                folder_peer->add(file);
+                folder_peer->add(file, false);
                 return file;
             };
+
+            auto builder = diff_builder_t(*cluster);
+
 
             SECTION("source & target are different files") {
                 proto::FileInfo pr_target;
@@ -428,33 +389,17 @@ void test_clone_block() {
                     auto source = make_file(pr_source, 1);
                     auto target = make_file(pr_target, 1);
 
-                    auto diffs = diff::aggregate_t::diffs_t{};
-                    diffs.push_back(new diff::modify::clone_file_t(*source));
-                    diffs.push_back(new diff::modify::clone_file_t(*target));
-                    auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                    sup->do_process();
+                    builder.clone_file(*source).clone_file(*target).apply(*sup);
 
                     auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
                     auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
 
-                    auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*source_file, 0, "12345"));
-                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                    sup->do_process();
-
-                    diff = new diff::modify::flush_file_t(*source);
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                    sup->do_process();
+                    builder.append_block(*source_file, 0, "12345").apply(*sup)
+                            .flush_file(*source_file).apply(*sup);
 
                     auto block = source_file->get_blocks()[0];
                     auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
-                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(file_block));
-                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                    sup->do_process();
-
-                    diff = new diff::modify::flush_file_t(*target);
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                    sup->do_process();
+                    builder.clone_block(file_block).apply(*sup).flush_file(*target).apply(*sup);
 
                     auto path = root_path / std::string(target_file->get_name());
                     REQUIRE(bfs::exists(path));
@@ -470,32 +415,46 @@ void test_clone_block() {
                     auto source = make_file(pr_source, 2);
                     auto target = make_file(pr_target, 2);
 
-                    auto diffs = diff::aggregate_t::diffs_t{};
-                    diffs.push_back(new diff::modify::clone_file_t(*source));
-                    diffs.push_back(new diff::modify::clone_file_t(*target));
-                    auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                    sup->do_process();
+                    builder.clone_file(*source).clone_file(*target).apply(*sup);
 
                     auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
                     auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
 
-                    auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*source_file, 0, "12345"));
-                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                    bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*source_file, 1, "67890"));
-                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                    sup->do_process();
+                    builder.append_block(*source_file, 0, "12345").append_block(*source_file, 1, "67890").apply(*sup);
 
                     auto blocks = source_file->get_blocks();
                     auto fb_1 = model::file_block_t(blocks[0].get(), target_file.get(), 0);
-                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(fb_1));
-                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
                     auto fb_2 = model::file_block_t(blocks[1].get(), target_file.get(), 1);
-                    bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(fb_2));
-                    sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                    diff = new diff::modify::flush_file_t(*target_file);
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                    sup->do_process();
+                    builder.clone_block(fb_1).clone_block(fb_2).apply(*sup).flush_file(*target).apply(*sup);
+
+                    auto filename = std::string(target_file->get_name());
+                    auto path = root_path / filename;
+                    REQUIRE(bfs::exists(path));
+                    REQUIRE(bfs::file_size(path) == 10);
+                    auto data = read_file(path);
+                    CHECK(data == "1234567890");
+                }
+
+                SECTION("source/target different sizes") {
+                    pr_source.set_size(5ul);
+                    pr_target.set_size(10ul);
+                    auto target = make_file(pr_target, 2);
+
+                    auto source = file_info_t::create(cluster->next_uuid(), pr_source, folder_peer).value();
+                    source->assign_block(blocks[1], 0);
+                    folder_peer->add(source, false);
+
+
+                    builder.clone_file(*source).clone_file(*target).apply(*sup);
+
+                    auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
+                    auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
+
+                    builder.append_block(*source_file, 0, "67890").append_block(*target_file, 0, "12345").apply(*sup);
+
+                    auto blocks = source_file->get_blocks();
+                    auto fb = model::file_block_t(blocks[0].get(), target_file.get(), 1);
+                    builder.clone_block(fb).apply(*sup).flush_file(*target).apply(*sup);
 
                     auto filename = std::string(target_file->get_name());
                     auto path = root_path / filename;
@@ -512,30 +471,19 @@ void test_clone_block() {
                 auto source = file_info_t::create(cluster->next_uuid(), pr_source, folder_peer).value();
                 source->assign_block(blocks[0], 0);
                 source->assign_block(blocks[0], 1);
-                folder_peer->add(source);
+                folder_peer->add(source, false);
 
-                auto diffs = diff::aggregate_t::diffs_t{};
-                diffs.push_back(new diff::modify::clone_file_t(*source));
-                auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                sup->do_process();
+                builder.clone_file(*source).apply(*sup);
 
                 auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
                 auto target_file = source_file;
 
-                auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*source_file, 0, "12345"));
-                sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                sup->do_process();
+                builder.append_block(*source_file, 0, "12345").apply(*sup);
 
                 auto block = source_file->get_blocks()[0];
                 auto file_block = model::file_block_t(block.get(), target_file.get(), 1);
-                bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(file_block));
-                sup->send<model::payload::block_update_t>(sup->get_address(), std::move(bdiff), nullptr);
-                sup->do_process();
+                builder.clone_block(file_block).apply(*sup).flush_file(*source).apply(*sup);
 
-                diff = new diff::modify::flush_file_t(*source);
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                sup->do_process();
                 auto path = root_path / std::string(target_file->get_name());
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 10);

@@ -50,6 +50,8 @@ TEST_CASE("update folder (via Index)", "[model]") {
     pr_index.set_folder(db_folder_1.id());
 
     SECTION("successful case") {
+        auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
+
         auto file = pr_index.add_files();
         file->set_name("a.txt");
         file->set_sequence(10ul);
@@ -59,10 +61,10 @@ TEST_CASE("update folder (via Index)", "[model]") {
         auto b = file->add_blocks();
         b->set_hash("123");
 
+        peer_folder_info->set_max_sequence(10ul);
         diff = diff::peer::update_folder_t::create(*cluster, *peer_device, pr_index).value();
         REQUIRE(diff->apply(*cluster));
 
-        auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
         auto &peer_files = peer_folder_info->get_file_infos();
         REQUIRE(peer_files.size() == 1);
         CHECK(peer_folder_info->is_actual());
@@ -79,6 +81,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
             same_file->set_modified_s(2);
             same_file->set_sequence(11ul);
 
+            peer_folder_info->set_max_sequence(11ul);
             diff = diff::peer::update_folder_t::create(*cluster, *peer_device, index_update).value();
             REQUIRE(diff->apply(*cluster));
 
@@ -103,12 +106,13 @@ TEST_CASE("update folder (via Index)", "[model]") {
         CHECK(opt.error() == model::make_error_code(model::error_code_t::folder_is_not_shared));
     }
 
-    SECTION("no progress") {
+    SECTION("exceed max sequence") {
         pr_index.set_folder(db_folder_1.id());
         auto f = pr_index.add_files();
+        f->set_sequence(999);
         auto opt = diff::peer::update_folder_t::create(*cluster, *peer_device, pr_index);
         REQUIRE(!opt);
-        CHECK(opt.error() == model::make_error_code(model::error_code_t::no_progress));
+        CHECK(opt.error() == model::make_error_code(model::error_code_t::exceed_max_sequence));
     }
 
     SECTION("blocks are not expected") {

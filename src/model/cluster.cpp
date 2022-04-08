@@ -13,8 +13,6 @@ cluster_t::cluster_t(device_ptr_t device_, size_t seed_) noexcept : device(devic
     rng_engine.seed(seed_);
 }
 
-cluster_t::~cluster_t() {}
-
 proto::ClusterConfig cluster_t::generate(const device_t &target) const noexcept {
     proto::ClusterConfig r;
     for (auto it : folders) {
@@ -40,6 +38,10 @@ block_infos_map_t &cluster_t::get_blocks() noexcept { return blocks; }
 const block_infos_map_t &cluster_t::get_blocks() const noexcept { return blocks; }
 
 folders_map_t &cluster_t::get_folders() noexcept { return folders; }
+
+auto cluster_t::get_unknown_folders() noexcept -> unknown_folders_t & { return unknown_folders; }
+
+auto cluster_t::get_unknown_folders() const noexcept -> const unknown_folders_t & { return unknown_folders; }
 
 const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
 

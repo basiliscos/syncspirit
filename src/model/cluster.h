@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <random>
+#include <forward_list>
 #include <boost/uuid/random_generator.hpp>
 #include <unordered_map>
 #include "misc/arc.hpp"
@@ -13,15 +14,16 @@
 #include "ignored_device.h"
 #include "ignored_folder.h"
 #include "folder.h"
+#include "unknown_folder.h"
 #include "block_info.h"
 #include "diff/cluster_diff.h"
 
 namespace syncspirit::model {
 
 struct cluster_t final : arc_base_t<cluster_t> {
+    using unknown_folders_t = std::forward_list<unknown_folder_ptr_t>;
 
     cluster_t(device_ptr_t device_, size_t seed) noexcept;
-    ~cluster_t();
 
     proto::ClusterConfig generate(const model::device_t &target) const noexcept;
     inline const device_ptr_t &get_device() const noexcept { return device; }
@@ -32,7 +34,10 @@ struct cluster_t final : arc_base_t<cluster_t> {
     ignored_devices_map_t &get_ignored_devices() noexcept;
     ignored_folders_map_t &get_ignored_folders() noexcept;
     folders_map_t &get_folders() noexcept;
+    unknown_folders_t &get_unknown_folders() noexcept;
+
     const folders_map_t &get_folders() const noexcept;
+    const unknown_folders_t &get_unknown_folders() const noexcept;
     uuid_t next_uuid() noexcept;
     uint64_t next_uint64() noexcept;
     inline bool is_tainted() const noexcept { return tainted; }
@@ -56,6 +61,7 @@ struct cluster_t final : arc_base_t<cluster_t> {
     devices_map_t devices;
     ignored_devices_map_t ignored_devices;
     ignored_folders_map_t ignored_folders;
+    unknown_folders_t unknown_folders;
     bool tainted = false;
 };
 

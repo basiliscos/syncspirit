@@ -61,6 +61,7 @@ add_library(syncspirit_lib
     src/model/diff/load/ignored_devices.cpp
     src/model/diff/load/ignored_folders.cpp
     src/model/diff/load/load_cluster.cpp
+    src/model/diff/load/unknown_folders.cpp
     src/model/diff/modify/append_block.cpp
     src/model/diff/modify/blocks_availability.cpp
     src/model/diff/modify/clone_block.cpp
@@ -92,9 +93,11 @@ add_library(syncspirit_lib
     src/model/device_id.cpp
     src/model/file_info.cpp
     src/model/folder.cpp
+    src/model/folder_data.cpp
     src/model/folder_info.cpp
     src/model/ignored_device.cpp
     src/model/ignored_folder.cpp
+    src/model/unknown_folder.cpp
     src/net/acceptor_actor.cpp
     src/net/cluster_supervisor.cpp
     src/net/controller_actor.cpp

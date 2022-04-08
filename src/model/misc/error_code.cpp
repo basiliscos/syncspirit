@@ -46,10 +46,16 @@ std::string error_code_category_t::message(int c) const {
         r = "invalid folder key length";
         break;
     case error_code_t::invalid_folder_prefix:
-        r = "invalind folder prefix";
+        r = "invalid folder prefix";
+        break;
+    case error_code_t::invalid_unknown_folder_length:
+        r = "invalid unknown folder prefix";
         break;
     case error_code_t::folder_deserialization_failure:
         r = "folder deserialization failure";
+        break;
+    case error_code_t::unknown_folder_deserialization_failure:
+        r = "unknown folder deserialization failure";
         break;
     case error_code_t::file_info_deserialization_failure:
         r = "file info deserialization failure";
@@ -58,13 +64,13 @@ std::string error_code_category_t::message(int c) const {
         r = "invalid file info key length";
         break;
     case error_code_t::invalid_file_info_prefix:
-        r = "invalind file info prefix";
+        r = "invalid file info prefix";
         break;
     case error_code_t::invalid_folder_info_key_length:
         r = "invalid folder info key length prefix";
         break;
     case error_code_t::invalid_folder_info_prefix:
-        r = "invalind folder info prefix";
+        r = "invalid folder info prefix";
         break;
     case error_code_t::folder_info_deserialization_failure:
         r = "fodler info deserialization failure";
@@ -73,13 +79,13 @@ std::string error_code_category_t::message(int c) const {
         r = "invalid ignored device key length";
         break;
     case error_code_t::invalid_ignored_device_prefix:
-        r = "invalind ingored device prefix";
+        r = "invalid ingored device prefix";
         break;
     case error_code_t::ignored_device_deserialization_failure:
         r = "ignored device deserialization failure";
         break;
     case error_code_t::invalid_ignored_folder_prefix:
-        r = "invalind ingored folder prefix";
+        r = "invalid ingored folder prefix";
         break;
     case error_code_t::ignored_folder_deserialization_failure:
         r = "ignored folder deserialization failure";
@@ -108,8 +114,8 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::invalid_block_size:
         r = "block size is invalid (i.e. greater than file size)";
         break;
-    case error_code_t::no_progress:
-        r = "no progress has been made (i.e. empty index/index_update)";
+    case error_code_t::exceed_max_sequence:
+        r = "file sequence exceed folder_info max sequence";
         break;
     case error_code_t::unexpected_blocks:
         r = "blocks are not expected (e.g. in deleted file)";

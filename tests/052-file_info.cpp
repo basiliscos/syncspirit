@@ -205,9 +205,9 @@ TEST_CASE("file_info_t::local_file", "[model]") {
 
     SECTION("there is identical local file") {
         auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
-        folder_my->add(file_my);
+        folder_my->add(file_my, false);
         auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
-        folder_peer->add(file_peer);
+        folder_peer->add(file_peer, false);
         file_my->set_source(file_peer);
 
         auto lf = file_peer->local_file();
@@ -217,7 +217,7 @@ TEST_CASE("file_info_t::local_file", "[model]") {
 
     SECTION("peer version is newer (1)") {
         auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
-        folder_my->add(file_my);
+        folder_my->add(file_my, false);
 
         auto c2 = version->add_counters();
         c2->set_id(2);
@@ -263,7 +263,7 @@ TEST_CASE("source file", "[model]") {
 
     auto peer_file = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
     my_file->set_source(peer_file);
-    folder_peer->add(peer_file);
+    folder_peer->add(peer_file, false);
     CHECK(my_file->get_source());
 
     SECTION("reset") {
@@ -274,7 +274,7 @@ TEST_CASE("source file", "[model]") {
     SECTION("peer has different version") {
         c1->set_id(2);
         peer_file = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
-        folder_peer->add(peer_file);
+        folder_peer->add(peer_file, false);
         CHECK(!my_file->get_source());
     }
 }

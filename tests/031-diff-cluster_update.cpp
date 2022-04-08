@@ -56,8 +56,10 @@ TEST_CASE("cluster update, new folder", "[model]") {
         CHECK(r_a);
 
         std::vector<proto::Folder> unknown;
+        std::set<std::string> removed_unknown;
         auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
-            unknown = diff.unknown_folders;
+            unknown = diff.new_unknown_folders;
+            removed_unknown = diff.removed_unknown_folders;
             return outcome::success();
         });
         auto r_v = diff->visit(visitor);
@@ -65,6 +67,53 @@ TEST_CASE("cluster update, new folder", "[model]") {
         REQUIRE(unknown.size() == 1);
         REQUIRE(unknown[0].id() == folder.id());
         REQUIRE(unknown[0].label() == folder.label());
+        CHECK(removed_unknown.empty());
+        REQUIRE(!cluster->get_unknown_folders().empty());
+        auto uf = cluster->get_unknown_folders().front();
+        CHECK(uf->device_id() == peer_device->device_id());
+        CHECK(uf->get_id() == "some-id");
+        CHECK(uf->get_max_sequence() == 10);
+        CHECK(uf->get_index() == 22ul);
+
+        // no changes
+        db::UnknownFolder db_uf;
+        auto mf = db_uf.mutable_folder();
+        mf->set_id(folder.id());
+        auto mfi = db_uf.mutable_folder_info();
+        mfi->set_max_sequence(d_peer->max_sequence());
+        mfi->set_index_id(d_peer->index_id());
+        unknown = {};
+
+        diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+        REQUIRE(diff_opt);
+        diff = diff_opt.value();
+        r_a = diff->apply(*cluster);
+        CHECK(r_a);
+        REQUIRE(!cluster->get_unknown_folders().empty());
+        (void)diff->visit(visitor);
+        CHECK(unknown.empty());
+        CHECK(removed_unknown.empty());
+
+        // max-id changed
+        d_peer->set_max_sequence(15);
+        diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+        REQUIRE(diff_opt);
+        diff = diff_opt.value();
+        r_a = diff->apply(*cluster);
+        CHECK(r_a);
+        (void)diff->visit(visitor);
+        REQUIRE(unknown.size() == 1);
+        REQUIRE(unknown[0].id() == folder.id());
+        REQUIRE(unknown[0].label() == folder.label());
+        REQUIRE(!removed_unknown.empty());
+        REQUIRE(*removed_unknown.begin() == uf->get_key());
+        REQUIRE(!cluster->get_unknown_folders().empty());
+        uf = cluster->get_unknown_folders().front();
+        CHECK(uf->device_id() == peer_device->device_id());
+        CHECK(uf->get_id() == "some-id");
+        CHECK(uf->get_max_sequence() == 15);
+        CHECK(uf->get_index() == 22ul);
+        CHECK(std::distance(cluster->get_unknown_folders().begin(), cluster->get_unknown_folders().end()) == 1);
     }
 
     SECTION("existing folder") {
@@ -100,6 +149,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         p_folder->set_id(std::string(folder->get_id()));
         p_folder->set_label(std::string(folder->get_label()));
         auto p_peer = p_folder->add_devices();
+        p_peer->set_max_sequence(folder_info_peer->get_max_sequence());
         p_peer->set_id(std::string(peer_id.get_sha256()));
         p_peer->set_name(std::string(peer_device->get_name()));
 
@@ -113,6 +163,11 @@ TEST_CASE("cluster update, new folder", "[model]") {
             auto &diff = diff_opt.value();
             auto r_a = diff->apply(*cluster);
             CHECK(r_a);
+            CHECK(!folder_info_peer->is_actual());
+            auto pr_file = proto::FileInfo();
+            pr_file.set_sequence(folder_info_peer->get_max_sequence());
+            auto peer_file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info_peer).value();
+            folder_info_peer->add(peer_file, false);
             CHECK(folder_info_peer->is_actual());
 
             bool visited = false;
@@ -203,7 +258,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             REQUIRE(r_a);
             auto fi = folder->get_folder_infos().by_device(peer_device);
             REQUIRE(fi->get_index() == 7ul);
-            REQUIRE(fi->get_max_sequence() == 0);
+            REQUIRE(fi->get_max_sequence() == 123456u);
 
             bool visited = false;
             auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
@@ -281,14 +336,14 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     pr_fi_my.set_size(5ul);
     pr_fi_my.set_block_size(5ul);
     auto fi_my = file_info_t::create(cluster->next_uuid(), pr_fi_my, folder_info_my).value();
-    folder_info_my->add(fi_my);
+    folder_info_my->add(fi_my, false);
 
     proto::FileInfo pr_fi_peer1;
     pr_fi_peer1.set_name("a/c.txt");
     pr_fi_peer1.set_size(5ul);
     pr_fi_peer1.set_block_size(5ul);
     auto fi_peer1 = file_info_t::create(cluster->next_uuid(), pr_fi_peer1, folder_info_peer).value();
-    folder_info_peer->add(fi_peer1);
+    folder_info_peer->add(fi_peer1, false);
     REQUIRE(folder_info_peer->get_file_infos().size() == 1);
 
     proto::FileInfo pr_fi_peer2;
@@ -296,7 +351,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     pr_fi_peer2.set_size(10ul);
     pr_fi_peer2.set_block_size(5ul);
     auto fi_peer2 = file_info_t::create(cluster->next_uuid(), pr_fi_peer2, folder_info_peer).value();
-    folder_info_peer->add(fi_peer2);
+    folder_info_peer->add(fi_peer2, false);
     REQUIRE(folder_info_peer->get_file_infos().size() == 2);
 
     fi_my->assign_block(b1, 0);
@@ -325,7 +380,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     REQUIRE(folder_info_peer_new != folder_info_peer);
     REQUIRE(folder_info_peer_new->get_file_infos().size() == 0);
     CHECK(folder_info_peer_new->get_index() == 7ul);
-    CHECK(folder_info_peer_new->get_max_sequence() == 0);
+    CHECK(folder_info_peer_new->get_max_sequence() == p_peer->max_sequence());
 
     CHECK(folder_info_peer->use_count() == 1);
     CHECK(fi_peer1->use_count() == 2);

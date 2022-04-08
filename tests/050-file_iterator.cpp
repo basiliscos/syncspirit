@@ -82,10 +82,10 @@ TEST_CASE("file iterator", "[model]") {
         auto file = idx.add_files();
         file->set_name("a.txt");
         file->set_sequence(10ul);
+        auto peer_folder = folder->get_folder_infos().by_device(peer_device);
 
         diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
         REQUIRE(diff->apply(*cluster));
-        auto peer_folder = folder->get_folder_infos().by_device(peer_device);
         auto peer_file = peer_folder->get_file_infos().by_name("a.txt");
 
         peer_file->lock();
@@ -141,7 +141,7 @@ TEST_CASE("file iterator", "[model]") {
                 auto pr_file = proto::FileInfo();
                 pr_file.set_name("a.txt");
                 auto my_file = file_info_t::create(cluster->next_uuid(), pr_file, my_folder).value();
-                my_folder->add(my_file);
+                my_folder->add(my_file, false);
 
                 auto peer_folder = folder_infos.by_device(peer_device);
                 REQUIRE(peer_folder->get_file_infos().size() == 2);
@@ -168,7 +168,7 @@ TEST_CASE("file iterator", "[model]") {
             auto my_folder = folder_infos.by_device(my_device);
             auto pr_file = proto::FileInfo();
             pr_file.set_name("a.txt");
-            my_folder->add(file_info_t::create(cluster->next_uuid(), pr_file, my_folder).value());
+            my_folder->add(file_info_t::create(cluster->next_uuid(), pr_file, my_folder).value(), false);
 
             auto f = next(true);
             REQUIRE(f);
@@ -187,7 +187,8 @@ TEST_CASE("file iterator", "[model]") {
 
             auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
             auto my_folder = folder_infos.by_device(my_device);
-            my_folder->add(file_info_t::create(cluster->next_uuid(), *file_1, my_folder).value());
+            my_folder->set_max_sequence(file_1->sequence());
+            my_folder->add(file_info_t::create(cluster->next_uuid(), *file_1, my_folder).value(), false);
 
             auto f = next(true);
             REQUIRE(f);
@@ -206,8 +207,9 @@ TEST_CASE("file iterator", "[model]") {
 
             auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
             auto peer_folder = folder_infos.by_device(peer_device);
-            peer_folder->add(file_info_t::create(cluster->next_uuid(), *file_1, peer_folder).value());
-            peer_folder->set_remote_max_sequence(peer_folder->get_max_sequence() + 1);
+            auto file = file_info_t::create(cluster->next_uuid(), *file_1, peer_folder).value();
+            peer_folder->add(file, true);
+            peer_folder->set_max_sequence(peer_folder->get_max_sequence() + 20);
             REQUIRE(!peer_folder->is_actual());
             REQUIRE(!next(true));
         }
@@ -272,6 +274,33 @@ TEST_CASE("file iterator", "[model]") {
             REQUIRE(!next(false));
         }
     }
+
+    SECTION("file actualization") {
+        auto file_a = idx.add_files();
+        file_a->set_name("a.txt");
+        file_a->set_sequence(10ul);
+
+        auto file_b = idx.add_files();
+        file_b->set_name("b.txt");
+        file_b->set_sequence(9ul);
+        auto peer_folder = folder->get_folder_infos().by_device(peer_device);
+
+        diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
+        REQUIRE(diff->apply(*cluster));
+        auto orig_file = peer_folder->get_file_infos().by_name("b.txt");
+
+        auto f_1 = next(true);
+        REQUIRE(f_1);
+
+        auto data = orig_file->as_db(false);
+        auto updated_file = model::file_info_t::create(orig_file->get_key(), data, peer_folder).value();
+        peer_folder->get_file_infos().put(updated_file);
+
+        auto f_2 = next(false);
+        REQUIRE(f_2);
+        CHECK(f_2 == updated_file);
+    }
+
 }
 
 TEST_CASE("file iterator for 2 folders", "[model]") {

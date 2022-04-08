@@ -126,7 +126,7 @@ TEST_CASE("scan_task", "[fs]") {
             bfs::last_write_time(path, modified);
 
             auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
-            folder_my->add(file);
+            folder_my->add(file, false);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();
@@ -157,7 +157,7 @@ TEST_CASE("scan_task", "[fs]") {
                 bfs::last_write_time(path, modified);
 
                 file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
-                folder_my->add(file);
+                folder_my->add(file, false);
             }
 
             SECTION("modification time differs") {
@@ -170,7 +170,7 @@ TEST_CASE("scan_task", "[fs]") {
                 bfs::last_write_time(path, modified);
 
                 file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
-                folder_my->add(file);
+                folder_my->add(file, false);
             }
             task = new scan_task_t(cluster, folder->get_id(), config);
             auto r = task->advance();
@@ -199,8 +199,8 @@ TEST_CASE("scan_task", "[fs]") {
 
                 auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
-                folder_my->add(file_my);
-                folder_peer->add(file_peer);
+                folder_my->add(file_my, false);
+                folder_peer->add(file_peer, false);
                 file_my->set_source(file_peer);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
@@ -222,7 +222,7 @@ TEST_CASE("scan_task", "[fs]") {
                 write_file(path, "12345");
 
                 auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
-                folder_my->add(file_my);
+                folder_my->add(file_my, false);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
                 auto r = task.advance();
@@ -243,8 +243,8 @@ TEST_CASE("scan_task", "[fs]") {
 
                 auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
-                folder_my->add(file_my);
-                folder_peer->add(file_peer);
+                folder_my->add(file_my, false);
+                folder_peer->add(file_peer, false);
                 file_my->set_source(file_peer);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
@@ -271,8 +271,8 @@ TEST_CASE("scan_task", "[fs]") {
             auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
             counter->set_id(10);
             auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
-            folder_my->add(file_my);
-            folder_peer->add(file_peer);
+            folder_my->add(file_my, false);
+            folder_peer->add(file_peer, false);
             file_my->set_source(file_peer);
 
             auto path = root_path / "a.txt";
@@ -316,7 +316,7 @@ TEST_CASE("scan_task", "[fs]") {
             write_file(path, "12345");
 
             auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
-            folder_my->add(file);
+            folder_my->add(file, false);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();
@@ -345,7 +345,7 @@ TEST_CASE("scan_task", "[fs]") {
             bfs::permissions(path, bfs::perms::owner_read, ec);
             if (ec) {
                 auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
-                folder_my->add(file);
+                folder_my->add(file, false);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
                 auto r = task.advance();

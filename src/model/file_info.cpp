@@ -358,6 +358,8 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
     }
 }
 
+file_info_ptr_t file_info_t::actualize() const noexcept { return folder_info->get_file_infos().get(get_uuid()); }
+
 template <> std::string_view get_index<0>(const file_info_ptr_t &item) noexcept { return item->get_uuid(); }
 template <> std::string_view get_index<1>(const file_info_ptr_t &item) noexcept { return item->get_name(); }
 

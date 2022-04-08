@@ -62,11 +62,10 @@ folder_info_t::folder_info_t(const uuid_t &uuid, const device_ptr_t &device_, co
     std::copy(uuid.begin(), uuid.end(), key + 1 + device_key.size() + folder_key.size());
 }
 
-folder_info_t::~folder_info_t() {}
-
 void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
     index = fi.index_id();
-    remote_max_sequence = max_sequence = fi.max_sequence();
+    max_sequence = fi.max_sequence();
+    actualized = max_sequence == 0;
 }
 
 std::string_view folder_info_t::get_key() noexcept { return std::string_view(key, data_length); }
@@ -80,11 +79,16 @@ bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
     return r.first == key + data_length;
 }
 
-void folder_info_t::add(const file_info_ptr_t &file_info) noexcept { file_infos.put(file_info); }
-
-void folder_info_t::set_max_sequence(int64_t value) noexcept {
-    assert(max_sequence < value);
-    remote_max_sequence = max_sequence = value;
+void folder_info_t::add(const file_info_ptr_t &file_info, bool inc_max_sequence) noexcept {
+    file_infos.put(file_info);
+    auto seq = file_info->get_sequence();
+    if (inc_max_sequence && seq > max_sequence) {
+        max_sequence = seq;
+        actualized = true;
+    } else {
+        assert(seq <= max_sequence);
+        actualized = actualized || (seq == max_sequence);
+    }
 }
 
 std::string folder_info_t::serialize() noexcept {
@@ -94,7 +98,12 @@ std::string folder_info_t::serialize() noexcept {
     return r.SerializeAsString();
 }
 
-bool folder_info_t::is_actual() noexcept { return max_sequence == remote_max_sequence; }
+bool folder_info_t::is_actual() noexcept { return actualized; }
+
+void folder_info_t::set_max_sequence(std::int64_t value) noexcept {
+    actualized = false;
+    max_sequence = value;
+}
 
 folder_info_ptr_t folder_infos_map_t::by_device(const device_ptr_t &device) const noexcept {
     return get<1>(device->device_id().get_sha256());

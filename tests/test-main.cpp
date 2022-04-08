@@ -85,5 +85,4 @@ std::string hash_string(const std::string_view &hash) noexcept {
     return r;
 }
 
-
 }

@@ -18,7 +18,8 @@ static const constexpr discr_t folder_info{0x12};
 static const constexpr discr_t file_info{0x13};
 static const constexpr discr_t ignored_device{0x14};
 static const constexpr discr_t ignored_folder{0x15};
-static const constexpr discr_t block_info{0x16};
+static const constexpr discr_t unknown_folder{0x16};
+static const constexpr discr_t block_info{0x17};
 } // namespace prefix
 
 struct value_t {

@@ -44,39 +44,13 @@ folder_t::folder_t(const uuid_t &uuid) noexcept {
     std::copy(uuid.begin(), uuid.end(), key + 1);
 }
 
-void folder_t::assign_fields(const db::Folder &item) noexcept {
-    id = item.id();
-    label = item.label();
-    path = item.path();
-    folder_type = (foldet_type_t)item.folder_type();
-    rescan_interval = item.rescan_interval();
-    pull_order = (pull_order_t)item.pull_order();
-    watched = item.watched();
-    read_only = item.read_only();
-    ignore_permissions = item.ignore_permissions();
-    ignore_delete = item.ignore_delete();
-    disable_temp_indixes = item.disable_temp_indexes();
-    paused = item.paused();
-}
-
 void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
 
 void folder_t::assign_cluster(const cluster_ptr_t &cluster_) noexcept { cluster = cluster_.get(); }
 
 std::string folder_t::serialize() noexcept {
-    db::Folder r;
-    r.set_id(id);
-    r.set_label(label);
-    r.set_read_only(read_only);
-    r.set_ignore_permissions(ignore_permissions);
-    r.set_ignore_delete(ignore_delete);
-    r.set_disable_temp_indexes(disable_temp_indixes);
-    r.set_paused(paused);
-    r.set_watched(watched);
-    r.set_path(path.string());
-    r.set_folder_type((db::FolderType)folder_type);
-    r.set_pull_order((db::PullOrder)pull_order);
-    r.set_rescan_interval(rescan_interval);
+    auto r = db::Folder();
+    folder_data_t::serialize(r);
     return r.SerializeAsString();
 }
 

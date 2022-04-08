@@ -3,15 +3,8 @@
 
 #include "catch.hpp"
 #include "test-utils.h"
-#include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/clone_file.h"
-#include "model/diff/modify/share_folder.h"
-#include "model/diff/modify/finish_file.h"
-#include "model/diff/modify/update_peer.h"
-#include "model/diff/peer/update_folder.h"
+#include "diff-builder.h"
 #include "model/diff/peer/cluster_remove.h"
-#include "model/diff/aggregate.h"
-#include "model/misc/version_utils.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -89,6 +82,7 @@ struct fixture_t {
                        .timeout(timeout)
                        .finish();
         sup->do_process();
+
         CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         db_addr = db_actor->get_address();
         main();
@@ -156,15 +150,12 @@ void test_loading_empty_db() {
 void test_folder_creation() {
     struct F : fixture_t {
         void main() noexcept override {
-            db::Folder db_folder;
-            db_folder.set_id("1234-5678");
-            db_folder.set_label("my-label");
-            db_folder.set_path("/my/path");
-            auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-            sup->do_process();
+            auto folder_id = "1234-5678";
 
-            auto folder = cluster->get_folders().by_id(db_folder.id());
+            auto builder = diff_builder_t(*cluster);
+            builder.create_folder(folder_id, "/my/path", "my-label").apply(*sup);
+
+            auto folder = cluster->get_folders().by_id(folder_id);
             REQUIRE(folder);
             REQUIRE(folder->get_folder_infos().by_device(cluster->get_device()));
 
@@ -177,8 +168,8 @@ void test_folder_creation() {
             auto folder_clone = cluster_clone->get_folders().by_id(folder->get_id());
             REQUIRE(folder_clone);
             REQUIRE(folder.get() != folder_clone.get());
-            REQUIRE(folder_clone->get_label() == db_folder.label());
-            REQUIRE(folder_clone->get_path().string() == db_folder.path());
+            REQUIRE(folder_clone->get_label() == "my-label");
+            REQUIRE(folder_clone->get_path().string() == "/my/path");
             REQUIRE(folder_clone->get_folder_infos().size() == 1);
             REQUIRE(folder_clone->get_folder_infos().by_device(cluster->get_device()));
         }
@@ -191,14 +182,9 @@ void test_peer_updating() {
     struct F : fixture_t {
         void main() noexcept override {
             auto sha256 = peer_device->device_id().get_sha256();
-            db::Device db_device;
-            db_device.set_cert_name("some-cn");
-            db_device.set_name("some_name");
-            db_device.set_auto_accept(true);
 
-            auto diff = diff::cluster_diff_ptr_t(new diff::modify::update_peer_t(db_device, sha256));
-            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-            sup->do_process();
+            auto builder = diff_builder_t(*cluster);
+            builder.update_peer(sha256, "some_name", "some-cn", true).apply(*sup);
 
             auto device = cluster->get_devices().by_sha256(sha256);
             REQUIRE(device);
@@ -227,25 +213,15 @@ void test_folder_sharing() {
     struct F : fixture_t {
         void main() noexcept override {
             auto sha256 = peer_device->device_id().get_sha256();
-            db::Device db_device;
-            db_device.set_cert_name("some-cn");
-            db_device.set_name("some_name");
-            db_device.set_auto_accept(true);
+            auto folder_id = "1234-5678";
+            auto builder = diff_builder_t(*cluster);
+            builder.update_peer(sha256)
+                    .apply(*sup)
+                    .create_folder(folder_id, "/my/path")
+                    .configure_cluster(sha256).add(sha256, folder_id, 5, 4).finish()
+                    .share_folder(sha256, folder_id)
+                    .apply(*sup);
 
-            auto diffs = diff::aggregate_t::diffs_t{};
-            diffs.push_back(new diff::modify::update_peer_t(db_device, sha256));
-
-            db::Folder db_folder;
-            db_folder.set_id("1234-5678");
-            db_folder.set_label("my-label");
-            db_folder.set_path("/my/path");
-            diffs.push_back(new diff::modify::create_folder_t(db_folder));
-
-            diffs.push_back(new diff::modify::share_folder_t(sha256, db_folder.id(), 5));
-
-            auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-            sup->do_process();
             CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
             sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
@@ -256,13 +232,13 @@ void test_folder_sharing() {
 
             auto peer_device = cluster_clone->get_devices().by_sha256(sha256);
             REQUIRE(peer_device);
-            auto folder = cluster_clone->get_folders().by_id(db_folder.id());
+            auto folder = cluster_clone->get_folders().by_id(folder_id);
             REQUIRE(folder);
             REQUIRE(folder->get_folder_infos().size() == 2);
             auto fi = folder->get_folder_infos().by_device(peer_device);
             REQUIRE(fi);
             CHECK(fi->get_index() == 5);
-            CHECK(fi->get_max_sequence() == 0);
+            CHECK(fi->get_max_sequence() == 4);
         }
     };
 
@@ -272,46 +248,36 @@ void test_folder_sharing() {
 void test_cluster_update_and_remove() {
     struct F : fixture_t {
         void main() noexcept override {
-            using keys_t = diff::peer::cluster_remove_t::keys_t;
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto folder_id = "1234-5678";
 
-            std::uint64_t peer_index{5};
-            auto diffs = diff::aggregate_t::diffs_t{};
-            db::Folder db_folder;
-            db_folder.set_id("1234-5678");
-            db_folder.set_label("my-label");
-            db_folder.set_path("/my/path");
-            diffs.emplace_back(new diff::modify::create_folder_t(db_folder));
-
-            auto peer_id = peer_device->device_id().get_sha256();
-            db::Device db_peer;
-            db_peer.set_name("some_name");
-            diffs.emplace_back(new diff::modify::update_peer_t(db_peer, peer_id));
-            diffs.emplace_back(new diff::modify::share_folder_t(peer_id, db_folder.id(), peer_index));
-
-            auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-            sup->do_process();
-
-            proto::Index idx;
-            idx.set_folder(db_folder.id());
-            auto file = idx.add_files();
-            file->set_name("a.txt");
-            file->set_size(5ul);
-            file->set_block_size(5ul);
-            file->set_sequence(6ul);
-            auto b = file->add_blocks();
+            auto file = proto::FileInfo();
+            file.set_name("a.txt");
+            file.set_size(5ul);
+            file.set_block_size(5ul);
+            file.set_sequence(6ul);
+            auto b = file.add_blocks();
             b->set_size(5ul);
             b->set_hash(utils::sha256_digest("12345").value());
-            diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
 
-            sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
-            sup->do_process();
+            auto builder = diff_builder_t(*cluster);
+            builder.update_peer(sha256)
+                    .apply(*sup)
+                    .create_folder(folder_id, "/my/path")
+                    .configure_cluster(sha256).add(sha256, folder_id, 5, file.sequence()).finish()
+                    .share_folder(sha256, folder_id)
+                    .apply(*sup)
+                    .make_index(sha256, folder_id).add(file).finish()
+                    .apply(*sup)
+                    ;
 
             REQUIRE(cluster->get_blocks().size() == 1);
             auto block = cluster->get_blocks().get(b->hash());
             REQUIRE(block);
-            auto peer_folder_info =
-                cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(peer_device);
+
+            auto folder =  cluster->get_folders().by_id(folder_id);
+            auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
+
             REQUIRE(peer_folder_info);
             CHECK(peer_folder_info->get_max_sequence() == 6ul);
             REQUIRE(peer_folder_info->get_file_infos().size() == 1);
@@ -328,18 +294,20 @@ void test_cluster_update_and_remove() {
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
                 REQUIRE(cluster_clone->get_blocks().size() == 1);
                 CHECK(cluster_clone->get_blocks().get(b->hash()));
-                auto peer_folder_info =
-                    cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(peer_device);
+                auto folder = cluster_clone->get_folders().by_id(folder_id);
+                auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
                 REQUIRE(peer_folder_info);
                 REQUIRE(peer_folder_info->get_file_infos().size() == 1);
                 REQUIRE(peer_folder_info->get_file_infos().by_name("a.txt"));
             }
 
-            keys_t updated_folders{std::string(db_folder.id())};
+            using keys_t = diff::peer::cluster_remove_t::keys_t;
+            keys_t updated_folders{std::string(folder_id)};
             keys_t removed_folder_infos{std::string(peer_folder_info->get_key())};
             keys_t removed_files{std::string(peer_file->get_key())};
             keys_t removed_blocks{std::string(block->get_key())};
-            diff = new diff::peer::cluster_remove_t(peer_id, updated_folders, removed_folder_infos, removed_files,
+            auto diff = model::diff::cluster_diff_ptr_t{};
+            diff = new diff::peer::cluster_remove_t(sha256, updated_folders, removed_folder_infos, removed_files,
                                                     removed_blocks);
             sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
             sup->do_process();
@@ -353,11 +321,12 @@ void test_cluster_update_and_remove() {
             {
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
                 REQUIRE(cluster_clone->get_blocks().size() == 0);
-                auto &fis = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos();
+                auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                 REQUIRE(fis.size() == 1);
                 REQUIRE(!fis.by_device(peer_device));
                 REQUIRE(fis.by_device(cluster->get_device()));
             }
+
         }
     };
     F().run();
@@ -366,50 +335,38 @@ void test_cluster_update_and_remove() {
 void test_clone_file() {
     struct F : fixture_t {
         void main() noexcept override {
-            db::Folder db_folder;
-            db_folder.set_id("some-id");
-            db_folder.set_label("some-label");
 
-            auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-            sup->do_process();
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto folder_id = "1234-5678";
 
-            uint64_t peer_index = 5;
-
-            auto diffs = diff::aggregate_t::diffs_t{};
-            auto peer_id = peer_device->device_id().get_sha256();
-            db::Device db_peer;
-            db_peer.set_name("some_name");
-            diffs.emplace_back(new diff::modify::update_peer_t(db_peer, peer_id));
-            diffs.emplace_back(new diff::modify::share_folder_t(peer_id, db_folder.id(), peer_index));
-
-            diff = new diff::aggregate_t(std::move(diffs));
-            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-            sup->do_process();
-
-            proto::Index idx;
-            idx.set_folder(db_folder.id());
-            auto file = idx.add_files();
-            file->set_name("a.bin");
-            file->set_sequence(6ul);
-            auto version = file->mutable_version();
+            auto file = proto::FileInfo();
+            file.set_name("a.txt");
+            file.set_sequence(6ul);
+            auto version = file.mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1);
             counter->set_value(peer_device->as_uint());
 
-            SECTION("file without blocks") {
-                diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
-                sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
-                sup->do_process();
+            auto builder = diff_builder_t(*cluster);
+            builder.update_peer(sha256)
+                    .apply(*sup)
+                    .create_folder(folder_id, "/my/path")
+                    .configure_cluster(sha256).add(sha256, folder_id, 5, file.sequence()).finish()
+                    .share_folder(sha256, folder_id)
+                    .apply(*sup)
 
-                auto folder = cluster->get_folders().by_id(db_folder.id());
-                auto folder_my = folder->get_folder_infos().by_device(my_device);
-                auto folder_peer = folder->get_folder_infos().by_device(peer_device);
-                auto file_peer = folder_peer->get_file_infos().by_name(file->name());
+                    ;
+
+            auto folder = cluster->get_folders().by_id(folder_id);
+            auto folder_my = folder->get_folder_infos().by_device(my_device);
+            auto folder_peer = folder->get_folder_infos().by_device(peer_device);
+
+            SECTION("file without blocks") {
+                builder.make_index(sha256, folder_id).add(file).finish().apply(*sup);
+
+                auto file_peer = folder_peer->get_file_infos().by_name(file.name());
                 REQUIRE(file_peer);
-                diff = new diff::modify::clone_file_t(*file_peer);
-                sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
-                sup->do_process();
+                builder.clone_file(*file_peer).apply(*sup);
 
                 sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
                 sup->do_process();
@@ -420,38 +377,36 @@ void test_clone_file() {
                 {
                     REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
                     REQUIRE(cluster_clone->get_blocks().size() == 0);
-                    auto &fis = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos();
+                    auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
                     auto folder_info_clone = fis.by_device(cluster_clone->get_device());
-                    auto file_clone = folder_info_clone->get_file_infos().by_name(file->name());
+                    auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
                     REQUIRE(file_clone);
-                    REQUIRE(file_clone->get_name() == file->name());
+                    REQUIRE(file_clone->get_name() == file.name());
                     REQUIRE(file_clone->get_blocks().size() == 0);
                     REQUIRE(file_clone->get_sequence() == 1);
                     REQUIRE(!file_clone->get_source());
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
                 }
+
             }
 
             SECTION("file with blocks") {
-                file->set_size(5ul);
-                file->set_block_size(5ul);
-                auto b = file->add_blocks();
+                file.set_size(5ul);
+                file.set_block_size(5ul);
+                auto b = file.add_blocks();
                 b->set_size(5ul);
                 b->set_hash(utils::sha256_digest("12345").value());
 
-                diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
-                sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
-                sup->do_process();
+                builder.make_index(sha256, folder_id).add(file).finish().apply(*sup);
 
-                auto folder = cluster->get_folders().by_id(db_folder.id());
+                auto folder = cluster->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_infos().by_device(my_device);
                 auto folder_peer = folder->get_folder_infos().by_device(peer_device);
-                auto file_peer = folder_peer->get_file_infos().by_name(file->name());
+                auto file_peer = folder_peer->get_file_infos().by_name(file.name());
                 REQUIRE(file_peer);
-                diff = new diff::modify::clone_file_t(*file_peer);
-                sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
-                sup->do_process();
+
+                builder.clone_file(*file_peer).apply(*sup);
                 REQUIRE(folder_my->get_max_sequence() == 0);
 
                 {
@@ -463,25 +418,23 @@ void test_clone_file() {
                     auto cluster_clone = make_cluster();
                     REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
-                    auto &fis = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos();
+                    auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
                     auto folder_info_clone = fis.by_device(cluster_clone->get_device());
-                    auto file_clone = folder_info_clone->get_file_infos().by_name(file->name());
+                    auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
                     REQUIRE(file_clone);
-                    REQUIRE(file_clone->get_name() == file->name());
+                    REQUIRE(file_clone->get_name() == file.name());
                     REQUIRE(file_clone->get_blocks().size() == 1);
                     REQUIRE(file_clone->get_sequence() == 0);
                     REQUIRE(folder_info_clone->get_max_sequence() == 0);
                 }
 
-                file_peer = folder_peer->get_file_infos().by_name(file->name());
+                file_peer = folder_peer->get_file_infos().by_name(file.name());
                 file_peer->mark_local_available(0);
                 REQUIRE(file_peer->is_locally_available());
 
-                auto file_my = folder_my->get_file_infos().by_name(file->name());
-                diff = new diff::modify::finish_file_t(*file_my);
-                sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
-                sup->do_process();
+                auto file_my = folder_my->get_file_infos().by_name(file.name());
+                builder.finish_file(*file_my).apply(*sup);
 
                 {
                     sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
@@ -492,12 +445,12 @@ void test_clone_file() {
                     auto cluster_clone = make_cluster();
                     REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
-                    auto &fis = cluster_clone->get_folders().by_id(db_folder.id())->get_folder_infos();
+                    auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
                     auto folder_info_clone = fis.by_device(cluster_clone->get_device());
-                    auto file_clone = folder_info_clone->get_file_infos().by_name(file->name());
+                    auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
                     REQUIRE(file_clone);
-                    REQUIRE(file_clone->get_name() == file->name());
+                    REQUIRE(file_clone->get_name() == file.name());
                     REQUIRE(file_clone->get_blocks().size() == 1);
                     REQUIRE(file_clone->get_blocks().at(0));
                     REQUIRE(file_clone->get_sequence() == 1);

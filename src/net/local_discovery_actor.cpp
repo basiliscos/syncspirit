@@ -47,12 +47,14 @@ void local_discovery_actor_t::init() noexcept {
         return do_shutdown(make_error(ec));
     }
 
+#if 0
     auto listen_endpoint = udp::endpoint{asio::ip::address_v4::loopback(), port};
     sock.bind(listen_endpoint, ec);
     if (ec) {
         LOG_WARN(log, "{}, init, can't bind socket :: {}", identity, ec.message());
         return do_shutdown(make_error(ec));
     }
+#endif
 
     sock.set_option(udp_socket_t::broadcast(true), ec);
     if (ec) {

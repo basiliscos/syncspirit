@@ -112,7 +112,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
             }
         }
         assert(new_file->check_consistency());
-        folder_my->add(new_file);
+        folder_my->add(new_file, false);
     }
 
     return outcome::success();

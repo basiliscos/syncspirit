@@ -19,6 +19,11 @@ void file_iterator_t::append(file_info_t &file) noexcept {
 
     auto &folder_infos = file.get_folder_info()->get_folder()->get_folder_infos();
     auto local_folder = folder_infos.by_device(cluster.get_device());
+    auto zzz = folder_infos.by_device(peer)->get_file_infos().by_name(".thumbnails/.thumbdata3--1967290299");
+    if (zzz) {
+        printf("here!");
+    }
+
     auto local_file = local_folder->get_file_infos().by_name(file.get_name());
     if (!local_file) {
         if (!missing_done.count(&file)) {
@@ -91,7 +96,10 @@ void file_iterator_t::prepare() noexcept {
 file_iterator_t::operator bool() const noexcept { return (bool)file; }
 
 file_info_ptr_t file_iterator_t::next() noexcept {
-    auto r = file_info_ptr_t(file);
+    auto r = file_info_ptr_t(std::move(file));
     prepare();
+    if (r) {
+        return r->actualize();
+    }
     return r;
 }

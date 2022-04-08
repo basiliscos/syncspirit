@@ -175,6 +175,9 @@ void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resourc
     }
     cancel_timer();
     cancel_io();
+    if (resources->has(resource::finalization)) {
+        resources->release(resource::finalization);
+    }
     io_error = true;
     if (state < r::state_t::SHUTTING_DOWN) {
         if (!connected) {
@@ -298,7 +301,9 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
     assert(tx_item);
     if (tx_item->final) {
         LOG_TRACE(log, "{}, process_tx_queue, final message has been sent, shutting down", identity);
-        resources->release(resource::finalization);
+        if (resources->has(resource::finalization)) {
+            resources->release(resource::finalization);
+        }
         cancel_io();
     } else {
         tx_item.reset();

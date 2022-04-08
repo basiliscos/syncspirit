@@ -88,7 +88,7 @@ auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resul
         }
     }
 
-    folder_info->add(fi);
+    folder_info->add(fi, true);
     return outcome::success();
 }
 

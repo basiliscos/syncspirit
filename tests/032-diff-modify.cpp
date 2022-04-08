@@ -9,6 +9,7 @@
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/misc/error_code.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -87,6 +88,6 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         auto r = diff->apply(*cluster);
         REQUIRE(!r);
         auto err = r.error();
-        CHECK(err.message() == "device id is malformed (29)");
+        CHECK(err == error_code_t::malformed_deviceid);
     }
 }
