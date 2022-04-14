@@ -52,7 +52,6 @@ struct fixture_t {
 
         auto folder_id = "1234-5678";
 
-
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<error_msg_t>([&](error_msg_t &msg) { errors.push_back(&msg); }));
@@ -69,7 +68,6 @@ struct fixture_t {
         files = &folder_info->get_file_infos();
         folder_info_peer = folder->get_folder_infos().by_device(peer_device);
         files_peer = &folder_info_peer->get_file_infos();
-
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 

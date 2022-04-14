@@ -4,7 +4,7 @@
 
 using namespace syncspirit::model;
 
-static const constexpr char prefix = (char)(syncspirit::db::prefix::folder);
+static const constexpr char prefix = (char)(syncspirit::db::prefix::unknown_folder);
 
 outcome::result<unknown_folder_ptr_t> unknown_folder_t::create(std::string_view key,
                                                                const db::UnknownFolder &data) noexcept {

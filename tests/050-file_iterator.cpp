@@ -300,7 +300,6 @@ TEST_CASE("file iterator", "[model]") {
         REQUIRE(f_2);
         CHECK(f_2 == updated_file);
     }
-
 }
 
 TEST_CASE("file iterator for 2 folders", "[model]") {

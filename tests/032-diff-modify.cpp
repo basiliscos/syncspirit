@@ -55,19 +55,46 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         CHECK(fi->get_index() != 0);
     }
 
-    SECTION("share folder") {
+    SECTION("share folder (w/o unknown folder)") {
         auto diff_create = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
         REQUIRE(diff_create->apply(*cluster));
-        auto diff_share =
-            diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id()));
-        REQUIRE(diff_share->apply(*cluster));
 
-        auto folder = folders.by_id(db_folder.id());
-        REQUIRE(folder);
-        auto fi_peer = folder->get_folder_infos().by_device(peer_device);
-        REQUIRE(fi_peer);
-        CHECK(fi_peer->get_device() == peer_device);
-        CHECK(fi_peer->get_max_sequence() == 0);
+        SECTION("w/o unknown folder") {
+            auto diff_share =
+                diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id()));
+            REQUIRE(diff_share->apply(*cluster));
+
+            auto folder = folders.by_id(db_folder.id());
+            REQUIRE(folder);
+            auto fi_peer = folder->get_folder_infos().by_device(peer_device);
+            REQUIRE(fi_peer);
+            CHECK(fi_peer->get_device() == peer_device);
+            CHECK(fi_peer->get_max_sequence() == 0);
+        }
+
+        SECTION("with unknown folder") {
+            auto db_uf = db::UnknownFolder();
+            *db_uf.mutable_folder() = db_folder;
+            auto db_fi = db_uf.mutable_folder_info();
+            db_fi->set_index_id(2345);
+            db_fi->set_max_sequence(12);
+
+            auto uf = unknown_folder_t::create(cluster->next_uuid(), db_uf, peer_device->device_id()).value();
+            cluster->get_unknown_folders().emplace_front(uf);
+
+            auto diff_share =
+                diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id()));
+            REQUIRE(diff_share->apply(*cluster));
+
+            auto folder = folders.by_id(db_folder.id());
+            REQUIRE(folder);
+            auto fi_peer = folder->get_folder_infos().by_device(peer_device);
+            REQUIRE(fi_peer);
+            CHECK(fi_peer->get_device() == peer_device);
+            CHECK(fi_peer->get_max_sequence() == 12);
+            CHECK(fi_peer->get_index() == 2345);
+            CHECK(cluster->get_unknown_folders().empty());
+        }
     }
 
     SECTION("update peer") {

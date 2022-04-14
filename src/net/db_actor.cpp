@@ -252,6 +252,33 @@ void db_actor_t::on_model_update(model::message::model_update_t &message) noexce
     }
 }
 
+auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff) noexcept -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto &unknown = cluster->get_unknown_folders();
+    if (unknown.empty()) {
+        return outcome::success();
+    }
+
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+    for (auto &uf : unknown) {
+        auto key = uf->get_key();
+        auto data = uf->serialize();
+
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+    return commit(true);
+}
+
 auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -438,6 +465,12 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_remove_t &diff) noe
         }
     }
     for (auto &key : diff.removed_blocks) {
+        auto r = db::remove(key, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+    for (auto &key : diff.removed_unknown_folders) {
         auto r = db::remove(key, txn);
         if (!r) {
             return r.assume_error();

@@ -72,9 +72,12 @@ struct fixture_t {
         file_addr = file_actor->get_address();
 
         auto builder = diff_builder_t(*cluster);
-        builder.create_folder(folder_id, root_path.string(), "my-label").apply(*sup)
-               .update_peer(sha256, "some_name", "some-cn", true).apply(*sup)
-               .share_folder(sha256, folder_id).apply(*sup);
+        builder.create_folder(folder_id, root_path.string(), "my-label")
+            .apply(*sup)
+            .update_peer(sha256, "some_name", "some-cn", true)
+            .apply(*sup)
+            .share_folder(sha256, folder_id)
+            .apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
         folder_my = folder->get_folder_infos().by_device(my_device);
@@ -273,8 +276,7 @@ void test_append_block() {
 
                 auto file = folder_my->get_file_infos().by_name(pr_source.name());
 
-                builder.append_block(*peer_file, 0, "12345").apply(*sup)
-                    .flush_file(*peer_file).apply(*sup);
+                builder.append_block(*peer_file, 0, "12345").apply(*sup).flush_file(*peer_file).apply(*sup);
 
                 auto path = root_path / std::string(file->get_name());
                 REQUIRE(bfs::exists(path));
@@ -374,7 +376,6 @@ void test_clone_block() {
 
             auto builder = diff_builder_t(*cluster);
 
-
             SECTION("source & target are different files") {
                 proto::FileInfo pr_target;
                 pr_target.set_name("b.txt");
@@ -394,8 +395,7 @@ void test_clone_block() {
                     auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
                     auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
 
-                    builder.append_block(*source_file, 0, "12345").apply(*sup)
-                            .flush_file(*source_file).apply(*sup);
+                    builder.append_block(*source_file, 0, "12345").apply(*sup).flush_file(*source_file).apply(*sup);
 
                     auto block = source_file->get_blocks()[0];
                     auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
@@ -443,7 +443,6 @@ void test_clone_block() {
                     auto source = file_info_t::create(cluster->next_uuid(), pr_source, folder_peer).value();
                     source->assign_block(blocks[1], 0);
                     folder_peer->add(source, false);
-
 
                     builder.clone_file(*source).clone_file(*target).apply(*sup);
 

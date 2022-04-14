@@ -17,17 +17,22 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     }
 
     auto &devices = cluster.get_devices();
+    auto &unknown = cluster.get_unknown_folders();
+
     auto peer = devices.by_sha256(peer_id);
     if (!peer) {
         return make_error_code(error_code_t::device_does_not_exist);
     }
     auto index = uint64_t{0};
     auto max_sequence = int64_t{0};
+    auto unknown_it = unknown.end();
 
-    for (auto &uf : cluster.get_unknown_folders()) {
-        if (uf->device_id() == peer->device_id() && uf->get_id() == folder_id) {
-            index = uf->get_index();
-            max_sequence = uf->get_max_sequence();
+    for (auto it = unknown.begin(), prev = unknown.before_begin(); it != unknown.end(); prev = it, ++it) {
+        auto &uf = **it;
+        if (uf.device_id() == peer->device_id() && uf.get_id() == folder_id) {
+            index = uf.get_index();
+            max_sequence = uf.get_max_sequence();
+            unknown_it = prev;
             break;
         }
     }
@@ -49,6 +54,9 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
 
     auto &fi = fi_opt.value();
     folder->add(fi);
+    if (index) {
+        unknown.erase_after(unknown_it);
+    }
 
     return outcome::success();
 }

@@ -154,8 +154,9 @@ struct fixture_t {
     using peer_ptr_t = r::intrusive_ptr_t<sample_peer_t>;
     using target_ptr_t = r::intrusive_ptr_t<net::controller_actor_t>;
 
-    fixture_t(bool auto_start_, int64_t max_sequence_) noexcept : auto_start{auto_start_}, max_sequence{max_sequence_}
-    { utils::set_default("trace"); }
+    fixture_t(bool auto_start_, int64_t max_sequence_) noexcept : auto_start{auto_start_}, max_sequence{max_sequence_} {
+        utils::set_default("trace");
+    }
 
     virtual void run() noexcept {
         auto peer_id =
@@ -175,9 +176,11 @@ struct fixture_t {
         auto builder = diff_builder_t(*cluster);
         auto sha256 = peer_id.get_sha256();
         builder.create_folder(folder_id_1, "")
-                .create_folder(folder_id_2, "")
-                .configure_cluster(sha256).add(sha256, folder_id_1, 123, max_sequence).finish()
-                .share_folder(peer_id.get_sha256(), folder_id_1);
+            .create_folder(folder_id_2, "")
+            .configure_cluster(sha256)
+            .add(sha256, folder_id_1, 123, max_sequence)
+            .finish()
+            .share_folder(peer_id.get_sha256(), folder_id_1);
 
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
@@ -201,6 +204,8 @@ struct fixture_t {
         auto &folders = cluster->get_folders();
         folder_1 = folders.by_id(folder_id_1);
         folder_2 = folders.by_id(folder_id_2);
+
+        folder_1_peer = folder_1->get_folder_infos().by_device_id(peer_id.get_sha256());
 
         target = sup->create_actor<controller_actor_t>()
                      .peer(peer_device)
@@ -231,7 +236,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual void main(diff_builder_t&) noexcept {}
+    virtual void main(diff_builder_t &) noexcept {}
 
     bool auto_start;
     int64_t max_sequence;
@@ -245,6 +250,7 @@ struct fixture_t {
     r::intrusive_ptr_t<supervisor_t> sup;
     r::system_context_t ctx;
     model::folder_ptr_t folder_1;
+    model::folder_info_ptr_t folder_1_peer;
     model::folder_ptr_t folder_2;
 };
 
@@ -253,7 +259,7 @@ struct fixture_t {
 void test_startup() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
-        void main(diff_builder_t&) noexcept override {
+        void main(diff_builder_t &) noexcept override {
             REQUIRE(peer_actor->reading);
             REQUIRE(peer_actor->messages.size() == 1);
             auto &msg = (*peer_actor->messages.front()).payload;
@@ -273,7 +279,7 @@ void test_startup() {
 void test_index() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
-        void main(diff_builder_t& builder) noexcept override {
+        void main(diff_builder_t &builder) noexcept override {
 
             auto cc = proto::ClusterConfig{};
             auto index = proto::Index{};
@@ -294,16 +300,16 @@ void test_index() {
                 folder->set_id(std::string(folder_1->get_id()));
                 auto d_peer = folder->add_devices();
                 d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-                auto uf = cluster->get_unknown_folders().front();
-                d_peer->set_max_sequence(uf->get_max_sequence());
-                d_peer->set_index_id(uf->get_index());
+                REQUIRE(cluster->get_unknown_folders().empty());
+                d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
+                d_peer->set_index_id(folder_1_peer->get_index());
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
 
                 index.set_folder(std::string(folder_1->get_id()));
                 auto file = index.add_files();
                 file->set_name("some-dir");
                 file->set_type(proto::FileInfoType::DIRECTORY);
-                file->set_sequence(uf->get_max_sequence());
+                file->set_sequence(folder_1_peer->get_max_sequence());
                 peer_actor->forward(proto::message::Index(new proto::Index(index)));
                 sup->do_process();
 
@@ -330,7 +336,7 @@ void test_index() {
                     auto file = index_update.add_files();
                     file->set_name("some-dir-2");
                     file->set_type(proto::FileInfoType::DIRECTORY);
-                    file->set_sequence(uf->get_max_sequence() + 1);
+                    file->set_sequence(folder_1_peer->get_max_sequence() + 1);
                     peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
 
                     sup->do_process();
@@ -355,9 +361,7 @@ void test_index() {
 void test_downloading() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
-        void main(diff_builder_t& builder) noexcept override {
-            auto uf = cluster->get_unknown_folders().front();
-
+        void main(diff_builder_t &builder) noexcept override {
             auto &folder_infos = folder_1->get_folder_infos();
             auto folder_my = folder_infos.by_device(my_device);
 
@@ -366,8 +370,8 @@ void test_downloading() {
             folder->set_id(std::string(folder_1->get_id()));
             auto d_peer = folder->add_devices();
             d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(uf->get_max_sequence());
-            d_peer->set_index_id(uf->get_index());
+            d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
+            d_peer->set_index_id(folder_1_peer->get_index());
 
             SECTION("cluster config & index has a new file => download it") {
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
@@ -377,7 +381,7 @@ void test_downloading() {
                 auto file = index.add_files();
                 file->set_name("some-file");
                 file->set_type(proto::FileInfoType::FILE);
-                file->set_sequence(uf->get_max_sequence());
+                file->set_sequence(folder_1_peer->get_max_sequence());
                 file->set_block_size(5);
                 file->set_size(5);
                 auto version = file->mutable_version();
@@ -412,7 +416,7 @@ void test_downloading() {
                 SECTION("dont redownload file only if metadata has changed") {
                     auto index_update = proto::IndexUpdate{};
                     index_update.set_folder(index.folder());
-                    file->set_sequence(uf->get_max_sequence() + 1);
+                    file->set_sequence(folder_1_peer->get_max_sequence() + 1);
                     counter->set_value(2ul);
 
                     *index_update.add_files() = *file;
@@ -431,7 +435,7 @@ void test_downloading() {
                 auto pr_fi = proto::FileInfo{};
                 pr_fi.set_name("some-file");
                 pr_fi.set_type(proto::FileInfoType::FILE);
-                pr_fi.set_sequence(uf->get_max_sequence());
+                pr_fi.set_sequence(folder_1_peer->get_max_sequence());
                 pr_fi.set_block_size(5);
                 pr_fi.set_size(5);
                 auto version = pr_fi.mutable_version();
@@ -470,7 +474,7 @@ void test_downloading() {
                 auto pr_fi = proto::FileInfo{};
                 pr_fi.set_name("some-file");
                 pr_fi.set_type(proto::FileInfoType::FILE);
-                pr_fi.set_sequence(uf->get_max_sequence());
+                pr_fi.set_sequence(folder_1_peer->get_max_sequence());
                 pr_fi.set_block_size(5);
                 pr_fi.set_size(5);
                 auto b1 = pr_fi.add_blocks();
@@ -483,21 +487,21 @@ void test_downloading() {
                 file_info->assign_block(b, 0);
                 folder_peer->add(file_info, true);
 
-                d_peer->set_max_sequence(uf->get_max_sequence() + 1);
+                d_peer->set_max_sequence(folder_1_peer->get_max_sequence() + 1);
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
                 sup->do_process();
 
-                auto index = proto::Index{};
+                auto index = proto::IndexUpdate{};
                 index.set_folder(std::string(folder_1->get_id()));
                 auto file = index.add_files();
                 file->set_name("some-file");
                 file->set_type(proto::FileInfoType::FILE);
                 file->set_deleted(true);
-                file->set_sequence(uf->get_max_sequence() + 1);
+                file->set_sequence(folder_1_peer->get_max_sequence() + 1);
                 file->set_block_size(0);
                 file->set_size(0);
 
-                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index)));
                 sup->do_process();
 
                 CHECK(folder_my->get_max_sequence() == 1ul);
@@ -526,7 +530,7 @@ void test_downloading() {
                 auto file = index_update.add_files();
                 file->set_name("some-file");
                 file->set_type(proto::FileInfoType::FILE);
-                file->set_sequence(uf->get_max_sequence() + 1);
+                file->set_sequence(folder_1_peer->get_max_sequence() + 1);
                 file->set_block_size(5);
                 file->set_size(5);
                 auto version = file->mutable_version();
@@ -564,7 +568,7 @@ void test_downloading() {
                 auto file_1 = index.add_files();
                 file_1->set_name("some-file");
                 file_1->set_type(proto::FileInfoType::FILE);
-                file_1->set_sequence(uf->get_max_sequence());
+                file_1->set_sequence(folder_1_peer->get_max_sequence());
                 file_1->set_deleted(true);
                 auto v1 = file_1->mutable_version();
                 auto c1 = v1->add_counters();
@@ -582,7 +586,7 @@ void test_downloading() {
                 auto file_2 = index_update.add_files();
                 file_2->set_name("some-file");
                 file_2->set_type(proto::FileInfoType::FILE);
-                file_2->set_sequence(uf->get_max_sequence() + 1);
+                file_2->set_sequence(folder_1_peer->get_max_sequence() + 1);
                 file_2->set_block_size(128 * 1024);
                 file_2->set_size(5);
                 auto v2 = file_2->mutable_version();
@@ -609,7 +613,6 @@ void test_downloading() {
                 CHECK(!f->is_locked());
             }
 
-
             SECTION("download a file, which has the same blocks locally") {
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
                 sup->do_process();
@@ -619,7 +622,7 @@ void test_downloading() {
                 auto file_1 = index.add_files();
                 file_1->set_name("some-file");
                 file_1->set_type(proto::FileInfoType::FILE);
-                file_1->set_sequence(uf->get_max_sequence());
+                file_1->set_sequence(folder_1_peer->get_max_sequence());
                 auto v1 = file_1->mutable_version();
                 auto c1 = v1->add_counters();
                 c1->set_id(1u);

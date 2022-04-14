@@ -16,7 +16,7 @@ struct cluster_remove_t final : cluster_diff_t {
     using keys_t = std::set<std::string>;
 
     cluster_remove_t(std::string_view source_device, keys_t updated_folders_, keys_t removed_folder_infos_,
-                     keys_t removed_files_, keys_t removed_blocks_) noexcept;
+                     keys_t removed_files_, keys_t removed_blocks_, keys_t removed_unknown_folders_) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
@@ -26,6 +26,7 @@ struct cluster_remove_t final : cluster_diff_t {
     keys_t removed_folder_infos;
     keys_t removed_files;
     keys_t removed_blocks;
+    keys_t removed_unknown_folders;
 };
 
 } // namespace syncspirit::model::diff::peer

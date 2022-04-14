@@ -108,8 +108,8 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     }
 
     ptr = new cluster_update_t(source, std::move(unknown), std::move(reset), std::move(updated), removed_blocks,
-                               std::move(removed_unknown_folders));
-    bool wrap = !removed_blocks.empty() || !removed_folders.empty();
+                               removed_unknown_folders);
+    bool wrap = !removed_blocks.empty() || !removed_folders.empty() || !removed_unknown_folders.empty();
     if (wrap) {
         keys_t updated_folders;
         for (auto &info : updated) {
@@ -118,7 +118,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
 
         auto remove = cluster_diff_ptr_t(new cluster_remove_t(
             source.device_id().get_sha256(), std::move(updated_folders), std::move(removed_folders),
-            std::move(removed_files_final), std::move(removed_blocks)));
+            std::move(removed_files_final), std::move(removed_blocks), std::move(removed_unknown_folders)));
         auto diffs = aggregate_t::diffs_t{std::move(ptr), std::move(remove)};
         auto container = cluster_diff_ptr_t(new aggregate_t(std::move(diffs)));
         return outcome::success(std::move(container));

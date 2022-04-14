@@ -216,11 +216,13 @@ void test_folder_sharing() {
             auto folder_id = "1234-5678";
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(sha256)
-                    .apply(*sup)
-                    .create_folder(folder_id, "/my/path")
-                    .configure_cluster(sha256).add(sha256, folder_id, 5, 4).finish()
-                    .share_folder(sha256, folder_id)
-                    .apply(*sup);
+                .apply(*sup)
+                .create_folder(folder_id, "/my/path")
+                .configure_cluster(sha256)
+                .add(sha256, folder_id, 5, 4)
+                .finish()
+                .share_folder(sha256, folder_id)
+                .apply(*sup);
 
             CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
@@ -250,6 +252,7 @@ void test_cluster_update_and_remove() {
         void main() noexcept override {
             auto sha256 = peer_device->device_id().get_sha256();
             auto folder_id = "1234-5678";
+            auto unknown_folder_id = "5678-999";
 
             auto file = proto::FileInfo();
             file.set_name("a.txt");
@@ -262,20 +265,24 @@ void test_cluster_update_and_remove() {
 
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(sha256)
-                    .apply(*sup)
-                    .create_folder(folder_id, "/my/path")
-                    .configure_cluster(sha256).add(sha256, folder_id, 5, file.sequence()).finish()
-                    .share_folder(sha256, folder_id)
-                    .apply(*sup)
-                    .make_index(sha256, folder_id).add(file).finish()
-                    .apply(*sup)
-                    ;
+                .apply(*sup)
+                .create_folder(folder_id, "/my/path")
+                .configure_cluster(sha256)
+                .add(sha256, folder_id, 5, file.sequence())
+                .add(sha256, unknown_folder_id, 5, 5)
+                .finish()
+                .share_folder(sha256, folder_id)
+                .apply(*sup)
+                .make_index(sha256, folder_id)
+                .add(file)
+                .finish()
+                .apply(*sup);
 
             REQUIRE(cluster->get_blocks().size() == 1);
             auto block = cluster->get_blocks().get(b->hash());
             REQUIRE(block);
 
-            auto folder =  cluster->get_folders().by_id(folder_id);
+            auto folder = cluster->get_folders().by_id(folder_id);
             auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
 
             REQUIRE(peer_folder_info);
@@ -283,6 +290,9 @@ void test_cluster_update_and_remove() {
             REQUIRE(peer_folder_info->get_file_infos().size() == 1);
             auto peer_file = peer_folder_info->get_file_infos().by_name("a.txt");
             REQUIRE(peer_file);
+
+            auto &unknown_folders = cluster->get_unknown_folders();
+            CHECK(std::distance(unknown_folders.begin(), unknown_folders.end()) == 1);
 
             sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
@@ -299,16 +309,19 @@ void test_cluster_update_and_remove() {
                 REQUIRE(peer_folder_info);
                 REQUIRE(peer_folder_info->get_file_infos().size() == 1);
                 REQUIRE(peer_folder_info->get_file_infos().by_name("a.txt"));
+                REQUIRE(!cluster_clone->get_unknown_folders().empty());
             }
 
+            auto &uf = *cluster->get_unknown_folders().front();
             using keys_t = diff::peer::cluster_remove_t::keys_t;
             keys_t updated_folders{std::string(folder_id)};
             keys_t removed_folder_infos{std::string(peer_folder_info->get_key())};
             keys_t removed_files{std::string(peer_file->get_key())};
             keys_t removed_blocks{std::string(block->get_key())};
+            keys_t removed_unknown_folders{std::string(uf.get_key())};
             auto diff = model::diff::cluster_diff_ptr_t{};
             diff = new diff::peer::cluster_remove_t(sha256, updated_folders, removed_folder_infos, removed_files,
-                                                    removed_blocks);
+                                                    removed_blocks, removed_unknown_folders);
             sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
             sup->do_process();
 
@@ -325,8 +338,8 @@ void test_cluster_update_and_remove() {
                 REQUIRE(fis.size() == 1);
                 REQUIRE(!fis.by_device(peer_device));
                 REQUIRE(fis.by_device(cluster->get_device()));
+                REQUIRE(cluster_clone->get_unknown_folders().empty());
             }
-
         }
     };
     F().run();
@@ -349,13 +362,15 @@ void test_clone_file() {
 
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(sha256)
-                    .apply(*sup)
-                    .create_folder(folder_id, "/my/path")
-                    .configure_cluster(sha256).add(sha256, folder_id, 5, file.sequence()).finish()
-                    .share_folder(sha256, folder_id)
-                    .apply(*sup)
+                .apply(*sup)
+                .create_folder(folder_id, "/my/path")
+                .configure_cluster(sha256)
+                .add(sha256, folder_id, 5, file.sequence())
+                .finish()
+                .share_folder(sha256, folder_id)
+                .apply(*sup)
 
-                    ;
+                ;
 
             auto folder = cluster->get_folders().by_id(folder_id);
             auto folder_my = folder->get_folder_infos().by_device(my_device);
@@ -388,7 +403,6 @@ void test_clone_file() {
                     REQUIRE(!file_clone->get_source());
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
                 }
-
             }
 
             SECTION("file with blocks") {
