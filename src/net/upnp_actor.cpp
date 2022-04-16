@@ -88,7 +88,7 @@ void upnp_actor_t::request_finish() noexcept {
 }
 
 void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
-    LOG_TRACE(log, "{}, on_igd_description, state = {}", identity, state);
+    LOG_TRACE(log, "{}, on_igd_description, state = {}", identity, (int)state);
     request_finish();
 
     auto &ee = msg.payload.ee;

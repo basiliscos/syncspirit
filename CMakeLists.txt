@@ -3,9 +3,10 @@ project (syncspirit)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# does not works because of pugixml
 #set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 #set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
-#cmake_policy(SET CMP0063 OLD)
+#cmake_policy(SET CMP0063 NEW)
 
 include(GenerateExportHeader)
 set(CMAKE_POSITION_INDEPENDENT_CODE True)
@@ -161,6 +162,8 @@ set(LZ4_BUILD_CLI false CACHE BOOL "LZ4_BUILD_CLI")
 set(LZ4_BUILD_LEGACY_LZ4C false CACHE BOOL "LZ4_BUILD_LEGACY_LZ4C")
 set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
 
+set(PUGIXML_NO_EXCEPTIONS on)
+
 add_subdirectory("lib/spdlog")
 add_subdirectory("lib/lz4/build/cmake/")
 add_subdirectory("lib/pugixml")
@@ -168,7 +171,6 @@ add_subdirectory("lib/rotor")
 add_subdirectory("lib/uriparser")
 add_subdirectory("lib/mbdx")
 
-target_compile_definitions(pugixml PUBLIC "PUGIXML_NO_EXCEPTIONS")
 
 target_include_directories(syncspirit_lib PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/rotor/include
