@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #pragma once
+
 #include <string>
 #include <system_error>
 #include <boost/system/error_code.hpp>
+#include "syncspirit-export.h"
 
 namespace syncspirit::utils {
 
@@ -93,35 +95,35 @@ enum class request_error_code_t {
 
 namespace detail {
 
-class error_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API error_code_category : public boost::system::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
 
-class bep_error_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API bep_error_code_category : public boost::system::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
 
-class protocol_error_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API protocol_error_code_category : public boost::system::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
 
-class request_error_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API request_error_code_category : public boost::system::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
 
 } // namespace detail
 
-const detail::error_code_category &error_code_category();
+SYNCSPIRIT_API const detail::error_code_category &error_code_category();
 
-const detail::bep_error_code_category &bep_error_code_category();
+SYNCSPIRIT_API const detail::bep_error_code_category &bep_error_code_category();
 
-const detail::protocol_error_code_category &protocol_error_code_category();
+SYNCSPIRIT_API const detail::protocol_error_code_category &protocol_error_code_category();
 
-const detail::request_error_code_category &request_error_code_category();
+SYNCSPIRIT_API const detail::request_error_code_category &request_error_code_category();
 
 inline boost::system::error_code make_error_code(error_code_t e) {
     return {static_cast<int>(e), error_code_category()};

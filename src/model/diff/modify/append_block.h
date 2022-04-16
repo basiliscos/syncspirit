@@ -8,7 +8,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct append_block_t final : block_diff_t {
+struct SYNCSPIRIT_API append_block_t final : block_diff_t {
 
     append_block_t(const file_info_t &file, size_t block_index, std::string data) noexcept;
 

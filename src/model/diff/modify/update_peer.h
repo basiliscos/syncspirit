@@ -8,7 +8,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct update_peer_t final : cluster_diff_t {
+struct SYNCSPIRIT_API update_peer_t final : cluster_diff_t {
 
     template <typename T>
     update_peer_t(T &&item_, std::string_view peer_id_) noexcept : item{std::forward<T>(item_)}, peer_id{peer_id_} {}

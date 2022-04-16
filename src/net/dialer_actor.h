@@ -39,7 +39,7 @@ template <typename Actor> struct dialer_actor_config_builder_t : r::actor_config
     }
 };
 
-struct dialer_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
+struct SYNCSPIRIT_API dialer_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = dialer_actor_config_t;
     template <typename Actor> using config_builder_t = dialer_actor_config_builder_t<Actor>;
 

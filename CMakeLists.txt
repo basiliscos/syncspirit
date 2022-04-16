@@ -3,9 +3,12 @@ project (syncspirit)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
-cmake_policy(SET CMP0063 NEW)
+#set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+#set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+#cmake_policy(SET CMP0063 OLD)
+
+include(GenerateExportHeader)
+set(CMAKE_POSITION_INDEPENDENT_CODE True)
 
 find_package(
     Boost
@@ -21,10 +24,26 @@ find_package(Protobuf REQUIRED)
 find_package(ZLIB REQUIRED)
 
 set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src)
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
+protobuf_generate_cpp(
+    PROTO_SRCS PROTO_HDRS
+    EXPORT_MACRO SYNCSPIRIT_API
     src/protobuf/bep.proto
     src/protobuf/structs.proto
 )
+add_library(syncspirit_pb ${PROTO_SRCS})
+generate_export_header(syncspirit_pb
+    EXPORT_MACRO_NAME SYNCSPIRIT_API
+    EXPORT_FILE_NAME include/syncspirit-export.h
+)
+target_compile_options(syncspirit_pb PRIVATE
+    -include ${CMAKE_CURRENT_BINARY_DIR}/include/syncspirit-export.h
+)
+target_include_directories(syncspirit_pb PUBLIC
+    ${Protobuf_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}/include
+)
+target_link_libraries(syncspirit_pb protobuf::libprotobuf)
 
 add_library(syncspirit_lib
     src/constants.cpp
@@ -129,7 +148,6 @@ add_library(syncspirit_lib
     src/utils/platform.cpp
     src/utils/tls.cpp
     src/utils/uri.cpp
-    ${PROTO_SRCS}
 )
 
 set(BUILD_BOOST_ASIO true CACHE BOOL "BUILD_BOOST_ASIO")
@@ -164,23 +182,28 @@ target_include_directories(syncspirit_lib PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/mbdx
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
-    ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}
-    ${syncspirit_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_link_libraries(syncspirit_lib
-    rotor_asio
-    rotor_thread
+    syncspirit_pb
+    rotor::asio
+    rotor::thread
     pugixml
+    Boost::iostreams
+    Boost::filesystem
+    Boost::program_options
+    Boost::system
     ${Boost_LIBRARIES}
     OpenSSL::SSL
-    protobuf::libprotobuf
     spdlog::spdlog
     uriparser
     lz4_static
     ZLIB::ZLIB
     mdbx-static
-    $<$<PLATFORM_ID:Windows>:iphlpapi ws2_32>
+    $<$<PLATFORM_ID:Windows>:iphlpapi>
+    $<$<PLATFORM_ID:Windows>:ws2_32>
 )
 
 enable_testing()

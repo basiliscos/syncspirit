@@ -13,7 +13,7 @@ namespace syncspirit::model::diff::modify {
 namespace asio = boost::asio;
 using tcp = asio::ip::tcp;
 
-struct connect_request_t final : contact_diff_t {
+struct SYNCSPIRIT_API connect_request_t final : contact_diff_t {
     using socket_ptr_t = std::unique_ptr<tcp::socket>;
     using mutex_t = std::mutex;
 

@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #pragma once
+
 #include <cstddef>
 #include <string>
 #include "mdbx.h"
+#include "syncspirit-export.h"
 
 namespace syncspirit::db {
 
@@ -22,7 +24,7 @@ static const constexpr discr_t unknown_folder{0x16};
 static const constexpr discr_t block_info{0x17};
 } // namespace prefix
 
-struct value_t {
+struct SYNCSPIRIT_API value_t {
     std::string bytes;
     MDBX_val value;
 
@@ -37,13 +39,23 @@ struct value_t {
 
 template <discr_t> struct prefixer_t;
 
-template <> struct prefixer_t<prefix::misc> { static value_t make(std::string_view name) noexcept; };
-template <> struct prefixer_t<prefix::device> { static value_t make(std::uint64_t db_key) noexcept; };
-template <> struct prefixer_t<prefix::folder> { static value_t make(std::uint64_t db_key) noexcept; };
-template <> struct prefixer_t<prefix::folder_info> { static value_t make(std::uint64_t db_key) noexcept; };
-template <> struct prefixer_t<prefix::file_info> { static value_t make(const std::string &db_key) noexcept; };
-template <> struct prefixer_t<prefix::ignored_device> { static value_t make(const std::string &db_key) noexcept; };
-template <> struct prefixer_t<prefix::ignored_folder> { static value_t make(const std::string &db_key) noexcept; };
-template <> struct prefixer_t<prefix::block_info> { static value_t make(std::uint64_t db_key) noexcept; };
+template <> struct prefixer_t<prefix::misc> { static SYNCSPIRIT_API value_t make(std::string_view name) noexcept; };
+template <> struct prefixer_t<prefix::device> { static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept; };
+template <> struct prefixer_t<prefix::folder> { static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept; };
+template <> struct prefixer_t<prefix::folder_info> {
+    static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept;
+};
+template <> struct prefixer_t<prefix::file_info> {
+    static SYNCSPIRIT_API value_t make(const std::string &db_key) noexcept;
+};
+template <> struct prefixer_t<prefix::ignored_device> {
+    static SYNCSPIRIT_API value_t make(const std::string &db_key) noexcept;
+};
+template <> struct prefixer_t<prefix::ignored_folder> {
+    static SYNCSPIRIT_API value_t make(const std::string &db_key) noexcept;
+};
+template <> struct prefixer_t<prefix::block_info> {
+    static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept;
+};
 
 } // namespace syncspirit::db

@@ -8,7 +8,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct finish_file_t final : cluster_diff_t {
+struct SYNCSPIRIT_API finish_file_t final : cluster_diff_t {
     finish_file_t(const model::file_info_t &file) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;

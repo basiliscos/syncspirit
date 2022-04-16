@@ -5,14 +5,14 @@
 
 #include <memory>
 #include <set>
-#include "proto/bep_support.h"
 #include "../cluster_diff.h"
 #include "model/device.h"
 #include "model/folder_info.h"
+#include "proto/bep_support.h"
 
 namespace syncspirit::model::diff::peer {
 
-struct cluster_remove_t final : cluster_diff_t {
+struct SYNCSPIRIT_API cluster_remove_t final : cluster_diff_t {
     using keys_t = std::set<std::string>;
 
     cluster_remove_t(std::string_view source_device, keys_t updated_folders_, keys_t removed_folder_infos_,

@@ -12,7 +12,7 @@ namespace syncspirit::model::diff::peer {
 namespace r = rotor;
 using tcp = boost::asio::ip::tcp;
 
-struct peer_state_t final : cluster_diff_t {
+struct SYNCSPIRIT_API peer_state_t final : cluster_diff_t {
 
     peer_state_t(cluster_t &cluster, std::string_view peer_id_, const r::address_ptr_t &peer_addr_, bool online_,
                  std::string cert_name_ = {}, tcp::endpoint endpoint_ = {},

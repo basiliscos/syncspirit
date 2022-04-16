@@ -6,6 +6,7 @@
 #include "misc/arc.hpp"
 #include "misc/map.hpp"
 #include "device_id.h"
+#include "syncspirit-export.h"
 #include <boost/outcome.hpp>
 
 namespace syncspirit::model {
@@ -16,7 +17,7 @@ struct ignored_device_t;
 
 using ignored_device_ptr_t = intrusive_ptr_t<ignored_device_t>;
 
-struct ignored_device_t final : arc_base_t<ignored_device_t> {
+struct SYNCSPIRIT_API ignored_device_t final : arc_base_t<ignored_device_t> {
 
     static outcome::result<ignored_device_ptr_t> create(const device_id_t &) noexcept;
     static outcome::result<ignored_device_ptr_t> create(std::string_view key, std::string_view data) noexcept;

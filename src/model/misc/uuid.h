@@ -5,12 +5,13 @@
 
 #include <string_view>
 #include <boost/uuid/uuid.hpp>
+#include "syncspirit-export.h"
 
 namespace syncspirit::model {
 
 static const constexpr size_t uuid_length = 16;
 using uuid_t = boost::uuids::uuid;
 
-void assign(uuid_t &, std::string_view source) noexcept;
+SYNCSPIRIT_API void assign(uuid_t &, std::string_view source) noexcept;
 
 } // namespace syncspirit::model

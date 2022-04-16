@@ -6,13 +6,14 @@
 #include <vector>
 #include "arc.hpp"
 #include "../block_info.h"
+#include "syncspirit-export.h"
 
 namespace syncspirit::model {
 
 struct folder_info_t;
 struct file_info_t;
 
-struct blocks_iterator_t : arc_base_t<blocks_iterator_t> {
+struct SYNCSPIRIT_API blocks_iterator_t : arc_base_t<blocks_iterator_t> {
     using blocks_t = std::vector<block_info_ptr_t>;
 
     blocks_iterator_t(file_info_t &source) noexcept;

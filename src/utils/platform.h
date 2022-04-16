@@ -3,11 +3,13 @@
 
 #pragma once
 
+#include "syncspirit-export.h"
+
 namespace syncspirit::utils {
 
 struct platform_t {
-    static void startup();
-    static void shutdhown() noexcept;
+    SYNCSPIRIT_API static void startup();
+    SYNCSPIRIT_API static void shutdhown() noexcept;
 };
 
 } // namespace syncspirit::utils

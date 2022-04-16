@@ -19,7 +19,7 @@ using tx_fn_t = std::function<bool(transaction_t &)>;
 
 enum class transaction_type_t { RO, RW };
 
-struct transaction_t {
+struct SYNCSPIRIT_API transaction_t {
     transaction_t() noexcept : txn{nullptr} {};
     transaction_t(transaction_t &&other) noexcept;
     ~transaction_t();
@@ -41,8 +41,8 @@ struct transaction_t {
         : txn{txn_}, dbi{dbi_}, type{type_} {}
 };
 
-outcome::result<transaction_t> make_transaction(transaction_type_t type, MDBX_env *env_) noexcept;
-outcome::result<transaction_t> make_transaction(transaction_type_t type, transaction_t &prev) noexcept;
+SYNCSPIRIT_API outcome::result<transaction_t> make_transaction(transaction_type_t type, MDBX_env *env_) noexcept;
+SYNCSPIRIT_API outcome::result<transaction_t> make_transaction(transaction_type_t type, transaction_t &prev) noexcept;
 
 } // namespace db
 } // namespace syncspirit

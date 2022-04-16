@@ -129,7 +129,7 @@ struct block_response_t {
     std::string data;
 };
 
-struct block_request_t {
+struct SYNCSPIRIT_API block_request_t {
     using response_t = block_response_t;
     model::file_info_ptr_t file;
     model::file_block_t block;

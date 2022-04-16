@@ -8,7 +8,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct file_availability_t final : cluster_diff_t {
+struct SYNCSPIRIT_API file_availability_t final : cluster_diff_t {
 
     file_availability_t(file_info_ptr_t file) noexcept;
 

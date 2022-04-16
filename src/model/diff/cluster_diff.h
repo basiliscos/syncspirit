@@ -5,10 +5,11 @@
 
 #include "generic_diff.hpp"
 #include "cluster_visitor.h"
+#include "syncspirit-export.h"
 
 namespace syncspirit::model::diff {
 
-struct cluster_diff_t : generic_diff_t<tag::cluster> {
+struct SYNCSPIRIT_API cluster_diff_t : generic_diff_t<tag::cluster> {
     virtual outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
 };
 

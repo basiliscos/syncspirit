@@ -8,7 +8,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct blocks_availability_t final : block_diff_t {
+struct SYNCSPIRIT_API blocks_availability_t final : block_diff_t {
 
     blocks_availability_t(const file_info_t &file, size_t last_block_index) noexcept;
 

@@ -7,6 +7,7 @@
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 #include <boost/outcome.hpp>
 #include "utils/log.h"
+#include "syncspirit-export.h"
 
 namespace syncspirit::model {
 
@@ -16,7 +17,7 @@ struct cluster_t;
 
 namespace diff {
 
-struct base_diff_t : boost::intrusive_ref_counter<base_diff_t, boost::thread_unsafe_counter> {
+struct SYNCSPIRIT_API base_diff_t : boost::intrusive_ref_counter<base_diff_t, boost::thread_unsafe_counter> {
     base_diff_t() noexcept;
     virtual ~base_diff_t() = default;
 

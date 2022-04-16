@@ -2,6 +2,10 @@
 #include "db/prefix.h"
 #include "misc/error_code.h"
 
+#ifdef uuid_t
+#undef uuid_t
+#endif
+
 using namespace syncspirit::model;
 
 static const constexpr char prefix = (char)(syncspirit::db::prefix::unknown_folder);

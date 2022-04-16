@@ -10,7 +10,7 @@
 
 namespace syncspirit::model::diff::peer {
 
-struct update_folder_t final : cluster_diff_t {
+struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
     using files_t = std::vector<proto::FileInfo>;
     using blocks_t = std::vector<proto::BlockInfo>;
 

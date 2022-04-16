@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #pragma once
+
 #include "generic_diff.hpp"
+#include "syncspirit-export.h"
 
 namespace syncspirit::model::diff {
 
@@ -12,7 +14,7 @@ struct blocks_availability_t;
 struct clone_block_t;
 } // namespace modify
 
-template <> struct generic_visitor_t<tag::block> {
+template <> struct SYNCSPIRIT_API generic_visitor_t<tag::block> {
     virtual ~generic_visitor_t() = default;
 
     virtual outcome::result<void> operator()(const modify::append_block_t &) noexcept;

@@ -7,6 +7,7 @@
 #include "../file_info.h"
 #include "../folder_info.h"
 #include "../folder.h"
+#include "syncspirit-export.h"
 #include <deque>
 
 namespace syncspirit::model {
@@ -14,7 +15,7 @@ namespace syncspirit::model {
 struct cluster_t;
 struct blocks_iterator_t;
 
-struct file_iterator_t : arc_base_t<file_iterator_t> {
+struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     file_iterator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
     file_iterator_t(const file_iterator_t &) = delete;
 

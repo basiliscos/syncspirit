@@ -8,6 +8,7 @@
 #include "device_id.h"
 #include "folder_data.h"
 #include "structs.pb.h"
+#include "syncspirit-export.h"
 #include <boost/outcome.hpp>
 
 namespace syncspirit::model {
@@ -18,7 +19,7 @@ struct unknown_folder_t;
 
 using unknown_folder_ptr_t = intrusive_ptr_t<unknown_folder_t>;
 
-struct unknown_folder_t final : arc_base_t<unknown_folder_t>, folder_data_t {
+struct SYNCSPIRIT_API unknown_folder_t final : arc_base_t<unknown_folder_t>, folder_data_t {
 
     static outcome::result<unknown_folder_ptr_t> create(std::string_view key, const db::UnknownFolder &data) noexcept;
     static outcome::result<unknown_folder_ptr_t> create(const uuid_t &uuid, const db::UnknownFolder &data,

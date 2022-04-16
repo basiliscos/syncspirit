@@ -47,7 +47,7 @@ template <typename Actor> struct http_actor_config_builder_t : r::actor_config_b
     }
 };
 
-struct http_actor_t : public r::actor_base_t {
+struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     using request_ptr_t = r::intrusive_ptr_t<message::http_request_t>;
     using socket_ptr_t = std::unique_ptr<tcp::socket>;
     using secure_socket_t = std::unique_ptr<ssl::stream<tcp_socket_t>>;

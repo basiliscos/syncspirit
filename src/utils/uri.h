@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #pragma once
+
+#include "syncspirit-export.h"
 #include <boost/optional.hpp>
 #include <boost/utility/string_view.hpp>
 #include <string>
@@ -9,7 +11,7 @@
 
 namespace syncspirit::utils {
 
-struct URI {
+struct SYNCSPIRIT_API URI {
     std::string full;
     std::string host;
     std::uint16_t port;
@@ -30,8 +32,8 @@ struct URI {
     void reconstruct() noexcept;
 };
 
-boost::optional<URI> parse(const char *uri);
-boost::optional<URI> parse(const boost::string_view &uri);
+SYNCSPIRIT_API boost::optional<URI> parse(const char *uri);
+SYNCSPIRIT_API boost::optional<URI> parse(const boost::string_view &uri);
 
 using uri_container_t = std::vector<URI>;
 

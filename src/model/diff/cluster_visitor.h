@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #pragma once
+
 #include "generic_diff.hpp"
+#include "syncspirit-export.h"
 
 namespace syncspirit::model::diff {
 
@@ -30,7 +32,7 @@ struct share_folder_t;
 struct update_peer_t;
 } // namespace modify
 
-template <> struct generic_visitor_t<tag::cluster> {
+template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual ~generic_visitor_t() = default;
 
     virtual outcome::result<void> operator()(const load::load_cluster_t &) noexcept;

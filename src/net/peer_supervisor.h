@@ -52,9 +52,9 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
     }
 };
 
-struct peer_supervisor_t : public ra::supervisor_asio_t,
-                           private model::diff::cluster_visitor_t,
-                           private model::diff::contact_visitor_t {
+struct SYNCSPIRIT_API peer_supervisor_t : public ra::supervisor_asio_t,
+                                          private model::diff::cluster_visitor_t,
+                                          private model::diff::contact_visitor_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = peer_supervisor_config_t;
     template <typename Actor> using config_builder_t = peer_supervisor_config_builder_t<Actor>;

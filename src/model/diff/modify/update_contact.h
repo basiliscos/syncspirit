@@ -8,7 +8,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct update_contact_t final : contact_diff_t {
+struct SYNCSPIRIT_API update_contact_t final : contact_diff_t {
     using ip_addresses_t = std::vector<std::string_view>;
 
     update_contact_t(const model::cluster_t &cluster, const model::device_id_t device,

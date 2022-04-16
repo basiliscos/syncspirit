@@ -8,7 +8,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct lock_file_t final : cluster_diff_t {
+struct SYNCSPIRIT_API lock_file_t final : cluster_diff_t {
 
     lock_file_t(const model::file_info_t &file, bool locked) noexcept;
 

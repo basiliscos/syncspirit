@@ -14,6 +14,7 @@
 #include "block_info.h"
 #include "device.h"
 #include "structs.pb.h"
+#include "syncspirit-export.h"
 
 namespace syncspirit::model {
 
@@ -29,7 +30,7 @@ struct blocks_iterator_t;
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
-struct file_info_t final : arc_base_t<file_info_t> {
+struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
 
     enum flags_t {
         f_deleted = 1 << 0,
@@ -156,7 +157,7 @@ struct file_info_t final : arc_base_t<file_info_t> {
     friend struct blocks_iterator_t;
 };
 
-struct file_infos_map_t : public generic_map_t<file_info_ptr_t, 2> {
+struct SYNCSPIRIT_API file_infos_map_t : public generic_map_t<file_info_ptr_t, 2> {
     using parent_t = generic_map_t<file_info_ptr_t, 2>;
     file_info_ptr_t by_name(std::string_view name) noexcept;
 };

@@ -8,13 +8,14 @@
 #include <boost/outcome.hpp>
 #include <boost/filesystem.hpp>
 #include "model/file_info.h"
+#include "syncspirit-export.h"
 
 namespace syncspirit::fs {
 
 namespace outcome = boost::outcome_v2;
 namespace bfs = boost::filesystem;
 
-struct file_t : model::arc_base_t<file_t> {
+struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     file_t() noexcept;
     file_t(file_t &) = delete;
     file_t(file_t &&) noexcept;

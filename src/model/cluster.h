@@ -20,7 +20,7 @@
 
 namespace syncspirit::model {
 
-struct cluster_t final : arc_base_t<cluster_t> {
+struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     using unknown_folders_t = std::forward_list<unknown_folder_ptr_t>;
 
     cluster_t(device_ptr_t device_, size_t seed) noexcept;

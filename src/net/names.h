@@ -3,10 +3,12 @@
 
 #pragma once
 
+#include "syncspirit-export.h"
+
 namespace syncspirit {
 namespace net {
 
-struct names {
+struct SYNCSPIRIT_API names {
     static const char *coordinator;
     static const char *resolver;
     static const char *http10;

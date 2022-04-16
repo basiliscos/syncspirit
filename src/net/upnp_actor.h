@@ -51,7 +51,7 @@ template <typename Actor> struct upnp_actor_config_builder_t : r::actor_config_b
     }
 };
 
-struct upnp_actor_t : public r::actor_base_t {
+struct SYNCSPIRIT_API upnp_actor_t : public r::actor_base_t {
     using config_t = upnp_actor_config_t;
     template <typename Actor> using config_builder_t = upnp_actor_config_builder_t<Actor>;
 

@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #pragma once
+
 #include "generic_diff.hpp"
+#include "syncspirit-export.h"
 
 namespace syncspirit::model::diff {
 
@@ -11,7 +13,7 @@ struct update_contact_t;
 struct connect_request_t;
 } // namespace modify
 
-template <> struct generic_visitor_t<tag::contact> {
+template <> struct SYNCSPIRIT_API generic_visitor_t<tag::contact> {
     virtual ~generic_visitor_t() = default;
 
     virtual outcome::result<void> operator()(const modify::update_contact_t &) noexcept;

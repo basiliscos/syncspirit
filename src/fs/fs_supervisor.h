@@ -6,6 +6,7 @@
 #include "config/main.h"
 #include "utils/log.h"
 #include "model/messages.h"
+#include "syncspirit-export.h"
 #include <rotor/thread.hpp>
 
 namespace syncspirit {
@@ -14,7 +15,7 @@ namespace fs {
 namespace r = rotor;
 namespace rth = rotor::thread;
 
-struct fs_supervisor_config_t : r::supervisor_config_t {
+struct SYNCSPIRIT_API fs_supervisor_config_t : r::supervisor_config_t {
     config::fs_config_t fs_config;
     uint32_t hasher_threads;
 };
@@ -34,7 +35,7 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
     }
 };
 
-struct fs_supervisor_t : rth::supervisor_thread_t {
+struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
     using parent_t = rth::supervisor_thread_t;
     using config_t = fs_supervisor_config_t;
     template <typename Supervisor> using config_builder_t = fs_supervisor_config_builder_t<Supervisor>;

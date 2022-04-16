@@ -61,7 +61,7 @@ template <typename Actor> struct global_discovery_actor_config_builder_t : r::ac
     }
 };
 
-struct global_discovery_actor_t : public r::actor_base_t, private model::diff::contact_visitor_t {
+struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private model::diff::contact_visitor_t {
     using config_t = global_discovery_actor_config_t;
     template <typename Actor> using config_builder_t = global_discovery_actor_config_builder_t<Actor>;
 

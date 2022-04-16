@@ -78,7 +78,7 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
     }
 };
 
-struct controller_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
+struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = controller_actor_config_t;
     template <typename Actor> using config_builder_t = controller_actor_config_builder_t<Actor>;
 
@@ -87,12 +87,6 @@ struct controller_actor_t : public r::actor_base_t, private model::diff::cluster
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
-
-    struct folder_updater_t {
-        model::device_ptr_t peer;
-        virtual const std::string &id() noexcept = 0;
-        virtual model::folder_info_ptr_t update(model::folder_t &folder) noexcept = 0;
-    };
 
   private:
     enum substate_t { none = 0, iterating_files, iterating_blocks };

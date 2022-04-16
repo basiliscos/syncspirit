@@ -9,7 +9,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct clone_file_t final : cluster_diff_t {
+struct SYNCSPIRIT_API clone_file_t final : cluster_diff_t {
     using blocks_t = std::vector<proto::BlockInfo>;
     using new_blocks_t = std::vector<size_t>;
 

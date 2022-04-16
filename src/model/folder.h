@@ -8,11 +8,12 @@
 #include <boost/filesystem.hpp>
 #include <boost/outcome.hpp>
 #include "device.h"
-#include "bep.pb.h"
 #include "folder_info.h"
 #include "misc/local_file.h"
 #include "misc/uuid.h"
 #include "folder_data.h"
+#include "syncspirit-export.h"
+#include "bep.pb.h"
 
 namespace syncspirit::model {
 
@@ -26,7 +27,7 @@ struct folder_t;
 
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
-struct folder_t final : arc_base_t<folder_t>, folder_data_t {
+struct SYNCSPIRIT_API folder_t final : arc_base_t<folder_t>, folder_data_t {
 
     static outcome::result<folder_ptr_t> create(std::string_view key, const db::Folder &folder) noexcept;
     static outcome::result<folder_ptr_t> create(const uuid_t &uuid, const db::Folder &folder) noexcept;
@@ -64,7 +65,7 @@ struct folder_t final : arc_base_t<folder_t>, folder_data_t {
     char key[data_length];
 };
 
-struct folders_map_t : generic_map_t<folder_ptr_t, 2> {
+struct SYNCSPIRIT_API folders_map_t : generic_map_t<folder_ptr_t, 2> {
     folder_ptr_t by_id(std::string_view id) const noexcept;
 };
 

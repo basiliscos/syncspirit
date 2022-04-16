@@ -4,7 +4,8 @@
 #pragma once
 
 #include "messages.h"
-#include "../utils/log.h"
+#include "utils/log.h"
+#include "syncspirit-export.h"
 
 namespace syncspirit {
 namespace hasher {
@@ -32,7 +33,7 @@ template <typename Actor> struct hasher_proxy_actor_config_builder_t : r::actor_
     }
 };
 
-struct hasher_proxy_actor_t : public r::actor_base_t {
+struct SYNCSPIRIT_API hasher_proxy_actor_t : public r::actor_base_t {
     using config_t = hasher_proxy_actor_config_t;
     template <typename Actor> using config_builder_t = hasher_proxy_actor_config_builder_t<Actor>;
 

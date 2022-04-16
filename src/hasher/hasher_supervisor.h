@@ -3,8 +3,10 @@
 
 #pragma once
 
-#include "../config/main.h"
-#include "../utils/log.h"
+#include "config/main.h"
+#include "utils/log.h"
+#include "syncspirit-export.h"
+
 #include <rotor/thread.hpp>
 
 namespace syncspirit {
@@ -28,7 +30,7 @@ template <typename Supervisor> struct hasher_supervisor_config_builder_t : r::su
     }
 };
 
-struct hasher_supervisor_t : rth::supervisor_thread_t {
+struct SYNCSPIRIT_API hasher_supervisor_t : rth::supervisor_thread_t {
     using parent_t = rth::supervisor_thread_t;
     using config_t = hasher_supervisor_config_t;
     template <typename Supervisor> using config_builder_t = hasher_supervisor_config_builder_t<Supervisor>;

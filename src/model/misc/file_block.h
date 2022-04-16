@@ -4,6 +4,7 @@
 #pragma once
 
 #include "arc.hpp"
+#include "syncspirit-export.h"
 
 namespace syncspirit::model {
 
@@ -11,7 +12,7 @@ struct block_info_t;
 struct file_info_t;
 using block_info_ptr_t = intrusive_ptr_t<block_info_t>;
 
-struct file_block_t {
+struct SYNCSPIRIT_API file_block_t {
     file_block_t() noexcept = default;
     file_block_t(file_block_t &&) noexcept = default;
     file_block_t(const file_block_t &) noexcept = default;

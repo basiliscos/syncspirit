@@ -19,7 +19,7 @@ namespace fs {
 namespace r = rotor;
 namespace outcome = boost::outcome_v2;
 
-struct scan_actor_config_t : r::actor_config_t {
+struct SYNCSPIRIT_API scan_actor_config_t : r::actor_config_t {
     config::fs_config_t fs_config;
     model::cluster_ptr_t cluster;
     r::address_ptr_t hasher_proxy;
@@ -52,7 +52,7 @@ template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_b
     }
 };
 
-struct scan_actor_t : public r::actor_base_t {
+struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
     using config_t = scan_actor_config_t;
     template <typename Actor> using config_builder_t = scan_actor_config_builder_t<Actor>;
 

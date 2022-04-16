@@ -8,6 +8,7 @@
 #include "file_info.h"
 #include "misc/local_file.h"
 #include "structs.pb.h"
+#include "syncspirit-export.h"
 #include <boost/outcome.hpp>
 
 namespace syncspirit::model {
@@ -20,7 +21,7 @@ using folder_ptr_t = intrusive_ptr_t<folder_t>;
 struct folder_info_t;
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
-struct folder_info_t final : arc_base_t<folder_info_t> {
+struct SYNCSPIRIT_API folder_info_t final : arc_base_t<folder_info_t> {
 
     static outcome::result<folder_info_ptr_t> create(std::string_view key, const db::FolderInfo &data,
                                                      const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
@@ -63,7 +64,7 @@ struct folder_info_t final : arc_base_t<folder_info_t> {
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
-struct folder_infos_map_t : public generic_map_t<folder_info_ptr_t, 2> {
+struct SYNCSPIRIT_API folder_infos_map_t : public generic_map_t<folder_info_ptr_t, 2> {
     folder_info_ptr_t by_device(const device_ptr_t &device) const noexcept;
     folder_info_ptr_t by_device_id(std::string_view device_id) const noexcept;
 };

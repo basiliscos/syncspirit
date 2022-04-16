@@ -4,6 +4,7 @@
 #pragma once
 
 #include <boost/system/error_code.hpp>
+#include "syncspirit-export.h"
 
 namespace syncspirit {
 namespace db {
@@ -18,21 +19,21 @@ enum class error_code {
 
 namespace detail {
 
-class db_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API db_code_category : public boost::system::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
 
-class mbdx_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API mbdx_code_category : public boost::system::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
 
 } // namespace detail
 
-const detail::db_code_category &db_code_category();
+SYNCSPIRIT_API const detail::db_code_category &db_code_category();
 
-const detail::mbdx_code_category &mbdx_code_category();
+SYNCSPIRIT_API const detail::mbdx_code_category &mbdx_code_category();
 
 inline boost::system::error_code make_error_code(int e) { return {static_cast<int>(e), db_code_category()}; }
 inline boost::system::error_code make_error_code(error_code ec) { return {static_cast<int>(ec), mbdx_code_category()}; }

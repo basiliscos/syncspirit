@@ -7,6 +7,7 @@
 #include "model/messages.h"
 #include "config/fs.h"
 #include "utils/log.h"
+#include "syncspirit-export.h"
 #include <rotor.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
@@ -48,7 +49,7 @@ struct file_error_t {
 using scan_result_t = std::variant<bool, scan_errors_t, changed_meta_t, unchanged_meta_t, incomplete_t,
                                    incomplete_removed_t, file_error_t>;
 
-struct scan_task_t : boost::intrusive_ref_counter<scan_task_t, boost::thread_unsafe_counter> {
+struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, boost::thread_unsafe_counter> {
     struct file_info_t {
         model::file_info_ptr_t file;
         bool temp;

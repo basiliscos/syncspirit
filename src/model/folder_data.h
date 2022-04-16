@@ -5,13 +5,14 @@
 
 #include <string>
 #include <boost/filesystem.hpp>
+#include "syncspirit-export.h"
 #include "structs.pb.h"
 
 namespace syncspirit::model {
 
 namespace bfs = boost::filesystem;
 
-struct folder_data_t {
+struct SYNCSPIRIT_API folder_data_t {
     enum class foldet_type_t { send = 0, receive, send_and_receive };
     enum class pull_order_t { random = 0, alphabetic, largest, oldest, newest };
 

@@ -40,7 +40,7 @@ template <typename Actor> struct local_discovery_actor_config_builder_t : r::act
     }
 };
 
-struct local_discovery_actor_t final : public r::actor_base_t {
+struct SYNCSPIRIT_API local_discovery_actor_t final : public r::actor_base_t {
     using config_t = local_discovery_actor_config_t;
     template <typename Actor> using config_builder_t = local_discovery_actor_config_builder_t<Actor>;
 

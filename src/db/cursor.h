@@ -6,6 +6,7 @@
 #include "mdbx.h"
 #include "string_view"
 #include "error_code.h"
+#include "syncspirit-export.h"
 #include <boost/outcome.hpp>
 
 namespace syncspirit {
@@ -15,7 +16,7 @@ namespace outcome = boost::outcome_v2;
 
 struct transaction_t;
 
-struct cursor_t {
+struct SYNCSPIRIT_API cursor_t {
     cursor_t() noexcept : impl{nullptr} {};
     cursor_t(cursor_t &&other) noexcept;
     ~cursor_t();

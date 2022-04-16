@@ -52,7 +52,7 @@ template <typename Actor> struct resolver_actor_config_builder_t : r::actor_conf
     }
 };
 
-struct resolver_actor_t : public r::actor_base_t {
+struct SYNCSPIRIT_API resolver_actor_t : public r::actor_base_t {
 
     using config_t = resolver_actor_config_t;
     template <typename Actor> using config_builder_t = resolver_actor_config_builder_t<Actor>;

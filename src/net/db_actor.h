@@ -45,7 +45,7 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
     }
 };
 
-struct db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
+struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = db_actor_config_t;
     template <typename Actor> using config_builder_t = db_actor_config_builder_t<Actor>;
 

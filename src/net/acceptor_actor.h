@@ -27,7 +27,7 @@ template <typename Actor> struct acceptor_actor_config_builder_t : r::actor_conf
     }
 };
 
-struct acceptor_actor_t : public r::actor_base_t {
+struct SYNCSPIRIT_API acceptor_actor_t : public r::actor_base_t {
     using config_t = acceptor_actor_config_t;
     template <typename Actor> using config_builder_t = acceptor_actor_config_builder_t<Actor>;
 

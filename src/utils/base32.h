@@ -2,16 +2,17 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #pragma once
+
 #include <string_view>
 #include <numeric>
-
 #include <boost/outcome.hpp>
+#include "syncspirit-export.h"
 
 namespace syncspirit::utils {
 
 namespace outcome = boost::outcome_v2;
 
-struct base32 {
+struct SYNCSPIRIT_API base32 {
 
     static const char in_alphabet[];
     static const std::int32_t out_alphabet[];

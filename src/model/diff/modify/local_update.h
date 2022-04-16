@@ -10,7 +10,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct local_update_t final : cluster_diff_t {
+struct SYNCSPIRIT_API local_update_t final : cluster_diff_t {
     using blocks_t = std::vector<proto::BlockInfo>;
 
     local_update_t(const file_info_t &file, db::FileInfo current, blocks_t current_blocks) noexcept;

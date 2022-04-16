@@ -34,7 +34,7 @@ template <typename Actor> struct ssdp_actor_config_builder_t : r::actor_config_b
     }
 };
 
-struct ssdp_actor_t : public r::actor_base_t {
+struct SYNCSPIRIT_API ssdp_actor_t : public r::actor_base_t {
     using config_t = ssdp_actor_config_t;
     template <typename Actor> using config_builder_t = ssdp_actor_config_builder_t<Actor>;
 

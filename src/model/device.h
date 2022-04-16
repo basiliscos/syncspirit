@@ -7,7 +7,8 @@
 #include "misc/map.hpp"
 #include "misc/uuid.h"
 #include "device_id.h"
-#include "../utils/uri.h"
+#include "utils/uri.h"
+#include "syncspirit-export.h"
 #include "bep.pb.h"
 #include "structs.pb.h"
 #include <boost/outcome.hpp>
@@ -19,7 +20,7 @@ namespace outcome = boost::outcome_v2;
 struct device_t;
 using device_ptr_t = intrusive_ptr_t<device_t>;
 
-struct device_t : arc_base_t<device_t> {
+struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     using uris_t = std::vector<utils::URI>;
     using name_option_t = std::optional<std::string>;
 
@@ -74,7 +75,7 @@ struct local_device_t final : device_t {
     std::string_view get_key() const noexcept override;
 };
 
-struct devices_map_t : public generic_map_t<device_ptr_t, 2> {
+struct SYNCSPIRIT_API devices_map_t : public generic_map_t<device_ptr_t, 2> {
     device_ptr_t by_sha256(std::string_view device_id) const noexcept;
 };
 

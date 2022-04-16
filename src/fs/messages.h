@@ -21,7 +21,7 @@ struct scan_progress_t {
     scan_task_ptr_t task;
 };
 
-struct rehash_needed_t {
+struct SYNCSPIRIT_API rehash_needed_t {
     rehash_needed_t(scan_task_ptr_t task, model::file_info_ptr_t file, model::file_info_ptr_t source_file,
                     file_ptr_t backend) noexcept;
 

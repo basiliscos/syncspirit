@@ -4,10 +4,11 @@
 #pragma once
 
 #include <string_view>
+#include "syncspirit-export.h"
 
 namespace syncspirit::proto {
 
-struct luhn32 {
+struct SYNCSPIRIT_API luhn32 {
     static char calculate(std::string_view in) noexcept;
     static bool validate(std::string_view in) noexcept;
 };

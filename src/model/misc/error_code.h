@@ -5,6 +5,7 @@
 
 #include <system_error>
 #include <boost/system/error_code.hpp>
+#include "syncspirit-export.h"
 
 namespace syncspirit::model {
 
@@ -50,14 +51,14 @@ enum class error_code_t {
 
 namespace detail {
 
-class error_code_category_t : public boost::system::error_category {
+class SYNCSPIRIT_API error_code_category_t : public boost::system::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
 
 } // namespace detail
 
-const detail::error_code_category_t &error_code_category();
+SYNCSPIRIT_API const detail::error_code_category_t &error_code_category();
 
 inline boost::system::error_code make_error_code(error_code_t e) {
     return {static_cast<int>(e), error_code_category()};

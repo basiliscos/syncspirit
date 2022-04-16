@@ -9,6 +9,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include "model/file_info.h"
+#include "syncspirit-export.h"
 
 namespace syncspirit {
 namespace fs {
@@ -17,19 +18,19 @@ namespace bfs = boost::filesystem;
 namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
 
-bfs::path make_temporal(const bfs::path &path) noexcept;
-bool is_temporal(const bfs::path &path) noexcept;
-std::pair<size_t, size_t> get_block_size(size_t file_size) noexcept;
+SYNCSPIRIT_API bfs::path make_temporal(const bfs::path &path) noexcept;
+SYNCSPIRIT_API bool is_temporal(const bfs::path &path) noexcept;
+SYNCSPIRIT_API std::pair<size_t, size_t> get_block_size(size_t file_size) noexcept;
 
 struct relative_result_t {
     bfs::path path;
     bool temp;
 };
 
-relative_result_t relativize(const bfs::path &path, const bfs::path &root) noexcept;
+SYNCSPIRIT_API relative_result_t relativize(const bfs::path &path, const bfs::path &root) noexcept;
 
-extern std::size_t block_sizes_sz;
-extern std::size_t *block_sizes;
+SYNCSPIRIT_API extern std::size_t block_sizes_sz;
+SYNCSPIRIT_API extern std::size_t *block_sizes;
 
 } // namespace fs
 } // namespace syncspirit

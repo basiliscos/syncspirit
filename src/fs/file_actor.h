@@ -28,7 +28,7 @@ namespace fs {
 namespace r = rotor;
 namespace outcome = boost::outcome_v2;
 
-struct file_actor_config_t : r::actor_config_t {
+struct SYNCSPIRIT_API file_actor_config_t : r::actor_config_t {
     model::cluster_ptr_t cluster;
     size_t mru_size;
 };
@@ -49,9 +49,9 @@ template <typename Actor> struct file_actor_config_builder_t : r::actor_config_b
     }
 };
 
-struct file_actor_t : public r::actor_base_t,
-                      private model::diff::block_visitor_t,
-                      private model::diff::cluster_visitor_t {
+struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t,
+                                     private model::diff::block_visitor_t,
+                                     private model::diff::cluster_visitor_t {
     using config_t = file_actor_config_t;
     template <typename Actor> using config_builder_t = file_actor_config_builder_t<Actor>;
 

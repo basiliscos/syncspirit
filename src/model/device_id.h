@@ -4,14 +4,15 @@
 #pragma once
 
 #include <string>
-#include "../utils/tls.h"
+#include "utils/tls.h"
+#include "syncspirit-export.h"
 #include "misc/arc.hpp"
 #include <spdlog/fmt/ostr.h>
 #include <optional>
 
 namespace syncspirit::model {
 
-struct device_id_t final {
+struct SYNCSPIRIT_API device_id_t {
     static const constexpr std::size_t SHA256_B32_SIZE = 52;
     static const constexpr std::size_t CHECK_DIGIT_INT = 13;
     static const constexpr std::size_t LUHN_ITERATIONS = SHA256_B32_SIZE / 13;

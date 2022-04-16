@@ -2,13 +2,15 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #pragma once
+
 #include <memory>
 #include <string>
 #include <string_view>
 #include <mutex>
 #include <boost/outcome.hpp>
 #include <spdlog/spdlog.h>
-#include "../config/log.h"
+#include "config/log.h"
+#include "syncspirit-export.h"
 
 namespace syncspirit::utils {
 
@@ -16,13 +18,14 @@ namespace outcome = boost::outcome_v2;
 
 using logger_t = std::shared_ptr<spdlog::logger>;
 
-spdlog::level::level_enum get_log_level(const std::string &log_level) noexcept;
+SYNCSPIRIT_API spdlog::level::level_enum get_log_level(const std::string &log_level) noexcept;
 
-void set_default(const std::string &level) noexcept;
+SYNCSPIRIT_API void set_default(const std::string &level) noexcept;
 
-outcome::result<void> init_loggers(const config::log_configs_t &configs, bool overwrite_default) noexcept;
+SYNCSPIRIT_API outcome::result<void> init_loggers(const config::log_configs_t &configs,
+                                                  bool overwrite_default) noexcept;
 
-logger_t get_logger(std::string_view name) noexcept;
+SYNCSPIRIT_API logger_t get_logger(std::string_view name) noexcept;
 
 #define LOG_GENERIC(LOGGER, LEVEL, ...)                                                                                \
     if (LEVEL >= LOGGER->level())                                                                                      \

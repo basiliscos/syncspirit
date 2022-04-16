@@ -8,7 +8,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct create_folder_t final : cluster_diff_t {
+struct SYNCSPIRIT_API create_folder_t final : cluster_diff_t {
 
     template <typename T> create_folder_t(T &&item_) noexcept : item{std::forward<T>(item_)} {}
 

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #pragma once
+
 #include <fmt/fmt.h>
 #include <boost/outcome.hpp>
 #include <boost/asio/buffer.hpp>
@@ -9,8 +10,9 @@
 #include <variant>
 #include <vector>
 #include <type_traits>
+#include "syncspirit-export.h"
 #include "bep.pb.h"
-#include "../utils/uri.h"
+#include "utils/uri.h"
 
 namespace syncspirit::proto {
 
@@ -47,17 +49,17 @@ struct wrapped_message_t {
 
 } // namespace message
 
-void make_hello_message(fmt::memory_buffer &buff, std::string_view device_name) noexcept;
+SYNCSPIRIT_API void make_hello_message(fmt::memory_buffer &buff, std::string_view device_name) noexcept;
 
-std::size_t make_announce_message(fmt::memory_buffer &buff, std::string_view device_name, const payload::URIs &uris,
-                                  std::int64_t instance) noexcept;
+SYNCSPIRIT_API std::size_t make_announce_message(fmt::memory_buffer &buff, std::string_view device_name,
+                                                 const payload::URIs &uris, std::int64_t instance) noexcept;
 
 template <typename Message>
 void serialize(fmt::memory_buffer &buff, const Message &message,
                proto::MessageCompression compression = proto::MessageCompression::NONE) noexcept;
 
-outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &buff) noexcept;
+SYNCSPIRIT_API outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &buff) noexcept;
 
-outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff) noexcept;
+SYNCSPIRIT_API outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff) noexcept;
 
 } // namespace syncspirit::proto

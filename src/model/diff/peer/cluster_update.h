@@ -12,7 +12,7 @@
 
 namespace syncspirit::model::diff::peer {
 
-struct cluster_update_t final : cluster_diff_t {
+struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     using message_t = proto::ClusterConfig;
     using unknown_folders_t = std::vector<proto::Folder>;
     struct update_info_t {
