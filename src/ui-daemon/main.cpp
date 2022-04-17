@@ -10,6 +10,7 @@
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
 
+#include "syncspirit-config.h"
 #include "constants.h"
 #include "config/utils.h"
 #include "utils/location.h"
@@ -184,7 +185,7 @@ int main(int argc, char **argv) {
         }
 
         spdlog::info("starting {} {}, libraries: protobuf v{}, lz4: v{}, OpenSSL {}", constants::client_name,
-                     constants::client_version, google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION),
+                     SYNCSPIRIT_VERSION, google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION),
                      LZ4_versionString(), OpenSSL_version(0));
 
         /* pre-init actors */

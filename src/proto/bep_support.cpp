@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #include "bep_support.h"
-#include "../constants.h"
-#include "../utils/error_code.h"
+#include "constants.h"
+#include "utils/error_code.h"
+#include "syncspirit-config.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/endian/conversion.hpp>
 #include <algorithm>
@@ -22,7 +23,7 @@ void make_hello_message(fmt::memory_buffer &buff, std::string_view device_name) 
     proto::Hello msg;
     msg.set_device_name(device_name.begin(), device_name.size());
     msg.set_client_name(constants::client_name);
-    msg.set_client_version(constants::client_version);
+    msg.set_client_version(SYNCSPIRIT_VERSION);
     auto sz = static_cast<std::uint16_t>(msg.ByteSizeLong());
     buff.resize(sz + 4 + 2);
 

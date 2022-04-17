@@ -24,6 +24,9 @@ find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(ZLIB REQUIRED)
 
+set(SYNCSPIRIT_VERSION "v0.1.0")
+
+configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
 set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src)
 protobuf_generate_cpp(
     PROTO_SRCS PROTO_HDRS
@@ -162,6 +165,7 @@ set(LZ4_BUILD_CLI false CACHE BOOL "LZ4_BUILD_CLI")
 set(LZ4_BUILD_LEGACY_LZ4C false CACHE BOOL "LZ4_BUILD_LEGACY_LZ4C")
 set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
 
+cmake_policy(SET CMP0077 NEW)
 set(PUGIXML_NO_EXCEPTIONS on)
 
 add_subdirectory("lib/spdlog")
