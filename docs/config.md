@@ -16,6 +16,11 @@ rx_timeout = 300000
 tx_timeout = 10000
 blocks_max_requested = 16   # maximum amount of concurrently requested blocks
 
+[db]
+upper_limit = 0x400000000   # maximum amount of database, in bytes
+uncommited_threshold = 150  # how often flush db to disk, i.e. how much operations
+                            # might be not commited. Affects disk performance
+
 [dialer]
 enabled = true
 redial_timeout = 300000     # how often try to redial to offline peers
@@ -24,9 +29,6 @@ redial_timeout = 300000     # how often try to redial to offline peers
 temporally_timeout = 86400000   # remove incomplete file after this timeout
 mru_size = 10                   # maximum amount of cached files
 
-[db]
-upper_limit = 0x400000000
-uncommited_threshold = 150
 
 [global_discovery]
 announce_url = 'https://discovery.syncthing.net/'
@@ -63,7 +65,7 @@ level = 'debug'
 # where folders are created by dfault
 default_location = '/tmp/syncspirit'
 # this device name
-device_name = 'hp-note'
+device_name = 'this-device-name'
 timeout = 5000
 # the amount of hasher threads
 hasher_threads = 3
