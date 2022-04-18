@@ -2,11 +2,14 @@
 
 sites: [github](https://github.com/basiliscos/syncspirit), [abf](https://github.com/basiliscos/syncspirit)
 
-syncspirit is a continuous file synchronization program, which synchronizes files between devices.
+`syncspirit` is a continuous file synchronization program, which synchronizes files between devices.
 It is build using C++ [rotor](github.com/basiliscos/cpp-rotor) actor framework. It implements
 [BEP-protocol](https://docs.syncthing.net/specs/bep-v1.html) for files syncrhonization, or, 
 simplistically speaking, it is [syncthing](https://syncthing.net)-compatible syncrhonization
 program.
+
+Despite of being functional `syncspirit` is much less feature-rich then [syncthing](https://syncthing.net)
+and still is in heavy development.
 
 
 # status
@@ -51,7 +54,7 @@ This list is probably incomplete, here are the most important changes
     syncspirit-daemon --log_level debug \
         --config_dir=/tmp/my_dir \
         --command add_peer:peer_label:KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7 \
-        --command add_folder:label=my_folder-label:id=nagkw-srrjz:path=/tmp/my_dir/data \
+        --command add_folder:label=my_label:id=nagkw-srrjz:path=/tmp/my_dir/data \
         --command share:folder=my_label:device=KUEQE66 \
         --command inactivate:120
 
