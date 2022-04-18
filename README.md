@@ -112,6 +112,11 @@ after the core completion.
 - (may be) *nix
 - (may be) mac os x
 
+# changes
+
+## 0.1.0 (18-Arp-2022)
+ - initial release
+
 # building from source
 
 [see](docs/building.md)

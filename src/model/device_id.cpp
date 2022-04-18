@@ -21,6 +21,23 @@ device_id_t::device_id_t(std::string_view value_, std::string_view sha256_) noex
     std::copy(sha256_.begin(), sha256_.end(), hash + 1);
 }
 
+device_id_t::device_id_t(device_id_t &&other) noexcept {
+    *this = std::move(other);
+}
+
+device_id_t& device_id_t::operator=(device_id_t &&other) noexcept {
+    value = std::move(other.value);
+    std::copy(other.hash, other.hash + data_length, hash);
+    return *this;
+}
+
+device_id_t& device_id_t::operator=(const device_id_t &other) noexcept {
+    value = other.value;
+    std::copy(other.hash, other.hash + data_length, hash);
+    return *this;
+}
+
+
 std::string_view device_id_t::get_short() const noexcept { return std::string_view(value.data(), DASH_INT); }
 
 std::optional<device_id_t> device_id_t::from_string(std::string_view value) noexcept {

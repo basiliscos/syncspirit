@@ -156,7 +156,7 @@ template <> struct base_impl_t<ssl_socket_t> {
 
             auto peer = std::move(peer_option.value());
             if (!actual_peer) {
-                actual_peer = peer;
+                actual_peer = std::move(peer);
                 spdlog::trace("tls, peer device_id = {}", actual_peer);
             }
 

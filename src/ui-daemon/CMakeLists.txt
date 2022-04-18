@@ -19,8 +19,6 @@ target_link_libraries(syncspirit-daemon
 )
 target_include_directories(syncspirit-daemon PUBLIC ${syncspirit_SOURCE_DIR}/src)
 
-message(STATUS "build type ${CMAKE_BUILD_TYPE}")
-
 if (("${CMAKE_BUILD_TYPE}" STREQUAL "Release") AND (NOT WIN32))
     include(CheckIPOSupported)
     check_ipo_supported(RESULT supported OUTPUT error)
@@ -30,4 +28,24 @@ if (("${CMAKE_BUILD_TYPE}" STREQUAL "Release") AND (NOT WIN32))
     else()
         message(STATUS "IPO / LTO not supported: <${error}>")
     endif()
+endif()
+
+if (CMAKE_BUILD_TYPE MATCHES "^([Rr]elease)|(MinSizeRel)")
+    set_target_properties(syncspirit-daemon PROPERTIES LINK_FLAGS -s)
+    set(DAEMON_TARGET "${CMAKE_CXX_COMPILER}")
+    string(REGEX REPLACE ".*/" "" DAEMON_TARGET ${DAEMON_TARGET})
+    string(REGEX REPLACE "(.*)-.+" "\\1" DAEMON_TARGET ${DAEMON_TARGET})
+    if ("${DAEMON_TARGET}" STREQUAL "")
+        set(DAEMON_TARGET "unknown")
+    endif()
+    string(JOIN "_"  DAEMON_TARGET "syncspirit-daemon" ${SYNCSPIRIT_VERSION} ${DAEMON_TARGET})
+    set(DAEMON_TARGET "${DAEMON_TARGET}.zip")
+    set(ACHIVE_NAME "${syncspirit_BINARY_DIR}/${DAEMON_TARGET}")
+    message(STATUS "going to make an ${ACHIVE_NAME}")
+    add_custom_target(make_archive ALL
+        COMMAND zip "-q9" "${ACHIVE_NAME}" "syncspirit-daemon${CMAKE_EXECUTABLE_SUFFIX}"
+        DEPENDS "syncspirit-daemon${CMAKE_EXECUTABLE_SUFFIX}"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "making release archive ${DAEMON_TARGET}"
+        VERBATIM)
 endif()
