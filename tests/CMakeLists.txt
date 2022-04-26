@@ -154,3 +154,7 @@ add_test(075-controller "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/075-controller")
 add_executable(076-scan_actor 076-scan_actor.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(076-scan_actor syncspirit_test_lib)
 add_test(076-scan_actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/076-scan_actor")
+
+add_executable(077-initiator 077-initiator.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(077-initiator syncspirit_test_lib)
+add_test(077-initiator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/077-initiator")

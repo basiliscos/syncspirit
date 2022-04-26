@@ -81,11 +81,8 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void peer_actor_t::instantiate_transport() noexcept {
     if (sock) {
-        transport::ssl_junction_t ssl{peer_device_id, &ssl_pair, false, ""};
-        auto uri = utils::parse("tcp://0.0.0.0/").value();
         auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
-        transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup, std::move(sock)};
-        transport = transport::initiate_stream(cfg);
+        transport = transport::initiate_tls_passive(*sup, ssl_pair, std::move(sock.value()));
         auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
         timer_request = start_timer(timeout, *this, &peer_actor_t::on_timer);
         resources->acquire(resource::io_timer);
@@ -97,18 +94,15 @@ void peer_actor_t::instantiate_transport() noexcept {
 }
 
 void peer_actor_t::try_next_uri() noexcept {
-    transport::ssl_junction_t ssl{peer_device_id, &ssl_pair, false, constants::protocol_name};
     while (++uri_idx < (std::int32_t)uris.size()) {
         auto &uri = uris[uri_idx];
         auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
         // log->warn("url: {}", uri.full);
-        transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup, {}};
-        auto result = transport::initiate_stream(cfg);
-        if (result) {
-            initiate(std::move(result), uri);
-            resources->release(resource::uris);
-            return;
-        }
+        auto result =
+            transport::initiate_tls_active(*sup, ssl_pair, peer_device_id, uri, false, constants::protocol_name);
+        initiate(std::move(result), uri);
+        resources->release(resource::uris);
+        return;
     }
 
     LOG_TRACE(log, "{}, try_next_uri, no way to conenct found, shut down", identity);
@@ -267,15 +261,6 @@ void peer_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const tcp:
     read_more();
     read_action = &peer_actor_t::read_hello;
 }
-
-#if 0
-void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
-    resources->release(resource::io);
-    if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "{}, on_handshake_error: {}", identity, ec.message());
-    }
-}
-#endif
 
 void peer_actor_t::read_more() noexcept {
     if (state > r::state_t::OPERATIONAL) {

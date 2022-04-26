@@ -22,7 +22,6 @@ struct peer_actor_config_t : public r::actor_config_t {
     model::device_id_t peer_device_id;
     utils::uri_container_t uris;
     std::optional<tcp_socket_t> sock;
-    std::optional<std::string> peer_identity;
     const utils::key_pair_t *ssl_pair;
     config::bep_config_t bep_config;
     r::address_ptr_t coordinator;
@@ -123,7 +122,6 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     void initiate(transport::stream_sp_t tran, const utils::URI &url) noexcept;
     void on_handshake(bool valid_peer, utils::x509_t &peer_cert, const tcp::endpoint &peer_endpoint,
                       const model::device_id_t *peer_device) noexcept;
-    void on_handshake_error(sys::error_code ec) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void read_more() noexcept;
     void push_write(fmt::memory_buffer &&buff, bool final) noexcept;

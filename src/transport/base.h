@@ -18,6 +18,7 @@ namespace syncspirit::transport {
 
 namespace asio = boost::asio;
 namespace sys = boost::system;
+namespace ra = rotor::asio;
 
 using tcp = asio::ip::tcp;
 
@@ -44,7 +45,7 @@ using ssl_option_t = std::optional<ssl_junction_t>;
 struct transport_config_t {
     ssl_option_t ssl_junction;
     utils::URI uri;
-    rotor::asio::supervisor_asio_t &supervisor;
+    ra::supervisor_asio_t &supervisor;
     std::optional<tcp::socket> sock;
 };
 

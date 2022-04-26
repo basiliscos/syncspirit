@@ -33,8 +33,8 @@ struct SYNCSPIRIT_API device_id_t {
     device_id_t(device_id_t &&other) noexcept;
     device_id_t(const device_id_t &other) = default;
 
-    device_id_t& operator=(device_id_t &&other) noexcept;
-    device_id_t& operator=(const device_id_t &other) noexcept;
+    device_id_t &operator=(device_id_t &&other) noexcept;
+    device_id_t &operator=(const device_id_t &other) noexcept;
 
     bool operator==(const device_id_t &other) const noexcept { return get_sha256() == other.get_sha256(); }
     bool operator!=(const device_id_t &other) const noexcept { return !(*this == other); }
