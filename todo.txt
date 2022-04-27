@@ -1,5 +1,28 @@
-- дока
- - configuration
+- introduce initiator
+   -- connect_request_t
+   -- update_contact_t
+   -- relay_connect_request_t
+   -- relay_update_contact_t
+
+ + device_lock
+
+===========
+5. разобраться с лог-левелами?
+
+1. ^ если в block iterator'е были проскипанные блоки (из-за того, что были залочены), то файл(!) надо добавить на рескан через некоторое время
+
+
+3. скан-актор не детектит скаченные файлы
+
+
+4. надо как-то понимать, что folder is up-to-date?
+
+
+
+- syncspirit-daemon: /home/b/development/cpp/syncspirit/src/net/dialer_actor.cpp:88: void syncspirit::net::dialer_actor_t::on_timer(rotor::request_id_t, bool): Assertion `it != redial_map.end()' failed.
+
+- 2022-03-28 20:47:54.664] [E/25546] fs::scan_actor, on_hash, file: my_label/Camera/VID_20210122_121411.mp4, error: fs::scan_actor request timeout
+
 =====================
 - идёт много file_clone, но нету скачки файла
 - check 4 symlinks test (scaner) ?
