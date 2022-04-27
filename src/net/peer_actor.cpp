@@ -383,7 +383,7 @@ void peer_actor_t::shutdown_finish() noexcept {
         auto device = cluster->get_devices().by_sha256(sha256);
         if (device && device->get_state() == model::device_state_t::online) {
             auto diff = model::diff::cluster_diff_ptr_t();
-            diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, false);
+            diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, model::device_state_t::offline);
             send<model::payload::model_update_t>(coordinator, std::move(diff));
         }
     }
@@ -483,8 +483,9 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
                     return do_shutdown(make_error(ec));
                 }
                 auto diff = cluster_diff_ptr_t();
-                diff = new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), true, cert_name,
-                                              peer_endpoint, msg->client_name());
+                diff =
+                    new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(),
+                                           model::device_state_t::online, cert_name, peer_endpoint, msg->client_name());
                 send<model::payload::model_update_t>(coordinator, std::move(diff));
             } else {
                 LOG_WARN(log, "{}, read_hello, unexpected_message", identity);

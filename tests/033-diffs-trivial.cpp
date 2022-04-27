@@ -28,13 +28,14 @@ TEST_CASE("peer state update", "[model]") {
     cluster->get_devices().put(peer_device);
 
     rotor::address_ptr_t addr;
-    auto diff = diff::cluster_diff_ptr_t(new diff::peer::peer_state_t(*cluster, peer_id.get_sha256(), addr, true));
+    auto diff = diff::cluster_diff_ptr_t(
+        new diff::peer::peer_state_t(*cluster, peer_id.get_sha256(), addr, device_state_t::online));
     CHECK(peer_device->get_state() == model::device_state_t::offline);
 
     REQUIRE(diff->apply(*cluster));
     CHECK(peer_device->get_state() == model::device_state_t::online);
 
-    diff = new diff::peer::peer_state_t(*cluster, peer_id.get_sha256(), addr, false);
+    diff = new diff::peer::peer_state_t(*cluster, peer_id.get_sha256(), addr, device_state_t::offline);
     REQUIRE(diff->apply(*cluster));
     CHECK(peer_device->get_state() == model::device_state_t::offline);
 }
