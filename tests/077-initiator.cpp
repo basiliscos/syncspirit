@@ -4,6 +4,7 @@
 
 #include "utils/tls.h"
 #include "model/cluster.h"
+#include "model/messages.h"
 #include "net/names.h"
 #include "net/initiator_actor.h"
 #include "net/resolver_actor.h"
@@ -55,7 +56,9 @@ using actor_ptr_t = r::intrusive_ptr_t<initiator_actor_t>;
 
 struct fixture_t {
     using acceptor_t = asio::ip::tcp::acceptor;
-    using msg_ptr_t = r::intrusive_ptr_t<message::peer_connected_t>;
+    using ready_ptr_t = r::intrusive_ptr_t<net::message::peer_connected_t>;
+    using diff_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
+    using diff_msgs_t = std::vector<diff_ptr_t>;
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
         utils::set_default("trace");
@@ -63,14 +66,20 @@ struct fixture_t {
     }
 
     void run() noexcept {
+
         auto strand = std::make_shared<asio::io_context::strand>(io_ctx);
         sup = ctx.create_supervisor<supervisor_t>().strand(strand).timeout(timeout).create_registry().finish();
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                using msg_t = message::peer_connected_t;
-                p.subscribe_actor(r::lambda<msg_t>([&](msg_t &msg) {
-                    message = &msg;
+                using connected_t = typename ready_ptr_t::element_type;
+                using diff_t = typename diff_ptr_t::element_type;
+                p.subscribe_actor(r::lambda<connected_t>([&](connected_t &msg) {
+                    connected_message = &msg;
                     LOG_INFO(log, "received message::peer_connected_t");
+                }));
+                p.subscribe_actor(r::lambda<diff_t>([&](diff_t &msg) {
+                    diff_msgs.emplace_back(&msg);
+                    LOG_INFO(log, "received diff message");
                 }));
             });
         };
@@ -91,8 +100,15 @@ struct fixture_t {
         my_keys = utils::generate_pair("me").value();
         peer_keys = utils::generate_pair("peer").value();
 
-        my_device = model::device_id_t::from_cert(my_keys.cert_data).value();
-        peer_device = model::device_id_t::from_cert(peer_keys.cert_data).value();
+        auto md = model::device_id_t::from_cert(my_keys.cert_data).value();
+        auto pd = model::device_id_t::from_cert(peer_keys.cert_data).value();
+
+        my_device = device_t::create(md, "my-device").value();
+        peer_device = device_t::create(pd, "peer-device").value();
+        cluster = new cluster_t(my_device, 1);
+
+        cluster->get_devices().put(my_device);
+        cluster->get_devices().put(peer_device);
 
         main();
     }
@@ -126,7 +142,7 @@ struct fixture_t {
     void initiate_active() noexcept {
         tcp::resolver resolver(io_ctx);
         auto addresses = resolver.resolve(host, std::to_string(listening_ep.port()));
-        peer_trans = transport::initiate_tls_active(*sup, peer_keys, my_device, peer_uri);
+        peer_trans = transport::initiate_tls_active(*sup, peer_keys, my_device->device_id(), peer_uri);
 
         transport::error_fn_t on_error = [&](auto &ec) {
             LOG_WARN(log, "initiate_active/connect, err: {}", ec.message());
@@ -157,8 +173,9 @@ struct fixture_t {
     virtual actor_ptr_t create_actor() noexcept {
         return sup->create_actor<initiator_actor_t>()
             .timeout(timeout)
-            .peer_device_id(peer_device)
+            .peer_device_id(peer_device->device_id())
             .uris({peer_uri})
+            .cluster(cluster)
             .ssl_pair(&my_keys)
             .escalate_failure()
             .finish();
@@ -169,10 +186,12 @@ struct fixture_t {
             .timeout(timeout)
             .sock(std::move(peer_sock))
             .ssl_pair(&my_keys)
+            .cluster(cluster)
             .escalate_failure()
             .finish();
     }
 
+    cluster_ptr_t cluster;
     asio::io_context io_ctx{1};
     ra::system_context_asio_t ctx;
     acceptor_t acceptor;
@@ -184,10 +203,12 @@ struct fixture_t {
     utils::key_pair_t my_keys;
     utils::key_pair_t peer_keys;
     utils::URI peer_uri;
-    model::device_id_t my_device;
-    model::device_id_t peer_device;
+    model::device_ptr_t my_device;
+    model::device_ptr_t peer_device;
     transport::stream_sp_t peer_trans;
-    msg_ptr_t message;
+    ready_ptr_t connected_message;
+    diff_msgs_t diff_msgs;
+    ;
     bool valid_handshake = false;
 };
 
@@ -198,7 +219,7 @@ void test_connect_timeout() {
             auto act = create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(!message);
+            CHECK(!connected_message);
         }
     };
     F().run();
@@ -213,7 +234,12 @@ void test_handshake_timeout() {
             auto act = create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(!message);
+            CHECK(!connected_message);
+            REQUIRE(diff_msgs.size() == 2);
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
+            CHECK(peer_device->get_state() == device_state_t::dialing);
+            CHECK(diff_msgs[1]->payload.diff->apply(*cluster));
+            CHECK(peer_device->get_state() == device_state_t::offline);
         }
     };
     F().run();
@@ -230,7 +256,7 @@ void test_connection_refused() {
             auto act = create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(!message);
+            CHECK(!connected_message);
         }
     };
     F().run();
@@ -245,7 +271,7 @@ void test_resolve_failure() {
             auto act = create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(!message);
+            CHECK(!connected_message);
         }
     };
     F().run();
@@ -257,11 +283,15 @@ void test_success() {
             auto act = create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
-            CHECK(message);
+            CHECK(connected_message);
+            CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
             CHECK(valid_handshake);
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            REQUIRE(diff_msgs.size() == 1);
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
+            CHECK(peer_device->get_state() == device_state_t::dialing);
         }
     };
     F().run();
@@ -281,7 +311,8 @@ void test_passive_success() {
             initiate_active();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
-            CHECK(message);
+            CHECK(connected_message);
+            CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
             CHECK(valid_handshake);
             sup->do_shutdown();
             sup->do_process();
@@ -307,7 +338,7 @@ void test_passive_timeout() {
             initiate_active();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(!message);
+            CHECK(!connected_message);
         }
     };
     F().run();

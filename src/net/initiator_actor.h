@@ -16,6 +16,7 @@ struct initiator_actor_config_t : public r::actor_config_t {
     utils::uri_container_t uris;
     const utils::key_pair_t *ssl_pair;
     std::optional<tcp_socket_t> sock;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Actor> struct initiator_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -40,6 +41,11 @@ template <typename Actor> struct initiator_actor_config_builder_t : r::actor_con
 
     builder_t &&sock(tcp_socket_t value) &&noexcept {
         parent_t::config.sock = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+        parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -72,13 +78,17 @@ struct initiator_actor_t : r::actor_base_t {
     utils::uri_container_t uris;
     const utils::key_pair_t &ssl_pair;
     std::optional<tcp_socket_t> sock;
+    model::cluster_ptr_t cluster;
 
     transport::stream_sp_t transport;
     r::address_ptr_t resolver;
+    r::address_ptr_t coordinator;
     size_t uri_idx = 0;
     utils::logger_t log;
+    tcp::endpoint remote_endpoint;
     bool connected = false;
     bool active = false;
+    bool success = false;
 };
 
 namespace payload {
@@ -86,6 +96,7 @@ namespace payload {
 struct peer_connected_t {
     transport::stream_sp_t transport;
     model::device_id_t peer_device_id;
+    tcp::endpoint remote_endpoint;
 };
 
 } // namespace payload

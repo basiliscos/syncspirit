@@ -16,6 +16,14 @@
 namespace syncspirit {
 namespace net {
 
+namespace payload {
+struct peer_connected_t;
+}
+
+namespace message {
+using peer_connected_t = r::message_t<payload::peer_connected_t>;
+}
+
 namespace outcome = boost::outcome_v2;
 
 struct peer_supervisor_config_t : ra::supervisor_config_asio_t {
@@ -67,6 +75,7 @@ struct SYNCSPIRIT_API peer_supervisor_t : public ra::supervisor_asio_t,
   private:
     void on_model_update(model::message::model_update_t &) noexcept;
     void on_contact_update(model::message::contact_update_t &) noexcept;
+    void on_ready(message::peer_connected_t &) noexcept;
 
     outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_contact_t &) noexcept override;

@@ -3,6 +3,7 @@
 
 #include "peer_supervisor.h"
 #include "peer_actor.h"
+#include "initiator_actor.h"
 #include "names.h"
 #include "utils/error_code.h"
 #include "model/diff/peer/peer_state.h"
@@ -30,6 +31,7 @@ void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&peer_supervisor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&peer_supervisor_t::on_contact_update, coordinator);
+                plugin->subscribe_actor(&peer_supervisor_t::on_ready);
             }
         });
     });
@@ -68,6 +70,22 @@ void peer_supervisor_t::on_contact_update(model::message::contact_update_t &msg)
     }
 }
 
+void peer_supervisor_t::on_ready(message::peer_connected_t &msg) noexcept {
+    LOG_TRACE(log, "{}, on_ready", identity);
+    auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
+    auto &p = msg.payload;
+    create_actor<peer_actor_t>()
+        .transport(std::move(p.transport))
+        .peer_device_id(p.peer_device_id)
+        .device_name(device_name)
+        .bep_config(bep_config)
+        .coordinator(coordinator)
+        .peer_endpoint(p.remote_endpoint)
+        .timeout(timeout)
+        .cluster(cluster)
+        .finish();
+}
+
 auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff) noexcept -> outcome::result<void> {
     auto &peer_addr = diff.peer_addr;
     if (!diff.known && diff.state == model::device_state_t::online) {
@@ -86,16 +104,12 @@ auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t 
     diff.sock.reset();
 
     auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
-    auto peer_addr = create_actor<peer_actor_t>()
-                         .ssl_pair(&ssl_pair)
-                         .device_name(device_name)
-                         .bep_config(bep_config)
-                         .coordinator(coordinator)
-                         .timeout(timeout)
-                         .sock(std::optional(std::move(sock)))
-                         .cluster(cluster)
-                         .finish()
-                         ->get_address();
+    create_actor<initiator_actor_t>()
+        .cluster(cluster)
+        .ssl_pair(&ssl_pair)
+        .sock(std::move(sock))
+        .timeout(timeout)
+        .finish();
     return outcome::success();
 }
 
@@ -108,18 +122,14 @@ auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &
             auto &uris = diff.uris;
             auto connect_timeout = r::pt::milliseconds{bep_config.connect_timeout};
             LOG_DEBUG(log, "{} initiating connection with {}", identity, peer->device_id());
-            auto peer_addr = create_actor<peer_actor_t>()
-                                 .ssl_pair(&ssl_pair)
-                                 .device_name(device_name)
-                                 .bep_config(bep_config)
-                                 .coordinator(coordinator)
-                                 .init_timeout(connect_timeout * (uris.size() + 1))
-                                 .shutdown_timeout(connect_timeout)
-                                 .peer_device_id(diff.device)
-                                 .uris(uris)
-                                 .cluster(cluster)
-                                 .finish()
-                                 ->get_address();
+            create_actor<initiator_actor_t>()
+                .ssl_pair(&ssl_pair)
+                .peer_device_id(diff.device)
+                .uris(uris)
+                .cluster(cluster)
+                .init_timeout(connect_timeout * (uris.size() + 1))
+                .shutdown_timeout(connect_timeout)
+                .finish();
         }
     }
     return outcome::success();

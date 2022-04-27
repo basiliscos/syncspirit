@@ -1,7 +1,9 @@
 #include "initiator_actor.h"
 #include "constants.h"
 #include "names.h"
+#include "model/messages.h"
 #include "utils/error_code.h"
+#include "model/diff/peer/peer_state.h"
 #include <sstream>
 #include <fmt/fmt.h>
 
@@ -18,7 +20,7 @@ r::plugin::resource_id_t handshake = 3;
 
 initiator_actor_t::initiator_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, uris{cfg.uris}, ssl_pair{*cfg.ssl_pair},
-      sock(std::move(cfg.sock)) {
+      sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)} {
     log = utils::get_logger("net.initator");
     active = !sock.has_value();
 }
@@ -40,13 +42,20 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&initiator_actor_t::on_resolve);
         resources->acquire(resource::initializing);
         if (active) {
+            auto diff = model::diff::cluster_diff_ptr_t();
+            auto state = model::device_state_t::dialing;
+            auto sha256 = peer_device_id.get_sha256();
+            diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
             initiate_active();
         } else {
             initiate_passive();
         }
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.discover_name(names::resolver, resolver).link(false); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.discover_name(names::resolver, resolver).link(false);
+        p.discover_name(names::coordinator, coordinator).link(false);
+    });
 }
 
 void initiator_actor_t::initiate_active() noexcept {
@@ -85,7 +94,8 @@ void initiator_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     LOG_TRACE(log, "{}, on_start", identity);
     auto &addr = supervisor->get_address();
-    send<payload::peer_connected_t>(addr, std::move(transport), peer_device_id);
+    send<payload::peer_connected_t>(addr, std::move(transport), peer_device_id, remote_endpoint);
+    success = true;
     do_shutdown();
 }
 
@@ -105,6 +115,13 @@ void initiator_actor_t::shutdown_start() noexcept {
 
 void initiator_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "{}, shutdown_finish", identity);
+    if (active && !success) {
+        auto diff = model::diff::cluster_diff_ptr_t();
+        auto state = model::device_state_t::offline;
+        auto sha256 = peer_device_id.get_sha256();
+        diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
+    }
     r::actor_base_t::shutdown_finish();
 }
 
@@ -185,5 +202,7 @@ void initiator_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const
         return do_shutdown(make_error(ec));
     }
     LOG_TRACE(log, "{}, on_handshake, valid = {}, issued by {}", identity, valid_peer, cert_name.value());
+    peer_device_id = *peer_device;
+    remote_endpoint = peer_endpoint;
     resources->release(resource::initializing);
 }
