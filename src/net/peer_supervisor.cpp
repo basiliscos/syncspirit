@@ -104,7 +104,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &
     if (!diff.self && diff.known) {
         auto &devices = cluster->get_devices();
         auto peer = devices.by_sha256(diff.device.get_sha256());
-        if (!peer->is_online()) {
+        if (peer->get_state() != model::device_state_t::online) {
             auto &uris = diff.uris;
             auto connect_timeout = r::pt::milliseconds{bep_config.connect_timeout};
             LOG_DEBUG(log, "{} initiating connection with {}", identity, peer->device_id());

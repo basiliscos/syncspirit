@@ -50,7 +50,8 @@ outcome::result<device_ptr_t> device_t::create(const device_id_t &device_id, std
 
 device_t::device_t(const device_id_t &device_id_, std::string_view name_, std::string_view cert_name_) noexcept
     : id(std::move(device_id_)), name{name_}, compression{proto::Compression::METADATA}, cert_name{cert_name_},
-      introducer{false}, auto_accept{false}, paused{false}, skip_introduction_removals{false}, online{false} {}
+      introducer{false}, auto_accept{false}, paused{false},
+      skip_introduction_removals{false}, state{device_state_t::offline} {}
 
 void device_t::update(const db::Device &source) noexcept { assign(source); }
 
@@ -82,14 +83,16 @@ std::string device_t::serialize() noexcept {
     return r.SerializeAsString();
 }
 
-void device_t::mark_online(bool value) noexcept { online = value; }
+void device_t::update_state(device_state_t new_state) { state = new_state; }
 
 std::string_view device_t::get_key() const noexcept { return id.get_key(); }
 
 void device_t::assing_uris(const uris_t &uris_) noexcept { uris = uris_; }
 
 local_device_t::local_device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept
-    : device_t(device_id, name, cert_name) {}
+    : device_t(device_id, name, cert_name) {
+    state = device_state_t::online;
+}
 
 std::string_view local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
 

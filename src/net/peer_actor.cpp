@@ -381,7 +381,7 @@ void peer_actor_t::shutdown_finish() noexcept {
     if (handshaked) {
         auto sha256 = peer_device_id.get_sha256();
         auto device = cluster->get_devices().by_sha256(sha256);
-        if (device && device->is_online()) {
+        if (device && device->get_state() == model::device_state_t::online) {
             auto diff = model::diff::cluster_diff_ptr_t();
             diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, false);
             send<model::payload::model_update_t>(coordinator, std::move(diff));
@@ -478,7 +478,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
                 LOG_TRACE(log, "{}, read_hello, from {} ({} {})", identity, msg->device_name(), msg->client_name(),
                           msg->client_version());
                 auto peer = cluster->get_devices().by_sha256(peer_device_id.get_sha256());
-                if (peer && peer->is_online()) {
+                if (peer && peer->get_state() == model::device_state_t::online) {
                     auto ec = utils::make_error_code(utils::error_code_t::already_connected);
                     return do_shutdown(make_error(ec));
                 }

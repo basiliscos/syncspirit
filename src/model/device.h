@@ -20,6 +20,8 @@ namespace outcome = boost::outcome_v2;
 struct device_t;
 using device_ptr_t = intrusive_ptr_t<device_t>;
 
+enum class device_state_t { offline, dialing, online };
+
 struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     using uris_t = std::vector<utils::URI>;
     using name_option_t = std::optional<std::string>;
@@ -35,8 +37,8 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
 
     std::string serialize() noexcept;
     inline bool is_dynamic() const noexcept { return static_uris.empty(); }
-    void mark_online(bool value) noexcept;
-    inline bool is_online() const noexcept { return online; }
+    inline device_state_t get_state() const noexcept { return state; }
+    void update_state(device_state_t new_state);
     inline device_id_t &device_id() noexcept { return id; }
     inline const device_id_t &device_id() const noexcept { return id; }
     inline std::string_view get_name() const noexcept { return name; }
@@ -66,7 +68,7 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     bool auto_accept;
     bool paused;
     bool skip_introduction_removals;
-    bool online = false;
+    device_state_t state = device_state_t::offline;
 };
 
 struct local_device_t final : device_t {
