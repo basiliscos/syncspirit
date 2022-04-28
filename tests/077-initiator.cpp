@@ -225,10 +225,48 @@ void test_connect_timeout() {
     F().run();
 }
 
+void test_connect_unsupproted_proto() {
+    struct F : fixture_t {
+        std::string get_uri(const asio::ip::tcp::endpoint &) noexcept override {
+            return fmt::format("xxx://{}", listening_ep);
+        }
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+        }
+    };
+    F().run();
+}
+
 void test_handshake_timeout() {
     struct F : fixture_t {
 
         void accept(const sys::error_code &ec) noexcept override { LOG_INFO(log, "accept (ignoring)", ec.message()); }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+            REQUIRE(diff_msgs.size() == 2);
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
+            CHECK(peer_device->get_state() == device_state_t::dialing);
+            CHECK(diff_msgs[1]->payload.diff->apply(*cluster));
+            CHECK(peer_device->get_state() == device_state_t::offline);
+        }
+    };
+    F().run();
+}
+
+void test_handshake_garbage() {
+    struct F : fixture_t {
+
+        void accept(const sys::error_code &ec) noexcept override {
+            auto buff = asio::buffer("garbage-garbage-garbage");
+            peer_sock.write_some(buff);
+        }
 
         void main() noexcept override {
             auto act = create_actor();
@@ -322,6 +360,41 @@ void test_passive_success() {
     F().run();
 }
 
+void test_passive_garbage() {
+    struct F : fixture_t {
+
+        actor_ptr_t act;
+        tcp::socket client_sock;
+        tcp::resolver::results_type addresses;
+
+        F() : client_sock{io_ctx} {}
+
+        void accept(const sys::error_code &ec) noexcept override {
+            LOG_INFO(log, "test_passive_garbage/accept, ec: {}", ec.message());
+            act = create_passive_actor();
+        }
+
+        void initiate_active() noexcept {
+            tcp::resolver resolver(io_ctx);
+            addresses = resolver.resolve(host, std::to_string(listening_ep.port()));
+            asio::async_connect(client_sock, addresses.begin(), addresses.end(), [&](auto ec, auto addr) {
+                LOG_INFO(log, "test_passive_garbage/peer connect, ec: {}", ec.message());
+                auto buff = asio::buffer("garbage-garbage-garbage");
+                client_sock.write_some(buff);
+                sup->do_process();
+            });
+        }
+
+        void main() noexcept override {
+            initiate_active();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+        }
+    };
+    F().run();
+}
+
 void test_passive_timeout() {
     struct F : fixture_t {
 
@@ -344,10 +417,13 @@ void test_passive_timeout() {
     F().run();
 }
 
+REGISTER_TEST_CASE(test_connect_unsupproted_proto, "test_connect_unsupproted_proto", "[initiator]");
 REGISTER_TEST_CASE(test_connect_timeout, "test_connect_timeout", "[initiator]");
 REGISTER_TEST_CASE(test_handshake_timeout, "test_handshake_timeout", "[initiator]");
+REGISTER_TEST_CASE(test_handshake_garbage, "test_handshake_garbage", "[initiator]");
 REGISTER_TEST_CASE(test_connection_refused, "test_connection_refused", "[initiator]");
 REGISTER_TEST_CASE(test_resolve_failure, "test_resolve_failure", "[initiator]");
 REGISTER_TEST_CASE(test_success, "test_success", "[initiator]");
 REGISTER_TEST_CASE(test_passive_success, "test_passive_success", "[initiator]");
+REGISTER_TEST_CASE(test_passive_garbage, "test_passive_garbage", "[initiator]");
 REGISTER_TEST_CASE(test_passive_timeout, "test_passive_timeout", "[initiator]");
