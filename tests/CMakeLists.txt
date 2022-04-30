@@ -59,6 +59,10 @@ add_executable(015-logger 015-logger.cpp $<$<PLATFORM_ID:Windows>:win32-resource
 target_link_libraries(015-logger syncspirit_test_lib)
 add_test(015-logger "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/015-logger")
 
+add_executable(016-relay-support 016-relay-support.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(016-relay-support syncspirit_test_lib)
+add_test(016-relay-support "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/016-relay-support")
+
 add_executable(020-generic-map 020-generic-map.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(020-generic-map syncspirit_test_lib)
 add_test(020-generic-map "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/020-generic-map")

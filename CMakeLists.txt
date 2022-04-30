@@ -141,6 +141,7 @@ add_library(syncspirit_lib
     src/proto/bep_support.cpp
     src/proto/discovery_support.cpp
     src/proto/luhn32.cpp
+    src/proto/relay_support.cpp
     src/proto/upnp_support.cpp
     src/transport/stream.cpp
     src/transport/http.cpp
