@@ -2,10 +2,13 @@
 // SPDX-FileCopyrightText: 2022 Ivan Baidakou
 
 #include "relay_support.h"
+#include "utils/error_code.h"
+#include <nlohmann/json.hpp>
 #include <boost/endian/arithmetic.hpp>
 #include <boost/endian/conversion.hpp>
 
 namespace be = boost::endian;
+using json = nlohmann::json;
 
 template <class> inline constexpr bool always_false_v = false;
 
@@ -272,6 +275,71 @@ parse_result_t parse(std::string_view data) noexcept {
     default:
         return protocol_error_t{};
     }
+}
+
+outcome::result<relay_infos_t> parse_endpoint(std::string_view buff) noexcept {
+    using namespace syncspirit::utils;
+    auto data = json::parse(buff.begin(), buff.end(), nullptr, false);
+    if (data.is_discarded()) {
+        return make_error_code(error_code_t::malformed_json);
+    }
+    if (!data.is_object()) {
+        return make_error_code(error_code_t::incorrect_json);
+    }
+
+    auto &relays = data["relays"];
+    if (!relays.is_array()) {
+        return make_error_code(error_code_t::incorrect_json);
+    }
+
+    auto r = relay_infos_t{};
+    for (auto &it : relays) {
+        if (!it.is_object()) {
+            return make_error_code(error_code_t::incorrect_json);
+        }
+        auto &url = it["url"];
+        if (!url.is_string()) {
+            return make_error_code(error_code_t::incorrect_json);
+        }
+        auto uri_str = url.get<std::string>();
+        auto uri_option = utils::parse(uri_str.c_str());
+        if (!uri_option) {
+            return make_error_code(error_code_t::incorrect_json);
+        }
+        auto &location = it["location"];
+        if (!location.is_object()) {
+            return make_error_code(error_code_t::incorrect_json);
+        }
+        auto &latitude = location["latitude"];
+        if (!latitude.is_number_float()) {
+            return make_error_code(error_code_t::incorrect_json);
+        }
+        auto &longitude = location["longitude"];
+        if (!longitude.is_number_float()) {
+            return make_error_code(error_code_t::incorrect_json);
+        }
+        auto &city = location["city"];
+        if (!city.is_string()) {
+            return make_error_code(error_code_t::incorrect_json);
+        }
+        auto &country = location["country"];
+        if (!country.is_string()) {
+            return make_error_code(error_code_t::incorrect_json);
+        }
+        auto &continent = location["continent"];
+        if (!continent.is_string()) {
+            return make_error_code(error_code_t::incorrect_json);
+        }
+        auto relay = relay_info_ptr_t{new relay_info_t{std::move(uri_option.value()), location_t{
+                                                                                          latitude.get<float>(),
+                                                                                          longitude.get<float>(),
+                                                                                          city.get<std::string>(),
+                                                                                          country.get<std::string>(),
+                                                                                          continent.get<std::string>(),
+                                                                                      }}};
+        r.emplace_back(std::move(relay));
+    }
+    return std::move(r);
 }
 
 } // namespace syncspirit::proto::relay

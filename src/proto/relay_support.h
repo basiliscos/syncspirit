@@ -6,12 +6,15 @@
 #include <string>
 #include <cstdint>
 #include <variant>
+#include <vector>
 #include <model/misc/arc.hpp>
+#include "utils/uri.h"
 #include "syncspirit-export.h"
+#include <boost/outcome.hpp>
 
-namespace syncspirit::proto {
+namespace syncspirit::proto::relay {
 
-namespace relay {
+namespace outcome = boost::outcome_v2;
 
 struct ping_t {};
 
@@ -56,6 +59,24 @@ using parse_result_t = std::variant<incomplete_t, protocol_error_t, wrapped_mess
 SYNCSPIRIT_API size_t serialize(const relay::message_t &, std::string &out) noexcept;
 SYNCSPIRIT_API parse_result_t parse(std::string_view data) noexcept;
 
-} // namespace relay
+struct location_t {
+    float latitude;
+    float longitude;
+    std::string city;
+    std::string country;
+    std::string continent;
+};
 
-} // namespace syncspirit::proto
+struct relay_info_t : model::arc_base_t<relay_info_t> {
+    inline relay_info_t(utils::URI uri_, location_t location_) noexcept
+        : uri(std::move(uri_)), location{std::move(location_)} {}
+    utils::URI uri;
+    location_t location;
+};
+
+using relay_info_ptr_t = model::intrusive_ptr_t<relay_info_t>;
+using relay_infos_t = std::vector<relay_info_ptr_t>;
+
+SYNCSPIRIT_API outcome::result<relay_infos_t> parse_endpoint(std::string_view data) noexcept;
+
+} // namespace syncspirit::proto::relay

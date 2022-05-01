@@ -134,3 +134,69 @@ TEST_CASE("relay proto", "[relay]") {
         }
     }
 }
+
+TEST_CASE("endpoing parsing", "[relay]") {
+    std::string body = R""(
+{
+  "relays": [
+    {
+      "url": "relay://130.61.176.206:22067/?id=OAKAXEX-7HE764M-5EWVN7U-SZCQU4D-ZPXF2TY-SNTL2LL-Y5RVGVM-U7WBRA3&pingInterval=1m0s&networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=ina",
+      "location": {
+        "latitude": 50.1049,
+        "longitude": 8.6295,
+        "city": "Frankfurt am Main",
+        "country": "DE",
+        "continent": "EU"
+      },
+      "stats": {
+        "startTime": "2022-04-16T09:12:21.941097618Z",
+        "uptimeSeconds": 1312802,
+        "numPendingSessionKeys": 0,
+        "numActiveSessions": 46,
+        "numConnections": 494,
+        "numProxies": 88,
+        "bytesProxied": 493207937616,
+        "goVersion": "go1.16.3",
+        "goOS": "linux",
+        "goArch": "arm64",
+        "goMaxProcs": 4,
+        "goNumRoutine": 1136,
+        "kbps10s1m5m15m30m60m": [
+          241,
+          284,
+          309,
+          332,
+          355,
+          312
+        ],
+        "options": {
+          "network-timeout": 120,
+          "ping-interval": 60,
+          "message-timeout": 60,
+          "per-session-rate": 0,
+          "global-rate": 0,
+          "pools": [
+            "https://relays.syncthing.net/endpoint"
+          ],
+          "provided-by": "ina"
+        }
+      },
+      "statsRetrieved": "2022-05-01T13:52:24.524417759Z"
+    }
+]
+}
+    )"";
+    auto r = parse_endpoint(body);
+    REQUIRE(r);
+    REQUIRE(r.value().size() == 1);
+    auto relay = r.value()[0];
+    CHECK(relay->uri.full == "relay://130.61.176.206:22067/"
+                             "?id=OAKAXEX-7HE764M-5EWVN7U-SZCQU4D-ZPXF2TY-SNTL2LL-Y5RVGVM-U7WBRA3&pingInterval=1m0s&"
+                             "networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=ina");
+    auto &l = relay->location;
+    CHECK(abs(l.latitude - 50.1049) < 0.0001);
+    CHECK(abs(l.longitude - 8.6295) < 0.0001);
+    CHECK(l.city == "Frankfurt am Main");
+    CHECK(l.country == "DE");
+    CHECK(l.continent == "EU");
+}
