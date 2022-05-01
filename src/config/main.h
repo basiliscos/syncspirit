@@ -11,6 +11,7 @@
 #include "global_announce.h"
 #include "local_announce.h"
 #include "log.h"
+#include "relay.h"
 #include "upnp.h"
 #include <boost/filesystem.hpp>
 
@@ -31,6 +32,7 @@ struct main_t {
     dialer_config_t dialer_config;
     fs_config_t fs_config;
     db_config_t db_config;
+    relay_config_t relay_config;
 
     std::uint32_t timeout;
     std::string device_name;
