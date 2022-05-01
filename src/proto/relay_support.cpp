@@ -9,7 +9,7 @@ namespace be = boost::endian;
 
 template <class> inline constexpr bool always_false_v = false;
 
-namespace syncspirit::proto {
+namespace syncspirit::proto::relay {
 
 struct header_t {
     uint32_t magic;
@@ -39,23 +39,23 @@ static void serialize_header(char *ptr, type_t type, size_t payload_sz) noexcept
     std::copy(in, in + header_sz, ptr);
 }
 
-size_t serialize(const relay::message_t &msg, std::string &out) noexcept {
+size_t serialize(const message_t &msg, std::string &out) noexcept {
     return std::visit(
         [&](auto &it) -> size_t {
             using T = std::decay_t<decltype(it)>;
-            if constexpr (std::is_same_v<T, relay::ping_t>) {
+            if constexpr (std::is_same_v<T, ping_t>) {
                 out.resize(header_sz);
                 serialize_header(out.data(), type_t::ping, 0);
                 return header_sz;
-            } else if constexpr (std::is_same_v<T, relay::pong_t>) {
+            } else if constexpr (std::is_same_v<T, pong_t>) {
                 out.resize(header_sz);
                 serialize_header(out.data(), type_t::pong, 0);
                 return header_sz;
-            } else if constexpr (std::is_same_v<T, relay::join_relay_request_t>) {
+            } else if constexpr (std::is_same_v<T, join_relay_request_t>) {
                 out.resize(header_sz);
                 serialize_header(out.data(), type_t::join_relay_request, 0);
                 return header_sz;
-            } else if constexpr (std::is_same_v<T, relay::join_session_request_t>) {
+            } else if constexpr (std::is_same_v<T, join_session_request_t>) {
                 auto key_sz = it.key.size();
                 auto payload_sz = sizeof(uint32_t) + key_sz;
                 auto sz = header_sz + payload_sz;
@@ -67,7 +67,7 @@ size_t serialize(const relay::message_t &msg, std::string &out) noexcept {
                 ptr += sizeof(uint32_t);
                 std::copy(it.key.begin(), it.key.end(), ptr);
                 return sz;
-            } else if constexpr (std::is_same_v<T, relay::response_t>) {
+            } else if constexpr (std::is_same_v<T, response_t>) {
                 auto msg_sz = it.details.size();
                 auto payload_sz = sizeof(uint32_t) + sizeof(uint32_t) + msg_sz;
                 auto sz = header_sz + payload_sz;
@@ -81,7 +81,7 @@ size_t serialize(const relay::message_t &msg, std::string &out) noexcept {
                 ptr += sizeof(uint32_t);
                 std::copy(it.details.begin(), it.details.end(), ptr);
                 return sz;
-            } else if constexpr (std::is_same_v<T, relay::connect_request_t>) {
+            } else if constexpr (std::is_same_v<T, connect_request_t>) {
                 auto id_sz = it.device_id.size();
                 auto payload_sz = sizeof(uint32_t) + id_sz;
                 auto sz = header_sz + payload_sz;
@@ -93,7 +93,7 @@ size_t serialize(const relay::message_t &msg, std::string &out) noexcept {
                 ptr += sizeof(uint32_t);
                 std::copy(it.device_id.begin(), it.device_id.end(), ptr);
                 return sz;
-            } else if constexpr (std::is_same_v<T, relay::session_invitation_t>) {
+            } else if constexpr (std::is_same_v<T, session_invitation_t>) {
                 auto &from = it.from;
                 auto &key = it.key;
                 auto &address = it.address;
@@ -130,131 +130,127 @@ size_t serialize(const relay::message_t &msg, std::string &out) noexcept {
         msg);
 }
 
-static relay::parse_result_t parse_ping(std::string_view data) noexcept {
-    return relay::wrapped_message_t{header_sz, relay::ping_t{}};
+static parse_result_t parse_ping(std::string_view data) noexcept { return wrapped_message_t{header_sz, ping_t{}}; }
+
+static parse_result_t parse_pong(std::string_view data) noexcept { return wrapped_message_t{header_sz, pong_t{}}; }
+
+static parse_result_t parse_join_relay_request(std::string_view data) noexcept {
+    return wrapped_message_t{header_sz, join_relay_request_t{}};
 }
 
-static relay::parse_result_t parse_pong(std::string_view data) noexcept {
-    return relay::wrapped_message_t{header_sz, relay::pong_t{}};
-}
-
-static relay::parse_result_t parse_join_relay_request(std::string_view data) noexcept {
-    return relay::wrapped_message_t{header_sz, relay::join_relay_request_t{}};
-}
-
-static relay::parse_result_t parse_join_session_request(std::string_view data) noexcept {
+static parse_result_t parse_join_session_request(std::string_view data) noexcept {
     if (data.size() < sizeof(uint32_t)) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto ptr = data.data();
     auto sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(ptr));
     if (sz + sizeof(uint32_t) != data.size()) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto tail = data.substr(sizeof(uint32_t));
-    return relay::wrapped_message_t{header_sz + data.size(), relay::join_session_request_t{std::string(tail)}};
+    return wrapped_message_t{header_sz + data.size(), join_session_request_t{std::string(tail)}};
 }
 
-static relay::parse_result_t parse_response(std::string_view data) noexcept {
+static parse_result_t parse_response(std::string_view data) noexcept {
     if (data.size() < sizeof(uint32_t) * 2) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto ptr = data.data();
     auto code = be::big_to_native(*reinterpret_cast<const uint32_t *>(ptr));
     ptr += sizeof(uint32_t);
     auto sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(ptr));
     if (sz + sizeof(uint32_t) * 2 != data.size()) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto tail = data.substr(sizeof(uint32_t) * 2);
-    return relay::wrapped_message_t{header_sz + data.size(), relay::response_t{code, std::string(tail)}};
+    return wrapped_message_t{header_sz + data.size(), response_t{code, std::string(tail)}};
 }
 
-static relay::parse_result_t parse_connect_request(std::string_view data) noexcept {
+static parse_result_t parse_connect_request(std::string_view data) noexcept {
     if (data.size() < sizeof(uint32_t)) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto ptr = data.data();
     auto sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(ptr));
     if (sz + sizeof(uint32_t) != data.size()) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto tail = data.substr(sizeof(uint32_t));
-    return relay::wrapped_message_t{header_sz + data.size(), relay::connect_request_t{std::string(tail)}};
+    return wrapped_message_t{header_sz + data.size(), connect_request_t{std::string(tail)}};
 }
 
-static relay::parse_result_t parse_session_invitation(std::string_view data) noexcept {
+static parse_result_t parse_session_invitation(std::string_view data) noexcept {
     if (data.size() < sizeof(uint32_t)) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto orig = data;
 
     auto from_sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
     data = data.substr(sizeof(uint32_t));
     if (data.size() < from_sz) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto from = data.substr(0, from_sz);
     data = data.substr(from_sz);
 
     if (data.size() < sizeof(uint32_t)) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto key_sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
     data = data.substr(sizeof(uint32_t));
     if (data.size() < key_sz) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto key = data.substr(0, key_sz);
     data = data.substr(key_sz);
 
     if (data.size() < sizeof(uint32_t)) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto addr_sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
     data = data.substr(sizeof(uint32_t));
     if (data.size() < key_sz) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto addr = data.substr(0, addr_sz);
     data = data.substr(addr_sz);
 
     if (data.size() < sizeof(uint32_t)) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto port = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
     data = data.substr(sizeof(uint32_t));
 
     if (data.size() < sizeof(uint32_t)) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto server_socket = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
     data = data.substr(sizeof(uint32_t));
 
-    return relay::wrapped_message_t{
+    return wrapped_message_t{
         header_sz + orig.size(),
-        relay::session_invitation_t{std::string(from), std::string(key), std::string(addr), port, (bool)server_socket}};
+        session_invitation_t{std::string(from), std::string(key), std::string(addr), port, (bool)server_socket}};
 }
 
-relay::parse_result_t parse(std::string_view data) noexcept {
+parse_result_t parse(std::string_view data) noexcept {
     if (data.size() < header_sz) {
-        return relay::incomplete_t{};
+        return incomplete_t{};
     }
     auto ptr = data.data();
     auto header = reinterpret_cast<const header_t *>(ptr);
     if (be::big_to_native(header->magic) != magic) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto type = be::big_to_native(header->type);
     if (type > (uint32_t)type_t::LAST) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     auto sz = be::big_to_native(header->length);
     if (sz > max_packet_sz) {
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
     if (data.size() < header_sz + sz) {
-        return relay::incomplete_t{};
+        return incomplete_t{};
     }
     auto tail = data.substr(header_sz);
 
@@ -274,8 +270,8 @@ relay::parse_result_t parse(std::string_view data) noexcept {
     case type_t::session_invitation:
         return parse_session_invitation(tail);
     default:
-        return relay::protocol_error_t{};
+        return protocol_error_t{};
     }
 }
 
-} // namespace syncspirit::proto
+} // namespace syncspirit::proto::relay

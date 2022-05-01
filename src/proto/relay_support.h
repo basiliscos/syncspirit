@@ -6,6 +6,8 @@
 #include <string>
 #include <cstdint>
 #include <variant>
+#include <model/misc/arc.hpp>
+#include "syncspirit-export.h"
 
 namespace syncspirit::proto {
 
@@ -51,10 +53,9 @@ struct wrapped_message_t {
 
 using parse_result_t = std::variant<incomplete_t, protocol_error_t, wrapped_message_t>;
 
+SYNCSPIRIT_API size_t serialize(const relay::message_t &, std::string &out) noexcept;
+SYNCSPIRIT_API parse_result_t parse(std::string_view data) noexcept;
+
 } // namespace relay
-
-size_t serialize(const relay::message_t &, std::string &out) noexcept;
-
-relay::parse_result_t parse(std::string_view data) noexcept;
 
 } // namespace syncspirit::proto
