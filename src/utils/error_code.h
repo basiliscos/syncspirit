@@ -68,6 +68,7 @@ enum class error_code_t {
     unknown_sink,
     misconfigured_default_logger,
     already_connected,
+    cannot_get_public_relays,
 };
 
 enum class bep_error_code_t {

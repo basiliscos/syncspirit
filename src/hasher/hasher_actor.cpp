@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #include "hasher_actor.h"
-#include "../net/names.h"
 #include "../utils/tls.h"
 #include <fmt/fmt.h>
 #include <zlib.h>

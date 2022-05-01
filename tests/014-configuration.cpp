@@ -48,7 +48,8 @@ bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept {
 }
 
 bool operator==(const relay_config_t &lhs, const relay_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.discovery_url == rhs.discovery_url;
+    return lhs.enabled == rhs.enabled && lhs.discovery_url == rhs.discovery_url &&
+            lhs.rx_buff_size == rhs.rx_buff_size;
 }
 
 bool operator==(const main_t &lhs, const main_t &rhs) noexcept {

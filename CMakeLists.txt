@@ -134,6 +134,7 @@ add_library(syncspirit_lib
     src/net/net_supervisor.cpp
     src/net/peer_actor.cpp
     src/net/peer_supervisor.cpp
+    src/net/relay_actor.cpp
     src/net/resolver_actor.cpp
     src/net/names.cpp
     src/net/ssdp_actor.cpp

@@ -13,6 +13,7 @@ struct SYNCSPIRIT_API names {
     static const char *resolver;
     static const char *http10;
     static const char *http11_gda;
+    static const char *http11_relay;
     static const char *hasher_proxy;
 };
 

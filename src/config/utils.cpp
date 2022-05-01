@@ -237,6 +237,30 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         c.debug = debug.value();
     };
 
+    // relay
+    {
+        auto t = root_tbl["relay"];
+        auto &c = cfg.relay_config;
+
+        auto enabled = t["enabled"].value<bool>();
+        if (!enabled) {
+            return "relay/enabled is incorrect or missing";
+        }
+        c.enabled = enabled.value();
+
+        auto discovery_url = t["discovery_url"].value<std::string>();
+        if (!discovery_url) {
+            return "upnp/discovery_url is incorrect or missing";
+        }
+        c.discovery_url = discovery_url.value();
+
+        auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
+        if (!rx_buff_size) {
+            return "relay/rx_buff_size is incorrect or missing";
+        }
+        c.rx_buff_size = rx_buff_size.value();
+    };
+
     // bep
     {
         auto t = root_tbl["bep"];
@@ -422,6 +446,11 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                    {"upper_limit", cfg.db_config.upper_limit},
                    {"uncommited_threshold", cfg.db_config.uncommited_threshold},
                }}},
+        {"relay", toml::table{{
+                      {"enabled", cfg.relay_config.enabled},
+                      {"discovery_url", cfg.relay_config.discovery_url},
+                      {"rx_buff_size", cfg.relay_config.rx_buff_size},
+                  }}},
     }};
     // clang-format on
     out << tbl;
@@ -513,6 +542,11 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     cfg.db_config = db_config_t {
         0x400000000,   /* upper_limit, 16Gb */
         150,           /* uncommited_threshold */
+    };
+    cfg.relay_config = relay_config_t {
+        true,                                       /* enabled */
+        "https://relays.syncthing.net/endpoint",    /* discovery url */
+        1024 * 1024,                                /* rx buff size */
     };
     return cfg;
 }

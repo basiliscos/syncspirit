@@ -14,6 +14,7 @@
 #include "peer_supervisor.h"
 #include "dialer_actor.h"
 #include "db_actor.h"
+#include "relay_actor.h"
 #include "names.h"
 #include <boost/filesystem.hpp>
 #include <algorithm>
@@ -287,6 +288,34 @@ void net_supervisor_t::launch_net() noexcept {
                 .device_id(std::move(global_device))
                 .rx_buff_size(gcfg.rx_buff_size)
                 .io_timeout(gcfg.timeout)
+                .spawner_address(spawner)
+                .finish();
+        };
+        spawn(factory)
+            .restart_period(pt::seconds{5})
+            .restart_period(r::pt::seconds{10})
+            .restart_policy(r::restart_policy_t::fail_only)
+            .spawn();
+    }
+
+    if (app_config.relay_config.enabled) {
+        auto timeout = shutdown_timeout * 9 / 10;
+        auto io_timeout = shutdown_timeout * 8 / 10;
+        create_actor<http_actor_t>()
+            .timeout(timeout)
+            .request_timeout(io_timeout)
+            .resolve_timeout(io_timeout)
+            .registry_name(names::http11_relay)
+            .keep_alive(true)
+            .escalate_failure()
+            .finish();
+
+        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+            auto timeout = shutdown_timeout * 9 / 10;
+            return create_actor<relay_actor_t>()
+                .timeout(timeout)
+                .relay_config(app_config.relay_config)
+                .cluster(cluster)
                 .spawner_address(spawner)
                 .finish();
         };

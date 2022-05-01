@@ -101,6 +101,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::already_connected:
         r = "peer is already connected";
         break;
+    case error_code_t::cannot_get_public_relays:
+        r = "cannot get public relays";
+        break;
     default:
         r = "unknown";
     }

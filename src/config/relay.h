@@ -10,6 +10,7 @@ namespace syncspirit::config {
 struct relay_config_t {
     bool enabled;
     std::string discovery_url;
+    std::uint32_t rx_buff_size;
 };
 
 } // namespace syncspirit::config

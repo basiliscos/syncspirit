@@ -295,48 +295,53 @@ outcome::result<relay_infos_t> parse_endpoint(std::string_view buff) noexcept {
     auto r = relay_infos_t{};
     for (auto &it : relays) {
         if (!it.is_object()) {
+            continue;
             return make_error_code(error_code_t::incorrect_json);
         }
         auto &url = it["url"];
         if (!url.is_string()) {
-            return make_error_code(error_code_t::incorrect_json);
+            continue;
         }
         auto uri_str = url.get<std::string>();
         auto uri_option = utils::parse(uri_str.c_str());
         if (!uri_option) {
-            return make_error_code(error_code_t::incorrect_json);
+            continue;
+        }
+        auto& uri = uri_option.value();
+        if (uri.proto != "relay") {
+            continue;
         }
         auto &location = it["location"];
         if (!location.is_object()) {
-            return make_error_code(error_code_t::incorrect_json);
+            continue;
         }
         auto &latitude = location["latitude"];
         if (!latitude.is_number_float()) {
-            return make_error_code(error_code_t::incorrect_json);
+            continue;
         }
         auto &longitude = location["longitude"];
         if (!longitude.is_number_float()) {
-            return make_error_code(error_code_t::incorrect_json);
+            continue;
         }
         auto &city = location["city"];
         if (!city.is_string()) {
-            return make_error_code(error_code_t::incorrect_json);
+            continue;
         }
         auto &country = location["country"];
         if (!country.is_string()) {
-            return make_error_code(error_code_t::incorrect_json);
+            continue;
         }
         auto &continent = location["continent"];
         if (!continent.is_string()) {
-            return make_error_code(error_code_t::incorrect_json);
+            continue;
         }
-        auto relay = relay_info_ptr_t{new relay_info_t{std::move(uri_option.value()), location_t{
-                                                                                          latitude.get<float>(),
-                                                                                          longitude.get<float>(),
-                                                                                          city.get<std::string>(),
-                                                                                          country.get<std::string>(),
-                                                                                          continent.get<std::string>(),
-                                                                                      }}};
+        auto relay = relay_info_ptr_t{new relay_info_t{std::move(uri), location_t{
+                                                                                  latitude.get<float>(),
+                                                                                  longitude.get<float>(),
+                                                                                  city.get<std::string>(),
+                                                                                  country.get<std::string>(),
+                                                                                  continent.get<std::string>(),
+                                                                              }}};
         r.emplace_back(std::move(relay));
     }
     return std::move(r);
