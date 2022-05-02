@@ -307,7 +307,7 @@ outcome::result<relay_infos_t> parse_endpoint(std::string_view buff) noexcept {
         if (!uri_option) {
             continue;
         }
-        auto& uri = uri_option.value();
+        auto &uri = uri_option.value();
         if (uri.proto != "relay") {
             continue;
         }
@@ -336,12 +336,12 @@ outcome::result<relay_infos_t> parse_endpoint(std::string_view buff) noexcept {
             continue;
         }
         auto relay = relay_info_ptr_t{new relay_info_t{std::move(uri), location_t{
-                                                                                  latitude.get<float>(),
-                                                                                  longitude.get<float>(),
-                                                                                  city.get<std::string>(),
-                                                                                  country.get<std::string>(),
-                                                                                  continent.get<std::string>(),
-                                                                              }}};
+                                                                           latitude.get<float>(),
+                                                                           longitude.get<float>(),
+                                                                           city.get<std::string>(),
+                                                                           country.get<std::string>(),
+                                                                           continent.get<std::string>(),
+                                                                       }}};
         r.emplace_back(std::move(relay));
     }
     return std::move(r);
