@@ -175,7 +175,8 @@ struct fixture_t {
             .timeout(timeout)
             .peer_device_id(peer_device->device_id())
             .uris({peer_uri})
-            .cluster(cluster)
+            .cluster(use_model ? cluster : nullptr)
+            .sink(sup->get_address())
             .ssl_pair(&my_keys)
             .escalate_failure()
             .finish();
@@ -187,6 +188,7 @@ struct fixture_t {
             .sock(std::move(peer_sock))
             .ssl_pair(&my_keys)
             .cluster(cluster)
+            .sink(sup->get_address())
             .escalate_failure()
             .finish();
     }
@@ -208,7 +210,8 @@ struct fixture_t {
     transport::stream_sp_t peer_trans;
     ready_ptr_t connected_message;
     diff_msgs_t diff_msgs;
-    ;
+    bool use_model = true;
+
     bool valid_handshake = false;
 };
 
@@ -300,6 +303,24 @@ void test_connection_refused() {
     F().run();
 }
 
+void test_connection_refused_no_model() {
+    struct F : fixture_t {
+        F() { use_model = false; }
+
+        std::string get_uri(const asio::ip::tcp::endpoint &) noexcept override {
+            return fmt::format("tcp://{}:0", host);
+        }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+        }
+    };
+    F().run();
+}
+
 void test_resolve_failure() {
     struct F : fixture_t {
 
@@ -330,6 +351,26 @@ void test_success() {
             REQUIRE(diff_msgs.size() == 1);
             CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
             CHECK(peer_device->get_state() == device_state_t::dialing);
+        }
+    };
+    F().run();
+}
+
+void test_success_no_model() {
+    struct F : fixture_t {
+        F() { use_model = false; }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::OPERATIONAL);
+            CHECK(connected_message);
+            CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
+            CHECK(valid_handshake);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            REQUIRE(diff_msgs.size() == 0);
         }
     };
     F().run();
@@ -422,8 +463,10 @@ REGISTER_TEST_CASE(test_connect_timeout, "test_connect_timeout", "[initiator]");
 REGISTER_TEST_CASE(test_handshake_timeout, "test_handshake_timeout", "[initiator]");
 REGISTER_TEST_CASE(test_handshake_garbage, "test_handshake_garbage", "[initiator]");
 REGISTER_TEST_CASE(test_connection_refused, "test_connection_refused", "[initiator]");
+REGISTER_TEST_CASE(test_connection_refused_no_model, "test_connection_refused_no_model", "[initiator]");
 REGISTER_TEST_CASE(test_resolve_failure, "test_resolve_failure", "[initiator]");
 REGISTER_TEST_CASE(test_success, "test_success", "[initiator]");
+REGISTER_TEST_CASE(test_success_no_model, "test_success_no_model", "[initiator]");
 REGISTER_TEST_CASE(test_passive_success, "test_passive_success", "[initiator]");
 REGISTER_TEST_CASE(test_passive_garbage, "test_passive_garbage", "[initiator]");
 REGISTER_TEST_CASE(test_passive_timeout, "test_passive_timeout", "[initiator]");

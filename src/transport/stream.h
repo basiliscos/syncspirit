@@ -20,8 +20,6 @@ struct stream_base_t : model::arc_base_t<stream_base_t>, stream_interface_t {
     virtual ~stream_base_t();
 };
 
-using stream_sp_t = model::intrusive_ptr_t<stream_base_t>;
-
 stream_sp_t initiate_tls_active(ra::supervisor_asio_t &supervisor, const utils::key_pair_t &my_keys,
                                 const model::device_id_t &expected_peer, const utils::URI &uri, bool sni = false,
                                 std::string_view alpn = "") noexcept;

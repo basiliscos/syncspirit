@@ -98,6 +98,22 @@ TEST_CASE("relay proto", "[relay]") {
             CHECK(target->address == source.address);
             CHECK(target->server_socket == source.server_socket);
         }
+
+        SECTION("response piece") {
+            const unsigned char data[] = {0x9e, 0x79, 0xbc, 0x40, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00,
+                                          0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07,
+                                          0x73, 0x75, 0x63, 0x63, 0x65, 0x73, 0x73, 0x00};
+            auto ptr = reinterpret_cast<const char *>(data);
+            auto r = parse({ptr, sizeof(data)});
+            auto msg = std::get_if<wrapped_message_t>(&r);
+            REQUIRE(msg);
+            CHECK(msg->length == 28);
+            auto target = std::get_if<response_t>(&msg->message);
+            REQUIRE(target);
+            CHECK(target->code == 0);
+            auto details = std::string_view("success");
+            CHECK(target->details == details);
+        }
     }
 
     SECTION("incompplete") {
@@ -140,7 +156,7 @@ TEST_CASE("endpoing parsing", "[relay]") {
 {
   "relays": [
     {
-      "url": "relay://130.61.176.206:22067/?id=OAKAXEX-7HE764M-5EWVN7U-SZCQU4D-ZPXF2TY-SNTL2LL-Y5RVGVM-U7WBRA3&pingInterval=1m0s&networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=ina",
+      "url": "relay://130.61.176.206:22067/?id=OAKAXEX-7HE764M-5EWVN7U-SZCQU4D-ZPXF2TY-SNTL2LL-Y5RVGVM-U7WBRA3&pingInterval=1m30s&networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=ina",
       "location": {
         "latitude": 50.1049,
         "longitude": 8.6295,
@@ -191,12 +207,14 @@ TEST_CASE("endpoing parsing", "[relay]") {
     REQUIRE(r.value().size() == 1);
     auto relay = r.value()[0];
     CHECK(relay->uri.full == "relay://130.61.176.206:22067/"
-                             "?id=OAKAXEX-7HE764M-5EWVN7U-SZCQU4D-ZPXF2TY-SNTL2LL-Y5RVGVM-U7WBRA3&pingInterval=1m0s&"
+                             "?id=OAKAXEX-7HE764M-5EWVN7U-SZCQU4D-ZPXF2TY-SNTL2LL-Y5RVGVM-U7WBRA3&pingInterval=1m30s&"
                              "networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=ina");
+    CHECK(relay->device_id.get_short() == "OAKAXEX");
     auto &l = relay->location;
     CHECK(abs(l.latitude - 50.1049) < 0.0001);
     CHECK(abs(l.longitude - 8.6295) < 0.0001);
     CHECK(l.city == "Frankfurt am Main");
     CHECK(l.country == "DE");
     CHECK(l.continent == "EU");
+    CHECK(relay->ping_interval == pt::seconds{90});
 }

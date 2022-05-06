@@ -74,6 +74,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::rx_timeout:
         r = "rx timeout";
         break;
+    case error_code_t::tx_timeout:
+        r = "tx timeout";
+        break;
     case error_code_t::announce_failed:
         r = "announce failed";
         break;
@@ -103,6 +106,12 @@ std::string error_code_category::message(int c) const {
         break;
     case error_code_t::cannot_get_public_relays:
         r = "cannot get public relays";
+        break;
+    case error_code_t::protocol_error:
+        r = "protocol error";
+        break;
+    case error_code_t::relay_failure:
+        r = "relay failure";
         break;
     default:
         r = "unknown";

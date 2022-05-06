@@ -35,6 +35,46 @@ static constexpr auto header_sz = sizeof(header_t);
 static constexpr auto max_packet_sz = size_t{1400};
 static constexpr uint32_t magic = 0x9E79BC40;
 
+static pt::time_duration parse_interval(const std::string_view in) noexcept {
+    auto ptr = in.data();
+    auto end = in.data() + in.size();
+    auto s = ptr;
+    auto e = ptr;
+    while (ptr < end && *ptr != 'm') {
+        ++ptr;
+    }
+    if (*ptr == 'm') {
+        e = ptr++;
+    };
+    int mins = 0;
+    while (s < e) {
+        mins *= 10;
+        mins += *s - '0';
+        ++s;
+    }
+
+    s = e = ptr;
+    while (ptr < end && *ptr != 's') {
+        ++ptr;
+    }
+    if (*ptr == 's') {
+        e = ptr;
+    };
+
+    int secs = 0;
+    while (s < e) {
+        secs *= 10;
+        secs += *s - '0';
+        ++s;
+    }
+
+    if (mins == 0 && secs == 0) {
+        mins = 1;
+    }
+
+    return pt::minutes{mins} + pt::seconds{secs};
+}
+
 static void serialize_header(char *ptr, type_t type, size_t payload_sz) noexcept {
     auto h = header_t{be::native_to_big(magic), be::native_to_big(static_cast<uint32_t>(type)),
                       be::native_to_big(static_cast<uint32_t>(payload_sz))};
@@ -147,7 +187,7 @@ static parse_result_t parse_join_session_request(std::string_view data) noexcept
     }
     auto ptr = data.data();
     auto sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(ptr));
-    if (sz + sizeof(uint32_t) != data.size()) {
+    if (sz + sizeof(uint32_t) > data.size()) {
         return protocol_error_t{};
     }
     auto tail = data.substr(sizeof(uint32_t));
@@ -162,10 +202,10 @@ static parse_result_t parse_response(std::string_view data) noexcept {
     auto code = be::big_to_native(*reinterpret_cast<const uint32_t *>(ptr));
     ptr += sizeof(uint32_t);
     auto sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(ptr));
-    if (sz + sizeof(uint32_t) * 2 != data.size()) {
+    if (sz + sizeof(uint32_t) * 2 > data.size()) {
         return protocol_error_t{};
     }
-    auto tail = data.substr(sizeof(uint32_t) * 2);
+    auto tail = data.substr(sizeof(uint32_t) * 2, sz);
     return wrapped_message_t{header_sz + data.size(), response_t{code, std::string(tail)}};
 }
 
@@ -311,6 +351,26 @@ outcome::result<relay_infos_t> parse_endpoint(std::string_view buff) noexcept {
         if (uri.proto != "relay") {
             continue;
         }
+        auto device_id_str = std::string{};
+        auto ping_interval_str = std::string{};
+        auto q = uri.decompose_query();
+        for (auto &pair : q) {
+            if (pair.first == "id") {
+                device_id_str = std::move(pair.second);
+            } else if (pair.first == "pingInterval") {
+                ping_interval_str = std::move(pair.second);
+            }
+        }
+        if (device_id_str.empty()) {
+            continue;
+        }
+        auto device_id = model::device_id_t::from_string(device_id_str);
+        if (!device_id) {
+            continue;
+        }
+
+        auto ping_interval = parse_interval(ping_interval_str);
+
         auto &location = it["location"];
         if (!location.is_object()) {
             continue;
@@ -335,13 +395,15 @@ outcome::result<relay_infos_t> parse_endpoint(std::string_view buff) noexcept {
         if (!continent.is_string()) {
             continue;
         }
-        auto relay = relay_info_ptr_t{new relay_info_t{std::move(uri), location_t{
-                                                                           latitude.get<float>(),
-                                                                           longitude.get<float>(),
-                                                                           city.get<std::string>(),
-                                                                           country.get<std::string>(),
-                                                                           continent.get<std::string>(),
-                                                                       }}};
+        auto relay = relay_info_ptr_t{new relay_info_t{std::move(uri), device_id.value(),
+                                                       location_t{
+                                                           latitude.get<float>(),
+                                                           longitude.get<float>(),
+                                                           city.get<std::string>(),
+                                                           country.get<std::string>(),
+                                                           continent.get<std::string>(),
+                                                       },
+                                                       ping_interval}};
         r.emplace_back(std::move(relay));
     }
     return std::move(r);

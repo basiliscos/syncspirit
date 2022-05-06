@@ -5,6 +5,7 @@
 
 using namespace syncspirit::net;
 
+const char *names::peer_supervisor = "net::peer_supervisor";
 const char *names::coordinator = "net::coodinator";
 const char *names::resolver = "net::resolver";
 const char *names::http10 = "net::http10";

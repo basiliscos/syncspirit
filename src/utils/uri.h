@@ -8,10 +8,14 @@
 #include <boost/utility/string_view.hpp>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace syncspirit::utils {
 
 struct SYNCSPIRIT_API URI {
+    using StringPair = std::pair<std::string, std::string>;
+    using StringPairs = std::vector<StringPair>;
+
     std::string full;
     std::string host;
     std::uint16_t port;
@@ -24,6 +28,8 @@ struct SYNCSPIRIT_API URI {
     void set_path(const std::string &value) noexcept;
     void set_query(const std::string &value) noexcept;
     std::string relative() const noexcept;
+
+    StringPairs decompose_query() const noexcept;
 
     inline bool operator==(const URI &other) const noexcept { return full == other.full; }
     inline operator bool() const noexcept { return !full.empty(); }

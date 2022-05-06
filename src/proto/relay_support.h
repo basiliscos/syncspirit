@@ -8,13 +8,16 @@
 #include <variant>
 #include <vector>
 #include <model/misc/arc.hpp>
+#include <model/device_id.h>
 #include "utils/uri.h"
 #include "syncspirit-export.h"
 #include <boost/outcome.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace syncspirit::proto::relay {
 
 namespace outcome = boost::outcome_v2;
+namespace pt = boost::posix_time;
 
 struct ping_t {};
 
@@ -68,10 +71,13 @@ struct location_t {
 };
 
 struct relay_info_t : model::arc_base_t<relay_info_t> {
-    inline relay_info_t(utils::URI uri_, location_t location_) noexcept
-        : uri(std::move(uri_)), location{std::move(location_)} {}
+    inline relay_info_t(utils::URI uri_, const model::device_id_t &device_id_, location_t location_,
+                        const pt::time_duration &ping_interval_) noexcept
+        : uri(std::move(uri_)), device_id{device_id_}, location{std::move(location_)}, ping_interval{ping_interval_} {}
     utils::URI uri;
+    model::device_id_t device_id;
     location_t location;
+    pt::time_duration ping_interval;
 };
 
 using relay_info_ptr_t = model::intrusive_ptr_t<relay_info_t>;

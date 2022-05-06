@@ -77,4 +77,22 @@ void URI::set_query(const std::string &value) noexcept {
 
 std::string URI::relative() const noexcept { return path + query; }
 
+auto URI::decompose_query() const noexcept -> StringPairs {
+    StringPairs r;
+    UriQueryListA *queryList;
+    int itemCount;
+    auto q = query.data();
+    if (uriDissectQueryMallocA(&queryList, &itemCount, q, q + query.size()) != URI_SUCCESS) {
+        return {};
+    }
+    using guard_t = std::unique_ptr<UriQueryListA, std::function<void(UriQueryListA *)>>;
+    guard_t guard(queryList, [](auto ptr) { uriFreeQueryListA(ptr); });
+    auto p = queryList;
+    while (p) {
+        r.emplace_back(StringPair(p->key, p->value));
+        p = p->next;
+    }
+    return r;
+}
+
 }; // namespace syncspirit::utils

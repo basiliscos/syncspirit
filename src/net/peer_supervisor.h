@@ -73,9 +73,11 @@ struct SYNCSPIRIT_API peer_supervisor_t : public ra::supervisor_asio_t,
     void on_start() noexcept override;
 
   private:
+    void on_connect(message::connect_request_t &) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
     void on_contact_update(model::message::contact_update_t &) noexcept;
-    void on_ready(message::peer_connected_t &) noexcept;
+    void on_peer_ready(message::peer_connected_t &) noexcept;
+    void on_connected(message::peer_connected_t &) noexcept;
 
     outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_contact_t &) noexcept override;
@@ -84,6 +86,7 @@ struct SYNCSPIRIT_API peer_supervisor_t : public ra::supervisor_asio_t,
     model::cluster_ptr_t cluster;
     utils::logger_t log;
     r::address_ptr_t coordinator;
+    r::address_ptr_t addr_unknown;
     std::string_view device_name;
     const utils::key_pair_t &ssl_pair;
     config::bep_config_t bep_config;

@@ -49,4 +49,8 @@ struct transport_config_t {
     std::optional<tcp::socket> sock;
 };
 
+struct stream_base_t;
+
+using stream_sp_t = model::intrusive_ptr_t<stream_base_t>;
+
 } // namespace syncspirit::transport

@@ -17,6 +17,8 @@ struct initiator_actor_config_t : public r::actor_config_t {
     const utils::key_pair_t *ssl_pair;
     std::optional<tcp_socket_t> sock;
     model::cluster_ptr_t cluster;
+    r::address_ptr_t sink;
+    r::message_ptr_t custom;
 };
 
 template <typename Actor> struct initiator_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -48,6 +50,16 @@ template <typename Actor> struct initiator_actor_config_builder_t : r::actor_con
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&sink(const r::address_ptr_t &value) &&noexcept {
+        parent_t::config.sink = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&custom(r::message_ptr_t value) &&noexcept {
+        parent_t::config.custom = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct initiator_actor_t : r::actor_base_t {
@@ -59,6 +71,8 @@ struct initiator_actor_t : r::actor_base_t {
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
+
+    template <typename T> auto &access() noexcept;
 
   private:
     using resolve_it_t = payload::address_response_t::resolve_results_t::iterator;
@@ -79,6 +93,8 @@ struct initiator_actor_t : r::actor_base_t {
     const utils::key_pair_t &ssl_pair;
     std::optional<tcp_socket_t> sock;
     model::cluster_ptr_t cluster;
+    r::address_ptr_t sink;
+    r::message_ptr_t custom;
 
     transport::stream_sp_t transport;
     r::address_ptr_t resolver;
@@ -97,6 +113,7 @@ struct peer_connected_t {
     transport::stream_sp_t transport;
     model::device_id_t peer_device_id;
     tcp::endpoint remote_endpoint;
+    r::message_ptr_t custom;
 };
 
 } // namespace payload

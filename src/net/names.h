@@ -9,6 +9,7 @@ namespace syncspirit {
 namespace net {
 
 struct SYNCSPIRIT_API names {
+    static const char *peer_supervisor;
     static const char *coordinator;
     static const char *resolver;
     static const char *http10;

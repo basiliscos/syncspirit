@@ -23,15 +23,21 @@ peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
 
 void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("peer_supervisor", false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity("peer_supervisor", false);
+        addr_unknown = p.create_address();
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.register_name(names::peer_supervisor, get_address());
         p.discover_name(names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&peer_supervisor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&peer_supervisor_t::on_contact_update, coordinator);
-                plugin->subscribe_actor(&peer_supervisor_t::on_ready);
+                plugin->subscribe_actor(&peer_supervisor_t::on_peer_ready);
+                plugin->subscribe_actor(&peer_supervisor_t::on_connect);
+                plugin->subscribe_actor(&peer_supervisor_t::on_connected, addr_unknown);
             }
         });
     });
@@ -70,8 +76,8 @@ void peer_supervisor_t::on_contact_update(model::message::contact_update_t &msg)
     }
 }
 
-void peer_supervisor_t::on_ready(message::peer_connected_t &msg) noexcept {
-    LOG_TRACE(log, "{}, on_ready", identity);
+void peer_supervisor_t::on_peer_ready(message::peer_connected_t &msg) noexcept {
+    LOG_TRACE(log, "{}, on_peer_ready", identity);
     auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
     auto &p = msg.payload;
     create_actor<peer_actor_t>()
@@ -83,6 +89,27 @@ void peer_supervisor_t::on_ready(message::peer_connected_t &msg) noexcept {
         .peer_endpoint(p.remote_endpoint)
         .timeout(timeout)
         .cluster(cluster)
+        .finish();
+}
+
+void peer_supervisor_t::on_connected(message::peer_connected_t &msg) noexcept {
+    LOG_TRACE(log, "{}, on_connected", identity);
+    auto &p = msg.payload;
+    auto req = static_cast<message::connect_request_t *>(p.custom.get());
+    reply_to(*req, std::move(p.transport));
+}
+
+void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
+    auto &p = msg.payload.request_payload;
+    auto connect_timeout = r::pt::milliseconds{bep_config.connect_timeout};
+    create_actor<initiator_actor_t>()
+        .ssl_pair(&ssl_pair)
+        .peer_device_id(p.device_id)
+        .uris({p.uri})
+        .custom(&msg)
+        .sink(addr_unknown)
+        .init_timeout(connect_timeout * 2)
+        .shutdown_timeout(connect_timeout)
         .finish();
 }
 

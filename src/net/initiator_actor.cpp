@@ -20,7 +20,8 @@ r::plugin::resource_id_t handshake = 3;
 
 initiator_actor_t::initiator_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, uris{cfg.uris}, ssl_pair{*cfg.ssl_pair},
-      sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)} {
+      sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
+      custom(std::move(cfg.custom)) {
     log = utils::get_logger("net.initator");
     active = !sock.has_value();
 }
@@ -42,11 +43,13 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&initiator_actor_t::on_resolve);
         resources->acquire(resource::initializing);
         if (active) {
-            auto diff = model::diff::cluster_diff_ptr_t();
-            auto state = model::device_state_t::dialing;
-            auto sha256 = peer_device_id.get_sha256();
-            diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
-            send<model::payload::model_update_t>(coordinator, std::move(diff));
+            if (cluster) {
+                auto diff = model::diff::cluster_diff_ptr_t();
+                auto state = model::device_state_t::dialing;
+                auto sha256 = peer_device_id.get_sha256();
+                diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
+                send<model::payload::model_update_t>(coordinator, std::move(diff));
+            }
             initiate_active();
         } else {
             initiate_passive();
@@ -93,8 +96,7 @@ void initiator_actor_t::initiate_passive() noexcept {
 void initiator_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     LOG_TRACE(log, "{}, on_start", identity);
-    auto &addr = supervisor->get_address();
-    send<payload::peer_connected_t>(addr, std::move(transport), peer_device_id, remote_endpoint);
+    send<payload::peer_connected_t>(sink, std::move(transport), peer_device_id, remote_endpoint, std::move(custom));
     success = true;
     do_shutdown();
 }
@@ -115,7 +117,7 @@ void initiator_actor_t::shutdown_start() noexcept {
 
 void initiator_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "{}, shutdown_finish", identity);
-    if (active && !success) {
+    if (active && !success && cluster) {
         auto diff = model::diff::cluster_diff_ptr_t();
         auto state = model::device_state_t::offline;
         auto sha256 = peer_device_id.get_sha256();
