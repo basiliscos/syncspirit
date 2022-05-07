@@ -171,6 +171,7 @@ void db_actor_t::shutdown_finish() noexcept {
     if (r != MDBX_SUCCESS) {
         LOG_ERROR(log, "{}, open, mbdx close error ({}): {}", identity, r, mdbx_strerror(r));
     }
+    env = nullptr;
     r::actor_base_t::shutdown_finish();
 }
 

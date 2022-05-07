@@ -19,6 +19,7 @@ struct initiator_actor_config_t : public r::actor_config_t {
     model::cluster_ptr_t cluster;
     r::address_ptr_t sink;
     r::message_ptr_t custom;
+    r::supervisor_t *router;
 };
 
 template <typename Actor> struct initiator_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -60,6 +61,11 @@ template <typename Actor> struct initiator_actor_config_builder_t : r::actor_con
         parent_t::config.custom = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&router(r::supervisor_t &value) &&noexcept {
+        parent_t::config.router = &value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct initiator_actor_t : r::actor_base_t {
@@ -95,6 +101,7 @@ struct initiator_actor_t : r::actor_base_t {
     model::cluster_ptr_t cluster;
     r::address_ptr_t sink;
     r::message_ptr_t custom;
+    r::supervisor_t &router;
 
     transport::stream_sp_t transport;
     r::address_ptr_t resolver;

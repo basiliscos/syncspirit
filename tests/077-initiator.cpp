@@ -178,6 +178,7 @@ struct fixture_t {
             .cluster(use_model ? cluster : nullptr)
             .sink(sup->get_address())
             .ssl_pair(&my_keys)
+            .router(*sup)
             .escalate_failure()
             .finish();
     }
@@ -187,6 +188,7 @@ struct fixture_t {
             .timeout(timeout)
             .sock(std::move(peer_sock))
             .ssl_pair(&my_keys)
+            .router(*sup)
             .cluster(cluster)
             .sink(sup->get_address())
             .escalate_failure()

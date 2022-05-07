@@ -61,7 +61,7 @@ void relay_actor_t::shutdown_start() noexcept {
     if (rx_state) {
         auto self = cluster->get_device();
         utils::uri_container_t uris;
-        for(auto& uri: self->get_uris()) {
+        for (auto &uri : self->get_uris()) {
             if (uri.proto != "relay") {
                 uris.emplace_back(uri);
             }

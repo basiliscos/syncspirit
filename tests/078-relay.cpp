@@ -45,11 +45,11 @@ struct supervisor_t : ra::supervisor_asio_t {
 
     void on_child_shutdown(actor_base_t *actor) noexcept override {
         if (actor) {
-            spdlog::info("child shutdown: {}, reason: {}", actor->get_identity(), actor->get_shutdown_reason()->message());
+            spdlog::info("child shutdown: {}, reason: {}", actor->get_identity(),
+                         actor->get_shutdown_reason()->message());
         }
         parent_t::on_child_shutdown(actor);
     }
-
 
     void shutdown_finish() noexcept override {
         parent_t::shutdown_finish();
@@ -73,8 +73,10 @@ struct fixture_t {
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
         utils::set_default("trace");
         log = utils::get_logger("fixture");
-        relay_config = config::relay_config_t {
-            true, "https://some-endpoint.com/", 1024 * 1024,
+        relay_config = config::relay_config_t{
+            true,
+            "https://some-endpoint.com/",
+            1024 * 1024,
         };
     }
 
@@ -85,9 +87,7 @@ struct fixture_t {
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 using contact_update_t = model::message::contact_update_t;
-                p.subscribe_actor(r::lambda<contact_update_t>([&](contact_update_t &msg) {
-                    on(msg);
-                }));
+                p.subscribe_actor(r::lambda<contact_update_t>([&](contact_update_t &msg) { on(msg); }));
                 using http_req_t = net::message::http_request_t;
                 p.subscribe_actor(r::lambda<http_req_t>([&](http_req_t &req) {
                     LOG_INFO(log, "received http request");
@@ -101,7 +101,6 @@ struct fixture_t {
                     LOG_INFO(log, "(connect request)");
                     on(req);
                 }));
-
             });
         };
         sup->start();
@@ -135,7 +134,8 @@ struct fixture_t {
 
     virtual void main() noexcept {}
 
-    virtual std::string generate_public_relays(const asio::ip::tcp::endpoint &endpoint, model::device_ptr_t& relay_device) noexcept {
+    virtual std::string generate_public_relays(const asio::ip::tcp::endpoint &endpoint,
+                                               model::device_ptr_t &relay_device) noexcept {
         std::string pattern = R""(
     {
       "relays": [
@@ -161,15 +161,13 @@ struct fixture_t {
         sup->acceptor = &acceptor;
     }
 
-
     virtual void accept(const sys::error_code &ec) noexcept {
         LOG_INFO(log, "accept (relay), ec: {}, sock = {}", ec.message(), peer_sock.native_handle());
         auto uri = utils::parse("tcp://127.0.0.1:0/").value();
-        auto cfg = transport::transport_config_t { {},  uri,  *sup,  std::move(peer_sock) };
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock)};
         relay_trans = transport::initiate_stream(cfg);
         relay_read();
     }
-
 
     virtual actor_ptr_t create_actor() noexcept {
         return sup->create_actor<actor_ptr_t::element_type>()
@@ -180,17 +178,15 @@ struct fixture_t {
             .finish();
     }
 
-    virtual void on(net::message::connect_request_t& req) noexcept {
-        auto& uri = req.payload.request_payload.uri;
+    virtual void on(net::message::connect_request_t &req) noexcept {
+        auto &uri = req.payload.request_payload.uri;
         log->info("requested connect to {}", uri.full);
-        auto cfg = transport::transport_config_t { {},  uri,  *sup,  {}  };
+        auto cfg = transport::transport_config_t{{}, uri, *sup, {}};
         tcp::resolver resolver(io_ctx);
         auto addresses = resolver.resolve(host, std::to_string(uri.port));
-        auto addresses_ptr = std::make_shared<decltype (addresses)>(addresses);
+        auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
         auto trans = transport::initiate_stream(cfg);
-        transport::error_fn_t on_error = [&](auto &ec) {
-            LOG_WARN(log, "active/connect, err: {}", ec.message());
-        };
+        transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "active/connect, err: {}", ec.message()); };
         using ptr_t = model::intrusive_ptr_t<std::decay_t<decltype(req)>>;
         auto ptr = ptr_t(&req);
         transport::connect_fn_t on_connect = [ptr, trans, addresses_ptr, this](auto arg) {
@@ -200,52 +196,43 @@ struct fixture_t {
         trans->async_connect(*addresses_ptr, on_connect, on_error);
     }
 
-
-    void on(proto::relay::ping_t&) noexcept {
-
-    };
-
-    void on(proto::relay::pong_t&) noexcept {
+    void on(proto::relay::ping_t &) noexcept {
 
     };
-    void on(proto::relay::join_relay_request_t&) noexcept {
+
+    void on(proto::relay::pong_t &) noexcept {
+
+    };
+    void on(proto::relay::join_relay_request_t &) noexcept {
         LOG_INFO(log, "join_relay_request_t");
         proto::relay::serialize(proto::relay::response_t{0, "ok"}, relay_tx);
 
-        transport::error_fn_t on_error = [&](auto &ec) {
-            LOG_WARN(log, "relay/write, err: {}", ec.message());
-        };
-        transport::io_fn_t on_write = [&](size_t bytes) {
-            LOG_TRACE(log, "relay/write, {} bytes", bytes);
-        };
+        transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "relay/write, err: {}", ec.message()); };
+        transport::io_fn_t on_write = [&](size_t bytes) { LOG_TRACE(log, "relay/write, {} bytes", bytes); };
         relay_trans->async_send(asio::buffer(relay_tx), on_write, on_error);
-        //relay_read();
+        // relay_read();
     };
-    void on(proto::relay::join_session_request_t&) noexcept {
+    void on(proto::relay::join_session_request_t &) noexcept {
 
     };
-    void on(proto::relay::response_t&) noexcept {
+    void on(proto::relay::response_t &) noexcept {
 
     };
-    void on(proto::relay::connect_request_t&) noexcept {
+    void on(proto::relay::connect_request_t &) noexcept {
 
     };
-    void on(proto::relay::session_invitation_t&) noexcept {
+    void on(proto::relay::session_invitation_t &) noexcept {
 
     };
-    virtual void on(model::message::contact_update_t& update) noexcept {
+    virtual void on(model::message::contact_update_t &update) noexcept {
         auto r = update.payload.diff->apply(*cluster);
         if (!r) {
             LOG_ERROR(log, "error applying diff: {}", r.error().message());
         }
     }
 
-
-
     void relay_read() noexcept {
-        transport::error_fn_t on_error = [&](auto &ec) {
-            LOG_WARN(log, "relay/read, err: {}", ec.message());
-        };
+        transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "relay/read, err: {}", ec.message()); };
         transport::io_fn_t on_read = [&](size_t bytes) {
             LOG_TRACE(log, "relay/read, {} bytes", bytes);
             auto msg = proto::relay::parse({relay_rx.data(), bytes});
@@ -254,9 +241,7 @@ struct fixture_t {
                 LOG_ERROR(log, "relay/read non-message?");
                 return;
             }
-            std::visit([&](auto& it) {
-                on(it);
-            }, wrapped->message);
+            std::visit([&](auto &it) { on(it); }, wrapped->message);
         };
         relay_rx.resize(1500);
         auto buff = asio::buffer(relay_rx.data(), relay_rx.size());
@@ -283,7 +268,6 @@ struct fixture_t {
     std::string relay_tx;
 };
 
-
 void test_master_connect() {
     struct F : fixture_t {
         void main() noexcept override {
@@ -293,7 +277,6 @@ void test_master_connect() {
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
             REQUIRE(my_device->get_uris().size() == 1);
             CHECK(my_device->get_uris()[0].proto == "relay");
-
 
             sup->shutdown();
             io_ctx.restart();
@@ -306,7 +289,7 @@ void test_master_connect() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
         }
 
-        void on(model::message::contact_update_t& update) noexcept override {
+        void on(model::message::contact_update_t &update) noexcept override {
             LOG_INFO(log, "contact_update_t");
             fixture_t::on(update);
             io_ctx.stop();
@@ -315,6 +298,5 @@ void test_master_connect() {
 
     F().run();
 }
-
 
 REGISTER_TEST_CASE(test_master_connect, "test_master_connect", "[relay]");

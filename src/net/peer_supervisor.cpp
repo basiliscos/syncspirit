@@ -107,6 +107,7 @@ void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
         .peer_device_id(p.device_id)
         .uris({p.uri})
         .custom(&msg)
+        .router(*locality_leader)
         .sink(addr_unknown)
         .init_timeout(connect_timeout * 2)
         .shutdown_timeout(connect_timeout)

@@ -21,7 +21,7 @@ r::plugin::resource_id_t handshake = 3;
 initiator_actor_t::initiator_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, uris{cfg.uris}, ssl_pair{*cfg.ssl_pair},
       sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
-      custom(std::move(cfg.custom)) {
+      custom(std::move(cfg.custom)), router{*cfg.router} {
     log = utils::get_logger("net.initator");
     active = !sock.has_value();
 }
@@ -69,7 +69,7 @@ void initiator_actor_t::initiate_active() noexcept {
     while (uri_idx < uris.size()) {
         auto &uri = uris[uri_idx++];
         if (uri.proto == "tcp") {
-            auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
+            auto sup = static_cast<ra::supervisor_asio_t *>(&router);
             auto trans = transport::initiate_tls_active(*sup, ssl_pair, peer_device_id, uri);
             initiate(std::move(trans), uri);
             return;
@@ -88,7 +88,7 @@ void initiator_actor_t::initiate_passive() noexcept {
         return;
     }
 
-    auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
+    auto sup = static_cast<ra::supervisor_asio_t *>(&router);
     transport = transport::initiate_tls_passive(*sup, ssl_pair, std::move(sock.value()));
     initiate_handshake();
 }
