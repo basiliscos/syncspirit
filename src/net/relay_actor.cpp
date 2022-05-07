@@ -2,6 +2,8 @@
 #include "names.h"
 #include "utils/error_code.h"
 #include "utils/beast_support.h"
+#include "model/messages.h"
+#include "model/diff/modify/update_contact.h"
 #include <spdlog/fmt/bin_to_hex.h>
 #include "messages.h"
 #include <cstdlib>
@@ -56,6 +58,19 @@ void relay_actor_t::shutdown_start() noexcept {
     if (resources->has(resource::io_read) || resources->has(resource::io_write)) {
         master->cancel();
     }
+    if (rx_state) {
+        auto self = cluster->get_device();
+        utils::uri_container_t uris;
+        for(auto& uri: self->get_uris()) {
+            if (uri.proto != "relay") {
+                uris.emplace_back(uri);
+            }
+        }
+        using namespace model::diff;
+        auto diff = model::diff::contact_diff_ptr_t{};
+        diff = new modify::update_contact_t(*cluster, self->device_id(), uris);
+        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+    }
 }
 
 void relay_actor_t::on_start() noexcept {
@@ -69,7 +84,7 @@ void relay_actor_t::connect_to_relay() noexcept {
     while (++attempts < 10) {
         relay_index = rand() % relays.size();
         auto relay = relays[relay_index];
-        if (!relay_index) {
+        if (!relay) {
             continue;
         }
         auto &l = relay->location;
@@ -82,7 +97,8 @@ void relay_actor_t::connect_to_relay() noexcept {
         return;
     }
     if (attempts >= 10) {
-        do_shutdown();
+        auto ec = utils::make_error_code(utils::error_code_t::relay_failure);
+        do_shutdown(make_error(ec));
     }
 }
 
@@ -162,7 +178,7 @@ void relay_actor_t::read_master() noexcept {
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg, resource::io_read); };
     resources->acquire(resource::io_read);
     auto buff = asio::buffer(rx_buff.data() + rx_idx, rx_buff.size() - rx_idx);
-    LOG_TRACE(log, "{}, read_more", identity);
+    LOG_TRACE(log, "{}, read_master, sz = {}", identity, buff.size());
     master->async_recv(buff, on_read, on_error);
 }
 
@@ -328,6 +344,13 @@ bool relay_actor_t::on(proto::relay::response_t &res) noexcept {
     }
     respawn_ping_timer();
     rx_state |= rx_state_t::invitation;
+    auto self = cluster->get_device();
+    auto uris = self->get_uris();
+    uris.emplace_back(relays[relay_index]->uri);
+    using namespace model::diff;
+    auto diff = model::diff::contact_diff_ptr_t{};
+    diff = new modify::update_contact_t(*cluster, self->device_id(), uris);
+    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     return true;
 }
 

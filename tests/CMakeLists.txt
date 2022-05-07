@@ -166,3 +166,13 @@ target_link_libraries(077-initiator syncspirit_test_lib
     $<$<PLATFORM_ID:Windows>:iphlpapi>
 )
 add_test(077-initiator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/077-initiator")
+
+add_executable(078-relay 078-relay.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(078-relay syncspirit_test_lib
+    $<$<PLATFORM_ID:Windows>:wsock32>
+    $<$<PLATFORM_ID:Windows>:ws2_32>
+    $<$<PLATFORM_ID:Windows>:iphlpapi>
+)
+add_test(078-relay "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/078-relay")
+
+

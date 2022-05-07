@@ -66,8 +66,19 @@ template <> struct base_impl_t<tcp_socket_t> {
     strand_t &strand;
     tcp_socket_t sock;
     bool cancelling = false;
+
+    static tcp_socket_t mk_sock(transport_config_t &config, strand_t &strand) noexcept {
+        if (config.sock) {
+            tcp::socket sock(std::move(config.sock.value()));
+            return {std::move(sock)};
+        } else {
+            tcp::socket sock(strand.context());
+            return {std::move(sock)};
+        }
+    }
+
     base_impl_t(transport_config_t &config) noexcept
-        : supervisor{config.supervisor}, strand{supervisor.get_strand()}, sock(strand.context()) {}
+        : supervisor{config.supervisor}, strand{supervisor.get_strand()}, sock(mk_sock(config, strand)) {}
 
     tcp_socket_t &get_physical_layer() noexcept { return sock; }
 };

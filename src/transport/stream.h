@@ -25,6 +25,6 @@ stream_sp_t initiate_tls_active(ra::supervisor_asio_t &supervisor, const utils::
                                 std::string_view alpn = "") noexcept;
 stream_sp_t initiate_tls_passive(ra::supervisor_asio_t &supervisor, const utils::key_pair_t &my_keys,
                                  tcp::socket sock) noexcept;
-// stream_sp_t initiate_stream(transport_config_t &config) noexcept;
+stream_sp_t initiate_stream(transport_config_t &config) noexcept;
 
 } // namespace syncspirit::transport
