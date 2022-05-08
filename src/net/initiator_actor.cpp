@@ -144,10 +144,9 @@ void initiator_actor_t::shutdown_start() noexcept {
     if (resources->has(resource::initializing)) {
         resources->release(resource::initializing);
     }
-    if (resources->has(resource::connect)) {
-        transport->cancel();
-    }
-    if (resources->has(resource::handshake)) {
+    bool cancel_transport = resources->has(resource::connect) || resources->has(resource::handshake) ||
+                            resources->has(resource::read) || resources->has(resource::write);
+    if (cancel_transport) {
         transport->cancel();
     }
     r::actor_base_t::shutdown_start();
