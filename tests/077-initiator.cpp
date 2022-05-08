@@ -462,53 +462,60 @@ void test_passive_timeout() {
     F().run();
 }
 
-void test_relay_passive_success() {
-    struct F : fixture_t {
+struct passive_relay_fixture_t: fixture_t {
+    std::string rx_buff;
+    bool initiate_handshake = true;
+    passive_relay_fixture_t() {
+        relay_session = "relay-session-key";
+        rx_buff.resize(128);
+    }
 
-        F() { rx_buff.resize(128); }
+    void on_read(size_t bytes) noexcept {
+        LOG_TRACE(log, "read (relay/passive), {} bytes", bytes);
+        auto r = proto::relay::parse({rx_buff.data(), bytes});
+        auto &wrapped = std::get<proto::relay::wrapped_message_t>(r);
+        auto &msg = std::get<proto::relay::join_session_request_t>(wrapped.message);
+        CHECK(msg.key == relay_session);
+        relay_reply();
+    }
 
-        void on_read(size_t bytes) noexcept {
-            LOG_TRACE(log, "read (relay/passive), {} bytes", bytes);
-            auto r = proto::relay::parse({rx_buff.data(), bytes});
-            auto &wrapped = std::get<proto::relay::wrapped_message_t>(r);
-            auto &msg = std::get<proto::relay::join_session_request_t>(wrapped.message);
-            CHECK(msg.key == relay_session);
-            relay_reply();
-        }
+    virtual void on_write(size_t bytes) noexcept {
+        LOG_TRACE(log, "write (relay/passive), {} bytes", bytes);
 
-        void on_write(size_t bytes) noexcept {
-            LOG_TRACE(log, "write (relay/passive), {} bytes", bytes);
-
+        if (initiate_handshake) {
             auto upgradeable = static_cast<transport::upgradeable_stream_base_t *>(peer_trans.get());
             auto ssl = transport::ssl_junction_t{my_device->device_id(), &peer_keys, false, "bep"};
             peer_trans = upgradeable->upgrade(ssl, true);
             initiate_peer_handshake();
         }
+    }
 
-        virtual void relay_reply() noexcept { write(proto::relay::response_t{0, "success"}); }
+    virtual void relay_reply() noexcept { write(proto::relay::response_t{0, "success"}); }
 
-        void write(const proto::relay::message_t &msg) noexcept {
-            proto::relay::serialize(msg, rx_buff);
-            auto buff = asio::buffer(rx_buff);
-            transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
-            transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
-            peer_trans->async_send(asio::buffer(rx_buff), write_fn, err_fn);
-        }
+    virtual void write(const proto::relay::message_t &msg) noexcept {
+        proto::relay::serialize(msg, rx_buff);
+        auto buff = asio::buffer(rx_buff);
+        transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
+        transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
+        peer_trans->async_send(asio::buffer(rx_buff), write_fn, err_fn);
+    }
 
-        void accept(const sys::error_code &ec) noexcept override {
-            LOG_INFO(log, "accept (relay/passive), ec: {}", ec.message());
-            auto uri = utils::parse("tcp://127.0.0.1:0/").value();
-            auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock)};
-            peer_trans = transport::initiate_stream(cfg);
+    void accept(const sys::error_code &ec) noexcept override {
+        LOG_INFO(log, "accept (relay/passive), ec: {}", ec.message());
+        auto uri = utils::parse("tcp://127.0.0.1:0/").value();
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock)};
+        peer_trans = transport::initiate_stream(cfg);
 
-            transport::error_fn_t read_err_fn(
-                [&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
-            transport::io_fn_t read_fn = [this](size_t bytes) { on_read(bytes); };
-            peer_trans->async_recv(asio::buffer(rx_buff), read_fn, read_err_fn);
-        }
+        transport::error_fn_t read_err_fn(
+            [&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
+        transport::io_fn_t read_fn = [this](size_t bytes) { on_read(bytes); };
+        peer_trans->async_recv(asio::buffer(rx_buff), read_fn, read_err_fn);
+    }
+};
 
+void test_relay_passive_success() {
+    struct F : passive_relay_fixture_t {
         void main() noexcept override {
-            relay_session = "relay-session-key";
             auto act = create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
@@ -518,10 +525,81 @@ void test_relay_passive_success() {
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            REQUIRE(diff_msgs.size() == 0);
+            CHECK(diff_msgs.size() == 0);
         }
 
-        std::string rx_buff;
+    };
+    F().run();
+}
+
+void test_relay_passive_gargabe() {
+    struct F : passive_relay_fixture_t {
+
+        void write(const proto::relay::message_t &) noexcept override {
+            rx_buff = "garbage-garbage-garbae";
+            initiate_handshake = false;
+            auto buff = asio::buffer(rx_buff);
+            transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
+            transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
+            peer_trans->async_send(asio::buffer(rx_buff), write_fn, err_fn);
+        }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+            CHECK(!valid_handshake);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(diff_msgs.size() == 0);
+        }
+
+    };
+    F().run();
+}
+
+void test_relay_passive_wrong_message() {
+    struct F : passive_relay_fixture_t {
+
+        void relay_reply() noexcept override { write(proto::relay::pong_t{}); }
+
+        void main() noexcept override {
+            initiate_handshake = false;
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+            CHECK(!valid_handshake);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(diff_msgs.size() == 0);
+        }
+
+    };
+    F().run();
+}
+
+void test_relay_passive_unsuccessful_join() {
+    struct F : passive_relay_fixture_t {
+
+        void relay_reply() noexcept override { write(proto::relay::response_t{5, "some-fail-reason"}); }
+
+        void main() noexcept override {
+            initiate_handshake = false;
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+            CHECK(!valid_handshake);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(diff_msgs.size() == 0);
+        }
+
     };
     F().run();
 }
@@ -539,3 +617,6 @@ REGISTER_TEST_CASE(test_passive_success, "test_passive_success", "[initiator]");
 REGISTER_TEST_CASE(test_passive_garbage, "test_passive_garbage", "[initiator]");
 REGISTER_TEST_CASE(test_passive_timeout, "test_passive_timeout", "[initiator]");
 REGISTER_TEST_CASE(test_relay_passive_success, "test_relay_passive_success", "[initiator]");
+REGISTER_TEST_CASE(test_relay_passive_gargabe, "test_relay_passive_gargabe", "[initiator]");
+REGISTER_TEST_CASE(test_relay_passive_wrong_message, "test_relay_passive_wrong_message", "[initiator]");
+REGISTER_TEST_CASE(test_relay_passive_unsuccessful_join, "test_relay_passive_unsuccessful_join", "[initiator]");

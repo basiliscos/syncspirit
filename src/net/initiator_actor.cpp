@@ -154,7 +154,7 @@ void initiator_actor_t::shutdown_start() noexcept {
 
 void initiator_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "{}, shutdown_finish", identity);
-    bool notify_offline = (role == role_t::active || role == role_t::relay_passive) && !success && cluster;
+    bool notify_offline = role == role_t::active && !success && cluster;
     if (notify_offline) {
         auto diff = model::diff::cluster_diff_ptr_t();
         auto state = model::device_state_t::offline;
