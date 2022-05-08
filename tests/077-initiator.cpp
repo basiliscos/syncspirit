@@ -8,6 +8,7 @@
 #include "net/names.h"
 #include "net/initiator_actor.h"
 #include "net/resolver_actor.h"
+#include "proto/relay_support.h"
 #include "transport/stream.h"
 #include <rotor/asio.hpp>
 
@@ -23,7 +24,7 @@ namespace ra = r::asio;
 
 using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
 
-auto timeout = r::pt::time_duration{r::pt::millisec{1500}};
+auto timeout = r::pt::time_duration{r::pt::millisec{2000}};
 auto host = "127.0.0.1";
 
 struct supervisor_t : ra::supervisor_asio_t {
@@ -174,6 +175,7 @@ struct fixture_t {
         return sup->create_actor<initiator_actor_t>()
             .timeout(timeout)
             .peer_device_id(peer_device->device_id())
+            .relay_session(relay_session)
             .uris({peer_uri})
             .cluster(use_model ? cluster : nullptr)
             .sink(sup->get_address())
@@ -212,6 +214,7 @@ struct fixture_t {
     transport::stream_sp_t peer_trans;
     ready_ptr_t connected_message;
     diff_msgs_t diff_msgs;
+    std::string relay_session;
     bool use_model = true;
 
     bool valid_handshake = false;
@@ -440,7 +443,6 @@ void test_passive_garbage() {
 
 void test_passive_timeout() {
     struct F : fixture_t {
-
         actor_ptr_t act;
 
         void accept(const sys::error_code &ec) noexcept override {
@@ -460,6 +462,70 @@ void test_passive_timeout() {
     F().run();
 }
 
+void test_relay_passive_success() {
+    struct F : fixture_t {
+
+        F() { rx_buff.resize(128); }
+
+        void on_read(size_t bytes) noexcept {
+            LOG_TRACE(log, "read (relay/passive), {} bytes", bytes);
+            auto r = proto::relay::parse({rx_buff.data(), bytes});
+            auto &wrapped = std::get<proto::relay::wrapped_message_t>(r);
+            auto &msg = std::get<proto::relay::join_session_request_t>(wrapped.message);
+            CHECK(msg.key == relay_session);
+            relay_reply();
+        }
+
+        void on_write(size_t bytes) noexcept {
+            LOG_TRACE(log, "write (relay/passive), {} bytes", bytes);
+
+            auto upgradeable = static_cast<transport::upgradeable_stream_base_t *>(peer_trans.get());
+            auto ssl = transport::ssl_junction_t{my_device->device_id(), &peer_keys, false, "bep"};
+            peer_trans = upgradeable->upgrade(ssl, true);
+            initiate_peer_handshake();
+        }
+
+        virtual void relay_reply() noexcept { write(proto::relay::response_t{0, "success"}); }
+
+        void write(const proto::relay::message_t &msg) noexcept {
+            proto::relay::serialize(msg, rx_buff);
+            auto buff = asio::buffer(rx_buff);
+            transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
+            transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
+            peer_trans->async_send(asio::buffer(rx_buff), write_fn, err_fn);
+        }
+
+        void accept(const sys::error_code &ec) noexcept override {
+            LOG_INFO(log, "accept (relay/passive), ec: {}", ec.message());
+            auto uri = utils::parse("tcp://127.0.0.1:0/").value();
+            auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock)};
+            peer_trans = transport::initiate_stream(cfg);
+
+            transport::error_fn_t read_err_fn(
+                [&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
+            transport::io_fn_t read_fn = [this](size_t bytes) { on_read(bytes); };
+            peer_trans->async_recv(asio::buffer(rx_buff), read_fn, read_err_fn);
+        }
+
+        void main() noexcept override {
+            relay_session = "relay-session-key";
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::OPERATIONAL);
+            CHECK(connected_message);
+            CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
+            CHECK(valid_handshake);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            REQUIRE(diff_msgs.size() == 0);
+        }
+
+        std::string rx_buff;
+    };
+    F().run();
+}
+
 REGISTER_TEST_CASE(test_connect_unsupproted_proto, "test_connect_unsupproted_proto", "[initiator]");
 REGISTER_TEST_CASE(test_connect_timeout, "test_connect_timeout", "[initiator]");
 REGISTER_TEST_CASE(test_handshake_timeout, "test_handshake_timeout", "[initiator]");
@@ -472,3 +538,4 @@ REGISTER_TEST_CASE(test_success_no_model, "test_success_no_model", "[initiator]"
 REGISTER_TEST_CASE(test_passive_success, "test_passive_success", "[initiator]");
 REGISTER_TEST_CASE(test_passive_garbage, "test_passive_garbage", "[initiator]");
 REGISTER_TEST_CASE(test_passive_timeout, "test_passive_timeout", "[initiator]");
+REGISTER_TEST_CASE(test_relay_passive_success, "test_relay_passive_success", "[initiator]");

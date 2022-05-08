@@ -171,7 +171,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
     virtual void accept(const sys::error_code &ec) noexcept {
         LOG_INFO(log, "accept (relay), ec: {}, sock = {}", ec.message(), peer_sock.native_handle());
         auto uri = utils::parse("tcp://127.0.0.1:0/").value();
-        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock)};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         relay_trans = transport::initiate_stream(cfg);
         relay_read();
     }
@@ -188,7 +188,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
     virtual void on(net::message::connect_request_t &req) noexcept {
         auto &uri = req.payload.request_payload.uri;
         log->info("requested connect to {}", uri.full);
-        auto cfg = transport::transport_config_t{{}, uri, *sup, {}};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, {}, true};
         tcp::resolver resolver(io_ctx);
         auto addresses = resolver.resolve(host, std::to_string(uri.port));
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);

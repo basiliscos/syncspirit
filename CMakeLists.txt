@@ -97,6 +97,7 @@ add_library(syncspirit_lib
     src/model/diff/modify/local_update.cpp
     src/model/diff/modify/lock_file.cpp
     src/model/diff/modify/new_file.cpp
+    src/model/diff/modify/relay_connect_request.cpp
     src/model/diff/modify/share_folder.cpp
     src/model/diff/modify/update_contact.cpp
     src/model/diff/modify/update_peer.cpp

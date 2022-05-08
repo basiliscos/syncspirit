@@ -47,6 +47,7 @@ struct transport_config_t {
     utils::URI uri;
     ra::supervisor_asio_t &supervisor;
     std::optional<tcp::socket> sock;
+    bool active;
 };
 
 struct stream_base_t;

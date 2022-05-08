@@ -66,6 +66,7 @@ template <> struct base_impl_t<tcp_socket_t> {
     strand_t &strand;
     tcp_socket_t sock;
     bool cancelling = false;
+    bool active;
 
     static tcp_socket_t mk_sock(transport_config_t &config, strand_t &strand) noexcept {
         if (config.sock) {
@@ -78,7 +79,8 @@ template <> struct base_impl_t<tcp_socket_t> {
     }
 
     base_impl_t(transport_config_t &config) noexcept
-        : supervisor{config.supervisor}, strand{supervisor.get_strand()}, sock(mk_sock(config, strand)) {}
+        : supervisor{config.supervisor}, strand{supervisor.get_strand()},
+          sock(mk_sock(config, strand)), active{config.active} {}
 
     tcp_socket_t &get_physical_layer() noexcept { return sock; }
 };
@@ -96,6 +98,7 @@ template <> struct base_impl_t<ssl_socket_t> {
     ssl_socket_t sock;
     bool validation_passed = false;
     bool cancelling = false;
+    bool active;
 
     static ssl::context get_context(self_t &source, std::string_view alpn) noexcept {
         ssl::context ctx(ssl::context::tls);
@@ -135,7 +138,8 @@ template <> struct base_impl_t<ssl_socket_t> {
     base_impl_t(transport_config_t &config) noexcept
         : supervisor{config.supervisor}, strand{supervisor.get_strand()}, expected_peer{config.ssl_junction->peer},
           me(config.ssl_junction->me), ctx(get_context(*this, config.ssl_junction->alpn)),
-          role(config.sock ? ssl::stream_base::server : ssl::stream_base::client), sock(mk_sock(config, ctx, strand)) {
+          role(!config.active ? ssl::stream_base::server : ssl::stream_base::client),
+          sock(mk_sock(config, ctx, strand)) {
         if (config.ssl_junction->sni_extension) {
             auto &host = config.uri.host;
             if (!SSL_set_tlsext_host_name(sock.native_handle(), host.c_str())) {

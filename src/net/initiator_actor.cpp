@@ -2,9 +2,11 @@
 #include "constants.h"
 #include "names.h"
 #include "model/messages.h"
+#include "proto/relay_support.h"
 #include "utils/error_code.h"
 #include "model/diff/peer/peer_state.h"
 #include <sstream>
+#include <spdlog/fmt/bin_to_hex.h>
 #include <fmt/fmt.h>
 
 using namespace syncspirit::net;
@@ -15,34 +17,55 @@ r::plugin::resource_id_t initializing = 0;
 r::plugin::resource_id_t resolving = 1;
 r::plugin::resource_id_t connect = 2;
 r::plugin::resource_id_t handshake = 3;
+r::plugin::resource_id_t read = 4;
+r::plugin::resource_id_t write = 5;
 } // namespace resource
 } // namespace
 
+static constexpr size_t BUFF_SZ = 256;
+
 initiator_actor_t::initiator_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, uris{cfg.uris}, ssl_pair{*cfg.ssl_pair},
+    : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, uris{cfg.uris},
+      relay_session(std::move(cfg.relay_session)), ssl_pair{*cfg.ssl_pair},
       sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
       custom(std::move(cfg.custom)), router{*cfg.router} {
     log = utils::get_logger("net.initator");
-    active = !sock.has_value();
+    if (sock.has_value()) {
+        role = role_t::passive;
+    } else {
+        if (!relay_session.empty()) {
+            role = role_t::relay_passive;
+        } else {
+            role = role_t::active;
+        }
+    }
 }
 
 void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
 
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        if (active) {
-            auto value = fmt::format("init/active:{}", peer_device_id.get_short());
-            p.set_identity(value, false);
-        } else {
+        std::string value;
+        switch (role) {
+        case role_t::active:
+            value = fmt::format("init/active:{}", peer_device_id.get_short());
+            break;
+        case role_t::passive: {
             auto ep = sock.value().remote_endpoint();
-            auto value = fmt::format("init/passive:{}", ep);
-            p.set_identity(value, false);
+            value = fmt::format("init/passive:{}", ep);
+            break;
         }
+        case role_t::relay_passive: {
+            value = fmt::format("init/relay:{}", peer_device_id.get_short());
+            break;
+        }
+        }
+        p.set_identity(value, false);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&initiator_actor_t::on_resolve);
         resources->acquire(resource::initializing);
-        if (active) {
+        if (role == role_t::active) {
             if (cluster) {
                 auto diff = model::diff::cluster_diff_ptr_t();
                 auto state = model::device_state_t::dialing;
@@ -51,8 +74,10 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 send<model::payload::model_update_t>(coordinator, std::move(diff));
             }
             initiate_active();
-        } else {
+        } else if (role == role_t::passive) {
             initiate_passive();
+        } else if (role == role_t::relay_passive) {
+            initiate_relay_passive();
         }
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
@@ -93,6 +118,19 @@ void initiator_actor_t::initiate_passive() noexcept {
     initiate_handshake();
 }
 
+void initiator_actor_t::initiate_relay_passive() noexcept {
+    if (state > r::state_t::OPERATIONAL) {
+        return;
+    }
+
+    auto sup = static_cast<ra::supervisor_asio_t *>(&router);
+    auto &uri = uris.at(0);
+    transport::transport_config_t cfg{{}, uri, *sup, {}, true};
+    transport = transport::initiate_stream(cfg);
+    assert(transport);
+    resolve(uri);
+}
+
 void initiator_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     LOG_TRACE(log, "{}, on_start", identity);
@@ -117,7 +155,8 @@ void initiator_actor_t::shutdown_start() noexcept {
 
 void initiator_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "{}, shutdown_finish", identity);
-    if (active && !success && cluster) {
+    bool notify_offline = (role == role_t::active || role == role_t::relay_passive) && !success && cluster;
+    if (notify_offline) {
         auto diff = model::diff::cluster_diff_ptr_t();
         auto state = model::device_state_t::offline;
         auto sha256 = peer_device_id.get_sha256();
@@ -127,13 +166,17 @@ void initiator_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
-void initiator_actor_t::initiate(transport::stream_sp_t stream, const utils::URI &uri) noexcept {
-    transport = std::move(stream);
+void initiator_actor_t::resolve(const utils::URI &uri) noexcept {
     LOG_TRACE(log, "{}, resolving {} (transport = {})", identity, uri.full, (void *)transport.get());
     pt::time_duration resolve_timeout = init_timeout / 2;
     auto port = std::to_string(uri.port);
     request<payload::address_request_t>(resolver, uri.host, port).send(resolve_timeout);
     resources->acquire(resource::resolving);
+}
+
+void initiator_actor_t::initiate(transport::stream_sp_t stream, const utils::URI &uri) noexcept {
+    transport = std::move(stream);
+    resolve(uri);
 }
 
 void initiator_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
@@ -163,7 +206,7 @@ void initiator_actor_t::on_io_error(const sys::error_code &ec, r::plugin::resour
         LOG_WARN(log, "{}, on_io_error: {}", identity, ec.message());
     }
     if (state < r::state_t::SHUTTING_DOWN) {
-        if (!connected && active) {
+        if (!connected && role == role_t::active) {
             initiate_active();
         } else {
             connected = false;
@@ -175,17 +218,37 @@ void initiator_actor_t::on_io_error(const sys::error_code &ec, r::plugin::resour
 
 void initiator_actor_t::on_connect(resolve_it_t) noexcept {
     LOG_TRACE(log, "{}, on_connect, device_id = {}", identity, peer_device_id.get_short());
-    initiate_handshake();
     resources->release(resource::connect);
+    if (role == role_t::active) {
+        initiate_handshake();
+    } else {
+        assert(role == role_t::relay_passive);
+        join_session();
+    }
 }
 
 void initiator_actor_t::initiate_handshake() noexcept {
-    LOG_TRACE(log, "{}, connected, initializing handshake", identity);
+    LOG_TRACE(log, "{}, initializing handshake", identity);
     connected = true;
     transport::handshake_fn_t handshake_fn([&](auto &&...args) { on_handshake(args...); });
     transport::error_fn_t error_fn([&](auto arg) { on_io_error(arg, resource::handshake); });
-    transport->async_handshake(handshake_fn, error_fn);
     resources->acquire(resource::handshake);
+    transport->async_handshake(handshake_fn, error_fn);
+}
+
+void initiator_actor_t::join_session() noexcept {
+    transport::error_fn_t read_err_fn([&](auto arg) { on_io_error(arg, resource::read); });
+    transport::io_fn_t read_fn = [this](size_t bytes) { on_read(bytes); };
+    rx_buff.resize(BUFF_SZ);
+    transport->async_recv(asio::buffer(rx_buff), read_fn, read_err_fn);
+    resources->acquire(resource::read);
+
+    auto msg = proto::relay::join_session_request_t{std::move(relay_session)};
+    proto::relay::serialize(msg, relay_session);
+    transport::error_fn_t write_err_fn([&](auto arg) { on_io_error(arg, resource::write); });
+    transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
+    transport->async_send(asio::buffer(relay_session), write_fn, write_err_fn);
+    resources->acquire(resource::write);
 }
 
 void initiator_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const tcp::endpoint &peer_endpoint,
@@ -207,4 +270,37 @@ void initiator_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const
     peer_device_id = *peer_device;
     remote_endpoint = peer_endpoint;
     resources->release(resource::initializing);
+}
+
+void initiator_actor_t::on_write(size_t bytes) noexcept {
+    LOG_TRACE(log, "{}, on_write, {} bytes", identity, bytes);
+    resources->release(resource::write);
+}
+
+void initiator_actor_t::on_read(size_t bytes) noexcept {
+    LOG_TRACE(log, "{}, on_read, {} bytes", identity, bytes);
+    resources->release(resource::read);
+    auto buff = std::string_view(rx_buff.data(), bytes);
+    auto r = proto::relay::parse(buff);
+    auto wrapped = std::get_if<proto::relay::wrapped_message_t>(&r);
+    if (!wrapped) {
+        LOG_WARN(log, "{}, unexpected incoming relay data: {}", identity, spdlog::to_hex(buff.begin(), buff.end()));
+        auto ec = utils::make_error_code(utils::error_code_t::relay_failure);
+        return do_shutdown(make_error(ec));
+    }
+    auto reply = std::get_if<proto::relay::response_t>(&wrapped->message);
+    if (!reply) {
+        LOG_WARN(log, "{}, unexpected relay message: {}", identity, spdlog::to_hex(buff.begin(), buff.end()));
+        auto ec = utils::make_error_code(utils::error_code_t::relay_failure);
+        return do_shutdown(make_error(ec));
+    }
+    if (reply->code) {
+        LOG_WARN(log, "{}, relay join failure({}): {}", identity, reply->code, reply->details);
+        auto ec = utils::make_error_code(utils::error_code_t::relay_failure);
+        return do_shutdown(make_error(ec));
+    }
+    auto upgradeable = static_cast<transport::upgradeable_stream_base_t *>(transport.get());
+    auto ssl = transport::ssl_junction_t{peer_device_id, &ssl_pair, false, "bep"};
+    transport = upgradeable->upgrade(ssl, false);
+    initiate_handshake();
 }

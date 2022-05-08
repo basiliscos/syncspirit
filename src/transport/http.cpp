@@ -6,8 +6,6 @@
 
 namespace syncspirit::transport {
 
-http_base_t::~http_base_t() {}
-
 template <typename Sock> struct http_impl_t : base_impl_t<Sock>, interface_t<http_impl_t<Sock>, Sock, http_base_t> {
     using self_t = http_impl_t;
     using socket_t = Sock;

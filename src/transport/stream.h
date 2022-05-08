@@ -17,7 +17,11 @@ struct stream_interface_t {
 };
 
 struct stream_base_t : model::arc_base_t<stream_base_t>, stream_interface_t {
-    virtual ~stream_base_t();
+    virtual ~stream_base_t() = default;
+};
+
+struct upgradeable_stream_base_t : stream_base_t {
+    virtual stream_sp_t upgrade(ssl_junction_t &ssl, bool active) noexcept = 0;
 };
 
 stream_sp_t initiate_tls_active(ra::supervisor_asio_t &supervisor, const utils::key_pair_t &my_keys,
