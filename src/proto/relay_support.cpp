@@ -252,7 +252,7 @@ static parse_result_t parse_session_invitation(std::string_view data) noexcept {
     }
     auto addr_sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
     data = data.substr(sizeof(uint32_t));
-    if (data.size() < key_sz) {
+    if (data.size() < addr_sz) {
         return protocol_error_t{};
     }
     auto addr = data.substr(0, addr_sz);

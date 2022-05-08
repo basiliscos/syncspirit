@@ -4,6 +4,7 @@
 #include "utils/beast_support.h"
 #include "model/messages.h"
 #include "model/diff/modify/update_contact.h"
+#include "model/diff/modify/relay_connect_request.h"
 #include <spdlog/fmt/bin_to_hex.h>
 #include "messages.h"
 #include <cstdlib>
@@ -225,7 +226,9 @@ void relay_actor_t::on_connect(message::connect_response_t &res) noexcept {
         return connect_to_relay();
     }
     LOG_DEBUG(log, "{}, connected to relay {}", identity, r->device_id.get_short());
-    master = std::move(res.payload.res.transport);
+    auto &p = res.payload.res;
+    master = std::move(p.transport);
+    master_endpoint = std::move(p.remote_endpoint);
     rx_buff.resize(BUFF_SZ);
     read_master();
     rx_state |= rx_state_t::response;
@@ -354,7 +357,36 @@ bool relay_actor_t::on(proto::relay::response_t &res) noexcept {
     return true;
 }
 
-bool relay_actor_t::on(proto::relay::session_invitation_t &) noexcept { std::abort(); }
+bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
+    auto diff = model::diff::contact_diff_ptr_t{};
+    auto device_opt = model::device_id_t::from_sha256(msg.from);
+    if (!device_opt) {
+        LOG_ERROR(log, "{}, not valid device: {}", identity, spdlog::to_hex(msg.from.begin(), msg.from.end()));
+        auto ec = utils::make_error_code(utils::error_code_t::invalid_deviceid);
+        do_shutdown(make_error(ec));
+        return false;
+    }
+
+    asio::ip::tcp::endpoint relay_ep;
+    if (!msg.address.empty()) {
+        sys::error_code ec;
+        auto ip = asio::ip::make_address(msg.address, ec);
+        if (ec) {
+            LOG_ERROR(log, "{}, invalid ip address: {}", identity,
+                      spdlog::to_hex(msg.address.begin(), msg.address.end()));
+            do_shutdown(make_error(ec));
+            return false;
+        }
+        relay_ep = asio::ip::tcp::endpoint{ip, (uint16_t)msg.port};
+    } else {
+        relay_ep = asio::ip::tcp::endpoint{master_endpoint.address(), (uint16_t)msg.port};
+    }
+
+    diff = new model::diff::modify::relay_connect_request_t(std::move(device_opt.value()), std::move(msg.key),
+                                                            std::move(relay_ep));
+    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+    return true;
+}
 
 void relay_actor_t::respawn_ping_timer() noexcept {
     if (ping_timer) {

@@ -72,6 +72,7 @@ enum class error_code_t {
     cannot_get_public_relays,
     protocol_error,
     relay_failure,
+    invalid_deviceid,
 };
 
 enum class bep_error_code_t {

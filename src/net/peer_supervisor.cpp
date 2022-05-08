@@ -96,7 +96,7 @@ void peer_supervisor_t::on_connected(message::peer_connected_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_connected", identity);
     auto &p = msg.payload;
     auto req = static_cast<message::connect_request_t *>(p.custom.get());
-    reply_to(*req, std::move(p.transport));
+    reply_to(*req, std::move(p.transport), std::move(p.remote_endpoint));
 }
 
 void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {

@@ -96,6 +96,7 @@ struct SYNCSPIRIT_API relay_actor_t : public r::actor_base_t {
     relays_t relays;
     int relay_index = -1;
     transport::stream_sp_t master;
+    tcp::endpoint master_endpoint;
     fmt::memory_buffer rx_buff;
     std::size_t rx_idx = 0;
     std::uint32_t rx_state = 0;

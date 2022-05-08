@@ -113,6 +113,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::relay_failure:
         r = "relay failure";
         break;
+    case error_code_t::invalid_deviceid:
+        r = "invalid device id";
+        break;
     default:
         r = "unknown";
     }

@@ -11,6 +11,7 @@ namespace syncspirit::model::diff {
 namespace modify {
 struct update_contact_t;
 struct connect_request_t;
+struct relay_connect_request_t;
 } // namespace modify
 
 template <> struct SYNCSPIRIT_API generic_visitor_t<tag::contact> {
@@ -18,6 +19,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::contact> {
 
     virtual outcome::result<void> operator()(const modify::update_contact_t &) noexcept;
     virtual outcome::result<void> operator()(const modify::connect_request_t &) noexcept;
+    virtual outcome::result<void> operator()(const modify::relay_connect_request_t &) noexcept;
 };
 
 using contact_visitor_t = generic_visitor_t<tag::contact>;

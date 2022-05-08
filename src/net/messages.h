@@ -139,6 +139,7 @@ struct SYNCSPIRIT_API block_request_t {
 
 struct connect_response_t {
     transport::stream_sp_t transport;
+    tcp::endpoint remote_endpoint;
 };
 
 struct connect_request_t {

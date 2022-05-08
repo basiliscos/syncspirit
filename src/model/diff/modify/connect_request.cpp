@@ -3,7 +3,6 @@
 
 #include "connect_request.h"
 #include "../contact_visitor.h"
-#include "../../cluster.h"
 
 using namespace syncspirit::model::diff::modify;
 

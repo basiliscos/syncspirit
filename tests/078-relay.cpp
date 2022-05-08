@@ -5,6 +5,7 @@
 #include "utils/tls.h"
 #include "model/cluster.h"
 #include "model/messages.h"
+#include "model/diff/modify/relay_connect_request.h"
 #include "net/names.h"
 #include "net/messages.h"
 #include "net/relay_actor.h"
@@ -67,7 +68,7 @@ struct supervisor_t : ra::supervisor_asio_t {
 using supervisor_ptr_t = r::intrusive_ptr_t<supervisor_t>;
 using actor_ptr_t = r::intrusive_ptr_t<relay_actor_t>;
 
-struct fixture_t {
+struct fixture_t : private model::diff::contact_visitor_t {
     using acceptor_t = asio::ip::tcp::acceptor;
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
@@ -113,13 +114,16 @@ struct fixture_t {
         listening_ep = acceptor.local_endpoint();
 
         my_keys = utils::generate_pair("me").value();
-        relay_keys = utils::generate_pair("peer").value();
+        relay_keys = utils::generate_pair("relay").value();
+        peer_keys = utils::generate_pair("peer").value();
 
         auto md = model::device_id_t::from_cert(my_keys.cert_data).value();
-        auto pd = model::device_id_t::from_cert(relay_keys.cert_data).value();
+        auto rd = model::device_id_t::from_cert(relay_keys.cert_data).value();
+        auto pd = model::device_id_t::from_cert(peer_keys.cert_data).value();
 
         my_device = device_t::create(md, "my-device").value();
-        relay_device = device_t::create(pd, "relay-device").value();
+        relay_device = device_t::create(rd, "relay-device").value();
+        peer_device = device_t::create(rd, "peer-device").value();
 
         public_relays = generate_public_relays(listening_ep, relay_device);
         log->debug("public relays json: {}", public_relays);
@@ -128,6 +132,9 @@ struct fixture_t {
         cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
+        cluster->get_devices().put(peer_device);
+
+        session_key = "lorem-imspum-dolor";
 
         main();
     }
@@ -189,11 +196,18 @@ struct fixture_t {
         transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "active/connect, err: {}", ec.message()); };
         using ptr_t = model::intrusive_ptr_t<std::decay_t<decltype(req)>>;
         auto ptr = ptr_t(&req);
-        transport::connect_fn_t on_connect = [ptr, trans, addresses_ptr, this](auto arg) {
+        transport::connect_fn_t on_connect = [ptr, trans, addresses_ptr, this](transport::resolved_item_t it) {
             LOG_INFO(log, "active/connected");
-            sup->reply_to(*ptr, trans);
+            sup->reply_to(*ptr, trans, it->endpoint());
         };
         trans->async_connect(*addresses_ptr, on_connect, on_error);
+    }
+
+    void send_relay(const proto::relay::message_t &msg) noexcept {
+        proto::relay::serialize(msg, relay_tx);
+        transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "relay/write, err: {}", ec.message()); };
+        transport::io_fn_t on_write = [&](size_t bytes) { LOG_TRACE(log, "relay/write, {} bytes", bytes); };
+        relay_trans->async_send(asio::buffer(relay_tx), on_write, on_error);
     }
 
     void on(proto::relay::ping_t &) noexcept {
@@ -205,13 +219,9 @@ struct fixture_t {
     };
     void on(proto::relay::join_relay_request_t &) noexcept {
         LOG_INFO(log, "join_relay_request_t");
-        proto::relay::serialize(proto::relay::response_t{0, "ok"}, relay_tx);
-
-        transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "relay/write, err: {}", ec.message()); };
-        transport::io_fn_t on_write = [&](size_t bytes) { LOG_TRACE(log, "relay/write, {} bytes", bytes); };
-        relay_trans->async_send(asio::buffer(relay_tx), on_write, on_error);
-        // relay_read();
+        send_relay(proto::relay::response_t{0, "ok"});
     };
+
     void on(proto::relay::join_session_request_t &) noexcept {
 
     };
@@ -225,9 +235,14 @@ struct fixture_t {
 
     };
     virtual void on(model::message::contact_update_t &update) noexcept {
-        auto r = update.payload.diff->apply(*cluster);
+        auto &diff = *update.payload.diff;
+        auto r = diff.apply(*cluster);
         if (!r) {
             LOG_ERROR(log, "error applying diff: {}", r.error().message());
+        }
+        r = diff.visit(*this);
+        if (!r) {
+            LOG_ERROR(log, "error visiting diff: {}", r.error().message());
         }
     }
 
@@ -261,11 +276,14 @@ struct fixture_t {
     std::string public_relays;
     utils::key_pair_t my_keys;
     utils::key_pair_t relay_keys;
+    utils::key_pair_t peer_keys;
     model::device_ptr_t my_device;
     model::device_ptr_t relay_device;
+    model::device_ptr_t peer_device;
     transport::stream_sp_t relay_trans;
     std::string relay_rx;
     std::string relay_tx;
+    std::string session_key;
 };
 
 void test_master_connect() {
@@ -299,4 +317,50 @@ void test_master_connect() {
     F().run();
 }
 
+void test_passive() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sent);
+            CHECK(received);
+            CHECK(sup->get_state() == r::state_t::OPERATIONAL);
+
+            sup->shutdown();
+            io_ctx.restart();
+            io_ctx.run();
+
+            CHECK(my_device->get_uris().size() == 0);
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+        }
+
+        void on(model::message::contact_update_t &update) noexcept override {
+            LOG_INFO(log, "contact_update_t");
+            fixture_t::on(update);
+            if (my_device->get_uris().size() == 1 && !sent) {
+                sent = true;
+                auto msg = proto::relay::session_invitation_t{
+                    std::string(peer_device->device_id().get_sha256()), session_key, {}, 12345, true};
+                send_relay(msg);
+            }
+        }
+
+        outcome::result<void> operator()(const model::diff::modify::relay_connect_request_t &diff) noexcept override {
+            CHECK(diff.peer == peer_device->device_id());
+            CHECK(diff.session_key == session_key);
+            CHECK(diff.relay.port() == 12345);
+            CHECK(diff.relay.address().to_string() == "127.0.0.1");
+            received = true;
+            io_ctx.stop();
+            return outcome::success();
+        }
+
+        bool sent = false;
+        bool received = false;
+    };
+
+    F().run();
+}
+
 REGISTER_TEST_CASE(test_master_connect, "test_master_connect", "[relay]");
+REGISTER_TEST_CASE(test_passive, "test_passive", "[relay]");
