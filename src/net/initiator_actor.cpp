@@ -6,6 +6,7 @@
 #include "utils/error_code.h"
 #include "model/diff/peer/peer_state.h"
 #include <sstream>
+#include <algorithm>
 #include <spdlog/fmt/bin_to_hex.h>
 #include <fmt/fmt.h>
 
@@ -25,7 +26,7 @@ r::plugin::resource_id_t write = 5;
 static constexpr size_t BUFF_SZ = 256;
 
 initiator_actor_t::initiator_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, uris{cfg.uris},
+    : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id},
       relay_session(std::move(cfg.relay_session)), ssl_pair{*cfg.ssl_pair},
       sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
       custom(std::move(cfg.custom)), router{*cfg.router} {
@@ -39,6 +40,23 @@ initiator_actor_t::initiator_actor_t(config_t &cfg)
             role = role_t::active;
         }
     }
+    for (auto &uri : cfg.uris) {
+        if (uri.proto != "tcp" && uri.proto != "relay") {
+            LOG_DEBUG(log, "{}, unsupported proto '{}' for the url '{}'", identity, uri.proto, uri.full);
+        } else {
+            uris.emplace_back(std::move(uri));
+        }
+    }
+    auto comparator = [](const utils::URI &a, const utils::URI &b) noexcept -> bool {
+        if (a.proto == b.proto) {
+            return std::lexicographical_compare(a.full.begin(), a.full.end(), b.full.begin(), b.full.end());
+        }
+        if (a.proto == "relay") {
+            return true;
+        }
+        return false;
+    };
+    std::sort(uris.begin(), uris.end(), comparator);
 }
 
 void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -56,7 +74,7 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             break;
         }
         case role_t::relay_passive: {
-            value = fmt::format("init/relay:{}", peer_device_id.get_short());
+            value = fmt::format("init/relay-passive:{}", peer_device_id.get_short());
             break;
         }
         }
@@ -93,14 +111,10 @@ void initiator_actor_t::initiate_active() noexcept {
 
     while (uri_idx < uris.size()) {
         auto &uri = uris[uri_idx++];
-        if (uri.proto == "tcp") {
-            auto sup = static_cast<ra::supervisor_asio_t *>(&router);
-            auto trans = transport::initiate_tls_active(*sup, ssl_pair, peer_device_id, uri);
-            initiate(std::move(trans), uri);
-            return;
-        } else {
-            LOG_DEBUG(log, "{}, unsupported proto '{}' for the url '{}'", identity, uri.proto, uri.full);
-        }
+        auto sup = static_cast<ra::supervisor_asio_t *>(&router);
+        auto trans = transport::initiate_tls_active(*sup, ssl_pair, peer_device_id, uri);
+        initiate(std::move(trans), uri);
+        return;
     }
 
     LOG_TRACE(log, "{}, try_next_uri, no way to connect found, shut down", identity);
