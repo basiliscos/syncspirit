@@ -317,6 +317,28 @@ parse_result_t parse(std::string_view data) noexcept {
     }
 }
 
+std::optional<model::device_id_t> parse_device(const utils::URI &uri) noexcept {
+    if (uri.proto != "relay") {
+        return {};
+    }
+    auto device_id_str = std::string{};
+    auto q = uri.decompose_query();
+    for (auto &pair : q) {
+        if (pair.first == "id") {
+            device_id_str = std::move(pair.second);
+            break;
+        }
+    }
+    if (device_id_str.empty()) {
+        return {};
+    }
+    auto device_opt = model::device_id_t::from_string(device_id_str);
+    if (!device_opt) {
+        return {};
+    }
+    return std::move(device_opt.value());
+}
+
 outcome::result<relay_infos_t> parse_endpoint(std::string_view buff) noexcept {
     using namespace syncspirit::utils;
     auto data = json::parse(buff.begin(), buff.end(), nullptr, false);

@@ -93,9 +93,11 @@ struct initiator_actor_t : r::actor_base_t {
     void initiate_passive() noexcept;
     void initiate_active() noexcept;
     void initiate_relay_passive() noexcept;
-    void initiate(transport::stream_sp_t stream, const utils::URI &uri) noexcept;
+    void initiate_active_tls(const utils::URI &uri) noexcept;
+    void initiate_active_relay(const utils::URI &uri) noexcept;
     void initiate_handshake() noexcept;
     void join_session() noexcept;
+    void request_relay_connection() noexcept;
     void resolve(const utils::URI &uri) noexcept;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
@@ -103,12 +105,15 @@ struct initiator_actor_t : r::actor_base_t {
     void on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept;
     void on_handshake(bool valid_peer, utils::x509_t &peer_cert, const tcp::endpoint &peer_endpoint,
                       const model::device_id_t *peer_device) noexcept;
-    void on_read(size_t bytes) noexcept;
+    void on_read_relay(size_t bytes) noexcept;
+    void on_read_relay_active(size_t bytes) noexcept;
     void on_write(size_t bytes) noexcept;
 
     model::device_id_t peer_device_id;
     utils::uri_container_t uris;
-    std::string relay_session;
+    std::string relay_rx;
+    std::string relay_tx;
+    std::string relay_key;
     const utils::key_pair_t &ssl_pair;
     std::optional<tcp_socket_t> sock;
     model::cluster_ptr_t cluster;
@@ -116,6 +121,7 @@ struct initiator_actor_t : r::actor_base_t {
     r::message_ptr_t custom;
     r::supervisor_t &router;
 
+    const utils::URI *active_uri = nullptr;
     transport::stream_sp_t transport;
     r::address_ptr_t resolver;
     r::address_ptr_t coordinator;
@@ -126,6 +132,7 @@ struct initiator_actor_t : r::actor_base_t {
     role_t role = role_t::passive;
     std::string rx_buff;
     bool success = false;
+    bool relaying = false;
 };
 
 namespace payload {

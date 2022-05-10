@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <variant>
 #include <vector>
+#include <optional>
 #include <model/misc/arc.hpp>
 #include <model/device_id.h>
 #include "utils/uri.h"
@@ -83,6 +84,7 @@ struct relay_info_t : model::arc_base_t<relay_info_t> {
 using relay_info_ptr_t = model::intrusive_ptr_t<relay_info_t>;
 using relay_infos_t = std::vector<relay_info_ptr_t>;
 
+SYNCSPIRIT_API std::optional<model::device_id_t> parse_device(const utils::URI &uri) noexcept;
 SYNCSPIRIT_API outcome::result<relay_infos_t> parse_endpoint(std::string_view data) noexcept;
 
 } // namespace syncspirit::proto::relay

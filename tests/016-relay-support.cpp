@@ -240,4 +240,8 @@ TEST_CASE("endpoing parsing", "[relay]") {
     CHECK(l.country == "DE");
     CHECK(l.continent == "EU");
     CHECK(relay->ping_interval == pt::seconds{90});
+
+    auto device = parse_device(relay->uri);
+    REQUIRE(device);
+    CHECK(device.value() == relay->device_id);
 }

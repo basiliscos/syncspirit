@@ -89,6 +89,15 @@ struct fixture_t {
         sup->create_actor<resolver_actor_t>().resolve_timeout(timeout / 2).timeout(timeout).finish();
         sup->do_process();
 
+        my_keys = utils::generate_pair("me").value();
+        peer_keys = utils::generate_pair("peer").value();
+
+        auto md = model::device_id_t::from_cert(my_keys.cert_data).value();
+        auto pd = model::device_id_t::from_cert(peer_keys.cert_data).value();
+
+        my_device = device_t::create(md, "my-device").value();
+        peer_device = device_t::create(pd, "peer-device").value();
+
         auto ep = asio::ip::tcp::endpoint(asio::ip::make_address(host), 0);
         acceptor.open(ep.protocol());
         acceptor.bind(ep);
@@ -98,14 +107,6 @@ struct fixture_t {
         log->debug("listening on {}", peer_uri.full);
         initiate_accept();
 
-        my_keys = utils::generate_pair("me").value();
-        peer_keys = utils::generate_pair("peer").value();
-
-        auto md = model::device_id_t::from_cert(my_keys.cert_data).value();
-        auto pd = model::device_id_t::from_cert(peer_keys.cert_data).value();
-
-        my_device = device_t::create(md, "my-device").value();
-        peer_device = device_t::create(pd, "peer-device").value();
         cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
@@ -133,12 +134,14 @@ struct fixture_t {
         transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &cert,
                                                         const tcp::endpoint &peer_endpoint,
                                                         const model::device_id_t *peer_device) {
-            valid_handshake = true;
-            LOG_INFO(log, "peer handshake");
+            valid_handshake = valid_peer;
+            on_peer_hanshake();
         };
         transport::error_fn_t on_error = [](const auto &) {};
         peer_trans->async_handshake(handshake_fn, on_error);
     }
+
+    virtual void on_peer_hanshake() noexcept { LOG_INFO(log, "peer handshake"); }
 
     void initiate_active() noexcept {
         tcp::resolver resolver(io_ctx);
@@ -462,7 +465,7 @@ void test_passive_timeout() {
     F().run();
 }
 
-struct passive_relay_fixture_t: fixture_t {
+struct passive_relay_fixture_t : fixture_t {
     std::string rx_buff;
     bool initiate_handshake = true;
     passive_relay_fixture_t() {
@@ -506,8 +509,7 @@ struct passive_relay_fixture_t: fixture_t {
         auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock)};
         peer_trans = transport::initiate_stream(cfg);
 
-        transport::error_fn_t read_err_fn(
-            [&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
+        transport::error_fn_t read_err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
         transport::io_fn_t read_fn = [this](size_t bytes) { on_read(bytes); };
         peer_trans->async_recv(asio::buffer(rx_buff), read_fn, read_err_fn);
     }
@@ -527,7 +529,6 @@ void test_relay_passive_success() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(diff_msgs.size() == 0);
         }
-
     };
     F().run();
 }
@@ -555,7 +556,6 @@ void test_relay_passive_gargabe() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(diff_msgs.size() == 0);
         }
-
     };
     F().run();
 }
@@ -577,7 +577,6 @@ void test_relay_passive_wrong_message() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(diff_msgs.size() == 0);
         }
-
     };
     F().run();
 }
@@ -599,7 +598,274 @@ void test_relay_passive_unsuccessful_join() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(diff_msgs.size() == 0);
         }
+    };
+    F().run();
+}
 
+void test_relay_malformed_uri() {
+    struct F : fixture_t {
+        std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept override {
+            return fmt::format("relay://{}", listening_ep);
+        }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+            CHECK(!valid_handshake);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(diff_msgs.size() == 2);
+        }
+    };
+    F().run();
+}
+
+void test_relay_active_wrong_relay_deviceid() {
+    struct F : fixture_t {
+
+        std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept override {
+            return fmt::format("relay://{}?id={}", listening_ep, my_device->device_id().get_value());
+        }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+            CHECK(!valid_handshake);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(diff_msgs.size() == 2);
+        }
+    };
+    F().run();
+}
+
+struct active_relay_fixture_t : fixture_t {
+    utils::key_pair_t relay_keys;
+    model::device_id_t relay_device;
+    std::string rx_buff;
+    std::string session_key = "lorem-session-dolor";
+    transport::stream_sp_t relay_trans;
+    bool session_mode = false;
+
+    active_relay_fixture_t() {
+        relay_keys = utils::generate_pair("relay").value();
+        relay_device = model::device_id_t::from_cert(relay_keys.cert_data).value();
+        rx_buff.resize(128);
+    }
+
+    std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept override {
+        return fmt::format("relay://{}?id={}", listening_ep, relay_device.get_value());
+    }
+
+    void accept(const sys::error_code &ec) noexcept override {
+        LOG_INFO(log, "relay/accept, ec: {}", ec.message());
+        if (!session_mode) {
+            relay_trans = transport::initiate_tls_passive(*sup, relay_keys, std::move(peer_sock));
+            transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &cert,
+                                                            const tcp::endpoint &peer_endpoint,
+                                                            const model::device_id_t *peer_device) {
+                valid_handshake = valid_peer;
+                on_relay_hanshake();
+            };
+            transport::error_fn_t on_error = [](const auto &) {};
+            relay_trans->async_handshake(handshake_fn, on_error);
+            return;
+        }
+        auto uri = utils::parse("tcp://127.0.0.1:0/").value();
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock)};
+        peer_trans = transport::initiate_stream(cfg);
+
+        transport::error_fn_t read_err_fn([&](auto ec) { log->error("(relay/active), read_err: {}", ec.message()); });
+        transport::io_fn_t read_fn = [this](size_t bytes) { on_read_peer(bytes); };
+        peer_trans->async_recv(asio::buffer(rx_buff), read_fn, read_err_fn);
+    }
+
+    virtual void on_relay_hanshake() noexcept {
+        transport::error_fn_t read_err_fn([&](auto ec) { log->error("(relay/active), read_err: {}", ec.message()); });
+        transport::io_fn_t read_fn = [this](size_t bytes) { on_read(bytes); };
+        relay_trans->async_recv(asio::buffer(rx_buff), read_fn, read_err_fn);
+    }
+
+    virtual void relay_reply() noexcept {
+        write(relay_trans, proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()),
+                                                              session_key, "", listening_ep.port(), false});
+    }
+
+    virtual void session_reply() noexcept { write(peer_trans, proto::relay::response_t{0, "ok"}); }
+
+    virtual void write(transport::stream_sp_t &stream, const proto::relay::message_t &msg) noexcept {
+        proto::relay::serialize(msg, rx_buff);
+        auto buff = asio::buffer(rx_buff);
+        transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
+        transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
+        stream->async_send(asio::buffer(rx_buff), write_fn, err_fn);
+    }
+
+    virtual void on_read_peer(size_t bytes) {
+        log->debug("(relay/active) read peer {} bytes", bytes);
+        auto r = proto::relay::parse({rx_buff.data(), bytes});
+        auto &wrapped = std::get<proto::relay::wrapped_message_t>(r);
+        auto &msg = std::get<proto::relay::join_session_request_t>(wrapped.message);
+        CHECK(msg.key == session_key);
+        session_reply();
+    }
+
+    virtual void on_read(size_t bytes) {
+        log->debug("(relay/active) read {} bytes", bytes);
+        auto r = proto::relay::parse({rx_buff.data(), bytes});
+        auto &wrapped = std::get<proto::relay::wrapped_message_t>(r);
+        auto &msg = std::get<proto::relay::connect_request_t>(wrapped.message);
+        CHECK(msg.device_id == peer_device->device_id().get_sha256());
+        relay_reply();
+    }
+
+    virtual void on_write(size_t bytes) {
+        log->debug("(relay/active) write {} bytes", bytes);
+        if (!session_mode) {
+            acceptor.async_accept(peer_sock, [this](auto ec) { this->accept(ec); });
+            session_mode = true;
+        } else {
+            auto upgradeable = static_cast<transport::upgradeable_stream_base_t *>(peer_trans.get());
+            auto ssl = transport::ssl_junction_t{my_device->device_id(), &peer_keys, false, "bep"};
+            peer_trans = upgradeable->upgrade(ssl, false);
+            initiate_peer_handshake();
+        }
+    }
+};
+
+void test_relay_active_success() {
+    struct F : active_relay_fixture_t {
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::OPERATIONAL);
+            REQUIRE(connected_message);
+            CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
+            CHECK(valid_handshake);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            REQUIRE(diff_msgs.size() == 1);
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
+            CHECK(peer_device->get_state() == device_state_t::dialing);
+        }
+    };
+    F().run();
+}
+
+void test_relay_wrong_device() {
+    struct F : active_relay_fixture_t {
+
+        void relay_reply() noexcept override {
+            write(relay_trans, proto::relay::session_invitation_t{std::string(relay_device.get_sha256()), session_key,
+                                                                  "", listening_ep.port(), false});
+        }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+            CHECK(valid_handshake);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(diff_msgs.size() == 2);
+        }
+    };
+    F().run();
+}
+
+void test_relay_non_conneteable() {
+    struct F : active_relay_fixture_t {
+
+        void relay_reply() noexcept override {
+            write(relay_trans, proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()),
+                                                                  session_key, "", 0, false});
+        }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(diff_msgs.size() == 2);
+        }
+    };
+    F().run();
+}
+
+void test_relay_malformed_address() {
+    struct F : active_relay_fixture_t {
+
+        void relay_reply() noexcept override {
+            write(relay_trans, proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()),
+                                                                  session_key, "8.8.8.8z", listening_ep.port(), false});
+        }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(diff_msgs.size() == 2);
+        }
+    };
+    F().run();
+}
+
+void test_relay_garbage_reply() {
+    struct F : active_relay_fixture_t {
+
+        void write(transport::stream_sp_t &stream, const proto::relay::message_t &) noexcept override {
+            rx_buff = "garbage-garbage-garbage";
+            auto buff = asio::buffer(rx_buff);
+            transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
+            transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
+            stream->async_send(asio::buffer(rx_buff), write_fn, err_fn);
+        }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(diff_msgs.size() == 2);
+        }
+    };
+    F().run();
+}
+
+void test_relay_noninvitation_reply() {
+    struct F : active_relay_fixture_t {
+
+        void relay_reply() noexcept override { write(relay_trans, proto::relay::pong_t{}); }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(!connected_message);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(diff_msgs.size() == 2);
+        }
     };
     F().run();
 }
@@ -620,3 +886,11 @@ REGISTER_TEST_CASE(test_relay_passive_success, "test_relay_passive_success", "[i
 REGISTER_TEST_CASE(test_relay_passive_gargabe, "test_relay_passive_gargabe", "[initiator]");
 REGISTER_TEST_CASE(test_relay_passive_wrong_message, "test_relay_passive_wrong_message", "[initiator]");
 REGISTER_TEST_CASE(test_relay_passive_unsuccessful_join, "test_relay_passive_unsuccessful_join", "[initiator]");
+REGISTER_TEST_CASE(test_relay_malformed_uri, "test_relay_malformed_uri", "[initiator]");
+REGISTER_TEST_CASE(test_relay_active_wrong_relay_deviceid, "test_relay_active_wrong_relay_deviceid", "[initiator]");
+REGISTER_TEST_CASE(test_relay_active_success, "test_relay_active_success", "[initiator]");
+REGISTER_TEST_CASE(test_relay_wrong_device, "test_relay_wrong_device", "[initiator]");
+REGISTER_TEST_CASE(test_relay_non_conneteable, "test_relay_non_conneteable", "[initiator]");
+REGISTER_TEST_CASE(test_relay_malformed_address, "test_relay_malformed_address", "[initiator]");
+REGISTER_TEST_CASE(test_relay_garbage_reply, "test_relay_garbage_reply", "[initiator]");
+REGISTER_TEST_CASE(test_relay_noninvitation_reply, "test_relay_noninvitation_reply", "[initiator]");

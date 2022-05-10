@@ -134,6 +134,8 @@ auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t 
     auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
     create_actor<initiator_actor_t>()
         .cluster(cluster)
+        .router(*locality_leader)
+        .sink(address)
         .ssl_pair(&ssl_pair)
         .sock(std::move(sock))
         .timeout(timeout)
@@ -151,6 +153,8 @@ auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &
             auto connect_timeout = r::pt::milliseconds{bep_config.connect_timeout};
             LOG_DEBUG(log, "{} initiating connection with {}", identity, peer->device_id());
             create_actor<initiator_actor_t>()
+                .router(*locality_leader)
+                .sink(address)
                 .ssl_pair(&ssl_pair)
                 .peer_device_id(diff.device)
                 .uris(uris)
