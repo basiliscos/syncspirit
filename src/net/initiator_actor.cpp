@@ -191,6 +191,7 @@ void initiator_actor_t::resolve(const utils::URI &uri) noexcept {
 }
 
 void initiator_actor_t::initiate_active_tls(const utils::URI &uri) noexcept {
+    LOG_TRACE(log, "{}, trying '{}' as active tsl", identity, uri.full);
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
     transport = transport::initiate_tls_active(*sup, ssl_pair, peer_device_id, uri);
     active_uri = &uri;
@@ -199,6 +200,7 @@ void initiator_actor_t::initiate_active_tls(const utils::URI &uri) noexcept {
 }
 
 void initiator_actor_t::initiate_active_relay(const utils::URI &uri) noexcept {
+    LOG_TRACE(log, "{}, trying '{}' as active relay", identity, uri.full);
     auto relay_device = proto::relay::parse_device(uri);
     if (!relay_device) {
         LOG_WARN(log, "{}, relay url '{}' does not contains valid device_id", identity, uri.full);

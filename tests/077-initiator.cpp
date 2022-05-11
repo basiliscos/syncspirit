@@ -23,6 +23,7 @@ namespace r = rotor;
 namespace ra = r::asio;
 
 using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
+using finish_callback_t = std::function<void()>;
 
 auto timeout = r::pt::time_duration{r::pt::millisec{2000}};
 auto host = "127.0.0.1";
@@ -41,14 +42,14 @@ struct supervisor_t : ra::supervisor_asio_t {
 
     void shutdown_finish() noexcept override {
         ra::supervisor_asio_t::shutdown_finish();
-        if (acceptor) {
-            acceptor->cancel();
+        if (finish_callback) {
+            finish_callback();
         }
     }
 
     auto get_state() noexcept { return state; }
 
-    asio::ip::tcp::acceptor *acceptor = nullptr;
+    finish_callback_t finish_callback;
     configure_callback_t configure_callback;
 };
 
@@ -64,6 +65,13 @@ struct fixture_t {
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
         utils::set_default("trace");
         log = utils::get_logger("fixture");
+    }
+
+    virtual void finish() {
+        acceptor.cancel();
+        if (peer_trans) {
+            peer_trans->cancel();
+        }
     }
 
     void run() noexcept {
@@ -84,6 +92,7 @@ struct fixture_t {
                 }));
             });
         };
+        sup->finish_callback = [&]() { finish(); };
         sup->start();
 
         sup->create_actor<resolver_actor_t>().resolve_timeout(timeout / 2).timeout(timeout).finish();
@@ -117,7 +126,6 @@ struct fixture_t {
 
     virtual void initiate_accept() noexcept {
         acceptor.async_accept(peer_sock, [this](auto ec) { this->accept(ec); });
-        sup->acceptor = &acceptor;
     }
 
     virtual std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept {
@@ -160,6 +168,7 @@ struct fixture_t {
     }
 
     virtual void active_connect() {
+        LOG_TRACE(log, "active_connect");
         transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &cert,
                                                         const tcp::endpoint &peer_endpoint,
                                                         const model::device_id_t *peer_device) {
@@ -384,16 +393,31 @@ void test_success_no_model() {
     F().run();
 }
 
-void test_passive_success() {
-    struct F : fixture_t {
+struct passive_fixture_t : fixture_t {
+    actor_ptr_t act;
+    bool active_connect_invoked = false;
 
-        actor_ptr_t act;
-
-        void accept(const sys::error_code &ec) noexcept override {
-            LOG_INFO(log, "test_passive_success/accept, ec: {}", ec.message());
-            act = create_passive_actor();
+    void active_connect() override {
+        LOG_TRACE(log, "active_connect");
+        if (!act || active_connect_invoked) {
+            return;
         }
+        active_connect_invoked = true;
+        active_connect_impl();
+    }
 
+    virtual void active_connect_impl() { fixture_t::active_connect(); }
+
+    void accept(const sys::error_code &ec) noexcept override {
+        LOG_INFO(log, "test_passive_success/accept, ec: {}", ec.message());
+        act = create_passive_actor();
+        sup->do_process();
+        active_connect();
+    }
+};
+
+void test_passive_success() {
+    struct F : passive_fixture_t {
         void main() noexcept override {
             initiate_active();
             io_ctx.run();
@@ -410,20 +434,14 @@ void test_passive_success() {
 }
 
 void test_passive_garbage() {
-    struct F : fixture_t {
+    struct F : passive_fixture_t {
 
-        actor_ptr_t act;
         tcp::socket client_sock;
         tcp::resolver::results_type addresses;
 
         F() : client_sock{io_ctx} {}
 
-        void accept(const sys::error_code &ec) noexcept override {
-            LOG_INFO(log, "test_passive_garbage/accept, ec: {}", ec.message());
-            act = create_passive_actor();
-        }
-
-        void initiate_active() noexcept {
+        void active_connect_impl() noexcept override {
             tcp::resolver resolver(io_ctx);
             addresses = resolver.resolve(host, std::to_string(listening_ep.port()));
             asio::async_connect(client_sock, addresses.begin(), addresses.end(), [&](auto ec, auto addr) {
@@ -445,13 +463,7 @@ void test_passive_garbage() {
 }
 
 void test_passive_timeout() {
-    struct F : fixture_t {
-        actor_ptr_t act;
-
-        void accept(const sys::error_code &ec) noexcept override {
-            LOG_INFO(log, "test_passive_timeout/accept, ec: {}", ec.message());
-            act = create_passive_actor();
-        }
+    struct F : passive_fixture_t {
 
         void active_connect() noexcept override { LOG_INFO(log, "test_passive_timeout/active_connect NOOP"); }
 
@@ -766,6 +778,7 @@ void test_relay_wrong_device() {
             write(relay_trans, proto::relay::session_invitation_t{std::string(relay_device.get_sha256()), session_key,
                                                                   "", listening_ep.port(), false});
         }
+        void on_write(size_t bytes) override {}
 
         void main() noexcept override {
             auto act = create_actor();
@@ -837,6 +850,8 @@ void test_relay_garbage_reply() {
             stream->async_send(asio::buffer(rx_buff), write_fn, err_fn);
         }
 
+        void on_write(size_t bytes) override {}
+
         void main() noexcept override {
             auto act = create_actor();
             io_ctx.run();
@@ -855,6 +870,7 @@ void test_relay_noninvitation_reply() {
     struct F : active_relay_fixture_t {
 
         void relay_reply() noexcept override { write(relay_trans, proto::relay::pong_t{}); }
+        void on_write(size_t bytes) override {}
 
         void main() noexcept override {
             auto act = create_actor();
