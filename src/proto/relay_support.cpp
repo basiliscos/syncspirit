@@ -270,7 +270,9 @@ static parse_result_t parse_session_invitation(std::string_view data) noexcept {
     auto server_socket = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
     data = data.substr(sizeof(uint32_t));
 
-    if(!addr.empty() && !addr[0]) { addr = ""; };
+    if (!addr.empty() && !addr[0]) {
+        addr = "";
+    };
 
     return wrapped_message_t{
         header_sz + orig.size(),

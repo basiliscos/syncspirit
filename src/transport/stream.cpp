@@ -6,24 +6,18 @@
 
 namespace syncspirit::transport {
 
-template <typename Sock>
-struct generic_steam_impl_t : base_impl_t<Sock>,
-                              interface_t<generic_steam_impl_t<Sock>, Sock, upgradeable_stream_base_t> {
+template <typename Sock, typename Interface>
+struct generic_steam_impl_t : base_impl_t<Sock>, interface_t<generic_steam_impl_t<Sock, Interface>, Sock, Interface> {
     using self_t = generic_steam_impl_t;
     using socket_t = Sock;
     using parent_t = base_impl_t<Sock>;
     using parent_t::parent_t;
 };
 
-struct ssl_stream_impl_t final : generic_steam_impl_t<ssl_socket_t> {
-    using parent_t = generic_steam_impl_t<socket_t>;
-    using parent_t::parent_t;
+using ssl_stream_impl_t = generic_steam_impl_t<ssl_socket_t, stream_base_t>;
 
-    stream_sp_t upgrade(ssl_junction_t &, bool) noexcept override { assert(0 && "should not happen"); }
-};
-
-struct tcp_stream_impl_t final : generic_steam_impl_t<tcp_socket_t> {
-    using parent_t = generic_steam_impl_t<socket_t>;
+struct tcp_stream_impl_t final : generic_steam_impl_t<tcp_socket_t, upgradeable_stream_base_t> {
+    using parent_t = generic_steam_impl_t;
 
     tcp_stream_impl_t(transport_config_t &config) noexcept : parent_t(config), uri(config.uri) {}
 

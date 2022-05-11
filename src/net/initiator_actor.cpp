@@ -359,10 +359,10 @@ void initiator_actor_t::on_read_relay(size_t bytes) noexcept {
         auto ec = utils::make_error_code(utils::error_code_t::relay_failure);
         return do_shutdown(make_error(ec));
     }
-    auto upgradeable = static_cast<transport::upgradeable_stream_base_t *>(transport.get());
+    auto &upgradeable = dynamic_cast<transport::upgradeable_stream_base_t &>(*transport.get());
     auto ssl = transport::ssl_junction_t{peer_device_id, &ssl_pair, true, constants::protocol_name};
     auto active = role == role_t::active;
-    transport = upgradeable->upgrade(ssl, active);
+    transport = upgradeable.upgrade(ssl, active);
     initiate_handshake();
 }
 
