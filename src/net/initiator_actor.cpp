@@ -116,6 +116,8 @@ void initiator_actor_t::initiate_active() noexcept {
             initiate_active_tls(uri);
         } else if (uri.proto == "relay") {
             initiate_active_relay(uri);
+        } else {
+            continue;
         }
         return;
     }
@@ -183,7 +185,7 @@ void initiator_actor_t::shutdown_finish() noexcept {
 }
 
 void initiator_actor_t::resolve(const utils::URI &uri) noexcept {
-    LOG_TRACE(log, "{}, resolving {} (transport = {})", identity, uri.full, (void *)transport.get());
+    LOG_DEBUG(log, "{}, resolving {} (transport = {})", identity, uri.full, (void *)transport.get());
     pt::time_duration resolve_timeout = init_timeout / 2;
     auto port = std::to_string(uri.port);
     request<payload::address_request_t>(resolver, uri.host, port).send(resolve_timeout);
@@ -191,7 +193,7 @@ void initiator_actor_t::resolve(const utils::URI &uri) noexcept {
 }
 
 void initiator_actor_t::initiate_active_tls(const utils::URI &uri) noexcept {
-    LOG_TRACE(log, "{}, trying '{}' as active tsl", identity, uri.full);
+    LOG_DEBUG(log, "{}, trying '{}' as active tls", identity, uri.full);
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
     transport = transport::initiate_tls_active(*sup, ssl_pair, peer_device_id, uri);
     active_uri = &uri;
@@ -358,7 +360,7 @@ void initiator_actor_t::on_read_relay(size_t bytes) noexcept {
         return do_shutdown(make_error(ec));
     }
     auto upgradeable = static_cast<transport::upgradeable_stream_base_t *>(transport.get());
-    auto ssl = transport::ssl_junction_t{peer_device_id, &ssl_pair, false, "bep"};
+    auto ssl = transport::ssl_junction_t{peer_device_id, &ssl_pair, true, constants::protocol_name};
     auto active = role == role_t::active;
     transport = upgradeable->upgrade(ssl, active);
     initiate_handshake();

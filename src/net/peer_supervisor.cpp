@@ -80,9 +80,15 @@ void peer_supervisor_t::on_peer_ready(message::peer_connected_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_peer_ready", identity);
     auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
     auto &p = msg.payload;
+    auto &d = p.peer_device_id;
+    auto peer = cluster->get_devices().by_sha256(d.get_sha256());
+    if (peer->get_state() == model::device_state_t::online) {
+        LOG_DEBUG(log, "{}, peer '{}' is already online, ignoring request", identity, d.get_short());
+        return;
+    }
     create_actor<peer_actor_t>()
         .transport(std::move(p.transport))
-        .peer_device_id(p.peer_device_id)
+        .peer_device_id(d)
         .device_name(device_name)
         .bep_config(bep_config)
         .coordinator(coordinator)
@@ -148,7 +154,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &
     if (!diff.self && diff.known) {
         auto &devices = cluster->get_devices();
         auto peer = devices.by_sha256(diff.device.get_sha256());
-        if (peer->get_state() != model::device_state_t::online) {
+        if (peer->get_state() == model::device_state_t::offline) {
             auto &uris = diff.uris;
             auto connect_timeout = r::pt::milliseconds{bep_config.connect_timeout};
             LOG_DEBUG(log, "{} initiating connection with {}", identity, peer->device_id());
@@ -162,6 +168,8 @@ auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &
                 .init_timeout(connect_timeout * (uris.size() + 1))
                 .shutdown_timeout(connect_timeout)
                 .finish();
+        } else {
+            LOG_DEBUG(log, "{}, peer '{}' is not offline, dropping connection", identity, peer->device_id());
         }
     }
     return outcome::success();

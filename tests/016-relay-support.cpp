@@ -99,6 +99,23 @@ TEST_CASE("relay proto", "[relay]") {
             CHECK(target->server_socket == source.server_socket);
         }
 
+        SECTION("session_invitation (host of zeroes)") {
+            auto zeros = std::string("\0\0\0\0", 4);
+            auto source = session_invitation_t{"lorem", "impsum", zeros, 1234, true};
+            auto sz = serialize(source, buff);
+            REQUIRE(sz);
+            auto r = parse(buff);
+            auto msg = std::get_if<wrapped_message_t>(&r);
+            REQUIRE(msg);
+            CHECK(msg->length == sz);
+            auto target = std::get_if<session_invitation_t>(&msg->message);
+            REQUIRE(target);
+            CHECK(target->from == source.from);
+            CHECK(target->key == source.key);
+            CHECK(target->address.empty());
+            CHECK(target->server_socket == source.server_socket);
+        }
+
         SECTION("response sample") {
             const unsigned char data[] = {0x9e, 0x79, 0xbc, 0x40, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00,
                                           0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07,
