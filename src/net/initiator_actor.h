@@ -141,6 +141,7 @@ struct peer_connected_t {
     transport::stream_sp_t transport;
     model::device_id_t peer_device_id;
     tcp::endpoint remote_endpoint;
+    std::string proto;
     r::message_ptr_t custom;
 };
 

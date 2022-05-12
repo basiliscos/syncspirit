@@ -93,6 +93,7 @@ void peer_supervisor_t::on_peer_ready(message::peer_connected_t &msg) noexcept {
         .bep_config(bep_config)
         .coordinator(coordinator)
         .peer_endpoint(p.remote_endpoint)
+        .peer_proto(p.proto)
         .timeout(timeout)
         .cluster(cluster)
         .finish();

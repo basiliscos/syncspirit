@@ -29,7 +29,7 @@ r::plugin::resource_id_t finalization = 5;
 peer_actor_t::peer_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device_name{config.device_name}, bep_config{config.bep_config},
       coordinator{config.coordinator}, peer_device_id{config.peer_device_id},
-      transport(std::move(config.transport)), peer_endpoint{config.peer_endpoint} {
+      transport(std::move(config.transport)), peer_endpoint{config.peer_endpoint}, peer_proto(std::move(config.peer_proto)) {
     rx_buff.resize(config.bep_config.rx_buff_size);
     log = utils::get_logger("net.peer_actor");
 }
@@ -39,7 +39,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         std::stringstream ss;
-        ss << peer_device_id.get_short() << "/" << peer_endpoint;
+        ss << peer_device_id.get_short() << "/" << peer_proto << "/" << peer_endpoint;
         p.set_identity(ss.str(), false);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {

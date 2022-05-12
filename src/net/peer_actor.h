@@ -25,6 +25,7 @@ struct peer_actor_config_t : public r::actor_config_t {
     r::address_ptr_t coordinator;
     model::cluster_ptr_t cluster;
     tcp::endpoint peer_endpoint;
+    std::string peer_proto;
 };
 
 template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -64,6 +65,11 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
 
     builder_t &&peer_endpoint(const tcp::endpoint &value) &&noexcept {
         parent_t::config.peer_endpoint = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&peer_proto(std::string value) &&noexcept {
+        parent_t::config.peer_proto = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -146,6 +152,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     bool io_error = false;
     std::string cert_name;
     tcp::endpoint peer_endpoint;
+    std::string peer_proto;
     read_action_t read_action;
     r::address_ptr_t controller;
     block_requests_t block_requests;

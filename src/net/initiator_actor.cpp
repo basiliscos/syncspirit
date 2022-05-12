@@ -153,7 +153,18 @@ void initiator_actor_t::initiate_relay_passive() noexcept {
 void initiator_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     LOG_TRACE(log, "{}, on_start", identity);
-    send<payload::peer_connected_t>(sink, std::move(transport), peer_device_id, remote_endpoint, std::move(custom));
+    std::string proto;
+    if (active_uri) {
+        proto = active_uri->proto;
+    } else {
+        if (role == role_t::relay_passive) {
+            proto = "relay";
+        } else if (role == role_t::passive) {
+            proto = "tcp";
+        }
+    }
+    send<payload::peer_connected_t>(sink, std::move(transport), peer_device_id, remote_endpoint,
+                                    std::move(proto), std::move(custom));
     success = true;
     do_shutdown();
 }

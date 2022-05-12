@@ -359,7 +359,8 @@ void test_success() {
             auto act = create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
-            CHECK(connected_message);
+            REQUIRE(connected_message);
+            CHECK(connected_message->payload.proto == "tcp");
             CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
             CHECK(valid_handshake);
             sup->do_shutdown();
@@ -422,7 +423,8 @@ void test_passive_success() {
             initiate_active();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
-            CHECK(connected_message);
+            REQUIRE(connected_message);
+            CHECK(connected_message->payload.proto == "tcp");
             CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
             CHECK(valid_handshake);
             sup->do_shutdown();
@@ -533,7 +535,8 @@ void test_relay_passive_success() {
             auto act = create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
-            CHECK(connected_message);
+            REQUIRE(connected_message);
+            CHECK(connected_message->payload.proto == "relay");
             CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
             CHECK(valid_handshake);
             sup->do_shutdown();
@@ -758,6 +761,7 @@ void test_relay_active_success() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
             REQUIRE(connected_message);
+            CHECK(connected_message->payload.proto == "relay");
             CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
             CHECK(valid_handshake);
             sup->do_shutdown();
