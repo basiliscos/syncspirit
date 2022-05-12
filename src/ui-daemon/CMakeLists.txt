@@ -32,20 +32,17 @@ endif()
 
 if (CMAKE_BUILD_TYPE MATCHES "^([Rr]elease)|(MinSizeRel)")
     set_target_properties(syncspirit-daemon PROPERTIES LINK_FLAGS -s)
-    set(DAEMON_TARGET "${CMAKE_CXX_COMPILER}")
-    string(REGEX REPLACE ".*/" "" DAEMON_TARGET ${DAEMON_TARGET})
-    string(REGEX REPLACE "(.*)-.+" "\\1" DAEMON_TARGET ${DAEMON_TARGET})
-    if ("${DAEMON_TARGET}" STREQUAL "")
-        set(DAEMON_TARGET "unknown")
+    find_program(UPX upx)
+    if (NOT ${UPX_FOUND})
+        message(WARNING "upx not found")
+    else()
+        message(STATUS "upx found")
+        set(EXE "syncspirit-daemon${CMAKE_EXECUTABLE_SUFFIX}")
+        add_custom_target(compress_exec ALL
+            COMMAND upx "--force" "-9" ${EXE}
+            DEPENDS ${EXE}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            COMMENT "compressing ${EXE}"
+            VERBATIM)
     endif()
-    string(JOIN "_"  DAEMON_TARGET "syncspirit-daemon" ${SYNCSPIRIT_VERSION} ${DAEMON_TARGET})
-    set(DAEMON_TARGET "${DAEMON_TARGET}.zip")
-    set(ACHIVE_NAME "${syncspirit_BINARY_DIR}/${DAEMON_TARGET}")
-    message(STATUS "going to make an ${ACHIVE_NAME}")
-    add_custom_target(make_archive ALL
-        COMMAND zip "-q9" "${ACHIVE_NAME}" "syncspirit-daemon${CMAKE_EXECUTABLE_SUFFIX}"
-        DEPENDS "syncspirit-daemon${CMAKE_EXECUTABLE_SUFFIX}"
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        COMMENT "making release archive ${DAEMON_TARGET}"
-        VERBATIM)
 endif()
