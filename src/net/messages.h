@@ -146,6 +146,7 @@ struct connect_request_t {
     using response_t = connect_response_t;
     model::device_id_t device_id;
     utils::URI uri;
+    std::string_view alpn;
 };
 
 } // end of namespace payload

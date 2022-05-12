@@ -1,5 +1,6 @@
 #include "relay_actor.h"
 #include "names.h"
+#include "constants.h"
 #include "utils/error_code.h"
 #include "utils/beast_support.h"
 #include "model/messages.h"
@@ -94,7 +95,9 @@ void relay_actor_t::connect_to_relay() noexcept {
                  relay->uri.host, relay->uri.port, l.city, l.country, l.continent);
 
         auto uri = utils::parse(fmt::format("tcp://{}:{}", u.host, u.port)).value();
-        request<payload::connect_request_t>(peer_supervisor, relay->device_id, std::move(uri)).send(init_timeout);
+        request<payload::connect_request_t>(peer_supervisor, relay->device_id, std::move(uri),
+                                            constants::relay_protocol_name)
+            .send(init_timeout);
         return;
     }
     if (attempts >= 10) {

@@ -117,6 +117,7 @@ void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
         .custom(&msg)
         .router(*locality_leader)
         .sink(addr_unknown)
+        .alpn(p.alpn)
         .init_timeout(connect_timeout * 2)
         .shutdown_timeout(connect_timeout)
         .finish();

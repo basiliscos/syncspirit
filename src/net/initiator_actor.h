@@ -21,6 +21,7 @@ struct initiator_actor_config_t : public r::actor_config_t {
     r::address_ptr_t sink;
     r::message_ptr_t custom;
     r::supervisor_t *router;
+    std::string_view alpn;
 };
 
 template <typename Actor> struct initiator_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -72,6 +73,11 @@ template <typename Actor> struct initiator_actor_config_builder_t : r::actor_con
         parent_t::config.router = &value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&alpn(std::string_view value) &&noexcept {
+        parent_t::config.alpn = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct initiator_actor_t : r::actor_base_t {
@@ -120,6 +126,7 @@ struct initiator_actor_t : r::actor_base_t {
     r::address_ptr_t sink;
     r::message_ptr_t custom;
     r::supervisor_t &router;
+    std::string_view alpn;
 
     const utils::URI *active_uri = nullptr;
     transport::stream_sp_t transport;

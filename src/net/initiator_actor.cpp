@@ -29,7 +29,7 @@ initiator_actor_t::initiator_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id},
       relay_key(std::move(cfg.relay_session)), ssl_pair{*cfg.ssl_pair},
       sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
-      custom(std::move(cfg.custom)), router{*cfg.router} {
+      custom(std::move(cfg.custom)), router{*cfg.router}, alpn(cfg.alpn) {
     log = utils::get_logger("net.initator");
     for (auto &uri : cfg.uris) {
         if (uri.proto != "tcp" && uri.proto != "relay") {
@@ -204,9 +204,9 @@ void initiator_actor_t::resolve(const utils::URI &uri) noexcept {
 }
 
 void initiator_actor_t::initiate_active_tls(const utils::URI &uri) noexcept {
-    LOG_DEBUG(log, "{}, trying '{}' as active tls", identity, uri.full);
+    LOG_DEBUG(log, "{}, trying '{}' as active tls, alpn = {}", identity, uri.full, alpn);
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
-    transport = transport::initiate_tls_active(*sup, ssl_pair, peer_device_id, uri);
+    transport = transport::initiate_tls_active(*sup, ssl_pair, peer_device_id, uri, false, alpn);
     active_uri = &uri;
     relaying = false;
     resolve(uri);
@@ -415,14 +415,12 @@ void initiator_actor_t::on_read_relay_active(size_t bytes) noexcept {
         } else {
             LOG_WARN(log, "{}, unexpected relay message: {}", identity, spdlog::to_hex(buff.begin(), buff.end()));
         }
-        auto ec = utils::make_error_code(utils::error_code_t::relay_failure);
-        return do_shutdown(make_error(ec));
+        return initiate_active();
     }
     auto &peer = inv->from;
     if (peer != peer_device_id.get_sha256()) {
         LOG_WARN(log, "{}, unexpected peer device: {}", identity, spdlog::to_hex(peer.begin(), peer.end()));
-        auto ec = utils::make_error_code(utils::error_code_t::relay_failure);
-        return do_shutdown(make_error(ec));
+        return initiate_active();
     }
     auto &addr = inv->address;
     relay_key = inv->key;
