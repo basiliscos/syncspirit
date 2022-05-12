@@ -163,8 +163,8 @@ void initiator_actor_t::on_start() noexcept {
             proto = "tcp";
         }
     }
-    send<payload::peer_connected_t>(sink, std::move(transport), peer_device_id, remote_endpoint,
-                                    std::move(proto), std::move(custom));
+    send<payload::peer_connected_t>(sink, std::move(transport), peer_device_id, remote_endpoint, std::move(proto),
+                                    std::move(custom));
     success = true;
     do_shutdown();
 }
@@ -409,7 +409,12 @@ void initiator_actor_t::on_read_relay_active(size_t bytes) noexcept {
     }
     auto inv = std::get_if<proto::relay::session_invitation_t>(&wrapped->message);
     if (!inv) {
-        LOG_WARN(log, "{}, unexpected relay message: {}", identity, spdlog::to_hex(buff.begin(), buff.end()));
+        auto reply = std::get_if<proto::relay::response_t>(&wrapped->message);
+        if (reply) {
+            LOG_DEBUG(log, "{}, reply (expected session invitation) ({}) : {}", identity, reply->code, reply->details);
+        } else {
+            LOG_WARN(log, "{}, unexpected relay message: {}", identity, spdlog::to_hex(buff.begin(), buff.end()));
+        }
         auto ec = utils::make_error_code(utils::error_code_t::relay_failure);
         return do_shutdown(make_error(ec));
     }

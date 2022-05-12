@@ -241,9 +241,8 @@ auto global_discovery_actor_t::operator()(const model::diff::modify::update_cont
         auto &uris = diff.uris;
         if (resources->has(resource::timer)) {
             cancel_timer(*timer_request);
-        } else {
-            announce();
         }
+        announce();
     }
     return outcome::success();
 }

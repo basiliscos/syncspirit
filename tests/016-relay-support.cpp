@@ -132,6 +132,22 @@ TEST_CASE("relay proto", "[relay]") {
             CHECK(target->details == details);
         }
 
+        SECTION("response sample-2") {
+            const unsigned char data[] = {0x9e, 0x79, 0xbc, 0x40, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
+                                          0x14, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x6e, 0x6f,
+                                          0x74, 0x20, 0x66, 0x6f, 0x75, 0x6e, 0x64, 0x00, 0x00, 0x00};
+            auto ptr = reinterpret_cast<const char *>(data);
+            auto r = parse({ptr, sizeof(data)});
+            auto msg = std::get_if<wrapped_message_t>(&r);
+            REQUIRE(msg);
+            CHECK(msg->length == 32);
+            auto target = std::get_if<response_t>(&msg->message);
+            REQUIRE(target);
+            CHECK(target->code == 1);
+            auto details = std::string_view("not found");
+            CHECK(target->details == details);
+        }
+
         SECTION("session invitation sample") {
             const unsigned char data[] = {0x9e, 0x79, 0xbc, 0x40, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x4a, 0x00,
                                           0x00, 0x00, 0x20, 0xf8, 0x31, 0xf5, 0x75, 0xea, 0x61, 0x8a, 0x2f, 0x15, 0xef,

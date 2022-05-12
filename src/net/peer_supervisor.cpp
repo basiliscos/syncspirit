@@ -8,6 +8,7 @@
 #include "utils/error_code.h"
 #include "model/diff/peer/peer_state.h"
 #include "model/diff/modify/connect_request.h"
+#include "model/diff/modify/relay_connect_request.h"
 #include "model/diff/modify/update_contact.h"
 #include "model/misc/error_code.h"
 
@@ -147,6 +148,31 @@ auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t 
         .sock(std::move(sock))
         .timeout(timeout)
         .finish();
+    return outcome::success();
+}
+
+auto peer_supervisor_t::operator()(const model::diff::modify::relay_connect_request_t &diff) noexcept
+    -> outcome::result<void> {
+
+    auto peer = cluster->get_devices().by_sha256(diff.peer.get_sha256());
+    if (peer->get_state() == model::device_state_t::offline) {
+        LOG_DEBUG(log, "{} initiating relay connection with {}", identity, peer->device_id());
+        auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
+        auto uri_str = fmt::format("tcp://{}", diff.relay);
+        auto uri = utils::parse(uri_str);
+        create_actor<initiator_actor_t>()
+            .cluster(cluster)
+            .router(*locality_leader)
+            .sink(address)
+            .ssl_pair(&ssl_pair)
+            .peer_device_id(diff.peer)
+            .uris({std::move(uri.value())})
+            .relay_session(diff.session_key)
+            .timeout(timeout)
+            .finish();
+    } else {
+        LOG_DEBUG(log, "{}, peer '{}' is not offline, dropping relay connection request", identity, peer->device_id());
+    }
     return outcome::success();
 }
 
