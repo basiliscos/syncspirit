@@ -203,8 +203,11 @@ int main(int argc, char **argv) {
                            .create_registry()
                            .guard_context(true)
                            .cluster_copies(cluster_copies)
+                           .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                            .finish();
         sup_net->start();
+        // pre-startup
+        sup_net->do_process();
 
         rth::system_context_thread_t fs_context;
         auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
@@ -234,15 +237,6 @@ int main(int argc, char **argv) {
         }
 
         /* launch actors */
-        auto net_thread = std::thread([&]() {
-#if defined(__linux__)
-            pthread_setname_np(pthread_self(), "ss/net");
-#endif
-            io_context.run();
-            shutdown_flag = true;
-            spdlog::trace("net thread has been terminated");
-        });
-
         auto fs_thread = std::thread([&]() {
 #if defined(__linux__)
             pthread_setname_np(pthread_self(), "ss/fs");
@@ -270,18 +264,12 @@ int main(int argc, char **argv) {
         }
 
         // main loop;
-        while (!shutdown_flag) {
-            using namespace std::chrono_literals;
-            std::this_thread::sleep_for(10ms);
-        }
-
-        // initiate shutdown
-        spdlog::trace("sending shutdown signal...");
-        auto ec = r::make_error_code(r::shutdown_code_t::normal);
-        auto coordinator = sup_net->get_address();
-        auto ee = r::make_error("syncspirit-daemon is terminating", ec);
-        auto msg = r::make_message<r::payload::shutdown_trigger_t>(coordinator, coordinator, ee);
-        sup_net->enqueue(msg);
+#if defined(__linux__)
+        pthread_setname_np(pthread_self(), "ss/net");
+#endif
+        io_context.run();
+        shutdown_flag = true;
+        spdlog::trace("net thread has been terminated");
 
         spdlog::trace("waiting fs thread termination");
         fs_thread.join();
@@ -290,10 +278,6 @@ int main(int argc, char **argv) {
         for (auto &thread : hasher_threads) {
             thread.join();
         }
-
-        spdlog::trace("waiting net thread termination");
-        net_thread.join();
-
         spdlog::trace("everything has been terminated");
     } catch (...) {
         spdlog::critical("unknown exception");
