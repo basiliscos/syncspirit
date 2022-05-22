@@ -8,7 +8,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-update_contact_t::update_contact_t(const model::cluster_t &cluster, const model::device_id_t device_,
+update_contact_t::update_contact_t(const model::cluster_t &cluster, const model::device_id_t &device_,
                                    const utils::uri_container_t &uris_) noexcept
     : device{device_}, uris{uris_} {
     auto &devices = cluster.get_devices();

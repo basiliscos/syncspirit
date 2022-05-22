@@ -22,51 +22,6 @@ static const std::string home_path = "~/.config/syncspirit";
 
 namespace syncspirit::config {
 
-bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
-    return lhs.rx_buff_size == rhs.rx_buff_size && lhs.connect_timeout == rhs.connect_timeout &&
-           lhs.request_timeout == rhs.request_timeout && lhs.tx_timeout == rhs.tx_timeout &&
-           lhs.rx_timeout == rhs.rx_timeout && lhs.blocks_max_requested == rhs.blocks_max_requested;
-}
-
-bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.redial_timeout == rhs.redial_timeout;
-}
-
-bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
-    return lhs.temporally_timeout == rhs.temporally_timeout && lhs.mru_size == rhs.mru_size;
-}
-
-bool operator==(const db_config_t &lhs, const db_config_t &rhs) noexcept {
-    return lhs.upper_limit == rhs.upper_limit && lhs.uncommited_threshold == rhs.uncommited_threshold;
-}
-
-bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.announce_url == rhs.announce_url && lhs.device_id == rhs.device_id &&
-           lhs.cert_file == rhs.cert_file && lhs.key_file == rhs.key_file && lhs.rx_buff_size == rhs.rx_buff_size &&
-           lhs.timeout == rhs.timeout && lhs.reannounce_after == rhs.reannounce_after;
-}
-
-bool operator==(const local_announce_config_t &lhs, const local_announce_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.port == rhs.port && lhs.frequency == rhs.frequency;
-}
-
-bool operator==(const log_config_t &lhs, const log_config_t &rhs) noexcept {
-    return lhs.name == rhs.name && lhs.level == rhs.level && lhs.sinks == rhs.sinks;
-}
-
-bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
-    return lhs.local_announce_config == rhs.local_announce_config && lhs.upnp_config == rhs.upnp_config &&
-           lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
-           lhs.db_config == rhs.db_config && lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
-           lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs &&
-           lhs.hasher_threads == rhs.hasher_threads;
-}
-
-bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.max_wait == rhs.max_wait && lhs.external_port == rhs.external_port &&
-           lhs.rx_buff_size == rhs.rx_buff_size && lhs.debug == rhs.debug;
-}
-
 using device_name_t = outcome::result<std::string>;
 
 static std::string expand_home(const std::string &path, const char *home) {
@@ -282,6 +237,30 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         c.debug = debug.value();
     };
 
+    // relay
+    {
+        auto t = root_tbl["relay"];
+        auto &c = cfg.relay_config;
+
+        auto enabled = t["enabled"].value<bool>();
+        if (!enabled) {
+            return "relay/enabled is incorrect or missing";
+        }
+        c.enabled = enabled.value();
+
+        auto discovery_url = t["discovery_url"].value<std::string>();
+        if (!discovery_url) {
+            return "upnp/discovery_url is incorrect or missing";
+        }
+        c.discovery_url = discovery_url.value();
+
+        auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
+        if (!rx_buff_size) {
+            return "relay/rx_buff_size is incorrect or missing";
+        }
+        c.rx_buff_size = rx_buff_size.value();
+    };
+
     // bep
     {
         auto t = root_tbl["bep"];
@@ -467,6 +446,11 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                    {"upper_limit", cfg.db_config.upper_limit},
                    {"uncommited_threshold", cfg.db_config.uncommited_threshold},
                }}},
+        {"relay", toml::table{{
+                      {"enabled", cfg.relay_config.enabled},
+                      {"discovery_url", cfg.relay_config.discovery_url},
+                      {"rx_buff_size", cfg.relay_config.rx_buff_size},
+                  }}},
     }};
     // clang-format on
     out << tbl;
@@ -559,8 +543,12 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         0x400000000,   /* upper_limit, 16Gb */
         150,           /* uncommited_threshold */
     };
+    cfg.relay_config = relay_config_t {
+        true,                                       /* enabled */
+        "https://relays.syncthing.net/endpoint",    /* discovery url */
+        1024 * 1024,                                /* rx buff size */
+    };
     return cfg;
 }
-
 
 }

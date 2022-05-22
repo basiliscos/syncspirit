@@ -24,7 +24,7 @@ find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(ZLIB REQUIRED)
 
-set(SYNCSPIRIT_VERSION "v0.1.0")
+set(SYNCSPIRIT_VERSION "v0.2.0")
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
 set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src)
@@ -97,6 +97,7 @@ add_library(syncspirit_lib
     src/model/diff/modify/local_update.cpp
     src/model/diff/modify/lock_file.cpp
     src/model/diff/modify/new_file.cpp
+    src/model/diff/modify/relay_connect_request.cpp
     src/model/diff/modify/share_folder.cpp
     src/model/diff/modify/update_contact.cpp
     src/model/diff/modify/update_peer.cpp
@@ -128,11 +129,13 @@ add_library(syncspirit_lib
     src/net/dialer_actor.cpp
     src/net/global_discovery_actor.cpp
     src/net/http_actor.cpp
+    src/net/initiator_actor.cpp
     src/net/local_discovery_actor.cpp
     src/net/messages.cpp
     src/net/net_supervisor.cpp
     src/net/peer_actor.cpp
     src/net/peer_supervisor.cpp
+    src/net/relay_actor.cpp
     src/net/resolver_actor.cpp
     src/net/names.cpp
     src/net/ssdp_actor.cpp
@@ -140,6 +143,7 @@ add_library(syncspirit_lib
     src/proto/bep_support.cpp
     src/proto/discovery_support.cpp
     src/proto/luhn32.cpp
+    src/proto/relay_support.cpp
     src/proto/upnp_support.cpp
     src/transport/stream.cpp
     src/transport/http.cpp
@@ -164,6 +168,8 @@ set(BUILD_SHARED_LIBS false CACHE BOOL "BUILD_SHARED_LIBS")
 set(LZ4_BUILD_CLI false CACHE BOOL "LZ4_BUILD_CLI")
 set(LZ4_BUILD_LEGACY_LZ4C false CACHE BOOL "LZ4_BUILD_LEGACY_LZ4C")
 set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
+set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
+set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
 
 cmake_policy(SET CMP0077 NEW)
 set(PUGIXML_NO_EXCEPTIONS on)

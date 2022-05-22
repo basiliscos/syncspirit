@@ -62,12 +62,17 @@ enum class error_code_t {
     unparseable_control_url,
     external_ip_failed,
     rx_timeout,
+    tx_timeout,
     fs_error,
     scan_aborted,
     already_shared,
     unknown_sink,
     misconfigured_default_logger,
     already_connected,
+    cannot_get_public_relays,
+    protocol_error,
+    relay_failure,
+    invalid_deviceid,
 };
 
 enum class bep_error_code_t {

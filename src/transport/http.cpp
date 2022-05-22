@@ -6,8 +6,6 @@
 
 namespace syncspirit::transport {
 
-http_base_t::~http_base_t() {}
-
 template <typename Sock> struct http_impl_t : base_impl_t<Sock>, interface_t<http_impl_t<Sock>, Sock, http_base_t> {
     using self_t = http_impl_t;
     using socket_t = Sock;
@@ -16,8 +14,6 @@ template <typename Sock> struct http_impl_t : base_impl_t<Sock>, interface_t<htt
     using parent_t::parent_t;
     using rx_buff_t = boost::beast::flat_buffer;
     using response_t = http::response<http::string_body>;
-
-    // virtual ~http_impl_t() {};
 
     void async_read(rx_buff_t &rx_buff, response_t &response, io_fn_t &on_read,
                     error_fn_t &on_error) noexcept override {
@@ -40,14 +36,10 @@ template <typename Sock> struct http_impl_t : base_impl_t<Sock>, interface_t<htt
 
 http_sp_t initiate_http(transport_config_t &config) noexcept {
     auto &proto = config.uri.proto;
-    if (!config.ssl_junction) {
-        if (proto == "http") {
-            return new http_impl_t<tcp_socket_t>(config);
-        }
-    } else {
-        if (proto == "https") {
-            return new http_impl_t<ssl_socket_t>(config);
-        }
+    if (proto == "http") {
+        return new http_impl_t<tcp_socket_t>(config);
+    } else if (proto == "https") {
+        return new http_impl_t<ssl_socket_t>(config);
     }
     return http_sp_t();
 }

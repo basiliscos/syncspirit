@@ -20,13 +20,12 @@ namespace net {
 struct peer_actor_config_t : public r::actor_config_t {
     std::string_view device_name;
     model::device_id_t peer_device_id;
-    utils::uri_container_t uris;
-    std::optional<tcp_socket_t> sock;
-    std::optional<std::string> peer_identity;
-    const utils::key_pair_t *ssl_pair;
     config::bep_config_t bep_config;
+    transport::stream_sp_t transport;
     r::address_ptr_t coordinator;
     model::cluster_ptr_t cluster;
+    tcp::endpoint peer_endpoint;
+    std::string peer_proto;
 };
 
 template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -36,16 +35,6 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
 
     builder_t &&peer_device_id(const model::device_id_t &value) &&noexcept {
         parent_t::config.peer_device_id = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&uris(const utils::uri_container_t &value) &&noexcept {
-        parent_t::config.uris = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&ssl_pair(const utils::key_pair_t *value) &&noexcept {
-        parent_t::config.ssl_pair = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -64,13 +53,23 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&sock(std::optional<tcp_socket_t> &&value) &&noexcept {
-        parent_t::config.sock = std::move(value);
+    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+        parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
-        parent_t::config.cluster = value;
+    builder_t &&transport(transport::stream_sp_t value) &&noexcept {
+        parent_t::config.transport = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&peer_endpoint(const tcp::endpoint &value) &&noexcept {
+        parent_t::config.peer_endpoint = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&peer_proto(std::string value) &&noexcept {
+        parent_t::config.peer_proto = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -81,6 +80,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
 
     peer_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void on_start() noexcept override;
     void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
 
@@ -101,7 +101,6 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
         };
     };
 
-    using resolve_it_t = payload::address_response_t::resolve_results_t::iterator;
     using tx_item_t = model::intrusive_ptr_t<confidential::payload::tx_item_t>;
     using tx_message_t = confidential::message::tx_item_t;
     using tx_queue_t = std::list<tx_item_t>;
@@ -109,29 +108,20 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     using block_request_ptr_t = r::intrusive_ptr_t<message::block_request_t>;
     using block_requests_t = std::list<block_request_ptr_t>;
 
-    void on_resolve(message::resolve_response_t &res) noexcept;
     void on_start_reading(message::start_reading_t &) noexcept;
     void on_termination(message::termination_signal_t &) noexcept;
     void on_block_request(message::block_request_t &) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
 
-    void on_connect(resolve_it_t) noexcept;
     void on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept;
     void on_write(std::size_t bytes) noexcept;
     void on_read(std::size_t bytes) noexcept;
-    void try_next_uri() noexcept;
-    void initiate(transport::stream_sp_t tran, const utils::URI &url) noexcept;
-    void on_handshake(bool valid_peer, utils::x509_t &peer_cert, const tcp::endpoint &peer_endpoint,
-                      const model::device_id_t *peer_device) noexcept;
-    void on_handshake_error(sys::error_code ec) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void read_more() noexcept;
     void push_write(fmt::memory_buffer &&buff, bool final) noexcept;
     void process_tx_queue() noexcept;
     void cancel_timer() noexcept;
     void cancel_io() noexcept;
-    void instantiate_transport() noexcept;
-    void initiate_handshake() noexcept;
     void on_tx_timeout(r::request_id_t, bool cancelled) noexcept;
     void on_rx_timeout(r::request_id_t, bool cancelled) noexcept;
 
@@ -150,12 +140,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     config::bep_config_t bep_config;
     r::address_ptr_t coordinator;
     model::device_id_t peer_device_id;
-    utils::uri_container_t uris;
-    std::optional<tcp_socket_t> sock;
-    const utils::key_pair_t &ssl_pair;
-    r::address_ptr_t resolver;
     transport::stream_sp_t transport;
-    std::int32_t uri_idx = -1;
     std::optional<r::request_id_t> timer_request;
     std::optional<r::request_id_t> tx_timer_request;
     std::optional<r::request_id_t> rx_timer_request;
@@ -163,13 +148,11 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     tx_item_t tx_item;
     fmt::memory_buffer rx_buff;
     std::size_t rx_idx = 0;
-    bool connected = false;
-    bool handshaked = false;
-    bool valid_peer = false;
     bool finished = false;
     bool io_error = false;
     std::string cert_name;
     tcp::endpoint peer_endpoint;
+    std::string peer_proto;
     read_action_t read_action;
     r::address_ptr_t controller;
     block_requests_t block_requests;

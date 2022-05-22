@@ -18,7 +18,7 @@ struct http_interface_t {
 };
 
 struct SYNCSPIRIT_API http_base_t : model::arc_base_t<http_base_t>, http_interface_t, stream_interface_t {
-    virtual ~http_base_t();
+    virtual ~http_base_t() = default;
 };
 
 using http_sp_t = model::intrusive_ptr_t<http_base_t>;

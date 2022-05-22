@@ -104,14 +104,14 @@ void test_dialer() {
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 auto sample_addr = sup->get_address();
                 auto peer_id = peer_device->device_id().get_sha256();
-                diff = new model::diff::peer::peer_state_t(*cluster, peer_id, sample_addr, true);
+                diff = new model::diff::peer::peer_state_t(*cluster, peer_id, sample_addr, device_state_t::online);
                 sup->send<model::payload::model_update_t>(sup->get_address(), diff);
 
                 sup->do_process();
                 CHECK(!discovery);
                 CHECK(sup->timers.size() == 0);
 
-                diff = new model::diff::peer::peer_state_t(*cluster, peer_id, sample_addr, false);
+                diff = new model::diff::peer::peer_state_t(*cluster, peer_id, sample_addr, device_state_t::offline);
                 sup->send<model::payload::model_update_t>(sup->get_address(), diff);
 
                 sup->do_process();

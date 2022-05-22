@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #include "hasher_proxy_actor.h"
-#include "../net/names.h"
 #include "../utils/error_code.h"
 #include <fmt/fmt.h>
 #include <numeric>

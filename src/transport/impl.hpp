@@ -66,36 +66,51 @@ template <> struct base_impl_t<tcp_socket_t> {
     strand_t &strand;
     tcp_socket_t sock;
     bool cancelling = false;
+    bool active;
+
+    static tcp_socket_t mk_sock(transport_config_t &config, strand_t &strand) noexcept {
+        if (config.sock) {
+            tcp::socket sock(std::move(config.sock.value()));
+            return {std::move(sock)};
+        } else {
+            tcp::socket sock(strand.context());
+            return {std::move(sock)};
+        }
+    }
+
     base_impl_t(transport_config_t &config) noexcept
-        : supervisor{config.supervisor}, strand{supervisor.get_strand()}, sock(strand.context()) {}
+        : supervisor{config.supervisor}, strand{supervisor.get_strand()},
+          sock(mk_sock(config, strand)), active{config.active} {}
 
     tcp_socket_t &get_physical_layer() noexcept { return sock; }
-    // virtual ~base_impl_t(){}
 };
 
 template <> struct base_impl_t<ssl_socket_t> {
     using self_t = base_impl_t<ssl_socket_t>;
-    // virtual ~base_impl_t(){}
 
     rotor::asio::supervisor_asio_t &supervisor;
     strand_t &strand;
     model::device_id_t expected_peer;
     model::device_id_t actual_peer;
-    const utils::key_pair_t &me;
+    const utils::key_pair_t *me = nullptr;
     ssl::context ctx;
     ssl::stream_base::handshake_type role;
     ssl_socket_t sock;
     bool validation_passed = false;
     bool cancelling = false;
+    bool active;
 
     static ssl::context get_context(self_t &source, std::string_view alpn) noexcept {
         ssl::context ctx(ssl::context::tls);
         ctx.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2);
 
-        auto &cert_data = source.me.cert_data.bytes;
-        auto &key_data = source.me.key_data.bytes;
-        ctx.use_certificate(asio::const_buffer(cert_data.c_str(), cert_data.size()), ssl::context::asn1);
-        ctx.use_private_key(asio::const_buffer(key_data.c_str(), key_data.size()), ssl::context::asn1);
+        auto me = source.me;
+        if (me) {
+            auto &cert_data = me->cert_data.bytes;
+            auto &key_data = me->key_data.bytes;
+            ctx.use_certificate(asio::const_buffer(cert_data.c_str(), cert_data.size()), ssl::context::asn1);
+            ctx.use_private_key(asio::const_buffer(key_data.c_str(), key_data.size()), ssl::context::asn1);
+        }
 
         if (alpn.size()) {
             std::byte wire_alpn[alpn.size() + 1];
@@ -122,8 +137,9 @@ template <> struct base_impl_t<ssl_socket_t> {
 
     base_impl_t(transport_config_t &config) noexcept
         : supervisor{config.supervisor}, strand{supervisor.get_strand()}, expected_peer{config.ssl_junction->peer},
-          me(*config.ssl_junction->me), ctx(get_context(*this, config.ssl_junction->alpn)),
-          role(config.sock ? ssl::stream_base::server : ssl::stream_base::client), sock(mk_sock(config, ctx, strand)) {
+          me(config.ssl_junction->me), ctx(get_context(*this, config.ssl_junction->alpn)),
+          role(!config.active ? ssl::stream_base::server : ssl::stream_base::client),
+          sock(mk_sock(config, ctx, strand)) {
         if (config.ssl_junction->sni_extension) {
             auto &host = config.uri.host;
             if (!SSL_set_tlsext_host_name(sock.native_handle(), host.c_str())) {
@@ -131,44 +147,47 @@ template <> struct base_impl_t<ssl_socket_t> {
                 spdlog::error("http_actor_t:: Set SNI Hostname : {}", ec.message());
             }
         }
-        auto mode = ssl::verify_peer | ssl::verify_fail_if_no_peer_cert | ssl::verify_client_once;
-        sock.set_verify_depth(1);
-        sock.set_verify_mode(mode);
-        sock.set_verify_callback([&](bool, ssl::verify_context &peer_ctx) -> bool {
-            auto native = peer_ctx.native_handle();
-            auto peer_cert = X509_STORE_CTX_get_current_cert(native);
-            if (!peer_cert) {
-                spdlog::warn("no peer certificate");
-                return false;
-            }
-            auto der_option = utils::as_serialized_der(peer_cert);
-            if (!der_option) {
-                spdlog::warn("peer certificate cannot be serialized as der : {}", der_option.error().message());
-                return false;
-            }
-
-            utils::cert_data_t cert_data{std::move(der_option.value())};
-            auto peer_option = model::device_id_t::from_cert(cert_data);
-            if (!peer_option) {
-                spdlog::warn("cannot get device_id from peer");
-                return false;
-            }
-
-            auto peer = std::move(peer_option.value());
-            if (!actual_peer) {
-                actual_peer = std::move(peer);
-                spdlog::trace("tls, peer device_id = {}", actual_peer);
-            }
-
-            if (role == ssl::stream_base::handshake_type::client) {
-                if (actual_peer != expected_peer) {
-                    spdlog::warn("unexcpected peer device_id. Got: {}, expected: {}", actual_peer, expected_peer);
+        if (me) {
+            auto mode = ssl::verify_peer | ssl::verify_fail_if_no_peer_cert | ssl::verify_client_once;
+            sock.set_verify_mode(mode);
+            sock.set_verify_depth(1);
+            sock.set_verify_callback([&](bool, ssl::verify_context &peer_ctx) -> bool {
+                auto native = peer_ctx.native_handle();
+                auto peer_cert = X509_STORE_CTX_get_current_cert(native);
+                if (!peer_cert) {
+                    spdlog::warn("no peer certificate");
                     return false;
                 }
-            }
-            validation_passed = true;
-            return true;
-        });
+                auto der_option = utils::as_serialized_der(peer_cert);
+                if (!der_option) {
+                    spdlog::warn("peer certificate cannot be serialized as der : {}", der_option.error().message());
+                    return false;
+                }
+
+                utils::cert_data_t cert_data{std::move(der_option.value())};
+                auto peer_option = model::device_id_t::from_cert(cert_data);
+                if (!peer_option) {
+                    spdlog::warn("cannot get device_id from peer");
+                    return false;
+                }
+
+                auto peer = std::move(peer_option.value());
+                if (!actual_peer) {
+                    actual_peer = std::move(peer);
+                    spdlog::trace("tls, peer device_id = {}", actual_peer);
+                }
+
+                if (role == ssl::stream_base::handshake_type::client) {
+                    if (actual_peer != expected_peer) {
+                        spdlog::warn("unexcpected peer device_id. Got: {}, expected: {}", actual_peer.get_value(),
+                                     expected_peer.get_value());
+                        return false;
+                    }
+                }
+                validation_passed = true;
+                return true;
+            });
+        }
     }
 
     tcp_socket_t &get_physical_layer() noexcept { return sock.next_layer(); }

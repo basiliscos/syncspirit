@@ -70,6 +70,12 @@ timeout = 5000
 # the amount of hasher threads
 hasher_threads = 3
 
+[relay]
+enabled = true
+# where pick the list of relay servers pool
+discovery_url = 'https://relays.syncthing.net/endpoint'
+rx_buff_size = 1048576
+
 [upnp]
 enabled = true
 # do output of upnp requests

@@ -137,6 +137,18 @@ struct SYNCSPIRIT_API block_request_t {
     ~block_request_t();
 };
 
+struct connect_response_t {
+    transport::stream_sp_t transport;
+    tcp::endpoint remote_endpoint;
+};
+
+struct connect_request_t {
+    using response_t = connect_response_t;
+    model::device_id_t device_id;
+    utils::URI uri;
+    std::string_view alpn;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -163,6 +175,9 @@ using termination_signal_t = r::message_t<payload::termination_t>;
 
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;
+
+using connect_request_t = r::request_traits_t<payload::connect_request_t>::request::message_t;
+using connect_response_t = r::request_traits_t<payload::connect_request_t>::response::message_t;
 
 } // end of namespace message
 

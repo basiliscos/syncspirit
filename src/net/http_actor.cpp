@@ -149,7 +149,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto &payload = queue.front()->payload.request_payload;
     auto &ssl_ctx = payload->ssl_context;
     auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
-    transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup, {}};
+    transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup, {}, true};
     transport = transport::initiate_http(cfg);
     if (!transport) {
         auto ec = utils::make_error_code(utils::error_code_t::transport_not_available);

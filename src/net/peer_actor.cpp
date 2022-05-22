@@ -10,161 +10,56 @@
 #include "model/messages.h"
 #include "model/diff/peer/peer_state.h"
 #include <boost/core/demangle.hpp>
+#include <sstream>
 
 using namespace syncspirit::net;
 using namespace syncspirit;
 
 namespace {
 namespace resource {
-r::plugin::resource_id_t resolving = 0;
-r::plugin::resource_id_t uris = 1;
-r::plugin::resource_id_t io_handshake = 2;
-r::plugin::resource_id_t io_read = 3;
-r::plugin::resource_id_t io_write = 4;
-r::plugin::resource_id_t io_connect = 5;
-r::plugin::resource_id_t io_timer = 6;
-r::plugin::resource_id_t tx_timer = 7;
-r::plugin::resource_id_t rx_timer = 8;
-r::plugin::resource_id_t finalization = 9;
+r::plugin::resource_id_t io_read = 0;
+r::plugin::resource_id_t io_write = 1;
+r::plugin::resource_id_t io_timer = 2;
+r::plugin::resource_id_t tx_timer = 3;
+r::plugin::resource_id_t rx_timer = 4;
+r::plugin::resource_id_t finalization = 5;
 } // namespace resource
 } // namespace
 
 peer_actor_t::peer_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device_name{config.device_name}, bep_config{config.bep_config},
-      coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, uris{config.uris},
-      sock(std::move(config.sock)), ssl_pair{*config.ssl_pair} {
+      coordinator{config.coordinator}, peer_device_id{config.peer_device_id},
+      transport(std::move(config.transport)), peer_endpoint{config.peer_endpoint},
+      peer_proto(std::move(config.peer_proto)) {
     rx_buff.resize(config.bep_config.rx_buff_size);
     log = utils::get_logger("net.peer_actor");
-}
-
-static std::string generate_id(const model::device_id_t *device_id, const tcp::endpoint *remote) noexcept {
-    std::string r;
-    if (device_id) {
-        r += device_id->get_short();
-    } else {
-        r += "[?]";
-    }
-    r += "/";
-    if (remote) {
-        r += remote->address().to_string();
-        r += ":";
-        r += std::to_string(remote->port());
-    } else {
-        r += "[?]";
-    }
-    return r;
 }
 
 void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
 
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        sys::error_code ec;
-        tcp::endpoint remote;
-        if (sock) {
-            remote = sock.value().remote_endpoint(ec);
-        }
-        auto value = generate_id((sock ? nullptr : &peer_device_id), (ec ? nullptr : &remote));
-        p.set_identity(value, false);
+        std::stringstream ss;
+        ss << peer_device_id.get_short() << "/" << peer_proto << "/" << peer_endpoint;
+        p.set_identity(ss.str(), false);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&peer_actor_t::on_resolve);
         p.subscribe_actor(&peer_actor_t::on_start_reading);
         p.subscribe_actor(&peer_actor_t::on_termination);
         p.subscribe_actor(&peer_actor_t::on_block_request);
         p.subscribe_actor(&peer_actor_t::on_forward);
-        instantiate_transport();
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.discover_name(names::resolver, resolver).link(false); });
 }
 
-void peer_actor_t::instantiate_transport() noexcept {
-    if (sock) {
-        transport::ssl_junction_t ssl{peer_device_id, &ssl_pair, false, ""};
-        auto uri = utils::parse("tcp://0.0.0.0/").value();
-        auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
-        transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup, std::move(sock)};
-        transport = transport::initiate_stream(cfg);
-        auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
-        timer_request = start_timer(timeout, *this, &peer_actor_t::on_timer);
-        resources->acquire(resource::io_timer);
-        initiate_handshake();
-    } else {
-        resources->acquire(resource::uris);
-        try_next_uri();
-    }
-}
+void peer_actor_t::on_start() noexcept {
+    LOG_TRACE(log, "{}, on_start", identity);
 
-void peer_actor_t::try_next_uri() noexcept {
-    transport::ssl_junction_t ssl{peer_device_id, &ssl_pair, false, constants::protocol_name};
-    while (++uri_idx < (std::int32_t)uris.size()) {
-        auto &uri = uris[uri_idx];
-        auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
-        // log->warn("url: {}", uri.full);
-        transport::transport_config_t cfg{transport::ssl_option_t(ssl), uri, *sup, {}};
-        auto result = transport::initiate_stream(cfg);
-        if (result) {
-            initiate(std::move(result), uri);
-            resources->release(resource::uris);
-            return;
-        }
-    }
+    fmt::memory_buffer buff;
+    proto::make_hello_message(buff, device_name);
+    push_write(std::move(buff), false);
 
-    LOG_TRACE(log, "{}, try_next_uri, no way to conenct found, shut down", identity);
-    resources->release(resource::uris);
-    auto ec = utils::make_error_code(utils::error_code_t::connection_impossible);
-    do_shutdown(make_error(ec));
-}
-
-void peer_actor_t::initiate(transport::stream_sp_t tran, const utils::URI &url) noexcept {
-    transport = std::move(tran);
-
-    LOG_TRACE(log, "{}, try_next_uri, will initate connection with via {} (transport = {})", identity, url.full,
-              (void *)transport.get());
-    pt::time_duration resolve_timeout = init_timeout / 2;
-    auto port = std::to_string(url.port);
-    request<payload::address_request_t>(resolver, url.host, port).send(resolve_timeout);
-    resources->acquire(resource::resolving);
-    return;
-}
-
-void peer_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
-    resources->release(resource::resolving);
-    if (state > r::state_t::OPERATIONAL) {
-        return;
-    }
-
-    auto &ee = res.payload.ee;
-    if (ee) {
-        LOG_WARN(log, "{}, on_resolve error : {}", identity, ee->message());
-        resources->acquire(resource::uris);
-        return try_next_uri();
-    }
-
-    auto &addresses = res.payload.res->results;
-    transport::connect_fn_t on_connect = [&](auto arg) { this->on_connect(arg); };
-    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg, resource::io_connect); };
-    transport->async_connect(addresses, on_connect, on_error);
-    resources->acquire(resource::io_connect);
-
-    auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
-    timer_request = start_timer(timeout, *this, &peer_actor_t::on_timer);
-    resources->acquire(resource::io_timer);
-}
-
-void peer_actor_t::on_connect(resolve_it_t) noexcept {
-    LOG_TRACE(log, "{}, on_connect, device_id = {}", identity, peer_device_id.get_short());
-    initiate_handshake();
-    resources->release(resource::io_connect);
-}
-
-void peer_actor_t::initiate_handshake() noexcept {
-    connected = true;
-    transport::handshake_fn_t handshake_fn([&](auto &&...args) { on_handshake(args...); });
-    transport::error_fn_t error_fn([&](auto arg) { on_io_error(arg, resource::io_handshake); });
-    transport->async_handshake(handshake_fn, error_fn);
-    resources->acquire(resource::io_handshake);
+    read_more();
+    read_action = &peer_actor_t::read_hello;
 }
 
 void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
@@ -180,14 +75,7 @@ void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resourc
     }
     io_error = true;
     if (state < r::state_t::SHUTTING_DOWN) {
-        if (!connected) {
-            resources->acquire(resource::uris);
-            try_next_uri();
-        } else {
-            connected = false;
-            LOG_DEBUG(log, "{}, on_io_error, initiating shutdown...", identity);
-            do_shutdown(make_error(ec));
-        }
+        do_shutdown(make_error(ec));
     }
 }
 
@@ -231,51 +119,6 @@ void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
         resources->acquire(resource::finalization);
     }
 }
-
-void peer_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const tcp::endpoint &peer_endpoint,
-                                const model::device_id_t *peer_device) noexcept {
-    resources->release(resource::io_handshake);
-    handshaked = true;
-    if (!peer_device) {
-        LOG_WARN(log, "{}, on_handshake,  missing peer device id", identity);
-        auto ec = utils::make_error_code(utils::error_code_t::missing_device_id);
-        return do_shutdown(make_error(ec));
-    }
-
-    auto new_id = generate_id(peer_device, &peer_endpoint);
-    LOG_DEBUG(log, "{} now becomes {}", identity, new_id);
-    identity = new_id;
-
-    identity = new_id;
-    auto cert_name = utils::get_common_name(cert);
-    if (!cert_name) {
-        LOG_WARN(log, "{}, on_handshake, can't get certificate name: {}", identity, cert_name.error().message());
-        auto ec = utils::make_error_code(utils::error_code_t::missing_cn);
-        return do_shutdown(make_error(ec));
-    }
-    LOG_TRACE(log, "{}, on_handshake, valid = {}, issued by {}", identity, valid_peer, cert_name.value());
-
-    this->cert_name = cert_name.value();
-    this->valid_peer = valid_peer;
-    this->peer_device_id = *peer_device;
-    this->peer_endpoint = peer_endpoint;
-
-    fmt::memory_buffer buff;
-    proto::make_hello_message(buff, device_name);
-    push_write(std::move(buff), false);
-
-    read_more();
-    read_action = &peer_actor_t::read_hello;
-}
-
-#if 0
-void peer_actor_t::on_handshake_error(sys::error_code ec) noexcept {
-    resources->release(resource::io);
-    if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "{}, on_handshake_error: {}", identity, ec.message());
-    }
-}
-#endif
 
 void peer_actor_t::read_more() noexcept {
     if (state > r::state_t::OPERATIONAL) {
@@ -345,10 +188,8 @@ void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     LOG_TRACE(log, "{}, on_timer_trigger, cancelled = {}", identity, cancelled);
     if (!cancelled) {
         cancel_io();
-        if (connected) {
-            auto ec = r::make_error_code(r::shutdown_code_t::normal);
-            do_shutdown(make_error(ec));
-        }
+        auto ec = r::make_error_code(r::shutdown_code_t::normal);
+        do_shutdown(make_error(ec));
     }
 }
 
@@ -367,17 +208,13 @@ void peer_actor_t::shutdown_start() noexcept {
         send<payload::termination_t>(controller, shutdown_reason);
     }
 
-    if (handshaked) {
-        fmt::memory_buffer buff;
-        proto::Close close;
-        close.set_reason(shutdown_reason->message());
-        proto::serialize(buff, close);
-        tx_queue.clear();
-        push_write(std::move(buff), true);
-        LOG_TRACE(log, "{}, going to send close message", identity);
-    } else {
-        cancel_io();
-    }
+    fmt::memory_buffer buff;
+    proto::Close close;
+    close.set_reason(shutdown_reason->message());
+    proto::serialize(buff, close);
+    tx_queue.clear();
+    push_write(std::move(buff), true);
+    LOG_TRACE(log, "{}, going to send close message", identity);
 
     r::actor_base_t::shutdown_start();
 }
@@ -393,15 +230,14 @@ void peer_actor_t::shutdown_finish() noexcept {
         send<payload::termination_t>(controller, shutdown_reason);
     }
     r::actor_base_t::shutdown_finish();
-    if (handshaked) {
-        auto sha256 = peer_device_id.get_sha256();
-        auto device = cluster->get_devices().by_sha256(sha256);
-        if (device && device->is_online()) {
-            auto diff = model::diff::cluster_diff_ptr_t();
-            diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, false);
-            send<model::payload::model_update_t>(coordinator, std::move(diff));
-        }
-    }
+    auto sha256 = peer_device_id.get_sha256();
+    auto device = cluster->get_devices().by_sha256(sha256);
+    assert(device && device->get_state() == model::device_state_t::online);
+
+    auto diff = model::diff::cluster_diff_ptr_t();
+    auto state = model::device_state_t::offline;
+    diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, state);
+    send<model::payload::model_update_t>(coordinator, std::move(diff));
 }
 
 void peer_actor_t::cancel_timer() noexcept {
@@ -419,16 +255,6 @@ void peer_actor_t::cancel_io() noexcept {
     }
     if (resources->has(resource::io_write)) {
         LOG_TRACE(log, "{}, cancelling I/O (write)", identity);
-        transport->cancel();
-        return;
-    }
-    if (resources->has(resource::io_connect)) {
-        LOG_TRACE(log, "{}, cancelling I/O (connect)", identity);
-        transport->cancel();
-        return;
-    }
-    if (resources->has(resource::io_handshake)) {
-        LOG_TRACE(log, "{}, cancelling I/O (handshake)", identity);
         transport->cancel();
         return;
     }
@@ -493,12 +319,13 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
                 LOG_TRACE(log, "{}, read_hello, from {} ({} {})", identity, msg->device_name(), msg->client_name(),
                           msg->client_version());
                 auto peer = cluster->get_devices().by_sha256(peer_device_id.get_sha256());
-                if (peer && peer->is_online()) {
+                if (peer && peer->get_state() == model::device_state_t::online) {
                     auto ec = utils::make_error_code(utils::error_code_t::already_connected);
                     return do_shutdown(make_error(ec));
                 }
                 auto diff = cluster_diff_ptr_t();
-                diff = new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), true, cert_name,
+                auto state = model::device_state_t::online;
+                diff = new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), state, cert_name,
                                               peer_endpoint, msg->client_name());
                 send<model::payload::model_update_t>(coordinator, std::move(diff));
             } else {

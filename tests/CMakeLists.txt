@@ -59,6 +59,10 @@ add_executable(015-logger 015-logger.cpp $<$<PLATFORM_ID:Windows>:win32-resource
 target_link_libraries(015-logger syncspirit_test_lib)
 add_test(015-logger "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/015-logger")
 
+add_executable(016-relay-support 016-relay-support.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(016-relay-support syncspirit_test_lib)
+add_test(016-relay-support "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/016-relay-support")
+
 add_executable(020-generic-map 020-generic-map.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(020-generic-map syncspirit_test_lib)
 add_test(020-generic-map "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/020-generic-map")
@@ -154,3 +158,21 @@ add_test(075-controller "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/075-controller")
 add_executable(076-scan_actor 076-scan_actor.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(076-scan_actor syncspirit_test_lib)
 add_test(076-scan_actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/076-scan_actor")
+
+add_executable(077-initiator 077-initiator.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(077-initiator syncspirit_test_lib
+    $<$<PLATFORM_ID:Windows>:wsock32>
+    $<$<PLATFORM_ID:Windows>:ws2_32>
+    $<$<PLATFORM_ID:Windows>:iphlpapi>
+)
+add_test(077-initiator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/077-initiator")
+
+add_executable(078-relay 078-relay.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(078-relay syncspirit_test_lib
+    $<$<PLATFORM_ID:Windows>:wsock32>
+    $<$<PLATFORM_ID:Windows>:ws2_32>
+    $<$<PLATFORM_ID:Windows>:iphlpapi>
+)
+add_test(078-relay "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/078-relay")
+
+

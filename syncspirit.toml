@@ -4,7 +4,7 @@ connect_timeout = 5000
 request_timeout = 60000
 rx_timeout = 300000
 tx_timeout = 10000
-blocks_max_requested = 16
+blocks_max_requested = 8
 
 [dialer]
 enabled = true
@@ -16,7 +16,7 @@ temporally_timeout = 86400000
 mru_size = 10
 
 [db]
-upper_limit = 0x400000000
+upper_limit = 0x40000000
 uncommited_threshold = 150
 
 [global_discovery]
@@ -31,7 +31,7 @@ timeout = 4000
 [local_discovery]
 enabled = true
 frequency = 10000
-port = 21026
+port = 21027
 
 [[log]]
 name = 'default'
@@ -40,7 +40,15 @@ sinks = ['stdout', 'file:/tmp/log.txt']
 
 [[log]]
 name = 'net.db'
-level = 'debug'
+level = 'info'
+
+[[log]]
+name = 'net.peer_actor'
+level = 'trace'
+
+[[log]]
+name = 'net.hasher.actor'
+level = 'info'
 
 [main]
 default_location = '/tmp/syncspirit'
@@ -54,5 +62,5 @@ discovery_attempts = 2
 external_port = 22001
 max_wait = 1
 rx_buff_size = 65536
-debug = true
+debug = false
 

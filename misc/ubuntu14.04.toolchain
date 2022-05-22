@@ -1,0 +1,8 @@
+set(TOOLCHAIN_HOME "/home/b/x-tools/x86_64-ubuntu14.04-linux-gnu")
+set(CMAKE_C_COMPILER   ${TOOLCHAIN_HOME}/bin/x86_64-ubuntu14.04-linux-gnu-gcc)
+set(CMAKE_CXX_COMPILER ${TOOLCHAIN_HOME}/bin/x86_64-ubuntu14.04-linux-gnu-g++)
+set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+set(CMAKE_FIND_ROOT_PATH
+    ${TOOLCHAIN_HOME}/x86_64-ubuntu14.04-linux-gnu/sysroot/
+    /home/b/development/cpp/syncspirit-cross/sysroot
+)

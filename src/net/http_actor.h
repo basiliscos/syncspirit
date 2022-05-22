@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "../transport/http.h"
-#include "../utils/log.h"
+#include "transport/http.h"
+#include "utils/log.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor.hpp>
