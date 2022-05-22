@@ -24,7 +24,7 @@ find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(ZLIB REQUIRED)
 
-set(SYNCSPIRIT_VERSION "v0.1.0")
+set(SYNCSPIRIT_VERSION "v0.2.0")
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
 set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src)

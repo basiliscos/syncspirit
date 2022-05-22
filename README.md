@@ -1,12 +1,14 @@
 # syncspirit
 
-sites: [github](https://github.com/basiliscos/syncspirit), [abf](https://github.com/basiliscos/syncspirit)
+sites: [github](https://github.com/basiliscos/syncspirit), [abf](https://github.com/basiliscos/syncspirit),
+[gitflic](https://gitflic.ru/project/basiliscos/syncspirit)
 
 `syncspirit` is a continuous file synchronization program, which synchronizes files between devices.
 It is build using C++ [rotor](github.com/basiliscos/cpp-rotor) actor framework. It implements
 [BEP-protocol](https://docs.syncthing.net/specs/bep-v1.html) for files syncrhonization, or, 
 simplistically speaking, it is [syncthing](https://syncthing.net)-compatible syncrhonization
-program.
+program, which uses [syncthing](https://syncthing.net) infrastructure (for global discovery
+and relaying)
 
 Despite of being functional `syncspirit` is much less feature-rich then [syncthing](https://syncthing.net)
 and still is in heavy development.
@@ -14,38 +16,37 @@ and still is in heavy development.
 
 # status
 
- [x] downloading files from peer devices (aka all folders are receive only)
+- [x] downloading files from peer devices (aka all folders are receive only)
 
- [x] [global peer discovery](https://docs.syncthing.net/specs/globaldisco-v3.html)
+- [x] [global peer discovery](https://docs.syncthing.net/specs/globaldisco-v3.html)
 
- [x] [local (LAN) peer discovery](https://docs.syncthing.net/specs/localdisco-v4.html)
+- [x] [local (LAN) peer discovery](https://docs.syncthing.net/specs/localdisco-v4.html)
 
- [x] upnp & nat passthough
+- [x] upnp & nat passthough
 
- [x] certificates generation
+- [x] certificates generation
 
+- [x] relay transport
 
 # missing features
 
 This list is probably incomplete, here are the most important changes
 
- [ ] relay transport
+- [ ] full-powered files synchronization (aka send and receive)
 
- [ ] full-powered files synchronization (aka send and receive)
+- [ ] conflict resolution
 
- [ ] conflict resolution
+- [ ] ignoring files
 
- [ ] ingoring files
+- [ ] [QUIC transport](https://en.wikipedia.org/wiki/QUIC)
 
- [ ] [QUIC transport](https://en.wikipedia.org/wiki/QUIC)
+- [ ] introducer support
 
- [ ] introducer support
+- [ ] outgoing messages compression
 
- [ ] outgoing messages compression
+- [ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
 
- [ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
-
- [ ] ...
+- [ ] ...
 
 # run
 
@@ -63,7 +64,7 @@ the output should be like
 [![asciicast](https://asciinema.org/a/474217.svg)](https://asciinema.org/a/474217)
 
 i.e. it records some peer, adds a folder, then shares the folder with the peer device, connects to
-the peer and downloads all files into `/tmp/my_dir/data` . The peer device Currently can be
+the peer and downloads all files into `/tmp/my_dir/data` . The peer device currently can be
 only [syncthing](https://syncthing.net). Then `syncspirit` either exits after 2 minutes of inactivity
 or when you press `ctrl+c`. The output is successful, because I previousy authorized this device
 with [syncthing](https://syncthing.net) web interface, and shared the folder with this device
@@ -92,7 +93,7 @@ classical desktop and client-server application models. I think,
 "core" into multiple different user interfaces (GUIs). 
 
 Currently, there syncspirit has only "daemon-ui", i.e. a simple non-interactive application,
-which shows synchronization log, and the only possible just stop it. However, as soon
+which shows synchronization log, and the only possibility is just to stop it. However, as soon
 as the "core" will be complete, there are plans to develop multiple `syncspirit` UIs:
 [wx-widgets](https://www.wxwidgets.org/), qt, gtk, may be native, may be even native mobile UIs...
 
@@ -116,6 +117,14 @@ after the core completion.
 - (may be) mac os x
 
 # changes
+
+## 0.2.0 (22-May-2022)
+- [feature] implement [relay transport](https://docs.syncthing.net/specs/relay-v1.html),
+the relay is randombly chosen from the public relays [pool](https://relays.syncthing.net/endpoint)
+- [feature] output binary is compressed via [upx](https://upx.github.io)
+- [feature] small optimization, use thread less in overall program
+- [bugfix] sometimes fs::scan_actor request timeout ocurrs, which is fatal
+- [bugfix] global discovery sometimes skipped announcements
 
 ## 0.1.0 (18-Arp-2022)
  - initial release

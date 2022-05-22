@@ -37,12 +37,20 @@ if (CMAKE_BUILD_TYPE MATCHES "^([Rr]elease)|(MinSizeRel)")
         message(WARNING "upx not found")
     else()
         message(STATUS "upx found")
+        set(DAEMON_TARGET "${CMAKE_CXX_COMPILER}")
+        string(REGEX REPLACE ".*/" "" DAEMON_TARGET ${DAEMON_TARGET})
+        string(REGEX REPLACE "(.*)-.+" "\\1" DAEMON_TARGET ${DAEMON_TARGET})
+        if ("${DAEMON_TARGET}" STREQUAL "")
+            set(DAEMON_TARGET "unknown")
+        endif()
+        string(JOIN "_"  DAEMON_TARGET "syncspirit-daemon" ${SYNCSPIRIT_VERSION} ${DAEMON_TARGET})
+        set(DAEMON_TARGET "${DAEMON_TARGET}${CMAKE_EXECUTABLE_SUFFIX}")
+
         set(EXE "syncspirit-daemon${CMAKE_EXECUTABLE_SUFFIX}")
         add_custom_target(compress_exec ALL
-            COMMAND upx "--force" "-9" ${EXE}
+            COMMAND upx "--force" "-9" "-q" "-o" "${syncspirit_BINARY_DIR}/${DAEMON_TARGET}" ${EXE}
             DEPENDS ${EXE}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            COMMENT "compressing ${EXE}"
-            VERBATIM)
+            COMMENT "compressing ${DAEMON_TARGET}")
     endif()
 endif()
