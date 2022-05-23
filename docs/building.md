@@ -91,3 +91,17 @@ make -j8 && make install
 export PATH=/home/b/development/cpp/syncspirit-cross/sysroot/bin:$PATH
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=/home/b/development/cpp/syncspirit/misc/ubuntu14.04.toolchain  -DBoost_USE_STATIC_RUNTIME=on ..
 ```
+
+# termux
+
+```
+pkg install git cmake boost-headers protobuf
+git clone https://github.com/basiliscos/syncspirit.git 
+cd syncspirit
+git checkout v0.2.0
+git submodule update --init
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j1 (or -j2 or -j3)
+```
