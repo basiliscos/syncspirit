@@ -9,6 +9,7 @@
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
+#include <fstream>
 
 #include "syncspirit-config.h"
 #include "constants.h"

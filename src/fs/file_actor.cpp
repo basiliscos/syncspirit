@@ -8,6 +8,7 @@
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/flush_file.h"
 #include "utils.h"
+#include <fstream>
 
 using namespace syncspirit::fs;
 
