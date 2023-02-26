@@ -96,7 +96,9 @@ local_device_t::local_device_t(const device_id_t &device_id, std::string_view na
 
 std::string_view local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0, device_ptr_t>(const device_ptr_t &item) noexcept { return item->get_key(); }
+template <> SYNCSPIRIT_API std::string_view get_index<0, device_ptr_t>(const device_ptr_t &item) noexcept {
+    return item->get_key();
+}
 
 template <> SYNCSPIRIT_API std::string_view get_index<1, device_ptr_t>(const device_ptr_t &item) noexcept {
     return item->device_id().get_sha256();

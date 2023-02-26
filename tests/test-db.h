@@ -6,7 +6,6 @@
 #include "db/utils.h"
 #include <boost/filesystem.hpp>
 
-
 namespace syncspirit::test {
 
 namespace bfs = boost::filesystem;
@@ -22,4 +21,4 @@ env_t mk_env();
 
 db::transaction_t mk_txn(env_t &env, db::transaction_type_t type);
 
-}
+} // namespace syncspirit::test

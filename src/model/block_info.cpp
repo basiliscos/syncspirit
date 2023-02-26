@@ -109,6 +109,8 @@ void block_info_t::lock() noexcept { ++locked; }
 
 void block_info_t::unlock() noexcept { --locked; }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const block_info_ptr_t &item) noexcept { return item->get_hash(); }
+template <> SYNCSPIRIT_API std::string_view get_index<0>(const block_info_ptr_t &item) noexcept {
+    return item->get_hash();
+}
 
 } // namespace syncspirit::model

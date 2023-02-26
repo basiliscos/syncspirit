@@ -360,8 +360,12 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
 
 file_info_ptr_t file_info_t::actualize() const noexcept { return folder_info->get_file_infos().get(get_uuid()); }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const file_info_ptr_t &item) noexcept { return item->get_uuid(); }
-template <> SYNCSPIRIT_API std::string_view get_index<1>(const file_info_ptr_t &item) noexcept { return item->get_name(); }
+template <> SYNCSPIRIT_API std::string_view get_index<0>(const file_info_ptr_t &item) noexcept {
+    return item->get_uuid();
+}
+template <> SYNCSPIRIT_API std::string_view get_index<1>(const file_info_ptr_t &item) noexcept {
+    return item->get_name();
+}
 
 file_info_ptr_t file_infos_map_t::by_name(std::string_view name) noexcept { return get<1>(name); }
 

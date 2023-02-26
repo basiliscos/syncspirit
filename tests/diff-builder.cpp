@@ -17,11 +17,11 @@
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 
-cluster_configurer_t::cluster_configurer_t(diff_builder_t& builder_, std::string_view peer_sha256_) noexcept: builder{builder_}, peer_sha256{peer_sha256_} {
+cluster_configurer_t::cluster_configurer_t(diff_builder_t &builder_, std::string_view peer_sha256_) noexcept
+    : builder{builder_}, peer_sha256{peer_sha256_} {}
 
-}
-
-cluster_configurer_t&& cluster_configurer_t::add(std::string_view sha256, std::string_view folder_id, uint64_t index, int64_t max_sequence) noexcept {
+cluster_configurer_t &&cluster_configurer_t::add(std::string_view sha256, std::string_view folder_id, uint64_t index,
+                                                 int64_t max_sequence) noexcept {
     auto folder = cc.add_folders();
     folder->set_id(std::string(folder_id));
     auto device = folder->add_devices();
@@ -31,8 +31,8 @@ cluster_configurer_t&& cluster_configurer_t::add(std::string_view sha256, std::s
     return std::move(*this);
 }
 
-diff_builder_t& cluster_configurer_t::finish() noexcept {
-    auto& cluster = builder.cluster;
+diff_builder_t &cluster_configurer_t::finish() noexcept {
+    auto &cluster = builder.cluster;
     auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
     auto diff = diff::peer::cluster_update_t::create(cluster, *peer, cc);
     assert(diff.has_value());
@@ -40,19 +40,18 @@ diff_builder_t& cluster_configurer_t::finish() noexcept {
     return builder;
 }
 
-
-index_maker_t::index_maker_t(diff_builder_t& builder_, std::string_view sha256, std::string_view folder_id) noexcept: builder{builder_},
-    peer_sha256{sha256} {
+index_maker_t::index_maker_t(diff_builder_t &builder_, std::string_view sha256, std::string_view folder_id) noexcept
+    : builder{builder_}, peer_sha256{sha256} {
     index.set_folder(std::string(folder_id));
 }
 
-index_maker_t&& index_maker_t::add(const proto::FileInfo& file) noexcept {
+index_maker_t &&index_maker_t::add(const proto::FileInfo &file) noexcept {
     *index.add_files() = file;
     return std::move(*this);
 }
 
-diff_builder_t& index_maker_t::finish() noexcept {
-    auto& cluster = builder.cluster;
+diff_builder_t &index_maker_t::finish() noexcept {
+    auto &cluster = builder.cluster;
     auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
     auto diff = diff::peer::update_folder_t::create(cluster, *peer, index);
     assert(diff.has_value());
@@ -60,20 +59,16 @@ diff_builder_t& index_maker_t::finish() noexcept {
     return builder;
 }
 
+diff_builder_t::diff_builder_t(model::cluster_t &cluster_) noexcept : cluster{cluster_} {}
 
-
-diff_builder_t::diff_builder_t(model::cluster_t& cluster_) noexcept: cluster{cluster_} {
-
-}
-
-diff_builder_t& diff_builder_t::apply(rotor::supervisor_t& sup) noexcept {
+diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
     assert(!(diffs.empty() && bdiffs.empty()));
     auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-    auto& addr = sup.get_address();
+    auto &addr = sup.get_address();
     sup.send<model::payload::model_update_t>(addr, std::move(diff), nullptr);
     diffs.clear();
 
-    for(auto& diff: bdiffs) {
+    for (auto &diff : bdiffs) {
         sup.send<model::payload::block_update_t>(addr, std::move(diff), nullptr);
     }
     bdiffs.clear();
@@ -82,7 +77,8 @@ diff_builder_t& diff_builder_t::apply(rotor::supervisor_t& sup) noexcept {
     return *this;
 }
 
-diff_builder_t& diff_builder_t::create_folder(std::string_view id, std::string_view path,  std::string_view label) noexcept {
+diff_builder_t &diff_builder_t::create_folder(std::string_view id, std::string_view path,
+                                              std::string_view label) noexcept {
     db::Folder db_folder;
     db_folder.set_id(std::string(id));
     db_folder.set_label(std::string(label));
@@ -91,7 +87,8 @@ diff_builder_t& diff_builder_t::create_folder(std::string_view id, std::string_v
     return *this;
 }
 
-diff_builder_t& diff_builder_t::update_peer(std::string_view sha256, std::string_view name,  std::string_view cert_name, bool auto_accept) noexcept {
+diff_builder_t &diff_builder_t::update_peer(std::string_view sha256, std::string_view name, std::string_view cert_name,
+                                            bool auto_accept) noexcept {
     db::Device db_device;
     db_device.set_name(std::string(name));
     db_device.set_cert_name(std::string(cert_name));
@@ -110,32 +107,33 @@ index_maker_t diff_builder_t::make_index(std::string_view sha256, std::string_vi
     return index_maker_t(*this, sha256, folder_id);
 }
 
-diff_builder_t& diff_builder_t::share_folder(std::string_view sha256, std::string_view folder_id) noexcept {
+diff_builder_t &diff_builder_t::share_folder(std::string_view sha256, std::string_view folder_id) noexcept {
     diffs.emplace_back(new diff::modify::share_folder_t(sha256, folder_id));
     return *this;
 }
 
-diff_builder_t& diff_builder_t::clone_file(const model::file_info_t &source) noexcept {
+diff_builder_t &diff_builder_t::clone_file(const model::file_info_t &source) noexcept {
     diffs.emplace_back(new diff::modify::clone_file_t(source));
     return *this;
 }
 
-diff_builder_t& diff_builder_t::finish_file(const model::file_info_t &source) noexcept {
+diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &source) noexcept {
     diffs.emplace_back(new diff::modify::finish_file_t(source));
     return *this;
 }
 
-diff_builder_t& diff_builder_t::flush_file(const model::file_info_t &source) noexcept {
+diff_builder_t &diff_builder_t::flush_file(const model::file_info_t &source) noexcept {
     diffs.emplace_back(new diff::modify::flush_file_t(source));
     return *this;
 }
 
-diff_builder_t& diff_builder_t::append_block(const model::file_info_t &target, size_t block_index, std::string data) noexcept {
+diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target, size_t block_index,
+                                             std::string data) noexcept {
     bdiffs.emplace_back(new diff::modify::append_block_t(target, block_index, std::move(data)));
     return *this;
 }
 
-diff_builder_t& diff_builder_t::clone_block(const model::file_block_t& file_block) noexcept {
+diff_builder_t &diff_builder_t::clone_block(const model::file_block_t &file_block) noexcept {
     bdiffs.emplace_back(new diff::modify::clone_block_t(file_block));
     return *this;
 }

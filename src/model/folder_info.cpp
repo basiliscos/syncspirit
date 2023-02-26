@@ -113,7 +113,9 @@ folder_info_ptr_t folder_infos_map_t::by_device_id(std::string_view device_id) c
     return get<1>(device_id);
 }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_info_ptr_t &item) noexcept { return item->get_uuid(); }
+template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_info_ptr_t &item) noexcept {
+    return item->get_uuid();
+}
 template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_info_ptr_t &item) noexcept {
     return item->get_device()->device_id().get_sha256();
 }
