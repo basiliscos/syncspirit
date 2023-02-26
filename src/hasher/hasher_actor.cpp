@@ -3,7 +3,7 @@
 
 #include "hasher_actor.h"
 #include "../utils/tls.h"
-#include <fmt/fmt.h>
+#include <fmt/core.h>
 #include <zlib.h>
 
 using namespace syncspirit::hasher;

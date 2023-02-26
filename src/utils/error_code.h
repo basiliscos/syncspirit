@@ -145,7 +145,7 @@ inline boost::system::error_code make_error_code(request_error_code_t e) {
     return {static_cast<int>(e), request_error_code_category()};
 }
 
-boost::system::error_code adapt(const std::error_code &ec) noexcept;
+SYNCSPIRIT_API boost::system::error_code adapt(const std::error_code &ec) noexcept;
 
 } // namespace syncspirit::utils
 

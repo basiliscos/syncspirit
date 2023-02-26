@@ -4,6 +4,7 @@
 #include "upnp_actor.h"
 #include "proto/upnp_support.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "names.h"
 #include "model/messages.h"
 #include "model/diff/modify/update_contact.h"

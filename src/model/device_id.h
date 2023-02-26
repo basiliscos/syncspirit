@@ -59,7 +59,7 @@ struct SYNCSPIRIT_API device_id_t {
     char hash[data_length];
 };
 
-extern const device_id_t local_device_id;
+SYNCSPIRIT_API extern const device_id_t local_device_id;
 
 } // namespace syncspirit::model
 

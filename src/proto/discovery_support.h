@@ -5,7 +5,7 @@
 #include "utils/uri.h"
 #include "model/device_id.h"
 #include "syncspirit-export.h"
-#include <fmt/fmt.h>
+#include <fmt/core.h>
 #include <string>
 #include <vector>
 #include <boost/outcome.hpp>

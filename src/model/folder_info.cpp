@@ -6,7 +6,7 @@
 #include "structs.pb.h"
 #include "../db/prefix.h"
 #include "misc/error_code.h"
-#include <spdlog.h>
+#include <spdlog/spdlog.h>
 
 #ifdef uuid_t
 #undef uuid_t
@@ -113,8 +113,8 @@ folder_info_ptr_t folder_infos_map_t::by_device_id(std::string_view device_id) c
     return get<1>(device_id);
 }
 
-template <> std::string_view get_index<0>(const folder_info_ptr_t &item) noexcept { return item->get_uuid(); }
-template <> std::string_view get_index<1>(const folder_info_ptr_t &item) noexcept {
+template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_info_ptr_t &item) noexcept { return item->get_uuid(); }
+template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_info_ptr_t &item) noexcept {
     return item->get_device()->device_id().get_sha256();
 }
 

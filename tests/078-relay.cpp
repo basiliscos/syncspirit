@@ -3,6 +3,7 @@
 #include "access.h"
 
 #include "utils/tls.h"
+#include "utils/format.hpp"
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "model/diff/modify/relay_connect_request.h"

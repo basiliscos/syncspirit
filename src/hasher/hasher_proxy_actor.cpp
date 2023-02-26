@@ -3,7 +3,7 @@
 
 #include "hasher_proxy_actor.h"
 #include "../utils/error_code.h"
-#include <fmt/fmt.h>
+#include <fmt/core.h>
 #include <numeric>
 
 using namespace syncspirit::hasher;

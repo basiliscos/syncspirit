@@ -5,7 +5,7 @@
 #include "db/utils.h"
 #include "db/prefix.h"
 #include "structs.pb.h"
-#include <spdlog.h>
+#include <spdlog/spdlog.h>
 #include "misc/error_code.h"
 
 #ifdef uuid_t
@@ -92,8 +92,8 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
     return r;
 }
 
-template <> std::string_view get_index<0>(const folder_ptr_t &item) noexcept { return item->get_key(); }
-template <> std::string_view get_index<1>(const folder_ptr_t &item) noexcept { return item->get_id(); }
+template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_ptr_t &item) noexcept { return item->get_key(); }
+template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_ptr_t &item) noexcept { return item->get_id(); }
 
 folder_ptr_t folders_map_t::by_id(std::string_view id) const noexcept { return get<1>(id); }
 

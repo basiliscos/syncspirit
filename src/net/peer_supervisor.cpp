@@ -6,6 +6,7 @@
 #include "initiator_actor.h"
 #include "names.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "model/diff/peer/peer_state.h"
 #include "model/diff/modify/connect_request.h"
 #include "model/diff/modify/relay_connect_request.h"

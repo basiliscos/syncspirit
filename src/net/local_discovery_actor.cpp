@@ -5,6 +5,7 @@
 #include "names.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "model/diff/modify/update_contact.h"
 #include "model/messages.h"
 

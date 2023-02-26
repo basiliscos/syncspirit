@@ -80,7 +80,7 @@ template <typename Actor> struct initiator_actor_config_builder_t : r::actor_con
     }
 };
 
-struct initiator_actor_t : r::actor_base_t {
+struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     using config_t = initiator_actor_config_t;
     template <typename Actor> using config_builder_t = initiator_actor_config_builder_t<Actor>;
 

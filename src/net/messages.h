@@ -13,7 +13,7 @@
 #include <memory>
 #include <optional>
 
-#include <fmt/fmt.h>
+#include <fmt/core.h>
 #include "model/misc/upnp.h"
 #include "model/cluster.h"
 #include "transport/base.h"

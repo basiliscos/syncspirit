@@ -65,7 +65,7 @@ std::string ignored_folder_t::serialize() noexcept {
     return r.SerializeAsString();
 }
 
-template <> std::string_view get_index<0, ignored_folder_ptr_t>(const ignored_folder_ptr_t &item) noexcept {
+template <> SYNCSPIRIT_API std::string_view get_index<0, ignored_folder_ptr_t>(const ignored_folder_ptr_t &item) noexcept {
     return item->get_id();
 }
 

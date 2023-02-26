@@ -4,7 +4,7 @@
 #include "update_contact.h"
 #include "../contact_visitor.h"
 #include "../../cluster.h"
-#include <fmt/fmt.h>
+#include <fmt/core.h>
 
 using namespace syncspirit::model::diff::modify;
 

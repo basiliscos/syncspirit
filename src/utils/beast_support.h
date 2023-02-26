@@ -5,7 +5,7 @@
 
 #include <boost/beast/http.hpp>
 #include <boost/outcome.hpp>
-#include <fmt/fmt.h>
+#include <fmt/format.h>
 #include "syncspirit-export.h"
 
 namespace syncspirit::utils {

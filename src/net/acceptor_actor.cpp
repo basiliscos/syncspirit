@@ -3,6 +3,7 @@
 
 #include "acceptor_actor.h"
 #include "names.h"
+#include "utils/format.hpp"
 #include "utils/error_code.h"
 #include "utils/network_interface.h"
 #include "model/messages.h"

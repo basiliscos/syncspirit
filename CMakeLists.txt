@@ -4,9 +4,10 @@ project (syncspirit)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # does not works because of pugixml
-#set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-#set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
-#cmake_policy(SET CMP0063 NEW)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+cmake_policy(SET CMP0063 NEW)
+cmake_policy(SET CMP0077 NEW)
 
 include(GenerateExportHeader)
 set(CMAKE_POSITION_INDEPENDENT_CODE True)
@@ -23,6 +24,14 @@ find_package(
 find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(rotor COMPONENTS asio thread REQUIRED)
+find_package(lz4)
+find_package(fmt)
+find_package(spdlog)
+find_package(pugixml)
+find_package(uriparser)
+find_package(tomlplusplus)
+find_package(nlohmann_json)
 
 set(SYNCSPIRIT_VERSION "v0.2.0")
 
@@ -171,28 +180,12 @@ set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
 set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
 set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
 
-cmake_policy(SET CMP0077 NEW)
 set(PUGIXML_NO_EXCEPTIONS on)
 
-add_subdirectory("lib/spdlog")
-add_subdirectory("lib/lz4/build/cmake/")
-add_subdirectory("lib/pugixml")
-add_subdirectory("lib/rotor")
-add_subdirectory("lib/uriparser")
 add_subdirectory("lib/mbdx")
 
-
 target_include_directories(syncspirit_lib PUBLIC
-    ${syncspirit_SOURCE_DIR}/lib/rotor/include
-    ${syncspirit_SOURCE_DIR}/lib/spdlog/include
-    ${syncspirit_SOURCE_DIR}/lib/spdlog/include/spdlog/
-    ${syncspirit_SOURCE_DIR}/lib/json/include
-    ${syncspirit_SOURCE_DIR}/lib/pugixml/src
-    ${syncspirit_SOURCE_DIR}/lib/uriparser/include
-    ${syncspirit_SOURCE_DIR}/lib/tomlplusplus/include
-    ${syncspirit_SOURCE_DIR}/lib/lz4/lib
     ${syncspirit_SOURCE_DIR}/lib/mbdx
-    ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -202,17 +195,18 @@ target_link_libraries(syncspirit_lib
     syncspirit_pb
     rotor::asio
     rotor::thread
-    pugixml
+    pugixml::pugixml
     Boost::iostreams
     Boost::filesystem
     Boost::program_options
     Boost::system
-    ${Boost_LIBRARIES}
     OpenSSL::SSL
+    fmt::fmt
     spdlog::spdlog
-    uriparser
-    lz4_static
-    ZLIB::ZLIB
+    uriparser::uriparser
+    tomlplusplus::tomlplusplus
+    nlohmann_json::nlohmann_json
+    lz4::lz4
     mdbx-static
     $<$<PLATFORM_ID:Windows>:iphlpapi>
     $<$<PLATFORM_ID:Windows>:ws2_32>

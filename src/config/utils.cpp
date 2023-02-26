@@ -465,7 +465,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         spdlog::info("creating directory {}", dir.string());
         bfs::create_directories(dir, ec);
         if (ec) {
-            spdlog::error("cannot create dirs: {}", ec);
+            spdlog::error("cannot create dirs: {}", ec.message());
             return ec;
         }
     }

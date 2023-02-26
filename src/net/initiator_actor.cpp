@@ -4,11 +4,12 @@
 #include "model/messages.h"
 #include "proto/relay_support.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "model/diff/peer/peer_state.h"
 #include <sstream>
 #include <algorithm>
 #include <spdlog/fmt/bin_to_hex.h>
-#include <fmt/fmt.h>
+#include <fmt/core.h>
 
 using namespace syncspirit::net;
 

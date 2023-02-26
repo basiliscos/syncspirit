@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #include "close_transaction.h"
-#include <spdlog.h>
+#include <spdlog/spdlog.h>
 
 using namespace syncspirit::model::diff::load;
 

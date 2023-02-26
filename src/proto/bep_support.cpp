@@ -218,7 +218,7 @@ outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff
     return std::move(msg);
 }
 
-template <typename Message>
+template <typename Message> SYNCSPIRIT_API
 void serialize(fmt::memory_buffer &buff, const Message &message, proto::MessageCompression compression) noexcept {
     using type = typename M2T<Message>::type;
     proto::Header header;
@@ -239,21 +239,21 @@ void serialize(fmt::memory_buffer &buff, const Message &message, proto::MessageC
     message.SerializeToArray(ptr, message_sz);
 }
 
-template void serialize(fmt::memory_buffer &buff, const proto::ClusterConfig &message,
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::ClusterConfig &message,
                         proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::Index &message,
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Index &message,
                         proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::IndexUpdate &message,
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::IndexUpdate &message,
                         proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::Request &message,
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Request &message,
                         proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::Response &message,
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Response &message,
                         proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::DownloadProgress &message,
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::DownloadProgress &message,
                         proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::Ping &message,
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Ping &message,
                         proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::Close &message,
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Close &message,
                         proto::MessageCompression compression) noexcept;
 
 } // namespace syncspirit::proto
