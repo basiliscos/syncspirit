@@ -1,27 +1,3 @@
-[submodule "lib/rotor"]
-	path = lib/rotor
-	url = https://github.com/basiliscos/cpp-rotor
-[submodule "lib/spdlog"]
-	path = lib/spdlog
-	url = https://github.com/gabime/spdlog
-[submodule "lib/json"]
-	path = lib/json
-	url = https://github.com/nlohmann/json.git
-[submodule "lib/pugixml"]
-	path = lib/pugixml
-	url = https://github.com/zeux/pugixml.git
-[submodule "lib/uriparser"]
-	path = lib/uriparser
-	url = https://github.com/uriparser/uriparser.git
-[submodule "lib/tomlplusplus"]
-	path = lib/tomlplusplus
-	url = https://github.com/marzer/tomlplusplus.git
-[submodule "lib/lz4"]
-	path = lib/lz4
-	url = https://github.com/lz4/lz4.git
 [submodule "lib/mbdx"]
 	path = lib/mbdx
 	url = https://gitflic.ru/project/erthink/libmdbx.git
-[submodule "lib/catch"]
-	path = lib/catch
-	url = https://github.com/catchorg/Catch2/
