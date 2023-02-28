@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "test_supervisor.h"
@@ -675,6 +674,11 @@ void test_downloading() {
     F(true, 10).run();
 }
 
-REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
-REGISTER_TEST_CASE(test_index, "test_index", "[net]");
-REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
+int _init() {
+    REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
+    REGISTER_TEST_CASE(test_index, "test_index", "[net]");
+    REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
+    return 1;
+}
+
+static int v = _init();

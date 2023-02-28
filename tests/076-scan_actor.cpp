@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "test_supervisor.h"
@@ -135,6 +134,7 @@ void test_meta_changes() {
             SECTION("just 1 subdir, which cannot be read") {
                 auto subdir = root_path / "abc";
                 CHECK(bfs::create_directories(subdir / "def", ec));
+                auto guard = test::path_guard_t(subdir);
                 bfs::permissions(subdir, bfs::perms::no_perms);
                 bfs::permissions(subdir, bfs::perms::owner_read, ec);
                 if (ec) {
@@ -360,4 +360,9 @@ void test_meta_changes() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");
+int _init() {
+    REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");
+    return 1;
+}
+
+static int v = _init();

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -128,4 +127,9 @@ void test_dialer() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_dialer, "test_dialer", "[net]");
+int _init() {
+    REGISTER_TEST_CASE(test_dialer, "test_dialer", "[net]");
+    return 1;
+}
+
+static int v = _init();

@@ -1,4 +1,6 @@
-#include "catch.hpp"
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+
 #include "test-utils.h"
 #include "access.h"
 
@@ -891,27 +893,33 @@ void test_relay_noninvitation_reply() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_connect_unsupproted_proto, "test_connect_unsupproted_proto", "[initiator]");
-REGISTER_TEST_CASE(test_connect_timeout, "test_connect_timeout", "[initiator]");
-REGISTER_TEST_CASE(test_handshake_timeout, "test_handshake_timeout", "[initiator]");
-REGISTER_TEST_CASE(test_handshake_garbage, "test_handshake_garbage", "[initiator]");
-REGISTER_TEST_CASE(test_connection_refused, "test_connection_refused", "[initiator]");
-REGISTER_TEST_CASE(test_connection_refused_no_model, "test_connection_refused_no_model", "[initiator]");
-REGISTER_TEST_CASE(test_resolve_failure, "test_resolve_failure", "[initiator]");
-REGISTER_TEST_CASE(test_success, "test_success", "[initiator]");
-REGISTER_TEST_CASE(test_success_no_model, "test_success_no_model", "[initiator]");
-REGISTER_TEST_CASE(test_passive_success, "test_passive_success", "[initiator]");
-REGISTER_TEST_CASE(test_passive_garbage, "test_passive_garbage", "[initiator]");
-REGISTER_TEST_CASE(test_passive_timeout, "test_passive_timeout", "[initiator]");
-REGISTER_TEST_CASE(test_relay_passive_success, "test_relay_passive_success", "[initiator]");
-REGISTER_TEST_CASE(test_relay_passive_gargabe, "test_relay_passive_gargabe", "[initiator]");
-REGISTER_TEST_CASE(test_relay_passive_wrong_message, "test_relay_passive_wrong_message", "[initiator]");
-REGISTER_TEST_CASE(test_relay_passive_unsuccessful_join, "test_relay_passive_unsuccessful_join", "[initiator]");
-REGISTER_TEST_CASE(test_relay_malformed_uri, "test_relay_malformed_uri", "[initiator]");
-REGISTER_TEST_CASE(test_relay_active_wrong_relay_deviceid, "test_relay_active_wrong_relay_deviceid", "[initiator]");
-REGISTER_TEST_CASE(test_relay_active_success, "test_relay_active_success", "[initiator]");
-REGISTER_TEST_CASE(test_relay_wrong_device, "test_relay_wrong_device", "[initiator]");
-REGISTER_TEST_CASE(test_relay_non_conneteable, "test_relay_non_conneteable", "[initiator]");
-REGISTER_TEST_CASE(test_relay_malformed_address, "test_relay_malformed_address", "[initiator]");
-REGISTER_TEST_CASE(test_relay_garbage_reply, "test_relay_garbage_reply", "[initiator]");
-REGISTER_TEST_CASE(test_relay_noninvitation_reply, "test_relay_noninvitation_reply", "[initiator]");
+int _init() {
+    REGISTER_TEST_CASE(test_connect_unsupproted_proto, "test_connect_unsupproted_proto", "[initiator]");
+    REGISTER_TEST_CASE(test_connect_timeout, "test_connect_timeout", "[initiator]");
+    REGISTER_TEST_CASE(test_handshake_timeout, "test_handshake_timeout", "[initiator]");
+    REGISTER_TEST_CASE(test_handshake_garbage, "test_handshake_garbage", "[initiator]");
+    REGISTER_TEST_CASE(test_connection_refused, "test_connection_refused", "[initiator]");
+    REGISTER_TEST_CASE(test_connection_refused_no_model, "test_connection_refused_no_model", "[initiator]");
+    REGISTER_TEST_CASE(test_resolve_failure, "test_resolve_failure", "[initiator]");
+    REGISTER_TEST_CASE(test_success, "test_success", "[initiator]");
+    REGISTER_TEST_CASE(test_success_no_model, "test_success_no_model", "[initiator]");
+    REGISTER_TEST_CASE(test_passive_success, "test_passive_success", "[initiator]");
+    REGISTER_TEST_CASE(test_passive_garbage, "test_passive_garbage", "[initiator]");
+    REGISTER_TEST_CASE(test_passive_timeout, "test_passive_timeout", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_passive_success, "test_relay_passive_success", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_passive_gargabe, "test_relay_passive_gargabe", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_passive_wrong_message, "test_relay_passive_wrong_message", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_passive_unsuccessful_join, "test_relay_passive_unsuccessful_join", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_malformed_uri, "test_relay_malformed_uri", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_active_wrong_relay_deviceid, "test_relay_active_wrong_relay_deviceid", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_active_success, "test_relay_active_success", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_wrong_device, "test_relay_wrong_device", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_non_conneteable, "test_relay_non_conneteable", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_malformed_address, "test_relay_malformed_address", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_garbage_reply, "test_relay_garbage_reply", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_noninvitation_reply, "test_relay_noninvitation_reply", "[initiator]");
+
+    return 1;
+}
+
+static int v = _init();

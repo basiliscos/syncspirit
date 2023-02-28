@@ -6,12 +6,13 @@
 #include "rotor/supervisor.h"
 #include "model/messages.h"
 #include "utils/log.h"
+#include "syncspirit-test-export.h"
 
 namespace syncspirit::test {
 
 namespace r = rotor;
 
-struct supervisor_t final : r::supervisor_t {
+struct SYNCSPIRIT_TEST_API supervisor_t final : r::supervisor_t {
     using timers_t = std::list<r::timer_handler_base_t *>;
     using parent_t = r::supervisor_t;
     using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;

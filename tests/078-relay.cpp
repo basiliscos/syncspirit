@@ -1,4 +1,6 @@
-#include "catch.hpp"
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+
 #include "test-utils.h"
 #include "access.h"
 
@@ -363,5 +365,11 @@ void test_passive() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_master_connect, "test_master_connect", "[relay]");
-REGISTER_TEST_CASE(test_passive, "test_passive", "[relay]");
+int _init() {
+    REGISTER_TEST_CASE(test_master_connect, "test_master_connect", "[relay]");
+    REGISTER_TEST_CASE(test_passive, "test_passive", "[relay]");
+
+    return 1;
+}
+
+static int v = _init();

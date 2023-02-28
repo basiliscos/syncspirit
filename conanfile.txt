@@ -12,6 +12,8 @@ spdlog/1.11.0
 tomlplusplus/3.3.0
 uriparser/0.9.7
 
+[test_requires]
+catch2/3.3.1
 
 [options]
 pugixml/1.13no_exceptions=True

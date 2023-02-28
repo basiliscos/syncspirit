@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -253,7 +252,12 @@ void test_late_announcement() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_succesfull_announcement, "test_succesfull_announcement", "[net]");
-REGISTER_TEST_CASE(test_failded_announcement, "test_failded_announcement", "[net]");
-REGISTER_TEST_CASE(test_peer_discovery, "test_peer_discovery", "[net]");
-REGISTER_TEST_CASE(test_late_announcement, "test_late_announcement", "[net]");
+int _init() {
+    REGISTER_TEST_CASE(test_succesfull_announcement, "test_succesfull_announcement", "[net]");
+    REGISTER_TEST_CASE(test_failded_announcement, "test_failded_announcement", "[net]");
+    REGISTER_TEST_CASE(test_peer_discovery, "test_peer_discovery", "[net]");
+    REGISTER_TEST_CASE(test_late_announcement, "test_late_announcement", "[net]");
+    return 1;
+}
+
+static int v = _init();

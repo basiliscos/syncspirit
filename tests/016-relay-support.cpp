@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023 Ivan Baidakou
 
-#include "catch.hpp"
+#include "test-utils.h"
 #include "proto/relay_support.h"
 
 using namespace syncspirit::proto::relay;

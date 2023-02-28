@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "syncspirit-test-export.h"
 #include <boost/filesystem.hpp>
 #include <rotor/supervisor.h>
 #include "model/device.h"
@@ -17,7 +18,7 @@ namespace r = rotor;
 
 struct diff_builder_t;
 
-struct cluster_configurer_t {
+struct SYNCSPIRIT_TEST_API cluster_configurer_t {
     cluster_configurer_t(diff_builder_t &builder, std::string_view peer_sha256) noexcept;
     cluster_configurer_t &&add(std::string_view sha256, std::string_view folder_id, uint64_t index,
                                int64_t max_sequence) noexcept;
@@ -29,7 +30,7 @@ struct cluster_configurer_t {
     std::string_view peer_sha256;
 };
 
-struct index_maker_t {
+struct SYNCSPIRIT_TEST_API index_maker_t {
     index_maker_t(diff_builder_t &builder, std::string_view peer_sha256, std::string_view folder_id) noexcept;
     index_maker_t &&add(const proto::FileInfo &) noexcept;
     diff_builder_t &finish() noexcept;
@@ -40,7 +41,7 @@ struct index_maker_t {
     std::string_view peer_sha256;
 };
 
-struct diff_builder_t {
+struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t(model::cluster_t &) noexcept;
     diff_builder_t &apply(r::supervisor_t &sup) noexcept;
     diff_builder_t &create_folder(std::string_view id, std::string_view path, std::string_view label = "") noexcept;

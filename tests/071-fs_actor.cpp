@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "fs/file_actor.h"
 #include "fs/utils.h"
@@ -495,6 +494,11 @@ void test_clone_block() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[fs]");
-REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
-REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
+int _init() {
+    REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[fs]");
+    REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
+    REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
+    return 1;
+}
+
+static int v = _init();

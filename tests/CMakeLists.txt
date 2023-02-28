@@ -1,4 +1,5 @@
 enable_testing()
+include(GenerateExportHeader)
 
 find_package(
     Boost
@@ -9,21 +10,27 @@ find_package(
     REQUIRED
 )
 find_package(OpenSSL REQUIRED)
+find_package(Catch2 REQUIRED)
 
 if(MINGW)
     ENABLE_LANGUAGE(RC)
 endif()
 
-add_library(syncspirit_test_lib STATIC
+add_library(syncspirit_test_lib SHARED
     $<$<PLATFORM_ID:Windows>:win32-resource.rc>
     test_supervisor.cpp
     test-db.cpp
-    test-main.cpp
+    test-utils.cpp
     diff-builder.cpp
 )
-target_link_libraries(syncspirit_test_lib syncspirit_lib)
+target_link_libraries(syncspirit_test_lib syncspirit_lib Catch2::Catch2WithMain)
 target_include_directories(syncspirit_test_lib PUBLIC
     "${syncspirit_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_BINARY_DIR}/include"
+)
+generate_export_header(syncspirit_test_lib
+    EXPORT_MACRO_NAME SYNCSPIRIT_TEST_API
+    EXPORT_FILE_NAME include/syncspirit-test-export.h
 )
 
 add_custom_command(TARGET syncspirit_test_lib PRE_BUILD

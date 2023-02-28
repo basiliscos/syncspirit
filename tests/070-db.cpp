@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
+#include <catch2/catch_all.hpp>
 #include "test-utils.h"
 #include "diff-builder.h"
 #include "model/diff/peer/cluster_remove.h"
@@ -476,10 +476,14 @@ void test_clone_file() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_db_migration, "test_db_migration", "[db]");
-REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
-REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
-REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
-REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
-REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
-REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
+int _init() {
+    REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
+    REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
+    REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
+    REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
+    REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
+    REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
+    return 1;
+}
+
+static int v = _init();
