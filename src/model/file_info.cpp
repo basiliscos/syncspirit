@@ -115,7 +115,6 @@ outcome::result<void> file_info_t::fields_update(const Source &s, size_t block_c
     if (s.no_permissions()) {
         flags |= flags_t::f_no_permissions;
     }
-    block_size = s.block_size();
     symlink_target = s.symlink_target();
     version = s.version();
     full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
@@ -123,7 +122,8 @@ outcome::result<void> file_info_t::fields_update(const Source &s, size_t block_c
         source_device = s.source_device();
         source_version = s.source_version();
     }
-    return reserve_blocks(block_count);
+    block_size = size ? s.block_size() : 0;
+    return reserve_blocks(size ? block_count : 0);
 }
 
 auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome::result<void> {
@@ -242,7 +242,6 @@ void file_info_t::set_source(const file_info_ptr_t &peer_file) noexcept {
 file_info_ptr_t file_info_t::get_source() const noexcept {
     if (!source_device.empty()) {
         auto folder = get_folder_info()->get_folder();
-        auto cluster = folder->get_cluster();
         auto peer_folder = folder->get_folder_infos().by_device_id(source_device);
         if (!peer_folder) {
             return {};

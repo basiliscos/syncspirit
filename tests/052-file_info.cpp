@@ -317,3 +317,34 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
     file_my->remove_blocks();
     CHECK(!file_my->check_consistency());
 }
+
+TEST_CASE("file_info_t::create, inconsistent source") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    cluster->get_devices().put(my_device);
+
+    auto &folders = cluster->get_folders();
+
+    auto db_folder = db::Folder();
+    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
+    REQUIRE(diff->apply(*cluster));
+
+    auto folder = folders.by_id(db_folder.id());
+    auto &folder_infos = folder->get_folder_infos();
+    auto folder_my = folder_infos.by_device(my_device);
+
+    auto pr_block = proto::BlockInfo();
+    pr_block.set_size(131072);
+
+    auto pr_file = proto::FileInfo();
+    pr_file.set_name("a.txt");
+    *pr_file.add_blocks() = pr_block;
+    pr_file.set_block_size(131072);
+    pr_file.set_size(0);
+
+    auto my_file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+    CHECK(my_file->get_block_size() == 0);
+    CHECK(my_file->get_blocks().size() == 0);
+}

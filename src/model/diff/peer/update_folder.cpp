@@ -48,20 +48,22 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         file = std::move(opt.assume_value());
         files_map.put(file);
 
-        for (int i = 0; i < f.blocks_size(); ++i) {
-            auto &b = f.blocks(i);
-            auto block = blocks_map.get(b.hash());
-            if (!block) {
-                block = bm.get(b.hash());
-            }
-            if (!block) {
-                auto opt = block_info_t::create(b);
-                if (!opt) {
-                    return opt.assume_error();
+        if (f.size()) {
+            for (int i = 0; i < f.blocks_size(); ++i) {
+                auto &b = f.blocks(i);
+                auto block = blocks_map.get(b.hash());
+                if (!block) {
+                    block = bm.get(b.hash());
                 }
-                block = std::move(opt.value());
+                if (!block) {
+                    auto opt = block_info_t::create(b);
+                    if (!opt) {
+                        return opt.assume_error();
+                    }
+                    block = std::move(opt.value());
+                }
+                file->assign_block(block, (size_t)i);
             }
-            file->assign_block(block, (size_t)i);
         }
         if (!file->check_consistency()) {
             LOG_ERROR(log, "inconsitency detected for the file {} at folder {}", file->get_name(), folder->get_label());

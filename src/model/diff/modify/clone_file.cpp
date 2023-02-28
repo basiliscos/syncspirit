@@ -104,7 +104,6 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
 
     if (new_file) {
         auto &blocks = peer_file->get_blocks();
-        assert(blocks.size() == file.blocks_size());
         for (size_t i = 0; i < blocks.size(); ++i) {
             auto &b = blocks[i];
             new_file->assign_block(b, i);

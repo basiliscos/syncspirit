@@ -124,8 +124,10 @@ TEST_CASE("block iterator", "[model]") {
         auto p_file_2 = pr_index.add_files();
         p_file_2->set_name("b.txt");
         p_file_2->set_sequence(2ul);
+        p_file_2->set_size(bi1.size());
         *p_file_2->add_blocks() = bi1;
         *p_file->add_blocks() = bi1;
+        p_file->set_size(bi1.size());
 
         diff = new diff::modify::new_file_t(*cluster, db_folder.id(), *p_file_2, {bi1});
         REQUIRE(diff->apply(*cluster));
