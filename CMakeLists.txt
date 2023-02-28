@@ -3,7 +3,6 @@ project (syncspirit)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# does not works because of pugixml
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 cmake_policy(SET CMP0063 NEW)
@@ -25,15 +24,15 @@ find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(rotor COMPONENTS asio thread REQUIRED)
-find_package(lz4)
-find_package(fmt)
-find_package(spdlog)
-find_package(pugixml)
-find_package(uriparser)
-find_package(tomlplusplus)
-find_package(nlohmann_json)
+find_package(lz4 REQUIRED)
+find_package(fmt REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(pugixml REQUIRED)
+find_package(uriparser REQUIRED)
+find_package(tomlplusplus REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
-set(SYNCSPIRIT_VERSION "v0.2.0")
+set(SYNCSPIRIT_VERSION "v0.3.0")
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
 set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src)
@@ -167,20 +166,10 @@ add_library(syncspirit_lib
     src/utils/uri.cpp
 )
 
-set(BUILD_BOOST_ASIO true CACHE BOOL "BUILD_BOOST_ASIO")
-set(URIPARSER_BUILD_WCHAR_T false CACHE BOOL "URIPARSER_BUILD_WCHAR_T")
-set(URIPARSER_BUILD_TOOLS false CACHE BOOL "URIPARSER_BUILD_TOOLS")
-set(URIPARSER_BUILD_DOCS false CACHE BOOL "DURIPARSER_BUILD_DOCS")
-set(URIPARSER_BUILD_TESTS false CACHE BOOL "URIPARSER_BUILD_TESTS")
-set(URIPARSER_ENABLE_INSTALL false CACHE BOOL "URIPARSER_ENABLE_INSTALL")
 set(BUILD_SHARED_LIBS false CACHE BOOL "BUILD_SHARED_LIBS")
-set(LZ4_BUILD_CLI false CACHE BOOL "LZ4_BUILD_CLI")
-set(LZ4_BUILD_LEGACY_LZ4C false CACHE BOOL "LZ4_BUILD_LEGACY_LZ4C")
 set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
 set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
 set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
-
-set(PUGIXML_NO_EXCEPTIONS on)
 
 add_subdirectory("lib/mbdx")
 
