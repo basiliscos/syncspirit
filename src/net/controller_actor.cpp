@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "controller_actor.h"
 #include "names.h"
@@ -53,7 +53,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(peer_addr, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
-        p.subscribe_actor(&controller_actor_t::on_ready);
+        p.subscribe_actor(&controller_actor_t::on_pull_ready);
         p.subscribe_actor(&controller_actor_t::on_termination);
         p.subscribe_actor(&controller_actor_t::on_block);
         p.subscribe_actor(&controller_actor_t::on_validation);
@@ -113,7 +113,7 @@ void controller_actor_t::on_termination(message::termination_signal_t &message) 
     do_shutdown(ee);
 }
 
-void controller_actor_t::ready() noexcept { send<payload::ready_signal_t>(get_address()); }
+void controller_actor_t::pull_ready() noexcept { send<payload::pull_signal_t>(get_address()); }
 
 model::file_info_ptr_t controller_actor_t::next_file(bool reset) noexcept {
     if (reset) {
@@ -137,8 +137,8 @@ model::file_block_t controller_actor_t::next_block(bool reset) noexcept {
     return {};
 }
 
-void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_ready, blocks requested = {}", identity, blocks_requested);
+void controller_actor_t::on_pull_ready(message::pull_signal_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_pull_ready, blocks requested = {}", identity, blocks_requested);
     bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
                   || (state != r::state_t::OPERATIONAL) // wrequest pool sz = 32505856e are shutting down
         ;
@@ -177,7 +177,7 @@ void controller_actor_t::on_ready(message::ready_signal_t &message) noexcept {
                 diff = new model::diff::modify::clone_file_t(*file);
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             } else {
-                ready();
+                pull_ready();
             }
         } else {
             substate = substate & ~substate_t::iterating_files;
@@ -203,7 +203,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
         ++blocks_requested;
         request_pool -= (int64_t)sz;
     }
-    ready();
+    pull_ready();
 }
 
 void controller_actor_t::on_forward(message::forwarded_message_t &message) noexcept {
@@ -222,7 +222,7 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
             auto ee = make_error(r.assume_error());
             return do_shutdown(ee);
         }
-        ready();
+        pull_ready();
     }
 }
 
@@ -347,7 +347,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto &data = message.payload.res.data;
     request<hasher::payload::validation_request_t>(hasher_proxy, data, hash, &message).send(init_timeout);
     resources->acquire(resource::hash);
-    return ready();
+    return pull_ready();
 }
 
 void controller_actor_t::on_validation(hasher::message::validation_response_t &res) noexcept {

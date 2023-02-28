@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -20,12 +20,12 @@ namespace outcome = boost::outcome_v2;
 
 namespace payload {
 
-struct ready_signal_t {};
+struct pull_signal_t {};
 
 } // namespace payload
 
 namespace message {
-using ready_signal_t = r::message_t<payload::ready_signal_t>;
+using pull_signal_t = r::message_t<payload::pull_signal_t>;
 }
 
 struct controller_actor_config_t : r::actor_config_t {
@@ -99,7 +99,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
 
     void on_termination(message::termination_signal_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
-    void on_ready(message::ready_signal_t &message) noexcept;
+    void on_pull_ready(message::pull_signal_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
     void on_validation(hasher::message::validation_response_t &res) noexcept;
     void preprocess_block(model::file_block_t &block) noexcept;
@@ -113,7 +113,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_message(proto::message::DownloadProgress &message) noexcept;
 
     void request_block(const model::file_block_t &block) noexcept;
-    void ready() noexcept;
+    void pull_ready() noexcept;
 
     model::file_info_ptr_t next_file(bool reset) noexcept;
     model::file_block_t next_block(bool reset) noexcept;
