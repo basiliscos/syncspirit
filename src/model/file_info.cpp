@@ -115,7 +115,6 @@ outcome::result<void> file_info_t::fields_update(const Source &s, size_t block_c
     if (s.no_permissions()) {
         flags |= flags_t::f_no_permissions;
     }
-    version = s.version();
     block_size = s.block_size();
     symlink_target = s.symlink_target();
     version = s.version();

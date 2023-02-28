@@ -64,7 +64,7 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
     inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
     std::string_view get_name() const noexcept;
     inline const std::string &get_full_name() const noexcept { return full_name; }
-    inline const proto::Vector &get_version() const noexcept { return version; };
+    inline const proto::Vector &get_version() const noexcept { return version; }
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     void set_sequence(std::int64_t value) noexcept;

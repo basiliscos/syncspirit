@@ -104,6 +104,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
 
     if (new_file) {
         auto &blocks = peer_file->get_blocks();
+        assert(blocks.size() == file.blocks_size());
         for (size_t i = 0; i < blocks.size(); ++i) {
             auto &b = blocks[i];
             new_file->assign_block(b, i);
@@ -113,6 +114,8 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
         }
         assert(new_file->check_consistency());
         folder_my->add(new_file, false);
+        LOG_TRACE(log, "clone_file_t, new file; folder = {}, name = {}, blocks = {}", folder_id,
+                  file.name(), blocks.size());
     }
 
     return outcome::success();
