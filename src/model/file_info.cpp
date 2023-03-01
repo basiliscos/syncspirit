@@ -308,12 +308,14 @@ void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t inde
 }
 
 bool file_info_t::check_consistency() noexcept {
+    uint64_t sz = 0;
     for (auto &b : blocks) {
         if (!b) {
             return false;
         }
+        sz += b->get_size();
     }
-    return true;
+    return size == sz;
 }
 
 void file_info_t::remove_blocks() noexcept {

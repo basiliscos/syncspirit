@@ -113,8 +113,8 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
         }
         assert(new_file->check_consistency());
         folder_my->add(new_file, false);
-        LOG_TRACE(log, "clone_file_t, new file; folder = {}, name = {}, blocks = {}", folder_id,
-                  file.name(), blocks.size());
+        LOG_TRACE(log, "clone_file_t, new file; folder = {}, name = {}, blocks = {}", folder_id, file.name(),
+                  blocks.size());
     }
 
     return outcome::success();

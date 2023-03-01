@@ -59,6 +59,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
         file->set_modified_s(1);
         auto b = file->add_blocks();
         b->set_hash("123");
+        b->set_size(5ul);
 
         peer_folder_info->set_max_sequence(10ul);
         diff = diff::peer::update_folder_t::create(*cluster, *peer_device, pr_index).value();

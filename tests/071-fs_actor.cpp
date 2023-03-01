@@ -157,6 +157,7 @@ void test_clone_file() {
                 auto b = proto::BlockInfo();
                 b.set_hash(utils::sha256_digest("12345").value());
                 b.set_weak_hash(555);
+                b.set_size(5ul);
                 auto bi = block_info_t::create(b).value();
                 auto &blocks_map = cluster->get_blocks();
                 blocks_map.put(bi);
