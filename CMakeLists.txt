@@ -35,7 +35,7 @@ find_package(nlohmann_json REQUIRED)
 set(SYNCSPIRIT_VERSION "v0.3.0")
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
-set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src)
+set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src/protobuf)
 protobuf_generate_cpp(
     PROTO_SRCS PROTO_HDRS
     EXPORT_MACRO SYNCSPIRIT_API
