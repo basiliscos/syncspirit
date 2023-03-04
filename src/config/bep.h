@@ -9,6 +9,7 @@ namespace syncspirit::config {
 
 struct bep_config_t {
     std::uint32_t rx_buff_size;
+    std::uint32_t tx_buff_limit;
     std::uint32_t connect_timeout;
     std::uint32_t request_timeout;
     std::uint32_t tx_timeout;

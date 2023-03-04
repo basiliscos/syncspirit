@@ -73,8 +73,13 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&blocks_max_requested(size_t value) &&noexcept {
+    builder_t &&blocks_max_requested(uint32_t value) &&noexcept {
         parent_t::config.blocks_max_requested = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&outgoing_buffer_max(uint32_t value) &&noexcept {
+        parent_t::config.outgoing_buffer_max = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };

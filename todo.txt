@@ -1,10 +1,6 @@
-- introduce initiator
-   -- connect_request_t
-   -- update_contact_t
-   -- relay_connect_request_t
-   -- relay_update_contact_t
+updates_streamer
+ - local_update_t, clone_file_t
 
- + device_lock
 
 ===========
 5. разобраться с лог-левелами?

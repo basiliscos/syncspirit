@@ -271,6 +271,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.rx_buff_size = rx_buff_size.value();
 
+        auto tx_buff_limit = t["tx_buff_limit"].value<std::uint32_t>();
+        if (!tx_buff_limit) {
+            return "bep/tx_buff_limit is incorrect or missing";
+        }
+        c.tx_buff_limit = tx_buff_limit.value();
+
         auto connect_timeout = t["connect_timeout"].value<std::uint32_t>();
         if (!connect_timeout) {
             return "bep/connect_timeout is incorrect or missing";
@@ -428,6 +434,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                  }}},
         {"bep", toml::table{{
                     {"rx_buff_size", cfg.bep_config.rx_buff_size},
+                    {"tx_buff_limit", cfg.bep_config.tx_buff_limit},
                     {"connect_timeout", cfg.bep_config.connect_timeout},
                     {"request_timeout", cfg.bep_config.request_timeout},
                     {"tx_timeout", cfg.bep_config.tx_timeout},
@@ -524,7 +531,8 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         false,      /* debug */
     };
     cfg.bep_config = bep_config_t {
-        16 * 1024 * 1024,   /* rx_buff */
+        16 * 1024 * 1024,   /* rx_buff_size */
+        8 * 1024 * 1024,    /* tx_buff_limit */
         5000,               /* connect_timeout */
         60000,              /* request_timeout */
         90000,              /* tx_timeout */

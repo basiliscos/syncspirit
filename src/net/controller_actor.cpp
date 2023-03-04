@@ -109,12 +109,16 @@ void controller_actor_t::shutdown_finish() noexcept {
 }
 
 void controller_actor_t::on_transfer_push(message::transfer_push_t &message) noexcept {
-    outgoing_buffer += message.payload.bytes;
+    auto sz = message.payload.bytes;
+    outgoing_buffer += sz;
+    LOG_TRACE(log, "{}, on_transfer_push, sz = {} (+{})", identity, outgoing_buffer, sz);
 }
 
 void controller_actor_t::on_transfer_pop(message::transfer_pop_t &message) noexcept {
-    assert(outgoing_buffer >= message.payload.bytes);
-    outgoing_buffer -= message.payload.bytes;
+    auto sz = message.payload.bytes;
+    assert(outgoing_buffer >= sz);
+    outgoing_buffer -= sz;
+    LOG_TRACE(log, "{}, on_transfer_pop, sz = {} (-{})", identity, outgoing_buffer, sz);
 }
 
 void controller_actor_t::on_termination(message::termination_signal_t &message) noexcept {

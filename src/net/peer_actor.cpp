@@ -144,6 +144,9 @@ void peer_actor_t::read_more() noexcept {
 void peer_actor_t::on_write(std::size_t sz) noexcept {
     resources->release(resource::io_write);
     LOG_TRACE(log, "{}, on_write, {} bytes", identity, sz);
+    if (controller) {
+        send<payload::transfer_pop_t>(controller, (uint32_t)sz);
+    }
     assert(tx_item);
     if (tx_item->final) {
         LOG_TRACE(log, "{}, process_tx_queue, final message has been sent, shutting down", identity);
