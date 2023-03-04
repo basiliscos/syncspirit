@@ -10,6 +10,7 @@ rotor/0.25
 spdlog/1.11.0
 tomlplusplus/3.3.0
 uriparser/0.9.7
+zlib/1.2.13
 
 [test_requires]
 catch2/3.3.1
