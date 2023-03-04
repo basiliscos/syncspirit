@@ -12,6 +12,7 @@
 #include "net/controller_actor.h"
 #include "net/names.h"
 #include "utils/error_code.h"
+#include "proto/bep_support.h"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -61,7 +62,7 @@ struct sample_peer_t : r::actor_base_t {
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
             p.subscribe_actor(&sample_peer_t::on_start_reading);
             p.subscribe_actor(&sample_peer_t::on_termination);
-            p.subscribe_actor(&sample_peer_t::on_forward);
+            p.subscribe_actor(&sample_peer_t::on_transfer);
             p.subscribe_actor(&sample_peer_t::on_block_request);
         });
     }
@@ -100,9 +101,24 @@ struct sample_peer_t : r::actor_base_t {
         }
     }
 
-    void on_forward(net::message::forwarded_message_t &message) noexcept {
-        LOG_TRACE(log, "{}, on_forward", identity);
-        messages.emplace_back(&message);
+    void on_transfer(net::message::transfer_data_t &message) noexcept {
+        auto &data = message.payload.data;
+        LOG_TRACE(log, "{}, on_transfer, bytes = {}", identity, data.size());
+        auto buff = boost::asio::buffer(data.data(), data.size());
+        auto result = proto::parse_bep(buff);
+        auto orig = std::move(result.value().message);
+        auto variant = net::payload::forwarded_message_t();
+        std::visit(
+            [&](auto &msg) {
+                using T = std::decay_t<decltype(msg)>;
+                using V = net::payload::forwarded_message_t;
+                if constexpr (std::is_constructible_v<V, T>) {
+                    variant = std::move(msg);
+                }
+            },
+            orig);
+        auto fwd_msg = new net::message::forwarded_message_t(address, std::move(variant));
+        messages.emplace_back(fwd_msg);
     }
 
     void on_block_request(net::message::block_request_t &req) noexcept {

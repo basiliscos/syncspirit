@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -87,7 +87,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
   private:
     struct confidential {
         struct payload {
-            struct tx_item_t : r::arc_base_t<tx_item_t> {
+            struct tx_item_t : boost::intrusive_ref_counter<tx_item_t, boost::thread_unsafe_counter> {
                 fmt::memory_buffer buff;
                 bool final = false;
 
@@ -111,14 +111,14 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     void on_start_reading(message::start_reading_t &) noexcept;
     void on_termination(message::termination_signal_t &) noexcept;
     void on_block_request(message::block_request_t &) noexcept;
-    void on_forward(message::forwarded_message_t &message) noexcept;
+    void on_transfer(message::transfer_data_t &message) noexcept;
 
     void on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept;
     void on_write(std::size_t bytes) noexcept;
     void on_read(std::size_t bytes) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void read_more() noexcept;
-    void push_write(fmt::memory_buffer &&buff, bool final) noexcept;
+    void push_write(fmt::memory_buffer &&buff, bool signal, bool final) noexcept;
     void process_tx_queue() noexcept;
     void cancel_timer() noexcept;
     void cancel_io() noexcept;

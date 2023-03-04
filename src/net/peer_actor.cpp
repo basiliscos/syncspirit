@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "peer_actor.h"
 #include "names.h"
@@ -47,7 +47,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&peer_actor_t::on_start_reading);
         p.subscribe_actor(&peer_actor_t::on_termination);
         p.subscribe_actor(&peer_actor_t::on_block_request);
-        p.subscribe_actor(&peer_actor_t::on_forward);
+        p.subscribe_actor(&peer_actor_t::on_transfer);
     });
 }
 
@@ -56,7 +56,7 @@ void peer_actor_t::on_start() noexcept {
 
     fmt::memory_buffer buff;
     proto::make_hello_message(buff, device_name);
-    push_write(std::move(buff), false);
+    push_write(std::move(buff), true, false);
 
     read_more();
     read_action = &peer_actor_t::read_hello;
@@ -106,9 +106,12 @@ void peer_actor_t::process_tx_queue() noexcept {
     }
 }
 
-void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
+void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool signal, bool final) noexcept {
     if (io_error) {
         return;
+    }
+    if (signal && controller) {
+        send<payload::transfer_push_t>(controller, buff.size());
     }
     tx_item_t item = new confidential::payload::tx_item_t{std::move(buff), final};
     tx_queue.emplace_back(std::move(item));
@@ -213,7 +216,7 @@ void peer_actor_t::shutdown_start() noexcept {
     close.set_reason(shutdown_reason->message());
     proto::serialize(buff, close);
     tx_queue.clear();
-    push_write(std::move(buff), true);
+    push_write(std::move(buff), true, true);
     LOG_TRACE(log, "{}, going to send close message", identity);
 
     r::actor_base_t::shutdown_start();
@@ -296,17 +299,14 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
 
     fmt::memory_buffer buff;
     proto::serialize(buff, req);
-    push_write(std::move(buff), false);
+    push_write(std::move(buff), true, false);
     block_requests.emplace_back(&message);
 }
 
-void peer_actor_t::on_forward(message::forwarded_message_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_forward", identity);
-    fmt::memory_buffer buff;
+void peer_actor_t::on_transfer(message::transfer_data_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_transfer", identity);
 
-    std::visit([&](auto &&msg) { proto::serialize(buff, *msg); }, message.payload);
-
-    push_write(std::move(buff), false);
+    push_write(std::move(message.payload.data), false, false);
 }
 
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
@@ -436,7 +436,7 @@ void peer_actor_t::on_tx_timeout(r::request_id_t, bool cancelled) noexcept {
         fmt::memory_buffer buff;
         proto::Ping ping;
         proto::serialize(buff, ping);
-        push_write(std::move(buff), false);
+        push_write(std::move(buff), true, false);
         reset_tx_timer();
     }
 }

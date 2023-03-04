@@ -10,6 +10,7 @@
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/flush_file.h"
+#include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include <fstream>
 
@@ -26,8 +27,9 @@ r::plugin::resource_id_t hash = 1;
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer}, peer_addr{config.peer_addr},
-      request_timeout{config.request_timeout}, request_pool{config.request_pool}, blocks_max_requested{
-                                                                                      config.blocks_max_requested} {
+      request_timeout{config.request_timeout}, request_pool{config.request_pool}, blocks_requested{0},
+      outgoing_buffer{0}, outgoing_buffer_max{config.outgoing_buffer_max}, blocks_max_requested{
+                                                                               config.blocks_max_requested} {
     log = utils::get_logger("net.controller_actor");
 }
 
@@ -56,6 +58,8 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&controller_actor_t::on_pull_ready);
         p.subscribe_actor(&controller_actor_t::on_termination);
         p.subscribe_actor(&controller_actor_t::on_block);
+        p.subscribe_actor(&controller_actor_t::on_transfer_pop);
+        p.subscribe_actor(&controller_actor_t::on_transfer_push);
         p.subscribe_actor(&controller_actor_t::on_validation);
     });
 }
@@ -66,9 +70,10 @@ void controller_actor_t::on_start() noexcept {
     send<payload::start_reading_t>(peer_addr, get_address(), true);
 
     auto cluster_config = cluster->generate(*peer);
-    using payload_t = std::decay_t<decltype(cluster_config)>;
-    auto payload = std::make_unique<payload_t>(std::move(cluster_config));
-    send<payload::forwarded_message_t>(peer_addr, std::move(payload));
+    fmt::memory_buffer data;
+    proto::serialize(data, cluster_config);
+    outgoing_buffer += static_cast<uint32_t>(data.size());
+    send<payload::transfer_data_t>(peer_addr, std::move(data));
 
     resources->acquire(resource::peer);
     LOG_INFO(log, "{} is online", identity);
@@ -101,6 +106,15 @@ void controller_actor_t::shutdown_finish() noexcept {
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
     r::actor_base_t::shutdown_finish();
+}
+
+void controller_actor_t::on_transfer_push(message::transfer_push_t &message) noexcept {
+    outgoing_buffer += message.payload.bytes;
+}
+
+void controller_actor_t::on_transfer_pop(message::transfer_pop_t &message) noexcept {
+    assert(outgoing_buffer >= message.payload.bytes);
+    outgoing_buffer -= message.payload.bytes;
 }
 
 void controller_actor_t::on_termination(message::termination_signal_t &message) noexcept {

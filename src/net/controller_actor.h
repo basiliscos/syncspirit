@@ -35,6 +35,7 @@ struct controller_actor_config_t : r::actor_config_t {
     r::address_ptr_t peer_addr;
     pt::time_duration request_timeout;
     uint32_t blocks_max_requested = 8;
+    uint32_t outgoing_buffer_max = 0;
 };
 
 template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -105,6 +106,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void preprocess_block(model::file_block_t &block) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
+    void on_transfer_push(message::transfer_push_t &message) noexcept;
+    void on_transfer_pop(message::transfer_pop_t &message) noexcept;
 
     void on_message(proto::message::ClusterConfig &message) noexcept;
     void on_message(proto::message::Index &message) noexcept;
@@ -134,6 +137,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     peers_map_t peers_map;
     // generic
     std::uint_fast32_t blocks_requested = 0;
+    uint32_t outgoing_buffer;
+    uint32_t outgoing_buffer_max;
 
     int64_t request_pool;
     uint32_t blocks_max_kept;

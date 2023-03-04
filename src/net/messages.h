@@ -129,7 +129,7 @@ struct block_response_t {
     std::string data;
 };
 
-struct SYNCSPIRIT_API block_request_t {
+struct block_request_t {
     using response_t = block_response_t;
     model::file_info_ptr_t file;
     model::file_block_t block;
@@ -147,6 +147,18 @@ struct connect_request_t {
     model::device_id_t device_id;
     utils::URI uri;
     std::string_view alpn;
+};
+
+struct transfer_data_t {
+    fmt::memory_buffer data;
+};
+
+struct transfer_push_t {
+    uint32_t bytes;
+};
+
+struct transfer_pop_t {
+    uint32_t bytes;
 };
 
 } // end of namespace payload
@@ -172,6 +184,9 @@ using load_cluster_response_t = r::request_traits_t<payload::load_cluster_reques
 using start_reading_t = r::message_t<payload::start_reading_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
 using termination_signal_t = r::message_t<payload::termination_t>;
+using transfer_data_t = r::message_t<payload::transfer_data_t>;
+using transfer_push_t = r::message_t<payload::transfer_push_t>;
+using transfer_pop_t = r::message_t<payload::transfer_pop_t>;
 
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;
