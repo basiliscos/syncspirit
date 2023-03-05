@@ -24,7 +24,7 @@ struct SYNCSPIRIT_TEST_API path_guard_t {
 
             bfs::permissions(path, bfs::perms::owner_all, ec);
             if (ec) {
-                printf("error setting permissions : %s\n", path.string().c_str(), ec.message().c_str());
+                printf("error setting permissions : %s: %s\n", path.string().c_str(), ec.message().c_str());
             }
 
             bfs::remove_all(path, ec);

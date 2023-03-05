@@ -19,7 +19,7 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     my_cluster_update_visitor_t(F &&fn_) : fn{std::forward<F>(fn_)} {}
 
     outcome::result<void> operator()(const diff::peer::cluster_update_t &diff) noexcept override { return fn(diff); }
-    outcome::result<void> operator()(const diff::peer::cluster_remove_t &diff) noexcept override {
+    outcome::result<void> operator()(const diff::peer::cluster_remove_t &) noexcept override {
         remove_diff = true;
         return outcome::success();
     }
@@ -568,7 +568,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
     auto opt = diff_opt.value()->apply(*cluster);
     REQUIRE(opt);
 
-    auto remote_folder = folder->get_remote_folder_infos().by_device(my_device);
+    auto remote_folder = peer_device->get_remote_folder_infos().by_folder(folder);
     REQUIRE(remote_folder);
     CHECK(remote_folder->get_index() == 5ul);
     CHECK(remote_folder->get_max_sequence() == 3);

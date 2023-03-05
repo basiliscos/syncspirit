@@ -1,4 +1,5 @@
 #include "remote_folder_info.h"
+#include "folder.h"
 
 namespace syncspirit::model {
 
@@ -12,10 +13,10 @@ remote_folder_info_t::remote_folder_info_t(const proto::Device &folder, const de
                                            const folder_ptr_t &folder_) noexcept
     : index_id{folder.index_id()}, max_sequence{folder.max_sequence()}, device{device_.get()}, folder{folder_.get()} {}
 
-std::string_view remote_folder_info_t::get_key() const noexcept { return device->device_id().get_sha256(); }
+std::string_view remote_folder_info_t::get_key() const noexcept { return folder->get_id(); }
 
-remote_folder_info_t_ptr_t remote_folder_infos_map_t::by_device(const device_ptr_t &device) const noexcept {
-    return get<0>(device->device_id().get_sha256());
+remote_folder_info_t_ptr_t remote_folder_infos_map_t::by_folder(const folder_ptr_t &folder) const noexcept {
+    return get<0>(folder->get_id());
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const remote_folder_info_t_ptr_t &item) noexcept {

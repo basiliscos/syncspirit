@@ -210,6 +210,8 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     }
 
     auto &devices = cluster.get_devices();
+    auto peer = cluster.get_devices().by_sha256(source_peer.device_id().get_sha256());
+    auto &peer_remote_folders = peer->get_remote_folder_infos();
     for (auto &info : remote_folders) {
         auto folder = folders.by_id(info.folder_id);
         assert(folder);
@@ -219,7 +221,7 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
         if (!opt) {
             return opt.assume_error();
         }
-        folder->get_remote_folder_infos().put(opt.assume_value());
+        peer_remote_folders.put(opt.assume_value());
     }
 
     return outcome::success();

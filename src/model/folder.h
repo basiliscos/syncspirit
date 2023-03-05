@@ -9,7 +9,6 @@
 #include <boost/outcome.hpp>
 #include "device.h"
 #include "folder_info.h"
-#include "remote_folder_info.h"
 #include "misc/local_file.h"
 #include "misc/uuid.h"
 #include "folder_data.h"
@@ -44,7 +43,6 @@ struct SYNCSPIRIT_API folder_t final : arc_base_t<folder_t>, folder_data_t {
 
     std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
     inline auto &get_folder_infos() noexcept { return folder_infos; }
-    inline auto &get_remote_folder_infos() noexcept { return remote_folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
 
     using folder_data_t::get_path;
@@ -63,7 +61,6 @@ struct SYNCSPIRIT_API folder_t final : arc_base_t<folder_t>, folder_data_t {
 
     device_ptr_t device;
     folder_infos_map_t folder_infos;
-    remote_folder_infos_map_t remote_folder_infos;
     cluster_t *cluster = nullptr;
     char key[data_length];
 };

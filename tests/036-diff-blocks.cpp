@@ -23,7 +23,6 @@ TEST_CASE("various block diffs", "[model]") {
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
-    auto &blocks_map = cluster->get_blocks();
 
     db::Folder db_folder;
     db_folder.set_id("1234-5678");
@@ -98,7 +97,6 @@ TEST_CASE("various block diffs", "[model]") {
     SECTION("availability") {
         auto bdiff = diff::block_diff_ptr_t(new diff::modify::blocks_availability_t(*file, 1));
         REQUIRE(bdiff->apply(*cluster));
-        auto &blocks = file->get_blocks();
         CHECK(file->is_locally_available());
     }
 }

@@ -28,16 +28,15 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
 
+    model::device_t source_peer;
     unknown_folders_t new_unknown_folders;
     modified_folders_t reset_folders;
     modified_folders_t updated_folders;
     modified_folders_t remote_folders;
-    std::string source_device;
     keys_t removed_folders;
     keys_t removed_files;
     keys_t removed_blocks;
     keys_t removed_unknown_folders;
-    model::device_t source_peer;
 
   private:
     cluster_update_t(const model::device_t &source, unknown_folders_t unknown_folders, modified_folders_t reset_folders,
