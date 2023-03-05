@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "scan_actor.h"
 #include "model/diff/modify/file_availability.h"
@@ -152,7 +152,6 @@ auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t 
         LOG_WARN(log, "{}, error opening file {}: {}", identity, path.string(), ec.message());
         model::io_errors_t errs;
         errs.push_back(model::io_error_t{orig_path, ec});
-        auto removed = bfs::remove(orig_path, ec);
         if (ec) {
             errs.push_back(model::io_error_t{orig_path, ec});
         }
@@ -178,7 +177,7 @@ bool scan_actor_t::rehash_next(message::rehash_needed_t &message) noexcept {
     if (!info.abandoned && !info.invalid) {
         auto condition = [&]() {
             return requested_hashes < requested_hashes_limit &&
-                   info.last_queued_block < info.source_file->get_blocks().size() && !info.abandoned;
+                   (info.last_queued_block < (int64_t)info.source_file->get_blocks().size()) && !info.abandoned;
         };
 
         auto block_sz = info.source_file->get_block_size();
@@ -217,7 +216,6 @@ bool scan_actor_t::rehash_next(message::rehash_needed_t &message) noexcept {
 void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     --requested_hashes;
 
-    auto &ee = res.payload.ee;
     auto &rp = res.payload.req->payload.request_payload;
     auto msg = static_cast<message::rehash_needed_t *>(rp.custom.get());
     auto &info = msg->payload;
@@ -240,7 +238,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
         auto &orig_block = info.source_file->get_blocks().at(block_index);
         if (orig_block->get_hash() == digest) {
             auto &ooo = info.out_of_order;
-            if (block_index == info.valid_blocks + 1) {
+            if ((int64_t)block_index == info.valid_blocks + 1) {
                 ++info.valid_blocks;
             } else {
                 ooo.insert((int64_t)block_index);

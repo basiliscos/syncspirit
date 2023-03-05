@@ -70,7 +70,6 @@ void governor_actor_t::on_model_update(model::message::forwarded_model_update_t 
 
 void governor_actor_t::on_block_update(model::message::forwarded_block_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_block_update", identity);
-    auto &payload = message.payload.message->payload;
     if (!cluster->is_tainted()) {
         auto &diff = *message.payload.message->payload.diff;
         auto r = diff.visit(*this);

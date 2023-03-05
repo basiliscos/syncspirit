@@ -219,7 +219,6 @@ void test_clone_file() {
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
                 CHECK(file->is_deleted());
 
-                auto &path = file->get_path();
                 REQUIRE(!bfs::exists(target));
             }
         }

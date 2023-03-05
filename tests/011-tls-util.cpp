@@ -57,7 +57,7 @@ TEST_CASE("sha256 for certificate", "[support][tls]") {
     auto &sha = sha_result.value();
     REQUIRE(1 == 1);
     std::string expected = "b1b48b580b78b47c975a138b4aaa2988fc621795c95a2868e24d93b327e8858c";
-    char got[expected.size() + 1];
+    char got[128];
     std::memset(got, 0, sizeof(got));
 
     for (std::size_t i = 0; i < sha.size(); i++) {

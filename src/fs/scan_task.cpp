@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "scan_task.h"
 #include "utils.h"
@@ -88,7 +88,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
         }
     }
     if (!errors.empty()) {
-        return std::move(errors);
+        return errors;
     }
 
     return true;
@@ -108,7 +108,7 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
     }
 
     if (!info.temp) {
-        if (sz != file->get_size()) {
+        if (sz != (size_t)file->get_size()) {
             return changed_meta_t{info.file};
         }
 
@@ -147,7 +147,7 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
         return incomplete_removed_t{file};
     }
 
-    if (sz != source->get_size()) {
+    if (sz != (size_t)source->get_size()) {
         LOG_DEBUG(log, "removing size-mismatched temporally {}", path.string());
         bfs::remove(path, ec);
         if (ec) {

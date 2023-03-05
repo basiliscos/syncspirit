@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "test_supervisor.h"
 #include "net/names.h"
@@ -43,7 +43,7 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     }
 }
 
-void supervisor_t::do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept {
+void supervisor_t::do_start_timer(const r::pt::time_duration &, r::timer_handler_base_t &handler) noexcept {
     timers.emplace_back(&handler);
 }
 

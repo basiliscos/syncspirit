@@ -21,7 +21,7 @@ local_update_t::local_update_t(const file_info_t &file, db::FileInfo current_, b
         blocks_updated = true;
     } else {
         for (size_t i = 0; i < blocks.size(); ++i) {
-            bool mismatch = !blocks[i] || (blocks[i]->get_size() != current_blocks[i].size()) ||
+            bool mismatch = !blocks[i] || ((int32_t)blocks[i]->get_size() != current_blocks[i].size()) ||
                             (blocks[i]->get_weak_hash() != current_blocks[i].weak_hash()) ||
                             (blocks[i]->get_hash() != current_blocks[i].hash());
             if (mismatch) {

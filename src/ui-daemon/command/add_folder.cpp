@@ -73,7 +73,6 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
     using namespace model::diff;
     log = actor.log;
 
-    bool found = false;
     for (auto it : actor.cluster->get_folders()) {
         auto f = it.item;
         if ((f->get_id() == folder.id())) {

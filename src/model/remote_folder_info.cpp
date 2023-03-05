@@ -1,5 +1,6 @@
 #include "remote_folder_info.h"
 #include "folder.h"
+#include "cluster.h"
 
 namespace syncspirit::model {
 
@@ -14,6 +15,12 @@ remote_folder_info_t::remote_folder_info_t(const proto::Device &folder, const de
     : index_id{folder.index_id()}, max_sequence{folder.max_sequence()}, device{device_.get()}, folder{folder_.get()} {}
 
 std::string_view remote_folder_info_t::get_key() const noexcept { return folder->get_id(); }
+
+bool remote_folder_info_t::needs_update() const noexcept {
+    auto device = folder->get_cluster()->get_device();
+    auto folder_info = folder->get_folder_infos().by_device(device);
+    return (folder_info->get_index() != index_id) || folder_info->get_max_sequence() > max_sequence;
+}
 
 remote_folder_info_t_ptr_t remote_folder_infos_map_t::by_folder(const folder_ptr_t &folder) const noexcept {
     return get<0>(folder->get_id());

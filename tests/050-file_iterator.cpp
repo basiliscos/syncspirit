@@ -259,7 +259,6 @@ TEST_CASE("file iterator", "[model]") {
         }
 
         SECTION("partly-downloaded file takes priority over non-downloaded") {
-            auto &blocks_map = cluster->get_blocks();
             diff = new diff::modify::clone_file_t(*f2);
             REQUIRE(diff->apply(*cluster));
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "file_actor.h"
 #include "net/names.h"
@@ -276,10 +276,7 @@ auto file_actor_t::open_file_rw(const boost::filesystem::path &path, model::file
     }
     auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
     files_cache.put(ptr);
-    return std::move(ptr);
-
-    files_cache.put(item);
-    return std::move(item);
+    return ptr;
 }
 
 auto file_actor_t::open_file_ro(const bfs::path &path) noexcept -> outcome::result<file_ptr_t> {

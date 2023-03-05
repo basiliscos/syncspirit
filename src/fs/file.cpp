@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "file.h"
 #include "utils.h"
@@ -16,7 +16,7 @@ auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::resul
     auto mode = "r+b";
     auto ec = sys::error_code{};
     bool need_resize = true;
-    auto exptected_size = model->get_size();
+    auto exptected_size = (uint64_t)model->get_size();
     if (bfs::exists(path, ec)) {
         auto file_size = bfs::file_size(path, ec);
         if (ec) {
@@ -159,11 +159,11 @@ auto file_t::read(size_t offset, size_t size) const noexcept -> outcome::result<
     }
 
     pos = offset + size;
-    return std::move(r);
+    return r;
 }
 
 auto file_t::write(size_t offset, std::string_view data) noexcept -> outcome::result<void> {
-    assert(offset + data.size() <= model->get_size());
+    assert(offset + data.size() <= (size_t)model->get_size());
     if (pos != offset || last_op != w) {
         auto r = fseek(backend, (long)offset, SEEK_SET);
         if (r != 0) {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "utils.h"
 
@@ -362,7 +362,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         c.uncommited_threshold = uncommited_threshold.value();
     }
 
-    return std::move(cfg);
+    return cfg;
 }
 
 static std::string_view get_level(spdlog::level::level_enum level) noexcept {

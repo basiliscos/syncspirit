@@ -131,7 +131,7 @@ struct fixture_t {
         acceptor.async_accept(peer_sock, [this](auto ec) { this->accept(ec); });
     }
 
-    virtual std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept {
+    virtual std::string get_uri(const asio::ip::tcp::endpoint &) noexcept {
         return fmt::format("tcp://{}", listening_ep);
     }
 
@@ -142,9 +142,8 @@ struct fixture_t {
     }
 
     virtual void initiate_peer_handshake() noexcept {
-        transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &cert,
-                                                        const tcp::endpoint &peer_endpoint,
-                                                        const model::device_id_t *peer_device) {
+        transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &, const tcp::endpoint &,
+                                                        const model::device_id_t *) {
             valid_handshake = valid_peer;
             on_peer_hanshake();
         };
@@ -162,7 +161,7 @@ struct fixture_t {
         transport::error_fn_t on_error = [&](auto &ec) {
             LOG_WARN(log, "initiate_active/connect, err: {}", ec.message());
         };
-        transport::connect_fn_t on_connect = [&](auto arg) {
+        transport::connect_fn_t on_connect = [&](auto) {
             LOG_INFO(log, "initiate_active/peer connect");
             active_connect();
         };
@@ -172,9 +171,8 @@ struct fixture_t {
 
     virtual void active_connect() {
         LOG_TRACE(log, "active_connect");
-        transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &cert,
-                                                        const tcp::endpoint &peer_endpoint,
-                                                        const model::device_id_t *peer_device) {
+        transport::handshake_fn_t handshake_fn = [this](bool, utils::x509_t &, const tcp::endpoint &,
+                                                        const model::device_id_t *) {
             valid_handshake = true;
             LOG_INFO(log, "test_passive_success/peer handshake");
         };
@@ -254,7 +252,7 @@ void test_connect_unsupproted_proto() {
             return fmt::format("xxx://{}", listening_ep);
         }
         void main() noexcept override {
-            auto act = create_actor();
+            create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
@@ -286,7 +284,7 @@ void test_handshake_timeout() {
 void test_handshake_garbage() {
     struct F : fixture_t {
 
-        void accept(const sys::error_code &ec) noexcept override {
+        void accept(const sys::error_code &) noexcept override {
             auto buff = asio::buffer("garbage-garbage-garbage");
             peer_sock.write_some(buff);
         }
@@ -449,7 +447,7 @@ void test_passive_garbage() {
         void active_connect_impl() noexcept override {
             tcp::resolver resolver(io_ctx);
             addresses = resolver.resolve(host, std::to_string(listening_ep.port()));
-            asio::async_connect(client_sock, addresses.begin(), addresses.end(), [&](auto ec, auto addr) {
+            asio::async_connect(client_sock, addresses.begin(), addresses.end(), [&](auto ec, auto) {
                 LOG_INFO(log, "test_passive_garbage/peer connect, ec: {}", ec.message());
                 auto buff = asio::buffer("garbage-garbage-garbage");
                 client_sock.write_some(buff);
@@ -514,7 +512,6 @@ struct passive_relay_fixture_t : fixture_t {
 
     virtual void write(const proto::relay::message_t &msg) noexcept {
         proto::relay::serialize(msg, rx_buff);
-        auto buff = asio::buffer(rx_buff);
         transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
         transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
         peer_trans->async_send(asio::buffer(rx_buff), write_fn, err_fn);
@@ -523,7 +520,7 @@ struct passive_relay_fixture_t : fixture_t {
     void accept(const sys::error_code &ec) noexcept override {
         LOG_INFO(log, "accept (relay/passive), ec: {}", ec.message());
         auto uri = utils::parse("tcp://127.0.0.1:0/").value();
-        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock)};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         peer_trans = transport::initiate_stream(cfg);
 
         transport::error_fn_t read_err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
@@ -557,14 +554,13 @@ void test_relay_passive_gargabe() {
         void write(const proto::relay::message_t &) noexcept override {
             rx_buff = "garbage-garbage-garbae";
             initiate_handshake = false;
-            auto buff = asio::buffer(rx_buff);
             transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
             transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
             peer_trans->async_send(asio::buffer(rx_buff), write_fn, err_fn);
         }
 
         void main() noexcept override {
-            auto act = create_actor();
+            create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
@@ -622,7 +618,7 @@ void test_relay_passive_unsuccessful_join() {
 
 void test_relay_malformed_uri() {
     struct F : fixture_t {
-        std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept override {
+        std::string get_uri(const asio::ip::tcp::endpoint &) noexcept override {
             return fmt::format("relay://{}", listening_ep);
         }
 
@@ -644,7 +640,7 @@ void test_relay_malformed_uri() {
 void test_relay_active_wrong_relay_deviceid() {
     struct F : fixture_t {
 
-        std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept override {
+        std::string get_uri(const asio::ip::tcp::endpoint &) noexcept override {
             return fmt::format("relay://{}?id={}", listening_ep, my_device->device_id().get_value());
         }
 
@@ -677,7 +673,7 @@ struct active_relay_fixture_t : fixture_t {
         rx_buff.resize(128);
     }
 
-    std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept override {
+    std::string get_uri(const asio::ip::tcp::endpoint &) noexcept override {
         return fmt::format("relay://{}?id={}", listening_ep, relay_device.get_value());
     }
 
@@ -685,9 +681,8 @@ struct active_relay_fixture_t : fixture_t {
         LOG_INFO(log, "relay/accept, ec: {}", ec.message());
         if (!session_mode) {
             relay_trans = transport::initiate_tls_passive(*sup, relay_keys, std::move(peer_sock));
-            transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &cert,
-                                                            const tcp::endpoint &peer_endpoint,
-                                                            const model::device_id_t *peer_device) {
+            transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &, const tcp::endpoint &,
+                                                            const model::device_id_t *) {
                 valid_handshake = valid_peer;
                 on_relay_hanshake();
             };
@@ -696,7 +691,7 @@ struct active_relay_fixture_t : fixture_t {
             return;
         }
         auto uri = utils::parse("tcp://127.0.0.1:0/").value();
-        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock)};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         peer_trans = transport::initiate_stream(cfg);
 
         transport::error_fn_t read_err_fn([&](auto ec) { log->error("(relay/active), read_err: {}", ec.message()); });
@@ -719,7 +714,6 @@ struct active_relay_fixture_t : fixture_t {
 
     virtual void write(transport::stream_sp_t &stream, const proto::relay::message_t &msg) noexcept {
         proto::relay::serialize(msg, rx_buff);
-        auto buff = asio::buffer(rx_buff);
         transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
         transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
         stream->async_send(asio::buffer(rx_buff), write_fn, err_fn);
@@ -785,7 +779,7 @@ void test_relay_wrong_device() {
             write(relay_trans, proto::relay::session_invitation_t{std::string(relay_device.get_sha256()), session_key,
                                                                   "", listening_ep.port(), false});
         }
-        void on_write(size_t bytes) override {}
+        void on_write(size_t) override {}
 
         void main() noexcept override {
             auto act = create_actor();
@@ -851,13 +845,12 @@ void test_relay_garbage_reply() {
 
         void write(transport::stream_sp_t &stream, const proto::relay::message_t &) noexcept override {
             rx_buff = "garbage-garbage-garbage";
-            auto buff = asio::buffer(rx_buff);
             transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
             transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
             stream->async_send(asio::buffer(rx_buff), write_fn, err_fn);
         }
 
-        void on_write(size_t bytes) override {}
+        void on_write(size_t) override {}
 
         void main() noexcept override {
             auto act = create_actor();
@@ -877,7 +870,7 @@ void test_relay_noninvitation_reply() {
     struct F : active_relay_fixture_t {
 
         void relay_reply() noexcept override { write(relay_trans, proto::relay::pong_t{}); }
-        void on_write(size_t bytes) override {}
+        void on_write(size_t) override {}
 
         void main() noexcept override {
             auto act = create_actor();

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "cluster_supervisor.h"
 #include "controller_actor.h"
@@ -28,8 +28,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
             }
         });
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        auto &sup = get_supervisor();
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &) {
         create_actor<hasher::hasher_proxy_actor_t>()
             .timeout(init_timeout)
             .hasher_threads(hasher_threads)

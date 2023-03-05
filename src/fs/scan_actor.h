@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -77,10 +77,10 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
     void on_rehash(message::rehash_needed_t &message) noexcept;
 
     model::cluster_ptr_t cluster;
-    utils::logger_t log;
-    r::address_ptr_t hasher_proxy;
-    r::address_ptr_t coordinator;
     config::fs_config_t fs_config;
+    r::address_ptr_t hasher_proxy;
+    utils::logger_t log;
+    r::address_ptr_t coordinator;
     uint32_t requested_hashes_limit;
     uint32_t requested_hashes = 0;
     uint32_t progress = 0;

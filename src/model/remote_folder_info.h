@@ -32,6 +32,7 @@ struct SYNCSPIRIT_API remote_folder_info_t final : arc_base_t<remote_folder_info
 
     inline std::uint64_t get_index() const noexcept { return index_id; }
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
+    bool needs_update() const noexcept;
 
   private:
     remote_folder_info_t(const proto::Device &folder, const device_ptr_t &device_,

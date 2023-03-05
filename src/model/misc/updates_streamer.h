@@ -9,6 +9,7 @@
 #include "model/file_info.h"
 #include "model/device.h"
 #include "model/folder_info.h"
+#include "model/remote_folder_info.h"
 #include "syncspirit-export.h"
 
 namespace syncspirit::model {
@@ -23,7 +24,7 @@ struct SYNCSPIRIT_API updates_streamer_t {
     void on_update(const file_info_t &) noexcept;
 
   private:
-    using folders_queue_t = std::unordered_set<folder_info_ptr_t>;
+    using folders_queue_t = std::unordered_set<remote_folder_info_t_ptr_t>;
 
     void prepare() noexcept;
 

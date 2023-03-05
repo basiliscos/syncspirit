@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "config/utils.h"
 #include "utils/error_code.h"
@@ -24,7 +24,7 @@ namespace bfs = boost::filesystem;
 using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
-    : parent_t{cfg}, cluster_copies{cfg.cluster_copies}, app_config{cfg.app_config} {
+    : parent_t{cfg}, app_config{cfg.app_config}, cluster_copies{cfg.cluster_copies} {
     seed = (size_t)std::time(nullptr);
     log = utils::get_logger("net.coordinator");
     auto &files_cfg = app_config.global_announce_config;
@@ -229,7 +229,7 @@ void net_supervisor_t::launch_net() noexcept {
     LOG_INFO(log, "{}, launching network services", identity);
 
     if (app_config.upnp_config.enabled) {
-        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto timeout = shutdown_timeout * 9 / 10;
             return create_actor<ssdp_actor_t>()
                 .timeout(timeout)
@@ -246,7 +246,7 @@ void net_supervisor_t::launch_net() noexcept {
     }
 
     if (app_config.local_announce_config.enabled) {
-        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto timeout = shutdown_timeout * 9 / 10;
             auto &cfg = app_config.local_announce_config;
             return create_actor<local_discovery_actor_t>()
@@ -276,9 +276,8 @@ void net_supervisor_t::launch_net() noexcept {
             .escalate_failure()
             .finish();
 
-        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto &gcfg = app_config.global_announce_config;
-            auto port = app_config.upnp_config.external_port;
             auto timeout = shutdown_timeout * 9 / 10;
             return create_actor<global_discovery_actor_t>()
                 .timeout(timeout)
@@ -310,7 +309,7 @@ void net_supervisor_t::launch_net() noexcept {
             .escalate_failure()
             .finish();
 
-        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto timeout = shutdown_timeout * 9 / 10;
             return create_actor<relay_actor_t>()
                 .timeout(timeout)

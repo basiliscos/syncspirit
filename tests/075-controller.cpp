@@ -294,7 +294,7 @@ void test_startup() {
 void test_index() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
-        void main(diff_builder_t &builder) noexcept override {
+        void main(diff_builder_t &) noexcept override {
 
             auto cc = proto::ClusterConfig{};
             auto index = proto::Index{};
@@ -376,7 +376,7 @@ void test_index() {
 void test_downloading() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
-        void main(diff_builder_t &builder) noexcept override {
+        void main(diff_builder_t &) noexcept override {
             auto &folder_infos = folder_1->get_folder_infos();
             auto folder_my = folder_infos.by_device(my_device);
 

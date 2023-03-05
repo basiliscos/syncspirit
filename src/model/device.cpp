@@ -75,7 +75,6 @@ std::string device_t::serialize() noexcept {
     r.set_auto_accept(auto_accept);
     r.set_paused(paused);
 
-    int i = 0;
     for (auto &address : static_uris) {
         *r.add_addresses() = address.full;
     }
