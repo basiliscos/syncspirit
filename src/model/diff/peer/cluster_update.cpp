@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "cluster_update.h"
 #include "cluster_remove.h"
@@ -20,6 +20,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     unknown_folders_t unknown;
     modified_folders_t updated;
     modified_folders_t reset;
+    modified_folders_t remote;
     keys_t removed_folders;
     keys_t removed_files_final;
     keys_t removed_unknown_folders;
@@ -77,6 +78,8 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                 continue;
             }
             if (device != &source) {
+                auto info = update_info_t{f.id(), d};
+                remote.emplace_back(std::move(info));
                 continue;
             }
 
@@ -107,7 +110,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         }
     }
 
-    ptr = new cluster_update_t(source, std::move(unknown), std::move(reset), std::move(updated), removed_blocks,
+    ptr = new cluster_update_t(source, std::move(unknown), std::move(reset), updated, remote, removed_blocks,
                                removed_unknown_folders);
     bool wrap = !removed_blocks.empty() || !removed_folders.empty() || !removed_unknown_folders.empty();
     if (wrap) {
@@ -128,10 +131,11 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
 
 cluster_update_t::cluster_update_t(const model::device_t &source, unknown_folders_t unknown_folders,
                                    modified_folders_t reset_folders_, modified_folders_t updated_folders_,
-                                   keys_t removed_blocks_, keys_t removed_unknown_folders_) noexcept
+                                   modified_folders_t remote_folders_, keys_t removed_blocks_,
+                                   keys_t removed_unknown_folders_) noexcept
     : source_peer(source), new_unknown_folders{std::move(unknown_folders)}, reset_folders{std::move(reset_folders_)},
-      updated_folders{std::move(updated_folders_)}, removed_blocks{removed_blocks_}, removed_unknown_folders{std::move(
-                                                                                         removed_unknown_folders_)} {}
+      updated_folders{std::move(updated_folders_)}, remote_folders{std::move(remote_folders_)},
+      removed_blocks{removed_blocks_}, removed_unknown_folders{std::move(removed_unknown_folders_)} {}
 
 auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "applyging cluster_update_t");
@@ -203,6 +207,19 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
             return opt.assume_error();
         }
         unknown.emplace_front(std::move(opt.value()));
+    }
+
+    auto &devices = cluster.get_devices();
+    for (auto &info : remote_folders) {
+        auto folder = folders.by_id(info.folder_id);
+        assert(folder);
+        auto device = devices.by_sha256(info.device.id());
+        assert(device);
+        auto opt = remote_folder_info_t::create(info.device, device, folder);
+        if (!opt) {
+            return opt.assume_error();
+        }
+        folder->get_remote_folder_infos().put(opt.assume_value());
     }
 
     return outcome::success();

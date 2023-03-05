@@ -117,6 +117,7 @@ add_library(syncspirit_lib
     src/model/misc/error_code.cpp
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
+    src/model/misc/updates_streamer.cpp
     src/model/misc/uuid.cpp
     src/model/misc/version_utils.cpp
     src/model/block_info.cpp
@@ -129,6 +130,7 @@ add_library(syncspirit_lib
     src/model/folder_info.cpp
     src/model/ignored_device.cpp
     src/model/ignored_folder.cpp
+    src/model/remote_folder_info.cpp
     src/model/unknown_folder.cpp
     src/net/acceptor_actor.cpp
     src/net/cluster_supervisor.cpp

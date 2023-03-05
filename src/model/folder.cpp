@@ -54,8 +54,8 @@ std::string folder_t::serialize() noexcept {
     return r.SerializeAsString();
 }
 
-bool folder_t::is_shared_with(const model::device_t &device) const noexcept {
-    return (bool)folder_infos.by_device_id(device.device_id().get_sha256());
+auto folder_t::is_shared_with(const model::device_t &device) const noexcept -> folder_info_ptr_t {
+    return folder_infos.by_device_id(device.device_id().get_sha256());
 }
 
 std::optional<proto::Folder> folder_t::generate(const model::device_t &device) const noexcept {

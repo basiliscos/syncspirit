@@ -19,10 +19,6 @@ void file_iterator_t::append(file_info_t &file) noexcept {
 
     auto &folder_infos = file.get_folder_info()->get_folder()->get_folder_infos();
     auto local_folder = folder_infos.by_device(cluster.get_device());
-    auto zzz = folder_infos.by_device(peer)->get_file_infos().by_name(".thumbnails/.thumbdata3--1967290299");
-    if (zzz) {
-        printf("here!");
-    }
 
     auto local_file = local_folder->get_file_infos().by_name(file.get_name());
     if (!local_file) {

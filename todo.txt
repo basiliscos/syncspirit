@@ -1,6 +1,6 @@
 updates_streamer
- - local_update_t, clone_file_t
-
+  - local_update_t, clone_file_t
+  - remote_folder_info
 
 ===========
 5. разобраться с лог-левелами?

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -31,6 +31,7 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     unknown_folders_t new_unknown_folders;
     modified_folders_t reset_folders;
     modified_folders_t updated_folders;
+    modified_folders_t remote_folders;
     std::string source_device;
     keys_t removed_folders;
     keys_t removed_files;
@@ -40,7 +41,7 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
 
   private:
     cluster_update_t(const model::device_t &source, unknown_folders_t unknown_folders, modified_folders_t reset_folders,
-                     modified_folders_t updated_folders, keys_t removed_blocks,
+                     modified_folders_t updated_folders, modified_folders_t remote_folders, keys_t removed_blocks,
                      keys_t removed_unknown_folders) noexcept;
 };
 
