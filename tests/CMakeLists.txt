@@ -134,6 +134,10 @@ add_executable(053-scan_task 053-scan_task.cpp $<$<PLATFORM_ID:Windows>:win32-re
 target_link_libraries(053-scan_task syncspirit_test_lib)
 add_test(053-scan_task "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/053-scan_task")
 
+add_executable(054-updates_streamer 054-updates_streamer.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(054-updates_streamer syncspirit_test_lib)
+add_test(054-updates_streamer "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/054-updates_streamer")
+
 add_executable(060-bep 060-bep.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(060-bep syncspirit_test_lib)
 add_test(060-bep "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/060-bep")

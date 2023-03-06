@@ -22,10 +22,36 @@ updates_streamer_t::updates_streamer_t(cluster_t &cluster, device_t &device) noe
     prepare();
 }
 
-updates_streamer_t::operator bool() const noexcept {
-    if (folders_queue.empty()) {
-    }
-    return false;
+updates_streamer_t::operator bool() const noexcept { return !files_queue.empty() || !folders_queue.empty(); }
+
+auto updates_streamer_t::next() noexcept -> file_info_ptr_t {
+    auto &by_sequence = files_queue.template get<1>();
+    auto it = by_sequence.begin();
+    auto r = *it;
+    by_sequence.erase(it);
+    prepare();
+    return r;
 }
 
-void updates_streamer_t::prepare() noexcept {}
+void updates_streamer_t::prepare() noexcept {
+    if (!files_queue.empty()) {
+        return;
+    }
+    if (folders_queue.empty()) {
+        return;
+    }
+    auto it = folders_queue.begin();
+    auto remote_folder = *it;
+    folders_queue.erase(it);
+    auto local_folder = remote_folder->get_local();
+    auto &files = local_folder->get_file_infos();
+    auto sequence_threshold =
+        remote_folder->get_index() == local_folder->get_index() ? remote_folder->get_max_sequence() : 0;
+
+    for (auto fi : files) {
+        auto &file = fi.item;
+        if (file->get_sequence() > sequence_threshold) {
+            files_queue.emplace(file);
+        }
+    }
+}

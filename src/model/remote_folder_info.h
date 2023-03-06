@@ -23,6 +23,9 @@ using device_ptr_t = intrusive_ptr_t<device_t>;
 struct remote_folder_info_t;
 using remote_folder_info_t_ptr_t = intrusive_ptr_t<remote_folder_info_t>;
 
+struct folder_info_t;
+using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
+
 struct SYNCSPIRIT_API remote_folder_info_t final : arc_base_t<remote_folder_info_t> {
 
     static outcome::result<remote_folder_info_t_ptr_t> create(const proto::Device &folder, const device_ptr_t &device_,
@@ -33,6 +36,8 @@ struct SYNCSPIRIT_API remote_folder_info_t final : arc_base_t<remote_folder_info
     inline std::uint64_t get_index() const noexcept { return index_id; }
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
     bool needs_update() const noexcept;
+
+    folder_info_ptr_t get_local() const noexcept;
 
   private:
     remote_folder_info_t(const proto::Device &folder, const device_ptr_t &device_,
