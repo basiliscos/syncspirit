@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "uri.h"
 #include <charconv>
@@ -39,7 +39,6 @@ boost::optional<URI> parse(const boost::string_view &uri) {
     for (auto p = obj.pathHead; p; p = p->next) {
         path += std::string("/") + std::string(p->text.first, p->text.afterLast);
     }
-    auto p = obj.pathHead;
 
     return result_t{URI{
         std::string(uri),                                        // full

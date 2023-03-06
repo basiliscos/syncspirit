@@ -238,7 +238,6 @@ void global_discovery_actor_t::shutdown_start() noexcept {
 auto global_discovery_actor_t::operator()(const model::diff::modify::update_contact_t &diff) noexcept
     -> outcome::result<void> {
     if (diff.self && state == r::state_t::OPERATIONAL) {
-        auto &uris = diff.uris;
         if (resources->has(resource::timer)) {
             cancel_timer(*timer_request);
         }

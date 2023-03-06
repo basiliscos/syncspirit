@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "bep_support.h"
 #include "constants.h"
@@ -107,7 +107,7 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
     } else {
         auto ptr_16 = reinterpret_cast<const std::uint16_t *>(buff.data());
         auto header_sz = be::big_to_native(*ptr_16++);
-        if (2 + header_sz > sz)
+        if (2 + header_sz > (int)sz)
             return wrap(message::message_t(), 0u);
         proto::Header header;
         if (!header.ParseFromArray(ptr_16, header_sz)) {
@@ -215,7 +215,7 @@ outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff
     if (!msg->ParseFromArray(ptr_32, sz - 4)) {
         return make_error_code(utils::bep_error_code_t::protobuf_err);
     }
-    return std::move(msg);
+    return msg;
 }
 
 template <typename Message>

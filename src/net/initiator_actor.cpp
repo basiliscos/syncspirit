@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+
 #include "initiator_actor.h"
 #include "constants.h"
 #include "names.h"
@@ -273,8 +276,9 @@ void initiator_actor_t::on_connect(resolve_it_t) noexcept {
               (void *)transport.get());
     resources->release(resource::connect);
     // auto do_handshake = role == role_t::active;
-    auto do_handshake = (role == role_t::active) &&
-                        (active_uri && (active_uri->proto == "relay" && relaying) || active_uri->proto == "tcp");
+    auto do_handshake =
+        (role == role_t::active) &&
+        (active_uri && ((((active_uri->proto == "relay") && relaying)) || (active_uri->proto == "tcp")));
     if (do_handshake) {
         initiate_handshake();
     } else {

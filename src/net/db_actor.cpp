@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "db_actor.h"
 #include "names.h"
@@ -253,7 +253,7 @@ void db_actor_t::on_model_update(model::message::model_update_t &message) noexce
     }
 }
 
-auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }

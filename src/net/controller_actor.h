@@ -141,7 +141,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     model::ignored_folders_map_t *ignored_folders;
     peers_map_t peers_map;
     // generic
-    std::uint_fast32_t blocks_requested = 0;
+    std::uint_fast32_t blocks_requested;
     uint32_t outgoing_buffer;
     uint32_t outgoing_buffer_max;
 

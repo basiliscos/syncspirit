@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -18,10 +18,10 @@ struct SYNCSPIRIT_API update_contact_t final : contact_diff_t {
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(contact_visitor_t &) const noexcept override;
 
-    bool self = false;
-    bool known = false;
     model::device_id_t device;
     utils::uri_container_t uris;
+    bool known;
+    bool self;
 };
 
 } // namespace syncspirit::model::diff::modify

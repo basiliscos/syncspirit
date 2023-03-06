@@ -144,7 +144,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
 
     virtual void main() noexcept {}
 
-    virtual std::string generate_public_relays(const asio::ip::tcp::endpoint &endpoint,
+    virtual std::string generate_public_relays(const asio::ip::tcp::endpoint &,
                                                model::device_ptr_t &relay_device) noexcept {
         std::string pattern = R""(
     {

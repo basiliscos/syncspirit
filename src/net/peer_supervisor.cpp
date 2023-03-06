@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "peer_supervisor.h"
 #include "peer_actor.h"
@@ -47,7 +47,6 @@ void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     using namespace model::diff;
-    auto &peer_addr = actor->get_address();
     auto &reason = actor->get_shutdown_reason();
     LOG_TRACE(log, "{}, on_child_shutdown, {} due to {} ", identity, actor->get_identity(), reason->message());
     parent_t::on_child_shutdown(actor);

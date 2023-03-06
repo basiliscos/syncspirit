@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "folder_info.h"
 #include "file_info.h"
@@ -179,7 +179,7 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
 outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
     size_t count = 0;
     if (!block_count && !(flags & f_deleted) && !(flags & f_invalid)) {
-        if ((size < block_size) && (size >= fs::block_sizes[0])) {
+        if ((size < block_size) && (size >= (int64_t)fs::block_sizes[0])) {
             return make_error_code(error_code_t::invalid_block_size);
         }
         if (size) {
@@ -187,7 +187,7 @@ outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
                 return make_error_code(error_code_t::invalid_block_size);
             }
             count = size / block_size;
-            if (block_size * count != size) {
+            if ((int64_t)(block_size * count) != size) {
                 ++count;
             }
         }
@@ -308,12 +308,12 @@ void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t inde
 }
 
 bool file_info_t::check_consistency() noexcept {
-    uint64_t sz = 0;
+    int64_t sz = 0;
     for (auto &b : blocks) {
         if (!b) {
             return false;
         }
-        sz += b->get_size();
+        sz += (int64_t)b->get_size();
     }
     return size == sz;
 }

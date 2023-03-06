@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023 Ivan Baidakou
 
 #include "relay_support.h"
 #include "utils/error_code.h"
@@ -173,11 +173,11 @@ size_t serialize(const message_t &msg, std::string &out) noexcept {
         msg);
 }
 
-static parse_result_t parse_ping(std::string_view data) noexcept { return wrapped_message_t{header_sz, ping_t{}}; }
+static parse_result_t parse_ping(std::string_view) noexcept { return wrapped_message_t{header_sz, ping_t{}}; }
 
-static parse_result_t parse_pong(std::string_view data) noexcept { return wrapped_message_t{header_sz, pong_t{}}; }
+static parse_result_t parse_pong(std::string_view) noexcept { return wrapped_message_t{header_sz, pong_t{}}; }
 
-static parse_result_t parse_join_relay_request(std::string_view data) noexcept {
+static parse_result_t parse_join_relay_request(std::string_view) noexcept {
     return wrapped_message_t{header_sz, join_relay_request_t{}};
 }
 
@@ -432,7 +432,7 @@ outcome::result<relay_infos_t> parse_endpoint(std::string_view buff) noexcept {
                                                        ping_interval}};
         r.emplace_back(std::move(relay));
     }
-    return std::move(r);
+    return r;
 }
 
 } // namespace syncspirit::proto::relay

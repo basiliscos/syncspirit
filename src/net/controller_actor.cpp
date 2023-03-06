@@ -27,9 +27,9 @@ r::plugin::resource_id_t hash = 1;
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer}, peer_addr{config.peer_addr},
-      request_timeout{config.request_timeout}, request_pool{config.request_pool}, blocks_requested{0},
-      outgoing_buffer{0}, outgoing_buffer_max{config.outgoing_buffer_max}, blocks_max_requested{
-                                                                               config.blocks_max_requested} {
+      request_timeout{config.request_timeout}, blocks_requested{0}, outgoing_buffer{0},
+      outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
+      blocks_max_requested{config.blocks_max_requested} {
     log = utils::get_logger("net.controller_actor");
 }
 
@@ -155,7 +155,7 @@ model::file_block_t controller_actor_t::next_block(bool reset) noexcept {
     return {};
 }
 
-void controller_actor_t::on_pull_ready(message::pull_signal_t &message) noexcept {
+void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
     LOG_TRACE(log, "{}, on_pull_ready, blocks requested = {}", identity, blocks_requested);
     bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
                   || (state != r::state_t::OPERATIONAL) // wrequest pool sz = 32505856e are shutting down
@@ -343,9 +343,9 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
     send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 
-void controller_actor_t::on_message(proto::message::Request &message) noexcept { std::abort(); }
+void controller_actor_t::on_message(proto::message::Request &) noexcept { std::abort(); }
 
-void controller_actor_t::on_message(proto::message::DownloadProgress &message) noexcept { std::abort(); }
+void controller_actor_t::on_message(proto::message::DownloadProgress &) noexcept { std::abort(); }
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     --blocks_requested;
@@ -356,7 +356,6 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     }
 
     auto &payload = message.payload.req->payload.request_payload;
-    auto &file = payload.file;
     auto &file_block = payload.block;
     auto &block = *file_block.block();
     auto hash = std::string(file_block.block()->get_hash());
@@ -376,7 +375,6 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     auto &payload = block_res->payload.req->payload.request_payload;
     auto &file = payload.file;
     auto &path = file->get_path();
-    auto block = payload.block.block();
 
     if (ee) {
         LOG_WARN(log, "{}, on_validation failed : {}", identity, ee->message());

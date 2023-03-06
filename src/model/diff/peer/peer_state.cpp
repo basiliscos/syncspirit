@@ -16,7 +16,6 @@ peer_state_t::peer_state_t(cluster_t &cluster, std::string_view peer_id_, const 
 }
 
 auto peer_state_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    using State = model::device_state_t;
     if (known) {
         auto peer = cluster.get_devices().by_sha256(peer_id);
         peer->update_state(state);

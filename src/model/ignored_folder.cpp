@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "folder.h"
 #include "ignored_folder.h"
@@ -59,7 +59,6 @@ std::string_view ignored_folder_t::get_id() const noexcept { return std::string_
 std::string_view ignored_folder_t::get_label() const noexcept { return label; }
 
 std::string ignored_folder_t::serialize() noexcept {
-    char c = prefix;
     db::IgnoredFolder r;
     r.set_label(label);
     return r.SerializeAsString();

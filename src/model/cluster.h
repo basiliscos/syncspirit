@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -52,10 +52,10 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     using uuid_generator_t = boost::uuids::basic_random_generator<rng_engine_t>;
     using uint64_generator_t = std::uniform_int_distribution<uint64_t>;
 
+    device_ptr_t device;
     rng_engine_t rng_engine;
     uuid_generator_t uuid_generator;
     uint64_generator_t uint64_generator;
-    device_ptr_t device;
     folders_map_t folders;
     block_infos_map_t blocks;
     devices_map_t devices;
