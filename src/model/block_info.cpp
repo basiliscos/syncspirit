@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "block_info.h"
 #include "file_info.h"
@@ -72,7 +72,7 @@ void block_info_t::link(file_info_t *file_info, size_t block_index) noexcept {
     file_blocks.emplace_back(this, file_info, block_index);
 }
 
-auto block_info_t::unlink(file_info_t *file_info, bool deletion) noexcept -> removed_incides_t {
+auto block_info_t::unlink(file_info_t *file_info) noexcept -> removed_incides_t {
     removed_incides_t r;
     for (auto it = file_blocks.begin(); it != file_blocks.end();) {
         auto &fb = *it;

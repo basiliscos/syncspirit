@@ -330,7 +330,7 @@ void file_info_t::remove_block(block_info_ptr_t &block) noexcept {
     if (!block) {
         return;
     }
-    auto indices = block->unlink(this, true);
+    auto indices = block->unlink(this);
     for (auto i : indices) {
         blocks[i] = nullptr;
     }
