@@ -35,4 +35,81 @@ TEST_CASE("updates_streamer", "[model]") {
 
     diff = diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id()));
     REQUIRE(diff->apply(*cluster));
+
+    auto add_remote = [&](std::uint64_t index, std::int64_t sequence) {
+        auto pr_device = proto::Device();
+        pr_device.set_id(std::string(my_id.get_sha256()));
+        pr_device.set_index_id(index);
+        pr_device.set_max_sequence(sequence);
+        auto remote_folder = remote_folder_info_t::create(pr_device, peer_device, folder).value();
+        peer_device->get_remote_folder_infos().put(remote_folder);
+    };
+
+    SECTION("trivial") {
+        SECTION("trivial, no files") {
+            auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+            REQUIRE(!streamer);
+        }
+
+        add_remote(0, 0);
+
+        SECTION("trivial, no files (2)") {
+            auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+            REQUIRE(!streamer);
+        }
+    }
+
+    auto my_folder = folder->get_folder_infos().by_device(my_device);
+    auto &my_files = my_folder->get_file_infos();
+
+    int seq = 1;
+    auto add_file = [&](const char *name) {
+        auto pr_file = proto::FileInfo();
+        pr_file.set_name(name);
+        pr_file.set_sequence(seq++);
+        auto f = file_info_t::create(cluster->next_uuid(), pr_file, my_folder).value();
+        my_files.put(f);
+        my_folder->set_max_sequence(f->get_sequence());
+        return f;
+    };
+
+    SECTION("2 files, index mismatch") {
+        SECTION("zero sequence") { add_remote(0, 0); }
+        SECTION("non-zero sequence") { add_remote(0, seq + 100); }
+
+        auto f1 = add_file("a.txt");
+        auto f2 = add_file("b.txt");
+
+        auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+        REQUIRE(streamer);
+        CHECK(streamer.next() == f1);
+
+        REQUIRE(streamer);
+        CHECK(streamer.next() == f2);
+
+        REQUIRE(!streamer);
+    }
+
+    SECTION("2 files, index matches, sequence greater") {
+        auto f1 = add_file("a.txt");
+        auto f2 = add_file("b.txt");
+
+        add_remote(my_folder->get_index(), f2->get_sequence());
+
+        auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+        REQUIRE(!streamer);
+    }
+
+    SECTION("2 files, index matches, sequence greater") {
+        auto f1 = add_file("a.txt");
+        auto f2 = add_file("b.txt");
+
+        add_remote(my_folder->get_index(), f1->get_sequence());
+
+        auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+        REQUIRE(streamer);
+        CHECK(streamer.next() == f2);
+        REQUIRE(!streamer);
+    }
+
 }

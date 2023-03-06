@@ -34,24 +34,26 @@ auto updates_streamer_t::next() noexcept -> file_info_ptr_t {
 }
 
 void updates_streamer_t::prepare() noexcept {
-    if (!files_queue.empty()) {
-        return;
-    }
-    if (folders_queue.empty()) {
-        return;
-    }
-    auto it = folders_queue.begin();
-    auto remote_folder = *it;
-    folders_queue.erase(it);
-    auto local_folder = remote_folder->get_local();
-    auto &files = local_folder->get_file_infos();
-    auto sequence_threshold =
-        remote_folder->get_index() == local_folder->get_index() ? remote_folder->get_max_sequence() : 0;
+    while (true) {
+        if (!files_queue.empty()) {
+            return;
+        }
+        if (folders_queue.empty()) {
+            return;
+        }
+        auto it = folders_queue.begin();
+        auto remote_folder = *it;
+        folders_queue.erase(it);
+        auto local_folder = remote_folder->get_local();
+        auto &files = local_folder->get_file_infos();
+        auto sequence_threshold =
+            remote_folder->get_index() == local_folder->get_index() ? remote_folder->get_max_sequence() : 0;
 
-    for (auto fi : files) {
-        auto &file = fi.item;
-        if (file->get_sequence() > sequence_threshold) {
-            files_queue.emplace(file);
+        for (auto fi : files) {
+            auto &file = fi.item;
+            if (file->get_sequence() > sequence_threshold) {
+                files_queue.emplace(file);
+            }
         }
     }
 }
