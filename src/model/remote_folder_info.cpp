@@ -21,8 +21,8 @@ bool remote_folder_info_t::needs_update() const noexcept {
     return (local->get_index() != index_id) || local->get_max_sequence() > max_sequence;
 }
 
-remote_folder_info_t_ptr_t remote_folder_infos_map_t::by_folder(const folder_ptr_t &folder) const noexcept {
-    return get<0>(folder->get_id());
+remote_folder_info_t_ptr_t remote_folder_infos_map_t::by_folder(const folder_t &folder) const noexcept {
+    return get<0>(folder.get_id());
 }
 
 auto remote_folder_info_t::get_local() const noexcept -> folder_info_ptr_t {

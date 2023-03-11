@@ -50,7 +50,7 @@ struct SYNCSPIRIT_API remote_folder_info_t final : arc_base_t<remote_folder_info
 };
 
 struct SYNCSPIRIT_API remote_folder_infos_map_t : public generic_map_t<remote_folder_info_t_ptr_t, 1> {
-    remote_folder_info_t_ptr_t by_folder(const folder_ptr_t &folder) const noexcept;
+    remote_folder_info_t_ptr_t by_folder(const folder_t &folder) const noexcept;
 };
 
 } // namespace syncspirit::model

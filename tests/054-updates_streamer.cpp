@@ -112,4 +112,34 @@ TEST_CASE("updates_streamer", "[model]") {
         REQUIRE(!streamer);
     }
 
+    SECTION("1 file, streamer is updated lazily") {
+        add_remote(0, seq);
+
+        auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+        REQUIRE(!streamer);
+
+        auto f1 = add_file("a.txt");
+        streamer.on_update(*f1);
+        CHECK(streamer.next() == f1);
+
+        REQUIRE(!streamer);
+    }
+
+    SECTION("2 files, streamer is updated") {
+        add_remote(0, seq + 100);
+
+        auto f1 = add_file("a.txt");
+        auto f2 = add_file("b.txt");
+
+        auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+        REQUIRE(streamer);
+
+        f1->set_sequence(++seq);
+        my_folder->set_max_sequence(seq);
+        streamer.on_update(*f1);
+
+        REQUIRE(streamer.next() == f2);
+        REQUIRE(streamer.next() == f1);
+        REQUIRE(!streamer);
+    }
 }

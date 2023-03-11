@@ -568,7 +568,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
     auto opt = diff_opt.value()->apply(*cluster);
     REQUIRE(opt);
 
-    auto remote_folder = peer_device->get_remote_folder_infos().by_folder(folder);
+    auto remote_folder = peer_device->get_remote_folder_infos().by_folder(*folder);
     REQUIRE(remote_folder);
     CHECK(remote_folder->get_index() == 5ul);
     CHECK(remote_folder->get_max_sequence() == 3);

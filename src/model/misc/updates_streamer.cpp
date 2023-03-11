@@ -13,7 +13,7 @@ updates_streamer_t::updates_streamer_t(cluster_t &cluster, device_t &device) noe
         auto &folder = it.item;
         auto folder_info = folder->is_shared_with(device);
         if (folder_info) {
-            auto remote_folder = remote_folders.by_folder(folder);
+            auto remote_folder = remote_folders.by_folder(*folder);
             if (remote_folder && remote_folder->needs_update()) {
                 folders_queue.insert(remote_folder);
             }
@@ -56,4 +56,26 @@ void updates_streamer_t::prepare() noexcept {
             }
         }
     }
+}
+
+void updates_streamer_t::on_update(file_info_t &file) noexcept {
+    auto folder = file.get_folder_info()->get_folder();
+    auto remote_folder = peer->get_remote_folder_infos().by_folder(*folder);
+    if (!remote_folder) {
+        return;
+    }
+
+    if (folders_queue.count(remote_folder)) {
+        return;
+    }
+
+    if (files_queue.empty()) {
+        folders_queue.insert(remote_folder);
+        return prepare();
+    }
+
+    auto &by_uuid = files_queue.template get<0>();
+    auto it = by_uuid.find(file.get_uuid());
+    by_uuid.erase(it);
+    files_queue.emplace(&file);
 }
