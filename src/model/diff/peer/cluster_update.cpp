@@ -101,7 +101,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                 for (auto it : files) {
                     auto key = std::string(it.item->get_key());
                     removed_files_final.emplace(key);
-                    removed_files.put(key);
+                    removed_files.put(std::move(key));
                 }
                 for (auto it : files) {
                     remove_blocks(it.item);

@@ -7,8 +7,10 @@
 #include "model/messages.h"
 #include "model/diff/contact_visitor.h"
 #include "utils/log.h"
+#include "utils/string_comparator.hpp"
 #include <boost/asio.hpp>
 #include <optional>
+#include <set>
 #include <unordered_set>
 
 namespace syncspirit {
@@ -73,7 +75,7 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
 
   private:
     using rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
-    using discovering_devices_t = std::unordered_set<std::string>;
+    using discovering_devices_t = std::set<std::string, utils::string_comparator_t>;
     using uris_t = std::unordered_set<std::string>;
 
     void announce() noexcept;

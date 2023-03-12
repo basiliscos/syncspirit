@@ -144,7 +144,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     auto &custom = message.payload.req->payload.request_payload->custom;
     auto msg = static_cast<message::discovery_notify_t *>(custom.get());
     auto &device_id = msg->payload.device_id;
-    auto sha256 = std::string(device_id.get_sha256());
+    auto sha256 = device_id.get_sha256();
     auto it = discovering_devices.find(sha256);
     discovering_devices.erase(it);
 
@@ -177,7 +177,7 @@ void global_discovery_actor_t::on_discovery(message::discovery_notify_t &req) no
     LOG_TRACE(log, "{}, on_discovery", identity);
 
     auto &device_id = req.payload.device_id;
-    auto sha256 = std::string(device_id.get_sha256());
+    auto sha256 = device_id.get_sha256();
     if (discovering_devices.count(sha256)) {
         LOG_TRACE(log, "{}, device '{}' is already discovering, skip", identity, device_id.get_short());
         return;
@@ -190,7 +190,7 @@ void global_discovery_actor_t::on_discovery(message::discovery_notify_t &req) no
         return do_shutdown(make_error(r.error()));
     }
 
-    discovering_devices.emplace(std::move(sha256));
+    discovering_devices.emplace(sha256);
     make_request(addr_discovery, r.value(), std::move(tx_buff), &req);
 }
 
