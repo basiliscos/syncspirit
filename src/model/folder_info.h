@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include "device.h"
 #include "file_info.h"
 #include "misc/local_file.h"
@@ -44,6 +45,7 @@ struct SYNCSPIRIT_API folder_info_t final : arc_base_t<folder_info_t> {
     void set_max_sequence(std::int64_t value) noexcept;
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
     bool is_actual() noexcept;
+    std::optional<proto::Index> generate() noexcept;
 
   private:
     folder_info_t(std::string_view key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;

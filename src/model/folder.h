@@ -48,7 +48,6 @@ struct SYNCSPIRIT_API folder_t final : arc_base_t<folder_t>, folder_data_t {
     using folder_data_t::get_path;
     void update(local_file_map_t &local_files) noexcept;
     std::optional<proto::Folder> generate(const model::device_t &device) const noexcept;
-    proto::Index generate() noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;

@@ -8,6 +8,8 @@
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/string_map.hpp"
 #include "model/misc/error_code.h"
+#include "utils/format.hpp"
+#include <spdlog/fmt/bin_to_hex.h>
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::model::diff::peer;
@@ -15,6 +17,7 @@ using namespace syncspirit::model::diff::peer;
 auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, const message_t &message) noexcept
     -> outcome::result<cluster_diff_ptr_t> {
     auto ptr = cluster_diff_ptr_t();
+    auto log = get_log();
 
     auto &known_unknowns = cluster.get_unknown_folders();
     unknown_folders_t unknown;
@@ -48,6 +51,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     for (int i = 0; i < message.folders_size(); ++i) {
         auto &f = message.folders(i);
         auto folder = folders.by_id(f.id());
+        LOG_TRACE(log, "cluster_update_t, folder = '{}'", f.label());
         if (!folder) {
             for (int i = 0; i < f.devices_size(); ++i) {
                 auto &d = f.devices(i);
@@ -59,11 +63,13 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                             if (!actual) {
                                 removed_unknown_folders.emplace(std::string(uf->get_key()));
                                 unknown.emplace_back(f);
+                                LOG_TRACE(log, "cluster_update_t, unknown folder = {}", f.label());
                             }
                         }
                         goto NEXT_FOLDER;
                     }
                     unknown.emplace_back(f);
+                    LOG_TRACE(log, "cluster_update_t, unknown folder = {}", f.label());
                     goto NEXT_FOLDER;
                 }
             }
@@ -75,12 +81,24 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
             auto &d = f.devices(j);
             auto device_sha = d.id();
             auto device = devices.by_sha256(device_sha);
+            auto device_opt = model::device_id_t::from_sha256(device_sha);
+            if (!device_opt) {
+                auto device_hex = spdlog::to_hex(device_sha.begin(), device_sha.end());
+                LOG_WARN(log, "cluster_update_t, malformed device id: {}", device_hex);
+                continue;
+            }
+            auto &device_id = *device_opt;
+            LOG_TRACE(log, "cluster_update_t, shared with device = '{}', index = {}, max seq. = {}", device_id,
+                      d.index_id(), d.max_sequence());
+
             if (!device) {
+                LOG_TRACE(log, "cluster_update_t, unknown device, ignoring");
                 continue;
             }
             if (device != &source) {
                 auto info = update_info_t{f.id(), d};
                 remote.emplace_back(std::move(info));
+                LOG_TRACE(log, "cluster_update_t, remote folder = {}", f.label());
                 continue;
             }
 
@@ -88,7 +106,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
             auto folder_info = folder_infos.by_device(*device);
             if (!folder_info) {
                 auto log = get_log();
-                LOG_WARN(log, "folder {} was not shared with a peer {}", folder->get_label(), device->device_id());
+                LOG_WARN(log, "folder '{}' was not shared with a peer '{}'", folder->get_label(), device->device_id());
                 return make_error_code(error_code_t::folder_is_not_shared);
             }
             checked_folders.emplace(folder_info->get_key());
@@ -107,6 +125,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                     remove_blocks(it.item);
                 }
             } else if (d.max_sequence() > folder_info->get_max_sequence()) {
+                LOG_TRACE(log, "cluster_update_t, updated folder = {}", f.label());
                 updated.emplace_back(update_info);
             }
         }

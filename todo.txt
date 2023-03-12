@@ -1,6 +1,18 @@
-updates_streamer
-  - local_update_t, clone_file_t
-  - remote_folder_info
+unit test:
+
+-- unit test: sending Index + IndexUpdate
+-- unit test: do not send Index, when there is no need
+-- unit test: send Index, when sequence mismatch
+
+-- ?
+[2023-03-12 17:48:52.789] [D/11137] 4QDTFOA/tcp/192.168.100.42:22000, read_controlled, std::unique_ptr<syncspirit::proto::ClusterConfig, std::default_delete<syncspirit::proto::ClusterConfig> >
+[2023-03-12 17:48:52.789] [T/11137] 4QDTFOA/tcp/192.168.100.42:22000, read_more
+[2023-03-12 17:48:52.789] [T/11137] 4QDTFOA/tcp/192.168.100.42:22000, on_read,  rx_idx = 0
+[2023-03-12 17:48:52.789] [D/11137] controller/4QDTFOA, on_message (ClusterConfig)
+[2023-03-12 17:48:52.789] [T/11137] cluster_update_t, remote folder = trivial-folder
+[2023-03-12 17:48:52.789] [W/11137] folder trivial-folder was not shared with a peer true
+[2023-03-12 17:48:52.789] [E/11137] controller/4QDTFOA, error processing message from true : folder is not shared (32)
+[2023-03-12 17:48:52.789] [T/11137] controller/4QDTFOA, shutdown_start
 
 ===========
 5. разобраться с лог-левелами?

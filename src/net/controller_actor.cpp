@@ -119,6 +119,7 @@ void controller_actor_t::on_transfer_pop(message::transfer_pop_t &message) noexc
     assert(outgoing_buffer >= sz);
     outgoing_buffer -= sz;
     LOG_TRACE(log, "{}, on_transfer_pop, sz = {} (-{})", identity, outgoing_buffer, sz);
+    push_pending();
 }
 
 void controller_actor_t::on_termination(message::termination_signal_t &message) noexcept {
@@ -132,6 +133,26 @@ void controller_actor_t::on_termination(message::termination_signal_t &message) 
 }
 
 void controller_actor_t::pull_ready() noexcept { send<payload::pull_signal_t>(get_address()); }
+
+void controller_actor_t::push_pending() noexcept {
+    while (outgoing_buffer < outgoing_buffer_max) {
+        if (updates_streamer) {
+            auto file_info = updates_streamer.next();
+            auto index_update = proto::IndexUpdate();
+            auto folder_id = file_info->get_folder_info()->get_folder()->get_id();
+            index_update.set_folder(std::string(folder_id));
+            *index_update.add_files() = file_info->as_proto(true);
+            fmt::memory_buffer data;
+            proto::serialize(data, index_update);
+            outgoing_buffer += static_cast<uint32_t>(data.size());
+            send<payload::transfer_data_t>(peer_addr, std::move(data));
+            LOG_TRACE(log, "{}, pushing index update for: {}, seq = {}", identity, file_info->get_full_name(),
+                      file_info->get_sequence());
+            continue;
+        }
+        break;
+    }
+}
 
 model::file_info_ptr_t controller_actor_t::next_file(bool reset) noexcept {
     if (reset) {
@@ -241,7 +262,31 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
             return do_shutdown(ee);
         }
         pull_ready();
+        // TODO: this should not depend on (message.payload.custom == this)
+        push_pending();
     }
+}
+auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &) noexcept -> outcome::result<void> {
+
+    for (auto it : cluster->get_folders()) {
+        auto &folder = *it.item;
+        auto folder_info = folder.is_shared_with(*peer);
+        if (folder_info) {
+            auto index_opt = folder_info->generate();
+            if (index_opt) {
+                LOG_DEBUG(log, "{}, sending new index", identity);
+                auto index = *index_opt;
+                fmt::memory_buffer data;
+                proto::serialize(data, index);
+                outgoing_buffer += static_cast<uint32_t>(data.size());
+                send<payload::transfer_data_t>(peer_addr, std::move(data));
+            }
+        }
+    }
+    updates_streamer = model::updates_streamer_t(*cluster, *peer);
+    push_pending();
+
+    return outcome::success();
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexcept -> outcome::result<void> {
@@ -264,6 +309,7 @@ auto controller_actor_t::operator()(const model::diff::modify::finish_file_t &di
     auto update = model::diff::cluster_diff_ptr_t{};
     update = new model::diff::modify::flush_file_t(*file);
     send<model::payload::model_update_t>(coordinator, std::move(update), this);
+    updates_streamer.on_update(*file);
     return outcome::success();
 }
 

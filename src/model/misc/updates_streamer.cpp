@@ -22,6 +22,13 @@ updates_streamer_t::updates_streamer_t(cluster_t &cluster, device_t &device) noe
     prepare();
 }
 
+updates_streamer_t &updates_streamer_t::operator=(updates_streamer_t &&other) noexcept {
+    peer = std::move(other.peer);
+    folders_queue = std::move(other.folders_queue);
+    files_queue = std::move(other.files_queue);
+    return *this;
+}
+
 updates_streamer_t::operator bool() const noexcept { return !files_queue.empty() || !folders_queue.empty(); }
 
 auto updates_streamer_t::next() noexcept -> file_info_ptr_t {

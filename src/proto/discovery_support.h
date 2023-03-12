@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 #include "utils/uri.h"
 #include "model/device_id.h"
 #include "syncspirit-export.h"
-#include <fmt/core.h>
+#include <spdlog/fmt/fmt.h>
 #include <string>
 #include <vector>
 #include <boost/outcome.hpp>

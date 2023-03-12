@@ -5,8 +5,9 @@
 #include "db/utils.h"
 #include "db/prefix.h"
 #include "structs.pb.h"
-#include <spdlog/spdlog.h>
 #include "misc/error_code.h"
+#include "utils/format.hpp"
+#include <spdlog/spdlog.h>
 
 #ifdef uuid_t
 #undef uuid_t
@@ -86,8 +87,8 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
         pd.set_index_id(fi.get_index());
         pd.set_introducer(d.is_introducer());
         pd.set_skip_introduction_removals(d.get_skip_introduction_removals());
-        spdlog::trace("folder_t::get (==>), folder = {}/{:#x}, device = {}, max_seq = {}", label, fi.get_index(),
-                      d.device_id(), max_seq);
+        spdlog::trace("folder_t::generate (==>), folder = {} (index = {}), device = {}, max_seq = {}", label,
+                      fi.get_index(), d.device_id(), max_seq);
     }
     return r;
 }

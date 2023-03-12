@@ -117,6 +117,7 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
     outcome::result<void> fields_update(const db::FileInfo &) noexcept;
 
     file_info_ptr_t actualize() const noexcept;
+    proto::Index generate() noexcept;
 
   private:
     using marks_vector_t = std::vector<bool>;

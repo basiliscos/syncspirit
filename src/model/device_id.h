@@ -7,7 +7,6 @@
 #include "utils/tls.h"
 #include "syncspirit-export.h"
 #include "misc/arc.hpp"
-#include <spdlog/fmt/ostr.h>
 #include <optional>
 
 namespace syncspirit::model {
@@ -46,10 +45,6 @@ struct SYNCSPIRIT_API device_id_t {
     std::string_view get_short() const noexcept;
     std::string_view get_sha256() const noexcept { return std::string_view(hash + 1, digest_length); }
     std::string_view get_key() const noexcept { return std::string_view(hash, data_length); }
-
-    template <typename OStream> friend OStream &operator<<(OStream &os, const device_id_t &device_id) {
-        return os << device_id.get_short();
-    }
 
   private:
     device_id_t(const utils::cert_data_t &) noexcept;

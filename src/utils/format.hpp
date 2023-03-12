@@ -1,5 +1,6 @@
 #pragma once
 
+#include "model/device_id.h"
 #include <boost/asio/ip/basic_endpoint.hpp>
 #include <boost/filesystem/path.hpp>
 
@@ -34,5 +35,13 @@ template <typename T> struct fmt::formatter<boost::asio::ip::basic_endpoint<T>> 
 
     template <typename FormatContext> auto format(const EndPoint &p, FormatContext &ctx) const -> decltype(ctx.out()) {
         return fmt::format_to(ctx.out(), "{}:{}", p.address(), p.port());
+    }
+};
+
+template <> struct fmt::formatter<syncspirit::model::device_id_t> : fmt::formatter<std::string> {
+    using device_id_t = syncspirit::model::device_id_t;
+
+    auto format(const device_id_t &device_id, format_context &ctx) -> decltype(ctx.out()) {
+        return format_to(ctx.out(), "{}", device_id.get_short());
     }
 };

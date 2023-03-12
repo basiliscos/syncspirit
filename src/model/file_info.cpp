@@ -172,8 +172,16 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
 }
 
 proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
-    assert(!include_blocks && "TODO");
-    return as<proto::FileInfo>();
+    auto r = as<proto::FileInfo>();
+    if (include_blocks) {
+        size_t offset = 0;
+        for (auto &b : blocks) {
+            auto &block = *b;
+            *r.add_blocks() = block.as_bep(offset);
+            offset += block.get_size();
+        }
+    }
+    return r;
 }
 
 outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
