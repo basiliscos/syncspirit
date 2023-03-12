@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "http_actor.h"
 #include "../utils/error_code.h"
@@ -160,7 +160,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     }
 
     auto &addresses = res.payload.res->results;
-    transport::connect_fn_t on_connect = [&](auto arg) { this->on_connect(arg); };
+    transport::connect_fn_t on_connect = [&](const auto &arg) { this->on_connect(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     transport->async_connect(addresses, on_connect, on_error);
     resources->acquire(resource::io);
@@ -168,7 +168,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     resolved_url = payload->url;
 }
 
-void http_actor_t::on_connect(resolve_it_t) noexcept {
+void http_actor_t::on_connect(const tcp::endpoint &) noexcept {
     LOG_TRACE(log, "{}, on_connect", identity);
     resources->release(resource::io);
     if (!need_response || stop_io) {

@@ -233,7 +233,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
         auto &map = folder->get_folder_infos();
         REQUIRE(map.size() == 1);
         target = map.get(fi->get_uuid());
-        REQUIRE(map.by_device(my_device));
+        REQUIRE(map.by_device(*my_device));
     }
 
     REQUIRE(target);

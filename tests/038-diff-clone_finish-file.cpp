@@ -35,8 +35,8 @@ TEST_CASE("new file diff", "[model]") {
 
     auto &blocks_map = cluster->get_blocks();
     auto folder = cluster->get_folders().by_id(db_folder.id());
-    auto folder_my = folder->get_folder_infos().by_device(my_device);
-    auto folder_peer = folder->get_folder_infos().by_device(peer_device);
+    auto folder_my = folder->get_folder_infos().by_device(*my_device);
+    auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
 
     proto::FileInfo file_info;
     file_info.set_name("a.txt");

@@ -110,7 +110,7 @@ struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     void resolve(const utils::URI &uri) noexcept;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
-    void on_connect(resolve_it_t) noexcept;
+    void on_connect(const tcp::endpoint &) noexcept;
     void on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept;
     void on_handshake(bool valid_peer, utils::x509_t &peer_cert, const tcp::endpoint &peer_endpoint,
                       const model::device_id_t *peer_device) noexcept;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "finish_file.h"
 
@@ -19,7 +19,7 @@ finish_file_t::finish_file_t(const model::file_info_t &file) noexcept {
 
 auto finish_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(cluster.get_device());
+    auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
     auto &files = folder_info->get_file_infos();
     auto file = files.by_name(file_name);
     LOG_TRACE(log, "finish_file_t for {}", file->get_full_name());

@@ -333,13 +333,13 @@ void test_index() {
 
                 auto &folder_infos = folder_1->get_folder_infos();
 
-                auto folder_peer = folder_infos.by_device(peer_device);
+                auto folder_peer = folder_infos.by_device(*peer_device);
                 REQUIRE(folder_peer);
                 CHECK(folder_peer->get_max_sequence() == 10ul);
                 REQUIRE(folder_peer->get_file_infos().size() == 1);
                 CHECK(folder_peer->get_file_infos().begin()->item->get_name() == file->name());
 
-                auto folder_my = folder_infos.by_device(my_device);
+                auto folder_my = folder_infos.by_device(*my_device);
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
@@ -378,7 +378,7 @@ void test_downloading() {
         using fixture_t::fixture_t;
         void main(diff_builder_t &) noexcept override {
             auto &folder_infos = folder_1->get_folder_infos();
-            auto folder_my = folder_infos.by_device(my_device);
+            auto folder_my = folder_infos.by_device(*my_device);
 
             auto cc = proto::ClusterConfig{};
             auto folder = cc.add_folders();
@@ -409,7 +409,7 @@ void test_downloading() {
                 b1->set_offset(0);
                 b1->set_size(5);
 
-                auto folder_my = folder_infos.by_device(my_device);
+                auto folder_my = folder_infos.by_device(*my_device);
                 CHECK(folder_my->get_max_sequence() == 0ul);
 
                 peer_actor->forward(proto::message::Index(new proto::Index(index)));
@@ -445,7 +445,7 @@ void test_downloading() {
                 }
             }
             SECTION("cluster config is the same, but there are non-downloaded files") {
-                auto folder_peer = folder_infos.by_device(peer_device);
+                auto folder_peer = folder_infos.by_device(*peer_device);
 
                 auto pr_fi = proto::FileInfo{};
                 pr_fi.set_name("some-file");
@@ -485,7 +485,7 @@ void test_downloading() {
             }
 
             SECTION("don't attempt to download a file, which is deleted") {
-                auto folder_peer = folder_infos.by_device(peer_device);
+                auto folder_peer = folder_infos.by_device(*peer_device);
                 auto pr_fi = proto::FileInfo{};
                 pr_fi.set_name("some-file");
                 pr_fi.set_type(proto::FileInfoType::FILE);
@@ -562,7 +562,7 @@ void test_downloading() {
                 peer_actor->push_block("12345", 0);
                 sup->do_process();
 
-                auto folder_my = folder_infos.by_device(my_device);
+                auto folder_my = folder_infos.by_device(*my_device);
                 CHECK(folder_my->get_max_sequence() == 1);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
                 auto f = folder_my->get_file_infos().begin()->item;
@@ -593,7 +593,7 @@ void test_downloading() {
                 peer_actor->forward(proto::message::Index(new proto::Index(index)));
                 sup->do_process();
 
-                auto folder_my = folder_infos.by_device(my_device);
+                auto folder_my = folder_infos.by_device(*my_device);
                 CHECK(folder_my->get_max_sequence() == 1ul);
 
                 auto index_update = proto::IndexUpdate{};

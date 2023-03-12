@@ -248,7 +248,7 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
     auto folder_id = diff.folder_id;
     auto file_name = diff.file.name();
     auto folder = cluster->get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(peer);
+    auto folder_info = folder->get_folder_infos().by_device(*peer);
     auto file = folder_info->get_file_infos().by_name(file_name);
     file->locally_unlock();
     auto it = locally_locked_files.find(file);
@@ -258,7 +258,7 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
 
 auto controller_actor_t::operator()(const model::diff::modify::finish_file_t &diff) noexcept -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(peer);
+    auto folder_info = folder->get_folder_infos().by_device(*peer);
     auto file = folder_info->get_file_infos().by_name(diff.file_name);
     assert(file);
     auto update = model::diff::cluster_diff_ptr_t{};
@@ -271,7 +271,7 @@ auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff
     auto folder_id = diff.folder_id;
     auto file_name = diff.file_name;
     auto folder = cluster->get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(peer);
+    auto folder_info = folder->get_folder_infos().by_device(*peer);
     auto file = folder_info->get_file_infos().by_name(file_name);
     if (diff.locked) {
         locked_files.emplace(std::move(file));

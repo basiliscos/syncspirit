@@ -46,7 +46,7 @@ TEST_CASE("block iterator", "[model]") {
 
     auto folder = folders.by_id(db_folder.id());
     auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
-    auto my_folder = folder_infos.by_device(my_device);
+    auto my_folder = folder_infos.by_device(*my_device);
 
     auto pr_index = proto::Index();
     pr_index.set_folder(db_folder.id());

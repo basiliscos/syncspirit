@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "file_iterator.h"
 #include "../cluster.h"
@@ -18,7 +18,7 @@ void file_iterator_t::append(file_info_t &file) noexcept {
     }
 
     auto &folder_infos = file.get_folder_info()->get_folder()->get_folder_infos();
-    auto local_folder = folder_infos.by_device(cluster.get_device());
+    auto local_folder = folder_infos.by_device(*cluster.get_device());
 
     auto local_file = local_folder->get_file_infos().by_name(file.get_name());
     if (!local_file) {
@@ -49,11 +49,11 @@ void file_iterator_t::reset() noexcept {
     auto &folders = cluster.get_folders();
     for (auto &it : folders) {
         auto &folder = *it.item;
-        auto peer_folder = folder.get_folder_infos().by_device(peer);
+        auto peer_folder = folder.get_folder_infos().by_device(*peer);
         if (!peer_folder || !peer_folder->is_actual()) {
             continue;
         }
-        auto my_folder = folder.get_folder_infos().by_device(cluster.get_device());
+        auto my_folder = folder.get_folder_infos().by_device(*cluster.get_device());
         if (!my_folder) {
             continue;
         }

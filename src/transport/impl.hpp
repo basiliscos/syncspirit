@@ -18,7 +18,7 @@ using ssl_socket_t = ssl::stream<tcp::socket>;
 template <typename T> struct error_curry_t : model::arc_base_t<error_curry_t<T>> {
     using backend_ptr_t = model::intrusive_ptr_t<T>;
     error_curry_t(T &owner, error_fn_t &on_error) noexcept : backend{&owner}, on_error_fn{std::move(on_error)} {}
-    virtual ~error_curry_t(){};
+    virtual ~error_curry_t() = default;
 
     void error(const sys::error_code &ec) noexcept {
         on_error_fn(ec);
@@ -239,7 +239,7 @@ template <> struct impl<tcp_socket_t> {
 
     template <typename Owner> inline static void async_connect(Owner owner, const resolved_hosts_t &hosts) noexcept {
         auto &sock = owner->backend->get_physical_layer();
-        asio::async_connect(sock, hosts.begin(), hosts.end(), [owner](auto ec, auto addr) mutable {
+        asio::async_connect(sock, hosts.begin(), hosts.end(), [owner](auto ec, auto it) mutable {
             auto &strand = owner->backend->strand;
             if (ec) {
                 strand.post([ec = ec, owner = std::move(owner)]() mutable {
@@ -250,7 +250,13 @@ template <> struct impl<tcp_socket_t> {
                 });
                 return;
             }
-            strand.post([addr = addr, owner = std::move(owner)]() mutable { owner->success(addr); });
+            // dirty hack?
+            using T = std::remove_cv_t<decltype(it)>;
+            if constexpr (std::is_same_v<T, tcp::endpoint>) {
+                strand.post([addr = it, owner = std::move(owner)]() mutable { owner->success(addr); });
+            } else {
+                strand.post([addr = *it, owner = std::move(owner)]() mutable { owner->success(addr); });
+            }
         });
     }
 

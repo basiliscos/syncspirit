@@ -97,8 +97,8 @@ TEST_CASE("file_info_t::need_download", "[model]") {
 
     auto folder = folders.by_id(db_folder.id());
     auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(my_device);
-    auto folder_peer = folder_infos.by_device(peer_device);
+    auto folder_my = folder_infos.by_device(*my_device);
+    auto folder_peer = folder_infos.by_device(*peer_device);
 
     auto pr_file = proto::FileInfo();
     pr_file.set_name("a.txt");
@@ -187,8 +187,8 @@ TEST_CASE("file_info_t::local_file", "[model]") {
 
     auto folder = folders.by_id(db_folder.id());
     auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(my_device);
-    auto folder_peer = folder_infos.by_device(peer_device);
+    auto folder_my = folder_infos.by_device(*my_device);
+    auto folder_peer = folder_infos.by_device(*peer_device);
 
     auto pr_file = proto::FileInfo();
     pr_file.set_name("a.txt");
@@ -247,8 +247,8 @@ TEST_CASE("source file", "[model]") {
 
     auto folder = folders.by_id(db_folder.id());
     auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(my_device);
-    auto folder_peer = folder_infos.by_device(peer_device);
+    auto folder_my = folder_infos.by_device(*my_device);
+    auto folder_peer = folder_infos.by_device(*peer_device);
 
     auto pr_file = proto::FileInfo();
     pr_file.set_name("a.txt");
@@ -293,7 +293,7 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
 
     auto folder = folders.by_id(db_folder.id());
     auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(my_device);
+    auto folder_my = folder_infos.by_device(*my_device);
 
     auto pr_file = proto::FileInfo();
     pr_file.set_name("a.txt");
@@ -334,7 +334,7 @@ TEST_CASE("file_info_t::create, inconsistent source") {
 
     auto folder = folders.by_id(db_folder.id());
     auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(my_device);
+    auto folder_my = folder_infos.by_device(*my_device);
 
     auto pr_block = proto::BlockInfo();
     pr_block.set_size(131072);

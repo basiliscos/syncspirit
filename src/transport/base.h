@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -25,9 +25,8 @@ using tcp = asio::ip::tcp;
 using strand_t = asio::io_context::strand;
 using resolver_t = tcp::resolver;
 using resolved_hosts_t = resolver_t::results_type;
-using resolved_item_t = resolved_hosts_t::iterator;
 
-using connect_fn_t = std::function<void(resolved_item_t)>;
+using connect_fn_t = std::function<void(const tcp::endpoint &)>;
 using error_fn_t = std::function<void(const sys::error_code &)>;
 using handshake_fn_t =
     std::function<void(bool valid, utils::x509_t &peer, const tcp::endpoint &, const model::device_id_t *peer_device)>;

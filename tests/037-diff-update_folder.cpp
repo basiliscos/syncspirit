@@ -49,7 +49,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
     pr_index.set_folder(db_folder_1.id());
 
     SECTION("successful case") {
-        auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
+        auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
 
         auto file = pr_index.add_files();
         file->set_name("a.txt");

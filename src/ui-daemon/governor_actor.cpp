@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "governor_actor.h"
 #include "net/names.h"
@@ -45,7 +45,7 @@ void governor_actor_t::shutdown_start() noexcept {
 void governor_actor_t::on_model_response(model::message::model_response_t &reply) noexcept {
     auto &ee = reply.payload.ee;
     if (ee) {
-        LOG_ERROR(log, "{}, on_cluster_seed: {},", ee->message());
+        LOG_ERROR(log, "{}, on_cluster_seed: {},", identity, ee->message());
         return do_shutdown(ee);
     }
     LOG_TRACE(log, "{}, on_model_response", identity);

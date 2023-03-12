@@ -203,7 +203,7 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noe
             if (!folder_info) {
                 continue;
             }
-            auto fi = folder_info->get_folder_infos().by_device(cluster->get_device());
+            auto fi = folder_info->get_folder_infos().by_device(*cluster->get_device());
             files += fi->get_file_infos().size();
         }
         LOG_DEBUG(log,

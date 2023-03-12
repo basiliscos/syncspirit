@@ -48,7 +48,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         CHECK(folder->get_path() == db_folder.path());
         CHECK(folder->get_cluster() == cluster);
 
-        auto fi = folder->get_folder_infos().by_device(my_device);
+        auto fi = folder->get_folder_infos().by_device(*my_device);
         REQUIRE(fi);
         CHECK(fi->get_max_sequence() == 0);
         CHECK(fi->get_index() != 0);
@@ -65,7 +65,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
 
             auto folder = folders.by_id(db_folder.id());
             REQUIRE(folder);
-            auto fi_peer = folder->get_folder_infos().by_device(peer_device);
+            auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
             REQUIRE(fi_peer);
             CHECK(fi_peer->get_device() == peer_device);
             CHECK(fi_peer->get_max_sequence() == 0);
@@ -87,7 +87,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
 
             auto folder = folders.by_id(db_folder.id());
             REQUIRE(folder);
-            auto fi_peer = folder->get_folder_infos().by_device(peer_device);
+            auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
             REQUIRE(fi_peer);
             CHECK(fi_peer->get_device() == peer_device);
             CHECK(fi_peer->get_max_sequence() == 12);

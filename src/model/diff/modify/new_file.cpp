@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "new_file.h"
 #include "../cluster_visitor.h"
@@ -20,7 +20,7 @@ new_file_t::new_file_t(const model::cluster_t &cluster, std::string_view folder_
     }
 
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto file_infos = folder->get_folder_infos().by_device(cluster.get_device());
+    auto file_infos = folder->get_folder_infos().by_device(*cluster.get_device());
     auto prev_file = file_infos->get_file_infos().by_name(file.name());
     if (!prev_file) {
         return;
@@ -57,7 +57,7 @@ auto new_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resul
     }
 
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(cluster.get_device());
+    auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
     auto &files = folder_info->get_file_infos();
 
     auto file = this->file;

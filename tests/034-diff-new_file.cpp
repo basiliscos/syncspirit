@@ -35,7 +35,7 @@ TEST_CASE("new file diff", "[model]") {
         diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {}));
         REQUIRE(diff->apply(*cluster));
 
-        auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
+        auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(*my_device);
         auto &files = folder_info->get_file_infos();
         auto file = files.by_name(pr_file_info.name());
         REQUIRE(file);
@@ -70,7 +70,7 @@ TEST_CASE("new file diff", "[model]") {
         diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {bi}));
         REQUIRE(diff->apply(*cluster));
 
-        auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
+        auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(*my_device);
         auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
         REQUIRE(file);
         REQUIRE(file->get_size() == 5);
@@ -98,7 +98,7 @@ TEST_CASE("new file diff", "[model]") {
         diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {bi}));
         REQUIRE(diff->apply(*cluster));
 
-        auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
+        auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(*my_device);
         auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
         REQUIRE(file->get_sequence() == 1);
         CHECK(!file->is_locally_available());

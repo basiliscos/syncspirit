@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "fs_supervisor.h"
 #include "net/names.h"
@@ -78,7 +78,7 @@ void fs_supervisor_t::on_model_response(model::message::model_response_t &res) n
     resources->release(resource::model);
     auto ee = res.payload.ee;
     if (ee) {
-        LOG_ERROR(log, "{}, cannot get model: {}", ee->message());
+        LOG_ERROR(log, "{}, cannot get model: {}", identity, ee->message());
         return do_shutdown(ee);
     }
     cluster = std::move(res.payload.res.cluster);

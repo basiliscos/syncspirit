@@ -105,8 +105,8 @@ void folder_info_t::set_max_sequence(std::int64_t value) noexcept {
     max_sequence = value;
 }
 
-folder_info_ptr_t folder_infos_map_t::by_device(const device_ptr_t &device) const noexcept {
-    return get<1>(device->device_id().get_sha256());
+folder_info_ptr_t folder_infos_map_t::by_device(const device_t &device) const noexcept {
+    return get<1>(device.device_id().get_sha256());
 }
 
 folder_info_ptr_t folder_infos_map_t::by_device_id(std::string_view device_id) const noexcept {

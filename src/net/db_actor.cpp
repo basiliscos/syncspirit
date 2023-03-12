@@ -301,7 +301,7 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) no
         return r.assume_error();
     }
 
-    auto folder_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
     auto fi_key = folder_info->get_key();
     auto fi_data = folder_info->serialize();
     r = db::save({fi_key, fi_data}, txn);
@@ -328,7 +328,7 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff) noe
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto folder_info = folder->get_folder_infos().by_device(peer);
+    auto folder_info = folder->get_folder_infos().by_device(*peer);
     assert(folder_info);
 
     auto fi_key = folder_info->get_key();
@@ -373,7 +373,7 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexc
     }
 
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
     auto file = file_info->get_file_infos().by_name(diff.file.name());
 
     auto txn_opt = get_txn();
@@ -411,7 +411,7 @@ auto db_actor_t::operator()(const model::diff::modify::finish_file_t &diff) noex
     }
 
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device(cluster->get_device());
+    auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
     auto file = file_info->get_file_infos().by_name(diff.file_name);
 
     auto txn_opt = get_txn();

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "acceptor_actor.h"
 #include "names.h"
 #include "utils/format.hpp"
 #include "utils/error_code.h"
 #include "utils/network_interface.h"
+#include "utils/format.hpp"
 #include "model/messages.h"
 #include "model/diff/contact_diff.h"
 #include "model/diff/modify/connect_request.h"
@@ -40,22 +41,19 @@ void acceptor_actor_t::on_start() noexcept {
 
     acceptor.open(endpoint.protocol(), ec);
     if (ec) {
-        LOG_ERROR(log, "{}, cannot open endpoint ({0}:{1}) : {2}", identity, endpoint.address().to_string(),
-                  endpoint.port(), ec.message());
+        LOG_ERROR(log, "{}, cannot open endpoint ({}) : {}", identity, endpoint, ec.message());
         return do_shutdown(make_error(ec));
     }
 
     acceptor.bind(endpoint, ec);
     if (ec) {
-        LOG_ERROR(log, "{}, cannot bind endpoint ({0}:{1}) : {2}", identity, endpoint.address().to_string(),
-                  endpoint.port(), ec.message());
+        LOG_ERROR(log, "{}, cannot bind endpoint ({}) : {}", identity, endpoint, ec.message());
         return do_shutdown(make_error(ec));
     }
 
     acceptor.listen(asio::socket_base::max_listen_connections, ec);
     if (ec) {
-        LOG_ERROR(log, "{}, cannot listen ({0}:{1}) : {2}", identity, endpoint.address().to_string(), endpoint.port(),
-                  ec.message());
+        LOG_ERROR(log, "{}, cannot listen ({}) : {}", identity, endpoint, ec.message());
         return do_shutdown(make_error(ec));
     }
 

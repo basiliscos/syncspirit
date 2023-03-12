@@ -199,9 +199,9 @@ struct fixture_t : private model::diff::contact_visitor_t {
         transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "active/connect, err: {}", ec.message()); };
         using ptr_t = model::intrusive_ptr_t<std::decay_t<decltype(req)>>;
         auto ptr = ptr_t(&req);
-        transport::connect_fn_t on_connect = [ptr, trans, addresses_ptr, this](transport::resolved_item_t it) {
+        transport::connect_fn_t on_connect = [ptr, trans, addresses_ptr, this](const tcp::endpoint &ep) {
             LOG_INFO(log, "active/connected");
-            sup->reply_to(*ptr, trans, it->endpoint());
+            sup->reply_to(*ptr, trans, ep);
         };
         trans->async_connect(*addresses_ptr, on_connect, on_error);
     }

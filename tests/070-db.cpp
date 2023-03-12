@@ -157,7 +157,7 @@ void test_folder_creation() {
 
             auto folder = cluster->get_folders().by_id(folder_id);
             REQUIRE(folder);
-            REQUIRE(folder->get_folder_infos().by_device(cluster->get_device()));
+            REQUIRE(folder->get_folder_infos().by_device(*cluster->get_device()));
 
             sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
@@ -171,7 +171,7 @@ void test_folder_creation() {
             REQUIRE(folder_clone->get_label() == "my-label");
             REQUIRE(folder_clone->get_path().string() == "/my/path");
             REQUIRE(folder_clone->get_folder_infos().size() == 1);
-            REQUIRE(folder_clone->get_folder_infos().by_device(cluster->get_device()));
+            REQUIRE(folder_clone->get_folder_infos().by_device(*cluster->get_device()));
         }
     };
 
@@ -237,7 +237,7 @@ void test_folder_sharing() {
             auto folder = cluster_clone->get_folders().by_id(folder_id);
             REQUIRE(folder);
             REQUIRE(folder->get_folder_infos().size() == 2);
-            auto fi = folder->get_folder_infos().by_device(peer_device);
+            auto fi = folder->get_folder_infos().by_device(*peer_device);
             REQUIRE(fi);
             CHECK(fi->get_index() == 5);
             CHECK(fi->get_max_sequence() == 4);
@@ -283,7 +283,7 @@ void test_cluster_update_and_remove() {
             REQUIRE(block);
 
             auto folder = cluster->get_folders().by_id(folder_id);
-            auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
+            auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
 
             REQUIRE(peer_folder_info);
             CHECK(peer_folder_info->get_max_sequence() == 6ul);
@@ -305,7 +305,7 @@ void test_cluster_update_and_remove() {
                 REQUIRE(cluster_clone->get_blocks().size() == 1);
                 CHECK(cluster_clone->get_blocks().get(b->hash()));
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
-                auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
+                auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
                 REQUIRE(peer_folder_info);
                 REQUIRE(peer_folder_info->get_file_infos().size() == 1);
                 REQUIRE(peer_folder_info->get_file_infos().by_name("a.txt"));
@@ -336,8 +336,8 @@ void test_cluster_update_and_remove() {
                 REQUIRE(cluster_clone->get_blocks().size() == 0);
                 auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                 REQUIRE(fis.size() == 1);
-                REQUIRE(!fis.by_device(peer_device));
-                REQUIRE(fis.by_device(cluster->get_device()));
+                REQUIRE(!fis.by_device(*peer_device));
+                REQUIRE(fis.by_device(*cluster->get_device()));
                 REQUIRE(cluster_clone->get_unknown_folders().empty());
             }
         }
@@ -373,8 +373,8 @@ void test_clone_file() {
                 ;
 
             auto folder = cluster->get_folders().by_id(folder_id);
-            auto folder_my = folder->get_folder_infos().by_device(my_device);
-            auto folder_peer = folder->get_folder_infos().by_device(peer_device);
+            auto folder_my = folder->get_folder_infos().by_device(*my_device);
+            auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
 
             SECTION("file without blocks") {
                 builder.make_index(sha256, folder_id).add(file).finish().apply(*sup);
@@ -394,7 +394,7 @@ void test_clone_file() {
                     REQUIRE(cluster_clone->get_blocks().size() == 0);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
-                    auto folder_info_clone = fis.by_device(cluster_clone->get_device());
+                    auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
                     auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name() == file.name());
@@ -415,8 +415,8 @@ void test_clone_file() {
                 builder.make_index(sha256, folder_id).add(file).finish().apply(*sup);
 
                 auto folder = cluster->get_folders().by_id(folder_id);
-                auto folder_my = folder->get_folder_infos().by_device(my_device);
-                auto folder_peer = folder->get_folder_infos().by_device(peer_device);
+                auto folder_my = folder->get_folder_infos().by_device(*my_device);
+                auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
                 auto file_peer = folder_peer->get_file_infos().by_name(file.name());
                 REQUIRE(file_peer);
 
@@ -434,7 +434,7 @@ void test_clone_file() {
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
-                    auto folder_info_clone = fis.by_device(cluster_clone->get_device());
+                    auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
                     auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name() == file.name());
@@ -461,7 +461,7 @@ void test_clone_file() {
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
-                    auto folder_info_clone = fis.by_device(cluster_clone->get_device());
+                    auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
                     auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name() == file.name());

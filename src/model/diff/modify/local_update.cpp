@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "local_update.h"
 #include "model/diff/cluster_visitor.h"
@@ -56,7 +56,7 @@ local_update_t::local_update_t(const file_info_t &file, db::FileInfo current_, b
 auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(device);
+    auto folder_info = folder->get_folder_infos().by_device(*device);
     auto file = folder_info->get_file_infos().by_name(file_name);
     auto &blocks_map = cluster.get_blocks();
     block_infos_map_t tmp_blocks;

@@ -268,8 +268,8 @@ const boost::filesystem::path &file_info_t::get_path() const noexcept {
 auto file_info_t::local_file() noexcept -> file_info_ptr_t {
     auto device = folder_info->get_device();
     auto cluster = folder_info->get_folder()->get_cluster();
-    auto &my_device = cluster->get_device();
-    assert(*device != *my_device);
+    auto &my_device = *cluster->get_device();
+    assert(*device != my_device);
     auto my_folder_info = folder_info->get_folder()->get_folder_infos().by_device(my_device);
     if (!my_folder_info) {
         return {};

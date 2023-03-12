@@ -79,8 +79,8 @@ struct fixture_t {
             .apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
-        folder_my = folder->get_folder_infos().by_device(my_device);
-        folder_peer = folder->get_folder_infos().by_device(peer_device);
+        folder_my = folder->get_folder_infos().by_device(*my_device);
+        folder_peer = folder->get_folder_infos().by_device(*peer_device);
 
         main();
         reply.reset();

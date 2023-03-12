@@ -30,7 +30,7 @@ TEST_CASE("various block diffs", "[model]") {
     auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
     REQUIRE(diff->apply(*cluster));
 
-    auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
+    auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(*my_device);
     proto::FileInfo pr_file_info;
     pr_file_info.set_name("a.txt");
     pr_file_info.set_block_size(5ul);

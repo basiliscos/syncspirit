@@ -27,7 +27,7 @@ remote_folder_info_t_ptr_t remote_folder_infos_map_t::by_folder(const folder_t &
 
 auto remote_folder_info_t::get_local() const noexcept -> folder_info_ptr_t {
     auto device = folder->get_cluster()->get_device();
-    return folder->get_folder_infos().by_device(device);
+    return folder->get_folder_infos().by_device(*device);
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const remote_folder_info_t_ptr_t &item) noexcept {

@@ -55,7 +55,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         CHECK(r_a);
 
         std::vector<proto::Folder> unknown;
-        std::set<std::string> removed_unknown;
+        std::set<std::string, utils::string_comparator_t> removed_unknown;
         auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
             unknown = diff.new_unknown_folders;
             removed_unknown = diff.removed_unknown_folders;
@@ -255,7 +255,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             auto &diff = diff_opt.value();
             auto r_a = diff->apply(*cluster);
             REQUIRE(r_a);
-            auto fi = folder->get_folder_infos().by_device(peer_device);
+            auto fi = folder->get_folder_infos().by_device(*peer_device);
             REQUIRE(fi->get_index() == 7ul);
             REQUIRE(fi->get_max_sequence() == 123456u);
 
@@ -374,7 +374,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     auto &diff = diff_opt.value();
     REQUIRE(diff->apply(*cluster));
 
-    auto folder_info_peer_new = folder->get_folder_infos().by_device(peer_device);
+    auto folder_info_peer_new = folder->get_folder_infos().by_device(*peer_device);
     REQUIRE(folder_info_peer_new);
     REQUIRE(folder_info_peer_new != folder_info_peer);
     REQUIRE(folder_info_peer_new->get_file_infos().size() == 0);
@@ -572,4 +572,18 @@ TEST_CASE("cluster update with remote folders", "[model]") {
     REQUIRE(remote_folder);
     CHECK(remote_folder->get_index() == 5ul);
     CHECK(remote_folder->get_max_sequence() == 3);
+
+    SECTION("unshare by peer") {
+        auto cc = std::make_unique<proto::ClusterConfig>();
+        diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+        REQUIRE(diff_opt);
+
+        auto &diff = diff_opt.value();
+        REQUIRE(diff->apply(*cluster));
+
+        CHECK(peer_device->get_remote_folder_infos().size() == 0);
+        auto fi = folder->get_folder_infos().by_device(*peer_device);
+        // we are still sharing the folder with peer
+        CHECK(fi);
+    }
 }

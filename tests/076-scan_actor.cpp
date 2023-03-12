@@ -63,9 +63,9 @@ struct fixture_t {
         builder.create_folder(folder_id, root_path.string()).share_folder(peer_id.get_sha256(), folder_id).apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
-        folder_info = folder->get_folder_infos().by_device(my_device);
+        folder_info = folder->get_folder_infos().by_device(*my_device);
         files = &folder_info->get_file_infos();
-        folder_info_peer = folder->get_folder_infos().by_device(peer_device);
+        folder_info_peer = folder->get_folder_infos().by_device(*peer_device);
         files_peer = &folder_info_peer->get_file_infos();
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
