@@ -16,7 +16,7 @@ if(MINGW)
     ENABLE_LANGUAGE(RC)
 endif()
 
-add_library(syncspirit_test_lib SHARED
+add_library(syncspirit_test_lib
     $<$<PLATFORM_ID:Windows>:win32-resource.rc>
     test_supervisor.cpp
     test-db.cpp
