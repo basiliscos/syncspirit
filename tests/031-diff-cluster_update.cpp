@@ -445,7 +445,9 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     p_peer->set_index_id(7ul);
 
     auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
-    REQUIRE(!diff_opt);
+    REQUIRE(diff_opt);
+    auto &diff = diff_opt.value();
+    REQUIRE(diff->apply(*cluster));
 }
 
 TEST_CASE("cluster update with unknown devices", "[model]") {

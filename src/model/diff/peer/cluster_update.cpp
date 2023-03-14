@@ -24,7 +24,6 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     modified_folders_t updated;
     modified_folders_t reset;
     modified_folders_t remote;
-    keys_t checked_folders;
     keys_t removed_folders;
     keys_t removed_files_final;
     keys_t removed_unknown_folders;
@@ -106,10 +105,9 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
             auto folder_info = folder_infos.by_device(*device);
             if (!folder_info) {
                 auto log = get_log();
-                LOG_WARN(log, "folder '{}' was not shared with a peer '{}'", folder->get_label(), device->device_id());
-                return make_error_code(error_code_t::folder_is_not_shared);
+                LOG_WARN(log, "unexpected folder '{}' with a peer '{}'", folder->get_label(), device->device_id());
+                continue;
             }
-            checked_folders.emplace(folder_info->get_key());
 
             auto update_info = update_info_t{f.id(), d};
             if (d.index_id() != folder_info->get_index()) {

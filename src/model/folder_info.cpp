@@ -111,7 +111,7 @@ std::optional<proto::Index> folder_info_t::generate() noexcept {
     auto &remote_folders = device->get_remote_folder_infos();
     auto remote_folder = remote_folders.by_folder(*folder);
     if (remote_folder) {
-        auto& rf = *remote_folder;
+        auto &rf = *remote_folder;
         auto &local_device = *folder->get_cluster()->get_device();
         auto local_folder = folder_infos.by_device(local_device);
         bool need_initiate = (rf.get_index() != local_folder->index) || (!rf.get_max_sequence());
