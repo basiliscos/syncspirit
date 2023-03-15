@@ -299,7 +299,7 @@ void test_startup() {
     F(false, 10).run();
 }
 
-void test_index() {
+void test_index_receiving() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main(diff_builder_t &) noexcept override {
@@ -700,7 +700,7 @@ void test_downloading() {
 
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
-    REGISTER_TEST_CASE(test_index, "test_index", "[net]");
+    REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
     return 1;
 }
