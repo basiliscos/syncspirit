@@ -406,24 +406,60 @@ void test_index_sending() {
             d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
             d_peer->set_index_id(folder_1_peer->get_index());
 
-            auto d_my = folder->add_devices();
-            d_my->set_id(std::string(my_device->device_id().get_sha256()));
-            d_my->set_max_sequence(folder_1_my->get_max_sequence() - 1);
-            d_my->set_index_id(folder_1_my->get_index());
+            SECTION("peer has outdated by sequence view") {
+                auto d_my = folder->add_devices();
+                d_my->set_id(std::string(my_device->device_id().get_sha256()));
+                d_my->set_max_sequence(folder_1_my->get_max_sequence() - 1);
+                d_my->set_index_id(folder_1_my->get_index());
 
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
-            sup->do_process();
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                sup->do_process();
 
-            auto &queue = peer_actor->messages;
-            REQUIRE(queue.size() == 2);
-            auto msg = &(*queue.front()).payload;
-            auto &my_index = *std::get<proto::message::Index>(*msg);
-            REQUIRE(my_index.files_size() == 0);
-            queue.pop_front();
+                auto &queue = peer_actor->messages;
+                REQUIRE(queue.size() == 2);
+                auto msg = &(*queue.front()).payload;
+                auto &my_index = *std::get<proto::message::Index>(*msg);
+                REQUIRE(my_index.files_size() == 0);
+                queue.pop_front();
 
-            msg = &(*queue.front()).payload;
-            auto &my_index_update = *std::get<proto::message::IndexUpdate>(*msg);
-            REQUIRE(my_index_update.files_size() == 1);
+                msg = &(*queue.front()).payload;
+                auto &my_index_update = *std::get<proto::message::IndexUpdate>(*msg);
+                REQUIRE(my_index_update.files_size() == 1);
+            }
+
+            SECTION("peer has outdated by index view") {
+                auto d_my = folder->add_devices();
+                d_my->set_id(std::string(my_device->device_id().get_sha256()));
+                d_my->set_max_sequence(folder_1_my->get_max_sequence());
+                d_my->set_index_id(folder_1_my->get_index() + 5);
+
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                sup->do_process();
+
+                auto &queue = peer_actor->messages;
+                REQUIRE(queue.size() == 2);
+                auto msg = &(*queue.front()).payload;
+                auto &my_index = *std::get<proto::message::Index>(*msg);
+                REQUIRE(my_index.files_size() == 0);
+                queue.pop_front();
+
+                msg = &(*queue.front()).payload;
+                auto &my_index_update = *std::get<proto::message::IndexUpdate>(*msg);
+                REQUIRE(my_index_update.files_size() == 1);
+            }
+
+            SECTION("peer has actual view") {
+                auto d_my = folder->add_devices();
+                d_my->set_id(std::string(my_device->device_id().get_sha256()));
+                d_my->set_max_sequence(folder_1_my->get_max_sequence());
+                d_my->set_index_id(folder_1_my->get_index());
+
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                sup->do_process();
+
+                auto &queue = peer_actor->messages;
+                REQUIRE(queue.size() == 0);
+            }
         }
     };
     F(true, 10).run();

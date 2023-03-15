@@ -1,8 +1,6 @@
 unit test:
 
--- unit test: sending Index + IndexUpdate
--- unit test: do not send Index, when there is no need
--- unit test: send Index, when sequence mismatch?
+-- unit test: sending IndexUpdates during downloads
 -- unit test: send ClusterUpdate (+ Index) on folder share/unshare.
 
 
