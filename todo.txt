@@ -3,7 +3,7 @@ unit test:
 -- unit test: sending Index + IndexUpdate
 -- unit test: do not send Index, when there is no need
 -- unit test: send Index, when sequence mismatch?
--- unit test: send ClusterUpdate ( + Index) on folder share/unshare.
+-- unit test: send ClusterUpdate (+ Index) on folder share/unshare.
 
 
 ===========

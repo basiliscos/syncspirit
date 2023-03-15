@@ -15,7 +15,6 @@
 #include "proto/bep_support.h"
 #include <boost/core/demangle.hpp>
 
-
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
@@ -230,6 +229,7 @@ struct fixture_t {
                      .peer(peer_device)
                      .peer_addr(peer_actor->get_address())
                      .request_pool(1024)
+                     .outgoing_buffer_max(1024'000)
                      .cluster(cluster)
                      .timeout(timeout)
                      .request_timeout(timeout)
@@ -376,6 +376,54 @@ void test_index_receiving() {
                     CHECK(folder_my->get_file_infos().by_name("some-dir-2"));
                 }
             }
+        }
+    };
+    F(true, 10).run();
+}
+
+void test_index_sending() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+
+            proto::FileInfo pr_file_info;
+            pr_file_info.set_name("link");
+            pr_file_info.set_type(proto::FileInfoType::SYMLINK);
+            pr_file_info.set_symlink_target("/some/where");
+
+            auto builder = diff_builder_t(*cluster);
+            builder.new_file(folder_1->get_id(), pr_file_info);
+            builder.apply(*sup);
+
+            auto folder_1_my = folder_1->get_folder_infos().by_device(*my_device);
+
+            auto cc = proto::ClusterConfig{};
+
+            auto folder = cc.add_folders();
+            folder->set_id(std::string(folder_1->get_id()));
+            auto d_peer = folder->add_devices();
+            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
+            d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
+            d_peer->set_index_id(folder_1_peer->get_index());
+
+            auto d_my = folder->add_devices();
+            d_my->set_id(std::string(my_device->device_id().get_sha256()));
+            d_my->set_max_sequence(folder_1_my->get_max_sequence() - 1);
+            d_my->set_index_id(folder_1_my->get_index());
+
+            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            sup->do_process();
+
+            auto &queue = peer_actor->messages;
+            REQUIRE(queue.size() == 2);
+            auto msg = &(*queue.front()).payload;
+            auto &my_index = *std::get<proto::message::Index>(*msg);
+            REQUIRE(my_index.files_size() == 0);
+            queue.pop_front();
+
+            msg = &(*queue.front()).payload;
+            auto &my_index_update = *std::get<proto::message::IndexUpdate>(*msg);
+            REQUIRE(my_index_update.files_size() == 1);
         }
     };
     F(true, 10).run();
@@ -701,6 +749,7 @@ void test_downloading() {
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
+    REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
     return 1;
 }

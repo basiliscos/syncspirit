@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "diff-builder.h"
 #include "model/messages.h"
@@ -9,6 +9,7 @@
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/flush_file.h"
+#include "model/diff/modify/new_file.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/cluster_update.h"
@@ -124,6 +125,12 @@ diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &source) no
 
 diff_builder_t &diff_builder_t::flush_file(const model::file_info_t &source) noexcept {
     diffs.emplace_back(new diff::modify::flush_file_t(source));
+    return *this;
+}
+
+diff_builder_t &diff_builder_t::new_file(std::string_view folder_id, const proto::FileInfo &file_,
+                                         const blocks_t blocks) noexcept {
+    diffs.emplace_back(new diff::modify::new_file_t(cluster, folder_id, file_, blocks));
     return *this;
 }
 
