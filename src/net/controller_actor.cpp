@@ -12,6 +12,7 @@
 #include "model/diff/modify/flush_file.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include <fstream>
 
 using namespace syncspirit;

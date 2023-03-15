@@ -13,6 +13,8 @@
 #include "net/names.h"
 #include "utils/error_code.h"
 #include "proto/bep_support.h"
+#include <boost/core/demangle.hpp>
+
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -110,7 +112,9 @@ struct sample_peer_t : r::actor_base_t {
         auto variant = net::payload::forwarded_message_t();
         std::visit(
             [&](auto &msg) {
+                using boost::core::demangle;
                 using T = std::decay_t<decltype(msg)>;
+                LOG_TRACE(log, "{}, received '{}' message", identity, demangle(typeid(T).name()));
                 using V = net::payload::forwarded_message_t;
                 if constexpr (std::is_constructible_v<V, T>) {
                     variant = std::move(msg);
@@ -278,7 +282,10 @@ void test_startup() {
             REQUIRE(peer_actor->reading);
             REQUIRE(peer_actor->messages.size() == 1);
             auto &msg = (*peer_actor->messages.front()).payload;
-            CHECK(std::get_if<proto::message::ClusterConfig>(&msg));
+            REQUIRE(std::get_if<proto::message::ClusterConfig>(&msg));
+
+            peer_actor->messages.pop_front();
+            CHECK(peer_actor->messages.empty());
 
             auto cc = proto::ClusterConfig{};
             auto payload = proto::message::ClusterConfig(new proto::ClusterConfig(cc));
@@ -286,6 +293,7 @@ void test_startup() {
             sup->do_process();
 
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            CHECK(peer_actor->messages.empty());
         }
     };
     F(false, 10).run();
