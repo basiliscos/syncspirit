@@ -18,8 +18,10 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
 
     my_cluster_update_visitor_t(F &&fn_) : fn{std::forward<F>(fn_)} {}
 
-    outcome::result<void> operator()(const diff::peer::cluster_update_t &diff) noexcept override { return fn(diff); }
-    outcome::result<void> operator()(const diff::peer::cluster_remove_t &) noexcept override {
+    outcome::result<void> operator()(const diff::peer::cluster_update_t &diff, void *) noexcept override {
+        return fn(diff);
+    }
+    outcome::result<void> operator()(const diff::peer::cluster_remove_t &, void *) noexcept override {
         remove_diff = true;
         return outcome::success();
     }
@@ -61,7 +63,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             removed_unknown = diff.removed_unknown_folders;
             return outcome::success();
         });
-        auto r_v = diff->visit(visitor);
+        auto r_v = diff->visit(visitor, nullptr);
         REQUIRE(r_v);
         REQUIRE(unknown.size() == 1);
         REQUIRE(unknown[0].id() == folder.id());
@@ -89,7 +91,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         r_a = diff->apply(*cluster);
         CHECK(r_a);
         REQUIRE(!cluster->get_unknown_folders().empty());
-        (void)diff->visit(visitor);
+        (void)diff->visit(visitor, nullptr);
         CHECK(unknown.empty());
         CHECK(removed_unknown.empty());
 
@@ -100,7 +102,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         diff = diff_opt.value();
         r_a = diff->apply(*cluster);
         CHECK(r_a);
-        (void)diff->visit(visitor);
+        (void)diff->visit(visitor, nullptr);
         REQUIRE(unknown.size() == 1);
         REQUIRE(unknown[0].id() == folder.id());
         REQUIRE(unknown[0].label() == folder.label());
@@ -176,7 +178,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
                 CHECK(diff.updated_folders.size() == 0);
                 return outcome::success();
             });
-            auto r_v = diff->visit(visitor);
+            auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
         }
@@ -203,7 +205,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
                 CHECK(info.device.id() == peer_device->device_id().get_sha256());
                 return outcome::success();
             });
-            auto r_v = diff->visit(visitor);
+            auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
         }
@@ -266,7 +268,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
                 CHECK(diff.updated_folders.size() == 0);
                 return outcome::success();
             });
-            auto r_v = diff->visit(visitor);
+            auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
         }
@@ -400,7 +402,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
         REQUIRE(blocks.size() == 2);
         return outcome::success();
     });
-    auto r_v = diff->visit(visitor);
+    auto r_v = diff->visit(visitor, nullptr);
     REQUIRE(r_v);
     REQUIRE(visited);
     CHECK(visitor.remove_diff);

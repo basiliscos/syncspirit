@@ -46,7 +46,7 @@ auto clone_block_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
     return outcome::success();
 }
 
-auto clone_block_t::visit(block_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto clone_block_t::visit(block_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting clone_block_t");
-    return visitor(*this);
+    return visitor(*this, custom);
 }

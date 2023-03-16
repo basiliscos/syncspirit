@@ -45,7 +45,7 @@ void file_actor_t::shutdown_start() noexcept {
 void file_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this);
+    auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -55,7 +55,7 @@ void file_actor_t::on_model_update(model::message::model_update_t &message) noex
 void file_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_block_update", identity);
     auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this);
+    auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -151,14 +151,14 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome
     return outcome::success();
 }
 
-auto file_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexcept -> outcome::result<void> {
+auto file_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *) noexcept -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = file_info->get_file_infos().by_name(diff.file.name());
     return reflect(file);
 }
 
-auto file_actor_t::operator()(const model::diff::modify::flush_file_t &diff) noexcept -> outcome::result<void> {
+auto file_actor_t::operator()(const model::diff::modify::flush_file_t &diff, void *) noexcept -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = file_info->get_file_infos().by_name(diff.file_name);
@@ -184,7 +184,8 @@ auto file_actor_t::operator()(const model::diff::modify::flush_file_t &diff) noe
     return outcome::success();
 }
 
-auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) noexcept -> outcome::result<void> {
+auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, void *) noexcept
+    -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = file_info->get_file_infos().by_name(diff.file_name);
@@ -203,7 +204,8 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff) n
     return backend->write(offset, diff.data);
 }
 
-auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff) noexcept -> outcome::result<void> {
+auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, void *) noexcept
+    -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto target_folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto target = target_folder_info->get_file_infos().by_name(diff.file_name);

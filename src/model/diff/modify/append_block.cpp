@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "append_block.h"
 #include "../block_visitor.h"
@@ -20,7 +20,7 @@ auto append_block_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     return outcome::success();
 }
 
-auto append_block_t::visit(block_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto append_block_t::visit(block_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting append_block_t");
-    return visitor(*this);
+    return visitor(*this, custom);
 }

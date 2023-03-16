@@ -118,7 +118,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     return outcome::success();
 }
 
-auto clone_file_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto clone_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting clone_file_t, folder = {}, file = {}", folder_id, file.name());
-    return visitor(*this);
+    return visitor(*this, custom);
 }

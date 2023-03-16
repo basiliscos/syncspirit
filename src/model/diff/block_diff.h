@@ -15,7 +15,7 @@ namespace diff {
 
 struct SYNCSPIRIT_API block_diff_t : generic_diff_t<tag::block> {
     block_diff_t(const file_info_t &file, size_t block_index = 0) noexcept;
-    virtual outcome::result<void> visit(block_visitor_t &) const noexcept override;
+    virtual outcome::result<void> visit(block_visitor_t &, void *custom) const noexcept override;
 
     std::string file_name;
     std::string folder_id;

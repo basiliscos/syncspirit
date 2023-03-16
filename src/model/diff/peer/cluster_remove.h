@@ -20,7 +20,7 @@ struct SYNCSPIRIT_API cluster_remove_t final : cluster_diff_t {
                      keys_t removed_files_, keys_t removed_blocks_, keys_t removed_unknown_folders_) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
-    outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string source_device;
     keys_t updated_folders;

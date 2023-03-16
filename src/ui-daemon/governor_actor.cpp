@@ -61,7 +61,7 @@ void governor_actor_t::on_model_update(model::message::forwarded_model_update_t 
     }
     if (!cluster->is_tainted()) {
         auto &diff = *message.payload.message->payload.diff;
-        auto r = diff.visit(*this);
+        auto r = diff.visit(*this, nullptr);
         if (!r) {
             LOG_WARN(log, "{}, model visiting error: {}", identity, r.assume_error().message());
         }
@@ -72,7 +72,7 @@ void governor_actor_t::on_block_update(model::message::forwarded_block_update_t 
     LOG_TRACE(log, "{}, on_block_update", identity);
     if (!cluster->is_tainted()) {
         auto &diff = *message.payload.message->payload.diff;
-        auto r = diff.visit(*this);
+        auto r = diff.visit(*this, nullptr);
         if (!r) {
             LOG_WARN(log, "{}, block visiting error: {}", identity, r.assume_error().message());
         }
@@ -134,27 +134,31 @@ void governor_actor_t::refresh_deadline() noexcept {
     deadline = now + timeout;
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &) noexcept -> outcome::result<void> {
+auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &, void *) noexcept -> outcome::result<void> {
     refresh_deadline();
     return outcome::success();
 }
 
-auto governor_actor_t::operator()(const model::diff::peer::cluster_update_t &) noexcept -> outcome::result<void> {
+auto governor_actor_t::operator()(const model::diff::peer::cluster_update_t &, void *) noexcept
+    -> outcome::result<void> {
     refresh_deadline();
     return outcome::success();
 }
 
-auto governor_actor_t::operator()(const model::diff::peer::update_folder_t &) noexcept -> outcome::result<void> {
+auto governor_actor_t::operator()(const model::diff::peer::update_folder_t &, void *) noexcept
+    -> outcome::result<void> {
     refresh_deadline();
     return outcome::success();
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::append_block_t &) noexcept -> outcome::result<void> {
+auto governor_actor_t::operator()(const model::diff::modify::append_block_t &, void *) noexcept
+    -> outcome::result<void> {
     refresh_deadline();
     return outcome::success();
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::clone_block_t &) noexcept -> outcome::result<void> {
+auto governor_actor_t::operator()(const model::diff::modify::clone_block_t &, void *) noexcept
+    -> outcome::result<void> {
     refresh_deadline();
     return outcome::success();
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -12,7 +12,7 @@ struct SYNCSPIRIT_API clone_block_t final : block_diff_t {
     clone_block_t(const file_block_t &file_block) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
-    outcome::result<void> visit(block_visitor_t &) const noexcept override;
+    outcome::result<void> visit(block_visitor_t &, void *) const noexcept override;
 
     std::string source_device_id;
     std::string source_folder_id;

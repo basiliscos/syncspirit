@@ -35,22 +35,22 @@ struct update_peer_t;
 template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual ~generic_visitor_t() = default;
 
-    virtual outcome::result<void> operator()(const load::load_cluster_t &) noexcept;
-    virtual outcome::result<void> operator()(const peer::cluster_remove_t &) noexcept;
-    virtual outcome::result<void> operator()(const peer::cluster_update_t &) noexcept;
-    virtual outcome::result<void> operator()(const peer::peer_state_t &) noexcept;
-    virtual outcome::result<void> operator()(const peer::update_folder_t &) noexcept;
+    virtual outcome::result<void> operator()(const load::load_cluster_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const peer::cluster_remove_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const peer::cluster_update_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const peer::peer_state_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const peer::update_folder_t &, void *custom) noexcept;
 
-    virtual outcome::result<void> operator()(const modify::clone_file_t &) noexcept;
-    virtual outcome::result<void> operator()(const modify::create_folder_t &) noexcept;
-    virtual outcome::result<void> operator()(const modify::file_availability_t &) noexcept;
-    virtual outcome::result<void> operator()(const modify::finish_file_t &) noexcept;
-    virtual outcome::result<void> operator()(const modify::flush_file_t &) noexcept;
-    virtual outcome::result<void> operator()(const modify::local_update_t &) noexcept;
-    virtual outcome::result<void> operator()(const modify::lock_file_t &) noexcept;
-    virtual outcome::result<void> operator()(const modify::new_file_t &) noexcept;
-    virtual outcome::result<void> operator()(const modify::share_folder_t &) noexcept;
-    virtual outcome::result<void> operator()(const modify::update_peer_t &) noexcept;
+    virtual outcome::result<void> operator()(const modify::clone_file_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::create_folder_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::file_availability_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::finish_file_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::flush_file_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::local_update_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::lock_file_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::new_file_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::share_folder_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::update_peer_t &, void *custom) noexcept;
 };
 
 using cluster_visitor_t = generic_visitor_t<tag::cluster>;

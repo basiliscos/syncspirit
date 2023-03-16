@@ -114,7 +114,7 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     return outcome::success();
 }
 
-auto local_update_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto local_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting local_update_t");
-    return visitor(*this);
+    return visitor(*this, custom);
 }

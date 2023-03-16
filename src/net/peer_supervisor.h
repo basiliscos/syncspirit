@@ -79,10 +79,10 @@ struct SYNCSPIRIT_API peer_supervisor_t : public ra::supervisor_asio_t,
     void on_peer_ready(message::peer_connected_t &) noexcept;
     void on_connected(message::peer_connected_t &) noexcept;
 
-    outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::update_contact_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::connect_request_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::relay_connect_request_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::update_contact_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::connect_request_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::relay_connect_request_t &, void *) noexcept override;
 
     model::cluster_ptr_t cluster;
     utils::logger_t log;

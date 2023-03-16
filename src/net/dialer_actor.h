@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -66,7 +66,7 @@ struct SYNCSPIRIT_API dialer_actor_t : public r::actor_base_t, private model::di
     void schedule_redial(const model::device_ptr_t &device) noexcept;
     void on_timer(r::request_id_t request_id, bool cancelled) noexcept;
 
-    outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *) noexcept override;
 
     utils::logger_t log;
     model::cluster_ptr_t cluster;

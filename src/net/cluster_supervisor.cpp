@@ -50,14 +50,15 @@ void cluster_supervisor_t::shutdown_start() noexcept {
 void cluster_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this);
+    auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
 }
 
-auto cluster_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff) noexcept -> outcome::result<void> {
+auto cluster_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff, void *) noexcept
+    -> outcome::result<void> {
     if (!cluster->is_tainted() && diff.known) {
         auto peer = cluster->get_devices().by_sha256(diff.peer_id);
         LOG_TRACE(log, "{}, visiting peer_state_t, {}, state: {}", identity, peer->device_id(), (int)diff.state);

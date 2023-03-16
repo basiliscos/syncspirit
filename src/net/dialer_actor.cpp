@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "dialer_actor.h"
 #include "model/diff/peer/peer_state.h"
@@ -116,14 +116,14 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
 void dialer_actor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto &diff = *msg.payload.diff;
-    auto r = diff.visit(*this);
+    auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
 }
 
-auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &diff) noexcept -> outcome::result<void> {
+auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
     if (diff.known) {
         auto &devices = cluster->get_devices();
         auto peer = devices.by_sha256(diff.peer_id);

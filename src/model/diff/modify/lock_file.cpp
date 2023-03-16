@@ -28,7 +28,7 @@ auto lock_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resu
     return outcome::success();
 }
 
-auto lock_file_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto lock_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting lock_file_t");
-    return visitor(*this);
+    return visitor(*this, custom);
 }

@@ -47,6 +47,6 @@ auto update_contact_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     return outcome::success();
 }
 
-auto update_contact_t::visit(contact_visitor_t &visitor) const noexcept -> outcome::result<void> {
-    return visitor(*this);
+auto update_contact_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+    return visitor(*this, custom);
 }

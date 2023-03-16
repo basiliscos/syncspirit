@@ -27,7 +27,7 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
                                                       const message_t &message) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
-    outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     model::device_t source_peer;
     unknown_folders_t new_unknown_folders;

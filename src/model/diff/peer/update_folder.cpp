@@ -83,9 +83,9 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     return outcome::success();
 }
 
-auto update_folder_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto update_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting update_folder_t", folder_id);
-    return visitor(*this);
+    return visitor(*this, custom);
 }
 
 using diff_t = diff::cluster_diff_ptr_t;

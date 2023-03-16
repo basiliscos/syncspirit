@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -62,7 +62,7 @@ struct SYNCSPIRIT_API cluster_supervisor_t : public ra::supervisor_asio_t, priva
   private:
     void on_model_update(model::message::model_update_t &message) noexcept;
 
-    outcome::result<void> operator()(const model::diff::peer::peer_state_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *) noexcept override;
 
     utils::logger_t log;
     r::address_ptr_t coordinator;

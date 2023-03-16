@@ -254,20 +254,21 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
 }
 
 void controller_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    if (message.payload.custom == this) {
-        LOG_TRACE(log, "{}, on_model_update", identity);
-        auto &diff = *message.payload.diff;
-        auto r = diff.visit(*this);
-        if (!r) {
-            auto ee = make_error(r.assume_error());
-            return do_shutdown(ee);
-        }
-        pull_ready();
-        // TODO: this should not depend on (message.payload.custom == this)
-        push_pending();
+    LOG_TRACE(log, "{}, on_model_update", identity);
+    auto &diff = *message.payload.diff;
+    auto r = diff.visit(*this, const_cast<void *>(message.payload.custom));
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        return do_shutdown(ee);
     }
+    pull_ready();
+    push_pending();
 }
-auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &) noexcept -> outcome::result<void> {
+auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &, void *custom) noexcept
+    -> outcome::result<void> {
+    if (custom != this) {
+        return outcome::success();
+    }
 
     for (auto it : cluster->get_folders()) {
         auto &folder = *it.item;
@@ -285,12 +286,16 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &)
         }
     }
     updates_streamer = model::updates_streamer_t(*cluster, *peer);
-    push_pending();
 
     return outcome::success();
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexcept -> outcome::result<void> {
+auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (custom != this) {
+        return outcome::success();
+    }
+
     auto folder_id = diff.folder_id;
     auto file_name = diff.file.name();
     auto folder = cluster->get_folders().by_id(folder_id);
@@ -302,19 +307,27 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
     return outcome::success();
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::finish_file_t &diff) noexcept -> outcome::result<void> {
+auto controller_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*peer);
     auto file = folder_info->get_file_infos().by_name(diff.file_name);
     assert(file);
-    auto update = model::diff::cluster_diff_ptr_t{};
-    update = new model::diff::modify::flush_file_t(*file);
-    send<model::payload::model_update_t>(coordinator, std::move(update), this);
     updates_streamer.on_update(*file);
+    if (custom == this) {
+        auto update = model::diff::cluster_diff_ptr_t{};
+        update = new model::diff::modify::flush_file_t(*file);
+        send<model::payload::model_update_t>(coordinator, std::move(update), this);
+    }
     return outcome::success();
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff) noexcept -> outcome::result<void> {
+auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (custom != this) {
+        return outcome::success();
+    }
+
     auto folder_id = diff.folder_id;
     auto file_name = diff.file_name;
     auto folder = cluster->get_folders().by_id(folder_id);

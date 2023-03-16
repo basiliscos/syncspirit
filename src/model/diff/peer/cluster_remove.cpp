@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "cluster_remove.h"
 #include "model/diff/cluster_visitor.h"
@@ -15,6 +15,6 @@ cluster_remove_t::cluster_remove_t(std::string_view source_device_, keys_t updat
 
 auto cluster_remove_t::apply_impl(cluster_t &) const noexcept -> outcome::result<void> { return outcome::success(); }
 
-auto cluster_remove_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
-    return visitor(*this);
+auto cluster_remove_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+    return visitor(*this, custom);
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -17,9 +17,9 @@ struct clone_block_t;
 template <> struct SYNCSPIRIT_API generic_visitor_t<tag::block> {
     virtual ~generic_visitor_t() = default;
 
-    virtual outcome::result<void> operator()(const modify::append_block_t &) noexcept;
-    virtual outcome::result<void> operator()(const modify::blocks_availability_t &) noexcept;
-    virtual outcome::result<void> operator()(const modify::clone_block_t &) noexcept;
+    virtual outcome::result<void> operator()(const modify::append_block_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::blocks_availability_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::clone_block_t &, void *custom) noexcept;
 };
 
 using block_visitor_t = generic_visitor_t<tag::block>;

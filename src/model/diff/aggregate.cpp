@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "aggregate.h"
 
@@ -15,9 +15,9 @@ auto aggregate_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resu
     return outcome::success();
 }
 
-auto aggregate_t::visit(cluster_visitor_t &vistor) const noexcept -> outcome::result<void> {
+auto aggregate_t::visit(cluster_visitor_t &vistor, void *custom) const noexcept -> outcome::result<void> {
     for (auto &diff : diffs) {
-        auto r = diff->visit(vistor);
+        auto r = diff->visit(vistor, custom);
         if (!r) {
             return r;
         }

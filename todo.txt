@@ -1,6 +1,5 @@
 unit test:
 
--- unit test: sending IndexUpdates during downloads
 -- unit test: send ClusterUpdate (+ Index) on folder share/unshare.
 
 

@@ -163,7 +163,7 @@ void net_supervisor_t::on_model_update(model::message::model_update_t &message) 
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
-    r = diff.visit(*this);
+    r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -190,7 +190,7 @@ void net_supervisor_t::on_contact_update(model::message::contact_update_t &messa
     }
 }
 
-auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noexcept -> outcome::result<void> {
+auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &, void *) noexcept -> outcome::result<void> {
     if (!cluster->is_tainted()) {
 
         auto &ignored_devices = cluster->get_ignored_devices();

@@ -69,7 +69,7 @@ struct SYNCSPIRIT_API net_supervisor_t : public ra::supervisor_asio_t, private m
     void seed_model() noexcept;
 
     outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
-    outcome::result<void> operator()(const model::diff::load::load_cluster_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *custom) noexcept override;
 
     utils::logger_t log;
     config::main_t app_config;

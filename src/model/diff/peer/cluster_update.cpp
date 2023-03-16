@@ -247,6 +247,6 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     return outcome::success();
 }
 
-auto cluster_update_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
-    return visitor(*this);
+auto cluster_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+    return visitor(*this, custom);
 }

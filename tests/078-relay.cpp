@@ -243,7 +243,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
         if (!r) {
             LOG_ERROR(log, "error applying diff: {}", r.error().message());
         }
-        r = diff.visit(*this);
+        r = diff.visit(*this, nullptr);
         if (!r) {
             LOG_ERROR(log, "error visiting diff: {}", r.error().message());
         }
@@ -348,7 +348,8 @@ void test_passive() {
             }
         }
 
-        outcome::result<void> operator()(const model::diff::modify::relay_connect_request_t &diff) noexcept override {
+        outcome::result<void> operator()(const model::diff::modify::relay_connect_request_t &diff,
+                                         void *) noexcept override {
             CHECK(diff.peer == peer_device->device_id());
             CHECK(diff.session_key == session_key);
             CHECK(diff.relay.port() == 12345);

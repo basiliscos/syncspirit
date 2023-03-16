@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "global_discovery_actor.h"
 #include "names.h"
@@ -197,7 +197,7 @@ void global_discovery_actor_t::on_discovery(message::discovery_notify_t &req) no
 void global_discovery_actor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_contact_update", identity);
     auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this);
+    auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -235,7 +235,7 @@ void global_discovery_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
-auto global_discovery_actor_t::operator()(const model::diff::modify::update_contact_t &diff) noexcept
+auto global_discovery_actor_t::operator()(const model::diff::modify::update_contact_t &diff, void *) noexcept
     -> outcome::result<void> {
     if (diff.self && state == r::state_t::OPERATIONAL) {
         if (resources->has(resource::timer)) {

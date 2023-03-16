@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -87,7 +87,7 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
     void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
                       const r::message_ptr_t &custom = {}) noexcept;
 
-    outcome::result<void> operator()(const model::diff::modify::update_contact_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::update_contact_t &, void *custom) noexcept override;
 
     model::device_id_t device_id;
     utils::logger_t log;

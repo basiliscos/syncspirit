@@ -28,7 +28,7 @@ auto blocks_availability_t::apply_impl(cluster_t &cluster) const noexcept -> out
     return outcome::success();
 }
 
-auto blocks_availability_t::visit(block_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto blocks_availability_t::visit(block_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting blocks_availability_t");
-    return visitor(*this);
+    return visitor(*this, custom);
 }

@@ -479,6 +479,10 @@ void test_downloading() {
             d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
             d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
             d_peer->set_index_id(folder_1_peer->get_index());
+            auto d_my = folder->add_devices();
+            d_my->set_id(std::string(my_device->device_id().get_sha256()));
+            d_my->set_max_sequence(folder_my->get_max_sequence());
+            d_my->set_index_id(folder_my->get_index());
 
             SECTION("cluster config & index has a new file => download it") {
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
@@ -519,6 +523,17 @@ void test_downloading() {
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_locked());
                 CHECK(peer_actor->blocks_requested == 1);
+
+                auto &queue = peer_actor->messages;
+                REQUIRE(queue.size() > 0);
+                auto msg = &(*queue.front()).payload;
+                auto &my_index = *std::get<proto::message::Index>(*msg);
+                REQUIRE(my_index.files_size() == 0);
+                queue.pop_front();
+
+                msg = &(*queue.back()).payload;
+                auto &my_index_update = *std::get<proto::message::IndexUpdate>(*msg);
+                REQUIRE(my_index_update.files_size() == 1);
 
                 SECTION("dont redownload file only if metadata has changed") {
                     auto index_update = proto::IndexUpdate{};

@@ -23,4 +23,6 @@ auto peer_state_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     return outcome::success();
 }
 
-auto peer_state_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> { return visitor(*this); }
+auto peer_state_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+    return visitor(*this, custom);
+}

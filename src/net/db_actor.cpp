@@ -245,7 +245,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
 void db_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this);
+    auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         LOG_ERROR(log, "{}, on_model_update error: {}", identity, r.assume_error().message());
@@ -253,7 +253,7 @@ void db_actor_t::on_model_update(model::message::model_update_t &message) noexce
     }
 }
 
-auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &, void *) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -280,7 +280,8 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &) noexcep
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff, void *) noexcept
+    -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -312,7 +313,7 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff) no
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -341,7 +342,7 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff) noe
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void *) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -367,7 +368,7 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff) noex
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -405,7 +406,7 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff) noexc
     return commit(false);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::finish_file_t &diff) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -442,7 +443,7 @@ auto db_actor_t::operator()(const model::diff::modify::finish_file_t &diff) noex
     return commit(false);
 }
 
-auto db_actor_t::operator()(const model::diff::peer::cluster_remove_t &diff) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::peer::cluster_remove_t &diff, void *) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -481,7 +482,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_remove_t &diff) noe
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }

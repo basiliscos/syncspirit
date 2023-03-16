@@ -60,7 +60,7 @@ void peer_supervisor_t::on_start() noexcept {
 void peer_supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto &diff = *msg.payload.diff;
-    auto r = diff.visit(*this);
+    auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -70,7 +70,7 @@ void peer_supervisor_t::on_model_update(model::message::model_update_t &msg) noe
 void peer_supervisor_t::on_contact_update(model::message::contact_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_contact_update", identity);
     auto &diff = *msg.payload.diff;
-    auto r = diff.visit(*this);
+    auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -123,7 +123,8 @@ void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
         .finish();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff) noexcept -> outcome::result<void> {
+auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff, void *) noexcept
+    -> outcome::result<void> {
     auto &peer_addr = diff.peer_addr;
     if (!diff.known && diff.state == model::device_state_t::online) {
         auto ec = model::make_error_code(model::error_code_t::unknown_device);
@@ -133,7 +134,7 @@ auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff) 
     return outcome::success();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t &diff) noexcept
+auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t &diff, void *) noexcept
     -> outcome::result<void> {
 
     auto lock = std::unique_lock(diff.mutex);
@@ -152,7 +153,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t 
     return outcome::success();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::modify::relay_connect_request_t &diff) noexcept
+auto peer_supervisor_t::operator()(const model::diff::modify::relay_connect_request_t &diff, void *) noexcept
     -> outcome::result<void> {
 
     auto peer = cluster->get_devices().by_sha256(diff.peer.get_sha256());
@@ -177,7 +178,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::relay_connect_requ
     return outcome::success();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &diff) noexcept
+auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &diff, void *) noexcept
     -> outcome::result<void> {
     if (!diff.self && diff.known) {
         auto &devices = cluster->get_devices();

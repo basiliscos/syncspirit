@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "connect_request.h"
 #include "../contact_visitor.h"
@@ -11,7 +11,7 @@ connect_request_t::connect_request_t(tcp::socket sock_, const tcp::endpoint &rem
 
 auto connect_request_t::apply_impl(cluster_t &) const noexcept -> outcome::result<void> { return outcome::success(); }
 
-auto connect_request_t::visit(contact_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto connect_request_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting connect_request_t");
-    return visitor(*this);
+    return visitor(*this, custom);
 }

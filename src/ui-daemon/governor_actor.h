@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -61,11 +61,11 @@ struct governor_actor_t : public r::actor_base_t,
 
     void refresh_deadline() noexcept;
 
-    outcome::result<void> operator()(const model::diff::modify::clone_file_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::cluster_update_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::update_folder_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::append_block_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::clone_block_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
 };
 
 } // namespace syncspirit::daemon

@@ -20,7 +20,7 @@ struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
                                                       const proto::IndexUpdate &message) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
-    outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     update_folder_t(std::string_view folder_id, std::string_view peer_id, files_t files, blocks_t blocks,
                     bool amssi) noexcept;

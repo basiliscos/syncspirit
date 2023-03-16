@@ -29,7 +29,7 @@ auto file_availability_t::apply_impl(cluster_t &cluster) const noexcept -> outco
     return outcome::success();
 }
 
-auto file_availability_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto file_availability_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting file_availability_t, folder = {}, file = {}", folder_id, file->get_name());
-    return visitor(*this);
+    return visitor(*this, custom);
 }

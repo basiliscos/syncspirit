@@ -61,7 +61,7 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     return outcome::success();
 }
 
-auto share_folder_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto share_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting share_folder_t");
-    return visitor(*this);
+    return visitor(*this, custom);
 }
