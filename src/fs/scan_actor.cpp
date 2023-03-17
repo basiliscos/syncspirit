@@ -107,6 +107,8 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             } else if constexpr (std::is_same_v<T, changed_meta_t>) {
                 LOG_WARN(log, "{}, changes in '{}' are ignored (not implemented)", identity, r.file->get_full_name());
+            } else if constexpr (std::is_same_v<T, unknown_file_t>) {
+                LOG_WARN(log, "{}, unknown file '{}' (not implemented)", identity, r.path.string());
             } else if constexpr (std::is_same_v<T, incomplete_t>) {
                 auto errs = initiate_rehash(task, r.file);
                 if (errs.empty()) {

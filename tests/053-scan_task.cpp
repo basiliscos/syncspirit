@@ -92,7 +92,7 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == false);
         }
 
-        SECTION("no dirs, file outside of recorded is ignored") {
+        SECTION("no dirs, unknown files") {
             auto task = scan_task_t(cluster, folder->get_id(), config);
             write_file(root_path / "some-file", "");
             auto r = task.advance();
@@ -100,7 +100,12 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == true);
 
             r = task.advance();
-            CHECK(std::get_if<bool>(&r));
+            auto *uf = std::get_if<unknown_file_t>(&r);
+            REQUIRE(uf);
+            CHECK(uf->path.filename() == "some-file");
+
+            r = task.advance();
+            REQUIRE(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
         }
     }

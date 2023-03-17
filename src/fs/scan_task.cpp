@@ -34,6 +34,11 @@ scan_task_t::~scan_task_t() {}
 std::string_view scan_task_t::get_folder_id() const noexcept { return folder_id; }
 
 scan_result_t scan_task_t::advance() noexcept {
+    if (!unknown_files_queue.empty()) {
+        auto path = unknown_files_queue.front();
+        unknown_files_queue.pop_front();
+        return path;
+    }
     if (!files_queue.empty()) {
         auto &file = files_queue.front();
         auto &&r = advance_file(file);
@@ -62,6 +67,8 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
         auto file = files->by_name(rp.path.string());
         if (file) {
             files_queue.push_back(file_info_t{file, rp.temp});
+        } else {
+            unknown_files_queue.push_back(unknown_file_t{rp.path});
         }
     };
 

@@ -46,8 +46,12 @@ struct file_error_t {
     sys::error_code ec;
 };
 
+struct unknown_file_t {
+    bfs::path path;
+};
+
 using scan_result_t = std::variant<bool, scan_errors_t, changed_meta_t, unchanged_meta_t, incomplete_t,
-                                   incomplete_removed_t, file_error_t>;
+                                   incomplete_removed_t, unknown_file_t, file_error_t>;
 
 struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, boost::thread_unsafe_counter> {
     struct file_info_t {
@@ -57,6 +61,7 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
 
     using path_queue_t = std::list<bfs::path>;
     using files_queue_t = std::list<file_info_t>;
+    using unknown_files_queue_t = std::list<unknown_file_t>;
 
     scan_task_t(model::cluster_ptr_t cluster, std::string_view folder_id, const config::fs_config_t &config) noexcept;
     ~scan_task_t();
@@ -76,6 +81,7 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
 
     path_queue_t dirs_queue;
     files_queue_t files_queue;
+    unknown_files_queue_t unknown_files_queue;
     bfs::path root;
 };
 
