@@ -68,17 +68,22 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
 
     void initiate_scan(std::string_view folder_id) noexcept;
     model::io_errors_t initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t file) noexcept;
-    bool rehash_next(message::rehash_needed_t &message) noexcept;
+    model::io_errors_t initiate_hash(scan_task_ptr_t task, const bfs::path &path) noexcept;
     void process_queue() noexcept;
 
     void on_initiate_scan(message::scan_folder_t &message) noexcept;
     void on_scan(message::scan_progress_t &message) noexcept;
     void on_hash(hasher::message::digest_response_t &res) noexcept;
     void on_rehash(message::rehash_needed_t &message) noexcept;
+    void on_hash_anew(message::hash_anew_t &message) noexcept;
+    void on_hash_new(hasher::message::digest_response_t &res) noexcept;
+
+    template <typename Message> bool hash_next(Message &m, const r::address_ptr_t &reply_addr) noexcept;
 
     model::cluster_ptr_t cluster;
     config::fs_config_t fs_config;
     r::address_ptr_t hasher_proxy;
+    r::address_ptr_t new_files; /* for routing */
     utils::logger_t log;
     r::address_ptr_t coordinator;
     uint32_t requested_hashes_limit;

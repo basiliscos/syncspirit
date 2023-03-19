@@ -18,11 +18,6 @@ namespace bfs = boost::filesystem;
 
 struct SYNCSPIRIT_API chunk_iterator_t {
 
-    struct chunk_t {
-        std::string data;
-        size_t block_index;
-    };
-
     chunk_iterator_t(scan_task_ptr_t task, model::file_info_ptr_t file, model::file_info_ptr_t source_file,
                      file_ptr_t backend) noexcept;
 
@@ -33,7 +28,7 @@ struct SYNCSPIRIT_API chunk_iterator_t {
 
     void ack_hashing() noexcept;
     bool ack_block(std::string_view digest, size_t block_index) noexcept;
-    outcome::result<chunk_t> read() noexcept;
+    outcome::result<details::chunk_t> read() noexcept;
     inline int64_t has_valid_blocks() const noexcept { return valid_blocks; }
 
     inline model::file_info_ptr_t get_source() { return source_file; }

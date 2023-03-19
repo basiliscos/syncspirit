@@ -19,7 +19,7 @@ bool chunk_iterator_t::has_more_chunks() const noexcept {
     return !abandoned && !invalid && (last_queued_block < (int64_t)source_file->get_blocks().size());
 }
 
-auto chunk_iterator_t::read() noexcept -> outcome::result<chunk_t> {
+auto chunk_iterator_t::read() noexcept -> outcome::result<details::chunk_t> {
     assert(!abandoned);
     auto &i = last_queued_block;
     auto block_sz = source_file->get_block_size();
@@ -37,11 +37,11 @@ auto chunk_iterator_t::read() noexcept -> outcome::result<chunk_t> {
         if (it == block.end()) { // we have only zeroes
             abandoned = true;
             unhashed_blocks -= (source_file->get_blocks().size() - i);
-            return outcome::success(chunk_t{{}, 0});
+            return outcome::success(details::chunk_t{{}, 0});
         } else {
             ++queue_size;
             auto idx = i++;
-            return outcome::success(chunk_t{std::move(block), (size_t)idx});
+            return outcome::success(details::chunk_t{std::move(block), (size_t)idx});
         }
     }
 }
