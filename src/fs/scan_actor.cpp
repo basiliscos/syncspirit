@@ -51,15 +51,6 @@ void scan_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
-#if 0
-void scan_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    if (message.payload.custom != this) {
-        ++generation;
-        LOG_CRITICAL(log, "{}, external model update", identity);
-    }
-}
-#endif
-
 void scan_actor_t::initiate_scan(std::string_view folder_id) noexcept {
     LOG_DEBUG(log, "{}, initiating scan of {}", identity, folder_id);
     auto task = scan_task_ptr_t(new scan_task_t(cluster, folder_id, fs_config));
@@ -176,40 +167,25 @@ void scan_actor_t::on_rehash(message::rehash_needed_t &message) noexcept {
 
 bool scan_actor_t::rehash_next(message::rehash_needed_t &message) noexcept {
     auto &info = message.payload;
-    if (!info.abandoned && !info.invalid) {
-        auto condition = [&]() {
-            return requested_hashes < requested_hashes_limit &&
-                   (info.last_queued_block < (int64_t)info.source_file->get_blocks().size()) && !info.abandoned;
-        };
-
-        auto block_sz = info.source_file->get_block_size();
-        auto file_sz = info.source_file->get_size();
-        auto non_zero = [](char it) { return it != 0; };
-
+    if (info.has_more_chunks()) {
+        auto condition = [&]() { return requested_hashes < requested_hashes_limit && info.has_more_chunks(); };
         while (condition()) {
-            auto &i = info.last_queued_block;
-            auto next_size = ((i + 1) * block_sz) > file_sz ? file_sz - (i * block_sz) : block_sz;
-            auto block_opt = info.backend->read(i * block_sz, next_size);
-            if (!block_opt) {
-                auto ec = block_opt.assume_error();
+            auto opt = info.read();
+            if (!opt) {
+                auto ec = opt.assume_error();
                 model::io_errors_t errs;
-                errs.push_back(model::io_error_t{info.backend->get_path(), ec});
+                errs.push_back(model::io_error_t{info.get_path(), ec});
                 send<model::payload::io_error_t>(coordinator, std::move(errs));
-                info.abandoned = true;
-            }
-            auto &block = block_opt.value();
-            auto it = std::find_if(block.begin(), block.end(), non_zero);
-            if (it == block.end()) { // we have only zeroes
-                info.abandoned = true;
-                info.unhashed_blocks -= (info.source_file->get_blocks().size() - i);
             } else {
-                using request_t = hasher::payload::digest_request_t;
-                request<request_t>(hasher_proxy, std::move(block), (size_t)i, r::message_ptr_t(&message))
-                    .send(init_timeout);
-                ++info.queue_size;
-                ++requested_hashes;
+                auto &chunk = opt.assume_value();
+                if (chunk.data.size()) {
+                    using request_t = hasher::payload::digest_request_t;
+                    request<request_t>(hasher_proxy, std::move(chunk.data), (size_t)chunk.block_index,
+                                       r::message_ptr_t(&message))
+                        .send(init_timeout);
+                    ++requested_hashes;
+                }
             }
-            ++i;
         }
     }
     return requested_hashes < requested_hashes_limit;
@@ -221,69 +197,52 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     auto &rp = res.payload.req->payload.request_payload;
     auto msg = static_cast<message::rehash_needed_t *>(rp.custom.get());
     auto &info = msg->payload;
-    auto &file = info.file;
-    --info.queue_size;
-    --info.unhashed_blocks;
+    info.ack_hashing();
 
     if (res.payload.ee) {
         auto &ee = res.payload.ee;
+        auto file = info.get_file();
         LOG_ERROR(log, "{}, on_hash, file: {}, block = {}, error: {}", identity, file->get_full_name(), rp.block_index,
                   ee->message());
         return do_shutdown(ee);
     }
 
     bool queued_next = false;
-    if (!info.invalid) {
+    if (info.is_valid()) {
         auto &digest = res.payload.res.digest;
         auto block_index = rp.block_index;
-        auto &source_file = info.source_file;
-        auto &orig_block = info.source_file->get_blocks().at(block_index);
-        if (orig_block->get_hash() == digest) {
-            auto &ooo = info.out_of_order;
-            if ((int64_t)block_index == info.valid_blocks + 1) {
-                ++info.valid_blocks;
-            } else {
-                ooo.insert((int64_t)block_index);
-            }
-            auto it = ooo.begin();
-            while (*it == info.valid_blocks + 1) {
-                ++info.valid_blocks;
-                it = ooo.erase(it);
-            }
+        if (info.ack_block(digest, block_index)) {
             bool can_process_more = rehash_next(*msg);
             queued_next = !can_process_more;
-            bool complete = (info.unhashed_blocks == 0);
-            if (complete) {
-                if (info.valid_blocks >= 0) {
-                    auto idx = (size_t)info.valid_blocks;
+            if (info.is_complete()) {
+                auto valid_blocks = info.has_valid_blocks();
+                if (valid_blocks >= 0) {
                     auto bdiff = model::diff::block_diff_ptr_t{};
-                    bdiff = new model::diff::modify::blocks_availability_t(*source_file, idx);
+                    bdiff = new model::diff::modify::blocks_availability_t(*info.get_source(), valid_blocks);
                     send<model::payload::block_update_t>(coordinator, std::move(bdiff), this);
                 }
                 auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::lock_file_t(*file, false);
+                diff = new model::diff::modify::lock_file_t(*info.get_file(), false);
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             }
-        } else {
-            info.invalid = true;
         }
     }
 
-    if (info.invalid && info.queue_size == 0) {
+    if (!info.is_valid() && info.get_queue_size() == 0) {
+        auto &file = *info.get_file();
         auto diff = model::diff::cluster_diff_ptr_t{};
-        diff = new model::diff::modify::lock_file_t(*file, false);
+        diff = new model::diff::modify::lock_file_t(file, false);
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 
-        LOG_DEBUG(log, "{}, removing temporal of '{}' as it corrupted", identity, file->get_full_name());
-        auto &backend = *info.backend;
-        auto r = backend.remove();
+        LOG_DEBUG(log, "{}, removing temporal of '{}' as it corrupted", identity, file.get_full_name());
+        auto r = info.remove();
         if (r) {
-            model::io_errors_t errors{model::io_error_t{backend.get_path(), r.assume_error()}};
+            model::io_errors_t errors{model::io_error_t{info.get_path(), r.assume_error()}};
             send<model::payload::io_error_t>(coordinator, std::move(errors));
         }
     }
 
     if (!queued_next) {
-        send<payload::scan_progress_t>(address, info.task);
+        send<payload::scan_progress_t>(address, info.get_task());
     }
 }

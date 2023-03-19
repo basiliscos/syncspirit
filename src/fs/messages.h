@@ -6,6 +6,7 @@
 #include <rotor.hpp>
 #include "scan_task.h"
 #include "file.h"
+#include "chunk_iterator.h"
 
 namespace syncspirit::fs {
 
@@ -21,24 +22,9 @@ struct scan_progress_t {
     scan_task_ptr_t task;
 };
 
-struct SYNCSPIRIT_API rehash_needed_t {
-    rehash_needed_t(scan_task_ptr_t task, model::file_info_ptr_t file, model::file_info_ptr_t source_file,
-                    file_ptr_t backend) noexcept;
+using rehash_needed_t = chunk_iterator_t;
 
-    scan_task_ptr_t task;
-    model::file_info_ptr_t file;
-    model::file_info_ptr_t source_file;
-    file_ptr_t backend;
-    int64_t last_queued_block;
-    int64_t valid_blocks;
-    size_t queue_size;
-    size_t unhashed_blocks;
-    std::set<std::int64_t> out_of_order;
-    bool abandoned;
-    bool invalid;
-};
-
-}; // namespace payload
+} // namespace payload
 
 namespace message {
 
