@@ -4,9 +4,7 @@
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
-#include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/new_file.h"
-#include "model/diff/cluster_visitor.h"
+#include "diff-builder.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -20,11 +18,11 @@ TEST_CASE("new file diff", "[model]") {
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
 
-    db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-    REQUIRE(diff->apply(*cluster));
+    auto builder = diff_builder_t(*cluster);
+    builder.create_folder("1234-5678", "some/path", "my-label");
+    REQUIRE(builder.apply());
+
+    auto folder = cluster->get_folders().by_id("1234-5678");
 
     proto::FileInfo pr_file_info;
     pr_file_info.set_name("a.txt");
@@ -32,10 +30,9 @@ TEST_CASE("new file diff", "[model]") {
     SECTION("symlink, inc sequence, no blocks") {
         pr_file_info.set_type(proto::FileInfoType::SYMLINK);
         pr_file_info.set_symlink_target("/some/where");
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {}));
-        REQUIRE(diff->apply(*cluster));
+        REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
 
-        auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(*my_device);
+        auto folder_info = folder->get_folder_infos().by_device(*my_device);
         auto &files = folder_info->get_file_infos();
         auto file = files.by_name(pr_file_info.name());
         REQUIRE(file);
@@ -47,9 +44,9 @@ TEST_CASE("new file diff", "[model]") {
 
         SECTION("update it") {
             pr_file_info.set_symlink_target("/new/location");
-            diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {}));
-            REQUIRE(diff->apply(*cluster));
+            REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
             REQUIRE(files.size() == 1);
+
             auto new_file = files.by_name(file->get_name());
             REQUIRE(new_file);
             CHECK(new_file.get() != file.get());
@@ -57,20 +54,20 @@ TEST_CASE("new file diff", "[model]") {
         }
     }
 
-    SECTION("file, no inc, with blocks") {
+    SECTION("file, no inc, new block") {
         pr_file_info.set_type(proto::FileInfoType::FILE);
         pr_file_info.set_size(5ul);
         pr_file_info.set_block_size(5ul);
 
-        auto bi = proto::BlockInfo();
-        bi.set_size(5);
-        bi.set_weak_hash(12);
-        bi.set_hash(utils::sha256_digest("12345").value());
-        bi.set_offset(0);
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {bi}));
-        REQUIRE(diff->apply(*cluster));
+        auto hash = utils::sha256_digest("12345").value();
+        auto pr_block = pr_file_info.add_blocks();
+        pr_block->set_weak_hash(12);
+        pr_block->set_size(5);
+        pr_block->set_hash(hash);
 
-        auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(*my_device);
+        REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
+
+        auto folder_info = folder->get_folder_infos().by_device(*my_device);
         auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
         REQUIRE(file);
         REQUIRE(file->get_size() == 5);
@@ -79,9 +76,9 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(file->get_sequence() == 1);
         REQUIRE(folder_info->get_max_sequence() == 1);
         REQUIRE(file->get_blocks().size() == 1);
-        REQUIRE(file->get_blocks()[0]->get_hash() == bi.hash());
+        REQUIRE(file->get_blocks()[0]->get_hash() == hash);
         REQUIRE(cluster->get_blocks().size() == 1);
-        REQUIRE(cluster->get_blocks().get(bi.hash()));
+        REQUIRE(cluster->get_blocks().get(hash));
     }
 
     SECTION("identical blocks") {
@@ -90,24 +87,21 @@ TEST_CASE("new file diff", "[model]") {
         pr_file_info.set_block_size(5ul);
         pr_file_info.set_sequence(1ul);
 
-        auto bi = proto::BlockInfo();
-        bi.set_size(5);
-        bi.set_weak_hash(12);
-        bi.set_hash(utils::sha256_digest("12345").value());
-        bi.set_offset(0);
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {bi}));
-        REQUIRE(diff->apply(*cluster));
+        auto hash = utils::sha256_digest("12345").value();
+        auto pr_block = pr_file_info.add_blocks();
+        pr_block->set_weak_hash(12);
+        pr_block->set_size(5);
+        pr_block->set_hash(hash);
 
-        auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(*my_device);
+        REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
+
+        auto folder_info = folder->get_folder_infos().by_device(*my_device);
         auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
         REQUIRE(file->get_sequence() == 1);
-        CHECK(!file->is_locally_available());
-        file->mark_local_available(0);
         CHECK(file->is_locally_available());
 
         pr_file_info.set_sequence(2ul);
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {bi}));
-        REQUIRE(diff->apply(*cluster));
+        REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
         file = folder_info->get_file_infos().by_name(pr_file_info.name());
         REQUIRE(file->get_sequence() == 2);
         CHECK(file->is_locally_available());

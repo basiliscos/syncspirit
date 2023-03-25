@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
-#include "syncspirit-test-export.h"
 #include <boost/filesystem.hpp>
+#include <boost/outcome.hpp>
 #include <rotor/supervisor.h>
+
+#include "syncspirit-test-export.h"
 #include "model/device.h"
 #include "model/file_info.h"
 #include "model/diff/cluster_diff.h"
@@ -15,6 +17,7 @@
 namespace syncspirit::test {
 
 namespace r = rotor;
+namespace outcome = boost::outcome_v2;
 
 struct diff_builder_t;
 
@@ -46,6 +49,8 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
 
     diff_builder_t(model::cluster_t &) noexcept;
     diff_builder_t &apply(r::supervisor_t &sup) noexcept;
+    outcome::result<void> apply() noexcept;
+
     diff_builder_t &create_folder(std::string_view id, std::string_view path, std::string_view label = "") noexcept;
     diff_builder_t &update_peer(std::string_view sha256, std::string_view name = "", std::string_view cert_name = "",
                                 bool auto_accept = true) noexcept;
@@ -55,7 +60,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &clone_file(const model::file_info_t &source) noexcept;
     diff_builder_t &finish_file(const model::file_info_t &source) noexcept;
     diff_builder_t &flush_file(const model::file_info_t &source) noexcept;
-    diff_builder_t &new_file(std::string_view folder_id, const proto::FileInfo &file_, const blocks_t = {}) noexcept;
+    diff_builder_t &new_file(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
     diff_builder_t &append_block(const model::file_info_t &target, size_t block_index, std::string data) noexcept;
     diff_builder_t &clone_block(const model::file_block_t &) noexcept;
 

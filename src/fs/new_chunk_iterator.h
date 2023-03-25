@@ -5,6 +5,7 @@
 
 #include <string_view>
 #include <boost/outcome.hpp>
+#include <vector>
 
 #include "file.h"
 #include "scan_task.h"
@@ -16,22 +17,40 @@ namespace outcome = boost::outcome_v2;
 namespace bfs = boost::filesystem;
 
 struct SYNCSPIRIT_API new_chunk_iterator_t {
-    new_chunk_iterator_t(scan_task_ptr_t task, file_ptr_t backend) noexcept;
+
+    struct block_hash_t {
+        std::string digest;
+        uint32_t weak;
+        int32_t size;
+    };
+
+    using hashes_t = std::vector<block_hash_t>;
+
+    new_chunk_iterator_t(scan_task_ptr_t task, file_ptr_t backend) noexcept {}
 
     bool has_more_chunks() const noexcept;
     outcome::result<details::chunk_t> read() noexcept;
-    inline bfs::path get_path() noexcept { return backend->get_path(); }
+    inline const bfs::path &get_path() noexcept { return backend->get_path(); }
 
     inline scan_task_ptr_t get_task() noexcept { return task; }
+    void ack(size_t block_index, std::string_view hash) noexcept;
+    bool is_complete() const noexcept;
+    inline hashes_t &get_hashes() noexcept { return hashes; }
+    int64_t get_size() const noexcept { return file_size; }
+    int64_t get_block_size() const noexcept { return block_size; }
 
   private:
     scan_task_ptr_t task;
     file_ptr_t backend;
     int64_t last_queued_block;
     int64_t valid_blocks;
+    size_t block_size;
     size_t queue_size;
+    int64_t file_size;
     size_t unhashed_blocks;
     std::set<std::int64_t> out_of_order;
+    std::set<std::int64_t> unfinished;
+    hashes_t hashes;
     bool abandoned;
     bool invalid;
 };

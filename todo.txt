@@ -1,5 +1,4 @@
-unit test:
-
+-- unit test: new empty file, new folder, new symlink, deleted file.
 -- unit test: send ClusterUpdate (+ Index) on folder share/unshare.
 
 

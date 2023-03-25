@@ -5,6 +5,7 @@
 
 #include <string_view>
 #include <boost/outcome.hpp>
+#include <rotor/address.hpp>
 
 #include "model/file_info.h"
 #include "file.h"
@@ -24,12 +25,12 @@ struct SYNCSPIRIT_API chunk_iterator_t {
     bool has_more_chunks() const noexcept;
     inline bool is_complete() const noexcept { return unhashed_blocks == 0; }
     inline bool is_valid() const noexcept { return !invalid; }
+    inline int64_t has_valid_blocks() const noexcept { return valid_blocks; }
     inline size_t get_queue_size() const noexcept { return queue_size; }
 
     void ack_hashing() noexcept;
     bool ack_block(std::string_view digest, size_t block_index) noexcept;
     outcome::result<details::chunk_t> read() noexcept;
-    inline int64_t has_valid_blocks() const noexcept { return valid_blocks; }
 
     inline model::file_info_ptr_t get_source() { return source_file; }
     inline model::file_info_ptr_t get_file() { return file; }

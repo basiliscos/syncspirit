@@ -1,3 +1,6 @@
 
-new_chunk_iterator_t::new_chunk_iterator_t(scan_task_ptr_t task_, file_ptr_t backend_) noexcept
-    : task{std::move(task)}, backend{std::move(backend_)}, abandoned{false}, invalid{false} {}
+#include "new_chunk_iterator.h"
+
+using namespace syncspirit::fs;
+
+bool new_chunk_iterator_t::is_complete() const noexcept { return out_of_order.empty() && unfinished.empty(); }

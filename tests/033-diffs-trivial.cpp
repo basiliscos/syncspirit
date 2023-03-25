@@ -3,11 +3,11 @@
 
 #include "test-utils.h"
 #include "access.h"
+#include "diff-builder.h"
 #include "model/cluster.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/file_availability.h"
-#include "model/diff/modify/new_file.h"
 #include "model/diff/peer/peer_state.h"
 #include "model/diff/cluster_visitor.h"
 
@@ -45,13 +45,12 @@ TEST_CASE("with file", "[model]") {
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
 
-    db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-    REQUIRE(diff->apply(*cluster));
+    auto builder = diff_builder_t(*cluster);
+    builder.create_folder("1234-5678", "some/path", "my-label");
+    REQUIRE(builder.apply());
 
-    auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(*my_device);
+    auto folder = cluster->get_folders().by_id("1234-5678");
+    auto folder_info = folder->get_folder_infos().by_device(*my_device);
     CHECK(folder_info->is_actual());
 
     proto::FileInfo pr_file_info;
@@ -60,18 +59,18 @@ TEST_CASE("with file", "[model]") {
     pr_file_info.set_symlink_target("/some/where");
     pr_file_info.set_block_size(5);
     pr_file_info.set_size(5);
+    auto b1_hash = utils::sha256_digest("12345").value();
     auto b1 = pr_file_info.add_blocks();
-    b1->set_hash(utils::sha256_digest("12345").value());
+    b1->set_hash(b1_hash);
     b1->set_offset(0);
     b1->set_size(5);
 
-    diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {*b1}));
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
     auto file = folder_info->get_file_infos().by_name("a.txt");
     REQUIRE(file);
 
     SECTION("lock/unlock") {
-        diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, true));
+        auto diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, true));
         REQUIRE(diff->apply(*cluster));
         auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
         REQUIRE(file->is_locked());
@@ -82,8 +81,11 @@ TEST_CASE("with file", "[model]") {
     }
 
     SECTION("file_availability") {
+        auto block = cluster->get_blocks().get(b1_hash);
+        file->remove_blocks();
+        file->assign_block(block, 0);
         REQUIRE(!file->is_locally_available());
-        diff = diff::cluster_diff_ptr_t(new diff::modify::file_availability_t(file));
+        auto diff = diff::cluster_diff_ptr_t(new diff::modify::file_availability_t(file));
         REQUIRE(diff->apply(*cluster));
         REQUIRE(file->is_locally_available());
     }
