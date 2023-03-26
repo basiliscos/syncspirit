@@ -185,24 +185,27 @@ auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path) no
 
 void scan_actor_t::on_rehash(message::rehash_needed_t &message) noexcept {
     LOG_TRACE(log, "{}, on_rehash", identity);
-    bool can_process_more = hash_next(message, address);
-    if (can_process_more) {
+    hash_next(message, address);
+    if (requested_hashes < requested_hashes_limit) {
         process_queue();
     }
 }
 
 void scan_actor_t::on_hash_anew(message::hash_anew_t &message) noexcept {
     LOG_TRACE(log, "{}, on_hash_anew", identity);
-#if 0
-    bool can_process_more = hash_next(message, new_files);
-    if (can_process_more) {
+    auto initial = requested_hashes;
+    hash_next(message, new_files);
+    // file w/o context
+    if (initial == requested_hashes) {
+        commit_new_file(message.payload);
+    }
+    if (requested_hashes < requested_hashes_limit) {
         process_queue();
     }
-#endif
 }
 
 template <typename Message>
-bool scan_actor_t::hash_next(Message &message, const r::address_ptr_t &reply_addr) noexcept {
+void scan_actor_t::hash_next(Message &message, const r::address_ptr_t &reply_addr) noexcept {
     auto &info = message.payload;
     if (info.has_more_chunks()) {
         auto condition = [&]() { return requested_hashes < requested_hashes_limit && info.has_more_chunks(); };
@@ -225,7 +228,7 @@ bool scan_actor_t::hash_next(Message &message, const r::address_ptr_t &reply_add
             }
         }
     }
-    return requested_hashes < requested_hashes_limit;
+    return;
 }
 
 void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
@@ -249,7 +252,8 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
         auto &digest = res.payload.res.digest;
         auto block_index = rp.block_index;
         if (info.ack_block(digest, block_index)) {
-            bool can_process_more = hash_next(*msg, address);
+            hash_next(*msg, address);
+            bool can_process_more = requested_hashes < requested_hashes_limit;
             queued_next = !can_process_more;
             if (info.is_complete()) {
                 auto valid_blocks = info.has_valid_blocks();
@@ -284,6 +288,31 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     }
 }
 
+void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
+    assert(info.is_complete());
+    auto &hashes = info.get_hashes();
+    auto file = proto::FileInfo();
+    file.set_name(info.get_path().string());
+    file.set_type(proto::FileInfoType::FILE);
+    file.set_size(info.get_size());
+    file.set_block_size(info.get_block_size());
+    int offset = 0;
+
+    for (auto &b : hashes) {
+        auto block = file.add_blocks();
+        block->set_hash(b.digest);
+        block->set_weak_hash(b.weak);
+        block->set_size(b.size);
+        block->set_offset(offset);
+        offset += b.size;
+    }
+
+    auto diff = model::diff::cluster_diff_ptr_t{};
+    auto folder_id = std::string(info.get_task()->get_folder_id());
+    diff = new model::diff::modify::new_file_t(*cluster, std::move(folder_id), file);
+    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+}
+
 void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept {
     --requested_hashes;
 
@@ -299,66 +328,20 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
         return do_shutdown(ee);
     }
 
-#if 0
-    info.ack(rp.block_index, res.payload.res.digest);
+    auto &hash_info = res.payload.res;
+
+    info.ack(rp.block_index, hash_info.weak, hash_info.digest);
 
     bool queued_next = false;
-    while(info.has_more_chunks()) {
-        bool can_process_more = hash_next(*msg, address);
+    while (info.has_more_chunks()) {
+        hash_next(*msg, address);
+        bool can_process_more = requested_hashes < requested_hashes_limit;
         queued_next = !can_process_more;
         if (info.is_complete()) {
-            auto& hashes = info.get_hashes();
-            auto file = proto::FileInfo();
-            file.set_name(path.string());
-            file.set_type(proto::FileInfoType::FILE);
-            file.set_size(info.get_size());
-            file.set_block_size(info.get_block_size());
-            int offset = 0;
-
-            for (auto& b: hashes) {
-                auto block = file.add_blocks();
-                block->set_hash(b.digest);
-                block->set_weak_hash(b.weak);
-                block->set_size(b.size);
-                block->set_offset(offset);
-                offset += b.size;
-            }
-
-
-            auto diff = model::diff::cluster_diff_ptr_t{};
-            diff = new model::diff::modify::new_file_t(*cluster,  *info.get_file(), false);
-            send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-            if (!hashes.empty()) {
-                auto bdiff = model::diff::block_diff_ptr_t{};
-                bdiff = new model::diff::modify::blocks_availability_t(*info.get_source(), valid_blocks);
-                send<model::payload::block_update_t>(coordinator, std::move(bdiff), this);
-            }
+            commit_new_file(info);
         }
     }
-#endif
-
 #if 0
-    bool queued_next = false;
-    if (info.is_valid()) {
-        auto &digest = res.payload.res.digest;
-        auto block_index = rp.block_index;
-        if (info.ack_block(digest, block_index)) {
-            bool can_process_more = hash_next(*msg, address);
-            queued_next = !can_process_more;
-            if (info.is_complete()) {
-                auto valid_blocks = info.has_valid_blocks();
-                if (valid_blocks >= 0) {
-                    auto bdiff = model::diff::block_diff_ptr_t{};
-                    bdiff = new model::diff::modify::blocks_availability_t(*info.get_source(), valid_blocks);
-                    send<model::payload::block_update_t>(coordinator, std::move(bdiff), this);
-                }
-                auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::lock_file_t(*info.get_file(), false);
-                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-            }
-        }
-    }
-
     if (!info.is_valid() && info.get_queue_size() == 0) {
         auto &file = *info.get_file();
         auto diff = model::diff::cluster_diff_ptr_t{};

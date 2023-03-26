@@ -19,7 +19,7 @@ std::size_t *block_sizes = _block_sizes;
 
 static const constexpr size_t max_blocks_count = 2000;
 
-std::pair<size_t, size_t> get_block_size(size_t sz) noexcept {
+block_division_t get_block_size(size_t sz) noexcept {
     size_t bs = 0;
     for (size_t i = 0; i < block_sizes_sz; ++i) {
         if (block_sizes[i] * max_blocks_count >= sz) {
@@ -42,7 +42,7 @@ std::pair<size_t, size_t> get_block_size(size_t sz) noexcept {
         }
     }
 
-    return {bs, count};
+    return {count, (int32_t)bs};
 }
 
 bfs::path make_temporal(const bfs::path &path) noexcept {

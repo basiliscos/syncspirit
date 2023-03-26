@@ -70,6 +70,7 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
     model::io_errors_t initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t file) noexcept;
     model::io_errors_t initiate_hash(scan_task_ptr_t task, const bfs::path &path) noexcept;
     void process_queue() noexcept;
+    void commit_new_file(new_chunk_iterator_t &info) noexcept;
 
     void on_initiate_scan(message::scan_folder_t &message) noexcept;
     void on_scan(message::scan_progress_t &message) noexcept;
@@ -78,7 +79,7 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
     void on_hash_anew(message::hash_anew_t &message) noexcept;
     void on_hash_new(hasher::message::digest_response_t &res) noexcept;
 
-    template <typename Message> bool hash_next(Message &m, const r::address_ptr_t &reply_addr) noexcept;
+    template <typename Message> void hash_next(Message &m, const r::address_ptr_t &reply_addr) noexcept;
 
     model::cluster_ptr_t cluster;
     config::fs_config_t fs_config;

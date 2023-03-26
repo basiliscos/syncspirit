@@ -32,6 +32,7 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
 
     std::string_view get_path_view() const noexcept;
     const bfs::path &get_path() const noexcept;
+    inline size_t get_file_size() const noexcept { return file_size; }
 
     outcome::result<void> close(bool remove_temporal) noexcept;
     outcome::result<void> remove() noexcept;
@@ -44,7 +45,7 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
 
   private:
     file_t(FILE *backend, model::file_info_ptr_t model, bfs::path path, bool temporal) noexcept;
-    file_t(FILE *backend, bfs::path path) noexcept;
+    file_t(FILE *backend, bfs::path path, size_t file_size) noexcept;
 
     enum last_op_t { r, w };
 
@@ -54,6 +55,7 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     std::string path_str;
     mutable size_t pos = 0;
     mutable last_op_t last_op{last_op_t::r};
+    size_t file_size;
     bool temporal{false};
 };
 

@@ -26,14 +26,14 @@ struct SYNCSPIRIT_API new_chunk_iterator_t {
 
     using hashes_t = std::vector<block_hash_t>;
 
-    new_chunk_iterator_t(scan_task_ptr_t task, file_ptr_t backend) noexcept {}
+    new_chunk_iterator_t(scan_task_ptr_t task, file_ptr_t backend) noexcept;
 
     bool has_more_chunks() const noexcept;
     outcome::result<details::chunk_t> read() noexcept;
     inline const bfs::path &get_path() noexcept { return backend->get_path(); }
 
     inline scan_task_ptr_t get_task() noexcept { return task; }
-    void ack(size_t block_index, std::string_view hash) noexcept;
+    void ack(size_t block_index, uint32_t weak, std::string_view hash) noexcept;
     bool is_complete() const noexcept;
     inline hashes_t &get_hashes() noexcept { return hashes; }
     int64_t get_size() const noexcept { return file_size; }
@@ -44,14 +44,15 @@ struct SYNCSPIRIT_API new_chunk_iterator_t {
     file_ptr_t backend;
     int64_t last_queued_block;
     int64_t valid_blocks;
+    size_t unread_blocks;
     size_t block_size;
     size_t queue_size;
+    size_t unread_bytes;
+    size_t next_idx;
     int64_t file_size;
-    size_t unhashed_blocks;
-    std::set<std::int64_t> out_of_order;
+    size_t offset;
     std::set<std::int64_t> unfinished;
     hashes_t hashes;
-    bool abandoned;
     bool invalid;
 };
 
