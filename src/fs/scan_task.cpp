@@ -95,7 +95,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
 
             bool is_symlink = bfs::is_symlink(child, ec);
             if (is_symlink) {
-                push(child.path(), file_type_t::regular);
+                push(child.path(), file_type_t::symlink);
                 continue;
             }
         }

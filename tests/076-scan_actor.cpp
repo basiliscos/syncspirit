@@ -360,8 +360,30 @@ void test_meta_changes() {
     F().run();
 }
 
+void test_new_files() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            sys::error_code ec;
+            SECTION("new symlink") {
+                auto file_path = root_path / "symlink";
+                bfs::create_symlink(bfs::path("/some/where"), file_path, ec);
+                REQUIRE(!ec);
+                sup->do_process();
+
+                auto file = files->by_name("symlink");
+                REQUIRE(file);
+                CHECK(file->is_link());
+                CHECK(file->get_block_size() == 0);
+                CHECK(file->get_size() == 0);
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");
+    REGISTER_TEST_CASE(test_new_files, "test_new_files", "[fs]");
     return 1;
 }
 

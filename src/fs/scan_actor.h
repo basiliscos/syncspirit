@@ -68,7 +68,7 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
 
     void initiate_scan(std::string_view folder_id) noexcept;
     model::io_errors_t initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t file) noexcept;
-    model::io_errors_t initiate_hash(scan_task_ptr_t task, const bfs::path &path) noexcept;
+    model::io_errors_t initiate_hash(scan_task_ptr_t task, const bfs::path &path, file_type_t file_type) noexcept;
     void process_queue() noexcept;
     void commit_new_file(new_chunk_iterator_t &info) noexcept;
 

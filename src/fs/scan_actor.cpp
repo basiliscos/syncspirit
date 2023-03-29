@@ -105,7 +105,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
             } else if constexpr (std::is_same_v<T, changed_meta_t>) {
                 LOG_WARN(log, "{}, changes in '{}' are ignored (not implemented)", identity, r.file->get_full_name());
             } else if constexpr (std::is_same_v<T, unknown_file_t>) {
-                auto errs = initiate_hash(task, r.path);
+                auto errs = initiate_hash(task, r.path, r.file_type);
                 if (errs.empty()) {
                     stop_processing = true;
                 } else {
@@ -150,7 +150,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
 auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t file) noexcept -> model::io_errors_t {
     auto orig_path = file->get_path();
     auto path = make_temporal(orig_path);
-    auto opt = file_t::open_read(path);
+    auto opt = file_t::open_read(path, false);
     if (!opt) {
         auto &ec = opt.assume_error();
         LOG_WARN(log, "{}, error opening file {}: {}", identity, path.string(), ec.message());
@@ -168,8 +168,9 @@ auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t 
     return {};
 }
 
-auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path) noexcept -> model::io_errors_t {
-    auto opt = file_t::open_read(path);
+auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path, file_type_t file_type) noexcept
+    -> model::io_errors_t {
+    auto opt = file_t::open_read(path, file_type == file_type_t::symlink);
     if (!opt) {
         auto &ec = opt.assume_error();
         LOG_WARN(log, "{}, error opening file {}: {}", identity, path.string(), ec.message());
@@ -177,9 +178,8 @@ auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path) no
         errs.push_back(model::io_error_t{path, ec});
         return errs;
     }
-
-    auto file_ptr = file_ptr_t(new file_t(std::move(opt.value())));
-    send<payload::hash_anew_t>(address, std::move(task), std::move(file_ptr));
+    auto file_ptr = new file_t(std::move(opt.value()));
+    send<payload::hash_anew_t>(address, std::move(task), file_type, std::move(file_ptr));
     return {};
 }
 
@@ -289,11 +289,13 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
 }
 
 void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
+    using FIT = proto::FileInfoType;
     assert(info.is_complete());
     auto &hashes = info.get_hashes();
     auto file = proto::FileInfo();
+    auto type = info.get_file_type() == file_type_t::regular ? FIT::FILE : FIT::SYMLINK;
     file.set_name(info.get_path().string());
-    file.set_type(proto::FileInfoType::FILE);
+    file.set_type(type);
     file.set_size(info.get_size());
     file.set_block_size(info.get_block_size());
     int offset = 0;

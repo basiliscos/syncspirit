@@ -56,18 +56,22 @@ auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::resul
     return file_t(file, std::move(model), std::move(path), tmp);
 }
 
-auto file_t::open_read(const bfs::path &path) noexcept -> outcome::result<file_t> {
-    auto path_str = path.string();
-    auto file = fopen(path_str.c_str(), "rb");
-    if (!file) {
-        return sys::error_code{errno, sys::system_category()};
+auto file_t::open_read(const bfs::path &path, bool symlink) noexcept -> outcome::result<file_t> {
+    if (!symlink) {
+        auto path_str = path.string();
+        auto file = fopen(path_str.c_str(), "rb");
+        if (!file) {
+            return sys::error_code{errno, sys::system_category()};
+        }
+        auto ec = sys::error_code{};
+        auto sz = bfs::file_size(path, ec);
+        if (ec) {
+            return ec;
+        }
+        return file_t(file, path, sz, false);
+    } else {
+        return file_t(nullptr, path, 0, true);
     }
-    auto ec = sys::error_code{};
-    auto sz = bfs::file_size(path, ec);
-    if (ec) {
-        return ec;
-    }
-    return file_t(file, path, sz);
 }
 
 file_t::file_t() noexcept : backend{nullptr} {}
@@ -78,9 +82,9 @@ file_t::file_t(FILE *backend_, model::file_info_ptr_t model_, bfs::path path_, b
     path_str = model_path.string();
 }
 
-file_t::file_t(FILE *backend_, bfs::path path_, size_t file_size_) noexcept
+file_t::file_t(FILE *backend_, bfs::path path_, size_t file_size_, bool symlink_) noexcept
     : backend{backend_}, path{std::move(path_)}, path_str{path.string()}, last_op{r}, file_size{file_size_},
-      temporal{false} {}
+      temporal{false}, symlink{symlink_} {}
 
 file_t::file_t(file_t &&other) noexcept : backend{nullptr} { *this = std::move(other); }
 

@@ -41,11 +41,11 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     outcome::result<std::string> read(size_t offset, size_t size) const noexcept;
 
     static outcome::result<file_t> open_write(model::file_info_ptr_t model) noexcept;
-    static outcome::result<file_t> open_read(const bfs::path &path) noexcept;
+    static outcome::result<file_t> open_read(const bfs::path &path, bool symlink) noexcept;
 
   private:
     file_t(FILE *backend, model::file_info_ptr_t model, bfs::path path, bool temporal) noexcept;
-    file_t(FILE *backend, bfs::path path, size_t file_size) noexcept;
+    file_t(FILE *backend, bfs::path path, size_t file_size, bool symblink) noexcept;
 
     enum last_op_t { r, w };
 
@@ -57,6 +57,7 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     mutable last_op_t last_op{last_op_t::r};
     size_t file_size;
     bool temporal{false};
+    bool symlink;
 };
 
 using file_ptr_t = model::intrusive_ptr_t<file_t>;

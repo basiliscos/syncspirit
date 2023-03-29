@@ -4,14 +4,21 @@
 
 using namespace syncspirit::fs;
 
-new_chunk_iterator_t::new_chunk_iterator_t(scan_task_ptr_t task_, file_ptr_t backend_) noexcept
-    : task{std::move(task_)}, backend{std::move(backend_)}, next_idx{0}, file_size{(int64_t)backend->get_file_size()},
-      offset{0} {
-    auto div = syncspirit::fs::get_block_size(file_size);
-    unread_blocks = div.count;
-    block_size = div.size;
-    unread_bytes = file_size;
-    hashes.resize(unread_blocks);
+new_chunk_iterator_t::new_chunk_iterator_t(scan_task_ptr_t task_, file_type_t file_type_, file_ptr_t backend_) noexcept
+    : task{std::move(task_)}, file_type{file_type_}, backend{std::move(backend_)}, next_idx{0}, offset{0} {
+    if (file_type == file_type_t::regular) {
+        file_size = (int64_t)backend->get_file_size();
+        auto div = syncspirit::fs::get_block_size(file_size);
+        unread_blocks = div.count;
+        block_size = div.size;
+        unread_bytes = file_size;
+        hashes.resize(unread_blocks);
+    } else {
+        file_size = 0;
+        unread_blocks = 0;
+        block_size = 0;
+        unread_bytes = 0;
+    }
 }
 
 bool new_chunk_iterator_t::is_complete() const noexcept { return !unread_bytes && unfinished.empty(); }
