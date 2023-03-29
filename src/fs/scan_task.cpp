@@ -31,7 +31,7 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
 
 scan_task_t::~scan_task_t() {}
 
-std::string_view scan_task_t::get_folder_id() const noexcept { return folder_id; }
+const std::string &scan_task_t::get_folder_id() const noexcept { return folder_id; }
 
 scan_result_t scan_task_t::advance() noexcept {
     if (!unknown_files_queue.empty()) {
@@ -68,7 +68,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
         if (file) {
             files_queue.push_back(file_info_t{file, rp.temp});
         } else {
-            unknown_files_queue.push_back(unknown_file_t{rp.path, file_type});
+            unknown_files_queue.push_back(unknown_file_t{path, file_type});
         }
     };
 

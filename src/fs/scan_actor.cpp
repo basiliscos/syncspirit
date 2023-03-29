@@ -292,9 +292,12 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     using FIT = proto::FileInfoType;
     assert(info.is_complete());
     auto &hashes = info.get_hashes();
+    auto folder_id = std::string(info.get_task()->get_folder_id());
+    auto folder = cluster->get_folders().by_id(folder_id);
+    auto rel_result = relativize(info.get_path(), folder->get_path());
     auto file = proto::FileInfo();
     auto type = info.get_file_type() == file_type_t::regular ? FIT::FILE : FIT::SYMLINK;
-    file.set_name(info.get_path().string());
+    file.set_name(rel_result.path.string());
     file.set_type(type);
     file.set_size(info.get_size());
     file.set_block_size(info.get_block_size());
@@ -310,7 +313,6 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     }
 
     auto diff = model::diff::cluster_diff_ptr_t{};
-    auto folder_id = std::string(info.get_task()->get_folder_id());
     diff = new model::diff::modify::new_file_t(*cluster, std::move(folder_id), file);
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 }

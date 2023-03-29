@@ -364,6 +364,7 @@ void test_new_files() {
     struct F : fixture_t {
         void main() noexcept override {
             sys::error_code ec;
+
             SECTION("new symlink") {
                 auto file_path = root_path / "symlink";
                 bfs::create_symlink(bfs::path("/some/where"), file_path, ec);
@@ -372,7 +373,21 @@ void test_new_files() {
 
                 auto file = files->by_name("symlink");
                 REQUIRE(file);
+                CHECK(!file->is_file());
                 CHECK(file->is_link());
+                CHECK(file->get_block_size() == 0);
+                CHECK(file->get_size() == 0);
+            }
+
+            SECTION("empty file") {
+                auto file_path = root_path / "empty.file";
+                write_file(file_path, "");
+                sup->do_process();
+
+                auto file = files->by_name("empty.file");
+                REQUIRE(file);
+                CHECK(!file->is_link());
+                CHECK(file->is_file());
                 CHECK(file->get_block_size() == 0);
                 CHECK(file->get_size() == 0);
             }

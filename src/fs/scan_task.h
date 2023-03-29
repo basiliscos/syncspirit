@@ -70,7 +70,7 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
     ~scan_task_t();
 
     scan_result_t advance() noexcept;
-    std::string_view get_folder_id() const noexcept;
+    const std::string &get_folder_id() const noexcept;
 
   private:
     scan_result_t advance_dir(const bfs::path &dir) noexcept;
