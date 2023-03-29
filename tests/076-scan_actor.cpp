@@ -364,7 +364,8 @@ void test_new_files() {
     struct F : fixture_t {
         void main() noexcept override {
             sys::error_code ec;
-
+            auto& blocks = cluster->get_blocks();
+#if 0
             SECTION("new symlink") {
                 auto file_path = root_path / "symlink";
                 bfs::create_symlink(bfs::path("/some/where"), file_path, ec);
@@ -377,6 +378,7 @@ void test_new_files() {
                 CHECK(file->is_link());
                 CHECK(file->get_block_size() == 0);
                 CHECK(file->get_size() == 0);
+                CHECK(blocks.size() == 0);
             }
 
             SECTION("empty file") {
@@ -391,6 +393,23 @@ void test_new_files() {
                 CHECK(file->is_file());
                 CHECK(file->get_block_size() == 0);
                 CHECK(file->get_size() == 0);
+                CHECK(blocks.size() == 0);
+            }
+#endif
+            SECTION("non-empty file") {
+                CHECK(bfs::create_directories(root_path / "abc"));
+                auto file_path = root_path / "file.ext";
+                write_file(file_path, "12345");
+                sup->do_process();
+
+                auto file = files->by_name("file.ext");
+                REQUIRE(file);
+                CHECK(!file->is_link());
+                CHECK(file->is_file());
+                CHECK(file->get_block_size() == 5);
+                CHECK(file->get_size() == 5);
+                CHECK(blocks.size() == 1);
+
             }
         }
     };

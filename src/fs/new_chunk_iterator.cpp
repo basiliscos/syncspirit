@@ -33,6 +33,7 @@ auto new_chunk_iterator_t::read() noexcept -> outcome::result<details::chunk_t> 
         auto idx = next_idx++;
         auto data = std::move(r.assume_value());
         unfinished.insert(idx);
+        unread_bytes -= next_sz;
         return details::chunk_t{std::move(data), idx};
     }
     invalid = true;
