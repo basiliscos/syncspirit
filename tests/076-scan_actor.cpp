@@ -380,11 +380,12 @@ void test_new_files() {
             }
 
             SECTION("empty file") {
-                auto file_path = root_path / "empty.file";
+                CHECK(bfs::create_directories(root_path / "abc"));
+                auto file_path = root_path / "abc"/ "empty.file";
                 write_file(file_path, "");
                 sup->do_process();
 
-                auto file = files->by_name("empty.file");
+                auto file = files->by_name("abc/empty.file");
                 REQUIRE(file);
                 CHECK(!file->is_link());
                 CHECK(file->is_file());
