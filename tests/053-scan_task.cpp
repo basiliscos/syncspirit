@@ -108,6 +108,25 @@ TEST_CASE("scan_task", "[fs]") {
             REQUIRE(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
         }
+
+        SECTION("no dirs, symlinks") {
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto file_path = root_path / "symlink";
+            bfs::create_symlink(bfs::path("/some/where"), file_path);
+
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            auto *uf = std::get_if<unknown_file_t>(&r);
+            REQUIRE(uf);
+            CHECK(uf->path.filename() == "symlink");
+
+            r = task.advance();
+            REQUIRE(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
     }
 
     SECTION("files") {

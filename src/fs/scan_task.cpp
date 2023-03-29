@@ -92,6 +92,12 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 push(child.path());
                 continue;
             }
+
+            bool is_symlink = bfs::is_symlink(child, ec);
+            if (is_symlink) {
+                push(child.path());
+                continue;
+            }
         }
     }
     if (!errors.empty()) {
