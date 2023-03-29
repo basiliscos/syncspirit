@@ -283,7 +283,7 @@ auto file_actor_t::open_file_rw(const boost::filesystem::path &path, model::file
 
 auto file_actor_t::open_file_ro(const bfs::path &path) noexcept -> outcome::result<file_ptr_t> {
     LOG_TRACE(log, "{}, open_file (by path), path = {}", identity, path.string());
-    auto opt = file_t::open_read(path, false);
+    auto opt = file_t::open_read(path);
     if (!opt) {
         auto &ec = opt.assume_error();
         LOG_ERROR(log, "{}, error opening file {}: {}", identity, path.string(), ec.message());

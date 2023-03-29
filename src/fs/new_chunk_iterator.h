@@ -26,7 +26,7 @@ struct SYNCSPIRIT_API new_chunk_iterator_t {
 
     using hashes_t = std::vector<block_hash_t>;
 
-    new_chunk_iterator_t(scan_task_ptr_t task, file_type_t file_type, file_ptr_t backend) noexcept;
+    new_chunk_iterator_t(scan_task_ptr_t task, proto::FileInfo metadata, file_ptr_t backend) noexcept;
 
     bool has_more_chunks() const noexcept;
     outcome::result<details::chunk_t> read() noexcept;
@@ -38,11 +38,11 @@ struct SYNCSPIRIT_API new_chunk_iterator_t {
     inline hashes_t &get_hashes() noexcept { return hashes; }
     inline int64_t get_size() const noexcept { return file_size; }
     inline int64_t get_block_size() const noexcept { return block_size; }
-    inline file_type_t get_file_type() const noexcept { return file_type; }
+    inline proto::FileInfo &get_metadata() noexcept { return metadata; }
 
   private:
     scan_task_ptr_t task;
-    file_type_t file_type;
+    proto::FileInfo metadata;
     file_ptr_t backend;
     int64_t last_queued_block;
     int64_t valid_blocks;

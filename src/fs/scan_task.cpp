@@ -62,16 +62,6 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
         return scan_errors_t{scan_error_t{dir, ec}};
     }
 
-    auto push = [this](const bfs::path &path, file_type_t file_type) noexcept {
-        auto rp = relativize(path, root);
-        auto file = files->by_name(rp.path.string());
-        if (file) {
-            files_queue.push_back(file_info_t{file, rp.temp});
-        } else {
-            unknown_files_queue.push_back(unknown_file_t{path, file_type});
-        }
-    };
-
     scan_errors_t errors;
     auto it = bfs::directory_iterator(dir, ec);
     if (ec) {
@@ -87,17 +77,28 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 continue;
             }
 
-            bool is_reg = bfs::is_regular_file(child, ec);
-            if (is_reg) {
-                push(child.path(), file_type_t::regular);
+            auto rp = relativize(child, root);
+            auto file = files->by_name(rp.path.string());
+            if (file) {
+                files_queue.push_back(file_info_t{file, rp.temp});
                 continue;
             }
 
-            bool is_symlink = bfs::is_symlink(child, ec);
-            if (is_symlink) {
-                push(child.path(), file_type_t::symlink);
-                continue;
+            proto::FileInfo metadata;
+            if (bfs::is_regular_file(child, ec)) {
+                metadata.set_type(proto::FileInfoType::FILE);
+                auto sz = bfs::file_size(child, ec);
+                if (ec) {
+                    errors.push_back(scan_error_t{dir, ec});
+                    continue;
+                }
+                metadata.set_size(sz);
+                ;
+            } else if (bfs::is_symlink(child, ec)) {
+                metadata.set_type(proto::FileInfoType::SYMLINK);
             }
+            metadata.set_name(rp.path.string());
+            unknown_files_queue.push_back(unknown_file_t{child, std::move(metadata)});
         }
     }
     if (!errors.empty()) {

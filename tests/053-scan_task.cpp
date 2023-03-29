@@ -103,7 +103,8 @@ TEST_CASE("scan_task", "[fs]") {
             auto *uf = std::get_if<unknown_file_t>(&r);
             REQUIRE(uf);
             CHECK(uf->path.filename() == "some-file");
-            CHECK(uf->file_type == file_type_t::regular);
+            CHECK(uf->metadata.size() == 0);
+            CHECK(uf->metadata.type() == proto::FileInfoType::FILE);
 
             r = task.advance();
             REQUIRE(std::get_if<bool>(&r));
@@ -123,7 +124,8 @@ TEST_CASE("scan_task", "[fs]") {
             auto *uf = std::get_if<unknown_file_t>(&r);
             REQUIRE(uf);
             CHECK(uf->path.filename() == "symlink");
-            CHECK(uf->file_type == file_type_t::symlink);
+            CHECK(uf->metadata.size() == 0);
+            CHECK(uf->metadata.type() == proto::FileInfoType::SYMLINK);
 
             r = task.advance();
             REQUIRE(std::get_if<bool>(&r));

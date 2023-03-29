@@ -4,10 +4,11 @@
 
 using namespace syncspirit::fs;
 
-new_chunk_iterator_t::new_chunk_iterator_t(scan_task_ptr_t task_, file_type_t file_type_, file_ptr_t backend_) noexcept
-    : task{std::move(task_)}, file_type{file_type_}, backend{std::move(backend_)}, next_idx{0}, offset{0} {
-    if (file_type == file_type_t::regular) {
-        file_size = (int64_t)backend->get_file_size();
+new_chunk_iterator_t::new_chunk_iterator_t(scan_task_ptr_t task_, proto::FileInfo metadata_,
+                                           file_ptr_t backend_) noexcept
+    : task{std::move(task_)}, metadata{std::move(metadata_)}, backend{std::move(backend_)}, next_idx{0}, offset{0} {
+    if (metadata.type() == proto::FileInfoType::FILE) {
+        file_size = metadata.size();
         auto div = syncspirit::fs::get_block_size(file_size);
         unread_blocks = div.count;
         block_size = div.size;

@@ -25,8 +25,6 @@ namespace sys = boost::system;
 using scan_error_t = model::io_error_t;
 using scan_errors_t = model::io_errors_t;
 
-enum class file_type_t { regular, symlink };
-
 struct unchanged_meta_t {
     model::file_info_ptr_t file;
 };
@@ -50,7 +48,7 @@ struct file_error_t {
 
 struct unknown_file_t {
     bfs::path path;
-    file_type_t file_type;
+    proto::FileInfo metadata;
 };
 
 using scan_result_t = std::variant<bool, scan_errors_t, changed_meta_t, unchanged_meta_t, incomplete_t,
