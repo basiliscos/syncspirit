@@ -62,13 +62,13 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
         return scan_errors_t{scan_error_t{dir, ec}};
     }
 
-    auto push = [this](const bfs::path &path) noexcept {
+    auto push = [this](const bfs::path &path, file_type_t file_type) noexcept {
         auto rp = relativize(path, root);
         auto file = files->by_name(rp.path.string());
         if (file) {
             files_queue.push_back(file_info_t{file, rp.temp});
         } else {
-            unknown_files_queue.push_back(unknown_file_t{rp.path});
+            unknown_files_queue.push_back(unknown_file_t{rp.path, file_type});
         }
     };
 
@@ -89,13 +89,13 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
 
             bool is_reg = bfs::is_regular_file(child, ec);
             if (is_reg) {
-                push(child.path());
+                push(child.path(), file_type_t::regular);
                 continue;
             }
 
             bool is_symlink = bfs::is_symlink(child, ec);
             if (is_symlink) {
-                push(child.path());
+                push(child.path(), file_type_t::regular);
                 continue;
             }
         }
