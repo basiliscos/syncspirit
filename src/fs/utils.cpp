@@ -9,13 +9,13 @@ namespace syncspirit::fs {
 
 static const std::string_view tmp_suffix = ".syncspirit-tmp";
 
-static std::size_t _block_sizes[] = {
+static const std::size_t _block_sizes[] = {
     (1 << 7) * 1024,  (1 << 8) * 1024,  (1 << 9) * 1024,  (1 << 10) * 1024,
     (1 << 11) * 1024, (1 << 12) * 1024, (1 << 13) * 1024, (1 << 14) * 1024,
 };
 
-std::size_t block_sizes_sz = 8;
-std::size_t *block_sizes = _block_sizes;
+const std::size_t block_sizes_sz = 8;
+const std::size_t *block_sizes = _block_sizes;
 
 static const constexpr size_t max_blocks_count = 2000;
 

@@ -94,7 +94,9 @@ file_t &file_t::operator=(file_t &&other) noexcept {
     std::swap(path, other.path);
     std::swap(path_str, other.path_str);
     std::swap(last_op, other.last_op);
+    std::swap(file_size, other.file_size);
     std::swap(temporal, other.temporal);
+    std::swap(symlink, other.symlink);
     return *this;
 }
 

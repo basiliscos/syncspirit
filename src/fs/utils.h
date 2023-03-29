@@ -34,8 +34,8 @@ struct relative_result_t {
 
 SYNCSPIRIT_API relative_result_t relativize(const bfs::path &path, const bfs::path &root) noexcept;
 
-SYNCSPIRIT_API extern std::size_t block_sizes_sz;
-SYNCSPIRIT_API extern std::size_t *block_sizes;
+SYNCSPIRIT_API extern const std::size_t block_sizes_sz;
+SYNCSPIRIT_API extern const std::size_t *block_sizes;
 
 } // namespace fs
 } // namespace syncspirit

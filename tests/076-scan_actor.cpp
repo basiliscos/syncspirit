@@ -381,7 +381,7 @@ void test_new_files() {
 
             SECTION("empty file") {
                 CHECK(bfs::create_directories(root_path / "abc"));
-                auto file_path = root_path / "abc"/ "empty.file";
+                auto file_path = root_path / "abc" / "empty.file";
                 write_file(file_path, "");
                 sup->do_process();
 
