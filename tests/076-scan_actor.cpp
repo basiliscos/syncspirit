@@ -409,8 +409,60 @@ void test_new_files() {
                 CHECK(file->get_block_size() == 5);
                 CHECK(file->get_size() == 5);
                 CHECK(blocks.size() == 1);
-
             }
+
+            SECTION("two files, diffrent content") {
+                CHECK(bfs::create_directories(root_path / "abc"));
+                auto file1_path = root_path / "file1.ext";
+                write_file(file1_path, "12345");
+
+                auto file2_path = root_path / "file2.ext";
+                write_file(file2_path, "67890");
+                sup->do_process();
+
+                auto file1 = files->by_name("file1.ext");
+                REQUIRE(file1);
+                CHECK(!file1->is_link());
+                CHECK(file1->is_file());
+                CHECK(file1->get_block_size() == 5);
+                CHECK(file1->get_size() == 5);
+
+                auto file2 = files->by_name("file2.ext");
+                REQUIRE(file2);
+                CHECK(!file2->is_link());
+                CHECK(file2->is_file());
+                CHECK(file2->get_block_size() == 5);
+                CHECK(file2->get_size() == 5);
+
+                CHECK(blocks.size() == 2);
+            }
+
+            SECTION("two files, same content") {
+                CHECK(bfs::create_directories(root_path / "abc"));
+                auto file1_path = root_path / "file1.ext";
+                write_file(file1_path, "12345");
+
+                auto file2_path = root_path / "file2.ext";
+                write_file(file2_path, "12345");
+                sup->do_process();
+
+                auto file1 = files->by_name("file1.ext");
+                REQUIRE(file1);
+                CHECK(!file1->is_link());
+                CHECK(file1->is_file());
+                CHECK(file1->get_block_size() == 5);
+                CHECK(file1->get_size() == 5);
+
+                auto file2 = files->by_name("file2.ext");
+                REQUIRE(file2);
+                CHECK(!file2->is_link());
+                CHECK(file2->is_file());
+                CHECK(file2->get_block_size() == 5);
+                CHECK(file2->get_size() == 5);
+
+                CHECK(blocks.size() == 1);
+            }
+
         }
     };
     F().run();
