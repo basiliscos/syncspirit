@@ -364,7 +364,7 @@ void test_new_files() {
     struct F : fixture_t {
         void main() noexcept override {
             sys::error_code ec;
-            auto& blocks = cluster->get_blocks();
+            auto &blocks = cluster->get_blocks();
 
             SECTION("new symlink") {
                 auto file_path = root_path / "symlink";
@@ -462,7 +462,6 @@ void test_new_files() {
 
                 CHECK(blocks.size() == 1);
             }
-
         }
     };
     F().run();

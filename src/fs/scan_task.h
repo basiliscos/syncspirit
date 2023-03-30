@@ -41,6 +41,10 @@ struct incomplete_removed_t {
     model::file_info_ptr_t file;
 };
 
+struct removed_t {
+    model::file_info_ptr_t file;
+};
+
 struct file_error_t {
     model::file_info_ptr_t file;
     sys::error_code ec;
@@ -51,7 +55,7 @@ struct unknown_file_t {
     proto::FileInfo metadata;
 };
 
-using scan_result_t = std::variant<bool, scan_errors_t, changed_meta_t, unchanged_meta_t, incomplete_t,
+using scan_result_t = std::variant<bool, scan_errors_t, changed_meta_t, unchanged_meta_t, incomplete_t, removed_t,
                                    incomplete_removed_t, unknown_file_t, file_error_t>;
 
 struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, boost::thread_unsafe_counter> {
@@ -76,7 +80,7 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
 
     std::string folder_id;
     model::cluster_ptr_t cluster;
-    model::file_infos_map_t *files;
+    model::file_infos_map_t files;
     utils::logger_t log;
     config::fs_config_t config;
 

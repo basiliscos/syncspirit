@@ -102,6 +102,8 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 diff = new model::diff::modify::file_availability_t(r.file);
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+            } else if constexpr (std::is_same_v<T, removed_t>) {
+                LOG_WARN(log, "{}, changes in '{}' are ignored (not implemented)", identity, r.file->get_full_name());
             } else if constexpr (std::is_same_v<T, changed_meta_t>) {
                 LOG_WARN(log, "{}, changes in '{}' are ignored (not implemented)", identity, r.file->get_full_name());
             } else if constexpr (std::is_same_v<T, unknown_file_t>) {

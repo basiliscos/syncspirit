@@ -24,7 +24,11 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
     dirs_queue.push_back(path);
 
     root = path;
-    files = &my_folder->get_file_infos();
+
+    auto &orig_files = my_folder->get_file_infos();
+    for (auto &it : orig_files) {
+        files.put(it.item);
+    }
 
     log = utils::get_logger("fs.scan");
 }
@@ -50,8 +54,16 @@ scan_result_t scan_task_t::advance() noexcept {
         dirs_queue.pop_front();
         return r;
     }
+    if (!dirs_queue.empty()) {
+        return true;
+    }
+    if (files.size() != 0) {
+        auto file = files.begin()->item;
+        files.remove(file);
+        return removed_t{file};
+    }
 
-    return !dirs_queue.empty();
+    return false;
 }
 
 scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
@@ -64,7 +76,19 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
 
     scan_errors_t errors;
     auto it = bfs::directory_iterator(dir, ec);
+    auto removed = model::file_infos_map_t{};
     if (ec) {
+        auto str = std::string{};
+        if (dir != root) {
+            str = bfs::relative(dir, root).string() + "/";
+        }
+        for (auto &it : files) {
+            auto &file = *it.item;
+            bool remove = str.empty() || (file.get_name().find(str) == 0);
+            if (remove) {
+                removed.put(it.item);
+            }
+        }
         errors.push_back(scan_error_t{dir, ec});
     } else {
         for (; it != bfs::directory_iterator(); ++it) {
@@ -78,9 +102,10 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             }
 
             auto rp = relativize(child, root);
-            auto file = files->by_name(rp.path.string());
+            auto file = files.by_name(rp.path.string());
             if (file) {
                 files_queue.push_back(file_info_t{file, rp.temp});
+                removed.put(file);
                 continue;
             }
 
@@ -100,6 +125,9 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             metadata.set_name(rp.path.string());
             unknown_files_queue.push_back(unknown_file_t{child, std::move(metadata)});
         }
+    }
+    for (auto &it : removed) {
+        files.remove(it.item);
     }
     if (!errors.empty()) {
         return errors;

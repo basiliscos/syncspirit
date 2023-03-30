@@ -170,6 +170,29 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == false);
         }
 
+        SECTION("file has been removed") {
+            pr_file.set_block_size(5);
+            pr_file.set_size(5);
+            pr_file.set_modified_s(modified);
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<removed_t>(&r));
+            auto ref = std::get_if<removed_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
         SECTION("meta is changed") {
             auto task = scan_task_ptr_t{};
             auto file = file_info_ptr_t{};
@@ -388,7 +411,7 @@ TEST_CASE("scan_task", "[fs]") {
                 REQUIRE(errs->at(0).ec);
 
                 r = task.advance();
-                CHECK(std::get_if<bool>(&r));
+                REQUIRE(std::get_if<bool>(&r));
                 CHECK(*std::get_if<bool>(&r) == false);
                 bfs::permissions(parent, bfs::perms::all_all);
             }
