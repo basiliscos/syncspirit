@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "scan_actor.h"
@@ -292,11 +292,9 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
 }
 
 void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
-    using FIT = proto::FileInfoType;
     assert(info.is_complete());
     auto &hashes = info.get_hashes();
     auto folder_id = std::string(info.get_task()->get_folder_id());
-    auto folder = cluster->get_folders().by_id(folder_id);
     auto &file = info.get_metadata();
     file.set_block_size(info.get_block_size());
     int offset = 0;
@@ -338,10 +336,14 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
     while (info.has_more_chunks()) {
         hash_next(*msg, address);
         bool can_process_more = requested_hashes < requested_hashes_limit;
-        queued_next = !can_process_more;
+        queued_next |= !can_process_more;
         if (info.is_complete()) {
             commit_new_file(info);
         }
+    }
+    if (!queued_next) {
+        commit_new_file(info);
+        send<payload::scan_progress_t>(address, info.get_task());
     }
 #if 0
     if (!info.is_valid() && info.get_queue_size() == 0) {

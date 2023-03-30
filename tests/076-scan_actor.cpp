@@ -365,7 +365,7 @@ void test_new_files() {
         void main() noexcept override {
             sys::error_code ec;
             auto& blocks = cluster->get_blocks();
-#if 0
+
             SECTION("new symlink") {
                 auto file_path = root_path / "symlink";
                 bfs::create_symlink(bfs::path("/some/where"), file_path, ec);
@@ -395,7 +395,7 @@ void test_new_files() {
                 CHECK(file->get_size() == 0);
                 CHECK(blocks.size() == 0);
             }
-#endif
+
             SECTION("non-empty file") {
                 CHECK(bfs::create_directories(root_path / "abc"));
                 auto file_path = root_path / "file.ext";
