@@ -392,7 +392,7 @@ void test_index_sending() {
             pr_file_info.set_symlink_target("/some/where");
 
             auto builder = diff_builder_t(*cluster);
-            builder.new_file(folder_1->get_id(), pr_file_info);
+            builder.local_update(folder_1->get_id(), pr_file_info);
             builder.apply(*sup);
 
             auto folder_1_my = folder_1->get_folder_infos().by_device(*my_device);

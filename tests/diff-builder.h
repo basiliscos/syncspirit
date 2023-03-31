@@ -60,7 +60,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &clone_file(const model::file_info_t &source) noexcept;
     diff_builder_t &finish_file(const model::file_info_t &source) noexcept;
     diff_builder_t &flush_file(const model::file_info_t &source) noexcept;
-    diff_builder_t &new_file(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
+    diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
     diff_builder_t &append_block(const model::file_info_t &target, size_t block_index, std::string data) noexcept;
     diff_builder_t &clone_block(const model::file_block_t &) noexcept;
 

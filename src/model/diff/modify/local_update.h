@@ -12,10 +12,10 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API new_file_t final : cluster_diff_t {
+struct SYNCSPIRIT_API local_update_t final : cluster_diff_t {
     using blocks_t = std::set<std::string, utils::string_comparator_t>;
 
-    new_file_t(const cluster_t &cluster, std::string_view folder_id, proto::FileInfo file) noexcept;
+    local_update_t(const cluster_t &cluster, std::string_view folder_id, proto::FileInfo file) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;

@@ -26,7 +26,7 @@ struct file_availability_t;
 struct finish_file_t;
 struct flush_file_t;
 struct lock_file_t;
-struct new_file_t;
+struct local_update_t;
 struct share_folder_t;
 struct update_peer_t;
 } // namespace modify
@@ -46,7 +46,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const modify::finish_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::flush_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::lock_file_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const modify::new_file_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::local_update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::share_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::update_peer_t &, void *custom) noexcept;
 };

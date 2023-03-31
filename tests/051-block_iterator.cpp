@@ -45,7 +45,7 @@ TEST_CASE("block iterator", "[model]") {
     p_file.set_sequence(2ul);
 
     SECTION("no blocks") {
-        REQUIRE(builder.new_file(folder->get_id(), p_file).apply());
+        REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
         auto my_file = my_folder->get_file_infos().by_name(p_file.name());
         REQUIRE(!next(my_file, true));
@@ -70,14 +70,14 @@ TEST_CASE("block iterator", "[model]") {
         SECTION("no iteration upon deleted file") {
             p_file.set_deleted(true);
 
-            REQUIRE(builder.new_file(folder->get_id(), p_file).apply());
+            REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
             auto my_file = my_folder->get_file_infos().by_name(p_file.name());
             CHECK(!next(my_file, true));
         }
 
         SECTION("normal iteration") {
-            REQUIRE(builder.new_file(folder->get_id(), p_file).apply());
+            REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
             auto my_file = my_folder->get_file_infos().by_name(p_file.name());
             auto bi1 = cluster->get_blocks().get(b1_hash);
@@ -115,12 +115,12 @@ TEST_CASE("block iterator", "[model]") {
         *p_file_2.add_blocks() = *b1;
         p_file.set_size(b1->size());
 
-        REQUIRE(builder.new_file(folder->get_id(), p_file_2).apply());
+        REQUIRE(builder.local_update(folder->get_id(), p_file_2).apply());
 
         auto my_file_2 = my_folder->get_file_infos().by_name(p_file_2.name());
         REQUIRE(my_file_2->is_locally_available());
 
-        REQUIRE(builder.new_file(folder->get_id(), p_file).apply());
+        REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
         auto my_file = my_folder->get_file_infos().by_name(p_file.name());
         auto bi1 = cluster->get_blocks().get(b1_hash);
@@ -139,7 +139,7 @@ TEST_CASE("block iterator", "[model]") {
         p_file.set_size(5ul);
         p_file.set_block_size(5ul);
 
-        REQUIRE(builder.new_file(folder->get_id(), p_file).apply());
+        REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
         auto my_file = my_folder->get_file_infos().by_name(p_file.name());
 
         auto bi1 = cluster->get_blocks().get(b1_hash);

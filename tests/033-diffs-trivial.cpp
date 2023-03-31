@@ -65,7 +65,7 @@ TEST_CASE("with file", "[model]") {
     b1->set_offset(0);
     b1->set_size(5);
 
-    REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
+    REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
     auto file = folder_info->get_file_infos().by_name("a.txt");
     REQUIRE(file);
 

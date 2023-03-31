@@ -127,7 +127,7 @@ TEST_CASE("file_info_t::need_download", "[model]") {
     auto bbb = blocks_map.get(b->hash());
     REQUIRE(bbb);
 
-    REQUIRE(builder.new_file(folder->get_id(), pr_file).apply());
+    REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
     auto file_my = folder_my->get_file_infos().by_name(pr_file.name());
     file_my->remove_blocks();
     file_my->assign_block(bbb, 0);
@@ -299,7 +299,7 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
     auto bbb = blocks_map.get(b->hash());
     REQUIRE(bbb);
 
-    REQUIRE(builder.new_file(folder->get_id(), pr_file).apply());
+    REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
     auto file_my = folder_my->get_file_infos().by_name(pr_file.name());
     CHECK(file_my->check_consistency());
 

@@ -30,7 +30,7 @@ TEST_CASE("new file diff", "[model]") {
     SECTION("symlink, inc sequence, no blocks") {
         pr_file_info.set_type(proto::FileInfoType::SYMLINK);
         pr_file_info.set_symlink_target("/some/where");
-        REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
+        REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
 
         auto folder_info = folder->get_folder_infos().by_device(*my_device);
         auto &files = folder_info->get_file_infos();
@@ -44,7 +44,7 @@ TEST_CASE("new file diff", "[model]") {
 
         SECTION("update it") {
             pr_file_info.set_symlink_target("/new/location");
-            REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
+            REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
             REQUIRE(files.size() == 1);
 
             auto new_file = files.by_name(file->get_name());
@@ -65,7 +65,7 @@ TEST_CASE("new file diff", "[model]") {
         pr_block->set_size(5);
         pr_block->set_hash(hash);
 
-        REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
+        REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
 
         auto folder_info = folder->get_folder_infos().by_device(*my_device);
         auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
@@ -93,7 +93,7 @@ TEST_CASE("new file diff", "[model]") {
         pr_block->set_size(5);
         pr_block->set_hash(hash);
 
-        REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
+        REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
 
         auto folder_info = folder->get_folder_infos().by_device(*my_device);
         auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
@@ -101,7 +101,7 @@ TEST_CASE("new file diff", "[model]") {
         CHECK(file->is_locally_available());
 
         pr_file_info.set_sequence(2ul);
-        REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
+        REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
         file = folder_info->get_file_infos().by_name(pr_file_info.name());
         REQUIRE(file->get_sequence() == 2);
         CHECK(file->is_locally_available());

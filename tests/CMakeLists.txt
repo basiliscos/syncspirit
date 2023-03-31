@@ -98,9 +98,9 @@ add_executable(033-diffs-trivial 033-diffs-trivial.cpp $<$<PLATFORM_ID:Windows>:
 target_link_libraries(033-diffs-trivial syncspirit_test_lib)
 add_test(033-diffs-trivial "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/033-diffs-trivial")
 
-add_executable(034-diff-new_file 034-diff-new_file.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
-target_link_libraries(034-diff-new_file syncspirit_test_lib)
-add_test(034-diff-new_file "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/034-diff-new_file")
+add_executable(034-diff-local_update 034-diff-local_update.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(034-diff-local_update syncspirit_test_lib)
+add_test(034-diff-local_update "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/034-diff-local_update")
 
 add_executable(036-diff-blocks 036-diff-blocks.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(036-diff-blocks syncspirit_test_lib)
@@ -181,5 +181,3 @@ target_link_libraries(078-relay syncspirit_test_lib
     $<$<PLATFORM_ID:Windows>:iphlpapi>
 )
 add_test(078-relay "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/078-relay")
-
-

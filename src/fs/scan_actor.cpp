@@ -5,7 +5,7 @@
 #include "model/diff/modify/file_availability.h"
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/blocks_availability.h"
-#include "model/diff/modify/new_file.h"
+#include "model/diff/modify/local_update.h"
 #include "net/names.h"
 #include "utils/error_code.h"
 #include "utils/tls.h"
@@ -311,7 +311,7 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     }
 
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::modify::new_file_t(*cluster, std::move(folder_id), std::move(file));
+    diff = new model::diff::modify::local_update_t(*cluster, std::move(folder_id), std::move(file));
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 }
 

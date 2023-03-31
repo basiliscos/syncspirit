@@ -45,7 +45,7 @@ TEST_CASE("various block diffs", "[model]") {
     b2->set_offset(5ul);
     b2->set_size(5);
 
-    REQUIRE(builder.new_file(folder->get_id(), pr_file_info).apply());
+    REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
 
     auto file = folder_info->get_file_infos().by_name("a.txt");
     auto bi1 = cluster->get_blocks().get(b1_hash);
@@ -78,7 +78,7 @@ TEST_CASE("various block diffs", "[model]") {
         b1->set_offset(0);
         b1->set_size(5);
 
-        REQUIRE(builder.new_file(folder->get_id(), pr_source).apply());
+        REQUIRE(builder.local_update(folder->get_id(), pr_source).apply());
         auto source = folder_info->get_file_infos().by_name("b.txt");
         auto b2 = source->get_blocks().at(0);
         b2->mark_local_available(source.get());
