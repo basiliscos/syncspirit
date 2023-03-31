@@ -106,4 +106,35 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(file->get_sequence() == 2);
         CHECK(file->is_locally_available());
     }
+
+    SECTION("delete file with blocks") {
+        pr_file_info.set_type(proto::FileInfoType::FILE);
+        pr_file_info.set_size(5ul);
+        pr_file_info.set_block_size(5ul);
+        pr_file_info.set_sequence(1ul);
+
+        auto hash = utils::sha256_digest("12345").value();
+        auto pr_block = pr_file_info.add_blocks();
+        pr_block->set_weak_hash(12);
+        pr_block->set_size(5);
+        pr_block->set_hash(hash);
+
+        auto folder_info = folder->get_folder_infos().by_device(*my_device);
+        auto &files = folder_info->get_file_infos();
+        auto &blocks = cluster->get_blocks();
+        REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
+        REQUIRE(files.size() == 1);
+        REQUIRE(blocks.size() == 1);
+
+        proto::FileInfo pr_updated;
+        pr_updated.set_name("a.txt");
+        pr_updated.set_deleted(true);
+        REQUIRE(builder.local_update(folder->get_id(), pr_updated).apply());
+        REQUIRE(files.size() == 1);
+        CHECK(blocks.size() == 0);
+
+        auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        CHECK(file->is_deleted());
+        CHECK(file->get_blocks().size() == 0);
+    }
 }

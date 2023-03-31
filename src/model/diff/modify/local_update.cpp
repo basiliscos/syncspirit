@@ -82,6 +82,13 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
         file_info->assign_block(block_info, i);
         file_info->mark_local_available(i);
     }
+    if (prev_file) {
+        for(auto& block_id: removed_blocks) {
+            auto block = blocks_map.get(block_id);
+            blocks_map.remove(block);
+        }
+        prev_file->remove_blocks();
+    }
     folder_info->add(file_info, true);
     return outcome::success();
 }
