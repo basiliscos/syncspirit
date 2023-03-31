@@ -397,7 +397,6 @@ void test_new_files() {
             }
 
             SECTION("non-empty file") {
-                CHECK(bfs::create_directories(root_path / "abc"));
                 auto file_path = root_path / "file.ext";
                 write_file(file_path, "12345");
                 sup->do_process();
@@ -412,7 +411,6 @@ void test_new_files() {
             }
 
             SECTION("two files, diffrent content") {
-                CHECK(bfs::create_directories(root_path / "abc"));
                 auto file1_path = root_path / "file1.ext";
                 write_file(file1_path, "12345");
 
@@ -438,7 +436,6 @@ void test_new_files() {
             }
 
             SECTION("two files, same content") {
-                CHECK(bfs::create_directories(root_path / "abc"));
                 auto file1_path = root_path / "file1.ext";
                 write_file(file1_path, "12345");
 
@@ -467,9 +464,39 @@ void test_new_files() {
     F().run();
 }
 
+void test_remove_file() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            sys::error_code ec;
+            auto &blocks = cluster->get_blocks();
+
+            SECTION("non-empty file") {
+                auto file_path = root_path / "file.ext";
+                write_file(file_path, "12345");
+                sup->do_process();
+
+                auto file = files->by_name("file.ext");
+                REQUIRE(file);
+                REQUIRE(blocks.size() == 1);
+
+                bfs::remove(file_path);
+                auto &addr = target->get_address();
+                sup->send<fs::payload::scan_folder_t>(addr, std::string(folder->get_id()));
+                sup->do_process();
+
+                file = files->by_name("file.ext");
+                CHECK(file->is_deleted() == 1);
+                CHECK(blocks.size() == 0);
+            }
+        }
+    };
+    F().run();
+};
+
 int _init() {
     REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");
     REGISTER_TEST_CASE(test_new_files, "test_new_files", "[fs]");
+    REGISTER_TEST_CASE(test_remove_file, "test_remove_file", "[fs]");
     return 1;
 }
 

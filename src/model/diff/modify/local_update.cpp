@@ -83,7 +83,7 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
         file_info->mark_local_available(i);
     }
     if (prev_file) {
-        for(auto& block_id: removed_blocks) {
+        for (auto &block_id : removed_blocks) {
             auto block = blocks_map.get(block_id);
             blocks_map.remove(block);
         }

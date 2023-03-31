@@ -103,7 +103,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                 diff = new model::diff::modify::file_availability_t(r.file);
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             } else if constexpr (std::is_same_v<T, removed_t>) {
-                LOG_WARN(log, "{}, changes in '{}' are ignored (not implemented)", identity, r.file->get_full_name());
+                on_remove(*r.file);
             } else if constexpr (std::is_same_v<T, changed_meta_t>) {
                 LOG_WARN(log, "{}, changes in '{}' are ignored (not implemented)", identity, r.file->get_full_name());
             } else if constexpr (std::is_same_v<T, unknown_file_t>) {
@@ -347,23 +347,15 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
         commit_new_file(info);
         send<payload::scan_progress_t>(address, info.get_task());
     }
-#if 0
-    if (!info.is_valid() && info.get_queue_size() == 0) {
-        auto &file = *info.get_file();
-        auto diff = model::diff::cluster_diff_ptr_t{};
-        diff = new model::diff::modify::lock_file_t(file, false);
-        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+}
 
-        LOG_DEBUG(log, "{}, removing temporal of '{}' as it corrupted", identity, file.get_full_name());
-        auto r = info.remove();
-        if (r) {
-            model::io_errors_t errors{model::io_error_t{info.get_path(), r.assume_error()}};
-            send<model::payload::io_error_t>(coordinator, std::move(errors));
-        }
-    }
-
-    if (!queued_next) {
-        send<payload::scan_progress_t>(address, info.get_task());
-    }
-#endif
+void scan_actor_t::on_remove(const model::file_info_t &file) noexcept {
+    LOG_DEBUG(log, "{}, locally removed {}, updating model", identity, file.get_full_name());
+    auto folder = file.get_folder_info()->get_folder();
+    auto folder_id = std::string(folder->get_id());
+    auto fi = file.as_proto(false);
+    fi.set_deleted(true);
+    auto diff = model::diff::cluster_diff_ptr_t{};
+    diff = new model::diff::modify::local_update_t(*cluster, std::move(folder_id), std::move(fi));
+    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 }

@@ -4,6 +4,7 @@
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
+#include "model/misc/version_utils.h"
 #include "diff-builder.h"
 
 using namespace syncspirit;
@@ -126,6 +127,10 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(files.size() == 1);
         REQUIRE(blocks.size() == 1);
 
+        auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        auto sequence = file->get_sequence();
+        auto version = file->get_version();
+
         proto::FileInfo pr_updated;
         pr_updated.set_name("a.txt");
         pr_updated.set_deleted(true);
@@ -133,8 +138,10 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(files.size() == 1);
         CHECK(blocks.size() == 0);
 
-        auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        file = folder_info->get_file_infos().by_name(pr_file_info.name());
         CHECK(file->is_deleted());
         CHECK(file->get_blocks().size() == 0);
+        CHECK(file->get_sequence() > sequence);
+        CHECK(model::compare(file->get_version(), version) == model::version_relation_t::identity);
     }
 }

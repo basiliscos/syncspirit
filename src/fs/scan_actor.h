@@ -78,6 +78,7 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
     void on_rehash(message::rehash_needed_t &message) noexcept;
     void on_hash_anew(message::hash_anew_t &message) noexcept;
     void on_hash_new(hasher::message::digest_response_t &res) noexcept;
+    void on_remove(const model::file_info_t &file) noexcept;
 
     template <typename Message> void hash_next(Message &m, const r::address_ptr_t &reply_addr) noexcept;
 
