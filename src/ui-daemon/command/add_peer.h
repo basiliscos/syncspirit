@@ -12,7 +12,7 @@ struct add_peer_t final : command_t {
     static outcome::result<command_ptr_t> construct(std::string_view in) noexcept;
     bool execute(governor_actor_t &) noexcept override;
 
-    inline add_peer_t() noexcept {};
+    inline add_peer_t() noexcept = default;
     inline add_peer_t(model::device_id_t peer_, std::string_view label_) noexcept : peer{peer_}, label(label_) {}
 
   private:

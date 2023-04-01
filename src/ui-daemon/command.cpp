@@ -10,8 +10,6 @@
 
 namespace syncspirit::daemon {
 
-command_t::~command_t() {}
-
 outcome::result<command_ptr_t> command_t::parse(std::string_view in) noexcept {
     auto colon = in.find(":");
     if (colon == in.npos) {

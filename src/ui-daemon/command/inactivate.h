@@ -12,7 +12,7 @@ struct inactivate_t final : command_t {
     static outcome::result<command_ptr_t> construct(std::string_view in) noexcept;
     bool execute(governor_actor_t &) noexcept override;
 
-    inline inactivate_t() noexcept {};
+    inline inactivate_t() noexcept = default;
     inline inactivate_t(std::uint32_t seconds_) noexcept : seconds{seconds_} {}
 
   private:
