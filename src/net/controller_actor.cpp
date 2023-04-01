@@ -10,6 +10,7 @@
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/flush_file.h"
+#include "model/diff/modify/local_update.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
@@ -328,8 +329,8 @@ auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff
         return outcome::success();
     }
 
-    auto folder_id = diff.folder_id;
-    auto file_name = diff.file_name;
+    auto &folder_id = diff.folder_id;
+    auto &file_name = diff.file_name;
     auto folder = cluster->get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*peer);
     auto file = folder_info->get_file_infos().by_name(file_name);
@@ -339,6 +340,19 @@ auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff
         auto it = locked_files.find(file);
         locked_files.erase(it);
     }
+    return outcome::success();
+}
+
+auto controller_actor_t::operator()(const model::diff::modify::local_update_t &diff, void *) noexcept
+    -> outcome::result<void> {
+
+    auto &folder_id = diff.folder_id;
+    auto &file_name = diff.file.name();
+    auto folder = cluster->get_folders().by_id(folder_id);
+    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
+    auto file = folder_info->get_file_infos().by_name(file_name);
+    updates_streamer.on_update(*file);
+    push_pending();
     return outcome::success();
 }
 

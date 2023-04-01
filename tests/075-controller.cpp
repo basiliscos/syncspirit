@@ -797,11 +797,56 @@ void test_downloading() {
     F(true, 10).run();
 }
 
+void test_sending_index_updates() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_my = folder_infos.by_device(*my_device);
+
+            auto cc = proto::ClusterConfig{};
+            auto folder = cc.add_folders();
+            folder->set_id(std::string(folder_1->get_id()));
+            auto d_peer = folder->add_devices();
+            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
+            d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
+            d_peer->set_index_id(folder_1_peer->get_index());
+
+            auto d_my = folder->add_devices();
+            d_my->set_id(std::string(my_device->device_id().get_sha256()));
+            d_my->set_max_sequence(folder_my->get_max_sequence());
+            d_my->set_index_id(folder_my->get_index());
+
+            auto index = proto::Index{};
+            auto folder_id = std::string(folder_1->get_id());
+            index.set_folder(folder_id);
+
+            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            peer_actor->forward(proto::message::Index(new proto::Index(index)));
+            sup->do_process();
+
+            auto builder = diff_builder_t(*cluster);
+            auto pr_file = proto::FileInfo();
+            pr_file.set_name("a.txt");
+
+            peer_actor->messages.clear();
+            builder.local_update(folder_id, pr_file).apply(*sup);
+            REQUIRE(peer_actor->messages.size() == 1);
+            auto &msg = peer_actor->messages.front();
+            auto &index_update = *std::get<proto::message::IndexUpdate>(msg->payload);
+            REQUIRE(index_update.files_size() == 1);
+            CHECK(index_update.files(0).name() == "a.txt");
+        }
+    };
+    F(true, 10).run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
+    REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     return 1;
 }
 
