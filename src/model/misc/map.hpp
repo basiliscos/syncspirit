@@ -50,17 +50,13 @@ template <size_t I, typename T>
 using hash_fn_t = mi::hashed_unique<mi::global_fun<const T &, std::string_view, &get_key<I, T>>, hash_op_t, eq_op_t>;
 // using hash_fn_t = mi::hashed_unique<mi::mem_fun<T, std::string, &T::template get<I>>, hash_op_t, eq_op_t>;
 
-template <size_t N, size_t I, typename T> struct hash_impl_t {
-    using type = hash_fn_t<I, key_t<T, N>>;
-};
+template <size_t N, size_t I, typename T> struct hash_impl_t { using type = hash_fn_t<I, key_t<T, N>>; };
 
 template <size_t I, size_t N, typename T, typename... Ts> struct hasher_t {
     using type = typename hasher_t<I - 1, N, T, typename hash_impl_t<N, I - 1, T>::type, Ts...>::type;
 };
 
-template <size_t N, typename T, typename... Ts> struct hasher_t<0, N, T, Ts...> {
-    using type = mi::indexed_by<Ts...>;
-};
+template <size_t N, typename T, typename... Ts> struct hasher_t<0, N, T, Ts...> { using type = mi::indexed_by<Ts...>; };
 
 template <typename T, size_t N = 1>
 using unordered_string_map_t = mi::multi_index_container<key_t<T, N>, typename hasher_t<N, N, T>::type>;

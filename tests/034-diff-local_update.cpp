@@ -146,6 +146,6 @@ TEST_CASE("new file diff", "[model]") {
         CHECK(file->is_deleted());
         CHECK(file->get_blocks().size() == 0);
         CHECK(file->get_sequence() > sequence);
-        CHECK(model::compare(file->get_version(), version) == model::version_relation_t::identity);
+        CHECK(model::compare(file->get_version(), version) == model::version_relation_t::newer);
     }
 }

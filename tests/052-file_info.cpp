@@ -127,8 +127,7 @@ TEST_CASE("file_info_t::need_download", "[model]") {
     auto bbb = blocks_map.get(b->hash());
     REQUIRE(bbb);
 
-    REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
-    auto file_my = folder_my->get_file_infos().by_name(pr_file.name());
+    auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
     file_my->remove_blocks();
     file_my->assign_block(bbb, 0);
 

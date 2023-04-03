@@ -39,8 +39,6 @@ struct SYNCSPIRIT_API value_t {
 
 template <discr_t> struct prefixer_t;
 
-template <> struct prefixer_t<prefix::misc> {
-    static SYNCSPIRIT_API value_t make(std::string_view name) noexcept;
-};
+template <> struct prefixer_t<prefix::misc> { static SYNCSPIRIT_API value_t make(std::string_view name) noexcept; };
 
 } // namespace syncspirit::db
