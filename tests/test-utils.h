@@ -22,9 +22,11 @@ struct SYNCSPIRIT_TEST_API path_guard_t {
         if (!getenv("SYNCSPIRIT_TEST_KEEP_PATH")) {
             sys::error_code ec;
 
-            bfs::permissions(path, bfs::perms::owner_all, ec);
-            if (ec) {
-                printf("error setting permissions : %s: %s\n", path.string().c_str(), ec.message().c_str());
+            if (bfs::exists(path, ec)) {
+                bfs::permissions(path, bfs::perms::owner_all, ec);
+                if (ec) {
+                    printf("error setting permissions : %s: %s\n", path.string().c_str(), ec.message().c_str());
+                }
             }
 
             bfs::remove_all(path, ec);

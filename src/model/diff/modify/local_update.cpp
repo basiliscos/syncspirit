@@ -40,6 +40,7 @@ local_update_t::local_update_t(const model::cluster_t &cluster, std::string_view
 }
 
 auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    LOG_TRACE(log, "local_update_t, folder: {}, file: {}", folder_id, file.name());
 
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
@@ -94,6 +95,6 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
 }
 
 auto local_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "visiting new_file_t, folder = {}, file = {}", folder_id, file.name());
+    LOG_TRACE(log, "visiting local_update_t, folder = {}, file = {}", folder_id, file.name());
     return visitor(*this, custom);
 }
