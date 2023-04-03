@@ -42,6 +42,8 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(file->is_link());
         REQUIRE(file->get_sequence() == 1);
         REQUIRE(folder_info->get_max_sequence() == 1);
+        REQUIRE(file->get_version().counters_size() == 1);
+        CHECK(file->get_version().counters(0).value() == 0);
 
         SECTION("update it") {
             pr_file_info.set_symlink_target("/new/location");
@@ -52,6 +54,8 @@ TEST_CASE("new file diff", "[model]") {
             REQUIRE(new_file);
             CHECK(new_file.get() != file.get());
             CHECK(new_file->get_key() == file->get_key());
+            REQUIRE(new_file->get_version().counters_size() == 1);
+            CHECK(new_file->get_version().counters(0).value() == 1);
         }
     }
 

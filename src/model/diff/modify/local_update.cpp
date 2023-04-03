@@ -4,6 +4,7 @@
 #include "local_update.h"
 #include "../cluster_visitor.h"
 #include "../../cluster.h"
+#include "../../misc/version_utils.h"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -43,20 +44,24 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     LOG_TRACE(log, "local_update_t, folder: {}, file: {}", folder_id, file.name());
 
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
+    auto& device = *cluster.get_device();
+    auto folder_info = folder->get_folder_infos().by_device(device);
     auto prev_file = folder_info->get_file_infos().by_name(file.name());
 
     auto file = this->file;
     auto seq = folder_info->get_max_sequence() + 1;
     folder_info->set_max_sequence(seq);
     file.set_sequence(seq);
+    auto version_ptr = file.mutable_version();
 
     auto uuid = uuid_t{};
     if (prev_file) {
         assign(uuid, prev_file->get_uuid());
+        *version_ptr  = prev_file->get_version();
     } else {
         uuid = cluster.next_uuid();
     }
+    increase(*version_ptr, device);
 
     auto opt = file_info_t::create(uuid, file, folder_info);
     if (!opt) {
