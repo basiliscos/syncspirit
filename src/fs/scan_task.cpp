@@ -60,7 +60,11 @@ scan_result_t scan_task_t::advance() noexcept {
     if (files.size() != 0) {
         auto file = files.begin()->item;
         files.remove(file);
-        return removed_t{file};
+        if (file->is_deleted()) {
+            return unchanged_meta_t{std::move(file)};
+        } else {
+            return removed_t{std::move(file)};
+        }
     }
 
     return false;

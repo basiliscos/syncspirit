@@ -193,6 +193,27 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == false);
         }
 
+        SECTION("removed file does not exists => unchanged meta") {
+            pr_file.set_deleted(true);
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
         SECTION("meta is changed") {
             auto task = scan_task_ptr_t{};
             auto file = file_info_ptr_t{};
