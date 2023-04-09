@@ -73,14 +73,14 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
 
     void remove_blocks() noexcept;
     void assign_block(const model::block_info_ptr_t &block, size_t index) noexcept;
-    bool check_consistency() noexcept;
 
     inline bool is_file() const noexcept { return type == proto::FileInfoType::FILE; }
     inline bool is_dir() const noexcept { return type == proto::FileInfoType::DIRECTORY; }
     inline bool is_link() const noexcept { return type == proto::FileInfoType::SYMLINK; }
     inline bool is_deleted() const noexcept { return flags & f_deleted; }
+    inline bool is_invalid() const noexcept { return flags & f_invalid; }
 
-    inline std::int64_t get_size() const noexcept { return size; }
+    std::int64_t get_size() const noexcept;
     inline void set_size(std::int64_t value) noexcept { size = value; }
 
     std::int32_t get_block_size() const noexcept { return block_size; }

@@ -65,10 +65,6 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
                 file->assign_block(block, (size_t)i);
             }
         }
-        if (!file->check_consistency()) {
-            LOG_ERROR(log, "inconsitency detected for the file {} at folder {}", file->get_name(), folder->get_label());
-            return make_error_code(error_code_t::inconsistent_file);
-        }
     }
 
     // all ok, commit

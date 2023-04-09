@@ -300,10 +300,7 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
 
     REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
     auto file_my = folder_my->get_file_infos().by_name(pr_file.name());
-    CHECK(file_my->check_consistency());
-
-    file_my->remove_blocks();
-    CHECK(!file_my->check_consistency());
+    CHECK(file_my->get_size() == 5);
 }
 
 TEST_CASE("file_info_t::create, inconsistent source") {
