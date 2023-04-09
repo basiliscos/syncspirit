@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -21,6 +21,7 @@ struct SYNCSPIRIT_API folder_data_t {
 
   protected:
     inline const bfs::path &get_path() noexcept { return path; }
+    void set_path(const bfs::path &value) noexcept { path = value; }
     void assign_fields(const db::Folder &item) noexcept;
     void serialize(db::Folder &dest) const noexcept;
 

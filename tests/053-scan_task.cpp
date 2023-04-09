@@ -43,11 +43,8 @@ TEST_CASE("scan_task", "[fs]") {
     folder->get_folder_infos().put(folder_peer);
 
     SECTION("without files") {
-        SECTION("non-existing dir => err") {
-            db_folder.set_path("/some/non-existing/path");
-
-            folder = folder_t::create(cluster->next_uuid(), db_folder).value();
-            cluster->get_folders().put(folder);
+        SECTION("no permissions to read dir => err") {
+            bfs::permissions(root_path, bfs::perms::no_perms);
 
             auto folder_info = folder_info_t::create(cluster->next_uuid(), db_folder_info, my_device, folder).value();
             folder->get_folder_infos().put(folder_info);
@@ -61,7 +58,7 @@ TEST_CASE("scan_task", "[fs]") {
 
             auto &err = errs->at(0);
             CHECK(err.ec);
-            CHECK(err.path.string() == db_folder.path());
+            CHECK(err.path == root_path);
         }
 
         SECTION("no dirs, no files") {
@@ -193,7 +190,7 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == false);
         }
 
-        SECTION("removed file does not exists => unchanged meta") {
+        SECTION("removed file does not exist => unchanged meta") {
             pr_file.set_deleted(true);
 
             auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
@@ -202,6 +199,28 @@ TEST_CASE("scan_task", "[fs]") {
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();
             CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
+        SECTION("root dir does not exist & deleted file => unchanged meta") {
+            pr_file.set_deleted(true);
+            folder->set_path(root_path / "zzz");
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            REQUIRE(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == true);
 
             r = task.advance();

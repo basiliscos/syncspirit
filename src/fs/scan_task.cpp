@@ -75,7 +75,11 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
 
     bool exists = bfs::exists(dir, ec);
     if (ec || !exists) {
-        return scan_errors_t{scan_error_t{dir, ec}};
+        if (ec == sys::errc::no_such_file_or_directory) {
+            return true;
+        } else {
+            return scan_errors_t{scan_error_t{dir, ec}};
+        }
     }
 
     scan_errors_t errors;
