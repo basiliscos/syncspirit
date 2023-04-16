@@ -33,7 +33,7 @@ struct SYNCSPIRIT_API new_chunk_iterator_t {
     inline const bfs::path &get_path() noexcept { return backend->get_path(); }
 
     inline scan_task_ptr_t get_task() noexcept { return task; }
-    void ack(size_t block_index, uint32_t weak, std::string_view hash) noexcept;
+    void ack(size_t block_index, uint32_t weak, std::string_view hash, int32_t block_size) noexcept;
     bool is_complete() const noexcept;
     inline hashes_t &get_hashes() noexcept { return hashes; }
     inline int64_t get_size() const noexcept { return file_size; }

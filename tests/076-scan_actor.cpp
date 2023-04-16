@@ -169,7 +169,7 @@ void test_meta_changes() {
 
             auto b = block_info_t::create(bi).value();
 
-            SECTION("a file does not physically exists") {
+            SECTION("a file does not physically exist") {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 folder_info_peer->add(file_peer, false);
@@ -201,18 +201,45 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     CHECK(file->is_locally_available());
                 }
+
                 SECTION("meta is changed (modification)") {
                     write_file(path, "12345");
                     sup->do_process();
                     CHECK(files->size() == 1);
-                    CHECK(!file->is_locally_available());
+                    auto new_file = files->by_name(pr_fi.name());
+                    REQUIRE(new_file);
+                    CHECK(file != new_file);
+                    CHECK(new_file->is_locally_available());
+                    CHECK(new_file->get_size() == 5);
+                    REQUIRE(new_file->get_blocks().size() == 1);
+                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
                 }
+
                 SECTION("meta is changed (size)") {
                     write_file(path, "123456");
                     bfs::last_write_time(path, modified);
                     sup->do_process();
                     CHECK(files->size() == 1);
-                    CHECK(!file->is_locally_available());
+                    auto new_file = files->by_name(pr_fi.name());
+                    REQUIRE(new_file);
+                    CHECK(file != new_file);
+                    CHECK(new_file->is_locally_available());
+                    CHECK(new_file->get_size() == 5);
+                    REQUIRE(new_file->get_blocks().size() == 1);
+                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
+                }
+
+                SECTION("meta is changed (content)") {
+                    write_file(path, "67890");
+                    sup->do_process();
+                    CHECK(files->size() == 1);
+                    auto new_file = files->by_name(pr_fi.name());
+                    REQUIRE(new_file);
+                    CHECK(file != new_file);
+                    CHECK(new_file->is_locally_available());
+                    CHECK(new_file->get_size() == 5);
+                    REQUIRE(new_file->get_blocks().size() == 1);
+                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
                 }
             }
 
@@ -374,6 +401,7 @@ void test_new_files() {
 
                 auto file = files->by_name("symlink");
                 REQUIRE(file);
+                CHECK(file->is_locally_available());
                 CHECK(!file->is_file());
                 CHECK(file->is_link());
                 CHECK(file->get_block_size() == 0);
@@ -389,6 +417,7 @@ void test_new_files() {
 
                 auto file = files->by_name("abc/empty.file");
                 REQUIRE(file);
+                CHECK(file->is_locally_available());
                 CHECK(!file->is_link());
                 CHECK(file->is_file());
                 CHECK(file->get_block_size() == 0);
@@ -403,6 +432,7 @@ void test_new_files() {
 
                 auto file = files->by_name("file.ext");
                 REQUIRE(file);
+                CHECK(file->is_locally_available());
                 CHECK(!file->is_link());
                 CHECK(file->is_file());
                 CHECK(file->get_block_size() == 5);
@@ -420,6 +450,7 @@ void test_new_files() {
 
                 auto file1 = files->by_name("file1.ext");
                 REQUIRE(file1);
+                CHECK(file1->is_locally_available());
                 CHECK(!file1->is_link());
                 CHECK(file1->is_file());
                 CHECK(file1->get_block_size() == 5);
@@ -427,6 +458,7 @@ void test_new_files() {
 
                 auto file2 = files->by_name("file2.ext");
                 REQUIRE(file2);
+                CHECK(file2->is_locally_available());
                 CHECK(!file2->is_link());
                 CHECK(file2->is_file());
                 CHECK(file2->get_block_size() == 5);
@@ -445,6 +477,7 @@ void test_new_files() {
 
                 auto file1 = files->by_name("file1.ext");
                 REQUIRE(file1);
+                CHECK(file1->is_locally_available());
                 CHECK(!file1->is_link());
                 CHECK(file1->is_file());
                 CHECK(file1->get_block_size() == 5);
@@ -452,6 +485,7 @@ void test_new_files() {
 
                 auto file2 = files->by_name("file2.ext");
                 REQUIRE(file2);
+                CHECK(file2->is_locally_available());
                 CHECK(!file2->is_link());
                 CHECK(file2->is_file());
                 CHECK(file2->get_block_size() == 5);

@@ -105,7 +105,14 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
             } else if constexpr (std::is_same_v<T, removed_t>) {
                 on_remove(*r.file);
             } else if constexpr (std::is_same_v<T, changed_meta_t>) {
-                LOG_WARN(log, "{}, changes in '{}' are ignored (not implemented)", identity, r.file->get_full_name());
+                auto &file = *r.file;
+                auto metadata = file.as_proto(true);
+                auto errs = initiate_hash(task, file.get_path(), metadata);
+                if (errs.empty()) {
+                    stop_processing = true;
+                } else {
+                    send<model::payload::io_error_t>(coordinator, std::move(errs));
+                }
             } else if constexpr (std::is_same_v<T, unknown_file_t>) {
                 auto errs = initiate_hash(task, r.path, r.metadata);
                 if (errs.empty()) {
@@ -301,6 +308,7 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     file.set_block_size(info.get_block_size());
     int offset = 0;
 
+    file.clear_blocks();
     for (auto &b : hashes) {
         auto block = file.add_blocks();
         block->set_hash(b.digest);
@@ -331,8 +339,9 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
     }
 
     auto &hash_info = res.payload.res;
+    auto block_size = rp.data.size();
 
-    info.ack(rp.block_index, hash_info.weak, hash_info.digest);
+    info.ack(rp.block_index, hash_info.weak, hash_info.digest, block_size);
 
     bool queued_next = false;
     while (info.has_more_chunks()) {

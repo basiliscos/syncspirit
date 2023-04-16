@@ -42,9 +42,9 @@ auto new_chunk_iterator_t::read() noexcept -> outcome::result<details::chunk_t> 
 
 bool new_chunk_iterator_t::has_more_chunks() const noexcept { return unread_bytes > 0; }
 
-void new_chunk_iterator_t::ack(size_t block_index, uint32_t weak, std::string_view hash) noexcept {
+void new_chunk_iterator_t::ack(size_t block_index, uint32_t weak, std::string_view hash, int32_t block_size) noexcept {
     assert(block_index < hashes.size());
     assert(unfinished.count(block_index));
-    hashes[block_index] = block_hash_t{std::string(hash), weak, (int32_t)hash.size()};
+    hashes[block_index] = block_hash_t{std::string(hash), weak, block_size};
     unfinished.erase(block_index);
 }
