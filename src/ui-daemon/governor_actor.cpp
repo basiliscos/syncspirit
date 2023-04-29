@@ -128,10 +128,21 @@ void governor_actor_t::on_inacitvity_timer(r::request_id_t, bool cancelled) noex
     do_shutdown();
 }
 
+void governor_actor_t::on_rescan_timer(r::request_id_t, bool cancelled) noexcept { std::abort(); }
+
 void governor_actor_t::refresh_deadline() noexcept {
     auto timeout = r::pt::seconds(inactivity_seconds);
     auto now = clock_t::local_time();
     deadline = now + timeout;
+}
+
+void governor_actor_t::schedule_rescan_dirs(const r::pt::time_duration &interval) noexcept {
+    dirs_rescan_interval = interval;
+}
+
+void governor_actor_t::schedule_rescan_dirs() noexcept {
+    LOG_INFO(log, "{}, scheduling dirs rescan", identity);
+    start_timer(dirs_rescan_interval, *this, &governor_actor_t::on_rescan_timer);
 }
 
 auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &, void *) noexcept -> outcome::result<void> {

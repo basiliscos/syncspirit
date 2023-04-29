@@ -19,15 +19,26 @@ const std::size_t *block_sizes = _block_sizes;
 
 static const constexpr size_t max_blocks_count = 2000;
 
-block_division_t get_block_size(size_t sz) noexcept {
+block_division_t get_block_size(size_t sz, int32_t prev_size) noexcept {
     size_t bs = 0;
-    for (size_t i = 0; i < block_sizes_sz; ++i) {
-        if (block_sizes[i] * max_blocks_count >= sz) {
-            bs = block_sizes[i];
-            if (bs > sz) {
-                bs = sz;
+    if (block_sizes[0] <= sz) {
+        for (size_t i = 0; i < block_sizes_sz; ++i) {
+            if (block_sizes[i] == (size_t)prev_size) {
+                bs = prev_size;
+                break;
             }
-            break;
+        }
+    }
+
+    if (!bs) {
+        for (size_t i = 0; i < block_sizes_sz; ++i) {
+            if (block_sizes[i] * max_blocks_count >= sz) {
+                bs = block_sizes[i];
+                if (bs > sz) {
+                    bs = sz;
+                }
+                break;
+            }
         }
     }
     if (bs == 0 && sz) {

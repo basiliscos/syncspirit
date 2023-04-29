@@ -45,9 +45,6 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void scan_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
-    for (auto it : cluster->get_folders()) {
-        send<payload::scan_folder_t>(address, std::string(it.item->get_id()));
-    }
     r::actor_base_t::on_start();
 }
 
@@ -75,7 +72,8 @@ void scan_actor_t::on_initiate_scan(message::scan_folder_t &message) noexcept {
 void scan_actor_t::process_queue() noexcept {
     if (!queue.empty() && state == r::state_t::OPERATIONAL) {
         auto &msg = queue.front();
-        initiate_scan(msg->payload.folder_id);
+        auto &p = msg->payload;
+        initiate_scan(p.folder_id);
         queue.pop_front();
     }
 }
@@ -121,12 +119,10 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     send<model::payload::io_error_t>(coordinator, std::move(errs));
                 }
             } else if constexpr (std::is_same_v<T, incomplete_t>) {
-                auto errs = initiate_rehash(task, r.file);
-                if (errs.empty()) {
-                    stop_processing = true;
-                } else {
-                    send<model::payload::io_error_t>(coordinator, std::move(errs));
-                }
+                auto &f = r.file;
+                assert(f->get_source());
+                stop_processing = true;
+                send<payload::rehash_needed_t>(address, task, std::move(f), f->get_source(), std::move(r.opened_file));
             } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
                 auto &file = *r.file;
                 if (file.is_locked()) {
@@ -151,30 +147,10 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
         send<payload::scan_progress_t>(address, std::move(task));
     } else if (completed) {
         LOG_DEBUG(log, "{}, completed scanning of {}", identity, folder_id);
+        send<payload::scan_completed_t>(coordinator, folder_id);
         --progress;
         process_queue();
     }
-}
-
-auto scan_actor_t::initiate_rehash(scan_task_ptr_t task, model::file_info_ptr_t file) noexcept -> model::io_errors_t {
-    auto orig_path = file->get_path();
-    auto path = make_temporal(orig_path);
-    auto opt = file_t::open_read(path);
-    if (!opt) {
-        auto &ec = opt.assume_error();
-        LOG_WARN(log, "{}, error opening file {}: {}", identity, path.string(), ec.message());
-        model::io_errors_t errs;
-        errs.push_back(model::io_error_t{orig_path, ec});
-        if (ec) {
-            errs.push_back(model::io_error_t{orig_path, ec});
-        }
-        return errs;
-    }
-
-    assert(file->get_source());
-    auto file_ptr = file_ptr_t(new file_t(std::move(opt.value())));
-    send<payload::rehash_needed_t>(address, std::move(task), std::move(file), file->get_source(), std::move(file_ptr));
-    return {};
 }
 
 auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path, proto::FileInfo &metadata) noexcept
@@ -197,9 +173,10 @@ auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path, pr
 
 void scan_actor_t::on_rehash(message::rehash_needed_t &message) noexcept {
     LOG_TRACE(log, "{}, on_rehash", identity);
+    auto initial = requested_hashes;
     hash_next(message, address);
-    if (requested_hashes < requested_hashes_limit) {
-        process_queue();
+    if (initial == requested_hashes) {
+        send<payload::scan_progress_t>(address, message.payload.get_task());
     }
 }
 
@@ -209,10 +186,9 @@ void scan_actor_t::on_hash_anew(message::hash_anew_t &message) noexcept {
     hash_next(message, new_files);
     // file w/o context
     if (initial == requested_hashes) {
-        commit_new_file(message.payload);
-    }
-    if (requested_hashes < requested_hashes_limit) {
-        process_queue();
+        auto &p = message.payload;
+        commit_new_file(p);
+        send<payload::scan_progress_t>(address, p.get_task());
     }
 }
 
@@ -295,7 +271,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
         }
     }
 
-    if (!queued_next) {
+    if (!queued_next && !requested_hashes) {
         send<payload::scan_progress_t>(address, info.get_task());
     }
 }
@@ -352,7 +328,7 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
             commit_new_file(info);
         }
     }
-    if (!queued_next) {
+    if (!queued_next && requested_hashes == 0) {
         commit_new_file(info);
         send<payload::scan_progress_t>(address, info.get_task());
     }

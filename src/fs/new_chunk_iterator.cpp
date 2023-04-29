@@ -9,7 +9,7 @@ new_chunk_iterator_t::new_chunk_iterator_t(scan_task_ptr_t task_, proto::FileInf
     : task{std::move(task_)}, metadata{std::move(metadata_)}, backend{std::move(backend_)}, next_idx{0}, offset{0} {
     if (metadata.type() == proto::FileInfoType::FILE) {
         file_size = metadata.size();
-        auto div = syncspirit::fs::get_block_size(file_size);
+        auto div = syncspirit::fs::get_block_size(file_size, metadata.block_size());
         unread_blocks = div.count;
         block_size = div.size;
         unread_bytes = file_size;

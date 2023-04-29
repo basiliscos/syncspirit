@@ -41,6 +41,7 @@ struct governor_actor_t : public r::actor_base_t,
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
     void track_inactivity() noexcept;
+    void schedule_rescan_dirs(const r::pt::time_duration &intreval) noexcept;
 
     r::address_ptr_t coordinator;
     model::cluster_ptr_t cluster;
@@ -51,13 +52,16 @@ struct governor_actor_t : public r::actor_base_t,
   private:
     using clock_t = r::pt::microsec_clock;
     r::pt::ptime deadline;
+    r::pt::time_duration dirs_rescan_interval;
 
+    void schedule_rescan_dirs() noexcept;
     void process() noexcept;
     void on_model_update(model::message::forwarded_model_update_t &message) noexcept;
     void on_block_update(model::message::forwarded_block_update_t &message) noexcept;
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_io_error(model::message::io_error_t &reply) noexcept;
     void on_inacitvity_timer(r::request_id_t, bool cancelled) noexcept;
+    void on_rescan_timer(r::request_id_t, bool cancelled) noexcept;
 
     void refresh_deadline() noexcept;
 

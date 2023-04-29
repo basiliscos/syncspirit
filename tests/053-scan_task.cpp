@@ -302,6 +302,7 @@ TEST_CASE("scan_task", "[fs]") {
                 REQUIRE(std::get_if<incomplete_t>(&r));
                 auto ref = std::get_if<incomplete_t>(&r);
                 CHECK(ref->file);
+                CHECK(ref->opened_file);
 
                 r = task.advance();
                 CHECK(std::get_if<bool>(&r));
@@ -395,6 +396,7 @@ TEST_CASE("scan_task", "[fs]") {
             }
             CHECK(unchanged.file == file_my);
             CHECK(incomplete.file);
+            CHECK(incomplete.opened_file);
             r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);

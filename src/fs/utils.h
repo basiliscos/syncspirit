@@ -25,7 +25,7 @@ struct block_division_t {
 
 SYNCSPIRIT_API bfs::path make_temporal(const bfs::path &path) noexcept;
 SYNCSPIRIT_API bool is_temporal(const bfs::path &path) noexcept;
-SYNCSPIRIT_API block_division_t get_block_size(size_t file_size) noexcept;
+SYNCSPIRIT_API block_division_t get_block_size(size_t file_size, int32_t prev_size) noexcept;
 
 struct relative_result_t {
     bfs::path path;

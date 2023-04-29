@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
+#include "syncspirit-export.h"
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "config/fs.h"
 #include "utils/log.h"
-#include "syncspirit-export.h"
+#include "file.h"
 #include <rotor.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
@@ -35,6 +36,7 @@ struct changed_meta_t {
 
 struct incomplete_t {
     model::file_info_ptr_t file;
+    file_ptr_t opened_file;
 };
 
 struct incomplete_removed_t {

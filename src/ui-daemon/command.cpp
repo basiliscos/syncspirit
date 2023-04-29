@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "command.h"
 #include "error_code.h"
 #include "command/add_peer.h"
 #include "command/add_folder.h"
 #include "command/inactivate.h"
+#include "command/rescan_dirs.h"
 #include "command/share_folder.h"
 
 namespace syncspirit::daemon {
@@ -24,6 +25,8 @@ outcome::result<command_ptr_t> command_t::parse(std::string_view in) noexcept {
         return command::share_folder_t::construct(in.substr(colon + 1));
     } else if (cmd == "inactivate") {
         return command::inactivate_t::construct(in.substr(colon + 1));
+    } else if (cmd == "rescan_dirs") {
+        return command::rescan_dirs_t::construct(in.substr(colon + 1));
     }
     return make_error_code(error_code_t::unknown_command);
 }

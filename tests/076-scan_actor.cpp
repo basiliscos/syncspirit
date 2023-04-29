@@ -25,11 +25,13 @@ struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::scan_actor_t>;
     using error_msg_t = model::message::io_error_t;
     using error_msg_ptr_t = r::intrusive_ptr_t<error_msg_t>;
+    using completion_msg_t = fs::message::scan_completed_t;
     using errors_container_t = std::vector<error_msg_ptr_t>;
 
     fixture_t() noexcept : root_path{bfs::unique_path()}, path_quard{root_path} {
         utils::set_default("trace");
         bfs::create_directory(root_path);
+        scan_completions = 0;
     }
 
     void run() noexcept {
@@ -54,6 +56,7 @@ struct fixture_t {
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<error_msg_t>([&](error_msg_t &msg) { errors.push_back(&msg); }));
+                p.subscribe_actor(r::lambda<completion_msg_t>([&](completion_msg_t &) { ++scan_completions; }));
             });
         };
 
@@ -89,7 +92,9 @@ struct fixture_t {
                      .fs_config(fs_config)
                      .requested_hashes_limit(2ul)
                      .finish();
+        sup->do_process();
 
+        sup->send<fs::payload::scan_folder_t>(target->get_address(), folder_id);
         main();
 
         sup->do_process();
@@ -114,6 +119,7 @@ struct fixture_t {
     model::file_infos_map_t *files;
     model::file_infos_map_t *files_peer;
     errors_container_t errors;
+    std::uint32_t scan_completions;
     model::device_ptr_t peer_device;
 };
 
@@ -122,31 +128,34 @@ void test_meta_changes() {
         void main() noexcept override {
             sys::error_code ec;
 
-            SECTION("no files") {
-                sup->do_process();
-                CHECK(folder_info->get_file_infos().size() == 0);
-            }
-            SECTION("just 1 dir") {
-                CHECK(bfs::create_directories(root_path / "abc"));
-                sup->do_process();
-                CHECK(folder_info->get_file_infos().size() == 0);
-            }
-            SECTION("just 1 subdir, which cannot be read") {
-                auto subdir = root_path / "abc";
-                CHECK(bfs::create_directories(subdir / "def", ec));
-                auto guard = test::path_guard_t(subdir);
-                bfs::permissions(subdir, bfs::perms::no_perms);
-                bfs::permissions(subdir, bfs::perms::owner_read, ec);
-                if (ec) {
+            SECTION("trivial") {
+                SECTION("no files") {
                     sup->do_process();
                     CHECK(folder_info->get_file_infos().size() == 0);
-                    bfs::permissions(subdir, bfs::perms::all_all);
-                    REQUIRE(errors.size() == 1);
-                    auto &errs = errors.at(0)->payload.errors;
-                    REQUIRE(errs.size() == 1);
-                    REQUIRE(errs.at(0).path == (subdir));
-                    REQUIRE(errs.at(0).ec);
                 }
+                SECTION("just 1 dir") {
+                    CHECK(bfs::create_directories(root_path / "abc"));
+                    sup->do_process();
+                    CHECK(folder_info->get_file_infos().size() == 0);
+                }
+                SECTION("just 1 subdir, which cannot be read") {
+                    auto subdir = root_path / "abc";
+                    CHECK(bfs::create_directories(subdir / "def", ec));
+                    auto guard = test::path_guard_t(subdir);
+                    bfs::permissions(subdir, bfs::perms::no_perms);
+                    bfs::permissions(subdir, bfs::perms::owner_read, ec);
+                    if (!ec) {
+                        sup->do_process();
+                        CHECK(folder_info->get_file_infos().size() == 0);
+                        bfs::permissions(subdir, bfs::perms::all_all);
+                        REQUIRE(errors.size() == 1);
+                        auto &errs = errors.at(0)->payload.errors;
+                        REQUIRE(errs.size() == 1);
+                        REQUIRE(errs.at(0).path == (subdir / "def"));
+                        REQUIRE(errs.at(0).ec);
+                    }
+                }
+                REQUIRE(scan_completions == 1);
             }
 
             proto::FileInfo pr_fi;
@@ -181,8 +190,8 @@ void test_meta_changes() {
                 sup->do_process();
                 CHECK(files->size() == 1);
                 CHECK(!file->is_locally_available());
+                REQUIRE(scan_completions == 1);
             }
-
             SECTION("complete file exists") {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
@@ -241,6 +250,7 @@ void test_meta_changes() {
                     REQUIRE(new_file->get_blocks().size() == 1);
                     CHECK(new_file->get_blocks()[0]->get_size() == 5);
                 }
+                REQUIRE(scan_completions == 1);
             }
 
             SECTION("incomplete file exists") {
@@ -314,22 +324,17 @@ void test_meta_changes() {
 
                 SECTION("error on reading -> remove") {
                     bfs::permissions(path, bfs::perms::no_perms);
-                    bfs::permissions(path, bfs::perms::owner_read, ec);
-                    if (ec) {
+                    if (!ec) {
                         sup->do_process();
                         CHECK(!file->is_locally_available());
-                        CHECK(file->is_locked());
+                        CHECK(!file->is_locked());
                         CHECK(!bfs::exists(path));
 
-                        REQUIRE(errors.size() == 1);
-                        auto &errs = errors.at(0)->payload.errors;
-                        REQUIRE(errs.size() == 1);
-                        CHECK(errs.at(0).path == path);
-                        CHECK(errs.at(0).ec);
+                        REQUIRE(errors.size() == 0);
                     }
                 }
+                REQUIRE(scan_completions == 1);
             }
-
             SECTION("local (previous) file exists") {
                 pr_fi.set_size(15ul);
                 pr_fi.set_block_size(5ul);
@@ -381,6 +386,7 @@ void test_meta_changes() {
                 CHECK(file_peer->is_locally_available(0));
                 CHECK(file_peer->is_locally_available(1));
                 CHECK(!file_peer->is_locally_available(2));
+                REQUIRE(scan_completions == 1);
             }
         }
     };
@@ -407,6 +413,7 @@ void test_new_files() {
                 CHECK(file->get_block_size() == 0);
                 CHECK(file->get_size() == 0);
                 CHECK(blocks.size() == 0);
+                REQUIRE(scan_completions == 1);
             }
 
             SECTION("empty file") {
@@ -423,6 +430,7 @@ void test_new_files() {
                 CHECK(file->get_block_size() == 0);
                 CHECK(file->get_size() == 0);
                 CHECK(blocks.size() == 0);
+                REQUIRE(scan_completions == 1);
             }
 
             SECTION("non-empty file") {
@@ -438,6 +446,7 @@ void test_new_files() {
                 CHECK(file->get_block_size() == 5);
                 CHECK(file->get_size() == 5);
                 CHECK(blocks.size() == 1);
+                REQUIRE(scan_completions == 1);
             }
 
             SECTION("two files, diffrent content") {
@@ -465,6 +474,7 @@ void test_new_files() {
                 CHECK(file2->get_size() == 5);
 
                 CHECK(blocks.size() == 2);
+                REQUIRE(scan_completions == 1);
             }
 
             SECTION("two files, same content") {
@@ -492,6 +502,7 @@ void test_new_files() {
                 CHECK(file2->get_size() == 5);
 
                 CHECK(blocks.size() == 1);
+                REQUIRE(scan_completions == 1);
             }
         }
     };
@@ -508,6 +519,7 @@ void test_remove_file() {
                 auto file_path = root_path / "file.ext";
                 write_file(file_path, "12345");
                 sup->do_process();
+                REQUIRE(scan_completions == 1);
 
                 auto file = files->by_name("file.ext");
                 REQUIRE(file);
@@ -521,6 +533,7 @@ void test_remove_file() {
                 file = files->by_name("file.ext");
                 CHECK(file->is_deleted() == 1);
                 CHECK(blocks.size() == 0);
+                REQUIRE(scan_completions == 2);
             }
         }
     };

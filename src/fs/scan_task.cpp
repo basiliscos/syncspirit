@@ -100,15 +100,17 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
         errors.push_back(scan_error_t{dir, ec});
     } else {
         for (; it != bfs::directory_iterator(); ++it) {
-            sys::error_code ec;
             auto &child = *it;
-            bool is_dir = bfs::is_directory(child, ec);
-
-            if (is_dir) {
+            sys::error_code ec;
+            auto status = bfs::symlink_status(child, ec);
+            if (ec) {
+                errors.push_back(scan_error_t{child, ec});
+                continue;
+            }
+            if (status.type() == bfs::file_type::directory_file) {
                 dirs_queue.push_back(child);
                 continue;
             }
-
             auto rp = relativize(child, root);
             auto file = files.by_name(rp.path.string());
             if (file) {
@@ -118,7 +120,8 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             }
 
             proto::FileInfo metadata;
-            if (bfs::is_regular_file(child, ec)) {
+            metadata.set_name(rp.path.string());
+            if (status.type() == bfs::file_type::regular_file) {
                 metadata.set_type(proto::FileInfoType::FILE);
                 auto sz = bfs::file_size(child, ec);
                 if (ec) {
@@ -126,11 +129,11 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                     continue;
                 }
                 metadata.set_size(sz);
-                ;
-            } else if (bfs::is_symlink(child, ec)) {
+            } else if (status.type() == bfs::file_type::symlink_file) {
                 metadata.set_type(proto::FileInfoType::SYMLINK);
+            } else {
+                LOG_WARN(log, "unknown/unimplemented file type {} : {}", (int)status.type(), bfs::path(child).string());
             }
-            metadata.set_name(rp.path.string());
             unknown_files_queue.push_back(unknown_file_t{child, std::move(metadata)});
         }
     }
@@ -206,5 +209,16 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
         return incomplete_removed_t{file};
     }
 
-    return incomplete_t{info.file};
+    auto opt = file_t::open_read(path);
+    if (!opt) {
+        LOG_DEBUG(log, "try to remove temporally {}, which cannot open ", path.string());
+        bfs::remove(path, ec);
+        if (ec) {
+            return file_error_t{file, ec};
+        }
+        return incomplete_removed_t{file};
+    }
+
+    auto &opened_file = opt.assume_value();
+    return incomplete_t{info.file, file_ptr_t(new file_t(std::move(opened_file)))};
 }

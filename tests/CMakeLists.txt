@@ -70,6 +70,10 @@ add_executable(016-relay-support 016-relay-support.cpp $<$<PLATFORM_ID:Windows>:
 target_link_libraries(016-relay-support syncspirit_test_lib)
 add_test(016-relay-support "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/016-relay-support")
 
+add_executable(017-fs-utils 017-fs-utils.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(017-fs-utils syncspirit_test_lib)
+add_test(017-fs-utils "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/017-fs-utils")
+
 add_executable(020-generic-map 020-generic-map.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(020-generic-map syncspirit_test_lib)
 add_test(020-generic-map "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/020-generic-map")

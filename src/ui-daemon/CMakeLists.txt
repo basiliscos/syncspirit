@@ -5,6 +5,7 @@ add_executable(syncspirit-daemon
     command/add_peer.cpp
     command/inactivate.cpp
     command/pair_iterator.cpp
+    command/rescan_dirs.cpp
     command/share_folder.cpp
     command.cpp
     error_code.cpp

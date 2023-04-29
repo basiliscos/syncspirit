@@ -60,26 +60,56 @@ static outcome::result<message::wrapped_message_t> parse_hello(const asio::const
 using MT = proto::MessageType;
 template <MT> struct T2M;
 
-template <> struct T2M<MT::CLUSTER_CONFIG> { using type = proto::ClusterConfig; };
-template <> struct T2M<MT::INDEX> { using type = proto::Index; };
-template <> struct T2M<MT::INDEX_UPDATE> { using type = proto::IndexUpdate; };
-template <> struct T2M<MT::REQUEST> { using type = proto::Request; };
-template <> struct T2M<MT::RESPONSE> { using type = proto::Response; };
-template <> struct T2M<MT::DOWNLOAD_PROGRESS> { using type = proto::DownloadProgress; };
-template <> struct T2M<MT::PING> { using type = proto::Ping; };
-template <> struct T2M<MT::CLOSE> { using type = proto::Close; };
+template <> struct T2M<MT::CLUSTER_CONFIG> {
+    using type = proto::ClusterConfig;
+};
+template <> struct T2M<MT::INDEX> {
+    using type = proto::Index;
+};
+template <> struct T2M<MT::INDEX_UPDATE> {
+    using type = proto::IndexUpdate;
+};
+template <> struct T2M<MT::REQUEST> {
+    using type = proto::Request;
+};
+template <> struct T2M<MT::RESPONSE> {
+    using type = proto::Response;
+};
+template <> struct T2M<MT::DOWNLOAD_PROGRESS> {
+    using type = proto::DownloadProgress;
+};
+template <> struct T2M<MT::PING> {
+    using type = proto::Ping;
+};
+template <> struct T2M<MT::CLOSE> {
+    using type = proto::Close;
+};
 
 template <typename M> struct M2T;
-template <> struct M2T<typename proto::ClusterConfig> { using type = std::integral_constant<MT, MT::CLUSTER_CONFIG>; };
-template <> struct M2T<typename proto::Index> { using type = std::integral_constant<MT, MT::INDEX>; };
-template <> struct M2T<typename proto::IndexUpdate> { using type = std::integral_constant<MT, MT::INDEX_UPDATE>; };
-template <> struct M2T<typename proto::Request> { using type = std::integral_constant<MT, MT::REQUEST>; };
-template <> struct M2T<typename proto::Response> { using type = std::integral_constant<MT, MT::RESPONSE>; };
+template <> struct M2T<typename proto::ClusterConfig> {
+    using type = std::integral_constant<MT, MT::CLUSTER_CONFIG>;
+};
+template <> struct M2T<typename proto::Index> {
+    using type = std::integral_constant<MT, MT::INDEX>;
+};
+template <> struct M2T<typename proto::IndexUpdate> {
+    using type = std::integral_constant<MT, MT::INDEX_UPDATE>;
+};
+template <> struct M2T<typename proto::Request> {
+    using type = std::integral_constant<MT, MT::REQUEST>;
+};
+template <> struct M2T<typename proto::Response> {
+    using type = std::integral_constant<MT, MT::RESPONSE>;
+};
 template <> struct M2T<typename proto::DownloadProgress> {
     using type = std::integral_constant<MT, MT::DOWNLOAD_PROGRESS>;
 };
-template <> struct M2T<typename proto::Ping> { using type = std::integral_constant<MT, MT::PING>; };
-template <> struct M2T<typename proto::Close> { using type = std::integral_constant<MT, MT::CLOSE>; };
+template <> struct M2T<typename proto::Ping> {
+    using type = std::integral_constant<MT, MT::PING>;
+};
+template <> struct M2T<typename proto::Close> {
+    using type = std::integral_constant<MT, MT::CLOSE>;
+};
 
 template <MessageType T>
 outcome::result<message::wrapped_message_t> parse(const asio::const_buffer &buff, std::size_t consumed) noexcept {
