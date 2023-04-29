@@ -8,7 +8,9 @@
 #include "model/messages.h"
 #include "model/diff/block_visitor.h"
 #include "model/diff/cluster_visitor.h"
+#include "fs/messages.h"
 #include "utils/log.h"
+#include <set>
 
 namespace syncspirit::daemon {
 
@@ -51,8 +53,6 @@ struct governor_actor_t : public r::actor_base_t,
 
   private:
     using clock_t = r::pt::microsec_clock;
-    r::pt::ptime deadline;
-    r::pt::time_duration dirs_rescan_interval;
 
     void schedule_rescan_dirs() noexcept;
     void process() noexcept;
@@ -62,7 +62,9 @@ struct governor_actor_t : public r::actor_base_t,
     void on_io_error(model::message::io_error_t &reply) noexcept;
     void on_inacitvity_timer(r::request_id_t, bool cancelled) noexcept;
     void on_rescan_timer(r::request_id_t, bool cancelled) noexcept;
+    void on_scan_completed(fs::message::scan_completed_t &message) noexcept;
 
+    void rescan_folders();
     void refresh_deadline() noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
@@ -70,6 +72,10 @@ struct governor_actor_t : public r::actor_base_t,
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
+
+    r::pt::ptime deadline;
+    r::pt::time_duration dirs_rescan_interval;
+    model::folders_map_t scaning_folders;
 };
 
 } // namespace syncspirit::daemon

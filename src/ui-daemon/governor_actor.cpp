@@ -24,6 +24,7 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&governor_actor_t::on_model_update, sup);
                 plugin->subscribe_actor(&governor_actor_t::on_block_update, sup);
                 plugin->subscribe_actor(&governor_actor_t::on_io_error, coordinator);
+                plugin->subscribe_actor(&governor_actor_t::on_scan_completed, coordinator);
             }
         });
     });
@@ -50,6 +51,7 @@ void governor_actor_t::on_model_response(model::message::model_response_t &reply
     }
     LOG_TRACE(log, "{}, on_model_response", identity);
     cluster = std::move(reply.payload.res.cluster);
+    rescan_folders();
     process();
 }
 
@@ -85,6 +87,13 @@ void governor_actor_t::on_io_error(model::message::io_error_t &reply) noexcept {
     for (auto &err : errs) {
         LOG_WARN(log, "{}, on_io_error (ignored) path: {}, problem: {}", identity, err.path, err.ec.message());
     }
+}
+
+void governor_actor_t::on_scan_completed(fs::message::scan_completed_t &message) noexcept {
+    auto &folder_id = message.payload.folder_id;
+    auto folder = scaning_folders.by_id(folder_id);
+    LOG_TRACE(log, "{}, on_scan_completed, folder = {}({})", identity, folder->get_label(), folder->get_id());
+    scaning_folders.remove(folder);
 }
 
 void governor_actor_t::process() noexcept {
@@ -128,7 +137,12 @@ void governor_actor_t::on_inacitvity_timer(r::request_id_t, bool cancelled) noex
     do_shutdown();
 }
 
-void governor_actor_t::on_rescan_timer(r::request_id_t, bool cancelled) noexcept { std::abort(); }
+void governor_actor_t::on_rescan_timer(r::request_id_t, bool cancelled) noexcept {
+    if (!cancelled) {
+        rescan_folders();
+        schedule_rescan_dirs();
+    }
+}
 
 void governor_actor_t::refresh_deadline() noexcept {
     auto timeout = r::pt::seconds(inactivity_seconds);
@@ -138,11 +152,23 @@ void governor_actor_t::refresh_deadline() noexcept {
 
 void governor_actor_t::schedule_rescan_dirs(const r::pt::time_duration &interval) noexcept {
     dirs_rescan_interval = interval;
+    schedule_rescan_dirs();
 }
 
 void governor_actor_t::schedule_rescan_dirs() noexcept {
     LOG_INFO(log, "{}, scheduling dirs rescan", identity);
     start_timer(dirs_rescan_interval, *this, &governor_actor_t::on_rescan_timer);
+}
+
+void governor_actor_t::rescan_folders() {
+    if (scaning_folders.size() == 0) {
+        LOG_INFO(log, "{}, issuing folders rescan", identity);
+        for (auto it : cluster->get_folders()) {
+            auto &folder = it.item;
+            send<fs::payload::scan_folder_t>(coordinator, std::string(folder->get_id()));
+            scaning_folders.put(folder);
+        }
+    }
 }
 
 auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &, void *) noexcept -> outcome::result<void> {
