@@ -123,6 +123,7 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(uf->path.filename() == "symlink");
             CHECK(uf->metadata.size() == 0);
             CHECK(uf->metadata.type() == proto::FileInfoType::SYMLINK);
+            CHECK(uf->metadata.symlink_target() == "/some/where");
 
             r = task.advance();
             REQUIRE(std::get_if<bool>(&r));
@@ -130,7 +131,7 @@ TEST_CASE("scan_task", "[fs]") {
         }
     }
 
-    SECTION("files") {
+    SECTION("regular files") {
         auto modified = std::time_t{1642007468};
         auto pr_file = proto::FileInfo{};
         pr_file.set_name("a.txt");
@@ -457,6 +458,69 @@ TEST_CASE("scan_task", "[fs]") {
                 CHECK(*std::get_if<bool>(&r) == false);
                 bfs::permissions(parent, bfs::perms::all_all);
             }
+        }
+    }
+
+    SECTION("symlink file") {
+        auto modified = std::time_t{1642007468};
+        auto pr_file = proto::FileInfo{};
+        pr_file.set_name("a.txt");
+        pr_file.set_sequence(2);
+        pr_file.set_type(proto::FileInfoType::SYMLINK);
+        pr_file.set_symlink_target("b.txt");
+        auto version = pr_file.mutable_version();
+        auto counter = version->add_counters();
+        counter->set_id(1);
+        counter->set_value(peer_device->as_uint());
+
+        SECTION("the same symlink exists") {
+            pr_file.set_modified_s(modified);
+
+            auto path = root_path / "a.txt";
+            auto target = bfs::path("b.txt");
+            bfs::create_symlink(target, path);
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
+        SECTION("symlink points to something different") {
+            pr_file.set_modified_s(modified);
+
+            auto path = root_path / "a.txt";
+            auto target = bfs::path("c.txt");
+            bfs::create_symlink(target, path);
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<changed_meta_t>(&r));
+            auto ref = std::get_if<changed_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
         }
     }
 }

@@ -74,7 +74,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     for (auto &it : files_map) {
         folder_info->add(it.item, allow_max_sequence_increase);
     }
-    LOG_TRACE(log, "update_folder_t, apply(). max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
+    LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
 
     return outcome::success();
 }

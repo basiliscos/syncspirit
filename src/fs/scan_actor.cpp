@@ -162,6 +162,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
 auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path, proto::FileInfo &metadata) noexcept
     -> model::io_errors_t {
     file_ptr_t file;
+    LOG_DEBUG(log, "{}, will try to initiate hashing of {}", identity, path.string());
     if (metadata.type() == proto::FileInfoType::FILE) {
         auto opt = file_t::open_read(path);
         if (!opt) {

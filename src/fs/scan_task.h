@@ -79,6 +79,8 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
   private:
     scan_result_t advance_dir(const bfs::path &dir) noexcept;
     scan_result_t advance_file(const file_info_t &file) noexcept;
+    scan_result_t advance_regular_file(const file_info_t &file) noexcept;
+    scan_result_t advance_symlink_file(const file_info_t &file) noexcept;
 
     std::string folder_id;
     model::cluster_ptr_t cluster;

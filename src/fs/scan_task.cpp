@@ -130,6 +130,12 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 }
                 metadata.set_size(sz);
             } else if (status.type() == bfs::file_type::symlink_file) {
+                auto target = bfs::read_symlink(child, ec);
+                if (ec) {
+                    errors.push_back(scan_error_t{dir, ec});
+                    continue;
+                }
+                metadata.set_symlink_target(target.string());
                 metadata.set_type(proto::FileInfoType::SYMLINK);
             } else {
                 LOG_WARN(log, "unknown/unimplemented file type {} : {}", (int)status.type(), bfs::path(child).string());
@@ -148,8 +154,18 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
 }
 
 scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
+    if (info.file->is_file()) {
+        return advance_regular_file(info);
+    } else {
+        assert(info.file->is_link());
+        return advance_symlink_file(info);
+    }
+}
+
+scan_result_t scan_task_t::advance_regular_file(const file_info_t &info) noexcept {
     sys::error_code ec;
     auto file = info.file.get();
+
     auto path = info.file->get_path();
     if (info.temp) {
         path = make_temporal(path);
@@ -221,4 +237,26 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
 
     auto &opened_file = opt.assume_value();
     return incomplete_t{info.file, file_ptr_t(new file_t(std::move(opened_file)))};
+}
+
+scan_result_t scan_task_t::advance_symlink_file(const file_info_t &info) noexcept {
+    auto path = info.file->get_path();
+    auto file = info.file.get();
+
+    if (!bfs::is_symlink(path)) {
+        LOG_CRITICAL(log, "not implemented change tracking: symlink -> non-symblink");
+        return unchanged_meta_t{file};
+    }
+
+    sys::error_code ec;
+    auto target = bfs::read_symlink(path, ec);
+    if (ec) {
+        return file_error_t{file, ec};
+    }
+
+    if (target.string() == info.file->get_link_target()) {
+        return unchanged_meta_t{info.file};
+    } else {
+        return changed_meta_t{info.file};
+    }
 }
