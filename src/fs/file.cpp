@@ -155,7 +155,8 @@ auto file_t::read(size_t offset, size_t size) const noexcept -> outcome::result<
     r.resize(size);
     auto rf = fread(r.data(), 1, size, backend);
     if (rf != size) {
-        return sys::error_code{errno, sys::system_category()};
+        auto code = feof(backend) ? ENOENT : ferror(backend);
+        return sys::error_code{code, sys::system_category()};
     }
 
     pos = offset + size;

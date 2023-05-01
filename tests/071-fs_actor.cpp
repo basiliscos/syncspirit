@@ -29,6 +29,8 @@ namespace {
 struct fixture_t {
     using msg_t = net::message::load_cluster_response_t;
     using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
+    using blk_res_t = fs::message::block_response_t;
+    using blk_res_ptr_t = r::intrusive_ptr_t<blk_res_t>;
 
     fixture_t() noexcept : root_path{bfs::unique_path()}, path_quard{root_path} {
         utils::set_default("trace");
@@ -37,15 +39,17 @@ struct fixture_t {
 
     virtual supervisor_t::configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
-            plugin.template with_casted<r::plugin::starter_plugin_t>(
-                [&](auto &p) { p.subscribe_actor(r::lambda<msg_t>([&](msg_t &msg) { reply = &msg; })); });
+            plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+                p.subscribe_actor(r::lambda<msg_t>([&](msg_t &msg) { reply = &msg; }));
+                p.subscribe_actor(r::lambda<blk_res_t>([&](blk_res_t &msg) { block_reply = &msg; }));
+            });
         };
     }
 
     virtual void run() noexcept {
         auto my_id =
             device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-        auto my_device = device_t::create(my_id, "my-device").value();
+        my_device = device_t::create(my_id, "my-device").value();
 
         cluster = new cluster_t(my_device, 1);
         auto peer_id =
@@ -97,6 +101,7 @@ struct fixture_t {
     r::pt::time_duration timeout = r::pt::millisec{10};
     cluster_ptr_t cluster;
     model::device_ptr_t peer_device;
+    model::device_ptr_t my_device;
     model::folder_ptr_t folder;
     model::folder_info_ptr_t folder_my;
     model::folder_info_ptr_t folder_peer;
@@ -106,6 +111,7 @@ struct fixture_t {
     path_guard_t path_quard;
     r::system_context_t ctx;
     msg_ptr_t reply;
+    blk_res_ptr_t block_reply;
     std::string_view folder_id = "1234-5678";
 };
 } // namespace
@@ -494,10 +500,104 @@ void test_clone_block() {
     F().run();
 }
 
+void test_requesting_block() {
+    struct F : fixture_t {
+        void main() noexcept override {
+
+            auto bi = proto::BlockInfo();
+            bi.set_size(5);
+            bi.set_weak_hash(12);
+            bi.set_hash(utils::sha256_digest("12345").value());
+            bi.set_offset(0);
+            auto b = block_info_t::create(bi).value();
+
+            auto bi2 = proto::BlockInfo();
+            bi2.set_size(5);
+            bi2.set_weak_hash(12);
+            bi2.set_hash(utils::sha256_digest("67890").value());
+            bi2.set_offset(0);
+            auto b2 = block_info_t::create(bi2).value();
+
+            cluster->get_blocks().put(b);
+            cluster->get_blocks().put(b2);
+            bfs::path target = root_path / "a.txt";
+
+            std::int64_t modified = 1641828421;
+            proto::FileInfo pr_source;
+            pr_source.set_name("a.txt");
+            pr_source.set_block_size(5ul);
+            pr_source.set_modified_s(modified);
+            pr_source.set_size(10);
+            auto version = pr_source.mutable_version();
+            auto counter = version->add_counters();
+            counter->set_id(1);
+            counter->set_value(my_device->as_uint());
+            *pr_source.add_blocks() = bi;
+            *pr_source.add_blocks() = bi2;
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_source, folder_my).value();
+            file->assign_block(b, 0);
+            file->assign_block(b2, 1);
+            folder_my->add(file, false);
+
+            auto req = proto::Request();
+            req.set_folder(std::string(folder->get_id()));
+            req.set_name("a.txt");
+            req.set_offset(0);
+            req.set_size(5);
+            auto req_ptr = proto::message::Request(new proto::Request(req));
+            auto msg = r::make_message<fs::payload::block_request_t>(file_actor->get_address(), std::move(req_ptr),
+                                                                     sup->get_address());
+
+            SECTION("error, no file") {
+                sup->put(msg);
+                sup->do_process();
+                REQUIRE(block_reply);
+                REQUIRE(block_reply->payload.remote_request);
+                REQUIRE(block_reply->payload.ec);
+                REQUIRE(block_reply->payload.data.empty());
+            }
+
+            SECTION("error, oversized request") {
+                write_file(target, "1234");
+                sup->put(msg);
+                sup->do_process();
+                REQUIRE(block_reply);
+                REQUIRE(block_reply->payload.remote_request);
+                REQUIRE(block_reply->payload.ec);
+                REQUIRE(block_reply->payload.data.empty());
+            }
+
+            SECTION("successfull file reading") {
+                write_file(target, "1234567890");
+                sup->put(msg);
+                sup->do_process();
+                REQUIRE(block_reply);
+                REQUIRE(block_reply->payload.remote_request);
+                REQUIRE(!block_reply->payload.ec);
+                REQUIRE(block_reply->payload.data == "12345");
+
+                req.set_offset(5);
+                auto req_ptr = proto::message::Request(new proto::Request(req));
+                auto msg = r::make_message<fs::payload::block_request_t>(file_actor->get_address(), std::move(req_ptr),
+                                                                         sup->get_address());
+                sup->put(msg);
+                sup->do_process();
+                REQUIRE(block_reply);
+                REQUIRE(block_reply->payload.remote_request);
+                REQUIRE(!block_reply->payload.ec);
+                REQUIRE(block_reply->payload.data == "67890");
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[fs]");
     REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
     REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
+    REGISTER_TEST_CASE(test_requesting_block, "test_requesting_block", "[fs]");
     return 1;
 }
 

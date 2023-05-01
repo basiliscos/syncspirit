@@ -3,6 +3,8 @@
 
 #include "file_actor.h"
 #include "net/names.h"
+#include "model/folder_info.h"
+#include "model/file_info.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/clone_file.h"
@@ -12,7 +14,8 @@
 
 using namespace syncspirit::fs;
 
-file_actor_t::file_actor_t(config_t &cfg) : r::actor_base_t{cfg}, cluster{cfg.cluster}, rw_cache(cfg.mru_size) {
+file_actor_t::file_actor_t(config_t &cfg)
+    : r::actor_base_t{cfg}, cluster{cfg.cluster}, rw_cache(cfg.mru_size), ro_cache(cfg.mru_size) {
     log = utils::get_logger("fs.file_actor");
 }
 
@@ -29,6 +32,8 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
+    plugin.with_casted<r::plugin::starter_plugin_t>(
+        [&](auto &p) { p.subscribe_actor(&file_actor_t::on_block_request); });
 }
 
 void file_actor_t::on_start() noexcept {
@@ -60,6 +65,35 @@ void file_actor_t::on_block_update(model::message::block_update_t &message) noex
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
+}
+
+void file_actor_t::on_block_request(message::block_request_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_block_request", identity);
+    auto &p = message.payload;
+    auto &dest = p.reply_to;
+    auto &req_ptr = message.payload.remote_request;
+    auto &req = *req_ptr;
+    auto folder = cluster->get_folders().by_id(req.folder());
+    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
+    auto file_info = folder_info->get_file_infos().by_name(req.name());
+    auto &path = file_info->get_path();
+    auto file_opt = open_file_ro(path, true);
+    auto ec = sys::error_code{};
+    auto data = std::string{};
+    if (!file_opt) {
+        ec = file_opt.assume_error();
+    } else {
+        auto &file = file_opt.assume_value();
+        auto block_opt = file->read(req.offset(), req.size());
+        if (!block_opt) {
+            ec = block_opt.assume_error();
+            LOG_WARN(log, "{}, error requesting block; offset = {}, size = {} :: {} ", identity, req.offset(),
+                     req.size(), ec.message());
+        } else {
+            data = std::move(block_opt.assume_value());
+        }
+    }
+    send<payload::block_response_t>(dest, std::move(req_ptr), std::move(p.custom), ec, std::move(data));
 }
 
 auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome::result<void> {
@@ -281,8 +315,15 @@ auto file_actor_t::open_file_rw(const boost::filesystem::path &path, model::file
     return ptr;
 }
 
-auto file_actor_t::open_file_ro(const bfs::path &path) noexcept -> outcome::result<file_ptr_t> {
+auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept -> outcome::result<file_ptr_t> {
     LOG_TRACE(log, "{}, open_file (by path), path = {}", identity, path.string());
+    if (use_cache) {
+        auto file = rw_cache.get(path.string());
+        if (file) {
+            return file;
+        }
+    }
+
     auto opt = file_t::open_read(path);
     if (!opt) {
         auto &ec = opt.assume_error();

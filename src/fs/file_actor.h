@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
 #include "file.h"
+#include "messages.h"
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "model/diff/block_visitor.h"
@@ -66,9 +67,10 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t,
 
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
+    void on_block_request(message::block_request_t &message) noexcept;
 
     outcome::result<file_ptr_t> open_file_rw(const bfs::path &path, model::file_info_ptr_t info) noexcept;
-    outcome::result<file_ptr_t> open_file_ro(const bfs::path &path) noexcept;
+    outcome::result<file_ptr_t> open_file_ro(const bfs::path &path, bool use_cache = false) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::flush_file_t &, void *) noexcept override;
@@ -81,6 +83,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t,
     utils::logger_t log;
     r::address_ptr_t coordinator;
     cache_t rw_cache;
+    cache_t ro_cache;
 };
 
 } // namespace fs
