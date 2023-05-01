@@ -13,3 +13,4 @@ const char *names::http11_gda = "net::http11_gda";
 const char *names::http11_relay = "net::http11_relay";
 const char *names::hasher_proxy = "net::hasher_proxy";
 const char *names::fs_scanner = "fs::scanner";
+const char *names::fs_actor = "fs::actor";

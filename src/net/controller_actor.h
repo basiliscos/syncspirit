@@ -140,6 +140,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     r::address_ptr_t coordinator;
     r::address_ptr_t peer_addr;
     r::address_ptr_t hasher_proxy;
+    r::address_ptr_t fs_addr;
     r::address_ptr_t open_reading; /* for routing */
     pt::time_duration request_timeout;
     model::ignored_folders_map_t *ignored_folders;

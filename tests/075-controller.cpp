@@ -204,6 +204,10 @@ struct fixture_t {
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
         sup->cluster = cluster;
 
+        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
+            plugin.template with_casted<r::plugin::registry_plugin_t>(
+                [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
+        };
         sup->start();
         sup->do_process();
 

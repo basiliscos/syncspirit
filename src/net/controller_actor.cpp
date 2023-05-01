@@ -44,6 +44,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         open_reading = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.discover_name(names::fs_actor, fs_addr, false).link();
         p.discover_name(names::hasher_proxy, hasher_proxy, false).link();
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {

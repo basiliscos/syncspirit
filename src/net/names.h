@@ -17,6 +17,7 @@ struct SYNCSPIRIT_API names {
     static const char *http11_relay;
     static const char *hasher_proxy;
     static const char *fs_scanner;
+    static const char *fs_actor;
 };
 
 } // namespace net
