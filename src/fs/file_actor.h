@@ -80,7 +80,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t,
     model::cluster_ptr_t cluster;
     utils::logger_t log;
     r::address_ptr_t coordinator;
-    cache_t files_cache;
+    cache_t rw_cache;
 };
 
 } // namespace fs

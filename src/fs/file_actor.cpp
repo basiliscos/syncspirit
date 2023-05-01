@@ -12,7 +12,7 @@
 
 using namespace syncspirit::fs;
 
-file_actor_t::file_actor_t(config_t &cfg) : r::actor_base_t{cfg}, cluster{cfg.cluster}, files_cache(cfg.mru_size) {
+file_actor_t::file_actor_t(config_t &cfg) : r::actor_base_t{cfg}, cluster{cfg.cluster}, rw_cache(cfg.mru_size) {
     log = utils::get_logger("fs.file_actor");
 }
 
@@ -39,7 +39,7 @@ void file_actor_t::on_start() noexcept {
 void file_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "{}, shutdown_start", identity);
     r::actor_base_t::shutdown_start();
-    files_cache.clear();
+    rw_cache.clear();
 }
 
 void file_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
@@ -165,14 +165,14 @@ auto file_actor_t::operator()(const model::diff::modify::flush_file_t &diff, voi
     assert(file->is_locally_available());
 
     auto path = file->get_path().string();
-    auto backend = files_cache.get(path);
+    auto backend = rw_cache.get(path);
     if (!backend) {
         LOG_ERROR(log, "{}, attempt to flush non-opend file {}", identity, path);
         auto ec = sys::errc::make_error_code(sys::errc::io_error);
         return ec;
     }
 
-    files_cache.remove(backend);
+    rw_cache.remove(backend);
     auto ok = backend->close(true);
     if (!ok) {
         auto &ec = ok.assume_error();
@@ -226,7 +226,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     auto source_path = source->get_path();
     if (source_path == target_path) {
         source_backend = target_backend;
-    } else if (auto cached_source = files_cache.get(source_path.string()); cached_source) {
+    } else if (auto cached_source = rw_cache.get(source_path.string()); cached_source) {
         source_backend = cached_source;
     } else {
         if (!source->is_locally_available()) {
@@ -251,7 +251,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
 
 auto file_actor_t::open_file_rw(const boost::filesystem::path &path, model::file_info_ptr_t info) noexcept
     -> outcome::result<file_ptr_t> {
-    auto item = files_cache.get(path.string());
+    auto item = rw_cache.get(path.string());
     if (item) {
         return item;
     }
@@ -277,7 +277,7 @@ auto file_actor_t::open_file_rw(const boost::filesystem::path &path, model::file
         return option.assume_error();
     }
     auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
-    files_cache.put(ptr);
+    rw_cache.put(ptr);
     return ptr;
 }
 
