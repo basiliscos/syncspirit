@@ -94,7 +94,7 @@ struct fixture_t {
                      .finish();
         sup->do_process();
 
-        sup->send<fs::payload::scan_folder_t>(sup->get_address(), folder_id);
+        sup->send<fs::payload::scan_folder_t>(target->get_address(), folder_id);
         main();
 
         sup->do_process();
@@ -526,7 +526,7 @@ void test_remove_file() {
                 REQUIRE(blocks.size() == 1);
 
                 bfs::remove(file_path);
-                auto &addr = sup->get_address();
+                auto &addr = target->get_address();
                 sup->send<fs::payload::scan_folder_t>(addr, std::string(folder->get_id()));
                 sup->do_process();
 

@@ -8,7 +8,8 @@
 
 using namespace syncspirit::daemon;
 
-governor_actor_t::governor_actor_t(config_t &cfg) : r::actor_base_t{cfg}, commands{std::move(cfg.commands)} {
+governor_actor_t::governor_actor_t(config_t &cfg)
+    : r::actor_base_t{cfg}, commands{std::move(cfg.commands)}, cluster{std::move(cfg.cluster)} {
     log = utils::get_logger("daemon.governor_actor");
 }
 
@@ -27,15 +28,15 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&governor_actor_t::on_scan_completed, coordinator);
             }
         });
+        p.discover_name(net::names::fs_scanner, fs_scanner, true).link(false);
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) { p.subscribe_actor(&governor_actor_t::on_model_response); });
 }
 
 void governor_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
+    rescan_folders();
+    process();
     r::actor_base_t::on_start();
-    request<model::payload::model_request_t>(supervisor->get_address()).send(init_timeout);
 }
 
 void governor_actor_t::shutdown_start() noexcept {
@@ -43,41 +44,30 @@ void governor_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
-void governor_actor_t::on_model_response(model::message::model_response_t &reply) noexcept {
-    auto &ee = reply.payload.ee;
-    if (ee) {
-        LOG_ERROR(log, "{}, on_cluster_seed: {},", identity, ee->message());
-        return do_shutdown(ee);
-    }
-    LOG_TRACE(log, "{}, on_model_response", identity);
-    cluster = std::move(reply.payload.res.cluster);
-    rescan_folders();
-    process();
-}
-
-void governor_actor_t::on_model_update(model::message::forwarded_model_update_t &message) noexcept {
+void governor_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
+    auto &diff = *message.payload.diff;
+    auto r = diff.visit(*this, nullptr);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+#if 0
+    process();
     auto &payload = message.payload.message->payload;
     if (payload.custom == this) {
         return process();
     }
-    if (!cluster->is_tainted()) {
-        auto &diff = *message.payload.message->payload.diff;
-        auto r = diff.visit(*this, nullptr);
-        if (!r) {
-            LOG_WARN(log, "{}, model visiting error: {}", identity, r.assume_error().message());
-        }
-    }
+#endif
 }
 
-void governor_actor_t::on_block_update(model::message::forwarded_block_update_t &message) noexcept {
+void governor_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_block_update", identity);
-    if (!cluster->is_tainted()) {
-        auto &diff = *message.payload.message->payload.diff;
-        auto r = diff.visit(*this, nullptr);
-        if (!r) {
-            LOG_WARN(log, "{}, block visiting error: {}", identity, r.assume_error().message());
-        }
+    auto &diff = *message.payload.diff;
+    auto r = diff.visit(*this, nullptr);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
     }
 }
 
@@ -165,7 +155,7 @@ void governor_actor_t::rescan_folders() {
         LOG_INFO(log, "{}, issuing folders rescan", identity);
         for (auto it : cluster->get_folders()) {
             auto &folder = it.item;
-            send<fs::payload::scan_folder_t>(coordinator, std::string(folder->get_id()));
+            send<fs::payload::scan_folder_t>(fs_scanner, std::string(folder->get_id()));
             scaning_folders.put(folder);
         }
     }

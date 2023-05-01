@@ -31,13 +31,8 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         new_files = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&scan_actor_t::on_initiate_scan, coordinator);
-            }
-        });
+        p.register_name(net::names::fs_scanner, address);
+        p.discover_name(net::names::coordinator, coordinator, true).link(false);
     });
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(hasher_proxy, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -46,6 +41,7 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&scan_actor_t::on_hash_new, new_files);
         p.subscribe_actor(&scan_actor_t::on_rehash);
         p.subscribe_actor(&scan_actor_t::on_hash_anew);
+        p.subscribe_actor(&scan_actor_t::on_initiate_scan);
     });
 }
 

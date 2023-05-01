@@ -18,6 +18,7 @@ namespace r = rotor;
 
 struct governor_actor_config_t : r::actor_config_t {
     Commands commands;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Actor> struct governor_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -27,6 +28,10 @@ template <typename Actor> struct governor_actor_config_builder_t : r::actor_conf
 
     builder_t &&commands(Commands &&value) &&noexcept {
         parent_t::config.commands = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+        parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -46,8 +51,9 @@ struct governor_actor_t : public r::actor_base_t,
     void schedule_rescan_dirs(const r::pt::time_duration &intreval) noexcept;
 
     r::address_ptr_t coordinator;
-    model::cluster_ptr_t cluster;
+    r::address_ptr_t fs_scanner;
     Commands commands;
+    model::cluster_ptr_t cluster;
     utils::logger_t log;
     std::uint32_t inactivity_seconds;
 
@@ -56,9 +62,8 @@ struct governor_actor_t : public r::actor_base_t,
 
     void schedule_rescan_dirs() noexcept;
     void process() noexcept;
-    void on_model_update(model::message::forwarded_model_update_t &message) noexcept;
-    void on_block_update(model::message::forwarded_block_update_t &message) noexcept;
-    void on_model_response(model::message::model_response_t &res) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_block_update(model::message::block_update_t &message) noexcept;
     void on_io_error(model::message::io_error_t &reply) noexcept;
     void on_inacitvity_timer(r::request_id_t, bool cancelled) noexcept;
     void on_rescan_timer(r::request_id_t, bool cancelled) noexcept;

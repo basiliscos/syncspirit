@@ -60,6 +60,9 @@ void fs_supervisor_t::launch() noexcept {
                      .requested_hashes_limit(hasher_threads * 2)
                      .timeout(timeout)
                      .finish();
+    for (auto &l : launchers) {
+        l(cluster);
+    }
 }
 
 void fs_supervisor_t::on_model_request(model::message::model_request_t &req) noexcept {
@@ -101,7 +104,6 @@ void fs_supervisor_t::on_model_update(model::message::model_update_t &message) n
         auto ee = make_error(r.assume_error());
         return do_shutdown(ee);
     }
-    send<model::payload::forwarded_model_update_t>(address, &message);
 }
 
 void fs_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
@@ -112,5 +114,4 @@ void fs_supervisor_t::on_block_update(model::message::block_update_t &message) n
         auto ee = make_error(r.assume_error());
         return do_shutdown(ee);
     }
-    send<model::payload::forwarded_block_update_t>(address, &message);
 }
