@@ -376,8 +376,8 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void 
     }
 
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file = file_info->get_file_infos().by_name(diff.file.name());
+    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
+    auto file = folder_info->get_file_infos().by_name(diff.file.name());
 
     auto txn_opt = get_txn();
     if (!txn_opt) {
@@ -396,8 +396,8 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void 
 
     bool save_fi = diff.identical || diff.create_new_file;
     if (save_fi) {
-        auto key = file_info->get_key();
-        auto data = file_info->serialize();
+        auto key = folder_info->get_key();
+        auto data = folder_info->serialize();
 
         auto r = db::save({key, data}, txn);
         if (!r) {
