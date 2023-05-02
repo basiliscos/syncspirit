@@ -887,35 +887,36 @@ void test_uploading() {
             d_my->set_max_sequence(folder_my->get_max_sequence());
             d_my->set_index_id(folder_my->get_index());
 
+            auto pr_fi = proto::FileInfo{};
+            pr_fi.set_name("data.bin");
+            pr_fi.set_type(proto::FileInfoType::FILE);
+            pr_fi.set_sequence(folder_1_peer->get_max_sequence());
+            pr_fi.set_block_size(5);
+            pr_fi.set_size(5);
+            auto version = pr_fi.mutable_version();
+            auto counter = version->add_counters();
+            counter->set_id(1);
+            counter->set_value(my_device->as_uint());
+            auto b1 = pr_fi.add_blocks();
+            b1->set_hash(utils::sha256_digest("12345").value());
+            b1->set_offset(0);
+            b1->set_size(5);
+            auto b = model::block_info_t::create(*b1).value();
+
+            auto file_info = model::file_info_t::create(cluster->next_uuid(), pr_fi, folder_my).value();
+            file_info->assign_block(b, 0);
+            folder_my->add(file_info, true);
+
+            auto req = proto::Request();
+            req.set_id(1);
+            req.set_folder(std::string(folder_1->get_id()));
+            req.set_name("data.bin");
+            req.set_offset(0);
+            req.set_size(5);
+
+            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+
             SECTION("upload regular file, no hash") {
-                auto pr_fi = proto::FileInfo{};
-                pr_fi.set_name("data.bin");
-                pr_fi.set_type(proto::FileInfoType::FILE);
-                pr_fi.set_sequence(folder_1_peer->get_max_sequence());
-                pr_fi.set_block_size(5);
-                pr_fi.set_size(5);
-                auto version = pr_fi.mutable_version();
-                auto counter = version->add_counters();
-                counter->set_id(1);
-                counter->set_value(my_device->as_uint());
-                auto b1 = pr_fi.add_blocks();
-                b1->set_hash(utils::sha256_digest("12345").value());
-                b1->set_offset(0);
-                b1->set_size(5);
-                auto b = model::block_info_t::create(*b1).value();
-
-                auto file_info = model::file_info_t::create(cluster->next_uuid(), pr_fi, folder_my).value();
-                file_info->assign_block(b, 0);
-                folder_my->add(file_info, true);
-
-                auto req = proto::Request();
-                req.set_id(1);
-                req.set_folder(std::string(folder_1->get_id()));
-                req.set_name("data.bin");
-                req.set_offset(0);
-                req.set_size(5);
-
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
                 peer_actor->forward(proto::message::Request(new proto::Request(req)));
 
                 auto req_ptr = proto::message::Request(new proto::Request(req));
