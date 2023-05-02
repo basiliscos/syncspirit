@@ -11,9 +11,11 @@
 #include "hasher/hasher_actor.h"
 #include "net/controller_actor.h"
 #include "net/names.h"
+#include "fs/messages.h"
 #include "utils/error_code.h"
 #include "proto/bep_support.h"
 #include <boost/core/demangle.hpp>
+#include <vector>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -52,6 +54,7 @@ struct sample_peer_t : r::actor_base_t {
     using block_responses_t = std::list<block_response_t>;
     using block_request_t = r::intrusive_ptr_t<net::message::block_request_t>;
     using block_requests_t = std::list<block_request_t>;
+    using uploaded_blocks_t = std::list<proto::message::Response>;
 
     sample_peer_t(config_t &config) : r::actor_base_t{config}, peer_device{config.peer_device_id} {
         log = utils::get_logger("test.sample_peer");
@@ -117,6 +120,8 @@ struct sample_peer_t : r::actor_base_t {
                 using V = net::payload::forwarded_message_t;
                 if constexpr (std::is_constructible_v<V, T>) {
                     variant = std::move(msg);
+                } else if constexpr (std::is_same_v<T, proto::message::Response>) {
+                    uploaded_blocks.push_back(std::move(msg));
                 }
             },
             orig);
@@ -166,11 +171,18 @@ struct sample_peer_t : r::actor_base_t {
     utils::logger_t log;
     block_requests_t block_requests;
     block_responses_t block_responses;
+    uploaded_blocks_t uploaded_blocks;
 };
 
 struct fixture_t {
     using peer_ptr_t = r::intrusive_ptr_t<sample_peer_t>;
     using target_ptr_t = r::intrusive_ptr_t<net::controller_actor_t>;
+    using blk_req_t = fs::message::block_request_t;
+    using blk_req_ptr_t = r::intrusive_ptr_t<blk_req_t>;
+    using blk_res_t = fs::message::block_response_t;
+    using blk_res_ptr_t = r::intrusive_ptr_t<blk_res_t>;
+    using block_requests_t = std::deque<blk_req_ptr_t>;
+    using block_responses_t = std::deque<r::message_ptr_t>;
 
     fixture_t(bool auto_start_, int64_t max_sequence_) noexcept : auto_start{auto_start_}, max_sequence{max_sequence_} {
         utils::set_default("trace");
@@ -207,6 +219,15 @@ struct fixture_t {
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>(
                 [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
+            plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+                p.subscribe_actor(r::lambda<blk_req_t>([&](blk_req_t &msg) {
+                    block_requests.push_back(&msg);
+                    if (block_responses.size()) {
+                        sup->put(block_responses.front());
+                        block_responses.pop_front();
+                    }
+                }));
+            });
         };
         sup->start();
         sup->do_process();
@@ -275,6 +296,8 @@ struct fixture_t {
     model::folder_ptr_t folder_1;
     model::folder_info_ptr_t folder_1_peer;
     model::folder_ptr_t folder_2;
+    block_requests_t block_requests;
+    block_responses_t block_responses;
 };
 
 } // namespace
@@ -845,12 +868,84 @@ void test_sending_index_updates() {
     F(true, 10).run();
 }
 
+void test_uploading() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_my = folder_infos.by_device(*my_device);
+
+            auto cc = proto::ClusterConfig{};
+            auto folder = cc.add_folders();
+            folder->set_id(std::string(folder_1->get_id()));
+            auto d_peer = folder->add_devices();
+            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
+            d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
+            d_peer->set_index_id(folder_1_peer->get_index());
+            auto d_my = folder->add_devices();
+            d_my->set_id(std::string(my_device->device_id().get_sha256()));
+            d_my->set_max_sequence(folder_my->get_max_sequence());
+            d_my->set_index_id(folder_my->get_index());
+
+            SECTION("upload regular file, no hash") {
+                auto pr_fi = proto::FileInfo{};
+                pr_fi.set_name("data.bin");
+                pr_fi.set_type(proto::FileInfoType::FILE);
+                pr_fi.set_sequence(folder_1_peer->get_max_sequence());
+                pr_fi.set_block_size(5);
+                pr_fi.set_size(5);
+                auto version = pr_fi.mutable_version();
+                auto counter = version->add_counters();
+                counter->set_id(1);
+                counter->set_value(my_device->as_uint());
+                auto b1 = pr_fi.add_blocks();
+                b1->set_hash(utils::sha256_digest("12345").value());
+                b1->set_offset(0);
+                b1->set_size(5);
+                auto b = model::block_info_t::create(*b1).value();
+
+                auto file_info = model::file_info_t::create(cluster->next_uuid(), pr_fi, folder_my).value();
+                file_info->assign_block(b, 0);
+                folder_my->add(file_info, true);
+
+                auto req = proto::Request();
+                req.set_id(1);
+                req.set_folder(std::string(folder_1->get_id()));
+                req.set_name("data.bin");
+                req.set_offset(0);
+                req.set_size(5);
+
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                peer_actor->forward(proto::message::Request(new proto::Request(req)));
+
+                auto req_ptr = proto::message::Request(new proto::Request(req));
+                auto res = r::make_message<fs::payload::block_response_t>(target->get_address(), std::move(req_ptr),
+                                                                          sys::error_code{}, std::string("12345"));
+                block_responses.push_back(res);
+
+                sup->do_process();
+                REQUIRE(block_requests.size() == 1);
+                CHECK(block_requests[0]->payload.remote_request->id() == 1);
+                CHECK(block_requests[0]->payload.remote_request->name() == "data.bin");
+
+                REQUIRE(peer_actor->uploaded_blocks.size() == 1);
+                auto &peer_res = *peer_actor->uploaded_blocks.front();
+                CHECK(peer_res.id() == 1);
+                CHECK(peer_res.code() == proto::ErrorCode::NO_BEP_ERROR);
+                CHECK(peer_res.data() == "12345");
+            }
+        }
+    };
+    F(true, 10).run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
+    REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
     return 1;
 }
 

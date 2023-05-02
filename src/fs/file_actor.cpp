@@ -94,7 +94,7 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
             data = std::move(block_opt.assume_value());
         }
     }
-    send<payload::block_response_t>(dest, std::move(req_ptr), std::move(p.custom), ec, std::move(data));
+    send<payload::block_response_t>(dest, std::move(req_ptr), ec, std::move(data));
 }
 
 auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome::result<void> {

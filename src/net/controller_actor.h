@@ -10,6 +10,7 @@
 #include "model/messages.h"
 #include "hasher/messages.h"
 #include "utils/log.h"
+#include "fs/messages.h"
 #include <unordered_set>
 #include <optional>
 
@@ -114,6 +115,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_block_update(model::message::block_update_t &message) noexcept;
     void on_transfer_push(message::transfer_push_t &message) noexcept;
     void on_transfer_pop(message::transfer_pop_t &message) noexcept;
+    void on_block_response(fs::message::block_response_t &message) noexcept;
 
     void on_message(proto::message::ClusterConfig &message) noexcept;
     void on_message(proto::message::Index &message) noexcept;
@@ -146,7 +148,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     model::ignored_folders_map_t *ignored_folders;
     peers_map_t peers_map;
     // generic
-    std::uint_fast32_t blocks_requested;
+    std::uint_fast32_t rx_blocks_requested;
+    std::uint_fast32_t tx_blocks_requested;
     uint32_t outgoing_buffer;
     uint32_t outgoing_buffer_max;
 

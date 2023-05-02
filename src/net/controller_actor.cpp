@@ -3,6 +3,7 @@
 
 #include "controller_actor.h"
 #include "names.h"
+#include "constants.h"
 #include "model/diff/aggregate.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
@@ -29,7 +30,7 @@ r::plugin::resource_id_t hash = 1;
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer}, peer_addr{config.peer_addr},
-      request_timeout{config.request_timeout}, blocks_requested{0}, outgoing_buffer{0},
+      request_timeout{config.request_timeout}, rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer{0},
       outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
       blocks_max_requested{config.blocks_max_requested} {
     log = utils::get_logger("net.controller_actor");
@@ -64,6 +65,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&controller_actor_t::on_transfer_pop);
         p.subscribe_actor(&controller_actor_t::on_transfer_push);
         p.subscribe_actor(&controller_actor_t::on_validation);
+        p.subscribe_actor(&controller_actor_t::on_block_response);
     });
 }
 
@@ -91,7 +93,7 @@ void controller_actor_t::shutdown_start() noexcept {
 }
 
 void controller_actor_t::shutdown_finish() noexcept {
-    LOG_TRACE(log, "{}, shutdown_finish, blocks_requested = {}", identity, blocks_requested);
+    LOG_TRACE(log, "{}, shutdown_finish, blocks_requested = {}", identity, rx_blocks_requested);
     if (!locked_files.empty()) {
         using diffs_t = model::diff::aggregate_t::diffs_t;
         auto diffs = diffs_t{};
@@ -180,8 +182,8 @@ model::file_block_t controller_actor_t::next_block(bool reset) noexcept {
 }
 
 void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
-    LOG_TRACE(log, "{}, on_pull_ready, blocks requested = {}", identity, blocks_requested);
-    bool ignore = (blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
+    LOG_TRACE(log, "{}, on_pull_ready, blocks requested = {}", identity, rx_blocks_requested);
+    bool ignore = (rx_blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
                   || (state != r::state_t::OPERATIONAL) // wrequest pool sz = 32505856e are shutting down
         ;
     //|| (!file_iterator && !block_iterator && blocks_requested)    // done
@@ -207,7 +209,7 @@ void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
         }
     }
     if (!(substate & substate_t::iterating_blocks)) {
-        bool reset_file = !(substate & substate_t::iterating_files) && !blocks_requested;
+        bool reset_file = !(substate & substate_t::iterating_files) && !rx_blocks_requested;
         file = next_file(reset_file);
         if (file) {
             substate |= substate_t::iterating_files;
@@ -242,7 +244,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
         LOG_TRACE(log, "{} request_block, file = {}, block index = {} / {}, sz = {}, request pool sz = {}", identity,
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
         request<payload::block_request_t>(peer_addr, file, file_block).send(request_timeout);
-        ++blocks_requested;
+        ++rx_blocks_requested;
         request_pool -= (int64_t)sz;
     }
     pull_ready();
@@ -418,12 +420,72 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
     send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 
-void controller_actor_t::on_message(proto::message::Request &) noexcept { std::abort(); }
+void controller_actor_t::on_message(proto::message::Request &req) noexcept {
+    proto::Response res;
+    fmt::memory_buffer data;
+    auto code = proto::ErrorCode::NO_BEP_ERROR;
+
+    if (tx_blocks_requested > blocks_max_requested * constants::tx_blocks_max_factor) {
+        LOG_WARN(log, "{}, peer requesting too many blocks ({}), rejecting current request", identity,
+                 tx_blocks_requested);
+        code = proto::ErrorCode::GENERIC;
+    } else {
+        auto folder = cluster->get_folders().by_id(req->folder());
+        if (!folder) {
+            code = proto::ErrorCode::NO_SUCH_FILE;
+        } else {
+            auto &folder_infos = folder->get_folder_infos();
+            auto peer_folder = folder_infos.by_device(*peer);
+            if (!peer_folder) {
+                code = proto::ErrorCode::NO_SUCH_FILE;
+            } else {
+                auto my_folder = folder_infos.by_device(*cluster->get_device());
+                auto file = my_folder->get_file_infos().by_name(req->name());
+                if (!file) {
+                    code = proto::ErrorCode::NO_SUCH_FILE;
+                } else {
+                    if (!file->is_file()) {
+                        LOG_WARN(log, "{}, attempt to request non-regual file: {}", identity, file->get_name());
+                        code = proto::ErrorCode::GENERIC;
+                    }
+                }
+            }
+        }
+    }
+
+    if (code != proto::ErrorCode::NO_BEP_ERROR) {
+        res.set_id(req->id());
+        res.set_code(code);
+        proto::serialize(data, res);
+        outgoing_buffer += static_cast<uint32_t>(data.size());
+        send<payload::transfer_data_t>(peer_addr, std::move(data));
+    } else {
+        ++tx_blocks_requested;
+        send<fs::payload::block_request_t>(fs_addr, std::move(req), address);
+    }
+}
 
 void controller_actor_t::on_message(proto::message::DownloadProgress &) noexcept { std::abort(); }
 
+void controller_actor_t::on_block_response(fs::message::block_response_t &message) noexcept {
+    --tx_blocks_requested;
+    auto &p = message.payload;
+    proto::Response res;
+    res.set_id(p.remote_request->id());
+    if (p.ec) {
+        res.set_code(proto::ErrorCode::GENERIC);
+    } else {
+        res.set_data(std::move(p.data));
+    }
+
+    fmt::memory_buffer data;
+    proto::serialize(data, res);
+    outgoing_buffer += static_cast<uint32_t>(data.size());
+    send<payload::transfer_data_t>(peer_addr, std::move(data));
+}
+
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
-    --blocks_requested;
+    --rx_blocks_requested;
     auto ee = message.payload.ee;
     if (ee) {
         LOG_WARN(log, "{}, can't receive block : {}", identity, ee->message());

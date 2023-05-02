@@ -34,12 +34,10 @@ using hash_anew_t = new_chunk_iterator_t;
 struct block_request_t {
     proto::message::Request remote_request;
     r::address_ptr_t reply_to;
-    r::message_ptr_t custom;
 };
 
 struct block_response_t {
     proto::message::Request remote_request;
-    r::message_ptr_t custom;
     sys::error_code ec;
     std::string data;
 };
