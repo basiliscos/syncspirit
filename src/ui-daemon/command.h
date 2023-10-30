@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -7,6 +7,7 @@
 #include <list>
 #include <boost/outcome.hpp>
 #include "../utils/log.h"
+#include "utils/format.hpp"
 
 namespace syncspirit::daemon {
 

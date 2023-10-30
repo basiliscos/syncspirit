@@ -7,6 +7,7 @@
 #include "utils/error_code.h"
 #include "hasher/hasher_proxy_actor.h"
 #include "model/diff/peer/peer_state.h"
+#include "../utils/format.hpp"
 
 using namespace syncspirit::net;
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+
 #pragma once
 
 #include "model/device_id.h"
@@ -38,10 +41,14 @@ template <typename T> struct fmt::formatter<boost::asio::ip::basic_endpoint<T>> 
     }
 };
 
-template <> struct fmt::formatter<syncspirit::model::device_id_t> : fmt::formatter<std::string> {
+template <> struct fmt::formatter<syncspirit::model::device_id_t> {
     using device_id_t = syncspirit::model::device_id_t;
 
-    auto format(const device_id_t &device_id, format_context &ctx) -> decltype(ctx.out()) {
+	constexpr auto parse(format_parse_context& ctx) -> format_parse_context::iterator {
+		return ctx.begin();
+	}
+
+	auto format(const device_id_t &device_id, format_context &ctx) -> format_context::iterator {
         return format_to(ctx.out(), "{}", device_id.get_short());
     }
 };

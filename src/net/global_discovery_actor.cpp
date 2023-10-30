@@ -9,6 +9,7 @@
 #include "utils/error_code.h"
 #include "http_actor.h"
 #include "model/diff/modify/update_contact.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::net;
 

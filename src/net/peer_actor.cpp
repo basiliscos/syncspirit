@@ -6,6 +6,7 @@
 #include "constants.h"
 #include "utils/tls.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "proto/bep_support.h"
 #include "model/messages.h"
 #include "model/diff/peer/peer_state.h"

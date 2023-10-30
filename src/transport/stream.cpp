@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
+#include "utils/format.hpp"
 #include "stream.h"
 #include "impl.hpp"
 

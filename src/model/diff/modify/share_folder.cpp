@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "share_folder.h"
 #include "../cluster_visitor.h"
 #include "../../cluster.h"
 #include "../../misc/error_code.h"
+#include "../../../utils/format.hpp"
 #include "structs.pb.h"
 
 using namespace syncspirit::model::diff::modify;

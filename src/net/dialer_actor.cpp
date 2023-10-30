@@ -4,6 +4,7 @@
 #include "dialer_actor.h"
 #include "model/diff/peer/peer_state.h"
 #include "names.h"
+#include "../utils/format.hpp"
 
 namespace syncspirit::net {
 
