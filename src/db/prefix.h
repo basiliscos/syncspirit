@@ -39,9 +39,15 @@ struct SYNCSPIRIT_API value_t {
 
 template <discr_t> struct prefixer_t;
 
-template <> struct prefixer_t<prefix::misc> { static SYNCSPIRIT_API value_t make(std::string_view name) noexcept; };
-template <> struct prefixer_t<prefix::device> { static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept; };
-template <> struct prefixer_t<prefix::folder> { static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept; };
+template <> struct prefixer_t<prefix::misc> {
+    static SYNCSPIRIT_API value_t make(std::string_view name) noexcept;
+};
+template <> struct prefixer_t<prefix::device> {
+    static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept;
+};
+template <> struct prefixer_t<prefix::folder> {
+    static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept;
+};
 template <> struct prefixer_t<prefix::folder_info> {
     static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept;
 };

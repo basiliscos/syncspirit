@@ -187,7 +187,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         std::memcpy(ptr, ptr + value.consumed, rx_idx);
     }
     (this->*read_action)(std::move(value.message));
-    LOG_TRACE(log, "{}, on_read,  rx_idx = {} ", identity, rx_idx);
+    LOG_TRACE(log, "{}, on_read, rx_idx = {} ", identity, rx_idx);
 }
 
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
