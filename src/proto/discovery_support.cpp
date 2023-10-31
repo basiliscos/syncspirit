@@ -10,6 +10,7 @@
 #include <charconv>
 #include <sstream>
 #include <iomanip>
+#include <cctype>
 
 using namespace syncspirit::utils;
 
@@ -141,7 +142,13 @@ outcome::result<utils::uri_container_t> parse_contact(http::response<http::strin
         return make_error_code(error_code_t::incorrect_json);
     }
     try {
-        auto date = boost::posix_time::from_iso_extended_string(seen.get<std::string>());
+		auto date_str = seen.get<std::string>();
+		auto valid_count = date_str.size();
+		while(valid_count > 0 && !isdigit(date_str[valid_count - 1])) {
+			--valid_count;
+		}
+		auto date_substr = std::string(date_str.data(), valid_count);
+		auto date = boost::posix_time::from_iso_extended_string(date_substr);
         (void)date;
         return outcome::success(std::move(urls));
     } catch (...) {

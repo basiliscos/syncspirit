@@ -14,7 +14,7 @@ using namespace syncspirit::proto;
 using namespace syncspirit::utils;
 using namespace syncspirit::test;
 
-TEST_CASE("parse valid announce sample", "[support]") {
+TEST_CASE("parse valid announce sample 1", "[support]") {
     std::string body =
         R""(
                 {"seen":"2020-10-13T18:41:37.02287354Z",
@@ -38,6 +38,28 @@ TEST_CASE("parse valid announce sample", "[support]") {
     auto &o = r.value();
     CHECK(o.size() == 9);
     CHECK(o[0].full == "quic://192.168.100.15:22000");
+}
+
+TEST_CASE("parse valid announce sample 2", "[support]") {
+	std::string body =
+		R""(
+{
+  "seen": "2023-10-31T09:38:31Z",
+  "addresses": [
+	"relay://93.31.21.95:443/?id=QUJWY5Q-YUKKWZF-OWOJ66C-NWAPXYC-LWU4IPC-TO6UBKB-67R5JV5-BILNNA7"
+  ]
+}
+			)"";
+
+	http::response<http::string_body> res;
+	res.result(200);
+	res.body() = body;
+	auto r = parse_contact(res);
+	REQUIRE((bool)r);
+
+	auto &o = r.value();
+	CHECK(o.size() == 1);
+	CHECK(o[0].full == "relay://93.31.21.95:443/?id=QUJWY5Q-YUKKWZF-OWOJ66C-NWAPXYC-LWU4IPC-TO6UBKB-67R5JV5-BILNNA7");
 }
 
 TEST_CASE("malformed url", "[support]") {
