@@ -78,7 +78,6 @@ struct fixture_t {
     }
 
     void run() noexcept {
-
         auto strand = std::make_shared<asio::io_context::strand>(io_ctx);
         sup = ctx.create_supervisor<supervisor_t>().strand(strand).timeout(timeout).create_registry().finish();
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {

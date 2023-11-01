@@ -53,6 +53,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void peer_actor_t::on_start() noexcept {
+    r::actor_base_t::on_start();
     LOG_TRACE(log, "{}, on_start", identity);
 
     fmt::memory_buffer buff;
@@ -61,6 +62,7 @@ void peer_actor_t::on_start() noexcept {
 
     read_more();
     read_action = &peer_actor_t::read_hello;
+    reset_rx_timer();
 }
 
 void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
@@ -239,12 +241,13 @@ void peer_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
     auto sha256 = peer_device_id.get_sha256();
     auto device = cluster->get_devices().by_sha256(sha256);
-    assert(device && device->get_state() == model::device_state_t::online);
-
-    auto diff = model::diff::cluster_diff_ptr_t();
-    auto state = model::device_state_t::offline;
-    diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, state);
-    send<model::payload::model_update_t>(coordinator, std::move(diff));
+    auto state = device->get_state();
+    if (state != model::device_state_t::offline) {
+        auto diff = model::diff::cluster_diff_ptr_t();
+        auto state = model::device_state_t::offline;
+        diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, state);
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
+    }
 }
 
 void peer_actor_t::cancel_timer() noexcept {
