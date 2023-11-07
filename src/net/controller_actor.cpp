@@ -10,6 +10,7 @@
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/flush_file.h"
+#include "model/diff/modify/share_folder.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
@@ -70,11 +71,7 @@ void controller_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
     send<payload::start_reading_t>(peer_addr, get_address(), true);
 
-    auto cluster_config = cluster->generate(*peer);
-    fmt::memory_buffer data;
-    proto::serialize(data, cluster_config);
-    outgoing_buffer += static_cast<uint32_t>(data.size());
-    send<payload::transfer_data_t>(peer_addr, std::move(data));
+    send_cluster_config();
 
     resources->acquire(resource::peer);
     LOG_INFO(log, "{} is online", identity);
@@ -107,6 +104,15 @@ void controller_actor_t::shutdown_finish() noexcept {
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
     r::actor_base_t::shutdown_finish();
+}
+
+void controller_actor_t::send_cluster_config() noexcept {
+    LOG_TRACE(log, "{}, sending cluster config", identity);
+    auto cluster_config = cluster->generate(*peer);
+    fmt::memory_buffer data;
+    proto::serialize(data, cluster_config);
+    outgoing_buffer += static_cast<uint32_t>(data.size());
+    send<payload::transfer_data_t>(peer_addr, std::move(data));
 }
 
 void controller_actor_t::on_transfer_push(message::transfer_push_t &message) noexcept {
@@ -339,6 +345,17 @@ auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff
         auto it = locked_files.find(file);
         locked_files.erase(it);
     }
+    return outcome::success();
+}
+
+auto controller_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (diff.peer_id != peer->device_id().get_sha256()) {
+        return outcome::success();
+    }
+
+    send_cluster_config();
+
     return outcome::success();
 }
 

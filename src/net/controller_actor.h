@@ -124,6 +124,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void request_block(const model::file_block_t &block) noexcept;
     void pull_ready() noexcept;
     void push_pending() noexcept;
+    void send_cluster_config() noexcept;
 
     model::file_info_ptr_t next_file(bool reset) noexcept;
     model::file_block_t next_block(bool reset) noexcept;
@@ -132,6 +133,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::lock_file_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::finish_file_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::share_folder_t &, void *) noexcept override;
 
     model::cluster_ptr_t cluster;
     model::device_ptr_t peer;

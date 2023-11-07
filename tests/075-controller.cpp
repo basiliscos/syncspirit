@@ -172,7 +172,8 @@ struct fixture_t {
     using peer_ptr_t = r::intrusive_ptr_t<sample_peer_t>;
     using target_ptr_t = r::intrusive_ptr_t<net::controller_actor_t>;
 
-    fixture_t(bool auto_start_, int64_t max_sequence_) noexcept : auto_start{auto_start_}, max_sequence{max_sequence_} {
+    fixture_t(bool auto_start_, int64_t max_sequence_, bool auto_share_ = true) noexcept
+        : auto_start{auto_start_}, max_sequence{max_sequence_}, auto_share{auto_share_} {
         utils::set_default("trace");
     }
 
@@ -197,8 +198,11 @@ struct fixture_t {
             .create_folder(folder_id_2, "")
             .configure_cluster(sha256)
             .add(sha256, folder_id_1, 123, max_sequence)
-            .finish()
-            .share_folder(peer_id.get_sha256(), folder_id_1);
+            .finish();
+
+        if (auto_share) {
+            builder.share_folder(peer_id.get_sha256(), folder_id_1);
+        }
 
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
@@ -258,6 +262,7 @@ struct fixture_t {
     virtual void main(diff_builder_t &) noexcept {}
 
     bool auto_start;
+    bool auto_share;
     int64_t max_sequence;
     peer_ptr_t peer_actor;
     target_ptr_t target;
@@ -797,11 +802,54 @@ void test_downloading() {
     F(true, 10).run();
 }
 
+void test_my_sharing() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            sup->do_process();
+
+            auto cc = proto::ClusterConfig{};
+            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+
+            // nothing is shared
+            sup->do_process();
+
+            REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+            REQUIRE(peer_actor->messages.size() == 1);
+            auto peer_msg = &peer_actor->messages.front()->payload;
+            auto peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
+            REQUIRE(peer_cluster_msg);
+            REQUIRE(*peer_cluster_msg);
+            REQUIRE((*peer_cluster_msg)->folders_size() == 0);
+
+            // share folder_1
+            peer_actor->messages.clear();
+            auto sha256 = peer_device->device_id().get_sha256();
+            diff_builder_t(*cluster).share_folder(sha256, folder_1->get_id()).apply(*sup);
+
+            REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            REQUIRE(peer_actor->messages.size() == 1);
+            peer_msg = &peer_actor->messages.front()->payload;
+            peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
+            REQUIRE(peer_cluster_msg);
+            REQUIRE(*peer_cluster_msg);
+            REQUIRE((*peer_cluster_msg)->folders_size() == 1);
+
+            // unshare folder_1
+        }
+    };
+    F(false, 10, false).run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
+    REGISTER_TEST_CASE(test_my_sharing, "test_my_sharing", "[net]");
     return 1;
 }
 
