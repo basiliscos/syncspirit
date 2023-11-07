@@ -6,6 +6,7 @@
 #include "model/cluster.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
@@ -71,7 +72,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             CHECK(fi_peer->get_max_sequence() == 0);
         }
 
-        SECTION("with unknown folder") {
+        SECTION("with unknown folder, then unshare") {
             auto db_uf = db::UnknownFolder();
             *db_uf.mutable_folder() = db_folder;
             auto db_fi = db_uf.mutable_folder_info();
@@ -93,6 +94,11 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             CHECK(fi_peer->get_max_sequence() == 12);
             CHECK(fi_peer->get_index() == 2345);
             CHECK(cluster->get_unknown_folders().empty());
+
+            auto diff_unshare =
+                diff::cluster_diff_ptr_t(new diff::modify::unshare_folder_t(peer_id.get_sha256(), db_folder.id()));
+            REQUIRE(diff_unshare->apply(*cluster));
+            REQUIRE(!folder->get_folder_infos().by_device(*peer_device));
         }
     }
 
