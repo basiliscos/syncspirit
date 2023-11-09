@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <memory>
 #include <set>
 #include "../cluster_diff.h"
 #include "model/device.h"

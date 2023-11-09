@@ -89,14 +89,45 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             auto folder = folders.by_id(db_folder.id());
             REQUIRE(folder);
             auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+            auto fi_my = folder->get_folder_infos().by_device(*my_device);
             REQUIRE(fi_peer);
             CHECK(fi_peer->get_device() == peer_device);
             CHECK(fi_peer->get_max_sequence() == 12);
             CHECK(fi_peer->get_index() == 2345);
             CHECK(cluster->get_unknown_folders().empty());
 
-            auto diff_unshare =
-                diff::cluster_diff_ptr_t(new diff::modify::unshare_folder_t(peer_id.get_sha256(), db_folder.id()));
+            auto pr_file_1 = proto::FileInfo();
+            pr_file_1.set_name("a.txt");
+            pr_file_1.set_sequence(1);
+            pr_file_1.set_size(10);
+
+            auto b1 = pr_file_1.add_blocks();
+            b1->set_hash("12345");
+            b1->set_size(5);
+            auto b2 = pr_file_1.add_blocks();
+            b2->set_hash("567890");
+            b2->set_size(5);
+            auto bi_1 = block_info_t::create(*b1).value();
+            auto bi_2 = block_info_t::create(*b2).value();
+
+            auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file_1, fi_peer).value();
+            fi_peer->get_file_infos().put(file_peer);
+            fi_peer->set_max_sequence(file_peer->get_sequence());
+            file_peer->assign_block(bi_1, 0);
+            file_peer->assign_block(bi_2, 1);
+
+            auto file_my = file_info_t::create(cluster->next_uuid(), pr_file_1, fi_my).value();
+            fi_my->get_file_infos().put(file_my);
+            fi_my->set_max_sequence(file_my->get_sequence());
+            file_my->assign_block(bi_2, 1);
+
+            auto diff_unshare = diff::cluster_diff_ptr_t();
+            auto raw_diff = new diff::modify::unshare_folder_t(*cluster, peer_id.get_sha256(), db_folder.id());
+            REQUIRE(raw_diff->removed_files.size() == 1);
+            REQUIRE(*raw_diff->removed_files.begin() == file_peer->get_key());
+            REQUIRE(raw_diff->removed_blocks.size() == 1);
+            REQUIRE(*raw_diff->removed_blocks.begin() == bi_1->get_key());
+            diff_unshare = raw_diff;
             REQUIRE(diff_unshare->apply(*cluster));
             REQUIRE(!folder->get_folder_infos().by_device(*peer_device));
         }

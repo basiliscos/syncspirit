@@ -10,6 +10,39 @@
 
 using namespace syncspirit::model::diff::modify;
 
+unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, std::string_view peer_device_,
+                                   std::string_view folder_id_) noexcept
+    : peer_id{peer_device_}, folder_id{folder_id_} {
+
+    auto &folders = cluster.get_folders();
+    auto &devices = cluster.get_devices();
+    auto &blocks = cluster.get_blocks();
+
+    auto folder = folders.by_id(folder_id);
+    auto peer = devices.by_sha256(peer_id);
+
+    auto &folder_infos = folder->get_folder_infos();
+    auto folder_info = folder_infos.by_device_id(peer_id);
+
+    auto &file_infos = folder_info->get_file_infos();
+    for (auto &fi : file_infos) {
+        auto &file_info = *fi.item;
+        removed_files.emplace(std::string(file_info.get_key()));
+        for (auto &b : file_info.get_blocks()) {
+            bool remove_block = true;
+            for (auto &fb : b->get_file_blocks()) {
+                if (*fb.file()->get_folder_info()->get_device() != *peer) {
+                    remove_block = false;
+                    break;
+                }
+            }
+            if (remove_block) {
+                removed_blocks.emplace(std::string(b->get_key()));
+            }
+        }
+    }
+}
+
 auto unshare_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto &folders = cluster.get_folders();
     auto folder = folders.by_id(folder_id);

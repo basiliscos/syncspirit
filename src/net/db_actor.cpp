@@ -342,6 +342,21 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, voi
     return commit(true);
 }
 
+auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    return commit(true);
+}
+
 auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void *) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
