@@ -1,6 +1,9 @@
 unit test:
 
 -- unit test: send ClusterUpdate (+ Index) on folder share/unshare.
+  -- [+] on my share
+  -- [ ] on my unshare
+  -- on remote share/unshare
 
 
 ===========
@@ -17,6 +20,7 @@ unit test:
 
 
 - syncspirit-daemon: /home/b/development/cpp/syncspirit/src/net/dialer_actor.cpp:88: void syncspirit::net::dialer_actor_t::on_timer(rotor::request_id_t, bool): Assertion `it != redial_map.end()' failed.
+- [2023-10-31 13:56:49.488] [D/23191] init/active:KUEQE66, resolving tcp://93.31.21.95:443 (transport = 0x5585be9747e0)
 
 - 2022-03-28 20:47:54.664] [E/25546] fs::scan_actor, on_hash, file: my_label/Camera/VID_20210122_121411.mp4, error: fs::scan_actor request timeout
 
