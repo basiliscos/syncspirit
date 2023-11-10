@@ -11,6 +11,7 @@
 #include "model/diff/modify/flush_file.h"
 #include "model/diff/modify/local_update.h"
 #include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
@@ -130,6 +131,11 @@ index_maker_t diff_builder_t::make_index(std::string_view sha256, std::string_vi
 
 diff_builder_t &diff_builder_t::share_folder(std::string_view sha256, std::string_view folder_id) noexcept {
     diffs.emplace_back(new diff::modify::share_folder_t(sha256, folder_id));
+    return *this;
+}
+
+diff_builder_t &diff_builder_t::unshare_folder(std::string_view sha256, std::string_view folder_id) noexcept {
+    diffs.emplace_back(new diff::modify::unshare_folder_t(cluster, sha256, folder_id));
     return *this;
 }
 

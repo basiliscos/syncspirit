@@ -359,7 +359,7 @@ auto controller_actor_t::operator()(const model::diff::modify::share_folder_t &d
     }
 
     send_cluster_config();
-	return outcome::success();
+    return outcome::success();
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::local_update_t &diff, void *) noexcept

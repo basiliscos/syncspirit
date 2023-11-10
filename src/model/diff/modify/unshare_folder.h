@@ -20,6 +20,7 @@ struct SYNCSPIRIT_API unshare_folder_t final : cluster_diff_t {
 
     std::string peer_id;
     std::string folder_id;
+    std::string folder_info_key;
     keys_t removed_files;
     keys_t removed_blocks;
 };

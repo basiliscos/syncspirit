@@ -24,6 +24,7 @@
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/local_update.h"
 #include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/cluster_remove.h"
 #include "model/diff/peer/update_folder.h"
@@ -355,6 +356,25 @@ auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, v
         return txn_opt.assume_error();
     }
     auto &txn = *txn_opt.assume_value();
+
+    {
+        auto r = db::remove(diff.folder_info_key, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+    for (auto &key : diff.removed_files) {
+        auto r = db::remove(key, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+    for (auto &key : diff.removed_blocks) {
+        auto r = db::remove(key, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
 
     return commit(true);
 }

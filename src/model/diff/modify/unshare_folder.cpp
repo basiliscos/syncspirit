@@ -23,6 +23,7 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, std::string_
 
     auto &folder_infos = folder->get_folder_infos();
     auto folder_info = folder_infos.by_device_id(peer_id);
+    folder_info_key = folder_info->get_key();
 
     auto &file_infos = folder_info->get_file_infos();
     for (auto &fi : file_infos) {
