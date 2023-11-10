@@ -217,12 +217,16 @@ int main(int argc, char **argv) {
                           .fs_config(cfg.fs_config)
                           .hasher_threads(cfg.hasher_threads)
                           .finish();
+
         // auxiliary payload
-        fs_sup->create_actor<governor_actor_t>()
-            .commands(std::move(commands))
-            .timeout(timeout)
-            .autoshutdown_supervisor()
-            .finish();
+        fs_sup->add_laucher([&](model::cluster_ptr_t &cluster) mutable {
+            fs_sup->create_actor<governor_actor_t>()
+                .commands(std::move(commands))
+                .cluster(cluster)
+                .timeout(timeout)
+                .autoshutdown_supervisor()
+                .finish();
+        });
 
         auto hasher_count = cfg.hasher_threads;
         using sys_thread_context_ptr_t = r::intrusive_ptr_t<rth::system_context_thread_t>;

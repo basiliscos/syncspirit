@@ -65,10 +65,6 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
                 file->assign_block(block, (size_t)i);
             }
         }
-        if (!file->check_consistency()) {
-            LOG_ERROR(log, "inconsitency detected for the file {} at folder {}", file->get_name(), folder->get_label());
-            return make_error_code(error_code_t::inconsistent_file);
-        }
     }
 
     // all ok, commit
@@ -78,7 +74,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     for (auto &it : files_map) {
         folder_info->add(it.item, allow_max_sequence_increase);
     }
-    LOG_TRACE(log, "update_folder_t, apply(). max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
+    LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
 
     return outcome::success();
 }

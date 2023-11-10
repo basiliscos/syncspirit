@@ -9,25 +9,36 @@ namespace syncspirit::fs {
 
 static const std::string_view tmp_suffix = ".syncspirit-tmp";
 
-static std::size_t _block_sizes[] = {
+static const std::size_t _block_sizes[] = {
     (1 << 7) * 1024,  (1 << 8) * 1024,  (1 << 9) * 1024,  (1 << 10) * 1024,
     (1 << 11) * 1024, (1 << 12) * 1024, (1 << 13) * 1024, (1 << 14) * 1024,
 };
 
-std::size_t block_sizes_sz = 8;
-std::size_t *block_sizes = _block_sizes;
+const std::size_t block_sizes_sz = 8;
+const std::size_t *block_sizes = _block_sizes;
 
 static const constexpr size_t max_blocks_count = 2000;
 
-std::pair<size_t, size_t> get_block_size(size_t sz) noexcept {
+block_division_t get_block_size(size_t sz, int32_t prev_size) noexcept {
     size_t bs = 0;
-    for (size_t i = 0; i < block_sizes_sz; ++i) {
-        if (block_sizes[i] * max_blocks_count >= sz) {
-            bs = block_sizes[i];
-            if (bs > sz) {
-                bs = sz;
+    if (block_sizes[0] <= sz) {
+        for (size_t i = 0; i < block_sizes_sz; ++i) {
+            if (block_sizes[i] == (size_t)prev_size) {
+                bs = prev_size;
+                break;
             }
-            break;
+        }
+    }
+
+    if (!bs) {
+        for (size_t i = 0; i < block_sizes_sz; ++i) {
+            if (block_sizes[i] * max_blocks_count >= sz) {
+                bs = block_sizes[i];
+                if (bs > sz) {
+                    bs = sz;
+                }
+                break;
+            }
         }
     }
     if (bs == 0 && sz) {
@@ -42,7 +53,7 @@ std::pair<size_t, size_t> get_block_size(size_t sz) noexcept {
         }
     }
 
-    return {bs, count};
+    return {count, (int32_t)bs};
 }
 
 bfs::path make_temporal(const bfs::path &path) noexcept {

@@ -57,10 +57,6 @@ auto cluster_visitor_t::operator()(const modify::flush_file_t &, void *) noexcep
     return outcome::success();
 }
 
-auto cluster_visitor_t::operator()(const modify::new_file_t &, void *) noexcept -> outcome::result<void> {
-    return outcome::success();
-}
-
 auto cluster_visitor_t::operator()(const modify::local_update_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }

@@ -368,9 +368,7 @@ void test_clone_file() {
                 .add(sha256, folder_id, 5, file.sequence())
                 .finish()
                 .share_folder(sha256, folder_id)
-                .apply(*sup)
-
-                ;
+                .apply(*sup);
 
             auto folder = cluster->get_folders().by_id(folder_id);
             auto folder_my = folder->get_folder_infos().by_device(*my_device);
@@ -476,6 +474,67 @@ void test_clone_file() {
     F().run();
 }
 
+void test_local_update() {
+    struct F : fixture_t {
+        void main() noexcept override {
+
+            auto folder_id = "1234-5678";
+
+            auto pr_file = proto::FileInfo();
+            pr_file.set_name("a.txt");
+            pr_file.set_size(5ul);
+
+            auto hash = utils::sha256_digest("12345").value();
+            auto pr_block = pr_file.add_blocks();
+            pr_block->set_weak_hash(12);
+            pr_block->set_size(5);
+            pr_block->set_hash(hash);
+
+            auto builder = diff_builder_t(*cluster);
+            builder.create_folder(folder_id, "/my/path").apply(*sup).local_update(folder_id, pr_file).apply(*sup);
+
+            SECTION("check saved file with new blocks") {
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                REQUIRE(!reply->payload.ee);
+                auto cluster_clone = make_cluster();
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+
+                auto folder = cluster_clone->get_folders().by_id(folder_id);
+                auto folder_my = folder->get_folder_infos().by_device(*my_device);
+                auto file = folder_my->get_file_infos().by_name("a.txt");
+                REQUIRE(file);
+                CHECK(cluster_clone->get_blocks().size() == 1);
+                CHECK(file->get_blocks().size() == 1);
+            }
+
+            pr_file.set_deleted(true);
+            pr_file.set_size(0);
+            pr_file.clear_blocks();
+            builder.local_update(folder_id, pr_file).apply(*sup);
+
+            SECTION("check deleted blocks") {
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                REQUIRE(!reply->payload.ee);
+                auto cluster_clone = make_cluster();
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+
+                auto folder = cluster_clone->get_folders().by_id(folder_id);
+                auto folder_my = folder->get_folder_infos().by_device(*my_device);
+                auto file = folder_my->get_file_infos().by_name("a.txt");
+                REQUIRE(file);
+                CHECK(file->is_deleted());
+                CHECK(cluster_clone->get_blocks().size() == 0);
+                CHECK(file->get_blocks().size() == 0);
+            }
+        }
+    };
+    F().run();
+};
+
 int _init() {
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
     REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
@@ -483,6 +542,7 @@ int _init() {
     REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
     REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
     REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
+    REGISTER_TEST_CASE(test_local_update, "test_local_update", "[db]");
     return 1;
 }
 

@@ -62,7 +62,7 @@ auto file_t::open_read(const bfs::path &path) noexcept -> outcome::result<file_t
     if (!file) {
         return sys::error_code{errno, sys::system_category()};
     }
-    return file_t(file, std::move(path));
+    return file_t(file, path);
 }
 
 file_t::file_t() noexcept : backend{nullptr} {}
@@ -74,7 +74,7 @@ file_t::file_t(FILE *backend_, model::file_info_ptr_t model_, bfs::path path_, b
 }
 
 file_t::file_t(FILE *backend_, bfs::path path_) noexcept
-    : backend{backend_}, path{std::move(path_)}, path_str{path.string()}, last_op{r} {}
+    : backend{backend_}, path{std::move(path_)}, path_str{path.string()}, last_op{r}, temporal{false} {}
 
 file_t::file_t(file_t &&other) noexcept : backend{nullptr} { *this = std::move(other); }
 
@@ -155,7 +155,8 @@ auto file_t::read(size_t offset, size_t size) const noexcept -> outcome::result<
     r.resize(size);
     auto rf = fread(r.data(), 1, size, backend);
     if (rf != size) {
-        return sys::error_code{errno, sys::system_category()};
+        auto code = feof(backend) ? ENOENT : ferror(backend);
+        return sys::error_code{code, sys::system_category()};
     }
 
     pos = offset + size;

@@ -315,17 +315,6 @@ void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t inde
     block->link(this, index);
 }
 
-bool file_info_t::check_consistency() noexcept {
-    int64_t sz = 0;
-    for (auto &b : blocks) {
-        if (!b) {
-            return false;
-        }
-        sz += (int64_t)b->get_size();
-    }
-    return size == sz;
-}
-
 void file_info_t::remove_blocks() noexcept {
     for (auto &it : blocks) {
         remove_block(it);
@@ -342,6 +331,16 @@ void file_info_t::remove_block(block_info_ptr_t &block) noexcept {
     for (auto i : indices) {
         blocks[i] = nullptr;
     }
+}
+
+std::int64_t file_info_t::get_size() const noexcept {
+    if (type == proto::FileInfoType::FILE) {
+        bool ok = !is_deleted() && !is_invalid();
+        if (ok) {
+            return size;
+        }
+    }
+    return 0;
 }
 
 bool file_info_t::need_download(const file_info_t &other) noexcept {

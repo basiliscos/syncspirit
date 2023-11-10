@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
+#include <functional>
 #include "config/main.h"
 #include "utils/log.h"
 #include "model/messages.h"
@@ -36,6 +37,7 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
 };
 
 struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
+    using launcher_t = std::function<void(model::cluster_ptr_t &)>;
     using parent_t = rth::supervisor_thread_t;
     using config_t = fs_supervisor_config_t;
     template <typename Supervisor> using config_builder_t = fs_supervisor_config_builder_t<Supervisor>;
@@ -43,9 +45,11 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
     explicit fs_supervisor_t(config_t &cfg);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
+    template <typename F> void add_laucher(F &&launcher) noexcept { launchers.push_back(std::forward<F>(launcher)); }
 
   private:
     using model_request_ptr_t = r::intrusive_ptr_t<model::message::model_request_t>;
+    using launchers_t = std::vector<launcher_t>;
 
     void on_model_request(model::message::model_request_t &req) noexcept;
     void on_model_response(model::message::model_response_t &res) noexcept;
@@ -61,6 +65,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
     r::actor_ptr_t scan_actor;
     r::actor_ptr_t file_actor;
     model_request_ptr_t model_request;
+    launchers_t launchers;
 };
 
 } // namespace fs

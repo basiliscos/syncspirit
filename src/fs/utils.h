@@ -18,9 +18,14 @@ namespace bfs = boost::filesystem;
 namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
 
+struct block_division_t {
+    size_t count;
+    int32_t size;
+};
+
 SYNCSPIRIT_API bfs::path make_temporal(const bfs::path &path) noexcept;
 SYNCSPIRIT_API bool is_temporal(const bfs::path &path) noexcept;
-SYNCSPIRIT_API std::pair<size_t, size_t> get_block_size(size_t file_size) noexcept;
+SYNCSPIRIT_API block_division_t get_block_size(size_t file_size, int32_t prev_size) noexcept;
 
 struct relative_result_t {
     bfs::path path;
@@ -29,8 +34,8 @@ struct relative_result_t {
 
 SYNCSPIRIT_API relative_result_t relativize(const bfs::path &path, const bfs::path &root) noexcept;
 
-SYNCSPIRIT_API extern std::size_t block_sizes_sz;
-SYNCSPIRIT_API extern std::size_t *block_sizes;
+SYNCSPIRIT_API extern const std::size_t block_sizes_sz;
+SYNCSPIRIT_API extern const std::size_t *block_sizes;
 
 } // namespace fs
 } // namespace syncspirit

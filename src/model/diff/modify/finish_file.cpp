@@ -46,7 +46,6 @@ auto finish_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
         new_file->assign_block(b, i);
         new_file->mark_local_available(i);
     }
-    assert(new_file->check_consistency());
     folder_info->add(new_file, true);
     return outcome::success();
 }

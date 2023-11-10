@@ -4,7 +4,7 @@
 #include "block_info.h"
 #include "file_info.h"
 #include "structs.pb.h"
-#include "../db/prefix.h"
+#include "db/prefix.h"
 #include "misc/error_code.h"
 #include <spdlog/spdlog.h>
 

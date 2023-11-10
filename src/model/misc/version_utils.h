@@ -4,6 +4,7 @@
 #pragma once
 
 #include "syncspirit-export.h"
+#include "../device.h"
 #include "bep.pb.h"
 
 namespace syncspirit::model {
@@ -11,5 +12,6 @@ namespace syncspirit::model {
 enum class version_relation_t { identity, older, newer, conflict };
 
 SYNCSPIRIT_API version_relation_t compare(const proto::Vector &lhs, const proto::Vector &rhs) noexcept;
+SYNCSPIRIT_API void record_update(proto::Vector &v, const device_t &source) noexcept;
 
 } // namespace syncspirit::model

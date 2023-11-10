@@ -24,14 +24,18 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
     dirs_queue.push_back(path);
 
     root = path;
-    files = &my_folder->get_file_infos();
+
+    auto &orig_files = my_folder->get_file_infos();
+    for (auto &it : orig_files) {
+        files.put(it.item);
+    }
 
     log = utils::get_logger("fs.scan");
 }
 
 scan_task_t::~scan_task_t() {}
 
-std::string_view scan_task_t::get_folder_id() const noexcept { return folder_id; }
+const std::string &scan_task_t::get_folder_id() const noexcept { return folder_id; }
 
 scan_result_t scan_task_t::advance() noexcept {
     if (!unknown_files_queue.empty()) {
@@ -50,8 +54,20 @@ scan_result_t scan_task_t::advance() noexcept {
         dirs_queue.pop_front();
         return r;
     }
+    if (!dirs_queue.empty()) {
+        return true;
+    }
+    if (files.size() != 0) {
+        auto file = files.begin()->item;
+        files.remove(file);
+        if (file->is_deleted()) {
+            return unchanged_meta_t{std::move(file)};
+        } else {
+            return removed_t{std::move(file)};
+        }
+    }
 
-    return !dirs_queue.empty();
+    return false;
 }
 
 scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
@@ -59,40 +75,76 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
 
     bool exists = bfs::exists(dir, ec);
     if (ec || !exists) {
-        return scan_errors_t{scan_error_t{dir, ec}};
-    }
-
-    auto push = [this](const bfs::path &path) noexcept {
-        auto rp = relativize(path, root);
-        auto file = files->by_name(rp.path.string());
-        if (file) {
-            files_queue.push_back(file_info_t{file, rp.temp});
+        if (ec == sys::errc::no_such_file_or_directory) {
+            return true;
         } else {
-            unknown_files_queue.push_back(unknown_file_t{rp.path});
+            return scan_errors_t{scan_error_t{dir, ec}};
         }
-    };
+    }
 
     scan_errors_t errors;
     auto it = bfs::directory_iterator(dir, ec);
+    auto removed = model::file_infos_map_t{};
     if (ec) {
+        auto str = std::string{};
+        if (dir != root) {
+            str = bfs::relative(dir, root).string() + "/";
+        }
+        for (auto &it : files) {
+            auto &file = *it.item;
+            bool remove = str.empty() || (file.get_name().find(str) == 0);
+            if (remove) {
+                removed.put(it.item);
+            }
+        }
         errors.push_back(scan_error_t{dir, ec});
     } else {
         for (; it != bfs::directory_iterator(); ++it) {
-            sys::error_code ec;
             auto &child = *it;
-            bool is_dir = bfs::is_directory(child, ec);
-
-            if (is_dir) {
+            sys::error_code ec;
+            auto status = bfs::symlink_status(child, ec);
+            if (ec) {
+                errors.push_back(scan_error_t{child, ec});
+                continue;
+            }
+            if (status.type() == bfs::file_type::directory_file) {
                 dirs_queue.push_back(child);
                 continue;
             }
-
-            bool is_reg = bfs::is_regular_file(child, ec);
-            if (is_reg) {
-                push(child.path());
+            auto rp = relativize(child, root);
+            auto file = files.by_name(rp.path.string());
+            if (file) {
+                files_queue.push_back(file_info_t{file, rp.temp});
+                removed.put(file);
                 continue;
             }
+
+            proto::FileInfo metadata;
+            metadata.set_name(rp.path.string());
+            if (status.type() == bfs::file_type::regular_file) {
+                metadata.set_type(proto::FileInfoType::FILE);
+                auto sz = bfs::file_size(child, ec);
+                if (ec) {
+                    errors.push_back(scan_error_t{dir, ec});
+                    continue;
+                }
+                metadata.set_size(sz);
+            } else if (status.type() == bfs::file_type::symlink_file) {
+                auto target = bfs::read_symlink(child, ec);
+                if (ec) {
+                    errors.push_back(scan_error_t{dir, ec});
+                    continue;
+                }
+                metadata.set_symlink_target(target.string());
+                metadata.set_type(proto::FileInfoType::SYMLINK);
+            } else {
+                LOG_WARN(log, "unknown/unimplemented file type {} : {}", (int)status.type(), bfs::path(child).string());
+            }
+            unknown_files_queue.push_back(unknown_file_t{child, std::move(metadata)});
         }
+    }
+    for (auto &it : removed) {
+        files.remove(it.item);
     }
     if (!errors.empty()) {
         return errors;
@@ -102,8 +154,18 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
 }
 
 scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
+    if (info.file->is_file()) {
+        return advance_regular_file(info);
+    } else {
+        assert(info.file->is_link());
+        return advance_symlink_file(info);
+    }
+}
+
+scan_result_t scan_task_t::advance_regular_file(const file_info_t &info) noexcept {
     sys::error_code ec;
     auto file = info.file.get();
+
     auto path = info.file->get_path();
     if (info.temp) {
         path = make_temporal(path);
@@ -163,5 +225,38 @@ scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
         return incomplete_removed_t{file};
     }
 
-    return incomplete_t{info.file};
+    auto opt = file_t::open_read(path);
+    if (!opt) {
+        LOG_DEBUG(log, "try to remove temporally {}, which cannot open ", path.string());
+        bfs::remove(path, ec);
+        if (ec) {
+            return file_error_t{file, ec};
+        }
+        return incomplete_removed_t{file};
+    }
+
+    auto &opened_file = opt.assume_value();
+    return incomplete_t{info.file, file_ptr_t(new file_t(std::move(opened_file)))};
+}
+
+scan_result_t scan_task_t::advance_symlink_file(const file_info_t &info) noexcept {
+    auto path = info.file->get_path();
+    auto file = info.file.get();
+
+    if (!bfs::is_symlink(path)) {
+        LOG_CRITICAL(log, "not implemented change tracking: symlink -> non-symblink");
+        return unchanged_meta_t{file};
+    }
+
+    sys::error_code ec;
+    auto target = bfs::read_symlink(path, ec);
+    if (ec) {
+        return file_error_t{file, ec};
+    }
+
+    if (target.string() == info.file->get_link_target()) {
+        return unchanged_meta_t{info.file};
+    } else {
+        return changed_meta_t{info.file};
+    }
 }

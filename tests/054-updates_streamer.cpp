@@ -46,14 +46,14 @@ TEST_CASE("updates_streamer", "[model]") {
     };
 
     SECTION("trivial") {
-        SECTION("trivial, no files") {
+        SECTION("no files") {
             auto streamer = model::updates_streamer_t(*cluster, *peer_device);
             REQUIRE(!streamer);
         }
 
         add_remote(0, 0);
 
-        SECTION("trivial, no files (2)") {
+        SECTION("no files (2)") {
             auto streamer = model::updates_streamer_t(*cluster, *peer_device);
             REQUIRE(!streamer);
         }
@@ -122,6 +122,17 @@ TEST_CASE("updates_streamer", "[model]") {
         streamer.on_update(*f1);
         CHECK(streamer.next() == f1);
 
+        REQUIRE(!streamer);
+    }
+
+    SECTION("empty streamer ignores updates") {
+        add_remote(0, seq);
+
+        auto streamer = model::updates_streamer_t();
+        REQUIRE(!streamer);
+
+        auto f1 = add_file("a.txt");
+        streamer.on_update(*f1);
         REQUIRE(!streamer);
     }
 

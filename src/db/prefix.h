@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -41,27 +41,6 @@ template <discr_t> struct prefixer_t;
 
 template <> struct prefixer_t<prefix::misc> {
     static SYNCSPIRIT_API value_t make(std::string_view name) noexcept;
-};
-template <> struct prefixer_t<prefix::device> {
-    static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept;
-};
-template <> struct prefixer_t<prefix::folder> {
-    static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept;
-};
-template <> struct prefixer_t<prefix::folder_info> {
-    static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept;
-};
-template <> struct prefixer_t<prefix::file_info> {
-    static SYNCSPIRIT_API value_t make(const std::string &db_key) noexcept;
-};
-template <> struct prefixer_t<prefix::ignored_device> {
-    static SYNCSPIRIT_API value_t make(const std::string &db_key) noexcept;
-};
-template <> struct prefixer_t<prefix::ignored_folder> {
-    static SYNCSPIRIT_API value_t make(const std::string &db_key) noexcept;
-};
-template <> struct prefixer_t<prefix::block_info> {
-    static SYNCSPIRIT_API value_t make(std::uint64_t db_key) noexcept;
 };
 
 } // namespace syncspirit::db

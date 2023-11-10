@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
+#include "syncspirit-export.h"
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "config/fs.h"
 #include "utils/log.h"
-#include "syncspirit-export.h"
+#include "file.h"
 #include <rotor.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
@@ -35,9 +36,14 @@ struct changed_meta_t {
 
 struct incomplete_t {
     model::file_info_ptr_t file;
+    file_ptr_t opened_file;
 };
 
 struct incomplete_removed_t {
+    model::file_info_ptr_t file;
+};
+
+struct removed_t {
     model::file_info_ptr_t file;
 };
 
@@ -48,9 +54,10 @@ struct file_error_t {
 
 struct unknown_file_t {
     bfs::path path;
+    proto::FileInfo metadata;
 };
 
-using scan_result_t = std::variant<bool, scan_errors_t, changed_meta_t, unchanged_meta_t, incomplete_t,
+using scan_result_t = std::variant<bool, scan_errors_t, changed_meta_t, unchanged_meta_t, incomplete_t, removed_t,
                                    incomplete_removed_t, unknown_file_t, file_error_t>;
 
 struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, boost::thread_unsafe_counter> {
@@ -67,15 +74,17 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
     ~scan_task_t();
 
     scan_result_t advance() noexcept;
-    std::string_view get_folder_id() const noexcept;
+    const std::string &get_folder_id() const noexcept;
 
   private:
     scan_result_t advance_dir(const bfs::path &dir) noexcept;
     scan_result_t advance_file(const file_info_t &file) noexcept;
+    scan_result_t advance_regular_file(const file_info_t &file) noexcept;
+    scan_result_t advance_symlink_file(const file_info_t &file) noexcept;
 
     std::string folder_id;
     model::cluster_ptr_t cluster;
-    model::file_infos_map_t *files;
+    model::file_infos_map_t files;
     utils::logger_t log;
     config::fs_config_t config;
 

@@ -9,7 +9,7 @@
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/flush_file.h"
-#include "model/diff/modify/new_file.h"
+#include "model/diff/modify/local_update.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/cluster_update.h"
@@ -78,6 +78,26 @@ diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
     return *this;
 }
 
+auto diff_builder_t::apply() noexcept -> outcome::result<void> {
+    auto r = outcome::result<void>(outcome::success());
+    for (auto &d : diffs) {
+        r = d->apply(cluster);
+        if (!r) {
+            return r;
+        }
+    }
+    diffs.clear();
+
+    for (auto &d : bdiffs) {
+        r = d->apply(cluster);
+        if (!r) {
+            return r;
+        }
+    }
+    bdiffs.clear();
+    return r;
+}
+
 diff_builder_t &diff_builder_t::create_folder(std::string_view id, std::string_view path,
                                               std::string_view label) noexcept {
     db::Folder db_folder;
@@ -128,9 +148,8 @@ diff_builder_t &diff_builder_t::flush_file(const model::file_info_t &source) noe
     return *this;
 }
 
-diff_builder_t &diff_builder_t::new_file(std::string_view folder_id, const proto::FileInfo &file_,
-                                         const blocks_t blocks) noexcept {
-    diffs.emplace_back(new diff::modify::new_file_t(cluster, folder_id, file_, blocks));
+diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
+    diffs.emplace_back(new diff::modify::local_update_t(cluster, folder_id, file_));
     return *this;
 }
 

@@ -66,6 +66,10 @@ void updates_streamer_t::prepare() noexcept {
 }
 
 void updates_streamer_t::on_update(file_info_t &file) noexcept {
+    if (!peer) {
+        return;
+    }
+
     auto folder = file.get_folder_info()->get_folder();
     auto remote_folder = peer->get_remote_folder_infos().by_folder(*folder);
     if (!remote_folder) {

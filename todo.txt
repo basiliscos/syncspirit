@@ -1,5 +1,5 @@
-unit test:
-
+- void controller_actor_t::on_message(proto::message::Request &) noexcept { std::abort(); }
+- conflict handling is not available
 -- unit test: send ClusterUpdate (+ Index) on folder share/unshare.
   -- [+] on my share
   -- [ ] on my unshare

@@ -34,6 +34,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::missing_folder_path:
         r = "folder path is missing";
         break;
+    case error_code_t::incorrect_number:
+        r = "specified argument is not a number";
+        break;
     default:
         r = "unknown";
     }
