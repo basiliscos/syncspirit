@@ -370,6 +370,10 @@ auto controller_actor_t::operator()(const model::diff::modify::unshare_folder_t 
     }
 
     send_cluster_config();
+    if (updates_streamer) {
+        updates_streamer = model::updates_streamer_t(*cluster, *peer);
+    }
+
     return outcome::success();
 }
 

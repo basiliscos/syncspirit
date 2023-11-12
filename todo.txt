@@ -1,6 +1,4 @@
-- updates_streamer_t::on_unshare_folder();
 - conflict handling is not available
-
 
 ===========
 5. разобраться с лог-левелами?
