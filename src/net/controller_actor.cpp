@@ -12,6 +12,7 @@
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/flush_file.h"
 #include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/local_update.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
@@ -353,6 +354,16 @@ auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (diff.peer_id != peer->device_id().get_sha256()) {
+        return outcome::success();
+    }
+
+    send_cluster_config();
+    return outcome::success();
+}
+
+auto controller_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (diff.peer_id != peer->device_id().get_sha256()) {
         return outcome::success();

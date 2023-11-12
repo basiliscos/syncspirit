@@ -866,6 +866,16 @@ void test_my_sharing() {
             REQUIRE((*peer_cluster_msg)->folders_size() == 1);
 
             // unshare folder_1
+            peer_actor->messages.clear();
+            diff_builder_t(*cluster).unshare_folder(sha256, folder_1->get_id()).apply(*sup);
+            REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            REQUIRE(peer_actor->messages.size() == 1);
+            peer_msg = &peer_actor->messages.front()->payload;
+            peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
+            REQUIRE(peer_cluster_msg);
+            REQUIRE(*peer_cluster_msg);
+            REQUIRE((*peer_cluster_msg)->folders_size() == 0);
         }
     };
     F(false, 10, false).run();

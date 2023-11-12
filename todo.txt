@@ -1,9 +1,5 @@
-- void controller_actor_t::on_message(proto::message::Request &) noexcept { std::abort(); }
+- updates_streamer_t::on_unshare_folder();
 - conflict handling is not available
--- unit test: send ClusterUpdate (+ Index) on folder share/unshare.
-  -- [+] on my share
-  -- [ ] on my unshare
-  -- on remote share/unshare
 
 
 ===========
