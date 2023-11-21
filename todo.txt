@@ -1,3 +1,5 @@
+- не сразу при старте сканит папку
+
 - conflict handling is not available
 
 ===========

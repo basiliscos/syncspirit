@@ -6,6 +6,8 @@
 #include "../../cluster.h"
 #include "../../misc/version_utils.h"
 
+#include <cassert>
+
 using namespace syncspirit::model::diff::modify;
 
 local_update_t::local_update_t(const model::cluster_t &cluster, std::string_view folder_id_,
@@ -15,11 +17,13 @@ local_update_t::local_update_t(const model::cluster_t &cluster, std::string_view
     blocks_t kept_blocks;
     for (int i = 0; i < file.blocks_size(); ++i) {
         auto &block = file.blocks(i);
-        auto existing_block = blocks_map.get(block.hash());
+        auto &hash = block.hash();
+        assert(!hash.empty());
+        auto existing_block = blocks_map.get(hash);
         if (!existing_block) {
-            new_blocks.insert(block.hash());
+            new_blocks.insert(hash);
         } else {
-            kept_blocks.insert(block.hash());
+            kept_blocks.insert(hash);
         }
     }
 

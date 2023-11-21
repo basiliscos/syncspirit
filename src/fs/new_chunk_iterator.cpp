@@ -22,7 +22,9 @@ new_chunk_iterator_t::new_chunk_iterator_t(scan_task_ptr_t task_, proto::FileInf
     }
 }
 
-bool new_chunk_iterator_t::is_complete() const noexcept { return !unread_bytes && unfinished.empty(); }
+bool new_chunk_iterator_t::is_complete() const noexcept {
+    return !unread_blocks && !unread_bytes && unfinished.empty();
+}
 
 auto new_chunk_iterator_t::read() noexcept -> outcome::result<details::chunk_t> {
     assert(unread_bytes);
@@ -34,6 +36,7 @@ auto new_chunk_iterator_t::read() noexcept -> outcome::result<details::chunk_t> 
         auto data = std::move(r.assume_value());
         unfinished.insert(idx);
         unread_bytes -= next_sz;
+        --unread_blocks;
         return details::chunk_t{std::move(data), idx};
     }
     invalid = true;
@@ -45,6 +48,7 @@ bool new_chunk_iterator_t::has_more_chunks() const noexcept { return unread_byte
 void new_chunk_iterator_t::ack(size_t block_index, uint32_t weak, std::string_view hash, int32_t block_size) noexcept {
     assert(block_index < hashes.size());
     assert(unfinished.count(block_index));
+    assert(!hash.empty());
     hashes[block_index] = block_hash_t{std::string(hash), weak, block_size};
     unfinished.erase(block_index);
 }

@@ -331,7 +331,7 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
             commit_new_file(info);
         }
     }
-    if (!queued_next && requested_hashes == 0) {
+    if (!queued_next && requested_hashes == 0 && info.is_complete()) {
         commit_new_file(info);
         send<payload::scan_progress_t>(address, info.get_task());
     }
