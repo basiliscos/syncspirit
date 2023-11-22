@@ -146,6 +146,10 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     if (stop_io || queue.empty())
         return process();
 
+    if (state != r::state_t::OPERATIONAL) {
+        return;
+    }
+
     auto &payload = queue.front()->payload.request_payload;
     auto &ssl_ctx = payload->ssl_context;
     auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
@@ -275,7 +279,9 @@ void http_actor_t::on_handshake(bool, utils::x509_t &, const tcp::endpoint &, co
     if (!need_response || stop_io) {
         return process();
     }
-    write_request();
+    if (state == r::state_t::OPERATIONAL) {
+        write_request();
+    }
 }
 
 void http_actor_t::on_handshake_error(sys::error_code ec) noexcept {
