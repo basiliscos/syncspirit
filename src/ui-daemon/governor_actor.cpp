@@ -21,9 +21,8 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             if (!ec && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                auto sup = supervisor->get_address();
-                plugin->subscribe_actor(&governor_actor_t::on_model_update, sup);
-                plugin->subscribe_actor(&governor_actor_t::on_block_update, sup);
+                plugin->subscribe_actor(&governor_actor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&governor_actor_t::on_block_update, coordinator);
                 plugin->subscribe_actor(&governor_actor_t::on_io_error, coordinator);
                 plugin->subscribe_actor(&governor_actor_t::on_scan_completed, coordinator);
             }
@@ -45,20 +44,17 @@ void governor_actor_t::shutdown_start() noexcept {
 }
 
 void governor_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_model_update", identity);
+    auto custom = message.payload.custom;
+    LOG_TRACE(log, "{}, on_model_update, this = {}, payload = {}", identity, (void *)this, custom);
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
-#if 0
-    process();
-    auto &payload = message.payload.message->payload;
-    if (payload.custom == this) {
+    if (custom == this) {
         return process();
     }
-#endif
 }
 
 void governor_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
