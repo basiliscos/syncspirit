@@ -25,6 +25,7 @@ struct initiator_actor_config_t : public r::actor_config_t {
     r::message_ptr_t custom;
     r::supervisor_t *router;
     std::string_view alpn;
+    bool relay_enabled;
 };
 
 template <typename Actor> struct initiator_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -79,6 +80,11 @@ template <typename Actor> struct initiator_actor_config_builder_t : r::actor_con
 
     builder_t &&alpn(std::string_view value) &&noexcept {
         parent_t::config.alpn = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&relay_enabled(bool value) &&noexcept {
+        parent_t::config.relay_enabled = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };

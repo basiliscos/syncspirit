@@ -4,6 +4,7 @@
 #pragma once
 
 #include "config/bep.h"
+#include "config/relay.h"
 #include "messages.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
@@ -30,6 +31,7 @@ struct peer_supervisor_config_t : ra::supervisor_config_asio_t {
     std::string_view device_name;
     const utils::key_pair_t *ssl_pair;
     config::bep_config_t bep_config;
+    config::relay_config_t relay_config;
     model::cluster_ptr_t cluster;
 };
 
@@ -51,6 +53,11 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
 
     builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
         parent_t::config.bep_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&relay_config(const config::relay_config_t &value) &&noexcept {
+        parent_t::config.relay_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -91,6 +98,7 @@ struct SYNCSPIRIT_API peer_supervisor_t : public ra::supervisor_asio_t,
     std::string_view device_name;
     const utils::key_pair_t &ssl_pair;
     config::bep_config_t bep_config;
+    config::relay_config_t relay_config;
 };
 
 } // namespace net

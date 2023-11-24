@@ -36,12 +36,12 @@ port = 21027
 [main]
 default_location = '/tmp/syncspirit'
 device_name = 'hp-note'
-hasher_threads = 3
+hasher_threads = 7
 timeout = 5000
 
 [relay]
 discovery_url = 'https://relays.syncthing.net/endpoint'
-enabled = true
+enabled = false
 rx_buff_size = 1048576
 
 [upnp]

@@ -19,7 +19,7 @@ template <class> inline constexpr bool always_false_v = false;
 
 peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
     : parent_t{cfg}, cluster{cfg.cluster}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair},
-      bep_config(cfg.bep_config) {
+      bep_config(cfg.bep_config), relay_config{cfg.relay_config} {
     log = utils::get_logger("net.peer_supervisor");
 }
 
@@ -197,6 +197,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &
                 .ssl_pair(&ssl_pair)
                 .peer_device_id(diff.device)
                 .uris(uris)
+                .relay_enabled(relay_config.enabled)
                 .cluster(cluster)
                 .init_timeout(connect_timeout * (uris.size() + 1))
                 .shutdown_timeout(connect_timeout)

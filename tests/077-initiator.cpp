@@ -188,6 +188,7 @@ struct fixture_t {
             .timeout(timeout)
             .peer_device_id(peer_device->device_id())
             .relay_session(relay_session)
+            .relay_enabled(true)
             .uris({peer_uri})
             .cluster(use_model ? cluster : nullptr)
             .sink(sup->get_address())
@@ -771,6 +772,36 @@ void test_relay_active_success() {
     F().run();
 }
 
+void test_relay_active_not_enabled() {
+    struct F : active_relay_fixture_t {
+
+        actor_ptr_t create_actor() noexcept override {
+            return sup->create_actor<initiator_actor_t>()
+                .timeout(timeout)
+                .peer_device_id(peer_device->device_id())
+                .relay_session(relay_session)
+                .uris({peer_uri})
+                .cluster(use_model ? cluster : nullptr)
+                .sink(sup->get_address())
+                .ssl_pair(&my_keys)
+                .router(*sup)
+                .escalate_failure()
+                .finish();
+        }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(peer_device->get_state() == device_state_t::offline);
+        }
+    };
+    F().run();
+}
+
 void test_relay_wrong_device() {
     struct F : active_relay_fixture_t {
 
@@ -905,6 +936,7 @@ int _init() {
     REGISTER_TEST_CASE(test_relay_malformed_uri, "test_relay_malformed_uri", "[initiator]");
     REGISTER_TEST_CASE(test_relay_active_wrong_relay_deviceid, "test_relay_active_wrong_relay_deviceid", "[initiator]");
     REGISTER_TEST_CASE(test_relay_active_success, "test_relay_active_success", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_active_not_enabled, "test_relay_active_not_enabled", "[initiator]");
     REGISTER_TEST_CASE(test_relay_wrong_device, "test_relay_wrong_device", "[initiator]");
     REGISTER_TEST_CASE(test_relay_non_conneteable, "test_relay_non_conneteable", "[initiator]");
     REGISTER_TEST_CASE(test_relay_malformed_address, "test_relay_malformed_address", "[initiator]");

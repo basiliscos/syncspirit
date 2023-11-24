@@ -35,11 +35,16 @@ initiator_actor_t::initiator_actor_t(config_t &cfg)
       sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
       custom(std::move(cfg.custom)), router{*cfg.router}, alpn(cfg.alpn) {
     log = utils::get_logger("net.initator");
+    auto tmp_identity = "init/unknown";
     for (auto &uri : cfg.uris) {
         if (uri.proto != "tcp" && uri.proto != "relay") {
-            LOG_DEBUG(log, "{}, unsupported proto '{}' for the url '{}'", identity, uri.proto, uri.full);
+            LOG_DEBUG(log, "{}, unsupported proto '{}' for the url '{}'", tmp_identity, uri.proto, uri.full);
         } else {
-            uris.emplace_back(std::move(uri));
+            if (uri.proto == "relay" && !cfg.relay_enabled) {
+                LOG_DEBUG(log, "{}, {} is not enabled, skipping '{}'", tmp_identity, uri.proto, uri.full);
+            } else {
+                uris.emplace_back(std::move(uri));
+            }
         }
     }
     auto comparator = [](const utils::URI &a, const utils::URI &b) noexcept -> bool {

@@ -334,6 +334,7 @@ void net_supervisor_t::launch_net() noexcept {
         .strand(strand)
         .timeout(timeout)
         .bep_config(app_config.bep_config)
+        .relay_config(app_config.relay_config)
         .escalate_failure()
         .finish();
 
