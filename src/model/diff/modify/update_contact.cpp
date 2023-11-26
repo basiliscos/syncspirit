@@ -11,12 +11,17 @@ using namespace syncspirit::model::diff::modify;
 
 update_contact_t::update_contact_t(const model::cluster_t &cluster, const model::device_id_t &device_,
                                    const utils::uri_container_t &uris_) noexcept
-    : device{device_}, uris{uris_}, self{false} {
+    : device{device_}, self{false} {
     auto &devices = cluster.get_devices();
     known = (bool)devices.by_sha256(device.get_sha256());
     if (known) {
         self = cluster.get_device()->device_id().get_sha256() == device.get_sha256();
     }
+
+    auto copy = uris_;
+    std::sort(begin(copy), end(copy));
+    auto end = std::unique(std::begin(copy), std::end(copy));
+    std::copy(begin(copy), end, std::back_insert_iterator(this->uris));
 }
 
 update_contact_t::update_contact_t(const model::cluster_t &cluster, const ip_addresses_t &addresses) noexcept
@@ -37,9 +42,8 @@ update_contact_t::update_contact_t(const model::cluster_t &cluster, const ip_add
         uris.push_back(uri);
     }
     std::sort(begin(uris), end(uris));
-    std::unique(begin(uris), end(uris));
-
-    this->uris = std::move(uris);
+    auto end = std::unique(std::begin(uris), std::end(uris));
+    std::copy(begin(uris), end, std::back_insert_iterator(this->uris));
 }
 
 auto update_contact_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
