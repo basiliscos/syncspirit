@@ -5,6 +5,7 @@
 #include <charconv>
 #include <regex>
 #include <uriparser/Uri.h>
+#include <algorithm>
 
 namespace syncspirit::utils {
 
@@ -92,6 +93,10 @@ auto URI::decompose_query() const noexcept -> StringPairs {
         p = p->next;
     }
     return r;
+}
+
+bool URI::operator<(const URI &other) const noexcept {
+    return std::lexicographical_compare(full.begin(), full.end(), other.full.begin(), other.full.end());
 }
 
 }; // namespace syncspirit::utils

@@ -32,6 +32,7 @@ struct SYNCSPIRIT_API URI {
     StringPairs decompose_query() const noexcept;
 
     inline bool operator==(const URI &other) const noexcept { return full == other.full; }
+    bool operator<(const URI &other) const noexcept;
     inline operator bool() const noexcept { return !full.empty(); }
 
   private:

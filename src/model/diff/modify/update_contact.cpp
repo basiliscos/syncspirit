@@ -5,6 +5,7 @@
 #include "../contact_visitor.h"
 #include "../../cluster.h"
 #include <fmt/core.h>
+#include <algorithm>
 
 using namespace syncspirit::model::diff::modify;
 
@@ -35,6 +36,9 @@ update_contact_t::update_contact_t(const model::cluster_t &cluster, const ip_add
         auto uri = utils::parse(uri_str).value();
         uris.push_back(uri);
     }
+    std::sort(begin(uris), end(uris));
+    std::unique(begin(uris), end(uris));
+
     this->uris = std::move(uris);
 }
 
