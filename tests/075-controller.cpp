@@ -50,6 +50,7 @@ struct sample_peer_t : r::actor_base_t {
     struct block_response_t {
         size_t block_index;
         std::string data;
+        sys::error_code ec;
     };
     using block_responses_t = std::list<block_response_t>;
     using block_request_t = r::intrusive_ptr_t<net::message::block_request_t>;
@@ -143,8 +144,14 @@ struct sample_peer_t : r::actor_base_t {
                        block_responses.front().block_index;
         };
         while (condition()) {
-            log->debug("{}, matched, replying...", identity);
-            reply_to(*block_requests.front(), block_responses.front().data);
+            auto &reply = block_responses.front();
+            auto &request = *block_requests.front();
+            log->debug("{}, matched, replying..., ec = {}", identity, reply.ec.value());
+            if (!reply.ec) {
+                reply_to(request, reply.data);
+            } else {
+                reply_with_error(request, make_error(reply.ec));
+            }
             block_responses.pop_front();
             block_requests.pop_front();
         }
@@ -161,6 +168,13 @@ struct sample_peer_t : r::actor_base_t {
             index = block_responses.size();
         }
         block_responses.push_back(block_response_t{index, std::string(data)});
+    }
+
+    void push_block(sys::error_code ec, size_t index) {
+        if (index == next_block) {
+            index = block_responses.size();
+        }
+        block_responses.push_back(block_response_t{index, std::string{}, ec});
     }
 
     size_t blocks_requested = 0;
@@ -829,6 +843,74 @@ void test_downloading() {
     F(true, 10).run();
 }
 
+void test_downloading_error() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_my = folder_infos.by_device(*my_device);
+
+            auto cc = proto::ClusterConfig{};
+            auto folder = cc.add_folders();
+            folder->set_id(std::string(folder_1->get_id()));
+            auto d_peer = folder->add_devices();
+            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
+            d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
+            d_peer->set_index_id(folder_1_peer->get_index());
+            auto d_my = folder->add_devices();
+            d_my->set_id(std::string(my_device->device_id().get_sha256()));
+            d_my->set_max_sequence(folder_my->get_max_sequence());
+            d_my->set_index_id(folder_my->get_index());
+
+            SECTION("cluster config & index has a new file => download it") {
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+
+                auto index = proto::Index{};
+                index.set_folder(std::string(folder_1->get_id()));
+                auto file = index.add_files();
+                file->set_name("some-file");
+                file->set_type(proto::FileInfoType::FILE);
+                file->set_sequence(folder_1_peer->get_max_sequence());
+                file->set_block_size(5);
+                file->set_size(5);
+                auto version = file->mutable_version();
+                auto counter = version->add_counters();
+                counter->set_id(1ul);
+                counter->set_value(1ul);
+
+                auto b1 = file->add_blocks();
+                b1->set_hash(utils::sha256_digest("12345").value());
+                b1->set_offset(0);
+                b1->set_size(5);
+
+                auto folder_my = folder_infos.by_device(*my_device);
+                CHECK(folder_my->get_max_sequence() == 0ul);
+
+                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                auto ec = utils::make_error_code(utils::request_error_code_t::generic);
+                peer_actor->push_block(ec, 0);
+                sup->do_process();
+
+                CHECK(peer_actor->blocks_requested == 1);
+                CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+                auto folder_peer = folder_infos.by_device(*peer_device);
+                REQUIRE(folder_peer->get_file_infos().size() == 1);
+                auto f = folder_peer->get_file_infos().begin()->item;
+                REQUIRE(f);
+                CHECK(f->is_unreachable());
+                CHECK(!f->is_locally_locked());
+                CHECK(!f->is_locked());
+
+                auto lf = f->local_file();
+                CHECK(!lf->is_locally_locked());
+                CHECK(!lf->is_locked());
+            }
+        }
+    };
+    F(true, 10).run();
+}
+
 void test_my_sharing() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -1002,6 +1084,7 @@ int _init() {
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
+    REGISTER_TEST_CASE(test_downloading_error, "test_downloading_error", "[net]");
     REGISTER_TEST_CASE(test_my_sharing, "test_my_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");

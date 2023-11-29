@@ -64,3 +64,7 @@ auto cluster_visitor_t::operator()(const modify::local_update_t &, void *) noexc
 auto cluster_visitor_t::operator()(const modify::lock_file_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
+
+auto cluster_visitor_t::operator()(const modify::mark_reachable_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}

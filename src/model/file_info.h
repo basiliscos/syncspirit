@@ -38,6 +38,7 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
         f_no_permissions = 1 << 2,
         f_locked = 1 << 3,
         f_local_locked = 1 << 4,
+        f_unreachable = 1 << 5,
     };
 
     using blocks_t = std::vector<block_info_ptr_t>;
@@ -79,6 +80,7 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
     inline bool is_link() const noexcept { return type == proto::FileInfoType::SYMLINK; }
     inline bool is_deleted() const noexcept { return flags & f_deleted; }
     inline bool is_invalid() const noexcept { return flags & f_invalid; }
+    inline bool is_unreachable() const noexcept { return flags & f_unreachable; }
 
     std::int64_t get_size() const noexcept;
     inline void set_size(std::int64_t value) noexcept { size = value; }
@@ -86,6 +88,7 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
     std::int32_t get_block_size() const noexcept { return block_size; }
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 
+    void mark_unreachable(bool value) noexcept;
     void mark_local_available(size_t block_index) noexcept;
     bool is_locally_available(size_t block_index) const noexcept;
     bool is_locally_available() const noexcept;

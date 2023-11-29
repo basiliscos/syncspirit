@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -28,6 +28,7 @@ struct SYNCSPIRIT_API blocks_iterator_t : arc_base_t<blocks_iterator_t> {
 
     file_block_t next(bool advance) noexcept;
     void reset() noexcept;
+    file_info_ptr_t get_source() noexcept;
 
   private:
     void prepare() noexcept;

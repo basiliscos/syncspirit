@@ -106,7 +106,22 @@ TEST_CASE("block iterator", "[model]") {
 
             REQUIRE(!next(my_file));
         }
+
+        SECTION("no iteration upon unavailable file") {
+            REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
+
+            auto my_file = my_folder->get_file_infos().by_name(p_file.name());
+            auto bi1 = cluster->get_blocks().get(b1_hash);
+            auto bi2 = cluster->get_blocks().get(b2_hash);
+            my_file->remove_blocks();
+            my_file->assign_block(bi1, 0);
+            my_file->assign_block(bi2, 1);
+
+            my_file->mark_unreachable(true);
+            CHECK(!next(my_file, true));
+        }
     }
+
     SECTION("block is available on some other local file") {
         auto p_file_2 = proto::FileInfo();
         p_file_2.set_name("b.txt");

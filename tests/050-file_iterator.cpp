@@ -78,7 +78,7 @@ TEST_CASE("file iterator", "[model]") {
     proto::Index idx;
     idx.set_folder(db_folder.id());
 
-    SECTION("file locking") {
+    SECTION("file locking && marking unreacheable") {
         auto file = idx.add_files();
         file->set_name("a.txt");
         file->set_sequence(10ul);
@@ -88,13 +88,21 @@ TEST_CASE("file iterator", "[model]") {
         REQUIRE(diff->apply(*cluster));
         auto peer_file = peer_folder->get_file_infos().by_name("a.txt");
 
-        peer_file->lock();
-        auto f = next(true);
-        REQUIRE(!f);
+        SECTION("locking") {
+            peer_file->lock();
+            auto f = next(true);
+            REQUIRE(!f);
 
-        peer_file->unlock();
-        f = next(true);
-        REQUIRE(f);
+            peer_file->unlock();
+            f = next(true);
+            REQUIRE(f);
+        }
+
+        SECTION("unreacheable") {
+            peer_file->mark_unreachable(true);
+            auto f = next(true);
+            REQUIRE(!f);
+        }
     }
 
     SECTION("2 files at peer") {

@@ -8,12 +8,13 @@
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/clone_file.h"
+#include "model/diff/modify/local_update.h"
 #include "model/diff/modify/lock_file.h"
+#include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/flush_file.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
-#include "model/diff/modify/local_update.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
@@ -248,7 +249,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
     } else {
         auto block = file_block.block();
         auto sz = block->get_size();
-        LOG_TRACE(log, "{} request_block, file = {}, block index = {} / {}, sz = {}, request pool sz = {}", identity,
+        LOG_TRACE(log, "{} request_block on file'{}'; block index = {} / {}, sz = {}, request pool sz = {}", identity,
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
         request<payload::block_request_t>(peer_addr, file, file_block).send(request_timeout);
         ++rx_blocks_requested;
@@ -390,6 +391,23 @@ auto controller_actor_t::operator()(const model::diff::modify::local_update_t &d
     return outcome::success();
 }
 
+auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (custom == this) {
+        auto &folder_id = diff.folder_id;
+        auto &file_name = diff.file_name;
+        auto folder = cluster->get_folders().by_id(folder_id);
+        auto &folder_infos = folder->get_folder_infos();
+        auto folder_info = folder_infos.by_device(*cluster->get_device());
+        auto file = folder_info->get_file_infos().by_name(file_name);
+        auto diff = model::diff::cluster_diff_ptr_t{};
+        diff = new model::diff::modify::lock_file_t(*file, false);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+    }
+    push_pending();
+    return outcome::success();
+}
+
 void controller_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
     if (message.payload.custom == this) {
         LOG_TRACE(log, "{}, on_block_update", identity);
@@ -518,18 +536,34 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     --rx_blocks_requested;
     auto ee = message.payload.ee;
-    if (ee) {
-        LOG_WARN(log, "{}, can't receive block : {}", identity, ee->message());
-        return do_shutdown(ee);
-    }
-
     auto &payload = message.payload.req->payload.request_payload;
     auto &file_block = payload.block;
     auto &block = *file_block.block();
+
+    if (ee) {
+        auto &ec = ee->root()->ec;
+        if (ec.category() == utils::request_error_code_category()) {
+            auto file = file_block.file();
+            if (!file->is_unreachable()) {
+                LOG_WARN(log, "{}, can't receive block from file '{}': {}; marking unreachable", identity,
+                         file->get_full_name(), ec.message());
+                file->mark_unreachable(true);
+                auto diff = model::diff::cluster_diff_ptr_t{};
+                diff = new model::diff::modify::mark_reachable_t(*file, false);
+                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+            }
+            pull_ready();
+        } else {
+            LOG_WARN(log, "{}, can't receive block : {}", identity, ee->message());
+            do_shutdown(ee);
+        }
+        return;
+    }
+
+    auto &data = message.payload.res.data;
     auto hash = std::string(file_block.block()->get_hash());
     request_pool += block.get_size();
 
-    auto &data = message.payload.res.data;
     request<hasher::payload::validation_request_t>(hasher_proxy, data, hash, &message).send(init_timeout);
     resources->acquire(resource::hash);
     return pull_ready();

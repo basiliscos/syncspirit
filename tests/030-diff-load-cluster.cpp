@@ -4,7 +4,6 @@
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
-#include "model/misc/file_iterator.h"
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/devices.h"
 #include "model/diff/load/ignored_devices.h"

@@ -16,7 +16,7 @@ auto lock_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resu
     auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
     auto file = folder_info->get_file_infos().by_name(file_name);
 
-    LOG_TRACE(log, "applyging lock_file_t, {}, lock = {}", file->get_full_name(), locked);
+    LOG_TRACE(log, "applyging lock_file_ for '{}'; lock = {}", file->get_full_name(), locked);
     if (locked) {
         assert(!file->is_locked());
         file->lock();

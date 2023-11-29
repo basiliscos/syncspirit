@@ -213,6 +213,14 @@ std::string file_info_t::serialize(bool include_blocks) const noexcept {
     return as_db(include_blocks).SerializeAsString();
 }
 
+void file_info_t::mark_unreachable(bool value) noexcept {
+    if (value) {
+        flags |= f_unreachable;
+    } else {
+        flags &= ~f_unreachable;
+    }
+}
+
 void file_info_t::mark_local_available(size_t block_index) noexcept {
     assert(block_index < blocks.size());
     assert(!marks[block_index]);
