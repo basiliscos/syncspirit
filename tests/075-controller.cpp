@@ -843,7 +843,7 @@ void test_downloading() {
     F(true, 10).run();
 }
 
-void test_downloading_error() {
+void test_downloading_errors() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main(diff_builder_t &) noexcept override {
@@ -862,50 +862,53 @@ void test_downloading_error() {
             d_my->set_max_sequence(folder_my->get_max_sequence());
             d_my->set_index_id(folder_my->get_index());
 
-            SECTION("cluster config & index has a new file => download it") {
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
 
-                auto index = proto::Index{};
-                index.set_folder(std::string(folder_1->get_id()));
-                auto file = index.add_files();
-                file->set_name("some-file");
-                file->set_type(proto::FileInfoType::FILE);
-                file->set_sequence(folder_1_peer->get_max_sequence());
-                file->set_block_size(5);
-                file->set_size(5);
-                auto version = file->mutable_version();
-                auto counter = version->add_counters();
-                counter->set_id(1ul);
-                counter->set_value(1ul);
+            auto index = proto::Index{};
+            index.set_folder(std::string(folder_1->get_id()));
+            auto file = index.add_files();
+            file->set_name("some-file");
+            file->set_type(proto::FileInfoType::FILE);
+            file->set_sequence(folder_1_peer->get_max_sequence());
+            file->set_block_size(5);
+            file->set_size(5);
+            auto version = file->mutable_version();
+            auto counter = version->add_counters();
+            counter->set_id(1ul);
+            counter->set_value(1ul);
 
-                auto b1 = file->add_blocks();
-                b1->set_hash(utils::sha256_digest("12345").value());
-                b1->set_offset(0);
-                b1->set_size(5);
+            auto b1 = file->add_blocks();
+            b1->set_hash(utils::sha256_digest("12345").value());
+            b1->set_offset(0);
+            b1->set_size(5);
 
-                auto folder_my = folder_infos.by_device(*my_device);
-                CHECK(folder_my->get_max_sequence() == 0ul);
+            CHECK(folder_my->get_max_sequence() == 0ul);
+            peer_actor->forward(proto::message::Index(new proto::Index(index)));
 
-                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+            SECTION("general error, ok, do not shutdown") {
                 auto ec = utils::make_error_code(utils::request_error_code_t::generic);
                 peer_actor->push_block(ec, 0);
-                sup->do_process();
-
-                CHECK(peer_actor->blocks_requested == 1);
-                CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
-
-                auto folder_peer = folder_infos.by_device(*peer_device);
-                REQUIRE(folder_peer->get_file_infos().size() == 1);
-                auto f = folder_peer->get_file_infos().begin()->item;
-                REQUIRE(f);
-                CHECK(f->is_unreachable());
-                CHECK(!f->is_locally_locked());
-                CHECK(!f->is_locked());
-
-                auto lf = f->local_file();
-                CHECK(!lf->is_locally_locked());
-                CHECK(!lf->is_locked());
             }
+            SECTION("hash mismatch, do not shutdown") { peer_actor->push_block("zzz", 0); }
+
+            sup->do_process();
+
+            CHECK(peer_actor->blocks_requested == 1);
+            CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+            auto folder_peer = folder_infos.by_device(*peer_device);
+            REQUIRE(folder_peer->get_file_infos().size() == 1);
+            auto f = folder_peer->get_file_infos().begin()->item;
+            REQUIRE(f);
+            CHECK(f->is_unreachable());
+            CHECK(!f->is_locally_locked());
+            CHECK(!f->is_locked());
+
+            auto lf = f->local_file();
+            CHECK(!lf->is_locally_locked());
+            CHECK(!lf->is_locked());
+
+            sup->do_process();
         }
     };
     F(true, 10).run();
@@ -1084,7 +1087,7 @@ int _init() {
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
-    REGISTER_TEST_CASE(test_downloading_error, "test_downloading_error", "[net]");
+    REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
     REGISTER_TEST_CASE(test_my_sharing, "test_my_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");

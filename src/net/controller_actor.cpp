@@ -583,11 +583,16 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
         do_shutdown(ee);
     } else {
         if (!res.payload.res.valid) {
-            std::string context = fmt::format("digest mismatch for {}", path.string());
-            auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-            LOG_WARN(log, "{}, check_digest, digest mismatch: {}", identity, context);
-            auto ee = r::make_error(context, ec);
-            do_shutdown(ee);
+            if (!file->is_unreachable()) {
+                auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
+                LOG_WARN(log, "{}, digest mismatch for '{}'; marking reachable", identity, file->get_full_name(),
+                         ec.message());
+                file->mark_unreachable(true);
+                auto diff = model::diff::cluster_diff_ptr_t{};
+                diff = new model::diff::modify::mark_reachable_t(*file, false);
+                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+            }
+            pull_ready();
         } else {
             auto &data = block_res->payload.res.data;
             auto index = payload.block.block_index();

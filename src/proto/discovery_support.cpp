@@ -62,8 +62,9 @@ outcome::result<URI> make_discovery_request(fmt::memory_buffer &buff, const URI 
 
     fmt::memory_buffer tx_buff;
     auto ok = serialize(req, buff);
-    if (!ok)
+    if (!ok) {
         return ok.error();
+    }
     return uri;
 }
 
