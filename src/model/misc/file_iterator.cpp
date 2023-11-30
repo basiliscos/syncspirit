@@ -13,7 +13,8 @@ file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_)
 }
 
 void file_iterator_t::append(file_info_t &file) noexcept {
-    if (file.is_locally_locked() || file.is_locked() || file.is_unreachable()) {
+    bool skip = file.is_locally_locked() || file.is_locked() || file.is_unreachable() || file.is_invalid();
+    if (skip) {
         return;
     }
 

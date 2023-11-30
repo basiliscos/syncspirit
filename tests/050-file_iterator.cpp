@@ -105,6 +105,18 @@ TEST_CASE("file iterator", "[model]") {
         }
     }
 
+    SECTION("file locking && marking unreacheable") {
+        auto file = idx.add_files();
+        file->set_name("a.txt");
+        file->set_sequence(10ul);
+        file->set_invalid(true);
+        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
+
+        diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
+        REQUIRE(diff->apply(*cluster));
+        REQUIRE(!next(true));
+    }
+
     SECTION("2 files at peer") {
         auto file_1 = idx.add_files();
         file_1->set_name("a.txt");
