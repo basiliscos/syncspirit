@@ -15,15 +15,16 @@ static const constexpr std::size_t BUFF_SZ = 1500;
 
 namespace {
 namespace resource {
-r::plugin::resource_id_t io = 0;
-r::plugin::resource_id_t timer = 1;
+r::plugin::resource_id_t send = 0;
+r::plugin::resource_id_t read = 1;
+r::plugin::resource_id_t timer = 2;
 } // namespace resource
 } // namespace
 
 local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, frequency{r::pt::milliseconds(cfg.frequency)},
-      strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, sock{strand.context()},
-      port{cfg.port}, cluster{cfg.cluster} {
+      strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()},
+      broadcast_sock{strand.context()}, sock{strand.context()}, port{cfg.port}, cluster{cfg.cluster} {
     log = utils::get_logger("net.local_discovery");
     rx_buff.resize(BUFF_SZ);
     tx_buff.resize(BUFF_SZ);
@@ -42,24 +43,28 @@ void local_discovery_actor_t::init() noexcept {
     sys::error_code ec;
 
     auto bc_endpoint = udp::endpoint(asio::ip::address_v4::broadcast(), port);
-    sock.open(bc_endpoint.protocol(), ec);
+    broadcast_sock.open(bc_endpoint.protocol(), ec);
+    if (ec) {
+        LOG_WARN(log, "{}, init, can't open broadcast socket :: {}", identity, ec.message());
+        return do_shutdown(make_error(ec));
+    }
+
+    broadcast_sock.set_option(udp_socket_t::broadcast(true), ec);
+    if (ec) {
+        LOG_WARN(log, "{}, init, can't set broadcast option :: {}", identity, ec.message());
+        return do_shutdown(make_error(ec));
+    }
+
+    auto listen_endpoint = udp::endpoint{asio::ip::address_v4::loopback(), port};
+    sock.open(listen_endpoint.protocol(), ec);
     if (ec) {
         LOG_WARN(log, "{}, init, can't open socket :: {}", identity, ec.message());
         return do_shutdown(make_error(ec));
     }
 
-#if 0
-    auto listen_endpoint = udp::endpoint{asio::ip::address_v4::loopback(), port};
     sock.bind(listen_endpoint, ec);
     if (ec) {
         LOG_WARN(log, "{}, init, can't bind socket :: {}", identity, ec.message());
-        return do_shutdown(make_error(ec));
-    }
-#endif
-
-    sock.set_option(udp_socket_t::broadcast(true), ec);
-    if (ec) {
-        LOG_WARN(log, "{}, init, can't set broadcast option :: {}", identity, ec.message());
         return do_shutdown(make_error(ec));
     }
 }
@@ -76,8 +81,14 @@ void local_discovery_actor_t::shutdown_start() noexcept {
     if (resources->has(resource::timer)) {
         cancel_timer(*timer_request);
     }
-    if (resources->has(resource::io)) {
-        sys::error_code ec;
+    sys::error_code ec;
+    if (resources->has(resource::send)) {
+        broadcast_sock.cancel(ec);
+        if (ec) {
+            LOG_WARN(log, "{}, shutdown_start, socket cancellation error:: {}", identity, ec.message());
+        }
+    }
+    if (resources->has(resource::read)) {
         sock.cancel(ec);
         if (ec) {
             LOG_WARN(log, "{}, shutdown_start, socket cancellation error:: {}", identity, ec.message());
@@ -99,8 +110,8 @@ void local_discovery_actor_t::announce() noexcept {
         auto fwd_send =
             ra::forwarder_t(*this, &local_discovery_actor_t::on_write, &local_discovery_actor_t::on_write_error);
         auto bc_endpoint = udp::endpoint(asio::ip::address_v4::broadcast(), port);
-        sock.async_send_to(buff, bc_endpoint, std::move(fwd_send));
-        resources->acquire(resource::io);
+        broadcast_sock.async_send_to(buff, bc_endpoint, std::move(fwd_send));
+        resources->acquire(resource::send);
         LOG_TRACE(log, "{}, announce has been sent", identity);
     } else {
         LOG_TRACE(log, "{}, announce() skipping", identity);
@@ -115,7 +126,7 @@ void local_discovery_actor_t::do_read() noexcept {
     auto fwd_receive =
         ra::forwarder_t(*this, &local_discovery_actor_t::on_read, &local_discovery_actor_t::on_read_error);
     sock.async_receive_from(buff, peer_endpoint, std::move(fwd_receive));
-    resources->acquire(resource::io);
+    resources->acquire(resource::read);
 }
 
 void local_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
@@ -128,7 +139,11 @@ void local_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept
 }
 
 void local_discovery_actor_t::on_read(size_t bytes) noexcept {
-    resources->release(resource::io);
+    resources->release(resource::read);
+    if (state > r::state_t::OPERATIONAL) {
+        return;
+    }
+
     // LOG_TRACE(log, "local_discovery_actor_t::on_read");
     auto buff = asio::buffer(rx_buff.data(), bytes);
     auto result = proto::parse_announce(buff);
@@ -171,17 +186,17 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
 }
 
 void local_discovery_actor_t::on_read_error(const sys::error_code &ec) noexcept {
-    resources->release(resource::io);
+    resources->release(resource::read);
     if (ec != asio::error::operation_aborted) {
         LOG_ERROR(log, "{}, on_read_error, error = {}", identity, ec.message());
         do_shutdown(make_error(ec));
     }
 }
 
-void local_discovery_actor_t::on_write(size_t) noexcept { resources->release(resource::io); }
+void local_discovery_actor_t::on_write(size_t) noexcept { resources->release(resource::send); }
 
 void local_discovery_actor_t::on_write_error(const sys::error_code &ec) noexcept {
-    resources->release(resource::io);
+    resources->release(resource::send);
     if (ec != asio::error::operation_aborted) {
         LOG_ERROR(log, "{}, on_write_error, error = {}", identity, ec.message());
         do_shutdown(make_error(ec));

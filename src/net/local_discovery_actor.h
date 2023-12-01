@@ -64,6 +64,7 @@ struct SYNCSPIRIT_API local_discovery_actor_t final : public r::actor_base_t {
     utils::logger_t log;
     r::pt::time_duration frequency;
     asio::io_context::strand &strand;
+    udp_socket_t broadcast_sock;
     udp_socket_t sock;
     r::address_ptr_t coordinator;
     fmt::memory_buffer rx_buff;
