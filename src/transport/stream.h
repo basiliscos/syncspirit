@@ -28,7 +28,7 @@ stream_sp_t SYNCSPIRIT_API initiate_tls_active(ra::supervisor_asio_t &supervisor
                                                const model::device_id_t &expected_peer, const utils::URI &uri,
                                                bool sni = false, std::string_view alpn = "") noexcept;
 stream_sp_t SYNCSPIRIT_API initiate_tls_passive(ra::supervisor_asio_t &supervisor, const utils::key_pair_t &my_keys,
-                                                tcp::socket sock) noexcept;
+                                                tcp::socket sock, std::string_view alpn = "") noexcept;
 stream_sp_t SYNCSPIRIT_API initiate_stream(transport_config_t &config) noexcept;
 
 } // namespace syncspirit::transport

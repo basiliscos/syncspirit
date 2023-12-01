@@ -32,9 +32,9 @@ struct tcp_stream_impl_t final : generic_steam_impl_t<tcp_socket_t, upgradeable_
     utils::URI uri;
 };
 
-stream_sp_t initiate_tls_passive(ra::supervisor_asio_t &sup, const utils::key_pair_t &my_keys,
-                                 tcp::socket peer_sock) noexcept {
-    ssl_junction_t ssl{{}, &my_keys, false, ""};
+stream_sp_t initiate_tls_passive(ra::supervisor_asio_t &sup, const utils::key_pair_t &my_keys, tcp::socket peer_sock,
+                                 std::string_view alpn) noexcept {
+    ssl_junction_t ssl{{}, &my_keys, false, alpn};
     transport_config_t cfg{ssl_option_t(ssl), {}, sup, std::move(peer_sock), false};
     return new ssl_stream_impl_t(cfg);
 }

@@ -142,7 +142,7 @@ void initiator_actor_t::initiate_passive() noexcept {
     }
 
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
-    transport = transport::initiate_tls_passive(*sup, ssl_pair, std::move(sock.value()));
+    transport = transport::initiate_tls_passive(*sup, ssl_pair, std::move(sock.value()), alpn);
     initiate_handshake();
 }
 
@@ -161,7 +161,7 @@ void initiator_actor_t::initiate_relay_passive() noexcept {
 
 void initiator_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start, alpn = {}", identity, alpn);
     std::string proto;
     if (active_uri) {
         proto = active_uri->proto;
