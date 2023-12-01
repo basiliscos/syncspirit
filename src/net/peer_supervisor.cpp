@@ -5,6 +5,7 @@
 #include "peer_actor.h"
 #include "initiator_actor.h"
 #include "names.h"
+#include "../constants.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "model/diff/peer/peer_state.h"
@@ -152,6 +153,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t 
         .sink(address)
         .ssl_pair(&ssl_pair)
         .sock(std::move(sock))
+        .alpn(constants::protocol_name)
         .timeout(timeout)
         .finish();
     return outcome::success();
