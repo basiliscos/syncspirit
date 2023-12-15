@@ -10,6 +10,7 @@
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
 #include <fstream>
+#include <exception>
 
 #include "syncspirit-config.h"
 #include "constants.h"
@@ -42,6 +43,28 @@ namespace asio = boost::asio;
 
 using namespace syncspirit;
 using namespace syncspirit::daemon;
+
+[[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
+    auto name = actor ? actor->get_identity() : "unknown";
+    spdlog::critical("actor '{}' error: {}", name, ec->message());
+    std::terminate();
+}
+
+struct asio_sys_context_t : ra::system_context_asio_t {
+    using parent_t = ra::system_context_asio_t;
+    using parent_t::parent_t;
+    void on_error(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override {
+        report_error_and_die(actor, ec);
+    }
+};
+
+struct thread_sys_context_t : rth::system_context_thread_t {
+    using parent_t = rth::system_context_thread_t;
+    using parent_t::parent_t;
+    void on_error(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override {
+        report_error_and_die(actor, ec);
+    }
+};
 
 static std::atomic_bool shutdown_flag = false;
 
@@ -191,7 +214,7 @@ int main(int argc, char **argv) {
 
         /* pre-init actors */
         asio::io_context io_context;
-        ra::system_context_ptr_t sys_context{new ra::system_context_asio_t{io_context}};
+        ra::system_context_ptr_t sys_context{new asio_sys_context_t{io_context}};
         auto strand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
 
@@ -210,7 +233,7 @@ int main(int argc, char **argv) {
         // pre-startup
         sup_net->do_process();
 
-        rth::system_context_thread_t fs_context;
+        thread_sys_context_t fs_context;
         auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                           .timeout(timeout)
                           .registry_address(sup_net->get_registry_address())
@@ -229,10 +252,10 @@ int main(int argc, char **argv) {
         });
 
         auto hasher_count = cfg.hasher_threads;
-        using sys_thread_context_ptr_t = r::intrusive_ptr_t<rth::system_context_thread_t>;
+        using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
         std::vector<sys_thread_context_ptr_t> hasher_ctxs;
         for (uint32_t i = 1; i <= hasher_count; ++i) {
-            hasher_ctxs.push_back(new rth::system_context_thread_t{});
+            hasher_ctxs.push_back(new thread_sys_context_t{});
             auto &ctx = hasher_ctxs.back();
             ctx->create_supervisor<hasher::hasher_supervisor_t>()
                 .timeout(timeout / 2)
