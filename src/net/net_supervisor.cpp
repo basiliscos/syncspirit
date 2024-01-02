@@ -56,7 +56,8 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
 
     auto device = model::device_ptr_t();
     device = new model::local_device_t(device_id, app_config.device_name, cn.value());
-    cluster = new model::cluster_t(device, seed);
+    auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
+    cluster = new model::cluster_t(device, seed, static_cast<int32_t>(simultaneous_writes));
 
     auto &gcfg = app_config.global_announce_config;
     if (gcfg.enabled) {
@@ -80,6 +81,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_contact_update);
         p.subscribe_actor(&net_supervisor_t::on_load_cluster);
         p.subscribe_actor(&net_supervisor_t::on_model_request);
+        p.subscribe_actor(&net_supervisor_t::on_write_ack);
         launch_early();
     });
 }
@@ -148,7 +150,8 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
     auto my_device = cluster->get_device();
     auto device = model::device_ptr_t();
     device = new model::local_device_t(my_device->device_id(), app_config.device_name, "");
-    auto cluster_copy = new model::cluster_t(device, seed);
+    auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
+    auto cluster_copy = new model::cluster_t(device, seed, static_cast<int32_t>(simultaneous_writes));
     reply_to(message, std::move(cluster_copy));
     if (cluster_copies == 0 && load_diff) {
         seed_model();
@@ -360,3 +363,5 @@ void net_supervisor_t::on_start() noexcept {
         .escalate_failure()
         .finish();
 }
+
+void net_supervisor_t::on_write_ack(model::message::write_ack_t &) noexcept { cluster->modify_write_requests(1); }

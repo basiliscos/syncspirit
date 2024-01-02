@@ -13,7 +13,8 @@ bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
     return lhs.rx_buff_size == rhs.rx_buff_size && lhs.tx_buff_limit == rhs.tx_buff_limit &&
            lhs.connect_timeout == rhs.connect_timeout && lhs.request_timeout == rhs.request_timeout &&
            lhs.tx_timeout == rhs.tx_timeout && lhs.rx_timeout == rhs.rx_timeout &&
-           lhs.blocks_max_requested == rhs.blocks_max_requested;
+           lhs.blocks_max_requested == rhs.blocks_max_requested &&
+           lhs.blocks_simultaneous_write == rhs.blocks_simultaneous_write;
 }
 
 bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept {

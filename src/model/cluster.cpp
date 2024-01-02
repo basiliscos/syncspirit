@@ -9,7 +9,8 @@
 using namespace syncspirit;
 using namespace syncspirit::model;
 
-cluster_t::cluster_t(device_ptr_t device_, size_t seed_) noexcept : device(device_), uuid_generator(rng_engine) {
+cluster_t::cluster_t(device_ptr_t device_, size_t seed_, int32_t write_requests_) noexcept
+    : device(device_), uuid_generator(rng_engine), tainted{false}, write_requests{write_requests_} {
     rng_engine.seed(seed_);
 }
 
@@ -62,4 +63,11 @@ auto cluster_t::process(proto::Index &msg, const device_t &peer) const noexcept
 auto cluster_t::process(proto::IndexUpdate &msg, const device_t &peer) const noexcept
     -> outcome::result<diff::cluster_diff_ptr_t> {
     return diff::peer::update_folder_t::create(*this, peer, msg);
+}
+
+int32_t cluster_t::get_write_requests() const noexcept { return write_requests; }
+
+void cluster_t::modify_write_requests(int32_t delta) noexcept {
+    write_requests += delta;
+    assert(write_requests >= 0);
 }

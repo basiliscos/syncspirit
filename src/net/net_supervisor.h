@@ -60,6 +60,7 @@ struct SYNCSPIRIT_API net_supervisor_t : public ra::supervisor_asio_t, private m
     void on_block_update(model::message::block_update_t &message) noexcept;
     void on_contact_update(model::message::contact_update_t &message) noexcept;
     void on_model_request(model::message::model_request_t &message) noexcept;
+    void on_write_ack(model::message::write_ack_t &message) noexcept;
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
     void launch_early() noexcept;

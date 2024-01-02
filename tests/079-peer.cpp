@@ -109,7 +109,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
         auto pd = model::device_id_t::from_cert(peer_keys.cert_data).value();
         peer_device = device_t::create(pd, "peer-device").value();
 
-        cluster = new cluster_t(my_device, 1);
+        cluster = new cluster_t(my_device, 1, 1);
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
 

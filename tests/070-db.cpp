@@ -52,7 +52,7 @@ struct fixture_t {
             device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
         my_device = device_t::create(my_id, "my-device").value();
 
-        return cluster_ptr_t(new cluster_t(my_device, 1));
+        return cluster_ptr_t(new cluster_t(my_device, 1, 1));
     }
 
     virtual void run() noexcept {

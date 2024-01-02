@@ -48,6 +48,10 @@ struct io_error_t {
     io_errors_t errors;
 };
 
+struct write_ack_t {
+    const void *custom;
+};
+
 } // namespace payload
 
 namespace message {
@@ -59,6 +63,8 @@ using io_error_t = r::message_t<payload::io_error_t>;
 
 using model_request_t = r::request_traits_t<payload::model_request_t>::request::message_t;
 using model_response_t = r::request_traits_t<payload::model_request_t>::response::message_t;
+
+using write_ack_t = r::message_t<payload::write_ack_t>;
 
 } // namespace message
 

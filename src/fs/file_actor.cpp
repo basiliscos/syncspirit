@@ -236,6 +236,7 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, v
     auto block_index = diff.block_index;
     auto offset = file->get_block_offset(block_index);
     auto &backend = file_opt.value();
+    send<model::payload::write_ack_t>(coordinator);
     return backend->write(offset, diff.data);
 }
 

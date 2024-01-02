@@ -56,6 +56,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&controller_actor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&controller_actor_t::on_block_update, coordinator);
+                plugin->subscribe_actor(&controller_actor_t::on_write_ack, coordinator);
             }
         });
     });
@@ -194,13 +195,11 @@ void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
     bool ignore = (rx_blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
                   || (state != r::state_t::OPERATIONAL) // wrequest pool sz = 32505856e are shutting down
         ;
-    //|| (!file_iterator && !block_iterator && blocks_requested)    // done
-
     if (ignore) {
         return;
     }
 
-    if (file && file->get_size() && file->local_file()) {
+    if (file && file->get_size() && file->local_file() && cluster->get_write_requests()) {
         auto reset_block = !(substate & substate_t::iterating_blocks);
         auto block = next_block(reset_block);
         if (block) {
@@ -246,6 +245,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1);
         auto diff = block_diff_ptr_t(new modify::clone_block_t(file_block));
         send<model::payload::block_update_t>(coordinator, std::move(diff), this);
+        cluster->modify_write_requests(-1);
     } else {
         auto block = file_block.block();
         auto sz = block->get_size();
@@ -597,9 +597,17 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
             auto &data = block_res->payload.res.data;
             auto index = payload.block.block_index();
 
-            LOG_TRACE(log, "{}, {}, got block {}", identity, file->get_name(), index);
+            LOG_TRACE(log, "{}, {}, got block {}, write requests left = {}", identity, file->get_name(), index,
+                      cluster->get_write_requests());
             auto diff = block_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
             send<model::payload::block_update_t>(coordinator, std::move(diff), this);
+            cluster->modify_write_requests(-1);
         }
+    }
+}
+
+void controller_actor_t::on_write_ack(model::message::write_ack_t &message) noexcept {
+    if (message.payload.custom == this) {
+        pull_ready();
     }
 }

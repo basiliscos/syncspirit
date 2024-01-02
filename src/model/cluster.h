@@ -3,11 +3,6 @@
 
 #pragma once
 
-#include <vector>
-#include <random>
-#include <forward_list>
-#include <boost/uuid/random_generator.hpp>
-#include <unordered_map>
 #include "misc/arc.hpp"
 #include "misc/uuid.h"
 #include "device.h"
@@ -18,12 +13,18 @@
 #include "block_info.h"
 #include "diff/cluster_diff.h"
 
+#include <vector>
+#include <random>
+#include <forward_list>
+#include <boost/uuid/random_generator.hpp>
+#include <unordered_map>
+
 namespace syncspirit::model {
 
 struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     using unknown_folders_t = std::forward_list<unknown_folder_ptr_t>;
 
-    cluster_t(device_ptr_t device_, size_t seed) noexcept;
+    cluster_t(device_ptr_t device_, size_t seed, int32_t write_requests) noexcept;
 
     proto::ClusterConfig generate(const model::device_t &target) const noexcept;
     inline const device_ptr_t &get_device() const noexcept { return device; }
@@ -42,6 +43,8 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     uint64_t next_uint64() noexcept;
     inline bool is_tainted() const noexcept { return tainted; }
     inline void mark_tainted() noexcept { tainted = true; }
+    int32_t get_write_requests() const noexcept;
+    void modify_write_requests(int32_t delta) noexcept;
 
     outcome::result<diff::cluster_diff_ptr_t> process(proto::ClusterConfig &msg, const device_t &peer) const noexcept;
     outcome::result<diff::cluster_diff_ptr_t> process(proto::Index &msg, const device_t &peer) const noexcept;
@@ -63,6 +66,7 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     ignored_folders_map_t ignored_folders;
     unknown_folders_t unknown_folders;
     bool tainted = false;
+    int32_t write_requests;
 };
 
 using cluster_ptr_t = intrusive_ptr_t<cluster_t>;

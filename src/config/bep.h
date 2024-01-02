@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -15,6 +15,7 @@ struct bep_config_t {
     std::uint32_t tx_timeout;
     std::uint32_t rx_timeout;
     std::uint32_t blocks_max_requested;
+    std::uint32_t blocks_simultaneous_write;
 };
 
 } // namespace syncspirit::config
