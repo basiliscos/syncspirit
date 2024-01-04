@@ -11,8 +11,10 @@
 #include "hasher/messages.h"
 #include "utils/log.h"
 #include "fs/messages.h"
+
 #include <unordered_set>
 #include <optional>
+#include <deque>
 
 namespace syncspirit {
 namespace net {
@@ -104,6 +106,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using unlink_request_t = r::message::unlink_request_t;
     using unlink_request_ptr_t = r::intrusive_ptr_t<unlink_request_t>;
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
+    using block_write_queue_t = std::deque<model::diff::block_diff_ptr_t>;
 
     void on_termination(message::termination_signal_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
@@ -128,6 +131,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void pull_ready() noexcept;
     void push_pending() noexcept;
     void send_cluster_config() noexcept;
+    void push_block_write(model::diff::block_diff_ptr_t block) noexcept;
+    void process_block_write() noexcept;
 
     model::file_info_ptr_t next_file(bool reset) noexcept;
     model::file_block_t next_block(bool reset) noexcept;
@@ -170,6 +175,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     int substate = substate_t::none;
     locked_files_t locked_files;
     locked_files_t locally_locked_files;
+    block_write_queue_t block_write_queue;
 };
 
 } // namespace net

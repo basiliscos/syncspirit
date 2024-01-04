@@ -244,8 +244,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
         LOG_TRACE(log, "{} cloning locally available block, file = {}, block index = {} / {}", identity,
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1);
         auto diff = block_diff_ptr_t(new modify::clone_block_t(file_block));
-        send<model::payload::block_update_t>(coordinator, std::move(diff), this);
-        cluster->modify_write_requests(-1);
+        push_block_write(std::move(diff));
     } else {
         auto block = file_block.block();
         auto sz = block->get_size();
@@ -600,14 +599,35 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
             LOG_TRACE(log, "{}, {}, got block {}, write requests left = {}", identity, file->get_name(), index,
                       cluster->get_write_requests());
             auto diff = block_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
-            send<model::payload::block_update_t>(coordinator, std::move(diff), this);
-            cluster->modify_write_requests(-1);
+            push_block_write(std::move(diff));
         }
     }
 }
 
 void controller_actor_t::on_write_ack(model::message::write_ack_t &message) noexcept {
     if (message.payload.custom == this) {
+        process_block_write();
         pull_ready();
+    }
+}
+
+void controller_actor_t::push_block_write(model::diff::block_diff_ptr_t diff) noexcept {
+    block_write_queue.emplace_back(std::move(diff));
+    process_block_write();
+}
+
+void controller_actor_t::process_block_write() noexcept {
+    auto requests_left = cluster->get_write_requests();
+    auto sent = 0;
+    while (requests_left > 0 && !block_write_queue.empty()) {
+        auto &diff = block_write_queue.front();
+        send<model::payload::block_update_t>(coordinator, std::move(diff), this);
+        --requests_left;
+        ++sent;
+        block_write_queue.pop_front();
+    }
+    if (sent) {
+        LOG_TRACE(log, "{}, {} block writes sent, requests left = {}", identity, sent, requests_left);
+        cluster->modify_write_requests(-sent);
     }
 }
