@@ -14,6 +14,11 @@
 
 using namespace syncspirit::fs;
 
+file_actor_t::write_ack_t::write_ack_t(r::actor_base_t *actor_, r::address_ptr_t coordinator_)
+    : actor{actor_}, coordinator{std::move(coordinator_)} {}
+
+file_actor_t::write_ack_t::~write_ack_t() { actor->send<model::payload::write_ack_t>(coordinator); }
+
 file_actor_t::file_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, cluster{cfg.cluster}, rw_cache(cfg.mru_size), ro_cache(cfg.mru_size) {
     log = utils::get_logger("fs.file_actor");
@@ -221,6 +226,7 @@ auto file_actor_t::operator()(const model::diff::modify::flush_file_t &diff, voi
 
 auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, void *) noexcept
     -> outcome::result<void> {
+    auto ack = write_ack();
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = file_info->get_file_infos().by_name(diff.file_name);
@@ -236,12 +242,12 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, v
     auto block_index = diff.block_index;
     auto offset = file->get_block_offset(block_index);
     auto &backend = file_opt.value();
-    send<model::payload::write_ack_t>(coordinator);
     return backend->write(offset, diff.data);
 }
 
 auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, void *) noexcept
     -> outcome::result<void> {
+    auto ack = write_ack();
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto target_folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto target = target_folder_info->get_file_infos().by_name(diff.file_name);
@@ -334,3 +340,5 @@ auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept 
     }
     return file_ptr_t(new file_t(std::move(opt.assume_value())));
 }
+
+auto file_actor_t::write_ack() noexcept -> write_ack_t { return write_ack_t(this, coordinator); }
