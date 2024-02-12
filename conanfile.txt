@@ -1,13 +1,13 @@
 
 [requires]
 openssl/1.1.1s
-boost/1.81.0
+boost/1.83.0
 lz4/1.9.4
 nlohmann_json/3.11.2
 protobuf/3.21.9
 pugixml/1.13
-rotor/0.25
-spdlog/1.11.0
+rotor/0.28
+spdlog/1.13.0
 tomlplusplus/3.3.0
 uriparser/0.9.7
 zlib/1.2.13
