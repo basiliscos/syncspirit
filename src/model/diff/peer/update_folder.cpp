@@ -10,9 +10,8 @@ using namespace syncspirit::model::diff::peer;
 
 update_folder_t::update_folder_t(std::string_view folder_id_, std::string_view peer_id_, files_t files_,
                                  blocks_t blocks_, bool amssi) noexcept
-    : folder_id{std::string(folder_id_)}, peer_id{std::string(peer_id_)}, files{std::move(files_)}, blocks{std::move(
-                                                                                                        blocks_)},
-      allow_max_sequence_increase(amssi) {}
+    : folder_id{std::string(folder_id_)}, peer_id{std::string(peer_id_)}, files{std::move(files_)},
+      blocks{std::move(blocks_)}, allow_max_sequence_increase(amssi) {}
 
 auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);

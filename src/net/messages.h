@@ -83,8 +83,8 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     template <typename URI>
     http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
                    bool local_ip_, const r::message_ptr_t &custom_ = {})
-        : url{std::forward<URI>(url_)}, data{std::move(data_)}, rx_buff{rx_buff_},
-          rx_buff_size{rx_buff_size_}, local_ip{local_ip_}, custom{custom_} {}
+        : url{std::forward<URI>(url_)}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_},
+          local_ip{local_ip_}, custom{custom_} {}
 
     template <typename URI>
     http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "diff-builder.h"
 #include "model/messages.h"
 #include "model/diff/modify/append_block.h"
+#include "model/diff/modify/block_acknowledge.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/create_folder.h"
@@ -15,6 +16,8 @@
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
+
+#include <algorithm>
 
 using namespace syncspirit::test;
 using namespace syncspirit::model;
@@ -65,37 +68,46 @@ diff_builder_t::diff_builder_t(model::cluster_t &cluster_) noexcept : cluster{cl
 
 diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
     assert(!(diffs.empty() && bdiffs.empty()));
-    auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
-    auto &addr = sup.get_address();
-    sup.send<model::payload::model_update_t>(addr, std::move(diff), nullptr);
-    diffs.clear();
 
-    for (auto &diff : bdiffs) {
-        sup.send<model::payload::block_update_t>(addr, std::move(diff), nullptr);
+    while (!(diffs.empty() && bdiffs.empty())) {
+        auto diffs_vector = diff::aggregate_t::diffs_t{};
+        std::move(diffs.begin(), diffs.end(), std::back_insert_iterator(diffs_vector));
+        auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs_vector)));
+        auto &addr = sup.get_address();
+        sup.send<model::payload::model_update_t>(addr, std::move(diff), nullptr);
+        diffs.clear();
+
+        for (auto &diff : bdiffs) {
+            sup.send<model::payload::block_update_t>(addr, std::move(diff), nullptr);
+        }
+        bdiffs.clear();
+
+        sup.do_process();
     }
-    bdiffs.clear();
 
-    sup.do_process();
     return *this;
 }
 
 auto diff_builder_t::apply() noexcept -> outcome::result<void> {
     auto r = outcome::result<void>(outcome::success());
-    for (auto &d : diffs) {
+    while (!diffs.empty()) {
+        auto &d = diffs.front();
         r = d->apply(cluster);
         if (!r) {
             return r;
         }
+        diffs.pop_front();
     }
-    diffs.clear();
 
-    for (auto &d : bdiffs) {
+    while (!bdiffs.empty()) {
+        auto &d = bdiffs.front();
         r = d->apply(cluster);
         if (!r) {
             return r;
         }
+        bdiffs.pop_front();
     }
-    bdiffs.clear();
+
     return r;
 }
 
@@ -159,13 +171,19 @@ diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const p
     return *this;
 }
 
-diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target, size_t block_index,
-                                             std::string data) noexcept {
-    bdiffs.emplace_back(new diff::modify::append_block_t(target, block_index, std::move(data)));
+diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target, size_t block_index, std::string data,
+                                             dispose_callback_t callback) noexcept {
+    bdiffs.emplace_back(new diff::modify::append_block_t(target, block_index, std::move(data), std::move(callback)));
     return *this;
 }
 
-diff_builder_t &diff_builder_t::clone_block(const model::file_block_t &file_block) noexcept {
-    bdiffs.emplace_back(new diff::modify::clone_block_t(file_block));
+diff_builder_t &diff_builder_t::clone_block(const model::file_block_t &file_block,
+                                            dispose_callback_t callback) noexcept {
+    bdiffs.emplace_back(new diff::modify::clone_block_t(file_block, std::move(callback)));
+    return *this;
+}
+
+diff_builder_t &diff_builder_t::ack_block(const model::diff::modify::block_transaction_t &diff) noexcept {
+    bdiffs.emplace_back(new diff::modify::block_acknowledge_t(diff));
     return *this;
 }

@@ -12,8 +12,8 @@
 using namespace syncspirit::net;
 
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
-    : ra::supervisor_asio_t{config}, bep_config{config.bep_config},
-      hasher_threads{config.hasher_threads}, cluster{config.cluster} {
+    : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, hasher_threads{config.hasher_threads},
+      cluster{config.cluster} {
     log = utils::get_logger("net.cluster");
 }
 

@@ -23,12 +23,12 @@ template <typename Actor> struct ssdp_actor_config_builder_t : r::actor_config_b
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&upnp_config(const config::upnp_config_t &value) &&noexcept {
+    builder_t &&upnp_config(const config::upnp_config_t &value) && noexcept {
         parent_t::config.upnp_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

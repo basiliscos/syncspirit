@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
 #include <boost/filesystem.hpp>
 #include <boost/outcome.hpp>
 #include <rotor/supervisor.h>
+#include <deque>
 
 #include "syncspirit-test-export.h"
 #include "model/device.h"
@@ -13,6 +14,7 @@
 #include "model/diff/cluster_diff.h"
 #include "model/diff/block_diff.h"
 #include "model/diff/aggregate.h"
+#include "model/diff/modify/block_transaction.h"
 
 namespace syncspirit::test {
 
@@ -46,6 +48,7 @@ struct SYNCSPIRIT_TEST_API index_maker_t {
 
 struct SYNCSPIRIT_TEST_API diff_builder_t {
     using blocks_t = std::vector<proto::BlockInfo>;
+    using dispose_callback_t = model::diff::modify::block_transaction_t::dispose_callback_t;
 
     diff_builder_t(model::cluster_t &) noexcept;
     diff_builder_t &apply(r::supervisor_t &sup) noexcept;
@@ -62,12 +65,14 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &finish_file(const model::file_info_t &source) noexcept;
     diff_builder_t &flush_file(const model::file_info_t &source) noexcept;
     diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
-    diff_builder_t &append_block(const model::file_info_t &target, size_t block_index, std::string data) noexcept;
-    diff_builder_t &clone_block(const model::file_block_t &) noexcept;
+    diff_builder_t &append_block(const model::file_info_t &target, size_t block_index, std::string data,
+                                 dispose_callback_t) noexcept;
+    diff_builder_t &clone_block(const model::file_block_t &, dispose_callback_t) noexcept;
+    diff_builder_t &ack_block(const model::diff::modify::block_transaction_t &) noexcept;
 
   private:
-    using bdiffs_t = std::vector<model::diff::block_diff_ptr_t>;
-    using diffs_t = model::diff::aggregate_t::diffs_t;
+    using bdiffs_t = std::deque<model::diff::block_diff_ptr_t>;
+    using diffs_t = std::deque<model::diff::cluster_diff_ptr_t>;
     model::cluster_t &cluster;
     diffs_t diffs;
     bdiffs_t bdiffs;

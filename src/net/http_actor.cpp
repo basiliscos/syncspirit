@@ -16,8 +16,8 @@ r::plugin::resource_id_t resolver = 2;
 } // namespace
 
 http_actor_t::http_actor_t(config_t &config)
-    : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout),
-      request_timeout(config.request_timeout), registry_name{config.registry_name}, keep_alive{config.keep_alive} {
+    : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout), request_timeout(config.request_timeout),
+      registry_name{config.registry_name}, keep_alive{config.keep_alive} {
     log = utils::get_logger("net.http");
 }
 

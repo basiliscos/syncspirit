@@ -46,7 +46,7 @@ template <typename Actor> struct resolver_actor_config_builder_t : r::actor_conf
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&resolve_timeout(const pt::time_duration &value) &&noexcept {
+    builder_t &&resolve_timeout(const pt::time_duration &value) && noexcept {
         parent_t::config.resolve_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

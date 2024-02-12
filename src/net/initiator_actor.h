@@ -33,57 +33,57 @@ template <typename Actor> struct initiator_actor_config_builder_t : r::actor_con
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&peer_device_id(const model::device_id_t &value) &&noexcept {
+    builder_t &&peer_device_id(const model::device_id_t &value) && noexcept {
         parent_t::config.peer_device_id = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&uris(const utils::uri_container_t &value) &&noexcept {
+    builder_t &&uris(const utils::uri_container_t &value) && noexcept {
         parent_t::config.uris = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&relay_session(const std::string &value) &&noexcept {
+    builder_t &&relay_session(const std::string &value) && noexcept {
         parent_t::config.relay_session = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&ssl_pair(const utils::key_pair_t *value) &&noexcept {
+    builder_t &&ssl_pair(const utils::key_pair_t *value) && noexcept {
         parent_t::config.ssl_pair = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&sock(tcp_socket_t value) &&noexcept {
+    builder_t &&sock(tcp_socket_t value) && noexcept {
         parent_t::config.sock = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&sink(const r::address_ptr_t &value) &&noexcept {
+    builder_t &&sink(const r::address_ptr_t &value) && noexcept {
         parent_t::config.sink = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&custom(r::message_ptr_t value) &&noexcept {
+    builder_t &&custom(r::message_ptr_t value) && noexcept {
         parent_t::config.custom = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&router(r::supervisor_t &value) &&noexcept {
+    builder_t &&router(r::supervisor_t &value) && noexcept {
         parent_t::config.router = &value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&alpn(std::string_view value) &&noexcept {
+    builder_t &&alpn(std::string_view value) && noexcept {
         parent_t::config.alpn = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&relay_enabled(bool value) &&noexcept {
+    builder_t &&relay_enabled(bool value) && noexcept {
         parent_t::config.relay_enabled = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -39,12 +39,12 @@ template <typename Actor> struct file_actor_config_builder_t : r::actor_config_b
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&mru_size(size_t value) &&noexcept {
+    builder_t &&mru_size(size_t value) && noexcept {
         parent_t::config.mru_size = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -66,10 +66,13 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t,
     using cache_t = model::mru_list_t<file_ptr_t>;
 
     struct write_ack_t {
-        write_ack_t(r::actor_base_t *actor, r::address_ptr_t coordinator);
+        write_ack_t(const model::diff::modify::block_transaction_t &txn) noexcept;
         ~write_ack_t();
-        r::actor_base_t *actor;
-        r::address_ptr_t coordinator;
+
+        outcome::result<void> operator()(outcome::result<void> result) noexcept;
+
+        const model::diff::modify::block_transaction_t &txn;
+        bool success;
     };
 
     void on_model_update(model::message::model_update_t &message) noexcept;
@@ -85,7 +88,6 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t,
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
 
     outcome::result<void> reflect(model::file_info_ptr_t &file) noexcept;
-    write_ack_t write_ack() noexcept;
 
     model::cluster_ptr_t cluster;
     utils::logger_t log;

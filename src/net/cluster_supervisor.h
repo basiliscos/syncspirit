@@ -32,17 +32,17 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
     using parent_t = ra::supervisor_config_asio_builder_t<Supervisor>;
     using parent_t::parent_t;
 
-    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
+    builder_t &&bep_config(const config::bep_config_t &value) && noexcept {
         parent_t::config.bep_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&hasher_threads(std::uint32_t value) &&noexcept {
+    builder_t &&hasher_threads(std::uint32_t value) && noexcept {
         parent_t::config.hasher_threads = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

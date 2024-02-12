@@ -3,18 +3,19 @@
 
 #pragma once
 
+#include "../block_diff.h"
 #include "block_transaction.h"
 #include "model/file_info.h"
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API append_block_t final : block_transaction_t {
+struct SYNCSPIRIT_API block_acknowledge_t final : block_diff_t {
+    using parent_t = block_diff_t;
 
-    append_block_t(const file_info_t &file, size_t block_index, std::string data, dispose_callback_t callback) noexcept;
+    block_acknowledge_t(const block_transaction_t &) noexcept;
 
+    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(block_visitor_t &, void *) const noexcept override;
-
-    std::string data;
 };
 
 } // namespace syncspirit::model::diff::modify

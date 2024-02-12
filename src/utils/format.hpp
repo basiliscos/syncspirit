@@ -47,6 +47,6 @@ template <> struct fmt::formatter<syncspirit::model::device_id_t> {
     constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
 
     auto format(const device_id_t &device_id, format_context &ctx) -> format_context::iterator {
-        return format_to(ctx.out(), "{}", device_id.get_short());
+        return fmt::format_to(ctx.out(), "{}", device_id.get_short());
     }
 };

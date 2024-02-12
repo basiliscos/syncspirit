@@ -81,8 +81,8 @@ template <> struct base_impl_t<tcp_socket_t> {
     }
 
     base_impl_t(transport_config_t &config) noexcept
-        : supervisor{config.supervisor}, strand{supervisor.get_strand()},
-          sock(mk_sock(config, strand)), active{config.active} {}
+        : supervisor{config.supervisor}, strand{supervisor.get_strand()}, sock(mk_sock(config, strand)),
+          active{config.active} {}
 
     tcp_socket_t &get_physical_layer() noexcept { return sock; }
 };

@@ -32,32 +32,32 @@ template <typename Actor> struct global_discovery_actor_config_builder_t : r::ac
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&announce_url(const utils::URI &value) &&noexcept {
+    builder_t &&announce_url(const utils::URI &value) && noexcept {
         parent_t::config.announce_url = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&ssl_pair(const utils::key_pair_t *value) &&noexcept {
+    builder_t &&ssl_pair(const utils::key_pair_t *value) && noexcept {
         parent_t::config.ssl_pair = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&rx_buff_size(const std::uint32_t value) &&noexcept {
+    builder_t &&rx_buff_size(const std::uint32_t value) && noexcept {
         parent_t::config.rx_buff_size = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&io_timeout(const std::uint32_t value) &&noexcept {
+    builder_t &&io_timeout(const std::uint32_t value) && noexcept {
         parent_t::config.io_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&device_id(const model::device_id_t &value) &&noexcept {
+    builder_t &&device_id(const model::device_id_t &value) && noexcept {
         parent_t::config.device_id = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

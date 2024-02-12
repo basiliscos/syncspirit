@@ -25,27 +25,27 @@ template <typename Actor> struct upnp_actor_config_builder_t : r::actor_config_b
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&descr_url(const utils::URI &value) &&noexcept {
+    builder_t &&descr_url(const utils::URI &value) && noexcept {
         parent_t::config.descr_url = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&external_port(std::uint16_t value) &&noexcept {
+    builder_t &&external_port(std::uint16_t value) && noexcept {
         parent_t::config.external_port = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&rx_buff_size(std::uint32_t value) &&noexcept {
+    builder_t &&rx_buff_size(std::uint32_t value) && noexcept {
         parent_t::config.rx_buff_size = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&debug(bool value) &&noexcept {
+    builder_t &&debug(bool value) && noexcept {
         parent_t::config.debug = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

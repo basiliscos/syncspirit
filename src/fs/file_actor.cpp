@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "file_actor.h"
 #include "net/names.h"
@@ -14,10 +14,19 @@
 
 using namespace syncspirit::fs;
 
-file_actor_t::write_ack_t::write_ack_t(r::actor_base_t *actor_, r::address_ptr_t coordinator_)
-    : actor{actor_}, coordinator{std::move(coordinator_)} {}
+file_actor_t::write_ack_t::write_ack_t(const model::diff::modify::block_transaction_t &txn_) noexcept
+    : txn{txn_}, success{false} {}
 
-file_actor_t::write_ack_t::~write_ack_t() { actor->send<model::payload::write_ack_t>(coordinator); }
+auto file_actor_t::write_ack_t::operator()(outcome::result<void> result) noexcept -> outcome::result<void> {
+    success = (bool)result;
+    return result;
+}
+
+file_actor_t::write_ack_t::~write_ack_t() {
+    if (!success) {
+        ++txn.errors;
+    }
+}
 
 file_actor_t::file_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, cluster{cfg.cluster}, rw_cache(cfg.mru_size), ro_cache(cfg.mru_size) {
@@ -226,7 +235,7 @@ auto file_actor_t::operator()(const model::diff::modify::flush_file_t &diff, voi
 
 auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, void *) noexcept
     -> outcome::result<void> {
-    auto ack = write_ack();
+    auto ack = write_ack_t(diff);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = file_info->get_file_infos().by_name(diff.file_name);
@@ -242,12 +251,12 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, v
     auto block_index = diff.block_index;
     auto offset = file->get_block_offset(block_index);
     auto &backend = file_opt.value();
-    return backend->write(offset, diff.data);
+    return ack(backend->write(offset, diff.data));
 }
 
 auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, void *) noexcept
     -> outcome::result<void> {
-    auto ack = write_ack();
+    auto ack = write_ack_t(diff);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto target_folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto target = target_folder_info->get_file_infos().by_name(diff.file_name);
@@ -288,7 +297,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     auto &block = source->get_blocks().at(diff.source_block_index);
     auto target_offset = target->get_block_offset(diff.block_index);
     auto source_offset = source->get_block_offset(diff.source_block_index);
-    return target_backend->copy(target_offset, *source_backend, source_offset, block->get_size());
+    return ack(target_backend->copy(target_offset, *source_backend, source_offset, block->get_size()));
 }
 
 auto file_actor_t::open_file_rw(const boost::filesystem::path &path, model::file_info_ptr_t info) noexcept
@@ -340,5 +349,3 @@ auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept 
     }
     return file_ptr_t(new file_t(std::move(opt.assume_value())));
 }
-
-auto file_actor_t::write_ack() noexcept -> write_ack_t { return write_ack_t(this, coordinator); }

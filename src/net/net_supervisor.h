@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -30,12 +30,12 @@ struct net_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<Su
     using parent_t = ra::supervisor_config_asio_builder_t<Supervisor>;
     using parent_t::parent_t;
 
-    builder_t &&app_config(const config::main_t &value) &&noexcept {
+    builder_t &&app_config(const config::main_t &value) && noexcept {
         parent_t::config.app_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster_copies(size_t value) &&noexcept {
+    builder_t &&cluster_copies(size_t value) && noexcept {
         parent_t::config.cluster_copies = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -60,7 +60,6 @@ struct SYNCSPIRIT_API net_supervisor_t : public ra::supervisor_asio_t, private m
     void on_block_update(model::message::block_update_t &message) noexcept;
     void on_contact_update(model::message::contact_update_t &message) noexcept;
     void on_model_request(model::message::model_request_t &message) noexcept;
-    void on_write_ack(model::message::write_ack_t &message) noexcept;
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
     void launch_early() noexcept;

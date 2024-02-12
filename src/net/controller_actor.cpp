@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "controller_actor.h"
 #include "names.h"
 #include "constants.h"
 #include "model/diff/aggregate.h"
 #include "model/diff/modify/append_block.h"
+#include "model/diff/modify/block_acknowledge.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/local_update.h"
@@ -56,7 +57,6 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&controller_actor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&controller_actor_t::on_block_update, coordinator);
-                plugin->subscribe_actor(&controller_actor_t::on_write_ack, coordinator);
             }
         });
     });
@@ -243,7 +243,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
     if (file_block.is_locally_available()) {
         LOG_TRACE(log, "{} cloning locally available block, file = {}, block index = {} / {}", identity,
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1);
-        auto diff = block_diff_ptr_t(new modify::clone_block_t(file_block));
+        auto diff = block_diff_ptr_t(new modify::clone_block_t(file_block, make_callback()));
         push_block_write(std::move(diff));
     } else {
         auto block = file_block.block();
@@ -598,18 +598,21 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
 
             LOG_TRACE(log, "{}, {}, got block {}, write requests left = {}", identity, file->get_name(), index,
                       cluster->get_write_requests());
-            auto diff = block_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
+            auto diff = block_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data), make_callback()));
             push_block_write(std::move(diff));
         }
     }
 }
 
+#if 0
 void controller_actor_t::on_write_ack(model::message::write_ack_t &message) noexcept {
+    cluster->modify_write_requests(1);
     if (message.payload.custom == this) {
         process_block_write();
         pull_ready();
     }
 }
+#endif
 
 void controller_actor_t::push_block_write(model::diff::block_diff_ptr_t diff) noexcept {
     block_write_queue.emplace_back(std::move(diff));
@@ -629,5 +632,23 @@ void controller_actor_t::process_block_write() noexcept {
     if (sent) {
         LOG_TRACE(log, "{}, {} block writes sent, requests left = {}", identity, sent, requests_left);
         cluster->modify_write_requests(-sent);
+    }
+}
+
+auto controller_actor_t::make_callback() noexcept -> dispose_callback_t {
+    using pointer_t = r::intrusive_ptr_t<controller_actor_t>;
+    return [self = pointer_t(this)](model::diff::modify::block_transaction_t &diff) { self->on_block_dispose(diff); };
+}
+
+void controller_actor_t::on_block_dispose(const model::diff::modify::block_transaction_t &source_diff) noexcept {
+    if (!source_diff.errors) {
+        auto diff = model::diff::block_diff_ptr_t{};
+        diff = new model::diff::modify::block_acknowledge_t(source_diff);
+        send<model::payload::block_update_t>(coordinator, std::move(diff), this);
+        cluster->modify_write_requests(1);
+        process_block_write();
+        pull_ready();
+    } else {
+        LOG_ERROR(log, "{} on_block_dispose, TODO: not implemented", identity);
     }
 }

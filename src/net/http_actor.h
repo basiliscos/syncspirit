@@ -26,22 +26,22 @@ template <typename Actor> struct http_actor_config_builder_t : r::actor_config_b
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&resolve_timeout(const pt::time_duration &value) &&noexcept {
+    builder_t &&resolve_timeout(const pt::time_duration &value) && noexcept {
         parent_t::config.resolve_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&request_timeout(const pt::time_duration &value) &&noexcept {
+    builder_t &&request_timeout(const pt::time_duration &value) && noexcept {
         parent_t::config.request_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&registry_name(const std::string &value) &&noexcept {
+    builder_t &&registry_name(const std::string &value) && noexcept {
         parent_t::config.registry_name = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&keep_alive(bool value = true) &&noexcept {
+    builder_t &&keep_alive(bool value = true) && noexcept {
         parent_t::config.keep_alive = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
-#include "../block_diff.h"
+#include "block_transaction.h"
 #include "model/misc/file_block.h"
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API clone_block_t final : block_diff_t {
-    clone_block_t(const file_block_t &file_block) noexcept;
+struct SYNCSPIRIT_API clone_block_t final : block_transaction_t {
+    clone_block_t(const file_block_t &file_block, dispose_callback_t callback) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(block_visitor_t &, void *) const noexcept override;
 
     std::string source_device_id;

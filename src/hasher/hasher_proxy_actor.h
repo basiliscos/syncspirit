@@ -22,12 +22,12 @@ template <typename Actor> struct hasher_proxy_actor_config_builder_t : r::actor_
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&hasher_threads(uint32_t value) &&noexcept {
+    builder_t &&hasher_threads(uint32_t value) && noexcept {
         parent_t::config.hasher_threads = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&name(std::string_view value) &&noexcept {
+    builder_t &&name(std::string_view value) && noexcept {
         parent_t::config.name = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

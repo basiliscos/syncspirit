@@ -33,42 +33,42 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&peer_device_id(const model::device_id_t &value) &&noexcept {
+    builder_t &&peer_device_id(const model::device_id_t &value) && noexcept {
         parent_t::config.peer_device_id = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&device_name(std::string_view value) &&noexcept {
+    builder_t &&device_name(std::string_view value) && noexcept {
         parent_t::config.device_name = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
+    builder_t &&bep_config(const config::bep_config_t &value) && noexcept {
         parent_t::config.bep_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&coordinator(const r::address_ptr_t &value) &&noexcept {
+    builder_t &&coordinator(const r::address_ptr_t &value) && noexcept {
         parent_t::config.coordinator = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&transport(transport::stream_sp_t value) &&noexcept {
+    builder_t &&transport(transport::stream_sp_t value) && noexcept {
         parent_t::config.transport = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&peer_endpoint(const tcp::endpoint &value) &&noexcept {
+    builder_t &&peer_endpoint(const tcp::endpoint &value) && noexcept {
         parent_t::config.peer_endpoint = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&peer_proto(std::string value) &&noexcept {
+    builder_t &&peer_proto(std::string value) && noexcept {
         parent_t::config.peer_proto = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

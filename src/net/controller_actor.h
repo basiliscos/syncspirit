@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -8,6 +8,8 @@
 #include "model/misc/block_iterator.h"
 #include "model/misc/updates_streamer.h"
 #include "model/messages.h"
+#include "model/messages.h"
+#include "model/diff/modify/block_transaction.h"
 #include "hasher/messages.h"
 #include "utils/log.h"
 #include "fs/messages.h"
@@ -47,42 +49,42 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&request_pool(int64_t value) &&noexcept {
+    builder_t &&request_pool(int64_t value) && noexcept {
         parent_t::config.request_pool = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&peer(const model::device_ptr_t &value) &&noexcept {
+    builder_t &&peer(const model::device_ptr_t &value) && noexcept {
         parent_t::config.peer = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&peer_addr(const r::address_ptr_t &value) &&noexcept {
+    builder_t &&peer_addr(const r::address_ptr_t &value) && noexcept {
         parent_t::config.peer_addr = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&request_timeout(const pt::time_duration &value) &&noexcept {
+    builder_t &&request_timeout(const pt::time_duration &value) && noexcept {
         parent_t::config.request_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&blocks_max_kept(size_t value) &&noexcept {
+    builder_t &&blocks_max_kept(size_t value) && noexcept {
         parent_t::config.blocks_max_kept = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&blocks_max_requested(uint32_t value) &&noexcept {
+    builder_t &&blocks_max_requested(uint32_t value) && noexcept {
         parent_t::config.blocks_max_requested = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&outgoing_buffer_max(uint32_t value) &&noexcept {
+    builder_t &&outgoing_buffer_max(uint32_t value) && noexcept {
         parent_t::config.outgoing_buffer_max = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -107,6 +109,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using unlink_request_ptr_t = r::intrusive_ptr_t<unlink_request_t>;
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
     using block_write_queue_t = std::deque<model::diff::block_diff_ptr_t>;
+    using dispose_callback_t = model::diff::modify::block_transaction_t::dispose_callback_t;
 
     void on_termination(message::termination_signal_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
@@ -119,7 +122,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_transfer_push(message::transfer_push_t &message) noexcept;
     void on_transfer_pop(message::transfer_pop_t &message) noexcept;
     void on_block_response(fs::message::block_response_t &message) noexcept;
-    void on_write_ack(model::message::write_ack_t &message) noexcept;
+    void on_block_dispose(const model::diff::modify::block_transaction_t &) noexcept;
 
     void on_message(proto::message::ClusterConfig &message) noexcept;
     void on_message(proto::message::Index &message) noexcept;
@@ -133,6 +136,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void send_cluster_config() noexcept;
     void push_block_write(model::diff::block_diff_ptr_t block) noexcept;
     void process_block_write() noexcept;
+    dispose_callback_t make_callback() noexcept;
 
     model::file_info_ptr_t next_file(bool reset) noexcept;
     model::file_block_t next_block(bool reset) noexcept;

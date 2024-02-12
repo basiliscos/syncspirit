@@ -26,11 +26,11 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
     using parent_t = r::supervisor_config_builder_t<Supervisor>;
     using parent_t::parent_t;
 
-    builder_t &&fs_config(const config::fs_config_t &value) &&noexcept {
+    builder_t &&fs_config(const config::fs_config_t &value) && noexcept {
         parent_t::config.fs_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-    builder_t &&hasher_threads(uint32_t value) &&noexcept {
+    builder_t &&hasher_threads(uint32_t value) && noexcept {
         parent_t::config.hasher_threads = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

@@ -23,8 +23,8 @@ r::plugin::resource_id_t timer = 2;
 
 local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, frequency{r::pt::milliseconds(cfg.frequency)},
-      strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()},
-      broadcast_sock{strand.context()}, sock{strand.context()}, port{cfg.port}, cluster{cfg.cluster} {
+      strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, broadcast_sock{strand.context()},
+      sock{strand.context()}, port{cfg.port}, cluster{cfg.cluster} {
     log = utils::get_logger("net.local_discovery");
     rx_buff.resize(BUFF_SZ);
     tx_buff.resize(BUFF_SZ);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -14,6 +14,7 @@ struct file_info_t;
 namespace diff {
 
 struct SYNCSPIRIT_API block_diff_t : generic_diff_t<tag::block> {
+    block_diff_t(const block_diff_t &) noexcept;
     block_diff_t(const file_info_t &file, size_t block_index = 0) noexcept;
     virtual outcome::result<void> visit(block_visitor_t &, void *custom) const noexcept override;
 

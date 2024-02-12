@@ -41,27 +41,27 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
     using parent_t = ra::supervisor_config_asio_builder_t<Supervisor>;
     using parent_t::parent_t;
 
-    builder_t &&device_name(std::string_view value) &&noexcept {
+    builder_t &&device_name(std::string_view value) && noexcept {
         parent_t::config.device_name = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&ssl_pair(const utils::key_pair_t *value) &&noexcept {
+    builder_t &&ssl_pair(const utils::key_pair_t *value) && noexcept {
         parent_t::config.ssl_pair = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&bep_config(const config::bep_config_t &value) &&noexcept {
+    builder_t &&bep_config(const config::bep_config_t &value) && noexcept {
         parent_t::config.bep_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&relay_config(const config::relay_config_t &value) &&noexcept {
+    builder_t &&relay_config(const config::relay_config_t &value) && noexcept {
         parent_t::config.relay_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

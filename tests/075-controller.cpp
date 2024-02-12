@@ -34,7 +34,7 @@ template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&peer_device_id(const model::device_id_t &value) &&noexcept {
+    builder_t &&peer_device_id(const model::device_id_t &value) && noexcept {
         parent_t::config.peer_device_id = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

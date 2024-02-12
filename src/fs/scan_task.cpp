@@ -103,7 +103,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             auto &child = *it;
             sys::error_code ec;
             auto status = bfs::symlink_status(child, ec);
-            if (ec) {
+            if (ec && (status.type() != bfs::file_type::symlink_file)) {
                 errors.push_back(scan_error_t{child, ec});
                 continue;
             }

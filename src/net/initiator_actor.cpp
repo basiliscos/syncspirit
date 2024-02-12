@@ -30,9 +30,8 @@ r::plugin::resource_id_t write = 5;
 static constexpr size_t BUFF_SZ = 256;
 
 initiator_actor_t::initiator_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id},
-      relay_key(std::move(cfg.relay_session)), ssl_pair{*cfg.ssl_pair},
-      sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
+    : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, relay_key(std::move(cfg.relay_session)),
+      ssl_pair{*cfg.ssl_pair}, sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
       custom(std::move(cfg.custom)), router{*cfg.router}, alpn(cfg.alpn) {
     log = utils::get_logger("net.initator");
     auto tmp_identity = "init/unknown";

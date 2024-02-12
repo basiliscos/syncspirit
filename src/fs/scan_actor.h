@@ -31,22 +31,22 @@ template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_b
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&fs_config(const config::fs_config_t &value) &&noexcept {
+    builder_t &&fs_config(const config::fs_config_t &value) && noexcept {
         parent_t::config.fs_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&hasher_proxy(r::address_ptr_t &value) &&noexcept {
+    builder_t &&hasher_proxy(r::address_ptr_t &value) && noexcept {
         parent_t::config.hasher_proxy = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&requested_hashes_limit(uint32_t value) &&noexcept {
+    builder_t &&requested_hashes_limit(uint32_t value) && noexcept {
         parent_t::config.requested_hashes_limit = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

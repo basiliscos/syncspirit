@@ -81,7 +81,6 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_contact_update);
         p.subscribe_actor(&net_supervisor_t::on_load_cluster);
         p.subscribe_actor(&net_supervisor_t::on_model_request);
-        p.subscribe_actor(&net_supervisor_t::on_write_ack);
         launch_early();
     });
 }
@@ -363,5 +362,3 @@ void net_supervisor_t::on_start() noexcept {
         .escalate_failure()
         .finish();
 }
-
-void net_supervisor_t::on_write_ack(model::message::write_ack_t &) noexcept { cluster->modify_write_requests(1); }

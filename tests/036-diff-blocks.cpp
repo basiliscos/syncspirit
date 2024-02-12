@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
 #include "diff-builder.h"
 
-#include "model/diff/modify/append_block.h"
 #include "model/diff/modify/blocks_availability.h"
 
 using namespace syncspirit;
@@ -55,9 +54,13 @@ TEST_CASE("various block diffs", "[model]") {
     file->assign_block(bi2, 1);
     REQUIRE(!file->is_locally_available());
 
+    auto callback = [&](diff::modify::block_transaction_t &diff) {
+        REQUIRE(diff.errors.load() == 0);
+        builder.ack_block(diff);
+    };
+
     SECTION("append") {
-        auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 0, "12345"));
-        REQUIRE(bdiff->apply(*cluster));
+        REQUIRE(builder.append_block(*file, 0, "12345", callback).apply());
         auto &blocks = file->get_blocks();
 
         auto lf1 = blocks[0]->local_file();
@@ -84,7 +87,7 @@ TEST_CASE("various block diffs", "[model]") {
         b2->mark_local_available(source.get());
 
         auto fb = model::file_block_t(bi2.get(), file.get(), 1);
-        REQUIRE(builder.clone_block(fb).apply());
+        REQUIRE(builder.clone_block(fb, callback).apply());
 
         auto &blocks = file->get_blocks();
         auto lf1 = blocks[1]->local_file();
