@@ -725,6 +725,10 @@ void test_downloading() {
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_locked());
+
+                auto fp = folder_1_peer->get_file_infos().begin()->item;
+                REQUIRE(fp);
+                CHECK(!fp->is_locked());
             }
 
             SECTION("deleted file, has been restored => download it") {
@@ -839,6 +843,7 @@ void test_downloading() {
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_locked());
             }
+
         }
     };
     F(true, 10).run();

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "model/device.h"
 #include "model/device_id.h"
 #include <boost/asio/ip/basic_endpoint.hpp>
 #include <boost/filesystem/path.hpp>
@@ -48,5 +49,25 @@ template <> struct fmt::formatter<syncspirit::model::device_id_t> {
 
     auto format(const device_id_t &device_id, format_context &ctx) -> format_context::iterator {
         return fmt::format_to(ctx.out(), "{}", device_id.get_short());
+    }
+};
+
+template <> struct fmt::formatter<syncspirit::model::device_t> {
+    using device_t = syncspirit::model::device_t;
+
+    constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
+
+    auto format(const device_t &device, format_context &ctx) -> format_context::iterator {
+        return fmt::format_to(ctx.out(), "{}", device.device_id());
+    }
+};
+
+template <> struct fmt::formatter<syncspirit::model::device_ptr_t> {
+    using device_t = syncspirit::model::device_ptr_t;
+
+    constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
+
+    auto format(const device_t &device, format_context &ctx) -> format_context::iterator {
+        return fmt::format_to(ctx.out(), "{}", *device);
     }
 };

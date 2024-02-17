@@ -16,6 +16,7 @@ struct SYNCSPIRIT_API lock_file_t final : cluster_diff_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string folder_id;
+    std::string device_id;
     std::string file_name;
     bool locked;
 };

@@ -354,8 +354,8 @@ auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff
     } else {
         file->set_unlocking(false);
         auto it = locked_files.find(file);
+        assert(it != locked_files.end());
         locked_files.erase(it);
-        LOG_WARN(log, "{}, removing from locked_file {}", identity, file->get_name());
     }
     return outcome::success();
 }
@@ -404,7 +404,8 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
         auto &file_name = diff.file_name;
         auto folder = cluster->get_folders().by_id(folder_id);
         auto &folder_infos = folder->get_folder_infos();
-        auto folder_info = folder_infos.by_device(*cluster->get_device());
+        auto device = cluster->get_devices().by_sha256(diff.device_id);
+        auto folder_info = folder_infos.by_device(*device);
         auto file = folder_info->get_file_infos().by_name(file_name);
         auto diff = model::diff::cluster_diff_ptr_t{};
         file->set_unlocking(true);
