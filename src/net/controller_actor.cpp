@@ -98,7 +98,12 @@ void controller_actor_t::shutdown_finish() noexcept {
         using diffs_t = model::diff::aggregate_t::diffs_t;
         auto diffs = diffs_t{};
         for (auto &file : locked_files) {
-            diffs.push_back(new model::diff::modify::lock_file_t(*file, false));
+            if (!file->is_unlocking()) {
+                LOG_TRACE(log, "{}, going to unlock {} ({}); is_unlocking {}", identity, file->get_full_name(),
+                          (void *)file.get(), file->is_unlocking());
+                diffs.push_back(new model::diff::modify::lock_file_t(*file, false));
+            }
+            file->set_unlocking(false);
         }
         for (auto &file : locally_locked_files) {
             file->locally_unlock();
@@ -347,8 +352,10 @@ auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff
     if (diff.locked) {
         locked_files.emplace(std::move(file));
     } else {
+        file->set_unlocking(false);
         auto it = locked_files.find(file);
         locked_files.erase(it);
+        LOG_WARN(log, "{}, removing from locked_file {}", identity, file->get_name());
     }
     return outcome::success();
 }
@@ -400,6 +407,7 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
         auto folder_info = folder_infos.by_device(*cluster->get_device());
         auto file = folder_info->get_file_infos().by_name(file_name);
         auto diff = model::diff::cluster_diff_ptr_t{};
+        file->set_unlocking(true);
         diff = new model::diff::modify::lock_file_t(*file, false);
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
@@ -419,7 +427,8 @@ void controller_actor_t::on_block_update(model::message::block_update_t &message
             LOG_TRACE(log, "{}, on_block_update, finalizing {}", identity, source_file->get_name());
             auto my_file = source_file->local_file();
             auto diffs = diffs_t{};
-            diffs.push_back(new model::diff::modify::lock_file_t(*my_file, false));
+            source_file->set_unlocking(true);
+            diffs.push_back(new model::diff::modify::lock_file_t(*source_file, false));
             diffs.push_back(new model::diff::modify::finish_file_t(*my_file));
             auto diff = model::diff::cluster_diff_ptr_t{};
             diff = new model::diff::aggregate_t(std::move(diffs));

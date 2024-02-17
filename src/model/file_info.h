@@ -32,14 +32,17 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
 struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
 
+    // clang-format off
     enum flags_t {
-        f_deleted = 1 << 0,
-        f_invalid = 1 << 1,
+        f_deleted        = 1 << 0,
+        f_invalid        = 1 << 1,
         f_no_permissions = 1 << 2,
-        f_locked = 1 << 3,
-        f_local_locked = 1 << 4,
-        f_unreachable = 1 << 5,
+        f_locked         = 1 << 3,
+        f_local_locked   = 1 << 4,
+        f_unreachable    = 1 << 5,
+        f_unlocking      = 1 << 6,
     };
+    // clang-format on
 
     using blocks_t = std::vector<block_info_ptr_t>;
 
@@ -110,6 +113,9 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
     bool is_locally_locked() const noexcept;
     void locally_lock() noexcept;
     void locally_unlock() noexcept;
+
+    bool is_unlocking() const noexcept;
+    void set_unlocking(bool value) noexcept;
 
     proto::FileInfo get() const noexcept;
     file_info_ptr_t get_source() const noexcept;

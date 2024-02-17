@@ -316,6 +316,16 @@ void file_info_t::locally_lock() noexcept { flags |= flags_t::f_local_locked; }
 
 bool file_info_t::is_locally_locked() const noexcept { return flags & flags_t::f_local_locked; }
 
+bool file_info_t::is_unlocking() const noexcept { return flags & flags_t::f_unlocking; }
+
+void file_info_t::set_unlocking(bool value) noexcept {
+    if (value) {
+        flags |= flags_t::f_unlocking;
+    } else {
+        flags = flags & ~flags_t::f_unlocking;
+    }
+}
+
 void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t index) noexcept {
     assert(index < blocks.size() && "blocks should be reserve enough space");
     assert(!blocks[index]);
