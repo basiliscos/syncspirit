@@ -6,7 +6,7 @@ lz4/1.9.4
 nlohmann_json/3.11.2
 protobuf/3.21.9
 pugixml/1.13
-rotor/0.28
+rotor/0.29
 spdlog/1.13.0
 tomlplusplus/3.3.0
 uriparser/0.9.7
@@ -17,8 +17,8 @@ catch2/3.3.1
 
 [options]
 pugixml/1.13:no_exceptions=True
-rotor/0.25:enable_asio=True
-rotor/0.25:enable_thread=True
+rotor/0.29:enable_asio=True
+rotor/0.29:enable_thread=True
 
 [generators]
 CMakeDeps
