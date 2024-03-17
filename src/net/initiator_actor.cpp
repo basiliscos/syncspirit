@@ -344,7 +344,9 @@ void initiator_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const
     } else {
         peer_device_id = *peer_device;
         remote_endpoint = peer_endpoint;
-        resources->release(resource::initializing);
+        if (state <= r::state_t::OPERATIONAL) {
+            resources->release(resource::initializing);
+        }
     }
 }
 

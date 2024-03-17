@@ -283,7 +283,7 @@ void peer_actor_t::on_termination(message::termination_signal_t &message) noexce
     if (!shutdown_reason) {
         auto &ee = message.payload.ee;
         auto reason = ee->message();
-        LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
+        LOG_DEBUG(log, "{}, on_termination: {}", identity, reason);
         do_shutdown(ee);
     }
 }

@@ -253,7 +253,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
     } else {
         auto block = file_block.block();
         auto sz = block->get_size();
-        LOG_TRACE(log, "{} request_block on file'{}'; block index = {} / {}, sz = {}, request pool sz = {}", identity,
+        LOG_TRACE(log, "{} request_block on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}", identity,
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
         request<payload::block_request_t>(peer_addr, file, file_block).send(request_timeout);
         ++rx_blocks_requested;

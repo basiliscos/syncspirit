@@ -242,7 +242,6 @@ void net_supervisor_t::launch_net() noexcept {
         };
         spawn(factory)
             .restart_period(pt::seconds{5})
-            .restart_period(r::pt::seconds{10})
             .restart_policy(r::restart_policy_t::fail_only)
             .spawn();
     }
@@ -261,7 +260,6 @@ void net_supervisor_t::launch_net() noexcept {
         };
         spawn(factory)
             .restart_period(pt::seconds{5})
-            .restart_period(r::pt::seconds{10})
             .restart_policy(r::restart_policy_t::fail_only)
             .spawn();
     }
@@ -294,7 +292,6 @@ void net_supervisor_t::launch_net() noexcept {
         };
         spawn(factory)
             .restart_period(pt::seconds{5})
-            .restart_period(r::pt::seconds{10})
             .restart_policy(r::restart_policy_t::fail_only)
             .spawn();
     }
@@ -322,7 +319,6 @@ void net_supervisor_t::launch_net() noexcept {
         };
         spawn(factory)
             .restart_period(pt::seconds{5})
-            .restart_period(r::pt::seconds{10})
             .restart_policy(r::restart_policy_t::fail_only)
             .spawn();
     }
