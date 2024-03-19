@@ -83,7 +83,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t,
     outcome::result<file_ptr_t> open_file_ro(const bfs::path &path, bool use_cache = false) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::flush_file_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::finish_file_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
 

@@ -13,7 +13,11 @@ auto block_visitor_t::operator()(const modify::blocks_availability_t &, void *) 
     return outcome::success();
 }
 
-auto block_visitor_t::operator()(const modify::block_acknowledge_t &, void *) noexcept -> outcome::result<void> {
+auto block_visitor_t::operator()(const modify::block_ack_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto block_visitor_t::operator()(const modify::block_rej_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
 

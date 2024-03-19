@@ -21,7 +21,7 @@
 #include "model/diff/load/unknown_folders.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/clone_file.h"
-#include "model/diff/modify/finish_file.h"
+#include "model/diff/modify/finish_file_ack.h"
 #include "model/diff/modify/local_update.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
@@ -443,7 +443,8 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void 
     return commit(false);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, void *) noexcept
+    -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }

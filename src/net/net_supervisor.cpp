@@ -240,10 +240,7 @@ void net_supervisor_t::launch_net() noexcept {
                 .spawner_address(spawner)
                 .finish();
         };
-        spawn(factory)
-            .restart_period(pt::seconds{5})
-            .restart_policy(r::restart_policy_t::fail_only)
-            .spawn();
+        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
     }
 
     if (app_config.local_announce_config.enabled) {
@@ -258,10 +255,7 @@ void net_supervisor_t::launch_net() noexcept {
                 .spawner_address(spawner)
                 .finish();
         };
-        spawn(factory)
-            .restart_period(pt::seconds{5})
-            .restart_policy(r::restart_policy_t::fail_only)
-            .spawn();
+        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
     }
 
     if (app_config.global_announce_config.enabled) {
@@ -290,10 +284,7 @@ void net_supervisor_t::launch_net() noexcept {
                 .spawner_address(spawner)
                 .finish();
         };
-        spawn(factory)
-            .restart_period(pt::seconds{5})
-            .restart_policy(r::restart_policy_t::fail_only)
-            .spawn();
+        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
     }
 
     if (app_config.relay_config.enabled) {
@@ -317,10 +308,7 @@ void net_supervisor_t::launch_net() noexcept {
                 .spawner_address(spawner)
                 .finish();
         };
-        spawn(factory)
-            .restart_period(pt::seconds{5})
-            .restart_policy(r::restart_policy_t::fail_only)
-            .spawn();
+        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
     }
 
     auto timeout = shutdown_timeout * 9 / 10;

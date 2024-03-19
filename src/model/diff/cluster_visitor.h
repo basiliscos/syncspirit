@@ -24,7 +24,7 @@ struct clone_file_t;
 struct create_folder_t;
 struct file_availability_t;
 struct finish_file_t;
-struct flush_file_t;
+struct finish_file_ack_t;
 struct lock_file_t;
 struct mark_reachable_t;
 struct unshare_folder_t;
@@ -47,7 +47,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const modify::create_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::file_availability_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::finish_file_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const modify::flush_file_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::finish_file_ack_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::lock_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::mark_reachable_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::local_update_t &, void *custom) noexcept;

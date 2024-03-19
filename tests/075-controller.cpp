@@ -843,7 +843,6 @@ void test_downloading() {
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_locked());
             }
-
         }
     };
     F(true, 10).run();

@@ -4,12 +4,12 @@
 #include "diff-builder.h"
 #include "model/messages.h"
 #include "model/diff/modify/append_block.h"
-#include "model/diff/modify/block_acknowledge.h"
+#include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/finish_file.h"
-#include "model/diff/modify/flush_file.h"
+#include "model/diff/modify/finish_file_ack.h"
 #include "model/diff/modify/local_update.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
@@ -161,8 +161,8 @@ diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &source) no
     return *this;
 }
 
-diff_builder_t &diff_builder_t::flush_file(const model::file_info_t &source) noexcept {
-    diffs.emplace_back(new diff::modify::flush_file_t(source));
+diff_builder_t &diff_builder_t::finish_file_ack(const model::file_info_t &source) noexcept {
+    diffs.emplace_back(new diff::modify::finish_file_ack_t(source));
     return *this;
 }
 
@@ -184,6 +184,6 @@ diff_builder_t &diff_builder_t::clone_block(const model::file_block_t &file_bloc
 }
 
 diff_builder_t &diff_builder_t::ack_block(const model::diff::modify::block_transaction_t &diff) noexcept {
-    bdiffs.emplace_back(new diff::modify::block_acknowledge_t(diff));
+    bdiffs.emplace_back(new diff::modify::block_ack_t(diff));
     return *this;
 }

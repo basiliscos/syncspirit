@@ -54,10 +54,7 @@ void fs_supervisor_t::launch() noexcept {
             .spawner_address(spawner)
             .finish();
     };
-    spawn(factory)
-        .restart_period(r::pt::seconds{1})
-        .restart_policy(r::restart_policy_t::fail_only)
-        .spawn();
+    spawn(factory).restart_period(r::pt::seconds{1}).restart_policy(r::restart_policy_t::fail_only).spawn();
 
     auto timeout = shutdown_timeout * 9 / 10;
     auto hasher_addr = create_actor<hasher::hasher_proxy_actor_t>()

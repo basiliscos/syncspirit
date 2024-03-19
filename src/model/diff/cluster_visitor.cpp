@@ -53,7 +53,7 @@ auto cluster_visitor_t::operator()(const modify::finish_file_t &, void *) noexce
     return outcome::success();
 }
 
-auto cluster_visitor_t::operator()(const modify::flush_file_t &, void *) noexcept -> outcome::result<void> {
+auto cluster_visitor_t::operator()(const modify::finish_file_ack_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
 

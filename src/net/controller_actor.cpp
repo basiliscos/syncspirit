@@ -6,20 +6,20 @@
 #include "constants.h"
 #include "model/diff/aggregate.h"
 #include "model/diff/modify/append_block.h"
-#include "model/diff/modify/block_acknowledge.h"
+#include "model/diff/modify/block_ack.h"
+#include "model/diff/modify/block_rej.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/local_update.h"
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/finish_file.h"
-#include "model/diff/modify/flush_file.h"
+#include "model/diff/modify/finish_file_ack.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
-#include <fstream>
 
 using namespace syncspirit;
 using namespace syncspirit::net;
@@ -323,18 +323,13 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
     return outcome::success();
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
+auto controller_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*peer);
     auto file = folder_info->get_file_infos().by_name(diff.file_name);
     assert(file);
     updates_streamer.on_update(*file);
-    if (custom == this) {
-        auto update = model::diff::cluster_diff_ptr_t{};
-        update = new model::diff::modify::flush_file_t(*file);
-        send<model::payload::model_update_t>(coordinator, std::move(update), this);
-    }
     return outcome::success();
 }
 
@@ -416,13 +411,27 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
     return outcome::success();
 }
 
+auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    cluster->modify_write_requests(1);
+    process_block_write();
+    pull_ready();
+    return outcome::success();
+}
+
+auto controller_actor_t::operator()(const model::diff::modify::block_rej_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    LOG_ERROR(log, "{}, on block rej, not implemented", identity);
+    return outcome::success();
+}
+
 void controller_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
     if (message.payload.custom == this) {
         LOG_TRACE(log, "{}, on_block_update", identity);
-        auto &d = *message.payload.diff;
-        auto folder = cluster->get_folders().by_id(d.folder_id);
-        auto folder_info = folder->get_folder_infos().by_device_id(d.device_id);
-        auto source_file = folder_info->get_file_infos().by_name(d.file_name);
+        auto &diff = *message.payload.diff;
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
+        auto source_file = folder_info->get_file_infos().by_name(diff.file_name);
         if (source_file->is_locally_available()) {
             using diffs_t = model::diff::aggregate_t::diffs_t;
             LOG_TRACE(log, "{}, on_block_update, finalizing {}", identity, source_file->get_name());
@@ -434,6 +443,11 @@ void controller_actor_t::on_block_update(model::message::block_update_t &message
             auto diff = model::diff::cluster_diff_ptr_t{};
             diff = new model::diff::aggregate_t(std::move(diffs));
             send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+        }
+        auto r = diff.visit(*this, const_cast<void *>(message.payload.custom));
+        if (!r) {
+            auto ee = make_error(r.assume_error());
+            return do_shutdown(ee);
         }
     }
 }
@@ -647,18 +661,18 @@ void controller_actor_t::process_block_write() noexcept {
 
 auto controller_actor_t::make_callback() noexcept -> dispose_callback_t {
     using pointer_t = r::intrusive_ptr_t<controller_actor_t>;
-    return [self = pointer_t(this)](model::diff::modify::block_transaction_t &diff) { self->on_block_dispose(diff); };
-}
-
-void controller_actor_t::on_block_dispose(const model::diff::modify::block_transaction_t &source_diff) noexcept {
-    if (!source_diff.errors) {
+    auto address = coordinator;
+    auto sup = r::supervisor_ptr_t{supervisor};
+    return [sup = std::move(sup), address = std::move(address),
+            this](model::diff::modify::block_transaction_t &source_diff) {
+        bool ok = source_diff.errors.load() == 0;
         auto diff = model::diff::block_diff_ptr_t{};
-        diff = new model::diff::modify::block_acknowledge_t(source_diff);
-        send<model::payload::block_update_t>(coordinator, std::move(diff), this);
-        cluster->modify_write_requests(1);
-        process_block_write();
-        pull_ready();
-    } else {
-        LOG_ERROR(log, "{} on_block_dispose, TODO: not implemented", identity);
-    }
+        if (ok) {
+            diff = new model::diff::modify::block_ack_t(source_diff);
+        } else {
+            diff = new model::diff::modify::block_rej_t(source_diff);
+        }
+        auto msg = r::make_message<model::payload::block_update_t>(coordinator, std::move(diff), this);
+        sup->enqueue(std::move(msg));
+    };
 }

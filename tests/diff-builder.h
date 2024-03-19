@@ -63,7 +63,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &unshare_folder(std::string_view sha256, std::string_view folder_id) noexcept;
     diff_builder_t &clone_file(const model::file_info_t &source) noexcept;
     diff_builder_t &finish_file(const model::file_info_t &source) noexcept;
-    diff_builder_t &flush_file(const model::file_info_t &source) noexcept;
+    diff_builder_t &finish_file_ack(const model::file_info_t &source) noexcept;
     diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
     diff_builder_t &append_block(const model::file_info_t &target, size_t block_index, std::string data,
                                  dispose_callback_t) noexcept;

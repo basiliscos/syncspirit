@@ -8,6 +8,7 @@
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/finish_file.h"
+#include "model/diff/modify/finish_file_ack.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -154,7 +155,7 @@ TEST_CASE("new file diff", "[model]") {
         }
 
         file_peer->mark_local_available(0);
-        diff = new diff::modify::finish_file_t(*file_my);
+        diff = new diff::modify::finish_file_ack_t(*file_my);
         REQUIRE(diff->apply(*cluster));
 
         file_my = folder_my->get_file_infos().by_name(file_info.name());

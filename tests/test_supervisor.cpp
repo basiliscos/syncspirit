@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "test_supervisor.h"
+#include "model/diff/modify/finish_file.h"
+#include "model/diff/modify/finish_file_ack.h"
 #include "net/names.h"
 
 namespace to {
@@ -24,8 +26,9 @@ inline auto rotor::actor_base_t::access<to::on_timer_trigger, request_id_t, bool
 using namespace syncspirit::net;
 using namespace syncspirit::test;
 
-supervisor_t::supervisor_t(r::supervisor_config_t &cfg) : r::supervisor_t(cfg) {
+supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) {
     log = utils::get_logger("net.test_supervisor");
+    auto_finish = cfg.auto_finish;
 }
 
 void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -90,6 +93,12 @@ void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept
         LOG_ERROR(log, "{}, error updating model: {}", identity, r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
     }
+
+    r = diff->visit(*this, nullptr);
+    if (!r) {
+        LOG_ERROR(log, "{}, error visiting model: {}", identity, r.assume_error().message());
+        do_shutdown(make_error(r.assume_error()));
+    }
 }
 
 void supervisor_t::on_block_update(model::message::block_update_t &msg) noexcept {
@@ -110,4 +119,17 @@ void supervisor_t::on_contact_update(model::message::contact_update_t &msg) noex
         LOG_ERROR(log, "{}, error updating contact: {}", identity, r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
     }
+}
+
+auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (auto_finish) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
+        auto file = file_info->get_file_infos().by_name(diff.file_name);
+        auto ack = model::diff::cluster_diff_ptr_t{};
+        ack = new model::diff::modify::finish_file_ack_t(*file);
+        send<model::payload::model_update_t>(get_address(), std::move(ack), this);
+    }
+    return outcome::success();
 }

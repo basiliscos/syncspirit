@@ -90,7 +90,9 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
     }
 };
 
-struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
+struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
+                                           private model::diff::cluster_visitor_t,
+                                           private model::diff::block_visitor_t {
     using config_t = controller_actor_config_t;
     template <typename Actor> using config_builder_t = controller_actor_config_builder_t<Actor>;
 
@@ -122,7 +124,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_transfer_push(message::transfer_push_t &message) noexcept;
     void on_transfer_pop(message::transfer_pop_t &message) noexcept;
     void on_block_response(fs::message::block_response_t &message) noexcept;
-    void on_block_dispose(const model::diff::modify::block_transaction_t &) noexcept;
 
     void on_message(proto::message::ClusterConfig &message) noexcept;
     void on_message(proto::message::Index &message) noexcept;
@@ -144,11 +145,13 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::lock_file_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::finish_file_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::finish_file_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::share_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::unshare_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::local_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::mark_reachable_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::block_ack_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::block_rej_t &, void *) noexcept override;
 
     model::cluster_ptr_t cluster;
     model::device_ptr_t peer;

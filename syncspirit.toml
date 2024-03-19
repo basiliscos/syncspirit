@@ -1,5 +1,6 @@
 [bep]
 blocks_max_requested = 16
+blocks_simultaneous_write = 16
 connect_timeout = 5000
 request_timeout = 60000
 rx_buff_size = 16777216
@@ -21,10 +22,10 @@ temporally_timeout = 86400000
 
 [global_discovery]
 announce_url = 'https://discovery.syncthing.net/'
-cert_file = '/home/b/.config/syncthing/cert.pem'
+cert_file = '/home/b/.config/syncspirit/cert.pem'
 device_id = 'LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW'
 enabled = true
-key_file = '/home/b/.config/syncthing/key.pem'
+key_file = '/home/b/.config/syncspirit/key.pem'
 rx_buff_size = 32768
 timeout = 3000
 
@@ -52,6 +53,6 @@ max_wait = 1
 rx_buff_size = 65536
 
 [[log]]
-level = 'info'
+level = 'trace'
 name = 'default'
-sinks = [ 'stdout' ]
+sinks = [ 'stdout', 'file:/tmp/log.tx' ]
