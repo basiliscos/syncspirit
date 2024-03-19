@@ -87,6 +87,9 @@ void updates_streamer_t::on_update(file_info_t &file) noexcept {
 
     auto &by_uuid = files_queue.template get<0>();
     auto it = by_uuid.find(file.get_uuid());
-    by_uuid.erase(it);
+    if (it != by_uuid.end()) {
+        by_uuid.erase(it);
+    }
+
     files_queue.emplace(&file);
 }

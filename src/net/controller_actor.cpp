@@ -413,9 +413,27 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
 
 auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
+    auto source_file = folder_info->get_file_infos().by_name(diff.file_name);
+    if (source_file->is_locally_available()) {
+        using diffs_t = model::diff::aggregate_t::diffs_t;
+        LOG_TRACE(log, "{}, on_block_update, finalizing {}", identity, source_file->get_name());
+        auto my_file = source_file->local_file();
+        auto diffs = diffs_t{};
+        source_file->set_unlocking(true);
+        diffs.push_back(new model::diff::modify::lock_file_t(*source_file, false));
+        diffs.push_back(new model::diff::modify::finish_file_t(*my_file));
+        auto diff = model::diff::cluster_diff_ptr_t{};
+        diff = new model::diff::aggregate_t(std::move(diffs));
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+    }
+
     cluster->modify_write_requests(1);
     process_block_write();
     pull_ready();
+
     return outcome::success();
 }
 
@@ -429,21 +447,6 @@ void controller_actor_t::on_block_update(model::message::block_update_t &message
     if (message.payload.custom == this) {
         LOG_TRACE(log, "{}, on_block_update", identity);
         auto &diff = *message.payload.diff;
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
-        auto source_file = folder_info->get_file_infos().by_name(diff.file_name);
-        if (source_file->is_locally_available()) {
-            using diffs_t = model::diff::aggregate_t::diffs_t;
-            LOG_TRACE(log, "{}, on_block_update, finalizing {}", identity, source_file->get_name());
-            auto my_file = source_file->local_file();
-            auto diffs = diffs_t{};
-            source_file->set_unlocking(true);
-            diffs.push_back(new model::diff::modify::lock_file_t(*source_file, false));
-            diffs.push_back(new model::diff::modify::finish_file_t(*my_file));
-            auto diff = model::diff::cluster_diff_ptr_t{};
-            diff = new model::diff::aggregate_t(std::move(diffs));
-            send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-        }
         auto r = diff.visit(*this, const_cast<void *>(message.payload.custom));
         if (!r) {
             auto ee = make_error(r.assume_error());

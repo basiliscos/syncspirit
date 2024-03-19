@@ -55,4 +55,4 @@ rx_buff_size = 65536
 [[log]]
 level = 'trace'
 name = 'default'
-sinks = [ 'stdout', 'file:/tmp/log.tx' ]
+sinks = [ 'stdout', 'file:/tmp/syncspirit-log.txt' ]
