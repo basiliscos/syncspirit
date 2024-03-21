@@ -383,6 +383,13 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
     }
 }
 
+std::size_t file_info_t::expected_meta_size() const noexcept {
+    auto r = name.size() + 1 + 8 + 4 + 8 + 4 + 8 + 3 + 8 + 4 + symlink_target.size();
+    r += version.counters_size() * 16;
+    r += blocks.size() * (8 + 4 + 4 + 32);
+    return r;
+}
+
 file_info_ptr_t file_info_t::actualize() const noexcept { return folder_info->get_file_infos().get(get_uuid()); }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const file_info_ptr_t &item) noexcept {

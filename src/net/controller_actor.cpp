@@ -154,22 +154,21 @@ void controller_actor_t::on_termination(message::termination_signal_t &message) 
 void controller_actor_t::pull_ready() noexcept { send<payload::pull_signal_t>(get_address()); }
 
 void controller_actor_t::push_pending() noexcept {
-    while (outgoing_buffer < outgoing_buffer_max) {
-        if (updates_streamer) {
-            auto file_info = updates_streamer.next();
-            auto index_update = proto::IndexUpdate();
-            auto folder_id = file_info->get_folder_info()->get_folder()->get_id();
-            index_update.set_folder(std::string(folder_id));
-            *index_update.add_files() = file_info->as_proto(true);
-            fmt::memory_buffer data;
-            proto::serialize(data, index_update);
-            outgoing_buffer += static_cast<uint32_t>(data.size());
-            send<payload::transfer_data_t>(peer_addr, std::move(data));
-            LOG_TRACE(log, "{}, pushing index update for: {}, seq = {}", identity, file_info->get_full_name(),
-                      file_info->get_sequence());
-            continue;
-        }
-        break;
+    auto index_update = proto::IndexUpdate();
+    auto expected_sz = 0;
+    while (updates_streamer && (expected_sz < outgoing_buffer_max - outgoing_buffer)) {
+        auto file_info = updates_streamer.next();
+        expected_sz += file_info->expected_meta_size();
+        *index_update.add_files() = file_info->as_proto(true);
+        LOG_TRACE(log, "{}, pushing index update for: {}, seq = {}", identity, file_info->get_full_name(),
+                  file_info->get_sequence());
+    }
+
+    if (index_update.files_size() > 0) {
+        fmt::memory_buffer data;
+        proto::serialize(data, index_update);
+        outgoing_buffer += static_cast<uint32_t>(data.size());
+        send<payload::transfer_data_t>(peer_addr, std::move(data));
     }
 }
 

@@ -127,6 +127,7 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
 
     file_info_ptr_t actualize() const noexcept;
     proto::Index generate() noexcept;
+    std::size_t expected_meta_size() const noexcept;
 
   private:
     using marks_vector_t = std::vector<bool>;
