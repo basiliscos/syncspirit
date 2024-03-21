@@ -21,6 +21,8 @@
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 
+#include <utility>
+
 using namespace syncspirit;
 using namespace syncspirit::net;
 namespace bfs = boost::filesystem;
@@ -154,21 +156,41 @@ void controller_actor_t::on_termination(message::termination_signal_t &message) 
 void controller_actor_t::pull_ready() noexcept { send<payload::pull_signal_t>(get_address()); }
 
 void controller_actor_t::push_pending() noexcept {
-    auto index_update = proto::IndexUpdate();
+    using pair_t = std::pair<model::folder_info_t *, proto::IndexUpdate>;
+    using indices_t = std::vector<pair_t>;
+
+    auto indices = indices_t{};
+    auto get_index = [&](model::file_info_t &file) -> proto::IndexUpdate & {
+        auto folder_info = file.get_folder_info();
+        for (auto &p : indices) {
+            if (p.first == folder_info) {
+                return p.second;
+            }
+        }
+        indices.emplace_back(folder_info, proto::IndexUpdate());
+        auto &index = indices.back().second;
+        index.set_folder(std::string(folder_info->get_folder()->get_id()));
+        return index;
+    };
+
     auto expected_sz = 0;
     while (updates_streamer && (expected_sz < outgoing_buffer_max - outgoing_buffer)) {
         auto file_info = updates_streamer.next();
         expected_sz += file_info->expected_meta_size();
-        *index_update.add_files() = file_info->as_proto(true);
+        auto &index = get_index(*file_info);
+        *index.add_files() = file_info->as_proto(true);
         LOG_TRACE(log, "{}, pushing index update for: {}, seq = {}", identity, file_info->get_full_name(),
                   file_info->get_sequence());
     }
 
-    if (index_update.files_size() > 0) {
-        fmt::memory_buffer data;
-        proto::serialize(data, index_update);
-        outgoing_buffer += static_cast<uint32_t>(data.size());
-        send<payload::transfer_data_t>(peer_addr, std::move(data));
+    fmt::memory_buffer data;
+    for (auto &p : indices) {
+        auto &index = p.second;
+        if (index.files_size() > 0) {
+            proto::serialize(data, index);
+            outgoing_buffer += static_cast<uint32_t>(data.size());
+            send<payload::transfer_data_t>(peer_addr, std::move(data));
+        }
     }
 }
 
