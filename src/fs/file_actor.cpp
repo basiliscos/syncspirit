@@ -218,9 +218,8 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     auto path = file->get_path().string();
     auto backend = rw_cache.get(path);
     if (!backend) {
-        LOG_ERROR(log, "{}, attempt to flush non-opend file {}", identity, path);
-        auto ec = sys::errc::make_error_code(sys::errc::io_error);
-        return ec;
+        LOG_DEBUG(log, "{}, attempt to flush non-opened file {}", identity, path);
+        return outcome::success();
     }
 
     rw_cache.remove(backend);
