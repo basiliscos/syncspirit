@@ -347,7 +347,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         if (!mru_size) {
             return "fs/mru_size is incorrect or missing";
         }
-        c.mru_size = temporally_timeout.value();
+        c.mru_size = mru_size.value();
     }
 
     // db
