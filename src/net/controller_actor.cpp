@@ -242,7 +242,7 @@ void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
         }
     }
     if (!(substate & substate_t::iterating_blocks)) {
-        bool reset_file = !(substate & substate_t::iterating_files) && !rx_blocks_requested;
+        bool reset_file = !(substate & substate_t::iterating_files);
         file = next_file(reset_file);
         if (file) {
             substate |= substate_t::iterating_files;
