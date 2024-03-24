@@ -51,6 +51,7 @@ void updates_streamer_t::prepare() noexcept {
         auto it = folders_queue.begin();
         auto remote_folder = *it;
         folders_queue.erase(it);
+
         auto local_folder = remote_folder->get_local();
         auto &files = local_folder->get_file_infos();
         auto sequence_threshold =
@@ -78,11 +79,6 @@ void updates_streamer_t::on_update(file_info_t &file) noexcept {
 
     if (folders_queue.count(remote_folder)) {
         return;
-    }
-
-    if (files_queue.empty()) {
-        folders_queue.insert(remote_folder);
-        return prepare();
     }
 
     auto &by_uuid = files_queue.template get<0>();

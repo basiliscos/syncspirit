@@ -98,6 +98,7 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
     auto data = std::string{};
     if (!file_opt) {
         ec = file_opt.assume_error();
+        LOG_ERROR(log, "{}, error opening file {}: {}", identity, path.string(), ec.message());
     } else {
         auto &file = file_opt.assume_value();
         auto block_opt = file->read(req.offset(), req.size());
@@ -259,6 +260,30 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, v
     return ack(backend->write(offset, diff.data));
 }
 
+auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const file_ptr_t &target_backend) noexcept
+    -> outcome::result<file_ptr_t> {
+    auto source_path = source->get_path();
+    if (source_path == target_backend->get_path()) {
+        return target_backend;
+    }
+
+    auto source_tmp = make_temporal(source_path);
+
+    if (auto cached = rw_cache.get(source_path.string()); cached) {
+        return cached;
+    } else if (auto cached = rw_cache.get(source_tmp.string()); cached) {
+        return cached;
+    } else if (auto cached = ro_cache.get(source_tmp.string()); cached) {
+        return cached;
+    } else if (auto cached = ro_cache.get(source_tmp.string()); cached) {
+        return cached;
+    } else if (auto opt = open_file_ro(source_tmp, false)) {
+        return opt.assume_value();
+    }
+
+    return open_file_ro(source_path, false);
+}
+
 auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, void *) noexcept
     -> outcome::result<void> {
     auto ack = write_ack_t(diff);
@@ -277,28 +302,13 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
         return err;
     }
     auto target_backend = std::move(file_opt.assume_value());
-    auto source_backend = file_ptr_t{};
-
-    auto source_path = source->get_path();
-    if (source_path == target_path) {
-        source_backend = target_backend;
-    } else if (auto cached_source = rw_cache.get(source_path.string()); cached_source) {
-        source_backend = cached_source;
-    } else {
-        if (!source->is_locally_available()) {
-            assert(source->is_partly_available());
-            source_path = make_temporal(source_path);
-        }
-
-        auto source_opt = open_file_ro(source_path);
-        if (!source_opt) {
-            auto &ec = source_opt.assume_error();
-            LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, source_path.string(), ec.message());
-            return ec;
-        }
-        source_backend = std::move(source_opt.assume_value());
+    auto source_backend_opt = get_source_for_cloning(source, target_backend);
+    if (!source_backend_opt) {
+        auto ec = source_backend_opt.assume_error();
+        LOG_ERROR(log, "{}, cannot open file for cloning: {}: {}", identity, target_path.string(), ec.message());
     }
 
+    auto &source_backend = source_backend_opt.assume_value();
     auto &block = source->get_blocks().at(diff.source_block_index);
     auto target_offset = target->get_block_offset(diff.block_index);
     auto source_offset = source->get_block_offset(diff.source_block_index);
@@ -348,8 +358,6 @@ auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept 
 
     auto opt = file_t::open_read(path);
     if (!opt) {
-        auto &ec = opt.assume_error();
-        LOG_ERROR(log, "{}, error opening file {}: {}", identity, path.string(), ec.message());
         return opt.assume_error();
     }
     return file_ptr_t(new file_t(std::move(opt.assume_value())));
