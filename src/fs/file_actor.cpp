@@ -219,8 +219,15 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     auto path = file->get_path().string();
     auto backend = rw_cache.get(path);
     if (!backend) {
-        LOG_DEBUG(log, "{}, attempt to flush non-opened file {}", identity, path);
-        return outcome::success();
+        LOG_DEBUG(log, "{}, attempt to flush non-opened file {}, re-open it as temporal", identity, path);
+        auto path_tmp = make_temporal(file->get_path());
+        auto result = open_file_rw(path_tmp, file);
+        if (!result) {
+            auto &ec = result.assume_error();
+            LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path_tmp.string(), ec.message());
+            return ec;
+        }
+        backend = std::move(result.assume_value());
     }
 
     rw_cache.remove(backend);
