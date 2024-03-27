@@ -57,16 +57,15 @@ void fs_supervisor_t::launch() noexcept {
     spawn(factory).restart_period(r::pt::seconds{1}).restart_policy(r::restart_policy_t::fail_only).spawn();
 
     auto timeout = shutdown_timeout * 9 / 10;
-    auto hasher_addr = create_actor<hasher::hasher_proxy_actor_t>()
-                           .hasher_threads(hasher_threads)
-                           .name("fs::hasher_proxy")
-                           .timeout(timeout)
-                           .finish()
-                           ->get_address();
+    create_actor<hasher::hasher_proxy_actor_t>()
+        .hasher_threads(hasher_threads)
+        .name("fs::hasher_proxy")
+        .timeout(timeout)
+        .finish()
+        ->get_address();
     scan_actor = create_actor<scan_actor_t>()
                      .fs_config(fs_config)
                      .cluster(cluster)
-                     .hasher_proxy(hasher_addr)
                      .requested_hashes_limit(hasher_threads * 2)
                      .timeout(timeout)
                      .finish();

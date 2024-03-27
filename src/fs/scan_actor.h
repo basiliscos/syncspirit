@@ -22,7 +22,6 @@ namespace outcome = boost::outcome_v2;
 struct SYNCSPIRIT_API scan_actor_config_t : r::actor_config_t {
     config::fs_config_t fs_config;
     model::cluster_ptr_t cluster;
-    r::address_ptr_t hasher_proxy;
     uint32_t requested_hashes_limit;
 };
 
@@ -33,11 +32,6 @@ template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_b
 
     builder_t &&fs_config(const config::fs_config_t &value) && noexcept {
         parent_t::config.fs_config = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&hasher_proxy(r::address_ptr_t &value) && noexcept {
-        parent_t::config.hasher_proxy = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 

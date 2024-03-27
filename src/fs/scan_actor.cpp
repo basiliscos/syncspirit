@@ -19,7 +19,7 @@ using namespace syncspirit::fs;
 template <class> inline constexpr bool always_false_v = false;
 
 scan_actor_t::scan_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, cluster{cfg.cluster}, fs_config{cfg.fs_config}, hasher_proxy{cfg.hasher_proxy},
+    : r::actor_base_t{cfg}, cluster{cfg.cluster}, fs_config{cfg.fs_config},
       requested_hashes_limit{cfg.requested_hashes_limit} {
     log = utils::get_logger("scan::actor");
 }
@@ -32,9 +32,9 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(net::names::fs_scanner, address);
+        p.discover_name(net::names::hasher_proxy, hasher_proxy, false).link();
         p.discover_name(net::names::coordinator, coordinator, true).link(false);
     });
-    plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(hasher_proxy, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&scan_actor_t::on_scan);
         p.subscribe_actor(&scan_actor_t::on_hash);
