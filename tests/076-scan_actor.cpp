@@ -88,7 +88,6 @@ struct fixture_t {
         target = sup->create_actor<fs::scan_actor_t>()
                      .timeout(timeout)
                      .cluster(cluster)
-                     .hasher_proxy(proxy_addr)
                      .fs_config(fs_config)
                      .requested_hashes_limit(2ul)
                      .finish();
