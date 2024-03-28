@@ -92,7 +92,11 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
     }
 
     auto diff = cluster_diff_ptr_t(new modify::create_folder_t(folder));
-    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(diff), &actor);
+    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(diff), this);
+    actor.add_callback(this, [&actor, folder_id = folder.id()]() -> bool {
+        actor.rescan_folder(folder_id);
+        return true;
+    });
     return true;
 }
 

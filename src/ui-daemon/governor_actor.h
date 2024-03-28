@@ -10,7 +10,9 @@
 #include "model/diff/cluster_visitor.h"
 #include "fs/messages.h"
 #include "utils/log.h"
-#include <set>
+
+#include <unordered_map>
+#include <functional>
 
 namespace syncspirit::daemon {
 
@@ -42,6 +44,8 @@ struct governor_actor_t : public r::actor_base_t,
     using config_t = governor_actor_config_t;
     template <typename Actor> using config_builder_t = governor_actor_config_builder_t<Actor>;
 
+    using command_callback_t = std::function<bool()>;
+
     explicit governor_actor_t(config_t &cfg);
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
@@ -49,6 +53,8 @@ struct governor_actor_t : public r::actor_base_t,
     void shutdown_start() noexcept override;
     void track_inactivity() noexcept;
     void schedule_rescan_dirs(const r::pt::time_duration &intreval) noexcept;
+    void add_callback(const void *, command_callback_t &&callback) noexcept;
+    void rescan_folder(std::string_view folder_id) noexcept;
 
     r::address_ptr_t coordinator;
     r::address_ptr_t fs_scanner;
@@ -59,6 +65,7 @@ struct governor_actor_t : public r::actor_base_t,
 
   private:
     using clock_t = r::pt::microsec_clock;
+    using callbacks_map_t = std::unordered_map<const void *, command_callback_t>;
 
     void schedule_rescan_dirs() noexcept;
     void process() noexcept;
@@ -81,6 +88,7 @@ struct governor_actor_t : public r::actor_base_t,
     r::pt::ptime deadline;
     r::pt::time_duration dirs_rescan_interval;
     model::folders_map_t scaning_folders;
+    callbacks_map_t callbacks_map;
 };
 
 } // namespace syncspirit::daemon

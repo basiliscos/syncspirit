@@ -11,6 +11,11 @@ using namespace syncspirit::daemon;
 governor_actor_t::governor_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, commands{std::move(cfg.commands)}, cluster{std::move(cfg.cluster)} {
     log = utils::get_logger("daemon.governor_actor");
+
+    add_callback(this, [&]() {
+        process();
+        return false;
+    });
 }
 
 void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -52,8 +57,13 @@ void governor_actor_t::on_model_update(model::message::model_update_t &message) 
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
-    if (custom == this) {
-        return process();
+
+    auto it = callbacks_map.find(custom);
+    if (it != callbacks_map.end()) {
+        auto remove = it->second();
+        if (remove) {
+            callbacks_map.erase(it);
+        }
     }
 }
 
@@ -155,6 +165,17 @@ void governor_actor_t::rescan_folders() {
             scaning_folders.put(folder);
         }
     }
+}
+
+void governor_actor_t::rescan_folder(std::string_view folder_id) noexcept {
+    auto folder = cluster->get_folders().by_id(folder_id);
+    LOG_INFO(log, "{}, forcing folder '{}' rescan", identity, folder->get_label());
+    send<fs::payload::scan_folder_t>(fs_scanner, std::string(folder->get_id()));
+    scaning_folders.put(folder);
+}
+
+void governor_actor_t::add_callback(const void *pointer, command_callback_t &&callback) noexcept {
+    callbacks_map.emplace(pointer, callback);
 }
 
 auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &, void *) noexcept -> outcome::result<void> {

@@ -17,7 +17,7 @@ enabled = true
 redial_timeout = 300000
 
 [fs]
-mru_size = 10
+mru_size = 5
 temporally_timeout = 86400000
 
 [global_discovery]

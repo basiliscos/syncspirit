@@ -1,20 +1,18 @@
-files limit
- ... solution: hard-code to 512.
-
- - win32
-   _getmaxstdio()
-   GetProcessHandleCount(GetCurrentProcess(), &handles_count);
-
-   https://www.codeproject.com/Questions/882911/How-do-I-count-the-number-of-handles-in-my-applica
-
-   https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/getmaxstdio?view=msvc-xc000a14f70
-
-   Since Windows 2000, there is a hard coded limit of handles - 10000.
-   (Check HKLM\Software\Microsoft\Windows NT\CurrentVersion\Windows).
-
-
-====
+- тест на аплоад
 - прикрурить новый rotor в sysctem_context?
+- change log
+- --help
+- сборка под винду
+
+[c@zbook ~]$ cd my_label/src/utils/
+[c@zbook utils]$ ls -lah
+total 116K
+drwxr-xr-x  2 c c 4.0K Mar 28 21:11 .
+drwxr-xr-x 13 c c 4.0K Mar 28 21:11 ..
+----------  1 c c 6.9K Jan  1  1970 base32.cpp
+----------  1 c c  792 Jan  1  1970 base32.h
+----------  1 c c 1.5K Jan  1  1970 beast_support.cpp
+
 
 ---
 
@@ -130,3 +128,27 @@ https://softwarerecs.stackexchange.com/questions/14409/leveldb-database-client
 
 
 https://forum.syncthing.net/t/a-few-questions-about-quic-hole-punching-and-stun/16490
+
+
+=========
+
+1. Есть глобальй регистратор
+
+ message_type -> ack_count
+
+2. Акторы при старте регаются что они выслают ack. При выключении - дерегаются.
+
+3. Интерфес visitor'а (Effector)
+
+ OnBegin(diff&) -> outcome::result;
+ OnCommit(diff&) -> void;
+ OnRevert(diff&) -> void;
+
+4. Diff
+  Apply()
+  Revert()
+  Commit() -> true/false. true если к-во ack'ов  == то, что в регистраторе
+
+  Diff::Ack
+
+5. По-умолчанию 1 подтверждение высылает сам источник, Commit ничего не делает
