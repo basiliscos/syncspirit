@@ -106,6 +106,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
         CHECK(opt.error() == model::make_error_code(model::error_code_t::folder_is_not_shared));
     }
 
+#if 0
     SECTION("exceed max sequence") {
         pr_index.set_folder(db_folder_1.id());
         auto f = pr_index.add_files();
@@ -114,6 +115,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
         REQUIRE(!opt);
         CHECK(opt.error() == model::make_error_code(model::error_code_t::exceed_max_sequence));
     }
+#endif
 
     SECTION("blocks are not expected") {
         auto file = pr_index.add_files();

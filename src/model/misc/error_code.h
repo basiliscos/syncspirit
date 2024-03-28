@@ -44,7 +44,6 @@ enum class error_code_t {
     malformed_deviceid,
     folder_is_not_shared,
     invalid_block_size,
-    exceed_max_sequence,
     unexpected_blocks
 };
 

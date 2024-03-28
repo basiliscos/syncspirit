@@ -9,9 +9,9 @@ using namespace syncspirit::model;
 using namespace syncspirit::model::diff::peer;
 
 update_folder_t::update_folder_t(std::string_view folder_id_, std::string_view peer_id_, files_t files_,
-                                 blocks_t blocks_, bool amssi) noexcept
+                                 blocks_t blocks_) noexcept
     : folder_id{std::string(folder_id_)}, peer_id{std::string(peer_id_)}, files{std::move(files_)},
-      blocks{std::move(blocks_)}, allow_max_sequence_increase(amssi) {}
+      blocks{std::move(blocks_)} {}
 
 auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
@@ -71,7 +71,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         bm.put(it.item);
     }
     for (auto &it : files_map) {
-        folder_info->add(it.item, allow_max_sequence_increase);
+        folder_info->add(it.item, true);
     }
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
 
@@ -85,7 +85,7 @@ auto update_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noex
 
 using diff_t = diff::cluster_diff_ptr_t;
 
-template <bool AllowMaxSequenceIncrease, typename T>
+template <typename T>
 static auto instantiate(const cluster_t &cluster, const device_t &source, const T &message) noexcept
     -> outcome::result<diff_t> {
     auto folder = cluster.get_folders().by_id(message.folder());
@@ -118,24 +118,18 @@ static auto instantiate(const cluster_t &cluster, const device_t &source, const 
             }
         }
         files.emplace_back(std::move(message.files(i)));
-        if constexpr (!AllowMaxSequenceIncrease) {
-            if (f.sequence() > max_seq) {
-                return make_error_code(error_code_t::exceed_max_sequence);
-            }
-        }
     }
 
-    auto diff = diff_t(new update_folder_t(message.folder(), device_id, std::move(files), std::move(new_blocks),
-                                           AllowMaxSequenceIncrease));
+    auto diff = diff_t(new update_folder_t(message.folder(), device_id, std::move(files), std::move(new_blocks)));
     return outcome::success(std::move(diff));
 }
 
 auto update_folder_t::create(const cluster_t &cluster, const model::device_t &source,
                              const proto::Index &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
-    return instantiate<false>(cluster, source, message);
+    return instantiate(cluster, source, message);
 }
 
 auto update_folder_t::create(const cluster_t &cluster, const model::device_t &source,
                              const proto::IndexUpdate &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
-    return instantiate<true>(cluster, source, message);
+    return instantiate(cluster, source, message);
 }
