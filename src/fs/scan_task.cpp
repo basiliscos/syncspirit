@@ -129,6 +129,14 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                     continue;
                 }
                 metadata.set_size(sz);
+
+                auto modification_time = bfs::last_write_time(child, ec);
+                if (ec) {
+                    errors.push_back(scan_error_t{dir, ec});
+                    continue;
+                }
+                metadata.set_modified_s(modification_time);
+
             } else if (status.type() == bfs::file_type::symlink_file) {
                 auto target = bfs::read_symlink(child, ec);
                 if (ec) {
@@ -139,7 +147,10 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 metadata.set_type(proto::FileInfoType::SYMLINK);
             } else {
                 LOG_WARN(log, "unknown/unimplemented file type {} : {}", (int)status.type(), bfs::path(child).string());
+                continue;
             }
+
+            metadata.set_permissions(static_cast<uint32_t>(status.permissions()));
             unknown_files_queue.push_back(unknown_file_t{child, std::move(metadata)});
         }
     }
