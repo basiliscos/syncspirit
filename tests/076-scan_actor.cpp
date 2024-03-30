@@ -432,7 +432,7 @@ void test_new_files() {
                 REQUIRE(scan_completions == 1);
             }
 
-            SECTION("non-empty file") {
+            SECTION("non-empty file (1 block)") {
                 auto file_path = root_path / "file.ext";
                 write_file(file_path, "12345");
                 sup->do_process();
@@ -444,6 +444,42 @@ void test_new_files() {
                 CHECK(file->is_file());
                 CHECK(file->get_block_size() == 5);
                 CHECK(file->get_size() == 5);
+                CHECK(blocks.size() == 1);
+                REQUIRE(scan_completions == 1);
+            }
+
+            SECTION("non-empty file (2 blocks)") {
+                auto file_path = root_path / "file.ext";
+                auto sz = size_t{128 * 1024 * 2};
+                std::string data(sz, 'x');
+                write_file(file_path, data);
+                sup->do_process();
+
+                auto file = files->by_name("file.ext");
+                REQUIRE(file);
+                CHECK(file->is_locally_available());
+                CHECK(!file->is_link());
+                CHECK(file->is_file());
+                CHECK(file->get_size() == sz);
+                CHECK(file->get_blocks().size() == 2);
+                CHECK(blocks.size() == 1);
+                REQUIRE(scan_completions == 1);
+            }
+
+            SECTION("non-empty file (3 blocks)") {
+                auto file_path = root_path / "file.ext";
+                auto sz = size_t{128 * 1024 * 3};
+                std::string data(sz, 'x');
+                write_file(file_path, data);
+                sup->do_process();
+
+                auto file = files->by_name("file.ext");
+                REQUIRE(file);
+                CHECK(file->is_locally_available());
+                CHECK(!file->is_link());
+                CHECK(file->is_file());
+                CHECK(file->get_size() == sz);
+                CHECK(file->get_blocks().size() == 3);
                 CHECK(blocks.size() == 1);
                 REQUIRE(scan_completions == 1);
             }

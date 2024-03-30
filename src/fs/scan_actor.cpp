@@ -323,7 +323,7 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
     info.ack(rp.block_index, hash_info.weak, hash_info.digest, block_size);
 
     while (info.has_more_chunks() && (requested_hashes < requested_hashes_limit)) {
-        hash_next(*msg, address);
+        hash_next(*msg, new_files);
     }
     if (info.is_complete()) {
         commit_new_file(info);
