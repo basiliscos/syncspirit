@@ -28,7 +28,7 @@ bool new_chunk_iterator_t::is_complete() const noexcept {
 
 auto new_chunk_iterator_t::read() noexcept -> outcome::result<details::chunk_t> {
     assert(unread_bytes);
-    size_t next_sz = unread_bytes < block_size ? block_size : unread_bytes;
+    size_t next_sz = std::min(block_size, unread_bytes);
     auto r = backend->read(offset, next_sz);
     if (r) {
         offset += next_sz;

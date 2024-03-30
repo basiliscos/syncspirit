@@ -322,16 +322,10 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
 
     info.ack(rp.block_index, hash_info.weak, hash_info.digest, block_size);
 
-    bool queued_next = false;
-    while (info.has_more_chunks()) {
+    while (info.has_more_chunks() && (requested_hashes < requested_hashes_limit)) {
         hash_next(*msg, address);
-        bool can_process_more = requested_hashes < requested_hashes_limit;
-        queued_next |= !can_process_more;
-        if (info.is_complete()) {
-            commit_new_file(info);
-        }
     }
-    if (!queued_next && requested_hashes == 0 && info.is_complete()) {
+    if (info.is_complete()) {
         commit_new_file(info);
         send<payload::scan_progress_t>(address, info.get_task());
     }

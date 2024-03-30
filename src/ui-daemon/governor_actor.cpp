@@ -158,7 +158,7 @@ void governor_actor_t::schedule_rescan_dirs() noexcept {
 
 void governor_actor_t::rescan_folders() {
     if (scaning_folders.size() == 0) {
-        auto& folders = cluster->get_folders();
+        auto &folders = cluster->get_folders();
         LOG_INFO(log, "{}, issuing folders ({}) rescan", identity, folders.size());
         for (auto it : folders) {
             auto &folder = it.item;
