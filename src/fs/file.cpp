@@ -97,6 +97,8 @@ file_t::~file_t() {
             auto &ec = result.assume_error();
             log->warn("(ignored) error closing file '{}' : {}", path_str, ec.message());
         }
+    } else if (backend) {
+        fclose(backend);
     }
 }
 
