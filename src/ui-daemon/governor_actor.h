@@ -55,6 +55,7 @@ struct governor_actor_t : public r::actor_base_t,
     void schedule_rescan_dirs(const r::pt::time_duration &intreval) noexcept;
     void add_callback(const void *, command_callback_t &&callback) noexcept;
     void rescan_folder(std::string_view folder_id) noexcept;
+    void process() noexcept;
 
     r::address_ptr_t coordinator;
     r::address_ptr_t fs_scanner;
@@ -68,7 +69,6 @@ struct governor_actor_t : public r::actor_base_t,
     using callbacks_map_t = std::unordered_map<const void *, command_callback_t>;
 
     void schedule_rescan_dirs() noexcept;
-    void process() noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
     void on_io_error(model::message::io_error_t &reply) noexcept;

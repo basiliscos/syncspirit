@@ -8,8 +8,9 @@
 #include "misc/version_utils.h"
 #include "db/prefix.h"
 #include "fs/utils.h"
-#include <algorithm>
+#include <zlib.h>
 #include <spdlog/spdlog.h>
+#include <algorithm>
 
 #ifdef uuid_t
 #undef uuid_t
@@ -179,6 +180,17 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
             auto &block = *b;
             *r.add_blocks() = block.as_bep(offset);
             offset += block.get_size();
+        }
+        if (blocks.empty() && is_file()) {
+            auto emtpy_block = r.add_blocks();
+            auto data = std::string();
+            auto weak_hash = adler32(0L, Z_NULL, 0);
+            weak_hash = adler32(weak_hash, (const unsigned char *)data.data(), data.length());
+            emtpy_block->set_weak_hash(weak_hash);
+
+            char digest[SHA256_DIGEST_LENGTH];
+            utils::digest(data.data(), data.length(), digest);
+            emtpy_block->set_hash(std::string(digest, SHA256_DIGEST_LENGTH));
         }
     }
     return r;
@@ -378,7 +390,22 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
     } else {
         assert(r == version_relation_t::conflict);
         auto log = utils::get_logger("model");
-        LOG_CRITICAL(log, "conflict handling is not available");
+        auto stringize = [](const proto::Vector& vector) -> std::string {
+            auto r = std::string();
+            for (int i = 0; i < vector.counters_size(); ++i) {
+                auto& c = vector.counters(i);
+                r += fmt::format("{:x}:{}", c.id(), c.value());
+                if (i + 1 < vector.counters_size()) {
+                    r += ", ";
+                }
+            }
+            return r;
+        };
+        auto my_version = stringize(version);
+        auto other_version = stringize(other.version);
+
+        LOG_CRITICAL(log, "conflict handling is not available for = {}, '{}' vs '{}'",
+                     get_full_name(), my_version, other_version);
         return false;
     }
 }
