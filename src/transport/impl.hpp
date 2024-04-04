@@ -4,10 +4,16 @@
 #pragma once
 
 #include "base.h"
+#include "utils/platform.h"
+#include "stream.h"
 #include <spdlog/spdlog.h>
 #include <boost/asio/ssl.hpp>
+
+#ifdef WIN32_LEAN_AND_MEAN
+#include <malloc.h>
+#else
 #include <alloca.h>
-#include "stream.h"
+#endif
 
 namespace syncspirit::transport {
 

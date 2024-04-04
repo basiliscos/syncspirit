@@ -390,10 +390,10 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
     } else {
         assert(r == version_relation_t::conflict);
         auto log = utils::get_logger("model");
-        auto stringize = [](const proto::Vector& vector) -> std::string {
+        auto stringize = [](const proto::Vector &vector) -> std::string {
             auto r = std::string();
             for (int i = 0; i < vector.counters_size(); ++i) {
-                auto& c = vector.counters(i);
+                auto &c = vector.counters(i);
                 r += fmt::format("{:x}:{}", c.id(), c.value());
                 if (i + 1 < vector.counters_size()) {
                     r += ", ";
@@ -404,8 +404,8 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
         auto my_version = stringize(version);
         auto other_version = stringize(other.version);
 
-        LOG_CRITICAL(log, "conflict handling is not available for = {}, '{}' vs '{}'",
-                     get_full_name(), my_version, other_version);
+        LOG_CRITICAL(log, "conflict handling is not available for = {}, '{}' vs '{}'", get_full_name(), my_version,
+                     other_version);
         return false;
     }
 }

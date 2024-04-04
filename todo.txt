@@ -1,22 +1,24 @@
+
+
+
 - тест на аплоад
 - прикрурить новый rotor в sysctem_context?
 - change log
 - --help
 - сборка под винду
 
-[c@zbook ~]$ cd my_label/src/utils/
-[c@zbook utils]$ ls -lah
-total 116K
-drwxr-xr-x  2 c c 4.0K Mar 28 21:11 .
-drwxr-xr-x 13 c c 4.0K Mar 28 21:11 ..
-----------  1 c c 6.9K Jan  1  1970 base32.cpp
-----------  1 c c  792 Jan  1  1970 base32.h
-----------  1 c c 1.5K Jan  1  1970 beast_support.cpp
+- не сразу после скана оттдаёт новый конфиг
 
 
----
+use get_default_config_dir()
+2024-04-03 23:53:00.949] [E/4544] cannot store cryptographical keys (~/.config/syncspirit/cert.pem & ~/.config/syncspirit/key.pem) :: No such file or directory
 
-- не сразу при старте сканит папку
+-- не к тому коннектится scan_actor
+// p.discover_name("fs::hasher_proxy", hasher_proxy, false).link();
+p.discover_name(net::names::hasher_proxy, hasher_proxy, false).link();
+
+scan_actor тест на block_request
+
 
 - conflict handling is not available
 

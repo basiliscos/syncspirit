@@ -203,7 +203,8 @@ int main(int argc, char **argv) {
             auto &key_path = cfg.global_announce_config.key_file;
             auto save_result = keys.save(cert_path.c_str(), key_path.c_str());
             if (!save_result) {
-                spdlog::error("cannot store cryptographical keys :: {}", save_result.error().message());
+                spdlog::error("cannot store cryptographical keys ({} & {}) :: {}", cert_path, key_path,
+                              save_result.error().message());
                 return 1;
             }
         }

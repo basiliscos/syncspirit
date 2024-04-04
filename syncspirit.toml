@@ -14,7 +14,7 @@ upper_limit = 17179869184
 
 [dialer]
 enabled = true
-redial_timeout = 300000
+redial_timeout = 30000
 
 [fs]
 mru_size = 5

@@ -3,9 +3,7 @@
 
 #include "db_actor.h"
 #include "names.h"
-#include <cstddef>
-#include <alloca.h>
-#include <string_view>
+#include "utils/platform.h"
 #include "db/prefix.h"
 #include "db/utils.h"
 #include "db/error_code.h"
@@ -29,6 +27,13 @@
 #include "model/diff/peer/cluster_remove.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/diff/cluster_visitor.h"
+#include <string_view>
+
+#ifdef WIN32_LEAN_AND_MEAN
+#include <malloc.h>
+#else
+#include <alloca.h>
+#endif
 
 namespace syncspirit::net {
 

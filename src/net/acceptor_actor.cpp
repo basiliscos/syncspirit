@@ -111,7 +111,7 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
         LOG_WARN(log, "{}, on_accept, cannot get remote endpoint:: {}", identity, err.message());
         return accept_next();
     }
-    LOG_TRACE(log, "{}, on_accept, peer = {}, sock = {}", identity, remote, peer.native_handle());
+    LOG_TRACE(log, "{}, on_accept, peer = {}", identity, remote);
 
     auto diff = model::diff::contact_diff_ptr_t{};
     diff = new modify::connect_request_t(std::move(peer), remote);
