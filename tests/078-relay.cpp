@@ -172,7 +172,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
     }
 
     virtual void accept(const sys::error_code &ec) noexcept {
-        LOG_INFO(log, "accept (relay), ec: {}, sock = {}", ec.message(), peer_sock.native_handle());
+        LOG_INFO(log, "accept (relay), ec: {}, remote = {}", ec.message(), peer_sock.remote_endpoint());
         auto uri = utils::parse("tcp://127.0.0.1:0/").value();
         auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         relay_trans = transport::initiate_stream(cfg);

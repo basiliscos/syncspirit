@@ -22,11 +22,13 @@ add_library(syncspirit_test_lib
     test-db.cpp
     test-utils.cpp
     diff-builder.cpp
-#    $<$<PLATFORM_ID:Windows>:wsock32>
-#    $<$<PLATFORM_ID:Windows>:ws2_32>
-#    $<$<PLATFORM_ID:Windows>:iphlpapi>
 )
-target_link_libraries(syncspirit_test_lib syncspirit_lib Catch2::Catch2WithMain)
+target_link_libraries(syncspirit_test_lib syncspirit_lib
+    Catch2::Catch2WithMain
+    $<$<PLATFORM_ID:Windows>:wsock32>
+    $<$<PLATFORM_ID:Windows>:ws2_32>
+    $<$<PLATFORM_ID:Windows>:iphlpapi>
+)
 target_include_directories(syncspirit_test_lib PUBLIC
     "${syncspirit_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_BINARY_DIR}/include"
