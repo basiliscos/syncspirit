@@ -10,6 +10,10 @@
 #include "model/diff/cluster_diff.h"
 #include "syncspirit-test-export.h"
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#define SYNCSPIRIT_WIN
+#endif
+
 namespace syncspirit::test {
 
 namespace bfs = boost::filesystem;

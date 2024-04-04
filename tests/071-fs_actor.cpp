@@ -12,10 +12,6 @@
 #include "access.h"
 #include <boost/filesystem.hpp>
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#define SYNCSPIRIT_WIN
-#endif
-
 using namespace syncspirit;
 using namespace syncspirit::db;
 using namespace syncspirit::test;

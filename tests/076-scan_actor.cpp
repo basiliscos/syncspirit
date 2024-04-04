@@ -137,6 +137,7 @@ void test_meta_changes() {
                     sup->do_process();
                     CHECK(folder_info->get_file_infos().size() == 0);
                 }
+#ifndef SYNCSPIRIT_WIN
                 SECTION("just 1 subdir, which cannot be read") {
                     auto subdir = root_path / "abc";
                     CHECK(bfs::create_directories(subdir / "def", ec));
@@ -154,6 +155,7 @@ void test_meta_changes() {
                         REQUIRE(errs.at(0).ec);
                     }
                 }
+#endif
                 REQUIRE(scan_completions == 1);
             }
 
@@ -321,6 +323,7 @@ void test_meta_changes() {
                     CHECK(!bfs::exists(path));
                 }
 
+#ifndef SYNCSPIRIT_WIN
                 SECTION("error on reading -> remove") {
                     bfs::permissions(path, bfs::perms::no_perms);
                     if (!ec) {
@@ -332,6 +335,7 @@ void test_meta_changes() {
                         REQUIRE(errors.size() == 0);
                     }
                 }
+#endif
                 REQUIRE(scan_completions == 1);
             }
             SECTION("local (previous) file exists") {

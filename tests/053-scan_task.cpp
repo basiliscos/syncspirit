@@ -43,6 +43,8 @@ TEST_CASE("scan_task", "[fs]") {
     folder->get_folder_infos().put(folder_peer);
 
     SECTION("without files") {
+
+#ifndef SYNCSPIRIT_WIN
         SECTION("no permissions to read dir => err") {
             bfs::permissions(root_path, bfs::perms::no_perms);
 
@@ -60,7 +62,7 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(err.ec);
             CHECK(err.path == root_path);
         }
-
+#endif
         SECTION("no dirs, no files") {
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();
