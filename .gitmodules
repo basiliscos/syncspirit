@@ -1,3 +1,4 @@
 [submodule "lib/mbdx"]
 	path = lib/mbdx
 	url = https://gitflic.ru/project/erthink/libmdbx.git
+
