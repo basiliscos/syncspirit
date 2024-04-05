@@ -18,7 +18,11 @@
 namespace bfs = boost::filesystem;
 namespace sys = boost::system;
 
+#if defined(__unix__)
 static const std::string home_path = "~/.config/syncspirit";
+#else
+static const std::string home_path = "~/syncspirit";
+#endif
 
 namespace syncspirit::config {
 
@@ -475,6 +479,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
             return ec;
         }
     }
+
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
     auto config_dir_opt = utils::get_default_config_dir();
@@ -498,7 +503,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     // clang-format off
     main_t cfg;
     cfg.config_path = config_path;
-    cfg.default_location = config_dir;
+    cfg.default_location = config_dir / "shared_data";
     cfg.timeout = 5000;
     cfg.device_name = device;
     cfg.hasher_threads = 3;

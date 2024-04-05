@@ -52,11 +52,17 @@ outcome::result<bfs::path> get_home_dir() noexcept {
 }
 
 outcome::result<bfs::path> get_default_config_dir() noexcept {
-    auto home = get_home_dir();
-    if (home.has_error()) {
-        return home.assume_error();
+    auto home_opt = get_home_dir();
+    if (home_opt.has_error()) {
+        return home_opt.assume_error();
     }
-    return home.assume_value().append("syncspirit");
+    auto home = home_opt.assume_value();
+
+#if defined(__unix__)
+    home /= ".config";
+#endif
+    home /= "syncspirit";
+    return home;
 }
 
 } // namespace syncspirit::utils
