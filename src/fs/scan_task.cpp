@@ -120,7 +120,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             }
 
             proto::FileInfo metadata;
-            metadata.set_name(rp.path.string());
+            metadata.set_name(rp.path.generic_string());
             if (status.type() == bfs::file_type::regular_file) {
                 metadata.set_type(proto::FileInfoType::FILE);
                 auto sz = bfs::file_size(child, ec);
