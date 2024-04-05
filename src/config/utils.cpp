@@ -25,13 +25,6 @@ namespace syncspirit::config {
 using device_name_t = outcome::result<std::string>;
 using home_option_t = outcome::result<bfs::path>;
 
-static std::string expand_home(const std::string &path, const home_option_t &home) {
-    if (home.has_value() && path.size() >= 2 && path[0] == '~' && path[1] == '/') {
-        return (home.assume_value() / path).string();
-    }
-    return path;
-}
-
 static device_name_t get_device_name() noexcept {
     sys::error_code ec;
     auto device_name = boost::asio::ip::host_name(ec);
@@ -179,13 +172,13 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         if (!cert_file) {
             return "global_discovery/cert_file is incorrect or missing";
         }
-        c.cert_file = expand_home(cert_file.value(), home_opt);
+        c.cert_file = utils::expand_home(cert_file.value(), home_opt);
 
         auto key_file = t["key_file"].value<std::string>();
         if (!key_file) {
             return "global_discovery/key_file is incorrect or missing";
         }
-        c.key_file = expand_home(key_file.value(), home_opt);
+        c.key_file = utils::expand_home(key_file.value(), home_opt);
 
         auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
         if (!rx_buff_size) {

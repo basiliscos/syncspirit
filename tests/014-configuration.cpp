@@ -4,6 +4,7 @@
 #include "test-utils.h"
 #include "config/utils.h"
 #include "utils/uri.h"
+#include "utils/location.h"
 #include <boost/filesystem.hpp>
 #include <sstream>
 
@@ -67,6 +68,21 @@ namespace fs = boost::filesystem;
 namespace st = syncspirit::test;
 
 using namespace syncspirit;
+
+TEST_CASE("expand_home", "[config]") {
+    SECTION("valid home") {
+        auto home = utils::home_option_t(fs::path("/user/home/.config/syncspirit_test"));
+        REQUIRE(utils::expand_home("some/path", home) == "some/path");
+        REQUIRE(utils::expand_home("~/some/path", home) == "/user/home/.config/syncspirit_test/some/path");
+    }
+
+    SECTION("invalid home") {
+        auto ec = sys::error_code{1, sys::system_category()};
+        auto home = utils::home_option_t(ec);
+        REQUIRE(utils::expand_home("some/path", home) == "some/path");
+        REQUIRE(utils::expand_home("~/some/path", home) == "~/some/path");
+    }
+}
 
 TEST_CASE("default config is OK", "[config]") {
     auto dir = fs::current_path() / fs::unique_path();
