@@ -550,7 +550,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     };
     cfg.fs_config = fs_config_t {
         86400000,   /* temporally_timeout, 24h default */
-        128,        /* mru_size max number of opend files for reading and writing */
+        128,        /* mru_size max number of open files for reading and writing */
     };
     cfg.db_config = db_config_t {
         0x400000000,   /* upper_limit, 16Gb */
