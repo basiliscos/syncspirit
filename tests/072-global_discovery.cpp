@@ -148,7 +148,7 @@ void test_succesfull_announcement() {
     struct F : fixture_t {
         bool preprocess() noexcept override {
             auto uri = utils::parse("tcp://127.0.0.1").value();
-            cluster->get_device()->assing_uris({uri});
+            cluster->get_device()->assign_uris({uri});
 
             SECTION("successul (and empty) announce response") {
                 http::response<http::string_body> res;
@@ -170,7 +170,7 @@ void test_failded_announcement() {
     struct F : fixture_t {
         bool preprocess() noexcept override {
             auto uri = utils::parse("tcp://127.0.0.1").value();
-            cluster->get_device()->assing_uris({uri});
+            cluster->get_device()->assign_uris({uri});
 
             SECTION("successul (and empty) announce response") {
                 http::response<http::string_body> res;
@@ -209,7 +209,7 @@ void test_peer_discovery() {
                 CHECK(peer_device->get_uris()[0].full == "tcp://127.0.0.2");
 
                 // 2nd attempt
-                peer_device->assing_uris({});
+                peer_device->assign_uris({});
                 res = {};
                 res.body() = j.dump();
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));

@@ -51,7 +51,7 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
 
     inline const uris_t &get_uris() const noexcept { return uris; }
 
-    void assing_uris(const uris_t &uris) noexcept;
+    void assign_uris(const uris_t &uris) noexcept;
 
     void update(const db::Device &source) noexcept;
     uint64_t as_uint() noexcept;

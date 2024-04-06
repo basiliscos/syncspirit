@@ -50,7 +50,7 @@ auto update_contact_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     if (known) {
         auto &devices = cluster.get_devices();
         auto device = devices.by_sha256(this->device.get_sha256());
-        device->assing_uris(uris);
+        device->assign_uris(uris);
     }
     return outcome::success();
 }
