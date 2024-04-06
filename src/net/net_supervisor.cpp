@@ -133,7 +133,7 @@ void net_supervisor_t::seed_model() noexcept {
 void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message) noexcept {
     auto &ee = message.payload.ee;
     if (ee) {
-        LOG_ERROR(log, "{}, cannot load clusted : {}", identity, ee->message());
+        LOG_ERROR(log, "{}, cannot load cluster : {}", identity, ee->message());
         return do_shutdown(ee);
     }
     LOG_TRACE(log, "{}, on_load_cluster", identity);

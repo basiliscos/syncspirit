@@ -33,7 +33,7 @@ initiator_actor_t::initiator_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, relay_key(std::move(cfg.relay_session)),
       ssl_pair{*cfg.ssl_pair}, sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
       custom(std::move(cfg.custom)), router{*cfg.router}, alpn(cfg.alpn) {
-    log = utils::get_logger("net.initator");
+    log = utils::get_logger("net.imitator");
     auto tmp_identity = "init/unknown";
     for (auto &uri : cfg.uris) {
         if (uri.proto != "tcp" && uri.proto != "relay") {

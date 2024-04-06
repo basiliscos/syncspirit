@@ -127,7 +127,7 @@ void db_actor_t::open() noexcept {
             resources->release(resource::db);
             return do_shutdown(make_error(r.error()));
         }
-        LOG_INFO(log, "{}, open, successufully migrated db: {} -> {} ", identity, version, db::version);
+        LOG_INFO(log, "{}, open, successfully migrated db: {} -> {} ", identity, version, db::version);
     }
     resources->release(resource::db);
 }
@@ -147,13 +147,13 @@ auto db_actor_t::get_txn() noexcept -> outcome::result<db::transaction_t *> {
 auto db_actor_t::commit(bool force) noexcept -> outcome::result<void> {
     assert(txn_holder);
     if (force) {
-        LOG_INFO(log, "{}, commiting tx", identity);
+        LOG_INFO(log, "{}, committing tx", identity);
         auto r = txn_holder->commit();
         txn_holder.reset();
         return r;
     }
     if (++uncommitted >= db_config.uncommitted_threshold) {
-        LOG_INFO(log, "{}, commiting tx", identity);
+        LOG_INFO(log, "{}, committing tx", identity);
         auto r = txn_holder->commit();
         txn_holder.reset();
         return r;

@@ -22,7 +22,7 @@ r::plugin::resource_id_t http = 1;
 
 global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, device_id{cfg.device_id}, announce_url{cfg.announce_url},
-      dicovery_device_id{std::move(cfg.device_id)}, ssl_pair{*cfg.ssl_pair}, rx_buff_size{cfg.rx_buff_size},
+      discovery_device_id{std::move(cfg.device_id)}, ssl_pair{*cfg.ssl_pair}, rx_buff_size{cfg.rx_buff_size},
       io_timeout(cfg.io_timeout), cluster{cfg.cluster} {
     log = utils::get_logger("net.gda");
     rx_buff = std::make_shared<rx_buff_t::element_type>(rx_buff_size);
@@ -151,7 +151,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
 
     auto &ee = message.payload.ee;
     if (ee) {
-        LOG_WARN(log, "{}, discovery faield = {}", identity, ee->message());
+        LOG_WARN(log, "{}, discovery failed = {}", identity, ee->message());
     } else {
         auto &http_res = message.payload.res->response;
         auto res = proto::parse_contact(http_res);
@@ -216,7 +216,7 @@ void global_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcep
 void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
                                             const rotor::message_ptr_t &custom) noexcept {
     auto timeout = r::pt::millisec{io_timeout};
-    transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true, ""};
+    transport::ssl_junction_t ssl{discovery_device_id, &ssl_pair, true, ""};
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
                                                         rx_buff_size, std::move(ssl), custom)
                        .send(timeout);

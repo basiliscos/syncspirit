@@ -94,7 +94,7 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
     r::address_ptr_t http_client;
     r::address_ptr_t coordinator;
     utils::URI announce_url;
-    model::device_id_t dicovery_device_id;
+    model::device_id_t discovery_device_id;
     const utils::key_pair_t &ssl_pair;
     rx_buff_t rx_buff;
     std::uint32_t rx_buff_size;

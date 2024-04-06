@@ -219,7 +219,7 @@ model::file_block_t controller_actor_t::next_block(bool reset) noexcept {
 void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
     LOG_TRACE(log, "{}, on_pull_ready, blocks requested = {}", identity, rx_blocks_requested);
     bool ignore = (rx_blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
-                  || (state != r::state_t::OPERATIONAL) // wrequest pool sz = 32505856e are shutting down
+                  || (state != r::state_t::OPERATIONAL) // request pool sz = 32505856e are shutting down
         ;
     if (ignore) {
         return;
@@ -541,7 +541,7 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
                     code = proto::ErrorCode::NO_SUCH_FILE;
                 } else {
                     if (!file->is_file()) {
-                        LOG_WARN(log, "{}, attempt to request non-regual file: {}", identity, file->get_name());
+                        LOG_WARN(log, "{}, attempt to request non-regular file: {}", identity, file->get_name());
                         code = proto::ErrorCode::GENERIC;
                     }
                 }
