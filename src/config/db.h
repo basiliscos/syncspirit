@@ -10,7 +10,7 @@ namespace syncspirit::config {
 
 struct db_config_t {
     std::int64_t upper_limit;
-    std::uint32_t uncommited_threshold;
+    std::uint32_t uncommitted_threshold;
 };
 
 } // namespace syncspirit::config

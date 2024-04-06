@@ -27,7 +27,7 @@ bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
 }
 
 bool operator==(const db_config_t &lhs, const db_config_t &rhs) noexcept {
-    return lhs.upper_limit == rhs.upper_limit && lhs.uncommited_threshold == rhs.uncommited_threshold;
+    return lhs.upper_limit == rhs.upper_limit && lhs.uncommitted_threshold == rhs.uncommitted_threshold;
 }
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {

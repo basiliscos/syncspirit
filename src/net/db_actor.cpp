@@ -139,7 +139,7 @@ auto db_actor_t::get_txn() noexcept -> outcome::result<db::transaction_t *> {
             return txn.assume_error();
         }
         txn_holder.reset(new db::transaction_t(std::move(txn.assume_value())));
-        uncommited = 0;
+        uncommitted = 0;
     }
     return txn_holder.get();
 }
@@ -152,7 +152,7 @@ auto db_actor_t::commit(bool force) noexcept -> outcome::result<void> {
         txn_holder.reset();
         return r;
     }
-    if (++uncommited >= db_config.uncommited_threshold) {
+    if (++uncommitted >= db_config.uncommitted_threshold) {
         LOG_INFO(log, "{}, commiting tx", identity);
         auto r = txn_holder->commit();
         txn_holder.reset();

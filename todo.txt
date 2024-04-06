@@ -1,7 +1,5 @@
- - add --help
- --command share:folder=my_label10:device=zzz
-
 - change log
+- update docs
 
 сборка:
  - linux/ubuntu https://www.simplified.guide/ubuntu/build-chroot-environment

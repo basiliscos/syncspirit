@@ -21,7 +21,7 @@ struct db_actor_config_t : r::actor_config_t {
     std::string db_dir;
     config::db_config_t db_config;
     model::cluster_ptr_t cluster;
-    size_t uncommited_threshold = {100};
+    size_t uncommitted_threshold = {100};
 };
 
 template <typename Actor> struct db_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -87,7 +87,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     config::db_config_t db_config;
     model::cluster_ptr_t cluster;
     transaction_ptr_t txn_holder;
-    size_t uncommited;
+    size_t uncommitted;
 };
 
 } // namespace net

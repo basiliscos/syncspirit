@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     }
 #endif
 #ifdef _WIN32
-    if  (!SetConsoleCtrlHandler(consoleHandler, true)) {
+    if (!SetConsoleCtrlHandler(consoleHandler, true)) {
         spdlog::critical("ERROR: Could not set control handler");
         return -1;
     }

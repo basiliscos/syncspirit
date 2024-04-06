@@ -19,7 +19,7 @@ blocks_max_requested = 16   # maximum amount of concurrently requested blocks
 [db]
 upper_limit = 0x400000000   # maximum amount of database, in bytes
 uncommited_threshold = 150  # how often flush db to disk, i.e. how much operations
-                            # might be not commited. Affects disk performance
+                            # might be not committed. Affects disk performance
 
 [dialer]
 enabled = true
@@ -62,7 +62,7 @@ name = 'net.db'
 level = 'debug'
 
 [main]
-# where folders are created by dfault
+# where folders are created by default
 default_location = '/tmp/syncspirit'
 # this device name
 device_name = 'this-device-name'

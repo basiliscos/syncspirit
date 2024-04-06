@@ -357,11 +357,11 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.upper_limit = upper_limit.value();
 
-        auto uncommited_threshold = t["uncommited_threshold"].value<std::uint32_t>();
-        if (!uncommited_threshold) {
-            return "db/uncommited_threshold is incorrect or missing";
+        auto uncommitted_threshold = t["uncommitted_threshold"].value<std::uint32_t>();
+        if (!uncommitted_threshold) {
+            return "db/uncommitted_threshold is incorrect or missing";
         }
-        c.uncommited_threshold = uncommited_threshold.value();
+        c.uncommitted_threshold = uncommitted_threshold.value();
     }
 
     return cfg;
@@ -454,7 +454,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                }}},
         {"db", toml::table{{
                    {"upper_limit", cfg.db_config.upper_limit},
-                   {"uncommited_threshold", cfg.db_config.uncommited_threshold},
+                   {"uncommitted_threshold", cfg.db_config.uncommitted_threshold},
                }}},
         {"relay", toml::table{{
                       {"enabled", cfg.relay_config.enabled},
@@ -554,7 +554,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     };
     cfg.db_config = db_config_t {
         0x400000000,   /* upper_limit, 16Gb */
-        150,           /* uncommited_threshold */
+        150,           /* uncommitted_threshold */
     };
     cfg.relay_config = relay_config_t {
         true,                                       /* enabled */
