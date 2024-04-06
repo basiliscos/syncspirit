@@ -28,7 +28,7 @@ struct fixture_t {
     using completion_msg_t = fs::message::scan_completed_t;
     using errors_container_t = std::vector<error_msg_ptr_t>;
 
-    fixture_t() noexcept : root_path{bfs::unique_path()}, path_quard{root_path} {
+    fixture_t() noexcept : root_path{bfs::unique_path()}, path_guard{root_path} {
         utils::set_default("trace");
         bfs::create_directory(root_path);
         scan_completions = 0;
@@ -110,7 +110,7 @@ struct fixture_t {
     cluster_ptr_t cluster;
     device_ptr_t my_device;
     bfs::path root_path;
-    path_guard_t path_quard;
+    path_guard_t path_guard;
     target_ptr_t target;
     model::folder_ptr_t folder;
     model::folder_info_ptr_t folder_info;
@@ -488,7 +488,7 @@ void test_new_files() {
                 REQUIRE(scan_completions == 1);
             }
 
-            SECTION("two files, diffrent content") {
+            SECTION("two files, different content") {
                 auto file1_path = root_path / "file1.ext";
                 write_file(file1_path, "12345");
 
