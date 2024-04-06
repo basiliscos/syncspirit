@@ -13,6 +13,6 @@ auto close_transaction_t::apply_impl(cluster_t &) const noexcept -> outcome::res
 close_transaction_t::~close_transaction_t() noexcept {
     auto r = txn.commit();
     if (!r) {
-        spdlog::critical("error closing tranaction:: {}", r.error().message());
+        spdlog::critical("error closing transaction:: {}", r.error().message());
     }
 }

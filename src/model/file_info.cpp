@@ -255,8 +255,8 @@ void file_info_t::set_source(const file_info_ptr_t &peer_file) noexcept {
         auto &version = peer_file->get_version();
         auto sz = version.counters_size();
         assert(sz && "source file should have some version");
-        auto &couter = version.counters(sz - 1);
-        assert(couter.id());
+        auto &counter = version.counters(sz - 1);
+        assert(counter.id());
         auto peer = peer_file->get_folder_info()->get_device();
         source_device = peer->device_id().get_sha256();
         source_version = peer_file->get_version();
@@ -390,7 +390,7 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
     } else {
         assert(r == version_relation_t::conflict);
         auto log = utils::get_logger("model");
-        auto stringize = [](const proto::Vector &vector) -> std::string {
+        auto stringify = [](const proto::Vector &vector) -> std::string {
             auto r = std::string();
             for (int i = 0; i < vector.counters_size(); ++i) {
                 auto &c = vector.counters(i);
@@ -401,8 +401,8 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
             }
             return r;
         };
-        auto my_version = stringize(version);
-        auto other_version = stringize(other.version);
+        auto my_version = stringify(version);
+        auto other_version = stringify(other.version);
 
         LOG_CRITICAL(log, "conflict handling is not available for = {}, '{}' vs '{}'", get_full_name(), my_version,
                      other_version);

@@ -157,7 +157,7 @@ cluster_update_t::cluster_update_t(const model::device_t &source, unknown_folder
       removed_blocks{removed_blocks_}, removed_unknown_folders{std::move(removed_unknown_folders_)} {}
 
 auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "applyging cluster_update_t");
+    LOG_TRACE(log, "applying cluster_update_t");
     auto &folders = cluster.get_folders();
 
     for (auto &info : updated_folders) {

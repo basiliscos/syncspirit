@@ -73,19 +73,19 @@ std::string error_code_category_t::message(int c) const {
         r = "invalid folder info prefix";
         break;
     case error_code_t::folder_info_deserialization_failure:
-        r = "fodler info deserialization failure";
+        r = "folder info deserialization failure";
         break;
     case error_code_t::invalid_ignored_device_key_length:
         r = "invalid ignored device key length";
         break;
     case error_code_t::invalid_ignored_device_prefix:
-        r = "invalid ingored device prefix";
+        r = "invalid ignored device prefix";
         break;
     case error_code_t::ignored_device_deserialization_failure:
         r = "ignored device deserialization failure";
         break;
     case error_code_t::invalid_ignored_folder_prefix:
-        r = "invalid ingored folder prefix";
+        r = "invalid ignored folder prefix";
         break;
     case error_code_t::ignored_folder_deserialization_failure:
         r = "ignored folder deserialization failure";
