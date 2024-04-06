@@ -44,7 +44,7 @@ SYNCSPIRIT_API outcome::result<void> make_unmapping_request(fmt::memory_buffer &
                                                             std::uint16_t external_port) noexcept;
 
 SYNCSPIRIT_API outcome::result<void> make_mapping_validation_request(fmt::memory_buffer &buff, const utils::URI &uri,
-                                                                    std::uint16_t external_port) noexcept;
+                                                                     std::uint16_t external_port) noexcept;
 
 SYNCSPIRIT_API outcome::result<bool> parse_mapping(const char *data, std::size_t bytes) noexcept;
 

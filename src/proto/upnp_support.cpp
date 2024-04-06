@@ -238,7 +238,7 @@ outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const URI
 }
 
 outcome::result<void> make_mapping_validation_request(fmt::memory_buffer &buff, const URI &uri,
-                                                     std::uint16_t external_port) noexcept {
+                                                      std::uint16_t external_port) noexcept {
     http::request<http::string_body> req;
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_GetSpecificPortMappingEntry);
     req.method(http::verb::post);
