@@ -144,13 +144,13 @@ struct fixture_t {
 
 } // namespace
 
-void test_succesfull_announcement() {
+void test_successful_announcement() {
     struct F : fixture_t {
         bool preprocess() noexcept override {
             auto uri = utils::parse("tcp://127.0.0.1").value();
             cluster->get_device()->assign_uris({uri});
 
-            SECTION("successul (and empty) announce response") {
+            SECTION("successful (and empty) announce response") {
                 http::response<http::string_body> res;
                 res.result(204);
                 res.set("Reannounce-After", "123");
@@ -166,13 +166,13 @@ void test_succesfull_announcement() {
     F().run();
 }
 
-void test_failded_announcement() {
+void test_failed_announcement() {
     struct F : fixture_t {
         bool preprocess() noexcept override {
             auto uri = utils::parse("tcp://127.0.0.1").value();
             cluster->get_device()->assign_uris({uri});
 
-            SECTION("successul (and empty) announce response") {
+            SECTION("successful (and empty) announce response") {
                 http::response<http::string_body> res;
                 res.result(204);
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
@@ -253,8 +253,8 @@ void test_late_announcement() {
 }
 
 int _init() {
-    REGISTER_TEST_CASE(test_succesfull_announcement, "test_succesfull_announcement", "[net]");
-    REGISTER_TEST_CASE(test_failded_announcement, "test_failded_announcement", "[net]");
+    REGISTER_TEST_CASE(test_successful_announcement, "test_successful_announcement", "[net]");
+    REGISTER_TEST_CASE(test_failed_announcement, "test_failed_announcement", "[net]");
     REGISTER_TEST_CASE(test_peer_discovery, "test_peer_discovery", "[net]");
     REGISTER_TEST_CASE(test_late_announcement, "test_late_announcement", "[net]");
     return 1;
