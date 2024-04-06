@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     }
 #endif
 #ifdef _WIN32
-    if (!SetConsoleCtrlHandler(consoleHandler, true)) {
+    if  (!SetConsoleCtrlHandler(consoleHandler, true)) {
         spdlog::critical("ERROR: Could not set control handler");
         return -1;
     }
@@ -108,9 +108,32 @@ int main(int argc, char **argv) {
         using CommandStrings = std::vector<std::string>;
         cmdline_descr.add_options()
             ("help", "show this help message")
-            ("log_level", po::value<std::string>()->default_value("info"), "initial log level")
-            ("config_dir", po::value<std::string>(), "configuration directory path")
-            ("command", po::value<CommandStrings>(), "configuration directory path");
+            ("log_level", po::value<std::string>()->default_value("info"),
+                        "initial log level")
+            ("config_dir", po::value<std::string>(),
+                        "configuration directory path")
+            ("command", po::value<CommandStrings>(), "command for a deamon. "
+                "An arg can be:\n"
+                "  add_peer:${label}:${device_id} - records peer in a database;"
+                    " tries to connect to it and  allows incoming commections"
+                    " from peer device;\n"
+                "  add_folder:label=${folder_label}:id=${folder_id}:path=${path}"
+                    " adds a folder into the database, scans folder there"
+                    " (and adds files from it into the database). The"
+                    " ${folder_label} is arbitrary human-readable local label,"
+                    " while {folder_id} is predefined folder id to be shared"
+                    " with other devices. The ${path} is local path to the"
+                    " folder, e.g. /storage/music;\n"
+                "  share:folder=${label}:device=${device} shares the folder"
+                    " with the device. The ${label} can be a folder label or"
+                    " folder id, and the device can be a device id, device"
+                    " label or the first part of the device id, e.g. for device"
+                    " id 'XBOWTOU-Y7H6RM6-D7WT3UB-7P2DZ5G-R6GNZG6-T5CCG54-SGVF3U5-LBM7RQB'"
+                    " the first part is 'XBOWTOU';\n"
+                "  inactivate:${seconds} shut down daemon after ${seconds}"
+                    " of inactivity;\n"
+                "  rescan_dirs:${seconds} rescan all folders every ${seconds};\n"
+            );
         // clang-format on
 
         po::variables_map vm;

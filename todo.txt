@@ -1,24 +1,11 @@
-d5e4c198d8ab8319041d41ce7c6d44b8c7e7c876 ../lib/mbdx (v0.11.6)
+ - add --help
+ --command share:folder=my_label10:device=zzz
 
-
-
-- тест на аплоад
-- прикрурить новый rotor в sysctem_context?
 - change log
-- --help
-- сборка под винду
 
-- не сразу после скана оттдаёт новый конфиг
-
-
-use get_default_config_dir()
-2024-04-03 23:53:00.949] [E/4544] cannot store cryptographical keys (~/.config/syncspirit/cert.pem & ~/.config/syncspirit/key.pem) :: No such file or directory
-
--- не к тому коннектится scan_actor
-// p.discover_name("fs::hasher_proxy", hasher_proxy, false).link();
-p.discover_name(net::names::hasher_proxy, hasher_proxy, false).link();
-
-scan_actor тест на block_request
+сборка:
+ - linux/ubuntu https://www.simplified.guide/ubuntu/build-chroot-environment
+ - windows
 
 
 - conflict handling is not available
