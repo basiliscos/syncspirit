@@ -20,4 +20,4 @@ void platform_t::startup() {
 #endif
 }
 
-void platform_t::shutdhown() noexcept {}
+void platform_t::shutdown() noexcept {}

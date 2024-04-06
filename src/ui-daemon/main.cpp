@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
             ("command", po::value<CommandStrings>(), "command for a deamon. "
                 "An arg can be:\n"
                 "  add_peer:${label}:${device_id} - records peer in a database;"
-                    " tries to connect to it and  allows incoming commections"
+                    " tries to connect to it and  allows incoming connections"
                     " from peer device;\n"
                 "  add_folder:label=${folder_label}:id=${folder_id}:path=${path}"
                     " adds a folder into the database, scans folder there"
@@ -215,10 +215,10 @@ int main(int argc, char **argv) {
         }
 
         if (populate) {
-            spdlog::info("Generating cryptographical keys...");
+            spdlog::info("Generating cryptographic keys...");
             auto pair = utils::generate_pair(constants::issuer_name);
             if (!pair) {
-                spdlog::error("cannot generate cryptographical keys :: {}", pair.error().message());
+                spdlog::error("cannot generate cryptographic keys :: {}", pair.error().message());
                 return 1;
             }
             auto &keys = pair.value();
@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
             auto &key_path = cfg.global_announce_config.key_file;
             auto save_result = keys.save(cert_path.c_str(), key_path.c_str());
             if (!save_result) {
-                spdlog::error("cannot store cryptographical keys ({} & {}) :: {}", cert_path, key_path,
+                spdlog::error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
                               save_result.error().message());
                 return 1;
             }
@@ -266,7 +266,7 @@ int main(int argc, char **argv) {
                           .finish();
 
         // auxiliary payload
-        fs_sup->add_laucher([&](model::cluster_ptr_t &cluster) mutable {
+        fs_sup->add_launcher([&](model::cluster_ptr_t &cluster) mutable {
             fs_sup->create_actor<governor_actor_t>()
                 .commands(std::move(commands))
                 .cluster(cluster)
@@ -337,7 +337,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    utils::platform_t::shutdhown();
+    utils::platform_t::shutdown();
     google::protobuf::ShutdownProtobufLibrary();
     /* exit */
 

@@ -42,7 +42,7 @@ std::string error_code_category::message(int c) const {
         r = "WAN device description was not found in the XML";
         break;
     case error_code_t::timed_out:
-        r = "timeout occured";
+        r = "timeout occurred";
         break;
     case error_code_t::service_not_available:
         r = "service not available";

@@ -68,7 +68,7 @@ std::string base32::encode(std::string_view input) noexcept {
     std::uint32_t out_index = 0;
     auto ptr = input.begin();
 
-    /* setup and pre-allign first 2 bytes */
+    /* setup and pre-align first 2 bytes */
     auto pull_in = [&]() {
         if (in_bytes) {
             std::uint32_t in_byte = static_cast<unsigned char>(*ptr++);

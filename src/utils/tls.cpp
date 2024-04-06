@@ -102,7 +102,7 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     if (1 != EVP_PKEY_keygen(key_ctx, &pkey)) {
         return error_code_t::tls_key_gen_failure;
     }
-    auto pkey_quard = make_guard(pkey, [](auto *ptr) { EVP_PKEY_free(ptr); });
+    auto pkey_guard = make_guard(pkey, [](auto *ptr) { EVP_PKEY_free(ptr); });
 
     EC_GROUP *group = EC_GROUP_new_by_curve_name(NID_secp384r1);
     EC_GROUP_set_asn1_flag(group, OPENSSL_EC_NAMED_CURVE);
@@ -180,7 +180,7 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
         return key_container.error();
     }
 
-    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), cert_data_t{std::move(cert_container.value())},
+    return key_pair_t{std::move(cert_guard), std::move(pkey_guard), cert_data_t{std::move(cert_container.value())},
                       cert_data_t{std::move(key_container.value())}};
 }
 
@@ -262,7 +262,7 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
     if (!pkey) {
         return error_code_t::tls_key_load_failure;
     }
-    auto pkey_quard = make_guard(pkey, [](auto *ptr) { EVP_PKEY_free(ptr); });
+    auto pkey_guard = make_guard(pkey, [](auto *ptr) { EVP_PKEY_free(ptr); });
 
     auto cert_container = as_der(cert);
     if (!cert_container) {
@@ -274,7 +274,7 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
         return key_container.error();
     }
 
-    return key_pair_t{std::move(cert_guard), std::move(pkey_quard), cert_data_t{std::move(cert_container.value())},
+    return key_pair_t{std::move(cert_guard), std::move(pkey_guard), cert_data_t{std::move(cert_container.value())},
                       cert_data_t{std::move(key_container.value())}};
 }
 

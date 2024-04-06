@@ -125,7 +125,7 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
     auto url_option = utils::parse(control_url.c_str());
     if (!url_option) {
         LOG_ERROR(log, "{}, can't parse IGD url {}", identity, control_url);
-        auto ec = utils::make_error_code(utils::error_code_t::unparseable_control_url);
+        auto ec = utils::make_error_code(utils::error_code_t::unparsable_control_url);
         return do_shutdown(make_error(ec));
     }
     igd_control_url = url_option.value();
@@ -232,7 +232,7 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
 
     if (ok) {
         fmt::memory_buffer tx_buff;
-        auto res = make_mappig_validation_request(tx_buff, igd_control_url, external_port);
+        auto res = make_mapping_validation_request(tx_buff, igd_control_url, external_port);
         if (!res) {
             auto &ec = res.error();
             LOG_TRACE(log, "{}, error making port mapping validation request :: {}", identity, ec.message());
@@ -290,7 +290,7 @@ void upnp_actor_t::on_validate(message::http_response_t &msg) noexcept {
         LOG_DEBUG(log, "validation port reply: {}\n", content);
     }
     bool ok = false;
-    auto result = parse_mappig_validation(body.data(), body.size());
+    auto result = parse_mapping_validation(body.data(), body.size());
     if (!result) {
         LOG_WARN(log, "{}, can't parse port mapping validation reply : {}", identity, result.error().message());
         LOG_DEBUG(log, "xml:\n{0}\n", content);

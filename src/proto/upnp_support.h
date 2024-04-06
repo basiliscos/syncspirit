@@ -43,13 +43,13 @@ SYNCSPIRIT_API outcome::result<void> make_mapping_request(fmt::memory_buffer &bu
 SYNCSPIRIT_API outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const utils::URI &uri,
                                                             std::uint16_t external_port) noexcept;
 
-SYNCSPIRIT_API outcome::result<void> make_mappig_validation_request(fmt::memory_buffer &buff, const utils::URI &uri,
+SYNCSPIRIT_API outcome::result<void> make_mapping_validation_request(fmt::memory_buffer &buff, const utils::URI &uri,
                                                                     std::uint16_t external_port) noexcept;
 
 SYNCSPIRIT_API outcome::result<bool> parse_mapping(const char *data, std::size_t bytes) noexcept;
 
 SYNCSPIRIT_API outcome::result<bool> parse_unmapping(const char *data, std::size_t bytes) noexcept;
 
-SYNCSPIRIT_API outcome::result<bool> parse_mappig_validation(const char *data, std::size_t bytes) noexcept;
+SYNCSPIRIT_API outcome::result<bool> parse_mapping_validation(const char *data, std::size_t bytes) noexcept;
 
 } // namespace syncspirit::proto

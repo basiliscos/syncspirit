@@ -59,7 +59,7 @@ enum class error_code_t {
     rx_limit_reached,
     non_authorized,
     igd_description_failed,
-    unparseable_control_url,
+    unparsable_control_url,
     external_ip_failed,
     rx_timeout,
     tx_timeout,

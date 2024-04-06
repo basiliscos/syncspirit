@@ -187,7 +187,7 @@ template <> struct base_impl_t<ssl_socket_t> {
 
                 if (role == ssl::stream_base::handshake_type::client) {
                     if (actual_peer != expected_peer) {
-                        spdlog::warn("unexcpected peer device_id. Got: {}, expected: {}", actual_peer.get_value(),
+                        spdlog::warn("unexpected peer device_id. Got: {}, expected: {}", actual_peer.get_value(),
                                      expected_peer.get_value());
                         return false;
                     }

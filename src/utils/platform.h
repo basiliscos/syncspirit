@@ -18,7 +18,7 @@ namespace syncspirit::utils {
 
 struct platform_t {
     SYNCSPIRIT_API static void startup();
-    SYNCSPIRIT_API static void shutdhown() noexcept;
+    SYNCSPIRIT_API static void shutdown() noexcept;
 };
 
 } // namespace syncspirit::utils

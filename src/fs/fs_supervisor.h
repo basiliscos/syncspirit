@@ -45,7 +45,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
     explicit fs_supervisor_t(config_t &cfg);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
-    template <typename F> void add_laucher(F &&launcher) noexcept { launchers.push_back(std::forward<F>(launcher)); }
+    template <typename F> void add_launcher(F &&launcher) noexcept { launchers.push_back(std::forward<F>(launcher)); }
 
   private:
     using model_request_ptr_t = r::intrusive_ptr_t<model::message::model_request_t>;

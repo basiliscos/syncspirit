@@ -87,9 +87,9 @@ void governor_actor_t::on_io_error(model::message::io_error_t &reply) noexcept {
 
 void governor_actor_t::on_scan_completed(fs::message::scan_completed_t &message) noexcept {
     auto &folder_id = message.payload.folder_id;
-    auto folder = scaning_folders.by_id(folder_id);
+    auto folder = scanning_folders.by_id(folder_id);
     LOG_TRACE(log, "{}, on_scan_completed, folder = {}({})", identity, folder->get_label(), folder->get_id());
-    scaning_folders.remove(folder);
+    scanning_folders.remove(folder);
 }
 
 void governor_actor_t::process() noexcept {
@@ -113,11 +113,11 @@ void governor_actor_t::track_inactivity() noexcept {
     auto timeout = r::pt::seconds(inactivity_seconds);
     auto now = clock_t::local_time();
     deadline = now + timeout;
-    start_timer(timeout, *this, &governor_actor_t::on_inacitvity_timer);
+    start_timer(timeout, *this, &governor_actor_t::on_inactivity_timer);
 }
 
-void governor_actor_t::on_inacitvity_timer(r::request_id_t, bool cancelled) noexcept {
-    LOG_DEBUG(log, "{}, on_inacitvity_timer", identity);
+void governor_actor_t::on_inactivity_timer(r::request_id_t, bool cancelled) noexcept {
+    LOG_DEBUG(log, "{}, on_inactivity_timer", identity);
     if (cancelled) {
         if (state == r::state_t::OPERATIONAL) {
             track_inactivity();
@@ -157,13 +157,13 @@ void governor_actor_t::schedule_rescan_dirs() noexcept {
 }
 
 void governor_actor_t::rescan_folders() {
-    if (scaning_folders.size() == 0) {
+    if (scanning_folders.size() == 0) {
         auto &folders = cluster->get_folders();
         LOG_INFO(log, "{}, issuing folders ({}) rescan", identity, folders.size());
         for (auto it : folders) {
             auto &folder = it.item;
             send<fs::payload::scan_folder_t>(fs_scanner, std::string(folder->get_id()));
-            scaning_folders.put(folder);
+            scanning_folders.put(folder);
         }
     }
 }
@@ -172,7 +172,7 @@ void governor_actor_t::rescan_folder(std::string_view folder_id) noexcept {
     auto folder = cluster->get_folders().by_id(folder_id);
     LOG_INFO(log, "{}, forcing folder '{}' rescan", identity, folder->get_label());
     send<fs::payload::scan_folder_t>(fs_scanner, std::string(folder->get_id()));
-    scaning_folders.put(folder);
+    scanning_folders.put(folder);
 }
 
 void governor_actor_t::add_callback(const void *pointer, command_callback_t &&callback) noexcept {

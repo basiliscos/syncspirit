@@ -76,16 +76,16 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
     for (auto it : actor.cluster->get_folders()) {
         auto f = it.item;
         if ((f->get_id() == folder.id())) {
-            log->warn("{}, folder with id = {} is alredy present is the cluster", actor.get_identity(), f->get_id());
+            log->warn("{}, folder with id = {} is already present is the cluster", actor.get_identity(), f->get_id());
             return false;
         }
         if (f->get_label() == folder.label()) {
-            log->warn("{}, folder with label = {} is alredy present is the cluster", actor.get_identity(),
+            log->warn("{}, folder with label = {} is already present is the cluster", actor.get_identity(),
                       f->get_label());
             return false;
         }
         if (f->get_path().string() == folder.path()) {
-            log->warn("{}, folder with path = {} is alredy present is the cluster", actor.get_identity(),
+            log->warn("{}, folder with path = {} is already present is the cluster", actor.get_identity(),
                       f->get_path());
             return false;
         }
