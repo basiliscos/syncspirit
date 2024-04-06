@@ -203,7 +203,7 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     bool ok = false;
     auto &ee = msg.payload.ee;
     if (ee) {
-        LOG_WARN(log, "{}, unsuccessfull port mapping: {}", ee->message(), identity);
+        LOG_WARN(log, "{}, unsuccessful port mapping: {}", ee->message(), identity);
         auto inner = utils::make_error_code(utils::error_code_t::portmapping_failed);
         return do_shutdown(make_error(inner, ee));
     } else if (state > r::state_t::OPERATIONAL) {
@@ -222,7 +222,7 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     } else {
         rx_buff->consume(msg.payload.res->bytes);
         if (!result.value()) {
-            LOG_WARN(log, "{}, unsuccessfull port mapping", identity);
+            LOG_WARN(log, "{}, unsuccessful port mapping", identity);
             LOG_DEBUG(log, "mapping port reply: {}\n", std::string_view(body.data(), body.size()));
         } else {
             LOG_DEBUG(log, "{}, port mapping succeeded", identity);
@@ -249,7 +249,7 @@ void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
 
     auto &ee = msg.payload.ee;
     if (ee) {
-        LOG_WARN(log, "upnp_actor:: unsuccessfull port mapping: {}", ee->message());
+        LOG_WARN(log, "upnp_actor:: unsuccessful port mapping: {}", ee->message());
         return;
     }
     auto &body = msg.payload.res->response.body();
@@ -265,7 +265,7 @@ void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
         LOG_WARN(log, "{}, port unmapping failed", identity);
         LOG_DEBUG(log, "xml:\n{0}\n", content);
     } else {
-        LOG_DEBUG(log, "{}, succesfully unmmaped external port {}", identity, external_port);
+        LOG_DEBUG(log, "{}, successfully unmapped external port {}", identity, external_port);
     }
     if (unlink_request) {
         auto p = get_plugin(r::plugin::link_client_plugin_t::class_identity);
@@ -281,7 +281,7 @@ void upnp_actor_t::on_validate(message::http_response_t &msg) noexcept {
 
     auto &ee = msg.payload.ee;
     if (ee) {
-        LOG_WARN(log, "upnp_actor:: unsuccessfull port mapping: {}", ee->message());
+        LOG_WARN(log, "upnp_actor:: unsuccessful port mapping: {}", ee->message());
         return;
     }
     auto &body = msg.payload.res->response.body();
@@ -298,7 +298,7 @@ void upnp_actor_t::on_validate(message::http_response_t &msg) noexcept {
         LOG_WARN(log, "{}, port mapping validation failed", identity);
         LOG_DEBUG(log, "xml:\n{0}\n", content);
     } else {
-        LOG_DEBUG(log, "{}, succesfully validate external port {} mapping", identity, external_port);
+        LOG_DEBUG(log, "{}, successfully validate external port {} mapping", identity, external_port);
         ok = true;
     }
 
@@ -320,7 +320,7 @@ void upnp_actor_t::shutdown_start() noexcept {
     }
 
     if (resources->has(resource::external_port)) {
-        LOG_TRACE(log, "{}, going to unmap extenal port {}", identity, external_port);
+        LOG_TRACE(log, "{}, going to unmap external port {}", identity, external_port);
         fmt::memory_buffer tx_buff;
         auto res = make_unmapping_request(tx_buff, igd_control_url, external_port);
         if (!res) {

@@ -39,7 +39,7 @@ void ssdp_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
     sock = std::make_unique<udp_socket_t>(strand.context(), udp::endpoint(udp::v4(), 0));
 
-    /* broadcast discorvery */
+    /* broadcast discovery */
     auto max_wait = upnp_config.max_wait;
     auto request_result = make_discovery_request(tx_buff, max_wait);
     if (!request_result) {
@@ -50,9 +50,9 @@ void ssdp_actor_t::on_start() noexcept {
 
     LOG_TRACE(log, "{}, sending multicast request to {}:{} ({} bytes)", identity, upnp_addr, upnp_port, tx_buff.size());
 
-    auto fwd_recieve = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_received, &ssdp_actor_t::on_udp_recv_error);
+    auto fwd_receive = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_received, &ssdp_actor_t::on_udp_recv_error);
     auto buff_rx = asio::buffer(rx_buff.data(), RX_BUFF_SIZE);
-    sock->async_receive(buff_rx, std::move(fwd_recieve));
+    sock->async_receive(buff_rx, std::move(fwd_receive));
     resources->acquire(resource::recv);
 
     auto fwd_discovery = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_sent, &ssdp_actor_t::on_udp_send_error);
