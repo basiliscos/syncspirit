@@ -28,7 +28,7 @@ struct fixture_t {
     using blk_res_t = fs::message::block_response_t;
     using blk_res_ptr_t = r::intrusive_ptr_t<blk_res_t>;
 
-    fixture_t() noexcept : root_path{bfs::unique_path()}, path_quard{root_path} {
+    fixture_t() noexcept : root_path{bfs::unique_path()}, path_guard{root_path} {
         utils::set_default("trace");
         bfs::create_directory(root_path);
     }
@@ -104,7 +104,7 @@ struct fixture_t {
     r::intrusive_ptr_t<supervisor_t> sup;
     r::intrusive_ptr_t<fs::file_actor_t> file_actor;
     bfs::path root_path;
-    path_guard_t path_quard;
+    path_guard_t path_guard;
     r::system_context_t ctx;
     msg_ptr_t reply;
     blk_res_ptr_t block_reply;
@@ -589,7 +589,7 @@ void test_requesting_block() {
                 REQUIRE(block_reply->payload.data.empty());
             }
 
-            SECTION("successfull file reading") {
+            SECTION("successful file reading") {
                 write_file(target, "1234567890");
                 sup->put(msg);
                 sup->do_process();

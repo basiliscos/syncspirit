@@ -172,7 +172,7 @@ TEST_CASE("relay proto", "[relay]") {
         }
     }
 
-    SECTION("incompplete") {
+    SECTION("incomplete") {
         auto r = parse(buff);
         auto msg = std::get_if<incomplete_t>(&r);
         REQUIRE(msg);

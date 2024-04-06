@@ -21,7 +21,7 @@ TEST_CASE("default logger", "[log]") {
     CHECK(l->level() == L::trace);
 }
 
-TEST_CASE("hierarcy", "[log]") {
+TEST_CASE("hierarchy", "[log]") {
     config::log_configs_t cfg{{"default", L::trace, {"stdout"}}, {"a", L::info, {}}, {"a.b.c", L::warn, {}}};
     REQUIRE(utils::init_loggers(cfg, overwrite));
     SECTION("custom") {
