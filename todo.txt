@@ -1,5 +1,5 @@
-- change log
 - update docs
+- fix year of changes
 
 сборка:
  - linux/ubuntu https://www.simplified.guide/ubuntu/build-chroot-environment
