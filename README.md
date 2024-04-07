@@ -16,7 +16,7 @@ and still is in heavy development.
 
 # status
 
-- [x] downloading files from peer devices (aka all folders are receive only)
+- [x] full-powered files synchronization (aka send and receive)
 
 - [x] [global peer discovery](https://docs.syncthing.net/specs/globaldisco-v3.html)
 
@@ -32,7 +32,6 @@ and still is in heavy development.
 
 This list is probably incomplete, here are the most important changes
 
-- [ ] full-powered files synchronization (aka send and receive)
 
 - [ ] conflict resolution
 
@@ -117,6 +116,13 @@ after the core completion.
 - (may be) mac os x
 
 # changes
+
+## 0.3.0 (xx-Apr-2024)
+- [feature] implemented complete files syncrhonisation
+- [feature] added local files watcher and updates streamer
+- [build] switched from git submodules to [conan2](https://conan.io)
+- [win32] better platform support
+
 
 ## 0.2.0 (22-May-2022)
 - [feature] implement [relay transport](https://docs.syncthing.net/specs/relay-v1.html),
