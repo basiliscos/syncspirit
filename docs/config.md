@@ -9,24 +9,29 @@ All timeouts are specified in milliseconds
 
 # settings peer connection
 [bep]
-rx_buff_size = 33554432     # preallocated buffer size
+blocks_max_requested = 16           # maximum concurrent block read requests to a peer
+blocks_simultaneous_write = 16      # maximum concurrent block write requests to disk
 connect_timeout = 5000
 request_timeout = 60000
+rx_buff_size = 16777216             # preallocated receive buffer size
 rx_timeout = 300000
-tx_timeout = 10000
-blocks_max_requested = 16   # maximum amount of concurrently requested blocks
+tx_buff_limit = 8388608             # preallocated transmit buffer size
+tx_timeout = 90000
 
+# database settings
 [db]
 upper_limit = 0x400000000   # maximum amount of database, in bytes
 uncommited_threshold = 150  # how often flush db to disk, i.e. how much operations
                             # might be not committed. Affects disk performance
 
+# dialer settings
 [dialer]
 enabled = true
 redial_timeout = 300000     # how often try to redial to offline peers
 
+# filesystem settings
 [fs]
-temporally_timeout = 86400000   # remove incomplete file after this timeout
+temporally_timeout = 86400000   # remove incomplete file after this amount of seconds
 mru_size = 10                   # maximum amount of cached files
 
 
@@ -56,18 +61,13 @@ level = 'trace'
 # where do output logs
 sinks = ['stdout', 'file:/tmp/log.txt']
 
-# actor specific log (for net.db in the case)
-[[log]]
-name = 'net.db'
-level = 'debug'
-
 [main]
 # where folders are created by default
 default_location = '/tmp/syncspirit'
 # this device name
 device_name = 'this-device-name'
 timeout = 5000
-# the amount of hasher threads
+# the amount cpu cores used for hashing
 hasher_threads = 3
 
 [relay]
@@ -85,6 +85,11 @@ discovery_attempts = 2
 external_port = 22001
 max_wait = 1
 rx_buff_size = 65536
+
+# actor specific log (for net.db in the case)
+[[log]]
+name = 'net.db'
+level = 'debug'
 
 ```
 
