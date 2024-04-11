@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "utils/platform.h"
 #include <boost/outcome.hpp>
 #include "transaction.h"
 #include "prefix.h"

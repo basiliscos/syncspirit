@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "utils/platform.h"
 #include "../cluster_diff.h"
 #include "model/file_info.h"
 

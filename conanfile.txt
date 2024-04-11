@@ -15,10 +15,13 @@ zlib/1.2.13
 [test_requires]
 catch2/3.3.1
 
+[tool_requires]
+protobuf/3.21.9
+
 [options]
-pugixml/1.13:no_exceptions=True
-rotor/0.29:enable_asio=True
-rotor/0.29:enable_thread=True
+pugixml/*:no_exceptions=True
+rotor/*:enable_asio=True
+rotor/*:enable_thread=True
 
 [generators]
 CMakeDeps

@@ -3,9 +3,11 @@
 
 #pragma once
 
+#include "utils/platform.h"
+#include "mdbx.h"
 #include <cstddef>
 #include <string>
-#include "mdbx.h"
+
 #include "syncspirit-export.h"
 
 namespace syncspirit::db {
