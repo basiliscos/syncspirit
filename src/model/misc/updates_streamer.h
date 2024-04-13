@@ -35,7 +35,7 @@ using files_set_t = mi::multi_index_container<
 } // namespace details
 
 struct SYNCSPIRIT_API updates_streamer_t {
-    updates_streamer_t() noexcept = default;
+    updates_streamer_t() = default;
     updates_streamer_t(cluster_t &, device_t &) noexcept;
 
     updates_streamer_t &operator=(updates_streamer_t &&) noexcept;

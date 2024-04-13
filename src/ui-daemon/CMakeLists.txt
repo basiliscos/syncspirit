@@ -27,7 +27,7 @@ if (("${CMAKE_BUILD_TYPE}" STREQUAL "Release") AND (NOT WIN32))
         message(STATUS "IPO / LTO enabled for the syncspirit-daemon")
         set_property(TARGET syncspirit-daemon PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     else()
-        message(STATUS "IPO / LTO not supported: <${error}>")
+        message(STATUS "IPO / LTO not supported")
     endif()
 endif()
 
