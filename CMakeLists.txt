@@ -32,7 +32,7 @@ find_package(uriparser REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
-set(SYNCSPIRIT_VERSION "v0.3.0")
+set(SYNCSPIRIT_VERSION "v0.4.0")
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
 set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src/protobuf)
@@ -211,3 +211,4 @@ target_link_libraries(syncspirit_lib
 enable_testing()
 add_subdirectory("tests")
 add_subdirectory("src/ui-daemon")
+add_subdirectory("src/ui-fltk")

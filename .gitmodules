@@ -2,3 +2,6 @@
 	path = lib/mbdx
 	url = https://gitflic.ru/project/erthink/libmdbx.git
 
+[submodule "lib/fltk"]
+	path = lib/fltk
+	url = https://github.com/fltk/fltk.git
