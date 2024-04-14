@@ -117,7 +117,7 @@ after the core completion.
 
 # changes
 
-## 0.3.0 (xx-Apr-2024)
+## 0.3.0 (14-Apr-2024)
 - [feature] implemented complete files syncrhonisation
 - [feature] added local files watcher and updates streamer
 - [build] switched from git submodules to [conan2](https://conan.io)
