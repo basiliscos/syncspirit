@@ -39,16 +39,16 @@ struct SYNCSPIRIT_API folder_t final : arc_base_t<folder_t>, folder_data_t {
     bool operator==(const folder_t &other) const noexcept { return get_id() == other.get_id(); }
     bool operator!=(const folder_t &other) const noexcept { return !(*this == other); }
 
-    bool is_shared_with(const device_t &device) const noexcept;
+    folder_info_ptr_t is_shared_with(const device_t &device) const noexcept;
 
     std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
     inline auto &get_folder_infos() noexcept { return folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
 
     using folder_data_t::get_path;
+    using folder_data_t::set_path;
     void update(local_file_map_t &local_files) noexcept;
     std::optional<proto::Folder> generate(const model::device_t &device) const noexcept;
-    proto::Index generate() noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;

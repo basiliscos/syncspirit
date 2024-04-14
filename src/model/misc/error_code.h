@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -44,9 +44,7 @@ enum class error_code_t {
     malformed_deviceid,
     folder_is_not_shared,
     invalid_block_size,
-    exceed_max_sequence,
-    unexpected_blocks,
-    inconsistent_file,
+    unexpected_blocks
 };
 
 namespace detail {

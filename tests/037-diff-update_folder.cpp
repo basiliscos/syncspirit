@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -21,7 +20,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -50,7 +49,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
     pr_index.set_folder(db_folder_1.id());
 
     SECTION("successful case") {
-        auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
+        auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
 
         auto file = pr_index.add_files();
         file->set_name("a.txt");
@@ -60,6 +59,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
         file->set_modified_s(1);
         auto b = file->add_blocks();
         b->set_hash("123");
+        b->set_size(5ul);
 
         peer_folder_info->set_max_sequence(10ul);
         diff = diff::peer::update_folder_t::create(*cluster, *peer_device, pr_index).value();
@@ -106,6 +106,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
         CHECK(opt.error() == model::make_error_code(model::error_code_t::folder_is_not_shared));
     }
 
+#if 0
     SECTION("exceed max sequence") {
         pr_index.set_folder(db_folder_1.id());
         auto f = pr_index.add_files();
@@ -114,6 +115,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
         REQUIRE(!opt);
         CHECK(opt.error() == model::make_error_code(model::error_code_t::exceed_max_sequence));
     }
+#endif
 
     SECTION("blocks are not expected") {
         auto file = pr_index.add_files();

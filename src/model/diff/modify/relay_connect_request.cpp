@@ -11,7 +11,7 @@ auto relay_connect_request_t::apply_impl(cluster_t &) const noexcept -> outcome:
     return outcome::success();
 }
 
-auto relay_connect_request_t::visit(contact_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto relay_connect_request_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting relay_connect_request_t");
-    return visitor(*this);
+    return visitor(*this, custom);
 }

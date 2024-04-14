@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -13,7 +13,7 @@
 #include <memory>
 #include <optional>
 
-#include <fmt/fmt.h>
+#include <fmt/core.h>
 #include "model/misc/upnp.h"
 #include "model/cluster.h"
 #include "transport/base.h"
@@ -83,8 +83,8 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     template <typename URI>
     http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
                    bool local_ip_, const r::message_ptr_t &custom_ = {})
-        : url{std::forward<URI>(url_)}, data{std::move(data_)}, rx_buff{rx_buff_},
-          rx_buff_size{rx_buff_size_}, local_ip{local_ip_}, custom{custom_} {}
+        : url{std::forward<URI>(url_)}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_},
+          local_ip{local_ip_}, custom{custom_} {}
 
     template <typename URI>
     http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
@@ -129,7 +129,7 @@ struct block_response_t {
     std::string data;
 };
 
-struct SYNCSPIRIT_API block_request_t {
+struct block_request_t {
     using response_t = block_response_t;
     model::file_info_ptr_t file;
     model::file_block_t block;
@@ -147,6 +147,18 @@ struct connect_request_t {
     model::device_id_t device_id;
     utils::URI uri;
     std::string_view alpn;
+};
+
+struct transfer_data_t {
+    fmt::memory_buffer data;
+};
+
+struct transfer_push_t {
+    uint32_t bytes;
+};
+
+struct transfer_pop_t {
+    uint32_t bytes;
 };
 
 } // end of namespace payload
@@ -172,6 +184,9 @@ using load_cluster_response_t = r::request_traits_t<payload::load_cluster_reques
 using start_reading_t = r::message_t<payload::start_reading_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
 using termination_signal_t = r::message_t<payload::termination_t>;
+using transfer_data_t = r::message_t<payload::transfer_data_t>;
+using transfer_push_t = r::message_t<payload::transfer_push_t>;
+using transfer_pop_t = r::message_t<payload::transfer_pop_t>;
 
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;

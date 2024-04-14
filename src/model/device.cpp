@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "device.h"
 #include "structs.pb.h"
@@ -50,8 +50,8 @@ outcome::result<device_ptr_t> device_t::create(const device_id_t &device_id, std
 
 device_t::device_t(const device_id_t &device_id_, std::string_view name_, std::string_view cert_name_) noexcept
     : id(std::move(device_id_)), name{name_}, compression{proto::Compression::METADATA}, cert_name{cert_name_},
-      introducer{false}, auto_accept{false}, paused{false},
-      skip_introduction_removals{false}, state{device_state_t::offline} {}
+      introducer{false}, auto_accept{false}, paused{false}, skip_introduction_removals{false},
+      state{device_state_t::offline} {}
 
 void device_t::update(const db::Device &source) noexcept { assign(source); }
 
@@ -75,7 +75,6 @@ std::string device_t::serialize() noexcept {
     r.set_auto_accept(auto_accept);
     r.set_paused(paused);
 
-    int i = 0;
     for (auto &address : static_uris) {
         *r.add_addresses() = address.full;
     }
@@ -87,7 +86,7 @@ void device_t::update_state(device_state_t new_state) { state = new_state; }
 
 std::string_view device_t::get_key() const noexcept { return id.get_key(); }
 
-void device_t::assing_uris(const uris_t &uris_) noexcept { uris = uris_; }
+void device_t::assign_uris(const uris_t &uris_) noexcept { uris = uris_; }
 
 local_device_t::local_device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept
     : device_t(device_id, name, cert_name) {
@@ -96,9 +95,11 @@ local_device_t::local_device_t(const device_id_t &device_id, std::string_view na
 
 std::string_view local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
 
-template <> std::string_view get_index<0, device_ptr_t>(const device_ptr_t &item) noexcept { return item->get_key(); }
+template <> SYNCSPIRIT_API std::string_view get_index<0, device_ptr_t>(const device_ptr_t &item) noexcept {
+    return item->get_key();
+}
 
-template <> std::string_view get_index<1, device_ptr_t>(const device_ptr_t &item) noexcept {
+template <> SYNCSPIRIT_API std::string_view get_index<1, device_ptr_t>(const device_ptr_t &item) noexcept {
     return item->device_id().get_sha256();
 }
 

@@ -48,7 +48,8 @@ std::string ignored_device_t::serialize() noexcept {
     return std::string(&c, 1);
 }
 
-template <> std::string_view get_index<0, ignored_device_ptr_t>(const ignored_device_ptr_t &item) noexcept {
+template <>
+SYNCSPIRIT_API std::string_view get_index<0, ignored_device_ptr_t>(const ignored_device_ptr_t &item) noexcept {
     return item->get_sha256();
 }
 

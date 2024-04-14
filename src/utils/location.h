@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -12,9 +12,15 @@ namespace syncspirit {
 namespace utils {
 
 namespace outcome = boost::outcome_v2;
-namespace fs = boost::filesystem;
+namespace bfs = boost::filesystem;
 
-SYNCSPIRIT_API outcome::result<fs::path> get_default_config_dir() noexcept;
+using home_option_t = outcome::result<bfs::path>;
+
+SYNCSPIRIT_API outcome::result<bfs::path> get_home_dir() noexcept;
+
+SYNCSPIRIT_API outcome::result<bfs::path> get_default_config_dir() noexcept;
+
+SYNCSPIRIT_API std::string expand_home(const std::string &path, const home_option_t &home) noexcept;
 
 } // namespace utils
 } // namespace syncspirit

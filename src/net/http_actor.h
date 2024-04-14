@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -26,22 +26,22 @@ template <typename Actor> struct http_actor_config_builder_t : r::actor_config_b
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&resolve_timeout(const pt::time_duration &value) &&noexcept {
+    builder_t &&resolve_timeout(const pt::time_duration &value) && noexcept {
         parent_t::config.resolve_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&request_timeout(const pt::time_duration &value) &&noexcept {
+    builder_t &&request_timeout(const pt::time_duration &value) && noexcept {
         parent_t::config.request_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&registry_name(const std::string &value) &&noexcept {
+    builder_t &&registry_name(const std::string &value) && noexcept {
         parent_t::config.registry_name = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&keep_alive(bool value = true) &&noexcept {
+    builder_t &&keep_alive(bool value = true) && noexcept {
         parent_t::config.keep_alive = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -76,7 +76,7 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_close_connection(message::http_close_connection_t &) noexcept;
 
-    void on_connect(resolve_it_t) noexcept;
+    void on_connect(const tcp::endpoint &) noexcept;
     void on_request_sent(std::size_t /* bytes */) noexcept;
     void on_request_read(std::size_t bytes) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;

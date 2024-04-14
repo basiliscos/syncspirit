@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -59,27 +59,6 @@ using io_error_t = r::message_t<payload::io_error_t>;
 
 using model_request_t = r::request_traits_t<payload::model_request_t>::request::message_t;
 using model_response_t = r::request_traits_t<payload::model_request_t>::response::message_t;
-
-} // namespace message
-
-namespace payload {
-
-struct forwarded_model_update_t {
-    using message_t = r::intrusive_ptr_t<message::model_update_t>;
-    message_t message;
-};
-
-struct forwarded_block_update_t {
-    using message_t = r::intrusive_ptr_t<message::block_update_t>;
-    message_t message;
-};
-
-} // namespace payload
-
-namespace message {
-
-using forwarded_model_update_t = r::message_t<payload::forwarded_model_update_t>;
-using forwarded_block_update_t = r::message_t<payload::forwarded_block_update_t>;
 
 } // namespace message
 

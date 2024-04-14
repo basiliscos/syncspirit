@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <fmt/fmt.h>
+#include <fmt/format.h>
 #include <boost/outcome.hpp>
 #include <boost/asio/buffer.hpp>
 #include <memory>

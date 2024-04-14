@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "share_folder.h"
 #include "../cluster_visitor.h"
 #include "../../cluster.h"
 #include "../../misc/error_code.h"
+#include "../../../utils/format.hpp"
 #include "structs.pb.h"
 
 using namespace syncspirit::model::diff::modify;
@@ -39,7 +40,7 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     LOG_TRACE(log, "applyging share_folder_t, folder {} with device {}, index = {}, max sequence = {}", folder_id,
               peer->device_id(), index, max_sequence);
 
-    auto folder_info = folder->get_folder_infos().by_device(peer);
+    auto folder_info = folder->get_folder_infos().by_device(*peer);
     if (folder_info) {
         return make_error_code(error_code_t::folder_is_already_shared);
     }
@@ -61,7 +62,7 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     return outcome::success();
 }
 
-auto share_folder_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto share_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting share_folder_t");
-    return visitor(*this);
+    return visitor(*this, custom);
 }

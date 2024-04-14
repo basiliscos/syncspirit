@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -23,7 +22,7 @@ struct fail_diff_t : diff::cluster_diff_t {
 TEST_CASE("generic cluster diff", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     auto diff = diff::cluster_diff_ptr_t(new fail_diff_t());
     CHECK(!cluster->is_tainted());
     CHECK(!diff->apply(*cluster));

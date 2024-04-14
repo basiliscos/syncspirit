@@ -1,8 +1,11 @@
-#include "catch.hpp"
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+
 #include "test-utils.h"
 #include "access.h"
 
 #include "utils/tls.h"
+#include "utils/format.hpp"
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "net/names.h"
@@ -75,7 +78,6 @@ struct fixture_t {
     }
 
     void run() noexcept {
-
         auto strand = std::make_shared<asio::io_context::strand>(io_ctx);
         sup = ctx.create_supervisor<supervisor_t>().strand(strand).timeout(timeout).create_registry().finish();
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
@@ -116,7 +118,7 @@ struct fixture_t {
         log->debug("listening on {}", peer_uri.full);
         initiate_accept();
 
-        cluster = new cluster_t(my_device, 1);
+        cluster = new cluster_t(my_device, 1, 1);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
@@ -128,7 +130,7 @@ struct fixture_t {
         acceptor.async_accept(peer_sock, [this](auto ec) { this->accept(ec); });
     }
 
-    virtual std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept {
+    virtual std::string get_uri(const asio::ip::tcp::endpoint &) noexcept {
         return fmt::format("tcp://{}", listening_ep);
     }
 
@@ -139,17 +141,16 @@ struct fixture_t {
     }
 
     virtual void initiate_peer_handshake() noexcept {
-        transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &cert,
-                                                        const tcp::endpoint &peer_endpoint,
-                                                        const model::device_id_t *peer_device) {
+        transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &, const tcp::endpoint &,
+                                                        const model::device_id_t *) {
             valid_handshake = valid_peer;
-            on_peer_hanshake();
+            on_peer_handshake();
         };
         transport::error_fn_t on_error = [](const auto &) {};
         peer_trans->async_handshake(handshake_fn, on_error);
     }
 
-    virtual void on_peer_hanshake() noexcept { LOG_INFO(log, "peer handshake"); }
+    virtual void on_peer_handshake() noexcept { LOG_INFO(log, "peer handshake"); }
 
     void initiate_active() noexcept {
         tcp::resolver resolver(io_ctx);
@@ -159,7 +160,7 @@ struct fixture_t {
         transport::error_fn_t on_error = [&](auto &ec) {
             LOG_WARN(log, "initiate_active/connect, err: {}", ec.message());
         };
-        transport::connect_fn_t on_connect = [&](auto arg) {
+        transport::connect_fn_t on_connect = [&](auto) {
             LOG_INFO(log, "initiate_active/peer connect");
             active_connect();
         };
@@ -169,9 +170,8 @@ struct fixture_t {
 
     virtual void active_connect() {
         LOG_TRACE(log, "active_connect");
-        transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &cert,
-                                                        const tcp::endpoint &peer_endpoint,
-                                                        const model::device_id_t *peer_device) {
+        transport::handshake_fn_t handshake_fn = [this](bool, utils::x509_t &, const tcp::endpoint &,
+                                                        const model::device_id_t *) {
             valid_handshake = true;
             LOG_INFO(log, "test_passive_success/peer handshake");
         };
@@ -188,6 +188,7 @@ struct fixture_t {
             .timeout(timeout)
             .peer_device_id(peer_device->device_id())
             .relay_session(relay_session)
+            .relay_enabled(true)
             .uris({peer_uri})
             .cluster(use_model ? cluster : nullptr)
             .sink(sup->get_address())
@@ -245,13 +246,13 @@ void test_connect_timeout() {
     F().run();
 }
 
-void test_connect_unsupproted_proto() {
+void test_connect_unsupported_proto() {
     struct F : fixture_t {
         std::string get_uri(const asio::ip::tcp::endpoint &) noexcept override {
             return fmt::format("xxx://{}", listening_ep);
         }
         void main() noexcept override {
-            auto act = create_actor();
+            create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
@@ -283,7 +284,7 @@ void test_handshake_timeout() {
 void test_handshake_garbage() {
     struct F : fixture_t {
 
-        void accept(const sys::error_code &ec) noexcept override {
+        void accept(const sys::error_code &) noexcept override {
             auto buff = asio::buffer("garbage-garbage-garbage");
             peer_sock.write_some(buff);
         }
@@ -446,7 +447,7 @@ void test_passive_garbage() {
         void active_connect_impl() noexcept override {
             tcp::resolver resolver(io_ctx);
             addresses = resolver.resolve(host, std::to_string(listening_ep.port()));
-            asio::async_connect(client_sock, addresses.begin(), addresses.end(), [&](auto ec, auto addr) {
+            asio::async_connect(client_sock, addresses.begin(), addresses.end(), [&](auto ec, auto) {
                 LOG_INFO(log, "test_passive_garbage/peer connect, ec: {}", ec.message());
                 auto buff = asio::buffer("garbage-garbage-garbage");
                 client_sock.write_some(buff);
@@ -511,7 +512,6 @@ struct passive_relay_fixture_t : fixture_t {
 
     virtual void write(const proto::relay::message_t &msg) noexcept {
         proto::relay::serialize(msg, rx_buff);
-        auto buff = asio::buffer(rx_buff);
         transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
         transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
         peer_trans->async_send(asio::buffer(rx_buff), write_fn, err_fn);
@@ -520,7 +520,7 @@ struct passive_relay_fixture_t : fixture_t {
     void accept(const sys::error_code &ec) noexcept override {
         LOG_INFO(log, "accept (relay/passive), ec: {}", ec.message());
         auto uri = utils::parse("tcp://127.0.0.1:0/").value();
-        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock)};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         peer_trans = transport::initiate_stream(cfg);
 
         transport::error_fn_t read_err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
@@ -548,20 +548,19 @@ void test_relay_passive_success() {
     F().run();
 }
 
-void test_relay_passive_gargabe() {
+void test_relay_passive_garbage() {
     struct F : passive_relay_fixture_t {
 
         void write(const proto::relay::message_t &) noexcept override {
-            rx_buff = "garbage-garbage-garbae";
+            rx_buff = "garbage-garbage-garbage";
             initiate_handshake = false;
-            auto buff = asio::buffer(rx_buff);
             transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
             transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
             peer_trans->async_send(asio::buffer(rx_buff), write_fn, err_fn);
         }
 
         void main() noexcept override {
-            auto act = create_actor();
+            create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
@@ -619,7 +618,7 @@ void test_relay_passive_unsuccessful_join() {
 
 void test_relay_malformed_uri() {
     struct F : fixture_t {
-        std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept override {
+        std::string get_uri(const asio::ip::tcp::endpoint &) noexcept override {
             return fmt::format("relay://{}", listening_ep);
         }
 
@@ -638,10 +637,10 @@ void test_relay_malformed_uri() {
     F().run();
 }
 
-void test_relay_active_wrong_relay_deviceid() {
+void test_relay_active_wrong_relay_device_id() {
     struct F : fixture_t {
 
-        std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept override {
+        std::string get_uri(const asio::ip::tcp::endpoint &) noexcept override {
             return fmt::format("relay://{}?id={}", listening_ep, my_device->device_id().get_value());
         }
 
@@ -674,7 +673,7 @@ struct active_relay_fixture_t : fixture_t {
         rx_buff.resize(128);
     }
 
-    std::string get_uri(const asio::ip::tcp::endpoint &endpoint) noexcept override {
+    std::string get_uri(const asio::ip::tcp::endpoint &) noexcept override {
         return fmt::format("relay://{}?id={}", listening_ep, relay_device.get_value());
     }
 
@@ -682,18 +681,17 @@ struct active_relay_fixture_t : fixture_t {
         LOG_INFO(log, "relay/accept, ec: {}", ec.message());
         if (!session_mode) {
             relay_trans = transport::initiate_tls_passive(*sup, relay_keys, std::move(peer_sock));
-            transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &cert,
-                                                            const tcp::endpoint &peer_endpoint,
-                                                            const model::device_id_t *peer_device) {
+            transport::handshake_fn_t handshake_fn = [this](bool valid_peer, utils::x509_t &, const tcp::endpoint &,
+                                                            const model::device_id_t *) {
                 valid_handshake = valid_peer;
-                on_relay_hanshake();
+                on_relay_handshake();
             };
             transport::error_fn_t on_error = [](const auto &) {};
             relay_trans->async_handshake(handshake_fn, on_error);
             return;
         }
         auto uri = utils::parse("tcp://127.0.0.1:0/").value();
-        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock)};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         peer_trans = transport::initiate_stream(cfg);
 
         transport::error_fn_t read_err_fn([&](auto ec) { log->error("(relay/active), read_err: {}", ec.message()); });
@@ -701,7 +699,7 @@ struct active_relay_fixture_t : fixture_t {
         peer_trans->async_recv(asio::buffer(rx_buff), read_fn, read_err_fn);
     }
 
-    virtual void on_relay_hanshake() noexcept {
+    virtual void on_relay_handshake() noexcept {
         transport::error_fn_t read_err_fn([&](auto ec) { log->error("(relay/active), read_err: {}", ec.message()); });
         transport::io_fn_t read_fn = [this](size_t bytes) { on_read(bytes); };
         relay_trans->async_recv(asio::buffer(rx_buff), read_fn, read_err_fn);
@@ -716,7 +714,6 @@ struct active_relay_fixture_t : fixture_t {
 
     virtual void write(transport::stream_sp_t &stream, const proto::relay::message_t &msg) noexcept {
         proto::relay::serialize(msg, rx_buff);
-        auto buff = asio::buffer(rx_buff);
         transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
         transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
         stream->async_send(asio::buffer(rx_buff), write_fn, err_fn);
@@ -775,6 +772,36 @@ void test_relay_active_success() {
     F().run();
 }
 
+void test_relay_active_not_enabled() {
+    struct F : active_relay_fixture_t {
+
+        actor_ptr_t create_actor() noexcept override {
+            return sup->create_actor<initiator_actor_t>()
+                .timeout(timeout)
+                .peer_device_id(peer_device->device_id())
+                .relay_session(relay_session)
+                .uris({peer_uri})
+                .cluster(use_model ? cluster : nullptr)
+                .sink(sup->get_address())
+                .ssl_pair(&my_keys)
+                .router(*sup)
+                .escalate_failure()
+                .finish();
+        }
+
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            sup->do_shutdown();
+            sup->do_process();
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(peer_device->get_state() == device_state_t::offline);
+        }
+    };
+    F().run();
+}
+
 void test_relay_wrong_device() {
     struct F : active_relay_fixture_t {
 
@@ -782,7 +809,7 @@ void test_relay_wrong_device() {
             write(relay_trans, proto::relay::session_invitation_t{std::string(relay_device.get_sha256()), session_key,
                                                                   "", listening_ep.port(), false});
         }
-        void on_write(size_t bytes) override {}
+        void on_write(size_t) override {}
 
         void main() noexcept override {
             auto act = create_actor();
@@ -799,7 +826,7 @@ void test_relay_wrong_device() {
     F().run();
 }
 
-void test_relay_non_conneteable() {
+void test_relay_non_connectable() {
     struct F : active_relay_fixture_t {
 
         void relay_reply() noexcept override {
@@ -848,13 +875,12 @@ void test_relay_garbage_reply() {
 
         void write(transport::stream_sp_t &stream, const proto::relay::message_t &) noexcept override {
             rx_buff = "garbage-garbage-garbage";
-            auto buff = asio::buffer(rx_buff);
             transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
             transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
             stream->async_send(asio::buffer(rx_buff), write_fn, err_fn);
         }
 
-        void on_write(size_t bytes) override {}
+        void on_write(size_t) override {}
 
         void main() noexcept override {
             auto act = create_actor();
@@ -870,11 +896,11 @@ void test_relay_garbage_reply() {
     F().run();
 }
 
-void test_relay_noninvitation_reply() {
+void test_relay_non_invitation_reply() {
     struct F : active_relay_fixture_t {
 
         void relay_reply() noexcept override { write(relay_trans, proto::relay::pong_t{}); }
-        void on_write(size_t bytes) override {}
+        void on_write(size_t) override {}
 
         void main() noexcept override {
             auto act = create_actor();
@@ -890,27 +916,35 @@ void test_relay_noninvitation_reply() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_connect_unsupproted_proto, "test_connect_unsupproted_proto", "[initiator]");
-REGISTER_TEST_CASE(test_connect_timeout, "test_connect_timeout", "[initiator]");
-REGISTER_TEST_CASE(test_handshake_timeout, "test_handshake_timeout", "[initiator]");
-REGISTER_TEST_CASE(test_handshake_garbage, "test_handshake_garbage", "[initiator]");
-REGISTER_TEST_CASE(test_connection_refused, "test_connection_refused", "[initiator]");
-REGISTER_TEST_CASE(test_connection_refused_no_model, "test_connection_refused_no_model", "[initiator]");
-REGISTER_TEST_CASE(test_resolve_failure, "test_resolve_failure", "[initiator]");
-REGISTER_TEST_CASE(test_success, "test_success", "[initiator]");
-REGISTER_TEST_CASE(test_success_no_model, "test_success_no_model", "[initiator]");
-REGISTER_TEST_CASE(test_passive_success, "test_passive_success", "[initiator]");
-REGISTER_TEST_CASE(test_passive_garbage, "test_passive_garbage", "[initiator]");
-REGISTER_TEST_CASE(test_passive_timeout, "test_passive_timeout", "[initiator]");
-REGISTER_TEST_CASE(test_relay_passive_success, "test_relay_passive_success", "[initiator]");
-REGISTER_TEST_CASE(test_relay_passive_gargabe, "test_relay_passive_gargabe", "[initiator]");
-REGISTER_TEST_CASE(test_relay_passive_wrong_message, "test_relay_passive_wrong_message", "[initiator]");
-REGISTER_TEST_CASE(test_relay_passive_unsuccessful_join, "test_relay_passive_unsuccessful_join", "[initiator]");
-REGISTER_TEST_CASE(test_relay_malformed_uri, "test_relay_malformed_uri", "[initiator]");
-REGISTER_TEST_CASE(test_relay_active_wrong_relay_deviceid, "test_relay_active_wrong_relay_deviceid", "[initiator]");
-REGISTER_TEST_CASE(test_relay_active_success, "test_relay_active_success", "[initiator]");
-REGISTER_TEST_CASE(test_relay_wrong_device, "test_relay_wrong_device", "[initiator]");
-REGISTER_TEST_CASE(test_relay_non_conneteable, "test_relay_non_conneteable", "[initiator]");
-REGISTER_TEST_CASE(test_relay_malformed_address, "test_relay_malformed_address", "[initiator]");
-REGISTER_TEST_CASE(test_relay_garbage_reply, "test_relay_garbage_reply", "[initiator]");
-REGISTER_TEST_CASE(test_relay_noninvitation_reply, "test_relay_noninvitation_reply", "[initiator]");
+int _init() {
+    REGISTER_TEST_CASE(test_connect_unsupported_proto, "test_connect_unsupported_proto", "[initiator]");
+    REGISTER_TEST_CASE(test_connect_timeout, "test_connect_timeout", "[initiator]");
+    REGISTER_TEST_CASE(test_handshake_timeout, "test_handshake_timeout", "[initiator]");
+    REGISTER_TEST_CASE(test_handshake_garbage, "test_handshake_garbage", "[initiator]");
+    REGISTER_TEST_CASE(test_connection_refused, "test_connection_refused", "[initiator]");
+    REGISTER_TEST_CASE(test_connection_refused_no_model, "test_connection_refused_no_model", "[initiator]");
+    REGISTER_TEST_CASE(test_resolve_failure, "test_resolve_failure", "[initiator]");
+    REGISTER_TEST_CASE(test_success, "test_success", "[initiator]");
+    REGISTER_TEST_CASE(test_success_no_model, "test_success_no_model", "[initiator]");
+    REGISTER_TEST_CASE(test_passive_success, "test_passive_success", "[initiator]");
+    REGISTER_TEST_CASE(test_passive_garbage, "test_passive_garbage", "[initiator]");
+    REGISTER_TEST_CASE(test_passive_timeout, "test_passive_timeout", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_passive_success, "test_relay_passive_success", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_passive_garbage, "test_relay_passive_garbage", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_passive_wrong_message, "test_relay_passive_wrong_message", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_passive_unsuccessful_join, "test_relay_passive_unsuccessful_join", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_malformed_uri, "test_relay_malformed_uri", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_active_wrong_relay_device_id, "test_relay_active_wrong_relay_device_id",
+                       "[initiator]");
+    REGISTER_TEST_CASE(test_relay_active_success, "test_relay_active_success", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_active_not_enabled, "test_relay_active_not_enabled", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_wrong_device, "test_relay_wrong_device", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_non_connectable, "test_relay_non_connectable", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_malformed_address, "test_relay_malformed_address", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_garbage_reply, "test_relay_garbage_reply", "[initiator]");
+    REGISTER_TEST_CASE(test_relay_non_invitation_reply, "test_relay_non_invitation_reply", "[initiator]");
+
+    return 1;
+}
+
+static int v = _init();

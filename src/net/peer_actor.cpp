@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "peer_actor.h"
 #include "names.h"
 #include "constants.h"
 #include "utils/tls.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "proto/bep_support.h"
 #include "model/messages.h"
 #include "model/diff/peer/peer_state.h"
@@ -28,9 +29,8 @@ r::plugin::resource_id_t finalization = 5;
 
 peer_actor_t::peer_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device_name{config.device_name}, bep_config{config.bep_config},
-      coordinator{config.coordinator}, peer_device_id{config.peer_device_id},
-      transport(std::move(config.transport)), peer_endpoint{config.peer_endpoint},
-      peer_proto(std::move(config.peer_proto)) {
+      coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, transport(std::move(config.transport)),
+      peer_endpoint{config.peer_endpoint}, peer_proto(std::move(config.peer_proto)) {
     rx_buff.resize(config.bep_config.rx_buff_size);
     log = utils::get_logger("net.peer_actor");
 }
@@ -47,19 +47,21 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&peer_actor_t::on_start_reading);
         p.subscribe_actor(&peer_actor_t::on_termination);
         p.subscribe_actor(&peer_actor_t::on_block_request);
-        p.subscribe_actor(&peer_actor_t::on_forward);
+        p.subscribe_actor(&peer_actor_t::on_transfer);
     });
 }
 
 void peer_actor_t::on_start() noexcept {
+    r::actor_base_t::on_start();
     LOG_TRACE(log, "{}, on_start", identity);
 
     fmt::memory_buffer buff;
     proto::make_hello_message(buff, device_name);
-    push_write(std::move(buff), false);
+    push_write(std::move(buff), true, false);
 
     read_more();
     read_action = &peer_actor_t::read_hello;
+    reset_rx_timer();
 }
 
 void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
@@ -106,9 +108,12 @@ void peer_actor_t::process_tx_queue() noexcept {
     }
 }
 
-void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool final) noexcept {
+void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool signal, bool final) noexcept {
     if (io_error) {
         return;
+    }
+    if (signal && controller) {
+        send<payload::transfer_push_t>(controller, buff.size());
     }
     tx_item_t item = new confidential::payload::tx_item_t{std::move(buff), final};
     tx_queue.emplace_back(std::move(item));
@@ -141,6 +146,9 @@ void peer_actor_t::read_more() noexcept {
 void peer_actor_t::on_write(std::size_t sz) noexcept {
     resources->release(resource::io_write);
     LOG_TRACE(log, "{}, on_write, {} bytes", identity, sz);
+    if (controller) {
+        send<payload::transfer_pop_t>(controller, (uint32_t)sz);
+    }
     assert(tx_item);
     if (tx_item->final) {
         LOG_TRACE(log, "{}, process_tx_queue, final message has been sent, shutting down", identity);
@@ -180,7 +188,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         std::memcpy(ptr, ptr + value.consumed, rx_idx);
     }
     (this->*read_action)(std::move(value.message));
-    LOG_TRACE(log, "{}, on_read,  rx_idx = {} ", identity, rx_idx);
+    LOG_TRACE(log, "{}, on_read, rx_idx = {} ", identity, rx_idx);
 }
 
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
@@ -213,7 +221,7 @@ void peer_actor_t::shutdown_start() noexcept {
     close.set_reason(shutdown_reason->message());
     proto::serialize(buff, close);
     tx_queue.clear();
-    push_write(std::move(buff), true);
+    push_write(std::move(buff), true, true);
     LOG_TRACE(log, "{}, going to send close message", identity);
 
     r::actor_base_t::shutdown_start();
@@ -232,12 +240,13 @@ void peer_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
     auto sha256 = peer_device_id.get_sha256();
     auto device = cluster->get_devices().by_sha256(sha256);
-    assert(device && device->get_state() == model::device_state_t::online);
-
-    auto diff = model::diff::cluster_diff_ptr_t();
-    auto state = model::device_state_t::offline;
-    diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, state);
-    send<model::payload::model_update_t>(coordinator, std::move(diff));
+    auto state = device->get_state();
+    if (state != model::device_state_t::offline) {
+        auto diff = model::diff::cluster_diff_ptr_t();
+        auto state = model::device_state_t::offline;
+        diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, state);
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
+    }
 }
 
 void peer_actor_t::cancel_timer() noexcept {
@@ -274,7 +283,7 @@ void peer_actor_t::on_termination(message::termination_signal_t &message) noexce
     if (!shutdown_reason) {
         auto &ee = message.payload.ee;
         auto reason = ee->message();
-        LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
+        LOG_DEBUG(log, "{}, on_termination: {}", identity, reason);
         do_shutdown(ee);
     }
 }
@@ -296,17 +305,14 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
 
     fmt::memory_buffer buff;
     proto::serialize(buff, req);
-    push_write(std::move(buff), false);
+    push_write(std::move(buff), true, false);
     block_requests.emplace_back(&message);
 }
 
-void peer_actor_t::on_forward(message::forwarded_message_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_forward", identity);
-    fmt::memory_buffer buff;
+void peer_actor_t::on_transfer(message::transfer_data_t &message) noexcept {
+    LOG_TRACE(log, "{}, on_transfer", identity);
 
-    std::visit([&](auto &&msg) { proto::serialize(buff, *msg); }, message.payload);
-
-    push_write(std::move(buff), false);
+    push_write(std::move(message.payload.data), false, false);
 }
 
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
@@ -436,7 +442,7 @@ void peer_actor_t::on_tx_timeout(r::request_id_t, bool cancelled) noexcept {
         fmt::memory_buffer buff;
         proto::Ping ping;
         proto::serialize(buff, ping);
-        push_write(std::move(buff), false);
+        push_write(std::move(buff), true, false);
         reset_tx_timer();
     }
 }

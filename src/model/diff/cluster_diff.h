@@ -10,7 +10,7 @@
 namespace syncspirit::model::diff {
 
 struct SYNCSPIRIT_API cluster_diff_t : generic_diff_t<tag::cluster> {
-    virtual outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
+    virtual outcome::result<void> visit(cluster_visitor_t &, void *custom) const noexcept override;
 };
 
 using cluster_diff_ptr_t = boost::intrusive_ptr<cluster_diff_t>;

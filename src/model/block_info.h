@@ -44,7 +44,7 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
     std::string serialize() const noexcept;
 
     void link(file_info_t *file_info, size_t block_index) noexcept;
-    removed_incides_t unlink(file_info_t *file_info, bool deletion = false) noexcept;
+    removed_incides_t unlink(file_info_t *file_info) noexcept;
 
     void mark_local_available(file_info_t *file_info) noexcept;
     file_block_t local_file() noexcept;

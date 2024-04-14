@@ -1,17 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
-#include "model/diff/modify/append_block.h"
+#include "diff-builder.h"
+
 #include "model/diff/modify/blocks_availability.h"
-#include "model/diff/modify/clone_block.h"
-#include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/local_update.h"
-#include "model/diff/modify/new_file.h"
-#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -22,45 +17,50 @@ TEST_CASE("various block diffs", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     cluster->get_devices().put(my_device);
-    auto &blocks_map = cluster->get_blocks();
 
-    db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-    REQUIRE(diff->apply(*cluster));
+    auto builder = diff_builder_t(*cluster);
+    builder.create_folder("1234-5678", "some/path", "my-label");
+    REQUIRE(builder.apply());
 
-    auto folder_info = cluster->get_folders().by_id(db_folder.id())->get_folder_infos().by_device(my_device);
+    auto folder = cluster->get_folders().by_id("1234-5678");
+    auto folder_info = folder->get_folder_infos().by_device(*my_device);
+
+    auto b1_hash = utils::sha256_digest("12345").value();
+    auto b2_hash = utils::sha256_digest("567890").value();
+
     proto::FileInfo pr_file_info;
     pr_file_info.set_name("a.txt");
     pr_file_info.set_block_size(5ul);
     pr_file_info.set_size(10ul);
+    auto b1 = pr_file_info.add_blocks();
+    b1->set_hash(b1_hash);
+    b1->set_offset(0);
+    b1->set_size(5);
 
-    diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file_info, {}));
-    REQUIRE(diff->apply(*cluster));
+    auto b2 = pr_file_info.add_blocks();
+    b2->set_hash(b2_hash);
+    b2->set_offset(5ul);
+    b2->set_size(5);
+
+    REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
+
     auto file = folder_info->get_file_infos().by_name("a.txt");
-
-    auto bi1 = proto::BlockInfo();
-    bi1.set_size(5);
-    bi1.set_weak_hash(12);
-    bi1.set_hash(utils::sha256_digest("12345").value());
-    bi1.set_offset(0);
-
-    auto bi2 = proto::BlockInfo();
-    bi2.set_size(5);
-    bi2.set_weak_hash(12);
-    bi2.set_hash(utils::sha256_digest("567890").value());
-    bi2.set_offset(5ul);
-
-    diff = diff::cluster_diff_ptr_t(new diff::modify::local_update_t(*file, file->as_db(false), {bi1, bi2}));
-    REQUIRE(diff->apply(*cluster));
+    auto bi1 = cluster->get_blocks().get(b1_hash);
+    auto bi2 = cluster->get_blocks().get(b2_hash);
+    file->remove_blocks();
+    file->assign_block(bi1, 0);
+    file->assign_block(bi2, 1);
     REQUIRE(!file->is_locally_available());
 
+    auto callback = [&](diff::modify::block_transaction_t &diff) {
+        REQUIRE(diff.errors.load() == 0);
+        builder.ack_block(diff);
+    };
+
     SECTION("append") {
-        auto bdiff = diff::block_diff_ptr_t(new diff::modify::append_block_t(*file, 0, "12345"));
-        REQUIRE(bdiff->apply(*cluster));
+        REQUIRE(builder.append_block(*file, 0, "12345", callback).apply());
         auto &blocks = file->get_blocks();
 
         auto lf1 = blocks[0]->local_file();
@@ -76,18 +76,20 @@ TEST_CASE("various block diffs", "[model]") {
         pr_source.set_name("b.txt");
         pr_source.set_block_size(5ul);
         pr_source.set_size(5ul);
+        auto b1 = pr_source.add_blocks();
+        b1->set_hash(b2_hash);
+        b1->set_offset(0);
+        b1->set_size(5);
 
-        diff = diff::cluster_diff_ptr_t(new diff::modify::new_file_t(*cluster, db_folder.id(), pr_source, {bi2}));
-        REQUIRE(diff->apply(*cluster));
+        REQUIRE(builder.local_update(folder->get_id(), pr_source).apply());
         auto source = folder_info->get_file_infos().by_name("b.txt");
         auto b2 = source->get_blocks().at(0);
         b2->mark_local_available(source.get());
 
-        auto fb = model::file_block_t(b2.get(), file.get(), 1);
-        auto bdiff = diff::block_diff_ptr_t(new diff::modify::clone_block_t(fb));
-        REQUIRE(bdiff->apply(*cluster));
-        auto &blocks = file->get_blocks();
+        auto fb = model::file_block_t(bi2.get(), file.get(), 1);
+        REQUIRE(builder.clone_block(fb, callback).apply());
 
+        auto &blocks = file->get_blocks();
         auto lf1 = blocks[1]->local_file();
         REQUIRE(lf1);
         CHECK(lf1.block_index() == 1);
@@ -99,7 +101,6 @@ TEST_CASE("various block diffs", "[model]") {
     SECTION("availability") {
         auto bdiff = diff::block_diff_ptr_t(new diff::modify::blocks_availability_t(*file, 1));
         REQUIRE(bdiff->apply(*cluster));
-        auto &blocks = file->get_blocks();
         CHECK(file->is_locally_available());
     }
 }

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -81,7 +80,7 @@ struct fixture_t {
         auto my_id =
             device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
         auto my_device = device_t::create(my_id, "my-device").value();
-        cluster = new cluster_t(my_device, 1);
+        cluster = new cluster_t(my_device, 1, 1);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
@@ -145,13 +144,13 @@ struct fixture_t {
 
 } // namespace
 
-void test_succesfull_announcement() {
+void test_successful_announcement() {
     struct F : fixture_t {
         bool preprocess() noexcept override {
             auto uri = utils::parse("tcp://127.0.0.1").value();
-            cluster->get_device()->assing_uris({uri});
+            cluster->get_device()->assign_uris({uri});
 
-            SECTION("successul (and empty) announce response") {
+            SECTION("successful (and empty) announce response") {
                 http::response<http::string_body> res;
                 res.result(204);
                 res.set("Reannounce-After", "123");
@@ -167,13 +166,13 @@ void test_succesfull_announcement() {
     F().run();
 }
 
-void test_failded_announcement() {
+void test_failed_announcement() {
     struct F : fixture_t {
         bool preprocess() noexcept override {
             auto uri = utils::parse("tcp://127.0.0.1").value();
-            cluster->get_device()->assing_uris({uri});
+            cluster->get_device()->assign_uris({uri});
 
-            SECTION("successul (and empty) announce response") {
+            SECTION("successful (and empty) announce response") {
                 http::response<http::string_body> res;
                 res.result(204);
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
@@ -210,7 +209,7 @@ void test_peer_discovery() {
                 CHECK(peer_device->get_uris()[0].full == "tcp://127.0.0.2");
 
                 // 2nd attempt
-                peer_device->assing_uris({});
+                peer_device->assign_uris({});
                 res = {};
                 res.body() = j.dump();
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
@@ -253,7 +252,12 @@ void test_late_announcement() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_succesfull_announcement, "test_succesfull_announcement", "[net]");
-REGISTER_TEST_CASE(test_failded_announcement, "test_failded_announcement", "[net]");
-REGISTER_TEST_CASE(test_peer_discovery, "test_peer_discovery", "[net]");
-REGISTER_TEST_CASE(test_late_announcement, "test_late_announcement", "[net]");
+int _init() {
+    REGISTER_TEST_CASE(test_successful_announcement, "test_successful_announcement", "[net]");
+    REGISTER_TEST_CASE(test_failed_announcement, "test_failed_announcement", "[net]");
+    REGISTER_TEST_CASE(test_peer_discovery, "test_peer_discovery", "[net]");
+    REGISTER_TEST_CASE(test_late_announcement, "test_late_announcement", "[net]");
+    return 1;
+}
+
+static int v = _init();

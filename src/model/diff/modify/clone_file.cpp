@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "clone_file.h"
 #include "../cluster_visitor.h"
@@ -17,7 +17,6 @@ clone_file_t::clone_file_t(const model::file_info_t &source) noexcept
     peer_id = peer_folder_info->get_device()->device_id().get_sha256();
     assert(peer_id != device_id);
 
-    auto cluster = folder->get_cluster();
     auto my_folder_info = folder->get_folder_infos().by_device_id(device_id);
     auto my_file = my_folder_info->get_file_infos().by_name(source.get_name());
     if (!my_file) {
@@ -45,7 +44,6 @@ clone_file_t::clone_file_t(const model::file_info_t &source) noexcept
 }
 
 auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto &blocks_map = cluster.get_blocks();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_my = folder->get_folder_infos().by_device_id(device_id);
     auto folder_peer = folder->get_folder_infos().by_device_id(peer_id);
@@ -111,14 +109,15 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
                 new_file->mark_local_available(i);
             }
         }
-        assert(new_file->check_consistency());
         folder_my->add(new_file, false);
+        LOG_TRACE(log, "clone_file_t, new file; folder = {}, name = {}, blocks = {}", folder_id, file.name(),
+                  blocks.size());
     }
 
     return outcome::success();
 }
 
-auto clone_file_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto clone_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting clone_file_t, folder = {}, file = {}", folder_id, file.name());
-    return visitor(*this);
+    return visitor(*this, custom);
 }

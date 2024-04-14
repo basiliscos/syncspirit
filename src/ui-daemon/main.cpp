@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include <google/protobuf/stubs/common.h>
 #include <lz4.h>
@@ -9,6 +9,8 @@
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
+#include <fstream>
+#include <exception>
 
 #include "syncspirit-config.h"
 #include "constants.h"
@@ -41,6 +43,28 @@ namespace asio = boost::asio;
 
 using namespace syncspirit;
 using namespace syncspirit::daemon;
+
+[[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
+    auto name = actor ? actor->get_identity() : "unknown";
+    spdlog::critical("actor '{}' error: {}", name, ec->message());
+    std::terminate();
+}
+
+struct asio_sys_context_t : ra::system_context_asio_t {
+    using parent_t = ra::system_context_asio_t;
+    using parent_t::parent_t;
+    void on_error(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override {
+        report_error_and_die(actor, ec);
+    }
+};
+
+struct thread_sys_context_t : rth::system_context_thread_t {
+    using parent_t = rth::system_context_thread_t;
+    using parent_t::parent_t;
+    void on_error(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override {
+        report_error_and_die(actor, ec);
+    }
+};
 
 static std::atomic_bool shutdown_flag = false;
 
@@ -84,9 +108,32 @@ int main(int argc, char **argv) {
         using CommandStrings = std::vector<std::string>;
         cmdline_descr.add_options()
             ("help", "show this help message")
-            ("log_level", po::value<std::string>()->default_value("info"), "initial log level")
-            ("config_dir", po::value<std::string>(), "configuration directory path")
-            ("command", po::value<CommandStrings>(), "configuration directory path");
+            ("log_level", po::value<std::string>()->default_value("info"),
+                        "initial log level")
+            ("config_dir", po::value<std::string>(),
+                        "configuration directory path")
+            ("command", po::value<CommandStrings>(), "command for a deamon. "
+                "An arg can be:\n"
+                "  add_peer:${label}:${device_id} - records peer in a database;"
+                    " tries to connect to it and  allows incoming connections"
+                    " from peer device;\n"
+                "  add_folder:label=${folder_label}:id=${folder_id}:path=${path}"
+                    " adds a folder into the database, scans folder there"
+                    " (and adds files from it into the database). The"
+                    " ${folder_label} is arbitrary human-readable local label,"
+                    " while {folder_id} is predefined folder id to be shared"
+                    " with other devices. The ${path} is local path to the"
+                    " folder, e.g. /storage/music;\n"
+                "  share:folder=${label}:device=${device} shares the folder"
+                    " with the device. The ${label} can be a folder label or"
+                    " folder id, and the device can be a device id, device"
+                    " label or the first part of the device id, e.g. for device"
+                    " id 'XBOWTOU-Y7H6RM6-D7WT3UB-7P2DZ5G-R6GNZG6-T5CCG54-SGVF3U5-LBM7RQB'"
+                    " the first part is 'XBOWTOU';\n"
+                "  inactivate:${seconds} shut down daemon after ${seconds}"
+                    " of inactivity;\n"
+                "  rescan_dirs:${seconds} rescan all folders every ${seconds};\n"
+            );
         // clang-format on
 
         po::variables_map vm;
@@ -168,10 +215,10 @@ int main(int argc, char **argv) {
         }
 
         if (populate) {
-            spdlog::info("Generating cryptographical keys...");
+            spdlog::info("Generating cryptographic keys...");
             auto pair = utils::generate_pair(constants::issuer_name);
             if (!pair) {
-                spdlog::error("cannot generate cryptographical keys :: {}", pair.error().message());
+                spdlog::error("cannot generate cryptographic keys :: {}", pair.error().message());
                 return 1;
             }
             auto &keys = pair.value();
@@ -179,7 +226,8 @@ int main(int argc, char **argv) {
             auto &key_path = cfg.global_announce_config.key_file;
             auto save_result = keys.save(cert_path.c_str(), key_path.c_str());
             if (!save_result) {
-                spdlog::error("cannot store cryptographical keys :: {}", save_result.error().message());
+                spdlog::error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
+                              save_result.error().message());
                 return 1;
             }
         }
@@ -190,7 +238,7 @@ int main(int argc, char **argv) {
 
         /* pre-init actors */
         asio::io_context io_context;
-        ra::system_context_ptr_t sys_context{new ra::system_context_asio_t{io_context}};
+        ra::system_context_ptr_t sys_context{new asio_sys_context_t{io_context}};
         auto strand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
 
@@ -209,25 +257,29 @@ int main(int argc, char **argv) {
         // pre-startup
         sup_net->do_process();
 
-        rth::system_context_thread_t fs_context;
+        thread_sys_context_t fs_context;
         auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                           .timeout(timeout)
                           .registry_address(sup_net->get_registry_address())
                           .fs_config(cfg.fs_config)
                           .hasher_threads(cfg.hasher_threads)
                           .finish();
+
         // auxiliary payload
-        fs_sup->create_actor<governor_actor_t>()
-            .commands(std::move(commands))
-            .timeout(timeout)
-            .autoshutdown_supervisor()
-            .finish();
+        fs_sup->add_launcher([&](model::cluster_ptr_t &cluster) mutable {
+            fs_sup->create_actor<governor_actor_t>()
+                .commands(std::move(commands))
+                .cluster(cluster)
+                .timeout(timeout)
+                .autoshutdown_supervisor()
+                .finish();
+        });
 
         auto hasher_count = cfg.hasher_threads;
-        using sys_thread_context_ptr_t = r::intrusive_ptr_t<rth::system_context_thread_t>;
+        using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
         std::vector<sys_thread_context_ptr_t> hasher_ctxs;
         for (uint32_t i = 1; i <= hasher_count; ++i) {
-            hasher_ctxs.push_back(new rth::system_context_thread_t{});
+            hasher_ctxs.push_back(new thread_sys_context_t{});
             auto &ctx = hasher_ctxs.back();
             ctx->create_supervisor<hasher::hasher_supervisor_t>()
                 .timeout(timeout / 2)
@@ -285,7 +337,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    utils::platform_t::shutdhown();
+    utils::platform_t::shutdown();
     google::protobuf::ShutdownProtobufLibrary();
     /* exit */
 

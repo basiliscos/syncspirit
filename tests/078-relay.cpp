@@ -1,8 +1,11 @@
-#include "catch.hpp"
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+
 #include "test-utils.h"
 #include "access.h"
 
 #include "utils/tls.h"
+#include "utils/format.hpp"
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "model/diff/modify/relay_connect_request.h"
@@ -129,7 +132,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
         log->debug("public relays json: {}", public_relays);
         initiate_accept();
 
-        cluster = new cluster_t(my_device, 1);
+        cluster = new cluster_t(my_device, 1, 1);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
@@ -141,7 +144,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
 
     virtual void main() noexcept {}
 
-    virtual std::string generate_public_relays(const asio::ip::tcp::endpoint &endpoint,
+    virtual std::string generate_public_relays(const asio::ip::tcp::endpoint &,
                                                model::device_ptr_t &relay_device) noexcept {
         std::string pattern = R""(
     {
@@ -169,7 +172,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
     }
 
     virtual void accept(const sys::error_code &ec) noexcept {
-        LOG_INFO(log, "accept (relay), ec: {}, sock = {}", ec.message(), peer_sock.native_handle());
+        LOG_INFO(log, "accept (relay), ec: {}, remote = {}", ec.message(), peer_sock.remote_endpoint());
         auto uri = utils::parse("tcp://127.0.0.1:0/").value();
         auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         relay_trans = transport::initiate_stream(cfg);
@@ -196,9 +199,9 @@ struct fixture_t : private model::diff::contact_visitor_t {
         transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "active/connect, err: {}", ec.message()); };
         using ptr_t = model::intrusive_ptr_t<std::decay_t<decltype(req)>>;
         auto ptr = ptr_t(&req);
-        transport::connect_fn_t on_connect = [ptr, trans, addresses_ptr, this](transport::resolved_item_t it) {
+        transport::connect_fn_t on_connect = [ptr, trans, addresses_ptr, this](const tcp::endpoint &ep) {
             LOG_INFO(log, "active/connected");
-            sup->reply_to(*ptr, trans, it->endpoint());
+            sup->reply_to(*ptr, trans, ep);
         };
         trans->async_connect(*addresses_ptr, on_connect, on_error);
     }
@@ -240,7 +243,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
         if (!r) {
             LOG_ERROR(log, "error applying diff: {}", r.error().message());
         }
-        r = diff.visit(*this);
+        r = diff.visit(*this, nullptr);
         if (!r) {
             LOG_ERROR(log, "error visiting diff: {}", r.error().message());
         }
@@ -345,7 +348,8 @@ void test_passive() {
             }
         }
 
-        outcome::result<void> operator()(const model::diff::modify::relay_connect_request_t &diff) noexcept override {
+        outcome::result<void> operator()(const model::diff::modify::relay_connect_request_t &diff,
+                                         void *) noexcept override {
             CHECK(diff.peer == peer_device->device_id());
             CHECK(diff.session_key == session_key);
             CHECK(diff.relay.port() == 12345);
@@ -362,5 +366,11 @@ void test_passive() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_master_connect, "test_master_connect", "[relay]");
-REGISTER_TEST_CASE(test_passive, "test_passive", "[relay]");
+int _init() {
+    REGISTER_TEST_CASE(test_master_connect, "test_master_connect", "[relay]");
+    REGISTER_TEST_CASE(test_passive, "test_passive", "[relay]");
+
+    return 1;
+}
+
+static int v = _init();

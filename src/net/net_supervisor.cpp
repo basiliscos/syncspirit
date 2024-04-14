@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "config/utils.h"
 #include "utils/error_code.h"
@@ -24,7 +24,7 @@ namespace bfs = boost::filesystem;
 using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
-    : parent_t{cfg}, cluster_copies{cfg.cluster_copies}, app_config{cfg.app_config} {
+    : parent_t{cfg}, app_config{cfg.app_config}, cluster_copies{cfg.cluster_copies} {
     seed = (size_t)std::time(nullptr);
     log = utils::get_logger("net.coordinator");
     auto &files_cfg = app_config.global_announce_config;
@@ -56,7 +56,8 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
 
     auto device = model::device_ptr_t();
     device = new model::local_device_t(device_id, app_config.device_name, cn.value());
-    cluster = new model::cluster_t(device, seed);
+    auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
+    cluster = new model::cluster_t(device, seed, static_cast<int32_t>(simultaneous_writes));
 
     auto &gcfg = app_config.global_announce_config;
     if (gcfg.enabled) {
@@ -132,7 +133,7 @@ void net_supervisor_t::seed_model() noexcept {
 void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message) noexcept {
     auto &ee = message.payload.ee;
     if (ee) {
-        LOG_ERROR(log, "{}, cannot load clusted : {}", identity, ee->message());
+        LOG_ERROR(log, "{}, cannot load cluster : {}", identity, ee->message());
         return do_shutdown(ee);
     }
     LOG_TRACE(log, "{}, on_load_cluster", identity);
@@ -148,7 +149,8 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
     auto my_device = cluster->get_device();
     auto device = model::device_ptr_t();
     device = new model::local_device_t(my_device->device_id(), app_config.device_name, "");
-    auto cluster_copy = new model::cluster_t(device, seed);
+    auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
+    auto cluster_copy = new model::cluster_t(device, seed, static_cast<int32_t>(simultaneous_writes));
     reply_to(message, std::move(cluster_copy));
     if (cluster_copies == 0 && load_diff) {
         seed_model();
@@ -163,7 +165,7 @@ void net_supervisor_t::on_model_update(model::message::model_update_t &message) 
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
-    r = diff.visit(*this);
+    r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -190,7 +192,7 @@ void net_supervisor_t::on_contact_update(model::message::contact_update_t &messa
     }
 }
 
-auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noexcept -> outcome::result<void> {
+auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &, void *) noexcept -> outcome::result<void> {
     if (!cluster->is_tainted()) {
 
         auto &ignored_devices = cluster->get_ignored_devices();
@@ -203,7 +205,7 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &) noe
             if (!folder_info) {
                 continue;
             }
-            auto fi = folder_info->get_folder_infos().by_device(cluster->get_device());
+            auto fi = folder_info->get_folder_infos().by_device(*cluster->get_device());
             files += fi->get_file_infos().size();
         }
         LOG_DEBUG(log,
@@ -229,7 +231,7 @@ void net_supervisor_t::launch_net() noexcept {
     LOG_INFO(log, "{}, launching network services", identity);
 
     if (app_config.upnp_config.enabled) {
-        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto timeout = shutdown_timeout * 9 / 10;
             return create_actor<ssdp_actor_t>()
                 .timeout(timeout)
@@ -238,15 +240,11 @@ void net_supervisor_t::launch_net() noexcept {
                 .spawner_address(spawner)
                 .finish();
         };
-        spawn(factory)
-            .restart_period(pt::seconds{5})
-            .restart_period(r::pt::seconds{10})
-            .restart_policy(r::restart_policy_t::fail_only)
-            .spawn();
+        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
     }
 
     if (app_config.local_announce_config.enabled) {
-        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto timeout = shutdown_timeout * 9 / 10;
             auto &cfg = app_config.local_announce_config;
             return create_actor<local_discovery_actor_t>()
@@ -257,11 +255,7 @@ void net_supervisor_t::launch_net() noexcept {
                 .spawner_address(spawner)
                 .finish();
         };
-        spawn(factory)
-            .restart_period(pt::seconds{5})
-            .restart_period(r::pt::seconds{10})
-            .restart_policy(r::restart_policy_t::fail_only)
-            .spawn();
+        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
     }
 
     if (app_config.global_announce_config.enabled) {
@@ -276,9 +270,8 @@ void net_supervisor_t::launch_net() noexcept {
             .escalate_failure()
             .finish();
 
-        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto &gcfg = app_config.global_announce_config;
-            auto port = app_config.upnp_config.external_port;
             auto timeout = shutdown_timeout * 9 / 10;
             return create_actor<global_discovery_actor_t>()
                 .timeout(timeout)
@@ -291,11 +284,7 @@ void net_supervisor_t::launch_net() noexcept {
                 .spawner_address(spawner)
                 .finish();
         };
-        spawn(factory)
-            .restart_period(pt::seconds{5})
-            .restart_period(r::pt::seconds{10})
-            .restart_policy(r::restart_policy_t::fail_only)
-            .spawn();
+        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
     }
 
     if (app_config.relay_config.enabled) {
@@ -310,7 +299,7 @@ void net_supervisor_t::launch_net() noexcept {
             .escalate_failure()
             .finish();
 
-        auto factory = [this](r::supervisor_t &sup, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto timeout = shutdown_timeout * 9 / 10;
             return create_actor<relay_actor_t>()
                 .timeout(timeout)
@@ -319,11 +308,7 @@ void net_supervisor_t::launch_net() noexcept {
                 .spawner_address(spawner)
                 .finish();
         };
-        spawn(factory)
-            .restart_period(pt::seconds{5})
-            .restart_period(r::pt::seconds{10})
-            .restart_policy(r::restart_policy_t::fail_only)
-            .spawn();
+        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
     }
 
     auto timeout = shutdown_timeout * 9 / 10;
@@ -335,6 +320,7 @@ void net_supervisor_t::launch_net() noexcept {
         .strand(strand)
         .timeout(timeout)
         .bep_config(app_config.bep_config)
+        .relay_config(app_config.relay_config)
         .escalate_failure()
         .finish();
 

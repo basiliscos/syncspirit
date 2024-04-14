@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "error_code.h"
 
@@ -73,19 +73,19 @@ std::string error_code_category_t::message(int c) const {
         r = "invalid folder info prefix";
         break;
     case error_code_t::folder_info_deserialization_failure:
-        r = "fodler info deserialization failure";
+        r = "folder info deserialization failure";
         break;
     case error_code_t::invalid_ignored_device_key_length:
         r = "invalid ignored device key length";
         break;
     case error_code_t::invalid_ignored_device_prefix:
-        r = "invalid ingored device prefix";
+        r = "invalid ignored device prefix";
         break;
     case error_code_t::ignored_device_deserialization_failure:
         r = "ignored device deserialization failure";
         break;
     case error_code_t::invalid_ignored_folder_prefix:
-        r = "invalid ingored folder prefix";
+        r = "invalid ignored folder prefix";
         break;
     case error_code_t::ignored_folder_deserialization_failure:
         r = "ignored folder deserialization failure";
@@ -114,14 +114,8 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::invalid_block_size:
         r = "block size is invalid (i.e. greater than file size)";
         break;
-    case error_code_t::exceed_max_sequence:
-        r = "file sequence exceed folder_info max sequence";
-        break;
     case error_code_t::unexpected_blocks:
         r = "blocks are not expected (e.g. in deleted file)";
-        break;
-    case error_code_t::inconsistent_file:
-        r = "file is inconsistent (missing blocks)";
         break;
     default:
         r = "unknown";

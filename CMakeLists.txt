@@ -1,12 +1,12 @@
 cmake_minimum_required (VERSION 3.2)
 project (syncspirit)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# does not works because of pugixml
-#set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-#set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
-#cmake_policy(SET CMP0063 NEW)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+cmake_policy(SET CMP0063 NEW)
+cmake_policy(SET CMP0077 NEW)
 
 include(GenerateExportHeader)
 set(CMAKE_POSITION_INDEPENDENT_CODE True)
@@ -23,11 +23,19 @@ find_package(
 find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(rotor COMPONENTS asio thread REQUIRED)
+find_package(lz4 REQUIRED)
+find_package(fmt REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(pugixml REQUIRED)
+find_package(uriparser REQUIRED)
+find_package(tomlplusplus REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
-set(SYNCSPIRIT_VERSION "v0.2.0")
+set(SYNCSPIRIT_VERSION "v0.3.0")
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
-set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src)
+set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src/protobuf)
 protobuf_generate_cpp(
     PROTO_SRCS PROTO_HDRS
     EXPORT_MACRO SYNCSPIRIT_API
@@ -57,10 +65,11 @@ add_library(syncspirit_lib
     src/db/prefix.cpp
     src/db/transaction.cpp
     src/db/utils.cpp
+    src/fs/chunk_iterator.cpp
     src/fs/file.cpp
     src/fs/file_actor.cpp
     src/fs/fs_supervisor.cpp
-    src/fs/messages.cpp
+    src/fs/new_chunk_iterator.cpp
     src/fs/scan_actor.cpp
     src/fs/scan_task.cpp
     src/fs/utils.cpp
@@ -86,6 +95,9 @@ add_library(syncspirit_lib
     src/model/diff/load/load_cluster.cpp
     src/model/diff/load/unknown_folders.cpp
     src/model/diff/modify/append_block.cpp
+    src/model/diff/modify/block_ack.cpp
+    src/model/diff/modify/block_rej.cpp
+    src/model/diff/modify/block_transaction.cpp
     src/model/diff/modify/blocks_availability.cpp
     src/model/diff/modify/clone_block.cpp
     src/model/diff/modify/clone_file.cpp
@@ -93,12 +105,13 @@ add_library(syncspirit_lib
     src/model/diff/modify/create_folder.cpp
     src/model/diff/modify/file_availability.cpp
     src/model/diff/modify/finish_file.cpp
-    src/model/diff/modify/flush_file.cpp
-    src/model/diff/modify/local_update.cpp
+    src/model/diff/modify/finish_file_ack.cpp
     src/model/diff/modify/lock_file.cpp
-    src/model/diff/modify/new_file.cpp
+    src/model/diff/modify/mark_reachable.cpp
+    src/model/diff/modify/local_update.cpp
     src/model/diff/modify/relay_connect_request.cpp
     src/model/diff/modify/share_folder.cpp
+    src/model/diff/modify/unshare_folder.cpp
     src/model/diff/modify/update_contact.cpp
     src/model/diff/modify/update_peer.cpp
     src/model/diff/peer/peer_state.cpp
@@ -109,6 +122,7 @@ add_library(syncspirit_lib
     src/model/misc/error_code.cpp
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
+    src/model/misc/updates_streamer.cpp
     src/model/misc/uuid.cpp
     src/model/misc/version_utils.cpp
     src/model/block_info.cpp
@@ -121,6 +135,7 @@ add_library(syncspirit_lib
     src/model/folder_info.cpp
     src/model/ignored_device.cpp
     src/model/ignored_folder.cpp
+    src/model/remote_folder_info.cpp
     src/model/unknown_folder.cpp
     src/net/acceptor_actor.cpp
     src/net/cluster_supervisor.cpp
@@ -158,41 +173,15 @@ add_library(syncspirit_lib
     src/utils/uri.cpp
 )
 
-set(BUILD_BOOST_ASIO true CACHE BOOL "BUILD_BOOST_ASIO")
-set(URIPARSER_BUILD_WCHAR_T false CACHE BOOL "URIPARSER_BUILD_WCHAR_T")
-set(URIPARSER_BUILD_TOOLS false CACHE BOOL "URIPARSER_BUILD_TOOLS")
-set(URIPARSER_BUILD_DOCS false CACHE BOOL "DURIPARSER_BUILD_DOCS")
-set(URIPARSER_BUILD_TESTS false CACHE BOOL "URIPARSER_BUILD_TESTS")
-set(URIPARSER_ENABLE_INSTALL false CACHE BOOL "URIPARSER_ENABLE_INSTALL")
 set(BUILD_SHARED_LIBS false CACHE BOOL "BUILD_SHARED_LIBS")
-set(LZ4_BUILD_CLI false CACHE BOOL "LZ4_BUILD_CLI")
-set(LZ4_BUILD_LEGACY_LZ4C false CACHE BOOL "LZ4_BUILD_LEGACY_LZ4C")
 set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
 set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
 set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
 
-cmake_policy(SET CMP0077 NEW)
-set(PUGIXML_NO_EXCEPTIONS on)
-
-add_subdirectory("lib/spdlog")
-add_subdirectory("lib/lz4/build/cmake/")
-add_subdirectory("lib/pugixml")
-add_subdirectory("lib/rotor")
-add_subdirectory("lib/uriparser")
 add_subdirectory("lib/mbdx")
 
-
 target_include_directories(syncspirit_lib PUBLIC
-    ${syncspirit_SOURCE_DIR}/lib/rotor/include
-    ${syncspirit_SOURCE_DIR}/lib/spdlog/include
-    ${syncspirit_SOURCE_DIR}/lib/spdlog/include/spdlog/
-    ${syncspirit_SOURCE_DIR}/lib/json/include
-    ${syncspirit_SOURCE_DIR}/lib/pugixml/src
-    ${syncspirit_SOURCE_DIR}/lib/uriparser/include
-    ${syncspirit_SOURCE_DIR}/lib/tomlplusplus/include
-    ${syncspirit_SOURCE_DIR}/lib/lz4/lib
     ${syncspirit_SOURCE_DIR}/lib/mbdx
-    ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -202,17 +191,18 @@ target_link_libraries(syncspirit_lib
     syncspirit_pb
     rotor::asio
     rotor::thread
-    pugixml
+    pugixml::pugixml
     Boost::iostreams
     Boost::filesystem
     Boost::program_options
     Boost::system
-    ${Boost_LIBRARIES}
     OpenSSL::SSL
+    fmt::fmt
     spdlog::spdlog
-    uriparser
-    lz4_static
-    ZLIB::ZLIB
+    uriparser::uriparser
+    tomlplusplus::tomlplusplus
+    nlohmann_json::nlohmann_json
+    lz4::lz4
     mdbx-static
     $<$<PLATFORM_ID:Windows>:iphlpapi>
     $<$<PLATFORM_ID:Windows>:ws2_32>

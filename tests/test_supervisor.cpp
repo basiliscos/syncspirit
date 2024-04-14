@@ -1,41 +1,41 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "test_supervisor.h"
+#include "model/diff/modify/finish_file.h"
+#include "model/diff/modify/finish_file_ack.h"
 #include "net/names.h"
 
 namespace to {
-struct queue{};
-struct on_timer_trigger{};
-}
+struct queue {};
+struct on_timer_trigger {};
+} // namespace to
 
 template <> inline auto &rotor::supervisor_t::access<to::queue>() noexcept { return queue; }
 
 namespace rotor {
 
-template <> inline auto rotor::actor_base_t::access<to::on_timer_trigger, request_id_t, bool>(request_id_t request_id,
-                                                                                        bool cancelled) noexcept {
+template <>
+inline auto rotor::actor_base_t::access<to::on_timer_trigger, request_id_t, bool>(request_id_t request_id,
+                                                                                  bool cancelled) noexcept {
     on_timer_trigger(request_id, cancelled);
 }
 
-}
-
-
+} // namespace rotor
 
 using namespace syncspirit::net;
 using namespace syncspirit::test;
 
-supervisor_t::supervisor_t(r::supervisor_config_t& cfg): r::supervisor_t(cfg) {
+supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) {
     log = utils::get_logger("net.test_supervisor");
+    auto_finish = cfg.auto_finish;
 }
-
 
 void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::coordinator, false); });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(names::coordinator, get_address());
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>(
+        [&](auto &p) { p.register_name(names::coordinator, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&supervisor_t::on_model_update);
         p.subscribe_actor(&supervisor_t::on_block_update);
@@ -46,17 +46,16 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     }
 }
 
-
-void supervisor_t::do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept {
+void supervisor_t::do_start_timer(const r::pt::time_duration &, r::timer_handler_base_t &handler) noexcept {
     timers.emplace_back(&handler);
 }
 
 void supervisor_t::do_cancel_timer(r::request_id_t timer_id) noexcept {
     auto it = timers.begin();
     while (it != timers.end()) {
-        auto& handler = *it;
+        auto &handler = *it;
         if (handler->request_id == timer_id) {
-            auto& actor_ptr = handler->owner;
+            auto &actor_ptr = handler->owner;
             actor_ptr->access<to::on_timer_trigger, r::request_id_t, bool>(timer_id, true);
             on_timer_trigger(timer_id, true);
             timers.erase(it);
@@ -70,15 +69,14 @@ void supervisor_t::do_cancel_timer(r::request_id_t timer_id) noexcept {
 
 void supervisor_t::do_invoke_timer(r::request_id_t timer_id) noexcept {
     LOG_DEBUG(log, "{}, invoking timer {}", identity, timer_id);
-    auto predicate = [&](auto& handler) { return handler->request_id == timer_id;  };
+    auto predicate = [&](auto &handler) { return handler->request_id == timer_id; };
     auto it = std::find_if(timers.begin(), timers.end(), predicate);
     assert(it != timers.end());
-    auto& handler = *it;
-    auto& actor_ptr = handler->owner;
+    auto &handler = *it;
+    auto &actor_ptr = handler->owner;
     actor_ptr->access<to::on_timer_trigger, r::request_id_t, bool>(timer_id, false);
     timers.erase(it);
 }
-
 
 void supervisor_t::start() noexcept {}
 void supervisor_t::shutdown() noexcept { do_shutdown(); }
@@ -89,17 +87,23 @@ void supervisor_t::enqueue(r::message_ptr_t message) noexcept {
 
 void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, updating model", identity);
-    auto& diff = msg.payload.diff;
+    auto &diff = msg.payload.diff;
     auto r = diff->apply(*cluster);
     if (!r) {
-        LOG_ERROR(log, "{}, error updating model: {}", identity,  r.assume_error().message());
+        LOG_ERROR(log, "{}, error updating model: {}", identity, r.assume_error().message());
+        do_shutdown(make_error(r.assume_error()));
+    }
+
+    r = diff->visit(*this, nullptr);
+    if (!r) {
+        LOG_ERROR(log, "{}, error visiting model: {}", identity, r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
     }
 }
 
 void supervisor_t::on_block_update(model::message::block_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, updating block", identity);
-    auto& diff = msg.payload.diff;
+    auto &diff = msg.payload.diff;
     auto r = diff->apply(*cluster);
     if (!r) {
         LOG_ERROR(log, "{}, error updating block: {}", identity, r.assume_error().message());
@@ -109,10 +113,23 @@ void supervisor_t::on_block_update(model::message::block_update_t &msg) noexcept
 
 void supervisor_t::on_contact_update(model::message::contact_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, updating contact", identity);
-    auto& diff = msg.payload.diff;
+    auto &diff = msg.payload.diff;
     auto r = diff->apply(*cluster);
     if (!r) {
         LOG_ERROR(log, "{}, error updating contact: {}", identity, r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
     }
+}
+
+auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (auto_finish) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
+        auto file = file_info->get_file_infos().by_name(diff.file_name);
+        auto ack = model::diff::cluster_diff_ptr_t{};
+        ack = new model::diff::modify::finish_file_ack_t(*file);
+        send<model::payload::model_update_t>(get_address(), std::move(ack), this);
+    }
+    return outcome::success();
 }

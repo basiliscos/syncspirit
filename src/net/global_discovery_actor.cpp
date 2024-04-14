@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "global_discovery_actor.h"
 #include "names.h"
@@ -9,6 +9,7 @@
 #include "utils/error_code.h"
 #include "http_actor.h"
 #include "model/diff/modify/update_contact.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::net;
 
@@ -21,7 +22,7 @@ r::plugin::resource_id_t http = 1;
 
 global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, device_id{cfg.device_id}, announce_url{cfg.announce_url},
-      dicovery_device_id{std::move(cfg.device_id)}, ssl_pair{*cfg.ssl_pair}, rx_buff_size{cfg.rx_buff_size},
+      discovery_device_id{std::move(cfg.device_id)}, ssl_pair{*cfg.ssl_pair}, rx_buff_size{cfg.rx_buff_size},
       io_timeout(cfg.io_timeout), cluster{cfg.cluster} {
     log = utils::get_logger("net.gda");
     rx_buff = std::make_shared<rx_buff_t::element_type>(rx_buff_size);
@@ -144,13 +145,13 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     auto &custom = message.payload.req->payload.request_payload->custom;
     auto msg = static_cast<message::discovery_notify_t *>(custom.get());
     auto &device_id = msg->payload.device_id;
-    auto sha256 = std::string(device_id.get_sha256());
+    auto sha256 = device_id.get_sha256();
     auto it = discovering_devices.find(sha256);
     discovering_devices.erase(it);
 
     auto &ee = message.payload.ee;
     if (ee) {
-        LOG_WARN(log, "{}, discovery faield = {}", identity, ee->message());
+        LOG_WARN(log, "{}, discovery failed = {}", identity, ee->message());
     } else {
         auto &http_res = message.payload.res->response;
         auto res = proto::parse_contact(http_res);
@@ -177,7 +178,7 @@ void global_discovery_actor_t::on_discovery(message::discovery_notify_t &req) no
     LOG_TRACE(log, "{}, on_discovery", identity);
 
     auto &device_id = req.payload.device_id;
-    auto sha256 = std::string(device_id.get_sha256());
+    auto sha256 = device_id.get_sha256();
     if (discovering_devices.count(sha256)) {
         LOG_TRACE(log, "{}, device '{}' is already discovering, skip", identity, device_id.get_short());
         return;
@@ -190,14 +191,14 @@ void global_discovery_actor_t::on_discovery(message::discovery_notify_t &req) no
         return do_shutdown(make_error(r.error()));
     }
 
-    discovering_devices.emplace(std::move(sha256));
+    discovering_devices.emplace(sha256);
     make_request(addr_discovery, r.value(), std::move(tx_buff), &req);
 }
 
 void global_discovery_actor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_contact_update", identity);
     auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this);
+    auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -215,7 +216,7 @@ void global_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcep
 void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
                                             const rotor::message_ptr_t &custom) noexcept {
     auto timeout = r::pt::millisec{io_timeout};
-    transport::ssl_junction_t ssl{dicovery_device_id, &ssl_pair, true, ""};
+    transport::ssl_junction_t ssl{discovery_device_id, &ssl_pair, true, ""};
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
                                                         rx_buff_size, std::move(ssl), custom)
                        .send(timeout);
@@ -235,10 +236,9 @@ void global_discovery_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
-auto global_discovery_actor_t::operator()(const model::diff::modify::update_contact_t &diff) noexcept
+auto global_discovery_actor_t::operator()(const model::diff::modify::update_contact_t &diff, void *) noexcept
     -> outcome::result<void> {
     if (diff.self && state == r::state_t::OPERATIONAL) {
-        auto &uris = diff.uris;
         if (resources->has(resource::timer)) {
             cancel_timer(*timer_request);
         }

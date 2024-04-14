@@ -15,6 +15,13 @@ namespace syncspirit::fs {
 namespace outcome = boost::outcome_v2;
 namespace bfs = boost::filesystem;
 
+namespace details {
+struct chunk_t {
+    std::string data;
+    size_t block_index;
+};
+} // namespace details
+
 struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     file_t() noexcept;
     file_t(file_t &) = delete;

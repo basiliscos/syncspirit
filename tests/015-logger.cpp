@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "utils/log.h"
 
@@ -22,7 +21,7 @@ TEST_CASE("default logger", "[log]") {
     CHECK(l->level() == L::trace);
 }
 
-TEST_CASE("hierarcy", "[log]") {
+TEST_CASE("hierarchy", "[log]") {
     config::log_configs_t cfg{{"default", L::trace, {"stdout"}}, {"a", L::info, {}}, {"a.b.c", L::warn, {}}};
     REQUIRE(utils::init_loggers(cfg, overwrite));
     SECTION("custom") {

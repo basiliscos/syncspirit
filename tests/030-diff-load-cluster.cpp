@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
-#include "model/misc/file_iterator.h"
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/devices.h"
 #include "model/diff/load/ignored_devices.h"
@@ -23,7 +21,7 @@ using namespace syncspirit::test;
 TEST_CASE("loading cluster (base)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     CHECK(cluster);
 
     auto self_key = my_device->get_key();
@@ -202,7 +200,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
 TEST_CASE("loading cluster (folder info)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     CHECK(cluster);
     cluster->get_devices().put(my_device);
 
@@ -234,7 +232,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
         auto &map = folder->get_folder_infos();
         REQUIRE(map.size() == 1);
         target = map.get(fi->get_uuid());
-        REQUIRE(map.by_device(my_device));
+        REQUIRE(map.by_device(*my_device));
     }
 
     REQUIRE(target);
@@ -251,7 +249,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     CHECK(cluster);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);

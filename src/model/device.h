@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -7,6 +7,7 @@
 #include "misc/map.hpp"
 #include "misc/uuid.h"
 #include "device_id.h"
+#include "remote_folder_info.h"
 #include "utils/uri.h"
 #include "syncspirit-export.h"
 #include "bep.pb.h"
@@ -46,10 +47,11 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     inline proto::Compression get_compression() const noexcept { return compression; }
     inline bool is_introducer() const noexcept { return introducer; }
     inline bool get_skip_introduction_removals() const noexcept { return skip_introduction_removals; }
+    inline auto &get_remote_folder_infos() noexcept { return remote_folder_infos; }
 
     inline const uris_t &get_uris() const noexcept { return uris; }
 
-    void assing_uris(const uris_t &uris) noexcept;
+    void assign_uris(const uris_t &uris) noexcept;
 
     void update(const db::Device &source) noexcept;
     uint64_t as_uint() noexcept;
@@ -69,6 +71,7 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     bool paused;
     bool skip_introduction_removals;
     device_state_t state = device_state_t::offline;
+    remote_folder_infos_map_t remote_folder_infos;
 };
 
 struct local_device_t final : device_t {

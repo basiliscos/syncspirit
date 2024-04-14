@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "model/cluster.h"
 #include "model/misc/file_iterator.h"
@@ -22,7 +21,7 @@ TEST_CASE("file iterator", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -71,6 +70,7 @@ TEST_CASE("file iterator", "[model]") {
     auto b = proto::BlockInfo();
     b.set_hash(utils::sha256_digest("12345").value());
     b.set_weak_hash(555);
+    b.set_size(5ul);
     auto bi = block_info_t::create(b).value();
     auto &blocks_map = cluster->get_blocks();
     blocks_map.put(bi);
@@ -78,23 +78,43 @@ TEST_CASE("file iterator", "[model]") {
     proto::Index idx;
     idx.set_folder(db_folder.id());
 
-    SECTION("file locking") {
+    SECTION("file locking && marking unreacheable") {
         auto file = idx.add_files();
         file->set_name("a.txt");
         file->set_sequence(10ul);
-        auto peer_folder = folder->get_folder_infos().by_device(peer_device);
+        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
 
         diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
         REQUIRE(diff->apply(*cluster));
         auto peer_file = peer_folder->get_file_infos().by_name("a.txt");
 
-        peer_file->lock();
-        auto f = next(true);
-        REQUIRE(!f);
+        SECTION("locking") {
+            peer_file->lock();
+            auto f = next(true);
+            REQUIRE(!f);
 
-        peer_file->unlock();
-        f = next(true);
-        REQUIRE(f);
+            peer_file->unlock();
+            f = next(true);
+            REQUIRE(f);
+        }
+
+        SECTION("unreacheable") {
+            peer_file->mark_unreachable(true);
+            auto f = next(true);
+            REQUIRE(!f);
+        }
+    }
+
+    SECTION("file locking && marking unreacheable") {
+        auto file = idx.add_files();
+        file->set_name("a.txt");
+        file->set_sequence(10ul);
+        file->set_invalid(true);
+        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
+
+        diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
+        REQUIRE(diff->apply(*cluster));
+        REQUIRE(!next(true));
     }
 
     SECTION("2 files at peer") {
@@ -137,13 +157,13 @@ TEST_CASE("file iterator", "[model]") {
 
             SECTION("one file is already exists on my side") {
                 auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
-                auto my_folder = folder_infos.by_device(my_device);
+                auto my_folder = folder_infos.by_device(*my_device);
                 auto pr_file = proto::FileInfo();
                 pr_file.set_name("a.txt");
                 auto my_file = file_info_t::create(cluster->next_uuid(), pr_file, my_folder).value();
                 my_folder->add(my_file, false);
 
-                auto peer_folder = folder_infos.by_device(peer_device);
+                auto peer_folder = folder_infos.by_device(*peer_device);
                 REQUIRE(peer_folder->get_file_infos().size() == 2);
 
                 auto f2 = next(true);
@@ -165,7 +185,7 @@ TEST_CASE("file iterator", "[model]") {
 
             auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
             proto::Vector my_version;
-            auto my_folder = folder_infos.by_device(my_device);
+            auto my_folder = folder_infos.by_device(*my_device);
             auto pr_file = proto::FileInfo();
             pr_file.set_name("a.txt");
             my_folder->add(file_info_t::create(cluster->next_uuid(), pr_file, my_folder).value(), false);
@@ -181,12 +201,13 @@ TEST_CASE("file iterator", "[model]") {
             file_1->set_block_size(5ul);
             auto b = file_1->add_blocks();
             b->set_hash("123");
+            b->set_size(5ul);
 
             diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
             REQUIRE(diff->apply(*cluster));
 
             auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
-            auto my_folder = folder_infos.by_device(my_device);
+            auto my_folder = folder_infos.by_device(*my_device);
             my_folder->set_max_sequence(file_1->sequence());
             my_folder->add(file_info_t::create(cluster->next_uuid(), *file_1, my_folder).value(), false);
 
@@ -201,12 +222,13 @@ TEST_CASE("file iterator", "[model]") {
             file_1->set_block_size(5ul);
             auto b = file_1->add_blocks();
             b->set_hash("123");
+            b->set_size(5ul);
 
             diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
             REQUIRE(diff->apply(*cluster));
 
             auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
-            auto peer_folder = folder_infos.by_device(peer_device);
+            auto peer_folder = folder_infos.by_device(*peer_device);
             auto file = file_info_t::create(cluster->next_uuid(), *file_1, peer_folder).value();
             peer_folder->add(file, true);
             peer_folder->set_max_sequence(peer_folder->get_max_sequence() + 20);
@@ -243,7 +265,7 @@ TEST_CASE("file iterator", "[model]") {
         diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
         REQUIRE(diff->apply(*cluster));
 
-        auto peer_folder = folder->get_folder_infos().by_device(peer_device);
+        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
         auto &peer_files = peer_folder->get_file_infos();
         auto f1 = peer_files.by_name(file_1->name());
         auto f2 = peer_files.by_name(file_2->name());
@@ -257,7 +279,6 @@ TEST_CASE("file iterator", "[model]") {
         }
 
         SECTION("partly-downloaded file takes priority over non-downloaded") {
-            auto &blocks_map = cluster->get_blocks();
             diff = new diff::modify::clone_file_t(*f2);
             REQUIRE(diff->apply(*cluster));
 
@@ -283,7 +304,7 @@ TEST_CASE("file iterator", "[model]") {
         auto file_b = idx.add_files();
         file_b->set_name("b.txt");
         file_b->set_sequence(9ul);
-        auto peer_folder = folder->get_folder_infos().by_device(peer_device);
+        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
 
         diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
         REQUIRE(diff->apply(*cluster));
@@ -308,7 +329,7 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 

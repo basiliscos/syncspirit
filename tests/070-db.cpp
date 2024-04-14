@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
+#include <catch2/catch_all.hpp>
 #include "test-utils.h"
 #include "diff-builder.h"
 #include "model/diff/peer/cluster_remove.h"
+#include "model/diff/modify/unshare_folder.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -51,7 +52,7 @@ struct fixture_t {
             device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
         my_device = device_t::create(my_id, "my-device").value();
 
-        return cluster_ptr_t(new cluster_t(my_device, 1));
+        return cluster_ptr_t(new cluster_t(my_device, 1, 1));
     }
 
     virtual void run() noexcept {
@@ -157,7 +158,7 @@ void test_folder_creation() {
 
             auto folder = cluster->get_folders().by_id(folder_id);
             REQUIRE(folder);
-            REQUIRE(folder->get_folder_infos().by_device(cluster->get_device()));
+            REQUIRE(folder->get_folder_infos().by_device(*cluster->get_device()));
 
             sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
@@ -171,7 +172,7 @@ void test_folder_creation() {
             REQUIRE(folder_clone->get_label() == "my-label");
             REQUIRE(folder_clone->get_path().string() == "/my/path");
             REQUIRE(folder_clone->get_folder_infos().size() == 1);
-            REQUIRE(folder_clone->get_folder_infos().by_device(cluster->get_device()));
+            REQUIRE(folder_clone->get_folder_infos().by_device(*cluster->get_device()));
         }
     };
 
@@ -237,7 +238,7 @@ void test_folder_sharing() {
             auto folder = cluster_clone->get_folders().by_id(folder_id);
             REQUIRE(folder);
             REQUIRE(folder->get_folder_infos().size() == 2);
-            auto fi = folder->get_folder_infos().by_device(peer_device);
+            auto fi = folder->get_folder_infos().by_device(*peer_device);
             REQUIRE(fi);
             CHECK(fi->get_index() == 5);
             CHECK(fi->get_max_sequence() == 4);
@@ -283,7 +284,7 @@ void test_cluster_update_and_remove() {
             REQUIRE(block);
 
             auto folder = cluster->get_folders().by_id(folder_id);
-            auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
+            auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
 
             REQUIRE(peer_folder_info);
             CHECK(peer_folder_info->get_max_sequence() == 6ul);
@@ -305,7 +306,7 @@ void test_cluster_update_and_remove() {
                 REQUIRE(cluster_clone->get_blocks().size() == 1);
                 CHECK(cluster_clone->get_blocks().get(b->hash()));
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
-                auto peer_folder_info = folder->get_folder_infos().by_device(peer_device);
+                auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
                 REQUIRE(peer_folder_info);
                 REQUIRE(peer_folder_info->get_file_infos().size() == 1);
                 REQUIRE(peer_folder_info->get_file_infos().by_name("a.txt"));
@@ -336,9 +337,72 @@ void test_cluster_update_and_remove() {
                 REQUIRE(cluster_clone->get_blocks().size() == 0);
                 auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                 REQUIRE(fis.size() == 1);
-                REQUIRE(!fis.by_device(peer_device));
-                REQUIRE(fis.by_device(cluster->get_device()));
+                REQUIRE(!fis.by_device(*peer_device));
+                REQUIRE(fis.by_device(*cluster->get_device()));
                 REQUIRE(cluster_clone->get_unknown_folders().empty());
+            }
+        }
+    };
+    F().run();
+}
+
+void test_unsharing_folder() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto folder_id = "1234-5678";
+
+            auto file = proto::FileInfo();
+            file.set_name("a.txt");
+            file.set_size(5ul);
+            file.set_block_size(5ul);
+            file.set_sequence(6ul);
+            auto b = file.add_blocks();
+            b->set_size(5ul);
+            b->set_hash(utils::sha256_digest("12345").value());
+
+            auto builder = diff_builder_t(*cluster);
+            builder.update_peer(sha256)
+                .apply(*sup)
+                .create_folder(folder_id, "/my/path")
+                .configure_cluster(sha256)
+                .add(sha256, folder_id, 5, file.sequence())
+                .finish()
+                .share_folder(sha256, folder_id)
+                .apply(*sup)
+                .make_index(sha256, folder_id)
+                .add(file)
+                .finish()
+                .apply(*sup);
+
+            REQUIRE(cluster->get_blocks().size() == 1);
+            auto block = cluster->get_blocks().get(b->hash());
+            REQUIRE(block);
+
+            auto folder = cluster->get_folders().by_id(folder_id);
+            auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
+
+            REQUIRE(peer_folder_info);
+            CHECK(peer_folder_info->get_max_sequence() == 6ul);
+            REQUIRE(peer_folder_info->get_file_infos().size() == 1);
+            auto peer_file = peer_folder_info->get_file_infos().by_name("a.txt");
+            REQUIRE(peer_file);
+
+            builder.unshare_folder(sha256, folder_id).apply(*sup);
+
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            REQUIRE(!reply->payload.ee);
+
+            auto cluster_clone = make_cluster();
+            {
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
+                REQUIRE(fis.size() == 1);
+                REQUIRE(!fis.by_device(*peer_device));
+                REQUIRE(fis.by_device(*cluster->get_device()));
+                REQUIRE(cluster_clone->get_blocks().size() == 0);
             }
         }
     };
@@ -368,13 +432,11 @@ void test_clone_file() {
                 .add(sha256, folder_id, 5, file.sequence())
                 .finish()
                 .share_folder(sha256, folder_id)
-                .apply(*sup)
-
-                ;
+                .apply(*sup);
 
             auto folder = cluster->get_folders().by_id(folder_id);
-            auto folder_my = folder->get_folder_infos().by_device(my_device);
-            auto folder_peer = folder->get_folder_infos().by_device(peer_device);
+            auto folder_my = folder->get_folder_infos().by_device(*my_device);
+            auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
 
             SECTION("file without blocks") {
                 builder.make_index(sha256, folder_id).add(file).finish().apply(*sup);
@@ -394,7 +456,7 @@ void test_clone_file() {
                     REQUIRE(cluster_clone->get_blocks().size() == 0);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
-                    auto folder_info_clone = fis.by_device(cluster_clone->get_device());
+                    auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
                     auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name() == file.name());
@@ -415,8 +477,8 @@ void test_clone_file() {
                 builder.make_index(sha256, folder_id).add(file).finish().apply(*sup);
 
                 auto folder = cluster->get_folders().by_id(folder_id);
-                auto folder_my = folder->get_folder_infos().by_device(my_device);
-                auto folder_peer = folder->get_folder_infos().by_device(peer_device);
+                auto folder_my = folder->get_folder_infos().by_device(*my_device);
+                auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
                 auto file_peer = folder_peer->get_file_infos().by_name(file.name());
                 REQUIRE(file_peer);
 
@@ -434,7 +496,7 @@ void test_clone_file() {
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
-                    auto folder_info_clone = fis.by_device(cluster_clone->get_device());
+                    auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
                     auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name() == file.name());
@@ -448,7 +510,7 @@ void test_clone_file() {
                 REQUIRE(file_peer->is_locally_available());
 
                 auto file_my = folder_my->get_file_infos().by_name(file.name());
-                builder.finish_file(*file_my).apply(*sup);
+                builder.finish_file_ack(*file_my).apply(*sup);
 
                 {
                     sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
@@ -461,7 +523,7 @@ void test_clone_file() {
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
-                    auto folder_info_clone = fis.by_device(cluster_clone->get_device());
+                    auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
                     auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name() == file.name());
@@ -476,10 +538,77 @@ void test_clone_file() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_db_migration, "test_db_migration", "[db]");
-REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
-REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
-REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
-REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
-REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
-REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
+void test_local_update() {
+    struct F : fixture_t {
+        void main() noexcept override {
+
+            auto folder_id = "1234-5678";
+
+            auto pr_file = proto::FileInfo();
+            pr_file.set_name("a.txt");
+            pr_file.set_size(5ul);
+
+            auto hash = utils::sha256_digest("12345").value();
+            auto pr_block = pr_file.add_blocks();
+            pr_block->set_weak_hash(12);
+            pr_block->set_size(5);
+            pr_block->set_hash(hash);
+
+            auto builder = diff_builder_t(*cluster);
+            builder.create_folder(folder_id, "/my/path").apply(*sup).local_update(folder_id, pr_file).apply(*sup);
+
+            SECTION("check saved file with new blocks") {
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                REQUIRE(!reply->payload.ee);
+                auto cluster_clone = make_cluster();
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+
+                auto folder = cluster_clone->get_folders().by_id(folder_id);
+                auto folder_my = folder->get_folder_infos().by_device(*my_device);
+                auto file = folder_my->get_file_infos().by_name("a.txt");
+                REQUIRE(file);
+                CHECK(cluster_clone->get_blocks().size() == 1);
+                CHECK(file->get_blocks().size() == 1);
+            }
+
+            pr_file.set_deleted(true);
+            pr_file.set_size(0);
+            pr_file.clear_blocks();
+            builder.local_update(folder_id, pr_file).apply(*sup);
+
+            SECTION("check deleted blocks") {
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                REQUIRE(!reply->payload.ee);
+                auto cluster_clone = make_cluster();
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+
+                auto folder = cluster_clone->get_folders().by_id(folder_id);
+                auto folder_my = folder->get_folder_infos().by_device(*my_device);
+                auto file = folder_my->get_file_infos().by_name("a.txt");
+                REQUIRE(file);
+                CHECK(file->is_deleted());
+                CHECK(cluster_clone->get_blocks().size() == 0);
+                CHECK(file->get_blocks().size() == 0);
+            }
+        }
+    };
+    F().run();
+};
+
+int _init() {
+    REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
+    REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
+    REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
+    REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
+    REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
+    REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
+    REGISTER_TEST_CASE(test_local_update, "test_local_update", "[db]");
+    REGISTER_TEST_CASE(test_unsharing_folder, "test_unsharing_folder", "[db]");
+    return 1;
+}
+
+static int v = _init();

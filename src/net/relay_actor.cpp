@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+
 #include "relay_actor.h"
 #include "names.h"
 #include "constants.h"
@@ -132,11 +135,7 @@ void relay_actor_t::request_relay_list() noexcept {
         return do_shutdown(make_error(ec));
     }
     resources->acquire(resource::http);
-    transport::ssl_junction_t ssl{
-        model::device_id_t{},
-        nullptr,
-        true,
-    };
+    transport::ssl_junction_t ssl{model::device_id_t{}, nullptr, true, {}};
     http_request = request<payload::http_request_t>(http_client, uri, std::move(tx_buff), http_rx_buff,
                                                     config.rx_buff_size, std::move(ssl))
                        .send(timeout);

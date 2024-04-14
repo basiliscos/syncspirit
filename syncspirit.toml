@@ -1,66 +1,58 @@
 [bep]
-rx_buff_size = 33554432
+blocks_max_requested = 16
+blocks_simultaneous_write = 16
 connect_timeout = 5000
 request_timeout = 60000
+rx_buff_size = 16777216
 rx_timeout = 300000
-tx_timeout = 10000
-blocks_max_requested = 8
+tx_buff_limit = 8388608
+tx_timeout = 90000
+
+[db]
+uncommited_threshold = 150
+upper_limit = 17179869184
 
 [dialer]
 enabled = true
-redial_timeout = 300000
+redial_timeout = 30000
 
 [fs]
-batch_dirs_count = 10
+mru_size = 5
 temporally_timeout = 86400000
-mru_size = 10
-
-[db]
-upper_limit = 0x40000000
-uncommited_threshold = 150
 
 [global_discovery]
 announce_url = 'https://discovery.syncthing.net/'
-cert_file = '/home/b/.config/syncthing/cert.pem'
+cert_file = '/home/b/.config/syncspirit/cert.pem'
 device_id = 'LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW'
 enabled = true
-key_file = '/home/b/.config/syncthing/key.pem'
+key_file = '/home/b/.config/syncspirit/key.pem'
 rx_buff_size = 32768
-timeout = 4000
+timeout = 3000
 
 [local_discovery]
 enabled = true
-frequency = 10000
-port = 21027
-
-[[log]]
-name = 'default'
-level = 'trace'
-sinks = ['stdout', 'file:/tmp/log.txt']
-
-[[log]]
-name = 'net.db'
-level = 'info'
-
-[[log]]
-name = 'net.peer_actor'
-level = 'trace'
-
-[[log]]
-name = 'net.hasher.actor'
-level = 'info'
+frequency = 30000
+port = 21026
 
 [main]
 default_location = '/tmp/syncspirit'
 device_name = 'hp-note'
+hasher_threads = 7
 timeout = 5000
-hasher_threads = 3
+
+[relay]
+discovery_url = 'https://relays.syncthing.net/endpoint'
+enabled = false
+rx_buff_size = 1048576
 
 [upnp]
+debug = false
 enabled = true
-discovery_attempts = 2
 external_port = 22001
 max_wait = 1
 rx_buff_size = 65536
-debug = false
 
+[[log]]
+level = 'trace'
+name = 'default'
+sinks = [ 'stdout', 'file:/tmp/syncspirit-log.txt' ]

@@ -16,7 +16,7 @@ and database
 
  - `--command` invoke a command within `syncspirit` core. It is possible
 to specify several commands, the next command is executed after the 
-previous one is succesfully applied.
+previous one is successfully applied.
 
 ## commands
 
@@ -29,7 +29,7 @@ with `$id` into the `syncspirit` database. All downloaded files will
 be located under `$path`
 
  - `share:folder=$folder:device=$device` shares the specified folder with
-the speficified peer device. The `$folder` can refer folder label or 
+the specified peer device. The `$folder` can refer folder label or 
 folder id; the `$device` can refer device either via full device id, 
 short device id or via device label.
 

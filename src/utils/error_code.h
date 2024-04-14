@@ -59,7 +59,7 @@ enum class error_code_t {
     rx_limit_reached,
     non_authorized,
     igd_description_failed,
-    unparseable_control_url,
+    unparsable_control_url,
     external_ip_failed,
     rx_timeout,
     tx_timeout,
@@ -145,7 +145,7 @@ inline boost::system::error_code make_error_code(request_error_code_t e) {
     return {static_cast<int>(e), request_error_code_category()};
 }
 
-boost::system::error_code adapt(const std::error_code &ec) noexcept;
+SYNCSPIRIT_API boost::system::error_code adapt(const std::error_code &ec) noexcept;
 
 } // namespace syncspirit::utils
 

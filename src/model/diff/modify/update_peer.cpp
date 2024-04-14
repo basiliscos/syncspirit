@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "update_peer.h"
 #include "db/prefix.h"
 #include "../cluster_visitor.h"
 #include "../../cluster.h"
 #include "../../misc/error_code.h"
+#include "../../../utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -33,7 +34,7 @@ auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
     return outcome::success();
 }
 
-auto update_peer_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto update_peer_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting update_peer_t");
-    return visitor(*this);
+    return visitor(*this, custom);
 }

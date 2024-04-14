@@ -5,6 +5,7 @@ add_executable(syncspirit-daemon
     command/add_peer.cpp
     command/inactivate.cpp
     command/pair_iterator.cpp
+    command/rescan_dirs.cpp
     command/share_folder.cpp
     command.cpp
     error_code.cpp
@@ -26,7 +27,7 @@ if (("${CMAKE_BUILD_TYPE}" STREQUAL "Release") AND (NOT WIN32))
         message(STATUS "IPO / LTO enabled for the syncspirit-daemon")
         set_property(TARGET syncspirit-daemon PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     else()
-        message(STATUS "IPO / LTO not supported: <${error}>")
+        message(STATUS "IPO / LTO not supported")
     endif()
 endif()
 

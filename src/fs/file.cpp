@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "file.h"
 #include "utils.h"
+#include "utils/log.h"
 #include <errno.h>
 #include <cassert>
 
@@ -16,7 +17,7 @@ auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::resul
     auto mode = "r+b";
     auto ec = sys::error_code{};
     bool need_resize = true;
-    auto exptected_size = model->get_size();
+    auto exptected_size = (uint64_t)model->get_size();
     if (bfs::exists(path, ec)) {
         auto file_size = bfs::file_size(path, ec);
         if (ec) {
@@ -62,7 +63,7 @@ auto file_t::open_read(const bfs::path &path) noexcept -> outcome::result<file_t
     if (!file) {
         return sys::error_code{errno, sys::system_category()};
     }
-    return file_t(file, std::move(path));
+    return file_t(file, path);
 }
 
 file_t::file_t() noexcept : backend{nullptr} {}
@@ -74,7 +75,7 @@ file_t::file_t(FILE *backend_, model::file_info_ptr_t model_, bfs::path path_, b
 }
 
 file_t::file_t(FILE *backend_, bfs::path path_) noexcept
-    : backend{backend_}, path{std::move(path_)}, path_str{path.string()}, last_op{r} {}
+    : backend{backend_}, path{std::move(path_)}, path_str{path.string()}, last_op{r}, temporal{false} {}
 
 file_t::file_t(file_t &&other) noexcept : backend{nullptr} { *this = std::move(other); }
 
@@ -89,7 +90,14 @@ file_t &file_t::operator=(file_t &&other) noexcept {
 }
 
 file_t::~file_t() {
-    if (backend) {
+    if (backend && model) {
+        auto result = close(model->is_locally_available());
+        if (!result) {
+            auto log = utils::get_logger("fs::file_t");
+            auto &ec = result.assume_error();
+            log->warn("(ignored) error closing file '{}' : {}", path_str, ec.message());
+        }
+    } else if (backend) {
         fclose(backend);
     }
 }
@@ -155,15 +163,16 @@ auto file_t::read(size_t offset, size_t size) const noexcept -> outcome::result<
     r.resize(size);
     auto rf = fread(r.data(), 1, size, backend);
     if (rf != size) {
-        return sys::error_code{errno, sys::system_category()};
+        auto code = feof(backend) ? ENOENT : ferror(backend);
+        return sys::error_code{code, sys::system_category()};
     }
 
     pos = offset + size;
-    return std::move(r);
+    return r;
 }
 
 auto file_t::write(size_t offset, std::string_view data) noexcept -> outcome::result<void> {
-    assert(offset + data.size() <= model->get_size());
+    assert(offset + data.size() <= (size_t)model->get_size());
     if (pos != offset || last_op != w) {
         auto r = fseek(backend, (long)offset, SEEK_SET);
         if (r != 0) {

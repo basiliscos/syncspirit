@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "peer_supervisor.h"
 #include "peer_actor.h"
 #include "initiator_actor.h"
 #include "names.h"
+#include "../constants.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "model/diff/peer/peer_state.h"
 #include "model/diff/modify/connect_request.h"
 #include "model/diff/modify/relay_connect_request.h"
@@ -18,7 +20,7 @@ template <class> inline constexpr bool always_false_v = false;
 
 peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
     : parent_t{cfg}, cluster{cfg.cluster}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair},
-      bep_config(cfg.bep_config) {
+      bep_config(cfg.bep_config), relay_config{cfg.relay_config} {
     log = utils::get_logger("net.peer_supervisor");
 }
 
@@ -46,7 +48,6 @@ void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     using namespace model::diff;
-    auto &peer_addr = actor->get_address();
     auto &reason = actor->get_shutdown_reason();
     LOG_TRACE(log, "{}, on_child_shutdown, {} due to {} ", identity, actor->get_identity(), reason->message());
     parent_t::on_child_shutdown(actor);
@@ -60,7 +61,7 @@ void peer_supervisor_t::on_start() noexcept {
 void peer_supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_model_update", identity);
     auto &diff = *msg.payload.diff;
-    auto r = diff.visit(*this);
+    auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -70,7 +71,7 @@ void peer_supervisor_t::on_model_update(model::message::model_update_t &msg) noe
 void peer_supervisor_t::on_contact_update(model::message::contact_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, on_contact_update", identity);
     auto &diff = *msg.payload.diff;
-    auto r = diff.visit(*this);
+    auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -83,6 +84,10 @@ void peer_supervisor_t::on_peer_ready(message::peer_connected_t &msg) noexcept {
     auto &p = msg.payload;
     auto &d = p.peer_device_id;
     auto peer = cluster->get_devices().by_sha256(d.get_sha256());
+    if (!peer) {
+        LOG_INFO(log, "{} unknown peer '{}' for the cluster", identity, d.get_value());
+        return;
+    }
     if (peer->get_state() == model::device_state_t::online) {
         LOG_DEBUG(log, "{}, peer '{}' is already online, ignoring request", identity, d.get_short());
         return;
@@ -123,7 +128,8 @@ void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
         .finish();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff) noexcept -> outcome::result<void> {
+auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff, void *) noexcept
+    -> outcome::result<void> {
     auto &peer_addr = diff.peer_addr;
     if (!diff.known && diff.state == model::device_state_t::online) {
         auto ec = model::make_error_code(model::error_code_t::unknown_device);
@@ -133,7 +139,7 @@ auto peer_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff) 
     return outcome::success();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t &diff) noexcept
+auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t &diff, void *) noexcept
     -> outcome::result<void> {
 
     auto lock = std::unique_lock(diff.mutex);
@@ -147,12 +153,13 @@ auto peer_supervisor_t::operator()(const model::diff::modify::connect_request_t 
         .sink(address)
         .ssl_pair(&ssl_pair)
         .sock(std::move(sock))
+        .alpn(constants::protocol_name)
         .timeout(timeout)
         .finish();
     return outcome::success();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::modify::relay_connect_request_t &diff) noexcept
+auto peer_supervisor_t::operator()(const model::diff::modify::relay_connect_request_t &diff, void *) noexcept
     -> outcome::result<void> {
 
     auto peer = cluster->get_devices().by_sha256(diff.peer.get_sha256());
@@ -177,7 +184,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::relay_connect_requ
     return outcome::success();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &diff) noexcept
+auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &diff, void *) noexcept
     -> outcome::result<void> {
     if (!diff.self && diff.known) {
         auto &devices = cluster->get_devices();
@@ -192,6 +199,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &
                 .ssl_pair(&ssl_pair)
                 .peer_device_id(diff.device)
                 .uris(uris)
+                .relay_enabled(relay_config.enabled)
                 .cluster(cluster)
                 .init_timeout(connect_timeout * (uris.size() + 1))
                 .shutdown_timeout(connect_timeout)

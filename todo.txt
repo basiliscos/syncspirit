@@ -1,10 +1,12 @@
-- introduce initiator
-   -- connect_request_t
-   -- update_contact_t
-   -- relay_connect_request_t
-   -- relay_update_contact_t
+- update docs
+- fix year of changes
 
- + device_lock
+сборка:
+ - linux/ubuntu https://www.simplified.guide/ubuntu/build-chroot-environment
+ - windows
+
+
+- conflict handling is not available
 
 ===========
 5. разобраться с лог-левелами?
@@ -20,6 +22,7 @@
 
 
 - syncspirit-daemon: /home/b/development/cpp/syncspirit/src/net/dialer_actor.cpp:88: void syncspirit::net::dialer_actor_t::on_timer(rotor::request_id_t, bool): Assertion `it != redial_map.end()' failed.
+- [2023-10-31 13:56:49.488] [D/23191] init/active:KUEQE66, resolving tcp://93.31.21.95:443 (transport = 0x5585be9747e0)
 
 - 2022-03-28 20:47:54.664] [E/25546] fs::scan_actor, on_hash, file: my_label/Camera/VID_20210122_121411.mp4, error: fs::scan_actor request timeout
 
@@ -113,3 +116,27 @@ https://softwarerecs.stackexchange.com/questions/14409/leveldb-database-client
 
 
 https://forum.syncthing.net/t/a-few-questions-about-quic-hole-punching-and-stun/16490
+
+
+=========
+
+1. Есть глобальй регистратор
+
+ message_type -> ack_count
+
+2. Акторы при старте регаются что они выслают ack. При выключении - дерегаются.
+
+3. Интерфес visitor'а (Effector)
+
+ OnBegin(diff&) -> outcome::result;
+ OnCommit(diff&) -> void;
+ OnRevert(diff&) -> void;
+
+4. Diff
+  Apply()
+  Revert()
+  Commit() -> true/false. true если к-во ack'ов  == то, что в регистраторе
+
+  Diff::Ack
+
+5. По-умолчанию 1 подтверждение высылает сам источник, Commit ничего не делает

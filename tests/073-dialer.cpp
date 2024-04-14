@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -34,7 +33,7 @@ struct fixture_t {
         auto my_id =
             device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
         auto my_device = device_t::create(my_id, "my-device").value();
-        cluster = new cluster_t(my_device, 1);
+        cluster = new cluster_t(my_device, 1, 1);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
@@ -128,4 +127,9 @@ void test_dialer() {
     F().run();
 }
 
-REGISTER_TEST_CASE(test_dialer, "test_dialer", "[net]");
+int _init() {
+    REGISTER_TEST_CASE(test_dialer, "test_dialer", "[net]");
+    return 1;
+}
+
+static int v = _init();

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "error_code.h"
 #include <map>
@@ -42,7 +42,7 @@ std::string error_code_category::message(int c) const {
         r = "WAN device description was not found in the XML";
         break;
     case error_code_t::timed_out:
-        r = "timeout occured";
+        r = "timeout occurred";
         break;
     case error_code_t::service_not_available:
         r = "service not available";

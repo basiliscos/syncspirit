@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #pragma once
 
@@ -13,7 +13,7 @@ struct SYNCSPIRIT_API file_availability_t final : cluster_diff_t {
     file_availability_t(file_info_ptr_t file) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
-    outcome::result<void> visit(cluster_visitor_t &) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string folder_id;
     model::file_info_ptr_t file;

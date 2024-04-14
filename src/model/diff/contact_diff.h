@@ -9,7 +9,7 @@
 namespace syncspirit::model::diff {
 
 struct SYNCSPIRIT_API contact_diff_t : generic_diff_t<tag::contact> {
-    virtual outcome::result<void> visit(contact_visitor_t &) const noexcept override;
+    virtual outcome::result<void> visit(contact_visitor_t &, void *custom) const noexcept override;
 };
 
 using contact_diff_ptr_t = boost::intrusive_ptr<contact_diff_t>;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -24,7 +24,7 @@ template <typename Supervisor> struct hasher_supervisor_config_builder_t : r::su
     using parent_t = r::supervisor_config_builder_t<Supervisor>;
     using parent_t::parent_t;
 
-    builder_t &&index(uint32_t value) &&noexcept {
+    builder_t &&index(uint32_t value) && noexcept {
         parent_t::config.index = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

@@ -1,14 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "governor_actor.h"
-#include "../net/names.h"
-#include "../utils/error_code.h"
+#include "net/names.h"
+#include "utils/format.hpp"
+#include "utils/error_code.h"
 
 using namespace syncspirit::daemon;
 
-governor_actor_t::governor_actor_t(config_t &cfg) : r::actor_base_t{cfg}, commands{std::move(cfg.commands)} {
+governor_actor_t::governor_actor_t(config_t &cfg)
+    : r::actor_base_t{cfg}, commands{std::move(cfg.commands)}, cluster{std::move(cfg.cluster)} {
     log = utils::get_logger("daemon.governor_actor");
+
+    add_callback(this, [&]() {
+        process();
+        return false;
+    });
 }
 
 void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -19,21 +26,21 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             if (!ec && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                auto sup = supervisor->get_address();
-                plugin->subscribe_actor(&governor_actor_t::on_model_update, sup);
-                plugin->subscribe_actor(&governor_actor_t::on_block_update, sup);
+                plugin->subscribe_actor(&governor_actor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&governor_actor_t::on_block_update, coordinator);
                 plugin->subscribe_actor(&governor_actor_t::on_io_error, coordinator);
+                plugin->subscribe_actor(&governor_actor_t::on_scan_completed, coordinator);
             }
         });
+        p.discover_name(net::names::fs_scanner, fs_scanner, true).link(false);
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) { p.subscribe_actor(&governor_actor_t::on_model_response); });
 }
 
 void governor_actor_t::on_start() noexcept {
     LOG_TRACE(log, "{}, on_start", identity);
+    rescan_folders();
+    process();
     r::actor_base_t::on_start();
-    request<model::payload::model_request_t>(supervisor->get_address()).send(init_timeout);
 }
 
 void governor_actor_t::shutdown_start() noexcept {
@@ -41,41 +48,32 @@ void governor_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
-void governor_actor_t::on_model_response(model::message::model_response_t &reply) noexcept {
-    auto &ee = reply.payload.ee;
-    if (ee) {
-        LOG_ERROR(log, "{}, on_cluster_seed: {},", ee->message());
-        return do_shutdown(ee);
+void governor_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
+    auto custom = message.payload.custom;
+    LOG_TRACE(log, "{}, on_model_update, this = {}, payload = {}", identity, (void *)this, custom);
+    auto &diff = *message.payload.diff;
+    auto r = diff.visit(*this, nullptr);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
     }
-    LOG_TRACE(log, "{}, on_model_response", identity);
-    cluster = std::move(reply.payload.res.cluster);
-    process();
-}
 
-void governor_actor_t::on_model_update(model::message::forwarded_model_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_model_update", identity);
-    auto &payload = message.payload.message->payload;
-    if (payload.custom == this) {
-        return process();
-    }
-    if (!cluster->is_tainted()) {
-        auto &diff = *message.payload.message->payload.diff;
-        auto r = diff.visit(*this);
-        if (!r) {
-            LOG_WARN(log, "{}, model visiting error: {}", identity, r.assume_error().message());
+    auto it = callbacks_map.find(custom);
+    if (it != callbacks_map.end()) {
+        auto remove = it->second();
+        if (remove) {
+            callbacks_map.erase(it);
         }
     }
 }
 
-void governor_actor_t::on_block_update(model::message::forwarded_block_update_t &message) noexcept {
+void governor_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
     LOG_TRACE(log, "{}, on_block_update", identity);
-    auto &payload = message.payload.message->payload;
-    if (!cluster->is_tainted()) {
-        auto &diff = *message.payload.message->payload.diff;
-        auto r = diff.visit(*this);
-        if (!r) {
-            LOG_WARN(log, "{}, block visiting error: {}", identity, r.assume_error().message());
-        }
+    auto &diff = *message.payload.diff;
+    auto r = diff.visit(*this, nullptr);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
     }
 }
 
@@ -85,6 +83,13 @@ void governor_actor_t::on_io_error(model::message::io_error_t &reply) noexcept {
     for (auto &err : errs) {
         LOG_WARN(log, "{}, on_io_error (ignored) path: {}, problem: {}", identity, err.path, err.ec.message());
     }
+}
+
+void governor_actor_t::on_scan_completed(fs::message::scan_completed_t &message) noexcept {
+    auto &folder_id = message.payload.folder_id;
+    auto folder = scanning_folders.by_id(folder_id);
+    LOG_TRACE(log, "{}, on_scan_completed, folder = {}({})", identity, folder->get_label(), folder->get_id());
+    scanning_folders.remove(folder);
 }
 
 void governor_actor_t::process() noexcept {
@@ -108,11 +113,11 @@ void governor_actor_t::track_inactivity() noexcept {
     auto timeout = r::pt::seconds(inactivity_seconds);
     auto now = clock_t::local_time();
     deadline = now + timeout;
-    start_timer(timeout, *this, &governor_actor_t::on_inacitvity_timer);
+    start_timer(timeout, *this, &governor_actor_t::on_inactivity_timer);
 }
 
-void governor_actor_t::on_inacitvity_timer(r::request_id_t, bool cancelled) noexcept {
-    LOG_DEBUG(log, "{}, on_inacitvity_timer", identity);
+void governor_actor_t::on_inactivity_timer(r::request_id_t, bool cancelled) noexcept {
+    LOG_DEBUG(log, "{}, on_inactivity_timer", identity);
     if (cancelled) {
         if (state == r::state_t::OPERATIONAL) {
             track_inactivity();
@@ -128,33 +133,77 @@ void governor_actor_t::on_inacitvity_timer(r::request_id_t, bool cancelled) noex
     do_shutdown();
 }
 
+void governor_actor_t::on_rescan_timer(r::request_id_t, bool cancelled) noexcept {
+    if (!cancelled) {
+        rescan_folders();
+        schedule_rescan_dirs();
+    }
+}
+
 void governor_actor_t::refresh_deadline() noexcept {
     auto timeout = r::pt::seconds(inactivity_seconds);
     auto now = clock_t::local_time();
     deadline = now + timeout;
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &) noexcept -> outcome::result<void> {
+void governor_actor_t::schedule_rescan_dirs(const r::pt::time_duration &interval) noexcept {
+    dirs_rescan_interval = interval;
+    schedule_rescan_dirs();
+}
+
+void governor_actor_t::schedule_rescan_dirs() noexcept {
+    LOG_INFO(log, "{}, scheduling dirs rescan", identity);
+    start_timer(dirs_rescan_interval, *this, &governor_actor_t::on_rescan_timer);
+}
+
+void governor_actor_t::rescan_folders() {
+    if (scanning_folders.size() == 0) {
+        auto &folders = cluster->get_folders();
+        LOG_INFO(log, "{}, issuing folders ({}) rescan", identity, folders.size());
+        for (auto it : folders) {
+            auto &folder = it.item;
+            send<fs::payload::scan_folder_t>(fs_scanner, std::string(folder->get_id()));
+            scanning_folders.put(folder);
+        }
+    }
+}
+
+void governor_actor_t::rescan_folder(std::string_view folder_id) noexcept {
+    auto folder = cluster->get_folders().by_id(folder_id);
+    LOG_INFO(log, "{}, forcing folder '{}' rescan", identity, folder->get_label());
+    send<fs::payload::scan_folder_t>(fs_scanner, std::string(folder->get_id()));
+    scanning_folders.put(folder);
+}
+
+void governor_actor_t::add_callback(const void *pointer, command_callback_t &&callback) noexcept {
+    callbacks_map.emplace(pointer, callback);
+}
+
+auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &, void *) noexcept -> outcome::result<void> {
     refresh_deadline();
     return outcome::success();
 }
 
-auto governor_actor_t::operator()(const model::diff::peer::cluster_update_t &) noexcept -> outcome::result<void> {
+auto governor_actor_t::operator()(const model::diff::peer::cluster_update_t &, void *) noexcept
+    -> outcome::result<void> {
     refresh_deadline();
     return outcome::success();
 }
 
-auto governor_actor_t::operator()(const model::diff::peer::update_folder_t &) noexcept -> outcome::result<void> {
+auto governor_actor_t::operator()(const model::diff::peer::update_folder_t &, void *) noexcept
+    -> outcome::result<void> {
     refresh_deadline();
     return outcome::success();
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::append_block_t &) noexcept -> outcome::result<void> {
+auto governor_actor_t::operator()(const model::diff::modify::append_block_t &, void *) noexcept
+    -> outcome::result<void> {
     refresh_deadline();
     return outcome::success();
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::clone_block_t &) noexcept -> outcome::result<void> {
+auto governor_actor_t::operator()(const model::diff::modify::clone_block_t &, void *) noexcept
+    -> outcome::result<void> {
     refresh_deadline();
     return outcome::success();
 }

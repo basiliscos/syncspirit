@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
+
 #include "base.h"
+#include "utils/platform.h"
+#include "stream.h"
 #include <spdlog/spdlog.h>
 #include <boost/asio/ssl.hpp>
-#include "stream.h"
+
+#ifdef WIN32_LEAN_AND_MEAN
+#include <malloc.h>
+#else
+#include <alloca.h>
+#endif
 
 namespace syncspirit::transport {
 
@@ -16,7 +24,7 @@ using ssl_socket_t = ssl::stream<tcp::socket>;
 template <typename T> struct error_curry_t : model::arc_base_t<error_curry_t<T>> {
     using backend_ptr_t = model::intrusive_ptr_t<T>;
     error_curry_t(T &owner, error_fn_t &on_error) noexcept : backend{&owner}, on_error_fn{std::move(on_error)} {}
-    virtual ~error_curry_t(){};
+    virtual ~error_curry_t() = default;
 
     void error(const sys::error_code &ec) noexcept {
         on_error_fn(ec);
@@ -79,8 +87,8 @@ template <> struct base_impl_t<tcp_socket_t> {
     }
 
     base_impl_t(transport_config_t &config) noexcept
-        : supervisor{config.supervisor}, strand{supervisor.get_strand()},
-          sock(mk_sock(config, strand)), active{config.active} {}
+        : supervisor{config.supervisor}, strand{supervisor.get_strand()}, sock(mk_sock(config, strand)),
+          active{config.active} {}
 
     tcp_socket_t &get_physical_layer() noexcept { return sock; }
 };
@@ -113,7 +121,7 @@ template <> struct base_impl_t<ssl_socket_t> {
         }
 
         if (alpn.size()) {
-            std::byte wire_alpn[alpn.size() + 1];
+            std::byte *wire_alpn = (std::byte *)alloca(alpn.size() + 1);
             wire_alpn[0] = (std::byte)(alpn.size());
             auto b = reinterpret_cast<const std::byte *>(alpn.data());
             std::copy(b, b + alpn.size(), wire_alpn + 1);
@@ -179,7 +187,7 @@ template <> struct base_impl_t<ssl_socket_t> {
 
                 if (role == ssl::stream_base::handshake_type::client) {
                     if (actual_peer != expected_peer) {
-                        spdlog::warn("unexcpected peer device_id. Got: {}, expected: {}", actual_peer.get_value(),
+                        spdlog::warn("unexpected peer device_id. Got: {}, expected: {}", actual_peer.get_value(),
                                      expected_peer.get_value());
                         return false;
                     }
@@ -237,7 +245,7 @@ template <> struct impl<tcp_socket_t> {
 
     template <typename Owner> inline static void async_connect(Owner owner, const resolved_hosts_t &hosts) noexcept {
         auto &sock = owner->backend->get_physical_layer();
-        asio::async_connect(sock, hosts.begin(), hosts.end(), [owner](auto ec, auto addr) mutable {
+        asio::async_connect(sock, hosts.begin(), hosts.end(), [owner](auto ec, auto it) mutable {
             auto &strand = owner->backend->strand;
             if (ec) {
                 strand.post([ec = ec, owner = std::move(owner)]() mutable {
@@ -248,7 +256,13 @@ template <> struct impl<tcp_socket_t> {
                 });
                 return;
             }
-            strand.post([addr = addr, owner = std::move(owner)]() mutable { owner->success(addr); });
+            // dirty hack?
+            using T = std::remove_cv_t<decltype(it)>;
+            if constexpr (std::is_same_v<T, tcp::endpoint>) {
+                strand.post([addr = it, owner = std::move(owner)]() mutable { owner->success(addr); });
+            } else {
+                strand.post([addr = *it, owner = std::move(owner)]() mutable { owner->success(addr); });
+            }
         });
     }
 

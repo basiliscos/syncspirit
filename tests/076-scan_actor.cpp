@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "test_supervisor.h"
@@ -26,11 +25,13 @@ struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::scan_actor_t>;
     using error_msg_t = model::message::io_error_t;
     using error_msg_ptr_t = r::intrusive_ptr_t<error_msg_t>;
+    using completion_msg_t = fs::message::scan_completed_t;
     using errors_container_t = std::vector<error_msg_ptr_t>;
 
-    fixture_t() noexcept : root_path{bfs::unique_path()}, path_quard{root_path} {
+    fixture_t() noexcept : root_path{bfs::unique_path()}, path_guard{root_path} {
         utils::set_default("trace");
         bfs::create_directory(root_path);
+        scan_completions = 0;
     }
 
     void run() noexcept {
@@ -41,7 +42,7 @@ struct fixture_t {
             device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
         peer_device = device_t::create(peer_id, "peer-device").value();
 
-        cluster = new cluster_t(my_device, 1);
+        cluster = new cluster_t(my_device, 1, 1);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
@@ -55,6 +56,7 @@ struct fixture_t {
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<error_msg_t>([&](error_msg_t &msg) { errors.push_back(&msg); }));
+                p.subscribe_actor(r::lambda<completion_msg_t>([&](completion_msg_t &) { ++scan_completions; }));
             });
         };
 
@@ -64,9 +66,9 @@ struct fixture_t {
         builder.create_folder(folder_id, root_path.string()).share_folder(peer_id.get_sha256(), folder_id).apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
-        folder_info = folder->get_folder_infos().by_device(my_device);
+        folder_info = folder->get_folder_infos().by_device(*my_device);
         files = &folder_info->get_file_infos();
-        folder_info_peer = folder->get_folder_infos().by_device(peer_device);
+        folder_info_peer = folder->get_folder_infos().by_device(*peer_device);
         files_peer = &folder_info_peer->get_file_infos();
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -86,11 +88,12 @@ struct fixture_t {
         target = sup->create_actor<fs::scan_actor_t>()
                      .timeout(timeout)
                      .cluster(cluster)
-                     .hasher_proxy(proxy_addr)
                      .fs_config(fs_config)
                      .requested_hashes_limit(2ul)
                      .finish();
+        sup->do_process();
 
+        sup->send<fs::payload::scan_folder_t>(target->get_address(), folder_id);
         main();
 
         sup->do_process();
@@ -107,7 +110,7 @@ struct fixture_t {
     cluster_ptr_t cluster;
     device_ptr_t my_device;
     bfs::path root_path;
-    path_guard_t path_quard;
+    path_guard_t path_guard;
     target_ptr_t target;
     model::folder_ptr_t folder;
     model::folder_info_ptr_t folder_info;
@@ -115,6 +118,7 @@ struct fixture_t {
     model::file_infos_map_t *files;
     model::file_infos_map_t *files_peer;
     errors_container_t errors;
+    std::uint32_t scan_completions;
     model::device_ptr_t peer_device;
 };
 
@@ -123,30 +127,36 @@ void test_meta_changes() {
         void main() noexcept override {
             sys::error_code ec;
 
-            SECTION("no files") {
-                sup->do_process();
-                CHECK(folder_info->get_file_infos().size() == 0);
-            }
-            SECTION("just 1 dir") {
-                CHECK(bfs::create_directories(root_path / "abc"));
-                sup->do_process();
-                CHECK(folder_info->get_file_infos().size() == 0);
-            }
-            SECTION("just 1 subdir, which cannot be read") {
-                auto subdir = root_path / "abc";
-                CHECK(bfs::create_directories(subdir / "def", ec));
-                bfs::permissions(subdir, bfs::perms::no_perms);
-                bfs::permissions(subdir, bfs::perms::owner_read, ec);
-                if (ec) {
+            SECTION("trivial") {
+                SECTION("no files") {
                     sup->do_process();
                     CHECK(folder_info->get_file_infos().size() == 0);
-                    bfs::permissions(subdir, bfs::perms::all_all);
-                    REQUIRE(errors.size() == 1);
-                    auto &errs = errors.at(0)->payload.errors;
-                    REQUIRE(errs.size() == 1);
-                    REQUIRE(errs.at(0).path == (subdir));
-                    REQUIRE(errs.at(0).ec);
                 }
+                SECTION("just 1 dir") {
+                    CHECK(bfs::create_directories(root_path / "abc"));
+                    sup->do_process();
+                    CHECK(folder_info->get_file_infos().size() == 0);
+                }
+#ifndef SYNCSPIRIT_WIN
+                SECTION("just 1 subdir, which cannot be read") {
+                    auto subdir = root_path / "abc";
+                    CHECK(bfs::create_directories(subdir / "def", ec));
+                    auto guard = test::path_guard_t(subdir);
+                    bfs::permissions(subdir, bfs::perms::no_perms);
+                    bfs::permissions(subdir, bfs::perms::owner_read, ec);
+                    if (!ec) {
+                        sup->do_process();
+                        CHECK(folder_info->get_file_infos().size() == 0);
+                        bfs::permissions(subdir, bfs::perms::all_all);
+                        REQUIRE(errors.size() == 1);
+                        auto &errs = errors.at(0)->payload.errors;
+                        REQUIRE(errs.size() == 1);
+                        REQUIRE(errs.at(0).path == (subdir / "def"));
+                        REQUIRE(errs.at(0).ec);
+                    }
+                }
+#endif
+                REQUIRE(scan_completions == 1);
             }
 
             proto::FileInfo pr_fi;
@@ -169,7 +179,7 @@ void test_meta_changes() {
 
             auto b = block_info_t::create(bi).value();
 
-            SECTION("a file does not physically exists") {
+            SECTION("a file does not physically exist") {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 folder_info_peer->add(file_peer, false);
@@ -181,8 +191,8 @@ void test_meta_changes() {
                 sup->do_process();
                 CHECK(files->size() == 1);
                 CHECK(!file->is_locally_available());
+                REQUIRE(scan_completions == 1);
             }
-
             SECTION("complete file exists") {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
@@ -201,19 +211,47 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     CHECK(file->is_locally_available());
                 }
+
                 SECTION("meta is changed (modification)") {
                     write_file(path, "12345");
                     sup->do_process();
                     CHECK(files->size() == 1);
-                    CHECK(!file->is_locally_available());
+                    auto new_file = files->by_name(pr_fi.name());
+                    REQUIRE(new_file);
+                    CHECK(file != new_file);
+                    CHECK(new_file->is_locally_available());
+                    CHECK(new_file->get_size() == 5);
+                    REQUIRE(new_file->get_blocks().size() == 1);
+                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
                 }
+
                 SECTION("meta is changed (size)") {
                     write_file(path, "123456");
                     bfs::last_write_time(path, modified);
                     sup->do_process();
                     CHECK(files->size() == 1);
-                    CHECK(!file->is_locally_available());
+                    auto new_file = files->by_name(pr_fi.name());
+                    REQUIRE(new_file);
+                    CHECK(file != new_file);
+                    CHECK(new_file->is_locally_available());
+                    CHECK(new_file->get_size() == 5);
+                    REQUIRE(new_file->get_blocks().size() == 1);
+                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
                 }
+
+                SECTION("meta is changed (content)") {
+                    write_file(path, "67890");
+                    sup->do_process();
+                    CHECK(files->size() == 1);
+                    auto new_file = files->by_name(pr_fi.name());
+                    REQUIRE(new_file);
+                    CHECK(file != new_file);
+                    CHECK(new_file->is_locally_available());
+                    CHECK(new_file->get_size() == 5);
+                    REQUIRE(new_file->get_blocks().size() == 1);
+                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
+                }
+                REQUIRE(scan_completions == 1);
             }
 
             SECTION("incomplete file exists") {
@@ -285,24 +323,21 @@ void test_meta_changes() {
                     CHECK(!bfs::exists(path));
                 }
 
+#ifndef SYNCSPIRIT_WIN
                 SECTION("error on reading -> remove") {
                     bfs::permissions(path, bfs::perms::no_perms);
-                    bfs::permissions(path, bfs::perms::owner_read, ec);
-                    if (ec) {
+                    if (!ec) {
                         sup->do_process();
                         CHECK(!file->is_locally_available());
-                        CHECK(file->is_locked());
+                        CHECK(!file->is_locked());
                         CHECK(!bfs::exists(path));
 
-                        REQUIRE(errors.size() == 1);
-                        auto &errs = errors.at(0)->payload.errors;
-                        REQUIRE(errs.size() == 1);
-                        CHECK(errs.at(0).path == path);
-                        CHECK(errs.at(0).ec);
+                        REQUIRE(errors.size() == 0);
                     }
                 }
+#endif
+                REQUIRE(scan_completions == 1);
             }
-
             SECTION("local (previous) file exists") {
                 pr_fi.set_size(15ul);
                 pr_fi.set_block_size(5ul);
@@ -354,10 +389,201 @@ void test_meta_changes() {
                 CHECK(file_peer->is_locally_available(0));
                 CHECK(file_peer->is_locally_available(1));
                 CHECK(!file_peer->is_locally_available(2));
+                REQUIRE(scan_completions == 1);
             }
         }
     };
     F().run();
 }
 
-REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");
+void test_new_files() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            sys::error_code ec;
+            auto &blocks = cluster->get_blocks();
+
+            SECTION("new symlink") {
+                auto file_path = root_path / "symlink";
+                bfs::create_symlink(bfs::path("/some/where"), file_path, ec);
+                REQUIRE(!ec);
+                sup->do_process();
+
+                auto file = files->by_name("symlink");
+                REQUIRE(file);
+                CHECK(file->is_locally_available());
+                CHECK(!file->is_file());
+                CHECK(file->is_link());
+                CHECK(file->get_block_size() == 0);
+                CHECK(file->get_size() == 0);
+                CHECK(blocks.size() == 0);
+                REQUIRE(scan_completions == 1);
+            }
+
+            SECTION("empty file") {
+                CHECK(bfs::create_directories(root_path / "abc"));
+                auto file_path = root_path / "abc" / "empty.file";
+                write_file(file_path, "");
+                sup->do_process();
+
+                auto file = files->by_name("abc/empty.file");
+                REQUIRE(file);
+                CHECK(file->is_locally_available());
+                CHECK(!file->is_link());
+                CHECK(file->is_file());
+                CHECK(file->get_block_size() == 0);
+                CHECK(file->get_size() == 0);
+                CHECK(blocks.size() == 0);
+                REQUIRE(scan_completions == 1);
+            }
+
+            SECTION("non-empty file (1 block)") {
+                auto file_path = root_path / "file.ext";
+                write_file(file_path, "12345");
+                sup->do_process();
+
+                auto file = files->by_name("file.ext");
+                REQUIRE(file);
+                CHECK(file->is_locally_available());
+                CHECK(!file->is_link());
+                CHECK(file->is_file());
+                CHECK(file->get_block_size() == 5);
+                CHECK(file->get_size() == 5);
+                CHECK(blocks.size() == 1);
+                REQUIRE(scan_completions == 1);
+            }
+
+            SECTION("non-empty file (2 blocks)") {
+                auto file_path = root_path / "file.ext";
+                auto sz = size_t{128 * 1024 * 2};
+                std::string data(sz, 'x');
+                write_file(file_path, data);
+                sup->do_process();
+
+                auto file = files->by_name("file.ext");
+                REQUIRE(file);
+                CHECK(file->is_locally_available());
+                CHECK(!file->is_link());
+                CHECK(file->is_file());
+                CHECK(file->get_size() == sz);
+                CHECK(file->get_blocks().size() == 2);
+                CHECK(blocks.size() == 1);
+                REQUIRE(scan_completions == 1);
+            }
+
+            SECTION("non-empty file (3 blocks)") {
+                auto file_path = root_path / "file.ext";
+                auto sz = size_t{128 * 1024 * 3};
+                std::string data(sz, 'x');
+                write_file(file_path, data);
+                sup->do_process();
+
+                auto file = files->by_name("file.ext");
+                REQUIRE(file);
+                CHECK(file->is_locally_available());
+                CHECK(!file->is_link());
+                CHECK(file->is_file());
+                CHECK(file->get_size() == sz);
+                CHECK(file->get_blocks().size() == 3);
+                CHECK(blocks.size() == 1);
+                REQUIRE(scan_completions == 1);
+            }
+
+            SECTION("two files, different content") {
+                auto file1_path = root_path / "file1.ext";
+                write_file(file1_path, "12345");
+
+                auto file2_path = root_path / "file2.ext";
+                write_file(file2_path, "67890");
+                sup->do_process();
+
+                auto file1 = files->by_name("file1.ext");
+                REQUIRE(file1);
+                CHECK(file1->is_locally_available());
+                CHECK(!file1->is_link());
+                CHECK(file1->is_file());
+                CHECK(file1->get_block_size() == 5);
+                CHECK(file1->get_size() == 5);
+
+                auto file2 = files->by_name("file2.ext");
+                REQUIRE(file2);
+                CHECK(file2->is_locally_available());
+                CHECK(!file2->is_link());
+                CHECK(file2->is_file());
+                CHECK(file2->get_block_size() == 5);
+                CHECK(file2->get_size() == 5);
+
+                CHECK(blocks.size() == 2);
+                REQUIRE(scan_completions == 1);
+            }
+
+            SECTION("two files, same content") {
+                auto file1_path = root_path / "file1.ext";
+                write_file(file1_path, "12345");
+
+                auto file2_path = root_path / "file2.ext";
+                write_file(file2_path, "12345");
+                sup->do_process();
+
+                auto file1 = files->by_name("file1.ext");
+                REQUIRE(file1);
+                CHECK(file1->is_locally_available());
+                CHECK(!file1->is_link());
+                CHECK(file1->is_file());
+                CHECK(file1->get_block_size() == 5);
+                CHECK(file1->get_size() == 5);
+
+                auto file2 = files->by_name("file2.ext");
+                REQUIRE(file2);
+                CHECK(file2->is_locally_available());
+                CHECK(!file2->is_link());
+                CHECK(file2->is_file());
+                CHECK(file2->get_block_size() == 5);
+                CHECK(file2->get_size() == 5);
+
+                CHECK(blocks.size() == 1);
+                REQUIRE(scan_completions == 1);
+            }
+        }
+    };
+    F().run();
+}
+
+void test_remove_file() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            sys::error_code ec;
+            auto &blocks = cluster->get_blocks();
+
+            SECTION("non-empty file") {
+                auto file_path = root_path / "file.ext";
+                write_file(file_path, "12345");
+                sup->do_process();
+                REQUIRE(scan_completions == 1);
+
+                auto file = files->by_name("file.ext");
+                REQUIRE(file);
+                REQUIRE(blocks.size() == 1);
+
+                bfs::remove(file_path);
+                auto &addr = target->get_address();
+                sup->send<fs::payload::scan_folder_t>(addr, std::string(folder->get_id()));
+                sup->do_process();
+
+                file = files->by_name("file.ext");
+                CHECK(file->is_deleted() == 1);
+                CHECK(blocks.size() == 0);
+                REQUIRE(scan_completions == 2);
+            }
+        }
+    };
+    F().run();
+};
+
+int _init() {
+    REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");
+    REGISTER_TEST_CASE(test_new_files, "test_new_files", "[fs]");
+    REGISTER_TEST_CASE(test_remove_file, "test_remove_file", "[fs]");
+    return 1;
+}
+
+static int v = _init();

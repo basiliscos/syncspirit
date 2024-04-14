@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "discovery_support.h"
 #include "utils/beast_support.h"
@@ -10,6 +10,7 @@
 #include <charconv>
 #include <sstream>
 #include <iomanip>
+#include <cctype>
 
 using namespace syncspirit::utils;
 
@@ -43,7 +44,7 @@ outcome::result<URI> make_announce_request(fmt::memory_buffer &buff, const URI &
     auto ok = serialize(req, buff);
     if (!ok)
         return ok.error();
-    return std::move(uri);
+    return uri;
 }
 
 outcome::result<URI> make_discovery_request(fmt::memory_buffer &buff, const URI &announce_uri,
@@ -61,9 +62,10 @@ outcome::result<URI> make_discovery_request(fmt::memory_buffer &buff, const URI 
 
     fmt::memory_buffer tx_buff;
     auto ok = serialize(req, buff);
-    if (!ok)
+    if (!ok) {
         return ok.error();
-    return std::move(uri);
+    }
+    return uri;
 }
 
 outcome::result<std::uint32_t> parse_announce(http::response<http::string_body> &res) noexcept {
@@ -141,7 +143,14 @@ outcome::result<utils::uri_container_t> parse_contact(http::response<http::strin
         return make_error_code(error_code_t::incorrect_json);
     }
     try {
-        auto date = boost::posix_time::from_iso_extended_string(seen.get<std::string>());
+        auto date_str = seen.get<std::string>();
+        auto valid_count = date_str.size();
+        while (valid_count > 0 && !isdigit(date_str[valid_count - 1])) {
+            --valid_count;
+        }
+        auto date_substr = std::string(date_str.data(), valid_count);
+        auto date = boost::posix_time::from_iso_extended_string(date_substr);
+        (void)date;
         return outcome::success(std::move(urls));
     } catch (...) {
         return make_error_code(error_code_t::malformed_date);

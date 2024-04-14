@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "access.h"
 #include "model/device.h"
@@ -91,7 +90,7 @@ using item_map_t = syncspirit::model::generic_map_t<item_t, 1>;
 
 namespace syncspirit::model {
 
-template <> inline std::string_view get_index<0>(const item_t &item) noexcept { return item.key; }
+template <> SYNCSPIRIT_API inline std::string_view get_index<0>(const item_t &item) noexcept { return item.key; }
 
 } // namespace syncspirit::model
 

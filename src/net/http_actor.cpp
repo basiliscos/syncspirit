@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "http_actor.h"
 #include "../utils/error_code.h"
@@ -16,8 +16,8 @@ r::plugin::resource_id_t resolver = 2;
 } // namespace
 
 http_actor_t::http_actor_t(config_t &config)
-    : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout),
-      request_timeout(config.request_timeout), registry_name{config.registry_name}, keep_alive{config.keep_alive} {
+    : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout), request_timeout(config.request_timeout),
+      registry_name{config.registry_name}, keep_alive{config.keep_alive} {
     log = utils::get_logger("net.http");
 }
 
@@ -146,6 +146,10 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     if (stop_io || queue.empty())
         return process();
 
+    if (state != r::state_t::OPERATIONAL) {
+        return;
+    }
+
     auto &payload = queue.front()->payload.request_payload;
     auto &ssl_ctx = payload->ssl_context;
     auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
@@ -160,7 +164,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     }
 
     auto &addresses = res.payload.res->results;
-    transport::connect_fn_t on_connect = [&](auto arg) { this->on_connect(arg); };
+    transport::connect_fn_t on_connect = [&](const auto &arg) { this->on_connect(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     transport->async_connect(addresses, on_connect, on_error);
     resources->acquire(resource::io);
@@ -168,7 +172,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     resolved_url = payload->url;
 }
 
-void http_actor_t::on_connect(resolve_it_t) noexcept {
+void http_actor_t::on_connect(const tcp::endpoint &) noexcept {
     LOG_TRACE(log, "{}, on_connect", identity);
     resources->release(resource::io);
     if (!need_response || stop_io) {
@@ -275,7 +279,9 @@ void http_actor_t::on_handshake(bool, utils::x509_t &, const tcp::endpoint &, co
     if (!need_response || stop_io) {
         return process();
     }
-    write_request();
+    if (state == r::state_t::OPERATIONAL) {
+        write_request();
+    }
 }
 
 void http_actor_t::on_handshake_error(sys::error_code ec) noexcept {

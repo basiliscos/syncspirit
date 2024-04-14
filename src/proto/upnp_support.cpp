@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include <boost/beast/http.hpp>
 #include <string_view>
@@ -237,8 +237,8 @@ outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const URI
     return serialize(req, buff);
 }
 
-outcome::result<void> make_mappig_validation_request(fmt::memory_buffer &buff, const URI &uri,
-                                                     std::uint16_t external_port) noexcept {
+outcome::result<void> make_mapping_validation_request(fmt::memory_buffer &buff, const URI &uri,
+                                                      std::uint16_t external_port) noexcept {
     http::request<http::string_body> req;
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_GetSpecificPortMappingEntry);
     req.method(http::verb::post);
@@ -286,7 +286,7 @@ outcome::result<bool> parse_unmapping(const char *data, std::size_t bytes) noexc
     return static_cast<bool>(node);
 }
 
-outcome::result<bool> parse_mappig_validation(const char *data, std::size_t bytes) noexcept {
+outcome::result<bool> parse_mapping_validation(const char *data, std::size_t bytes) noexcept {
     pugi::xml_document doc;
     auto result = doc.load_buffer(data, bytes);
     if (!result) {

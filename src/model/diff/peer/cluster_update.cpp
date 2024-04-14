@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "cluster_update.h"
 #include "cluster_remove.h"
@@ -8,6 +8,8 @@
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/string_map.hpp"
 #include "model/misc/error_code.h"
+#include "utils/format.hpp"
+#include <spdlog/fmt/bin_to_hex.h>
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::model::diff::peer;
@@ -15,11 +17,13 @@ using namespace syncspirit::model::diff::peer;
 auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, const message_t &message) noexcept
     -> outcome::result<cluster_diff_ptr_t> {
     auto ptr = cluster_diff_ptr_t();
+    auto log = get_log();
 
     auto &known_unknowns = cluster.get_unknown_folders();
     unknown_folders_t unknown;
     modified_folders_t updated;
     modified_folders_t reset;
+    modified_folders_t remote;
     keys_t removed_folders;
     keys_t removed_files_final;
     keys_t removed_unknown_folders;
@@ -46,6 +50,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     for (int i = 0; i < message.folders_size(); ++i) {
         auto &f = message.folders(i);
         auto folder = folders.by_id(f.id());
+        LOG_TRACE(log, "cluster_update_t, folder = '{}'", f.label());
         if (!folder) {
             for (int i = 0; i < f.devices_size(); ++i) {
                 auto &d = f.devices(i);
@@ -57,11 +62,13 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                             if (!actual) {
                                 removed_unknown_folders.emplace(std::string(uf->get_key()));
                                 unknown.emplace_back(f);
+                                LOG_TRACE(log, "cluster_update_t, unknown folder = {}", f.label());
                             }
                         }
                         goto NEXT_FOLDER;
                     }
                     unknown.emplace_back(f);
+                    LOG_TRACE(log, "cluster_update_t, unknown folder = {}", f.label());
                     goto NEXT_FOLDER;
                 }
             }
@@ -73,19 +80,33 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
             auto &d = f.devices(j);
             auto device_sha = d.id();
             auto device = devices.by_sha256(device_sha);
+            auto device_opt = model::device_id_t::from_sha256(device_sha);
+            if (!device_opt) {
+                auto device_hex = spdlog::to_hex(device_sha.begin(), device_sha.end());
+                LOG_WARN(log, "cluster_update_t, malformed device id: {}", device_hex);
+                continue;
+            }
+            auto &device_id = *device_opt;
+            LOG_TRACE(log, "cluster_update_t, shared with device = '{}', index = {}, max seq. = {}", device_id,
+                      d.index_id(), d.max_sequence());
+
             if (!device) {
+                LOG_TRACE(log, "cluster_update_t, unknown device, ignoring");
                 continue;
             }
             if (device != &source) {
+                auto info = update_info_t{f.id(), d};
+                remote.emplace_back(std::move(info));
+                LOG_TRACE(log, "cluster_update_t, remote folder = {}", f.label());
                 continue;
             }
 
             auto &folder_infos = folder->get_folder_infos();
-            auto folder_info = folder_infos.by_device(device);
+            auto folder_info = folder_infos.by_device(*device);
             if (!folder_info) {
                 auto log = get_log();
-                LOG_WARN(log, "folder {} was not shared with a peer {}", folder->get_label(), device->device_id());
-                return make_error_code(error_code_t::folder_is_not_shared);
+                LOG_WARN(log, "unexpected folder '{}' with a peer '{}'", folder->get_label(), device->device_id());
+                continue;
             }
 
             auto update_info = update_info_t{f.id(), d};
@@ -96,18 +117,19 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                 for (auto it : files) {
                     auto key = std::string(it.item->get_key());
                     removed_files_final.emplace(key);
-                    removed_files.put(key);
+                    removed_files.put(std::move(key));
                 }
                 for (auto it : files) {
                     remove_blocks(it.item);
                 }
             } else if (d.max_sequence() > folder_info->get_max_sequence()) {
+                LOG_TRACE(log, "cluster_update_t, updated folder = {}", f.label());
                 updated.emplace_back(update_info);
             }
         }
     }
 
-    ptr = new cluster_update_t(source, std::move(unknown), std::move(reset), std::move(updated), removed_blocks,
+    ptr = new cluster_update_t(source, std::move(unknown), std::move(reset), updated, remote, removed_blocks,
                                removed_unknown_folders);
     bool wrap = !removed_blocks.empty() || !removed_folders.empty() || !removed_unknown_folders.empty();
     if (wrap) {
@@ -128,13 +150,14 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
 
 cluster_update_t::cluster_update_t(const model::device_t &source, unknown_folders_t unknown_folders,
                                    modified_folders_t reset_folders_, modified_folders_t updated_folders_,
-                                   keys_t removed_blocks_, keys_t removed_unknown_folders_) noexcept
+                                   modified_folders_t remote_folders_, keys_t removed_blocks_,
+                                   keys_t removed_unknown_folders_) noexcept
     : source_peer(source), new_unknown_folders{std::move(unknown_folders)}, reset_folders{std::move(reset_folders_)},
-      updated_folders{std::move(updated_folders_)}, removed_blocks{removed_blocks_}, removed_unknown_folders{std::move(
-                                                                                         removed_unknown_folders_)} {}
+      updated_folders{std::move(updated_folders_)}, remote_folders{std::move(remote_folders_)},
+      removed_blocks{removed_blocks_}, removed_unknown_folders{std::move(removed_unknown_folders_)} {}
 
 auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "applyging cluster_update_t");
+    LOG_TRACE(log, "applying cluster_update_t");
     auto &folders = cluster.get_folders();
 
     for (auto &info : updated_folders) {
@@ -205,9 +228,25 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
         unknown.emplace_front(std::move(opt.value()));
     }
 
+    auto &devices = cluster.get_devices();
+    auto peer = cluster.get_devices().by_sha256(source_peer.device_id().get_sha256());
+    auto &peer_remote_folders = peer->get_remote_folder_infos();
+    peer_remote_folders.clear();
+    for (auto &info : remote_folders) {
+        auto folder = folders.by_id(info.folder_id);
+        assert(folder);
+        auto device = devices.by_sha256(info.device.id());
+        assert(device);
+        auto opt = remote_folder_info_t::create(info.device, device, folder);
+        if (!opt) {
+            return opt.assume_error();
+        }
+        peer_remote_folders.put(opt.assume_value());
+    }
+
     return outcome::success();
 }
 
-auto cluster_update_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
-    return visitor(*this);
+auto cluster_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+    return visitor(*this, custom);
 }

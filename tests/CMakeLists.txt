@@ -1,4 +1,5 @@
 enable_testing()
+include(GenerateExportHeader)
 
 find_package(
     Boost
@@ -9,27 +10,37 @@ find_package(
     REQUIRED
 )
 find_package(OpenSSL REQUIRED)
+find_package(Catch2 REQUIRED)
 
 if(MINGW)
     ENABLE_LANGUAGE(RC)
 endif()
 
-add_library(syncspirit_test_lib STATIC
+add_library(syncspirit_test_lib
     $<$<PLATFORM_ID:Windows>:win32-resource.rc>
     test_supervisor.cpp
     test-db.cpp
-    test-main.cpp
+    test-utils.cpp
     diff-builder.cpp
 )
-target_link_libraries(syncspirit_test_lib syncspirit_lib)
+target_link_libraries(syncspirit_test_lib syncspirit_lib
+    Catch2::Catch2WithMain
+    $<$<PLATFORM_ID:Windows>:wsock32>
+    $<$<PLATFORM_ID:Windows>:ws2_32>
+    $<$<PLATFORM_ID:Windows>:iphlpapi>
+)
 target_include_directories(syncspirit_test_lib PUBLIC
     "${syncspirit_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_BINARY_DIR}/include"
+)
+generate_export_header(syncspirit_test_lib
+    EXPORT_MACRO_NAME SYNCSPIRIT_TEST_API
+    EXPORT_FILE_NAME include/syncspirit-test-export.h
 )
 
 add_custom_command(TARGET syncspirit_test_lib PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_SOURCE_DIR}/tests/data ${CMAKE_BINARY_DIR}/data)
-
 
 add_executable(009-uri 009-uri.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(009-uri syncspirit_test_lib)
@@ -63,6 +74,10 @@ add_executable(016-relay-support 016-relay-support.cpp $<$<PLATFORM_ID:Windows>:
 target_link_libraries(016-relay-support syncspirit_test_lib)
 add_test(016-relay-support "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/016-relay-support")
 
+add_executable(017-fs-utils 017-fs-utils.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(017-fs-utils syncspirit_test_lib)
+add_test(017-fs-utils "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/017-fs-utils")
+
 add_executable(020-generic-map 020-generic-map.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(020-generic-map syncspirit_test_lib)
 add_test(020-generic-map "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/020-generic-map")
@@ -91,13 +106,9 @@ add_executable(033-diffs-trivial 033-diffs-trivial.cpp $<$<PLATFORM_ID:Windows>:
 target_link_libraries(033-diffs-trivial syncspirit_test_lib)
 add_test(033-diffs-trivial "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/033-diffs-trivial")
 
-add_executable(034-diff-new_file 034-diff-new_file.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
-target_link_libraries(034-diff-new_file syncspirit_test_lib)
-add_test(034-diff-new_file "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/034-diff-new_file")
-
-add_executable(035-diff-local_update 035-diff-local_update.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
-target_link_libraries(035-diff-local_update syncspirit_test_lib)
-add_test(035-diff-local_update "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/035-diff-local_update")
+add_executable(034-diff-local_update 034-diff-local_update.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(034-diff-local_update syncspirit_test_lib)
+add_test(034-diff-local_update "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/034-diff-local_update")
 
 add_executable(036-diff-blocks 036-diff-blocks.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(036-diff-blocks syncspirit_test_lib)
@@ -126,6 +137,10 @@ add_test(052-file_info "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/052-file_info")
 add_executable(053-scan_task 053-scan_task.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(053-scan_task syncspirit_test_lib)
 add_test(053-scan_task "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/053-scan_task")
+
+add_executable(054-updates_streamer 054-updates_streamer.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(054-updates_streamer syncspirit_test_lib)
+add_test(054-updates_streamer "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/054-updates_streamer")
 
 add_executable(060-bep 060-bep.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(060-bep syncspirit_test_lib)
@@ -160,19 +175,13 @@ target_link_libraries(076-scan_actor syncspirit_test_lib)
 add_test(076-scan_actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/076-scan_actor")
 
 add_executable(077-initiator 077-initiator.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
-target_link_libraries(077-initiator syncspirit_test_lib
-    $<$<PLATFORM_ID:Windows>:wsock32>
-    $<$<PLATFORM_ID:Windows>:ws2_32>
-    $<$<PLATFORM_ID:Windows>:iphlpapi>
-)
+target_link_libraries(077-initiator syncspirit_test_lib)
 add_test(077-initiator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/077-initiator")
 
 add_executable(078-relay 078-relay.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
-target_link_libraries(078-relay syncspirit_test_lib
-    $<$<PLATFORM_ID:Windows>:wsock32>
-    $<$<PLATFORM_ID:Windows>:ws2_32>
-    $<$<PLATFORM_ID:Windows>:iphlpapi>
-)
+target_link_libraries(078-relay syncspirit_test_lib)
 add_test(078-relay "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/078-relay")
 
-
+add_executable(079-peer 079-peer.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(079-peer syncspirit_test_lib)
+add_test(079-peer "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/079-peer")

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "utils.h"
 
@@ -18,20 +18,16 @@
 namespace bfs = boost::filesystem;
 namespace sys = boost::system;
 
+#if defined(__unix__)
 static const std::string home_path = "~/.config/syncspirit";
+#else
+static const std::string home_path = "~/syncspirit";
+#endif
 
 namespace syncspirit::config {
 
 using device_name_t = outcome::result<std::string>;
-
-static std::string expand_home(const std::string &path, const char *home) {
-    if (home && path.size() && path[0] == '~') {
-        std::string new_path(home);
-        new_path += path.c_str() + 1;
-        return new_path;
-    }
-    return path;
-}
+using home_option_t = outcome::result<bfs::path>;
 
 static device_name_t get_device_name() noexcept {
     sys::error_code ec;
@@ -46,7 +42,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
     main_t cfg;
     cfg.config_path = config_path;
 
-    auto home = std::getenv("HOME");
+    auto home_opt = utils::get_home_dir();
     auto r = toml::parse(config);
     if (!r) {
         return std::string(r.error().description());
@@ -180,13 +176,13 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         if (!cert_file) {
             return "global_discovery/cert_file is incorrect or missing";
         }
-        c.cert_file = expand_home(cert_file.value(), home);
+        c.cert_file = utils::expand_home(cert_file.value(), home_opt);
 
         auto key_file = t["key_file"].value<std::string>();
         if (!key_file) {
             return "global_discovery/key_file is incorrect or missing";
         }
-        c.key_file = expand_home(key_file.value(), home);
+        c.key_file = utils::expand_home(key_file.value(), home_opt);
 
         auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
         if (!rx_buff_size) {
@@ -271,6 +267,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.rx_buff_size = rx_buff_size.value();
 
+        auto tx_buff_limit = t["tx_buff_limit"].value<std::uint32_t>();
+        if (!tx_buff_limit) {
+            return "bep/tx_buff_limit is incorrect or missing";
+        }
+        c.tx_buff_limit = tx_buff_limit.value();
+
         auto connect_timeout = t["connect_timeout"].value<std::uint32_t>();
         if (!connect_timeout) {
             return "bep/connect_timeout is incorrect or missing";
@@ -300,6 +302,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "bep/blocks_max_requested is incorrect or missing";
         }
         c.blocks_max_requested = blocks_max_requested.value();
+
+        auto blocks_simultaneous_write = t["blocks_simultaneous_write"].value<std::uint32_t>();
+        if (!blocks_simultaneous_write) {
+            return "bep/blocks_simultaneous_write is incorrect or missing";
+        }
+        c.blocks_simultaneous_write = blocks_simultaneous_write.value();
     }
 
     // dialer
@@ -335,7 +343,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         if (!mru_size) {
             return "fs/mru_size is incorrect or missing";
         }
-        c.mru_size = temporally_timeout.value();
+        c.mru_size = mru_size.value();
     }
 
     // db
@@ -349,14 +357,14 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.upper_limit = upper_limit.value();
 
-        auto uncommited_threshold = t["uncommited_threshold"].value<std::uint32_t>();
-        if (!uncommited_threshold) {
-            return "db/uncommited_threshold is incorrect or missing";
+        auto uncommitted_threshold = t["uncommitted_threshold"].value<std::uint32_t>();
+        if (!uncommitted_threshold) {
+            return "db/uncommitted_threshold is incorrect or missing";
         }
-        c.uncommited_threshold = uncommited_threshold.value();
+        c.uncommitted_threshold = uncommitted_threshold.value();
     }
 
-    return std::move(cfg);
+    return cfg;
 }
 
 static std::string_view get_level(spdlog::level::level_enum level) noexcept {
@@ -428,11 +436,13 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                  }}},
         {"bep", toml::table{{
                     {"rx_buff_size", cfg.bep_config.rx_buff_size},
+                    {"tx_buff_limit", cfg.bep_config.tx_buff_limit},
                     {"connect_timeout", cfg.bep_config.connect_timeout},
                     {"request_timeout", cfg.bep_config.request_timeout},
                     {"tx_timeout", cfg.bep_config.tx_timeout},
                     {"rx_timeout", cfg.bep_config.rx_timeout},
                     {"blocks_max_requested", cfg.bep_config.blocks_max_requested},
+                    {"blocks_simultaneous_write", cfg.bep_config.blocks_simultaneous_write},
                 }}},
         {"dialer", toml::table{{
                        {"enabled", cfg.dialer_config.enabled},
@@ -444,7 +454,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                }}},
         {"db", toml::table{{
                    {"upper_limit", cfg.db_config.upper_limit},
-                   {"uncommited_threshold", cfg.db_config.uncommited_threshold},
+                   {"uncommitted_threshold", cfg.db_config.uncommitted_threshold},
                }}},
         {"relay", toml::table{{
                       {"enabled", cfg.relay_config.enabled},
@@ -465,10 +475,11 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         spdlog::info("creating directory {}", dir.string());
         bfs::create_directories(dir, ec);
         if (ec) {
-            spdlog::error("cannot create dirs: {}", ec);
+            spdlog::error("cannot create dirs: {}", ec.message());
             return ec;
         }
     }
+
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
     auto config_dir_opt = utils::get_default_config_dir();
@@ -492,7 +503,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     // clang-format off
     main_t cfg;
     cfg.config_path = config_path;
-    cfg.default_location = config_dir;
+    cfg.default_location = config_dir / "shared_data";
     cfg.timeout = 5000;
     cfg.device_name = device;
     cfg.hasher_threads = 3;
@@ -524,12 +535,14 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         false,      /* debug */
     };
     cfg.bep_config = bep_config_t {
-        16 * 1024 * 1024,   /* rx_buff */
+        16 * 1024 * 1024,   /* rx_buff_size */
+        8 * 1024 * 1024,    /* tx_buff_limit */
         5000,               /* connect_timeout */
         60000,              /* request_timeout */
         90000,              /* tx_timeout */
         300000,             /* rx_timeout */
         16,                 /* blocks_max_requested */
+        32,                 /* blocks_simultaneous_write */
     };
     cfg.dialer_config = dialer_config_t {
         true,       /* enabled */
@@ -537,11 +550,11 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     };
     cfg.fs_config = fs_config_t {
         86400000,   /* temporally_timeout, 24h default */
-        10,         /* mru_size max number of opend files for reading and writing */
+        128,        /* mru_size max number of open files for reading and writing */
     };
     cfg.db_config = db_config_t {
         0x400000000,   /* upper_limit, 16Gb */
-        150,           /* uncommited_threshold */
+        150,           /* uncommitted_threshold */
     };
     cfg.relay_config = relay_config_t {
         true,                                       /* enabled */

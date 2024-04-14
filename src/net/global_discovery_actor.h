@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -7,8 +7,10 @@
 #include "model/messages.h"
 #include "model/diff/contact_visitor.h"
 #include "utils/log.h"
+#include "utils/string_comparator.hpp"
 #include <boost/asio.hpp>
 #include <optional>
+#include <set>
 #include <unordered_set>
 
 namespace syncspirit {
@@ -30,32 +32,32 @@ template <typename Actor> struct global_discovery_actor_config_builder_t : r::ac
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&announce_url(const utils::URI &value) &&noexcept {
+    builder_t &&announce_url(const utils::URI &value) && noexcept {
         parent_t::config.announce_url = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&ssl_pair(const utils::key_pair_t *value) &&noexcept {
+    builder_t &&ssl_pair(const utils::key_pair_t *value) && noexcept {
         parent_t::config.ssl_pair = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&rx_buff_size(const std::uint32_t value) &&noexcept {
+    builder_t &&rx_buff_size(const std::uint32_t value) && noexcept {
         parent_t::config.rx_buff_size = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&io_timeout(const std::uint32_t value) &&noexcept {
+    builder_t &&io_timeout(const std::uint32_t value) && noexcept {
         parent_t::config.io_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&device_id(const model::device_id_t &value) &&noexcept {
+    builder_t &&device_id(const model::device_id_t &value) && noexcept {
         parent_t::config.device_id = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -73,7 +75,7 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
 
   private:
     using rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
-    using discovering_devices_t = std::unordered_set<std::string>;
+    using discovering_devices_t = std::set<std::string, utils::string_comparator_t>;
     using uris_t = std::unordered_set<std::string>;
 
     void announce() noexcept;
@@ -85,14 +87,14 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
     void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
                       const r::message_ptr_t &custom = {}) noexcept;
 
-    outcome::result<void> operator()(const model::diff::modify::update_contact_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::update_contact_t &, void *custom) noexcept override;
 
     model::device_id_t device_id;
     utils::logger_t log;
     r::address_ptr_t http_client;
     r::address_ptr_t coordinator;
     utils::URI announce_url;
-    model::device_id_t dicovery_device_id;
+    model::device_id_t discovery_device_id;
     const utils::key_pair_t &ssl_pair;
     rx_buff_t rx_buff;
     std::uint32_t rx_buff_size;

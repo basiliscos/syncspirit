@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+
 #pragma once
 
 #include <rotor.hpp>
@@ -22,6 +25,7 @@ struct initiator_actor_config_t : public r::actor_config_t {
     r::message_ptr_t custom;
     r::supervisor_t *router;
     std::string_view alpn;
+    bool relay_enabled;
 };
 
 template <typename Actor> struct initiator_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -29,58 +33,63 @@ template <typename Actor> struct initiator_actor_config_builder_t : r::actor_con
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&peer_device_id(const model::device_id_t &value) &&noexcept {
+    builder_t &&peer_device_id(const model::device_id_t &value) && noexcept {
         parent_t::config.peer_device_id = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&uris(const utils::uri_container_t &value) &&noexcept {
+    builder_t &&uris(const utils::uri_container_t &value) && noexcept {
         parent_t::config.uris = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&relay_session(const std::string &value) &&noexcept {
+    builder_t &&relay_session(const std::string &value) && noexcept {
         parent_t::config.relay_session = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&ssl_pair(const utils::key_pair_t *value) &&noexcept {
+    builder_t &&ssl_pair(const utils::key_pair_t *value) && noexcept {
         parent_t::config.ssl_pair = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&sock(tcp_socket_t value) &&noexcept {
+    builder_t &&sock(tcp_socket_t value) && noexcept {
         parent_t::config.sock = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&sink(const r::address_ptr_t &value) &&noexcept {
+    builder_t &&sink(const r::address_ptr_t &value) && noexcept {
         parent_t::config.sink = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&custom(r::message_ptr_t value) &&noexcept {
+    builder_t &&custom(r::message_ptr_t value) && noexcept {
         parent_t::config.custom = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&router(r::supervisor_t &value) &&noexcept {
+    builder_t &&router(r::supervisor_t &value) && noexcept {
         parent_t::config.router = &value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&alpn(std::string_view value) &&noexcept {
+    builder_t &&alpn(std::string_view value) && noexcept {
         parent_t::config.alpn = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&relay_enabled(bool value) && noexcept {
+        parent_t::config.relay_enabled = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
 
-struct initiator_actor_t : r::actor_base_t {
+struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     using config_t = initiator_actor_config_t;
     template <typename Actor> using config_builder_t = initiator_actor_config_builder_t<Actor>;
 
@@ -107,7 +116,7 @@ struct initiator_actor_t : r::actor_base_t {
     void resolve(const utils::URI &uri) noexcept;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
-    void on_connect(resolve_it_t) noexcept;
+    void on_connect(const tcp::endpoint &) noexcept;
     void on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept;
     void on_handshake(bool valid_peer, utils::x509_t &peer_cert, const tcp::endpoint &peer_endpoint,
                       const model::device_id_t *peer_device) noexcept;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -32,13 +32,17 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
 struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
 
+    // clang-format off
     enum flags_t {
-        f_deleted = 1 << 0,
-        f_invalid = 1 << 1,
+        f_deleted        = 1 << 0,
+        f_invalid        = 1 << 1,
         f_no_permissions = 1 << 2,
-        f_locked = 1 << 3,
-        f_local_locked = 1 << 4,
+        f_locked         = 1 << 3,
+        f_local_locked   = 1 << 4,
+        f_unreachable    = 1 << 5,
+        f_unlocking      = 1 << 6,
     };
+    // clang-format on
 
     using blocks_t = std::vector<block_info_ptr_t>;
 
@@ -64,7 +68,7 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
     inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
     std::string_view get_name() const noexcept;
     inline const std::string &get_full_name() const noexcept { return full_name; }
-    inline const proto::Vector &get_version() const noexcept { return version; };
+    inline const proto::Vector &get_version() const noexcept { return version; }
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     void set_sequence(std::int64_t value) noexcept;
@@ -73,19 +77,21 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
 
     void remove_blocks() noexcept;
     void assign_block(const model::block_info_ptr_t &block, size_t index) noexcept;
-    bool check_consistency() noexcept;
 
     inline bool is_file() const noexcept { return type == proto::FileInfoType::FILE; }
     inline bool is_dir() const noexcept { return type == proto::FileInfoType::DIRECTORY; }
     inline bool is_link() const noexcept { return type == proto::FileInfoType::SYMLINK; }
     inline bool is_deleted() const noexcept { return flags & f_deleted; }
+    inline bool is_invalid() const noexcept { return flags & f_invalid; }
+    inline bool is_unreachable() const noexcept { return flags & f_unreachable; }
 
-    inline std::int64_t get_size() const noexcept { return size; }
+    std::int64_t get_size() const noexcept;
     inline void set_size(std::int64_t value) noexcept { size = value; }
 
     std::int32_t get_block_size() const noexcept { return block_size; }
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 
+    void mark_unreachable(bool value) noexcept;
     void mark_local_available(size_t block_index) noexcept;
     bool is_locally_available(size_t block_index) const noexcept;
     bool is_locally_available() const noexcept;
@@ -108,6 +114,9 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
     void locally_lock() noexcept;
     void locally_unlock() noexcept;
 
+    bool is_unlocking() const noexcept;
+    void set_unlocking(bool value) noexcept;
+
     proto::FileInfo get() const noexcept;
     file_info_ptr_t get_source() const noexcept;
     void set_source(const file_info_ptr_t &peer_file) noexcept;
@@ -117,6 +126,8 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
     outcome::result<void> fields_update(const db::FileInfo &) noexcept;
 
     file_info_ptr_t actualize() const noexcept;
+    proto::Index generate() noexcept;
+    std::size_t expected_meta_size() const noexcept;
 
   private:
     using marks_vector_t = std::vector<bool>;

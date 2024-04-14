@@ -1,17 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "platform.h"
 #include <stdexcept>
-
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-
-#define WIN32_LEAN_AND_MEAN
-
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#endif
 
 using namespace syncspirit::utils;
 
@@ -29,4 +20,4 @@ void platform_t::startup() {
 #endif
 }
 
-void platform_t::shutdhown() noexcept {}
+void platform_t::shutdown() noexcept {}

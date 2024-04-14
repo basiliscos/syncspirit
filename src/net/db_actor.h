@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -21,7 +21,7 @@ struct db_actor_config_t : r::actor_config_t {
     std::string db_dir;
     config::db_config_t db_config;
     model::cluster_ptr_t cluster;
-    size_t uncommited_threshold = {100};
+    size_t uncommitted_threshold = {100};
 };
 
 template <typename Actor> struct db_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -29,17 +29,17 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&db_dir(const std::string &value) &&noexcept {
+    builder_t &&db_dir(const std::string &value) && noexcept {
         parent_t::config.db_dir = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) &&noexcept {
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&db_config(const config::db_config_t &value) &&noexcept {
+    builder_t &&db_config(const config::db_config_t &value) && noexcept {
         parent_t::config.db_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -69,14 +69,16 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;
-    outcome::result<void> operator()(const model::diff::modify::create_folder_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::share_folder_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::update_peer_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::clone_file_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::finish_file_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::cluster_update_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::cluster_remove_t &) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::update_folder_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::create_folder_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::share_folder_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::unshare_folder_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::finish_file_ack_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::local_update_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::cluster_remove_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
     r::address_ptr_t coordinator;
     utils::logger_t log;
@@ -85,7 +87,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     config::db_config_t db_config;
     model::cluster_ptr_t cluster;
     transaction_ptr_t txn_holder;
-    size_t uncommited;
+    size_t uncommitted;
 };
 
 } // namespace net

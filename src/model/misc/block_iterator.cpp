@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "../cluster.h"
 #include "block_iterator.h"
@@ -31,8 +31,9 @@ void blocks_iterator_t::advance() noexcept {
 
 void blocks_iterator_t::prepare() noexcept {
     if (source) {
-        if (i >= source->blocks.size()) {
-            source = nullptr;
+        bool reset = source->is_unreachable() || (i >= source->blocks.size());
+        if (reset) {
+            source.reset();
         }
     }
 }
@@ -50,3 +51,5 @@ file_block_t blocks_iterator_t::next(bool advance_) noexcept {
     }
     return {sb[idx].get(), src, idx};
 }
+
+file_info_ptr_t blocks_iterator_t::get_source() noexcept { return source; }

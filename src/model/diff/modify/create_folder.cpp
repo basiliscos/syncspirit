@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "create_folder.h"
 #include "../cluster_visitor.h"
@@ -41,7 +41,7 @@ auto create_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     return outcome::success();
 }
 
-auto create_folder_t::visit(cluster_visitor_t &visitor) const noexcept -> outcome::result<void> {
+auto create_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting create_folder_t");
-    return visitor(*this);
+    return visitor(*this, custom);
 }

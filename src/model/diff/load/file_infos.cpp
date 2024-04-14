@@ -9,8 +9,6 @@
 using namespace syncspirit::model::diff::load;
 
 auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    static const constexpr char folder_info_prefix = (char)(db::prefix::folder_info);
-    static const constexpr char block_prefix = (char)(db::prefix::block_info);
 
     folder_infos_map_t all_fi;
     auto &folders = cluster.get_folders();
@@ -48,12 +46,6 @@ auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
             assert(block);
             fi->assign_block(block, (size_t)i);
         }
-        if (!fi->check_consistency()) {
-            LOG_ERROR(log, "inconsitency detected for the file {} at folder {}", fi->get_name(),
-                      folder_info->get_folder()->get_label());
-            return make_error_code(error_code_t::inconsistent_file);
-        }
-
         if (!db.source_device().empty()) {
             fi->lock();
         }

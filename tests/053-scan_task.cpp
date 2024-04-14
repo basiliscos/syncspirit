@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "fs/scan_task.h"
 
@@ -24,7 +23,7 @@ TEST_CASE("scan_task", "[fs]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -44,11 +43,10 @@ TEST_CASE("scan_task", "[fs]") {
     folder->get_folder_infos().put(folder_peer);
 
     SECTION("without files") {
-        SECTION("non-existing dir => err") {
-            db_folder.set_path("/some/non-existing/path");
 
-            folder = folder_t::create(cluster->next_uuid(), db_folder).value();
-            cluster->get_folders().put(folder);
+#ifndef SYNCSPIRIT_WIN
+        SECTION("no permissions to read dir => err") {
+            bfs::permissions(root_path, bfs::perms::no_perms);
 
             auto folder_info = folder_info_t::create(cluster->next_uuid(), db_folder_info, my_device, folder).value();
             folder->get_folder_infos().put(folder_info);
@@ -62,9 +60,9 @@ TEST_CASE("scan_task", "[fs]") {
 
             auto &err = errs->at(0);
             CHECK(err.ec);
-            CHECK(err.path.string() == db_folder.path());
+            CHECK(err.path == root_path);
         }
-
+#endif
         SECTION("no dirs, no files") {
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();
@@ -93,7 +91,7 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == false);
         }
 
-        SECTION("no dirs, file outside of recorded is ignored") {
+        SECTION("no dirs, unknown files") {
             auto task = scan_task_t(cluster, folder->get_id(), config);
             write_file(root_path / "some-file", "");
             auto r = task.advance();
@@ -101,12 +99,41 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == true);
 
             r = task.advance();
+            auto *uf = std::get_if<unknown_file_t>(&r);
+            REQUIRE(uf);
+            CHECK(uf->path.filename() == "some-file");
+            CHECK(uf->metadata.size() == 0);
+            CHECK(uf->metadata.type() == proto::FileInfoType::FILE);
+
+            r = task.advance();
+            REQUIRE(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
+        SECTION("no dirs, symlinks") {
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto file_path = root_path / "symlink";
+            bfs::create_symlink(bfs::path("/some/where"), file_path);
+
+            auto r = task.advance();
             CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            auto *uf = std::get_if<unknown_file_t>(&r);
+            REQUIRE(uf);
+            CHECK(uf->path.filename() == "symlink");
+            CHECK(uf->metadata.size() == 0);
+            CHECK(uf->metadata.type() == proto::FileInfoType::SYMLINK);
+            CHECK(uf->metadata.symlink_target() == "/some/where");
+
+            r = task.advance();
+            REQUIRE(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
         }
     }
 
-    SECTION("files") {
+    SECTION("regular files") {
         auto modified = std::time_t{1642007468};
         auto pr_file = proto::FileInfo{};
         pr_file.set_name("a.txt");
@@ -131,6 +158,72 @@ TEST_CASE("scan_task", "[fs]") {
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();
             CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
+        SECTION("file has been removed") {
+            pr_file.set_block_size(5);
+            pr_file.set_size(5);
+            pr_file.set_modified_s(modified);
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<removed_t>(&r));
+            auto ref = std::get_if<removed_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
+        SECTION("removed file does not exist => unchanged meta") {
+            pr_file.set_deleted(true);
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
+        SECTION("root dir does not exist & deleted file => unchanged meta") {
+            pr_file.set_deleted(true);
+            folder->set_path(root_path / "zzz");
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            REQUIRE(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == true);
 
             r = task.advance();
@@ -212,6 +305,7 @@ TEST_CASE("scan_task", "[fs]") {
                 REQUIRE(std::get_if<incomplete_t>(&r));
                 auto ref = std::get_if<incomplete_t>(&r);
                 CHECK(ref->file);
+                CHECK(ref->opened_file);
 
                 r = task.advance();
                 CHECK(std::get_if<bool>(&r));
@@ -305,6 +399,7 @@ TEST_CASE("scan_task", "[fs]") {
             }
             CHECK(unchanged.file == file_my);
             CHECK(incomplete.file);
+            CHECK(incomplete.opened_file);
             r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
@@ -361,10 +456,73 @@ TEST_CASE("scan_task", "[fs]") {
                 REQUIRE(errs->at(0).ec);
 
                 r = task.advance();
-                CHECK(std::get_if<bool>(&r));
+                REQUIRE(std::get_if<bool>(&r));
                 CHECK(*std::get_if<bool>(&r) == false);
                 bfs::permissions(parent, bfs::perms::all_all);
             }
+        }
+    }
+
+    SECTION("symlink file") {
+        auto modified = std::time_t{1642007468};
+        auto pr_file = proto::FileInfo{};
+        pr_file.set_name("a.txt");
+        pr_file.set_sequence(2);
+        pr_file.set_type(proto::FileInfoType::SYMLINK);
+        pr_file.set_symlink_target("b.txt");
+        auto version = pr_file.mutable_version();
+        auto counter = version->add_counters();
+        counter->set_id(1);
+        counter->set_value(peer_device->as_uint());
+
+        SECTION("the same symlink exists") {
+            pr_file.set_modified_s(modified);
+
+            auto path = root_path / "a.txt";
+            auto target = bfs::path("b.txt");
+            bfs::create_symlink(target, path);
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
+        SECTION("symlink points to something different") {
+            pr_file.set_modified_s(modified);
+
+            auto path = root_path / "a.txt";
+            auto target = bfs::path("c.txt");
+            bfs::create_symlink(target, path);
+
+            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<changed_meta_t>(&r));
+            auto ref = std::get_if<changed_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
         }
     }
 }

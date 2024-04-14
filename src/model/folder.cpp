@@ -5,8 +5,9 @@
 #include "db/utils.h"
 #include "db/prefix.h"
 #include "structs.pb.h"
-#include <spdlog.h>
 #include "misc/error_code.h"
+#include "utils/format.hpp"
+#include <spdlog/spdlog.h>
 
 #ifdef uuid_t
 #undef uuid_t
@@ -54,8 +55,8 @@ std::string folder_t::serialize() noexcept {
     return r.SerializeAsString();
 }
 
-bool folder_t::is_shared_with(const model::device_t &device) const noexcept {
-    return (bool)folder_infos.by_device_id(device.device_id().get_sha256());
+auto folder_t::is_shared_with(const model::device_t &device) const noexcept -> folder_info_ptr_t {
+    return folder_infos.by_device_id(device.device_id().get_sha256());
 }
 
 std::optional<proto::Folder> folder_t::generate(const model::device_t &device) const noexcept {
@@ -86,14 +87,14 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
         pd.set_index_id(fi.get_index());
         pd.set_introducer(d.is_introducer());
         pd.set_skip_introduction_removals(d.get_skip_introduction_removals());
-        spdlog::trace("folder_t::get (==>), folder = {}/{:#x}, device = {}, max_seq = {}", label, fi.get_index(),
-                      d.device_id(), max_seq);
+        spdlog::trace("folder_t::generate (==>), folder = {} (index = {}), device = {}, max_seq = {}", label,
+                      fi.get_index(), d.device_id(), max_seq);
     }
     return r;
 }
 
-template <> std::string_view get_index<0>(const folder_ptr_t &item) noexcept { return item->get_key(); }
-template <> std::string_view get_index<1>(const folder_ptr_t &item) noexcept { return item->get_id(); }
+template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_ptr_t &item) noexcept { return item->get_key(); }
+template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_ptr_t &item) noexcept { return item->get_id(); }
 
 folder_ptr_t folders_map_t::by_id(std::string_view id) const noexcept { return get<1>(id); }
 

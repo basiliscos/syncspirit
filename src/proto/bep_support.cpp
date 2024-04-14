@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "bep_support.h"
 #include "constants.h"
@@ -60,26 +60,56 @@ static outcome::result<message::wrapped_message_t> parse_hello(const asio::const
 using MT = proto::MessageType;
 template <MT> struct T2M;
 
-template <> struct T2M<MT::CLUSTER_CONFIG> { using type = proto::ClusterConfig; };
-template <> struct T2M<MT::INDEX> { using type = proto::Index; };
-template <> struct T2M<MT::INDEX_UPDATE> { using type = proto::IndexUpdate; };
-template <> struct T2M<MT::REQUEST> { using type = proto::Request; };
-template <> struct T2M<MT::RESPONSE> { using type = proto::Response; };
-template <> struct T2M<MT::DOWNLOAD_PROGRESS> { using type = proto::DownloadProgress; };
-template <> struct T2M<MT::PING> { using type = proto::Ping; };
-template <> struct T2M<MT::CLOSE> { using type = proto::Close; };
+template <> struct T2M<MT::CLUSTER_CONFIG> {
+    using type = proto::ClusterConfig;
+};
+template <> struct T2M<MT::INDEX> {
+    using type = proto::Index;
+};
+template <> struct T2M<MT::INDEX_UPDATE> {
+    using type = proto::IndexUpdate;
+};
+template <> struct T2M<MT::REQUEST> {
+    using type = proto::Request;
+};
+template <> struct T2M<MT::RESPONSE> {
+    using type = proto::Response;
+};
+template <> struct T2M<MT::DOWNLOAD_PROGRESS> {
+    using type = proto::DownloadProgress;
+};
+template <> struct T2M<MT::PING> {
+    using type = proto::Ping;
+};
+template <> struct T2M<MT::CLOSE> {
+    using type = proto::Close;
+};
 
 template <typename M> struct M2T;
-template <> struct M2T<typename proto::ClusterConfig> { using type = std::integral_constant<MT, MT::CLUSTER_CONFIG>; };
-template <> struct M2T<typename proto::Index> { using type = std::integral_constant<MT, MT::INDEX>; };
-template <> struct M2T<typename proto::IndexUpdate> { using type = std::integral_constant<MT, MT::INDEX_UPDATE>; };
-template <> struct M2T<typename proto::Request> { using type = std::integral_constant<MT, MT::REQUEST>; };
-template <> struct M2T<typename proto::Response> { using type = std::integral_constant<MT, MT::RESPONSE>; };
+template <> struct M2T<typename proto::ClusterConfig> {
+    using type = std::integral_constant<MT, MT::CLUSTER_CONFIG>;
+};
+template <> struct M2T<typename proto::Index> {
+    using type = std::integral_constant<MT, MT::INDEX>;
+};
+template <> struct M2T<typename proto::IndexUpdate> {
+    using type = std::integral_constant<MT, MT::INDEX_UPDATE>;
+};
+template <> struct M2T<typename proto::Request> {
+    using type = std::integral_constant<MT, MT::REQUEST>;
+};
+template <> struct M2T<typename proto::Response> {
+    using type = std::integral_constant<MT, MT::RESPONSE>;
+};
 template <> struct M2T<typename proto::DownloadProgress> {
     using type = std::integral_constant<MT, MT::DOWNLOAD_PROGRESS>;
 };
-template <> struct M2T<typename proto::Ping> { using type = std::integral_constant<MT, MT::PING>; };
-template <> struct M2T<typename proto::Close> { using type = std::integral_constant<MT, MT::CLOSE>; };
+template <> struct M2T<typename proto::Ping> {
+    using type = std::integral_constant<MT, MT::PING>;
+};
+template <> struct M2T<typename proto::Close> {
+    using type = std::integral_constant<MT, MT::CLOSE>;
+};
 
 template <MessageType T>
 outcome::result<message::wrapped_message_t> parse(const asio::const_buffer &buff, std::size_t consumed) noexcept {
@@ -107,7 +137,7 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
     } else {
         auto ptr_16 = reinterpret_cast<const std::uint16_t *>(buff.data());
         auto header_sz = be::big_to_native(*ptr_16++);
-        if (2 + header_sz > sz)
+        if (2 + header_sz > (int)sz)
             return wrap(message::message_t(), 0u);
         proto::Header header;
         if (!header.ParseFromArray(ptr_16, header_sz)) {
@@ -215,11 +245,12 @@ outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff
     if (!msg->ParseFromArray(ptr_32, sz - 4)) {
         return make_error_code(utils::bep_error_code_t::protobuf_err);
     }
-    return std::move(msg);
+    return msg;
 }
 
 template <typename Message>
-void serialize(fmt::memory_buffer &buff, const Message &message, proto::MessageCompression compression) noexcept {
+SYNCSPIRIT_API void serialize(fmt::memory_buffer &buff, const Message &message,
+                              proto::MessageCompression compression) noexcept {
     using type = typename M2T<Message>::type;
     proto::Header header;
     header.set_compression(compression);
@@ -239,21 +270,21 @@ void serialize(fmt::memory_buffer &buff, const Message &message, proto::MessageC
     message.SerializeToArray(ptr, message_sz);
 }
 
-template void serialize(fmt::memory_buffer &buff, const proto::ClusterConfig &message,
-                        proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::Index &message,
-                        proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::IndexUpdate &message,
-                        proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::Request &message,
-                        proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::Response &message,
-                        proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::DownloadProgress &message,
-                        proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::Ping &message,
-                        proto::MessageCompression compression) noexcept;
-template void serialize(fmt::memory_buffer &buff, const proto::Close &message,
-                        proto::MessageCompression compression) noexcept;
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::ClusterConfig &message,
+                                       proto::MessageCompression compression) noexcept;
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Index &message,
+                                       proto::MessageCompression compression) noexcept;
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::IndexUpdate &message,
+                                       proto::MessageCompression compression) noexcept;
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Request &message,
+                                       proto::MessageCompression compression) noexcept;
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Response &message,
+                                       proto::MessageCompression compression) noexcept;
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::DownloadProgress &message,
+                                       proto::MessageCompression compression) noexcept;
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Ping &message,
+                                       proto::MessageCompression compression) noexcept;
+template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Close &message,
+                                       proto::MessageCompression compression) noexcept;
 
 } // namespace syncspirit::proto

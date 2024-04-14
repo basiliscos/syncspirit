@@ -1,14 +1,18 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+
 #include "initiator_actor.h"
 #include "constants.h"
 #include "names.h"
 #include "model/messages.h"
 #include "proto/relay_support.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "model/diff/peer/peer_state.h"
 #include <sstream>
 #include <algorithm>
 #include <spdlog/fmt/bin_to_hex.h>
-#include <fmt/fmt.h>
+#include <fmt/core.h>
 
 using namespace syncspirit::net;
 
@@ -26,16 +30,20 @@ r::plugin::resource_id_t write = 5;
 static constexpr size_t BUFF_SZ = 256;
 
 initiator_actor_t::initiator_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id},
-      relay_key(std::move(cfg.relay_session)), ssl_pair{*cfg.ssl_pair},
-      sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
+    : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, relay_key(std::move(cfg.relay_session)),
+      ssl_pair{*cfg.ssl_pair}, sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
       custom(std::move(cfg.custom)), router{*cfg.router}, alpn(cfg.alpn) {
-    log = utils::get_logger("net.initator");
+    log = utils::get_logger("net.imitator");
+    auto tmp_identity = "init/unknown";
     for (auto &uri : cfg.uris) {
         if (uri.proto != "tcp" && uri.proto != "relay") {
-            LOG_DEBUG(log, "{}, unsupported proto '{}' for the url '{}'", identity, uri.proto, uri.full);
+            LOG_DEBUG(log, "{}, unsupported proto '{}' for the url '{}'", tmp_identity, uri.proto, uri.full);
         } else {
-            uris.emplace_back(std::move(uri));
+            if (uri.proto == "relay" && !cfg.relay_enabled) {
+                LOG_DEBUG(log, "{}, {} is not enabled, skipping '{}'", tmp_identity, uri.proto, uri.full);
+            } else {
+                uris.emplace_back(std::move(uri));
+            }
         }
     }
     auto comparator = [](const utils::URI &a, const utils::URI &b) noexcept -> bool {
@@ -133,7 +141,7 @@ void initiator_actor_t::initiate_passive() noexcept {
     }
 
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
-    transport = transport::initiate_tls_passive(*sup, ssl_pair, std::move(sock.value()));
+    transport = transport::initiate_tls_passive(*sup, ssl_pair, std::move(sock.value()), alpn);
     initiate_handshake();
 }
 
@@ -152,7 +160,7 @@ void initiator_actor_t::initiate_relay_passive() noexcept {
 
 void initiator_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start, alpn = {}", identity, alpn);
     std::string proto;
     if (active_uri) {
         proto = active_uri->proto;
@@ -244,7 +252,7 @@ void initiator_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     }
 
     auto &addresses = res.payload.res->results;
-    transport::connect_fn_t on_connect = [&](auto arg) { this->on_connect(arg); };
+    transport::connect_fn_t on_connect = [&](const auto &arg) { this->on_connect(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg, resource::connect); };
     transport->async_connect(addresses, on_connect, on_error);
     resources->acquire(resource::connect);
@@ -267,13 +275,14 @@ void initiator_actor_t::on_io_error(const sys::error_code &ec, r::plugin::resour
     }
 }
 
-void initiator_actor_t::on_connect(resolve_it_t) noexcept {
+void initiator_actor_t::on_connect(const tcp::endpoint &) noexcept {
     LOG_TRACE(log, "{}, on_connect, device_id = {}, transport = {}", identity, peer_device_id.get_short(),
               (void *)transport.get());
     resources->release(resource::connect);
     // auto do_handshake = role == role_t::active;
-    auto do_handshake = (role == role_t::active) &&
-                        (active_uri && (active_uri->proto == "relay" && relaying) || active_uri->proto == "tcp");
+    auto do_handshake =
+        (role == role_t::active) &&
+        (active_uri && ((((active_uri->proto == "relay") && relaying)) || (active_uri->proto == "tcp")));
     if (do_handshake) {
         initiate_handshake();
     } else {
@@ -335,7 +344,9 @@ void initiator_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const
     } else {
         peer_device_id = *peer_device;
         remote_endpoint = peer_endpoint;
-        resources->release(resource::initializing);
+        if (state <= r::state_t::OPERATIONAL) {
+            resources->release(resource::initializing);
+        }
     }
 }
 

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "proto/bep_support.h"
 #include "model/device_id.h"
@@ -78,7 +77,7 @@ TEST_CASE("hello", "[bep]") {
         auto &msg = std::get<proto::message::Hello>(v.message);
         CHECK(msg->device_name() == "test-device");
         CHECK(msg->client_name() == "syncspirit");
-        CHECK(msg->client_version() == "v0.1.0");
+        CHECK(msg->client_version() == "v0.3.0");
     }
 }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <cstdint>
 
 namespace syncspirit::utils {
 
@@ -32,6 +33,7 @@ struct SYNCSPIRIT_API URI {
     StringPairs decompose_query() const noexcept;
 
     inline bool operator==(const URI &other) const noexcept { return full == other.full; }
+    bool operator<(const URI &other) const noexcept;
     inline operator bool() const noexcept { return !full.empty(); }
 
   private:

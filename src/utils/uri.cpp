@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
 #include "uri.h"
 #include <charconv>
 #include <regex>
 #include <uriparser/Uri.h>
+#include <algorithm>
 
 namespace syncspirit::utils {
 
@@ -39,7 +40,6 @@ boost::optional<URI> parse(const boost::string_view &uri) {
     for (auto p = obj.pathHead; p; p = p->next) {
         path += std::string("/") + std::string(p->text.first, p->text.afterLast);
     }
-    auto p = obj.pathHead;
 
     return result_t{URI{
         std::string(uri),                                        // full
@@ -93,6 +93,10 @@ auto URI::decompose_query() const noexcept -> StringPairs {
         p = p->next;
     }
     return r;
+}
+
+bool URI::operator<(const URI &other) const noexcept {
+    return std::lexicographical_compare(full.begin(), full.end(), other.full.begin(), other.full.end());
 }
 
 }; // namespace syncspirit::utils

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -30,12 +30,12 @@ struct net_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<Su
     using parent_t = ra::supervisor_config_asio_builder_t<Supervisor>;
     using parent_t::parent_t;
 
-    builder_t &&app_config(const config::main_t &value) &&noexcept {
+    builder_t &&app_config(const config::main_t &value) && noexcept {
         parent_t::config.app_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&cluster_copies(size_t value) &&noexcept {
+    builder_t &&cluster_copies(size_t value) && noexcept {
         parent_t::config.cluster_copies = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -69,7 +69,7 @@ struct SYNCSPIRIT_API net_supervisor_t : public ra::supervisor_asio_t, private m
     void seed_model() noexcept;
 
     outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
-    outcome::result<void> operator()(const model::diff::load::load_cluster_t &) noexcept override;
+    outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *custom) noexcept override;
 
     utils::logger_t log;
     config::main_t app_config;

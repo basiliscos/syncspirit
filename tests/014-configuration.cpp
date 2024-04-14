@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "config/utils.h"
 #include "utils/uri.h"
+#include "utils/location.h"
 #include <boost/filesystem.hpp>
 #include <sstream>
 
 namespace syncspirit::config {
 
 bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
-    return lhs.rx_buff_size == rhs.rx_buff_size && lhs.connect_timeout == rhs.connect_timeout &&
-           lhs.request_timeout == rhs.request_timeout && lhs.tx_timeout == rhs.tx_timeout &&
-           lhs.rx_timeout == rhs.rx_timeout && lhs.blocks_max_requested == rhs.blocks_max_requested;
+    return lhs.rx_buff_size == rhs.rx_buff_size && lhs.tx_buff_limit == rhs.tx_buff_limit &&
+           lhs.connect_timeout == rhs.connect_timeout && lhs.request_timeout == rhs.request_timeout &&
+           lhs.tx_timeout == rhs.tx_timeout && lhs.rx_timeout == rhs.rx_timeout &&
+           lhs.blocks_max_requested == rhs.blocks_max_requested &&
+           lhs.blocks_simultaneous_write == rhs.blocks_simultaneous_write;
 }
 
 bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept {
@@ -25,7 +27,7 @@ bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
 }
 
 bool operator==(const db_config_t &lhs, const db_config_t &rhs) noexcept {
-    return lhs.upper_limit == rhs.upper_limit && lhs.uncommited_threshold == rhs.uncommited_threshold;
+    return lhs.upper_limit == rhs.upper_limit && lhs.uncommitted_threshold == rhs.uncommitted_threshold;
 }
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
@@ -66,6 +68,21 @@ namespace fs = boost::filesystem;
 namespace st = syncspirit::test;
 
 using namespace syncspirit;
+
+TEST_CASE("expand_home", "[config]") {
+    SECTION("valid home") {
+        auto home = utils::home_option_t(fs::path("/user/home/.config/syncspirit_test"));
+        REQUIRE(utils::expand_home("some/path", home) == "some/path");
+        REQUIRE(utils::expand_home("~/some/path", home) == "/user/home/.config/syncspirit_test/some/path");
+    }
+
+    SECTION("invalid home") {
+        auto ec = sys::error_code{1, sys::system_category()};
+        auto home = utils::home_option_t(ec);
+        REQUIRE(utils::expand_home("some/path", home) == "some/path");
+        REQUIRE(utils::expand_home("~/some/path", home) == "~/some/path");
+    }
+}
 
 TEST_CASE("default config is OK", "[config]") {
     auto dir = fs::current_path() / fs::unique_path();

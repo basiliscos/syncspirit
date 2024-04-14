@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
 
-#include "catch.hpp"
 #include "test-utils.h"
 #include "model/cluster.h"
 #include "model/misc/version_utils.h"
-#include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/new_file.h"
-#include "model/diff/modify/share_folder.h"
+#include "diff-builder.h"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -84,22 +81,19 @@ TEST_CASE("file_info_t::need_download", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
     auto &folders = cluster->get_folders();
+    auto builder = diff_builder_t(*cluster);
+    builder.create_folder("1234-5678", "some/path", "my-label").share_folder(peer_id.get_sha256(), "1234-5678");
+    REQUIRE(builder.apply());
 
-    auto db_folder = db::Folder();
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-    REQUIRE(diff->apply(*cluster));
-    diff = new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id());
-    REQUIRE(diff->apply(*cluster));
-
-    auto folder = folders.by_id(db_folder.id());
+    auto folder = folders.by_id("1234-5678");
     auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(my_device);
-    auto folder_peer = folder_infos.by_device(peer_device);
+    auto folder_my = folder_infos.by_device(*my_device);
+    auto folder_peer = folder_infos.by_device(*peer_device);
 
     auto pr_file = proto::FileInfo();
     pr_file.set_name("a.txt");
@@ -133,9 +127,9 @@ TEST_CASE("file_info_t::need_download", "[model]") {
     auto bbb = blocks_map.get(b->hash());
     REQUIRE(bbb);
 
-    diff = new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file, {*b});
-    REQUIRE(diff->apply(*cluster));
-    auto file_my = folder_my->get_file_infos().by_name(pr_file.name());
+    auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+    file_my->remove_blocks();
+    file_my->assign_block(bbb, 0);
 
     SECTION("versions are identical, no local file => download") {
         auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
@@ -174,22 +168,19 @@ TEST_CASE("file_info_t::local_file", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
     auto &folders = cluster->get_folders();
+    auto builder = diff_builder_t(*cluster);
+    builder.create_folder("1234-5678", "some/path", "my-label").share_folder(peer_id.get_sha256(), "1234-5678");
+    REQUIRE(builder.apply());
 
-    auto db_folder = db::Folder();
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-    REQUIRE(diff->apply(*cluster));
-    diff = new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id());
-    REQUIRE(diff->apply(*cluster));
-
-    auto folder = folders.by_id(db_folder.id());
+    auto folder = folders.by_id("1234-5678");
     auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(my_device);
-    auto folder_peer = folder_infos.by_device(peer_device);
+    auto folder_my = folder_infos.by_device(*my_device);
+    auto folder_peer = folder_infos.by_device(*peer_device);
 
     auto pr_file = proto::FileInfo();
     pr_file.set_name("a.txt");
@@ -234,22 +225,19 @@ TEST_CASE("source file", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
     auto &folders = cluster->get_folders();
+    auto builder = diff_builder_t(*cluster);
+    builder.create_folder("1234-5678", "some/path", "my-label").share_folder(peer_id.get_sha256(), "1234-5678");
+    REQUIRE(builder.apply());
 
-    auto db_folder = db::Folder();
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-    REQUIRE(diff->apply(*cluster));
-    diff = new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id());
-    REQUIRE(diff->apply(*cluster));
-
-    auto folder = folders.by_id(db_folder.id());
+    auto folder = folders.by_id("1234-5678");
     auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(my_device);
-    auto folder_peer = folder_infos.by_device(peer_device);
+    auto folder_my = folder_infos.by_device(*my_device);
+    auto folder_peer = folder_infos.by_device(*peer_device);
 
     auto pr_file = proto::FileInfo();
     pr_file.set_name("a.txt");
@@ -283,18 +271,17 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
     cluster->get_devices().put(my_device);
 
     auto &folders = cluster->get_folders();
+    auto builder = diff_builder_t(*cluster);
+    builder.create_folder("1234-5678", "some/path", "my-label");
+    REQUIRE(builder.apply());
 
-    auto db_folder = db::Folder();
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-    REQUIRE(diff->apply(*cluster));
-
-    auto folder = folders.by_id(db_folder.id());
+    auto folder = folders.by_id("1234-5678");
     auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(my_device);
+    auto folder_my = folder_infos.by_device(*my_device);
 
     auto pr_file = proto::FileInfo();
     pr_file.set_name("a.txt");
@@ -304,17 +291,44 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
     auto b = pr_file.add_blocks();
     b->set_hash(utils::sha256_digest("12345").value());
     b->set_weak_hash(555);
+    b->set_size(5ul);
     auto bi = block_info_t::create(*b).value();
     auto &blocks_map = cluster->get_blocks();
     blocks_map.put(bi);
     auto bbb = blocks_map.get(b->hash());
     REQUIRE(bbb);
 
-    diff = new diff::modify::new_file_t(*cluster, db_folder.id(), pr_file, {*b});
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
     auto file_my = folder_my->get_file_infos().by_name(pr_file.name());
-    CHECK(file_my->check_consistency());
+    CHECK(file_my->get_size() == 5);
+}
 
-    file_my->remove_blocks();
-    CHECK(!file_my->check_consistency());
+TEST_CASE("file_info_t::create, inconsistent source") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    cluster->get_devices().put(my_device);
+
+    auto &folders = cluster->get_folders();
+    auto builder = diff_builder_t(*cluster);
+    builder.create_folder("1234-5678", "some/path", "my-label");
+    REQUIRE(builder.apply());
+
+    auto folder = folders.by_id("1234-5678");
+    auto &folder_infos = folder->get_folder_infos();
+    auto folder_my = folder_infos.by_device(*my_device);
+
+    auto pr_block = proto::BlockInfo();
+    pr_block.set_size(131072);
+
+    auto pr_file = proto::FileInfo();
+    pr_file.set_name("a.txt");
+    *pr_file.add_blocks() = pr_block;
+    pr_file.set_block_size(131072);
+    pr_file.set_size(0);
+
+    auto my_file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+    CHECK(my_file->get_block_size() == 0);
+    CHECK(my_file->get_blocks().size() == 0);
 }
