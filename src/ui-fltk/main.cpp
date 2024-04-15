@@ -326,7 +326,37 @@ int main(int argc, char **argv) {
         }
         auto &cfg = cfg_option.value();
         spdlog::trace("configuration seems OK");
+
+        asio::io_context io_context;
+        ra::system_context_ptr_t sys_context{new asio_sys_context_t{io_context}};
+        auto strand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
+        auto cluster_copies = 0ul;
+
+        auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
+                           .app_config(cfg)
+                           .strand(strand)
+                           .timeout(timeout)
+                           .create_registry()
+                           .guard_context(true)
+                           .cluster_copies(cluster_copies)
+                           .shutdown_flag(shutdown_flag, r::pt::millisec{50})
+                           .finish();
+        sup_net->start();
+        sup_net->do_process();
+
+        auto hasher_count = cfg.hasher_threads;
+        using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
+        std::vector<sys_thread_context_ptr_t> hasher_ctxs;
+        for (uint32_t i = 1; i <= hasher_count; ++i) {
+            hasher_ctxs.push_back(new thread_sys_context_t{});
+            auto &ctx = hasher_ctxs.back();
+            ctx->create_supervisor<hasher::hasher_supervisor_t>()
+                .timeout(timeout / 2)
+                .registry_address(sup_net->get_registry_address())
+                .index(i)
+                .finish();
+        }
 
         auto fltk_ctx = rf::system_context_fltk_t();
         auto sup_fltk = fltk_ctx.create_supervisor<rf::supervisor_fltk_t>()
@@ -346,9 +376,33 @@ int main(int argc, char **argv) {
         window.end();
         window.show(argc, argv);
 
+        auto net_thread = std::thread([&]() {
+            io_context.run();
+            shutdown_flag = true;
+            spdlog::trace("net thread has been terminated");
+        });
+
+        auto hasher_threads = std::vector<std::thread>();
+        for (uint32_t i = 0; i < hasher_count; ++i) {
+            auto &ctx = hasher_ctxs.at(i);
+            auto thread = std::thread([ctx = ctx, i = i]() {
+#if defined(__linux__)
+                std::string name = "ss/hasher-" + std::to_string(i + 1);
+                pthread_setname_np(pthread_self(), name.c_str());
+#endif
+                ctx->run();
+                shutdown_flag = true;
+#if defined(__linux__)
+                spdlog::trace("{} thread has been terminated", name);
+#endif
+            });
+            hasher_threads.emplace_back(std::move(thread));
+        }
+
         while(!shutdown_flag){
             sup_fltk->do_process();
             if (!Fl::wait()) {
+                shutdown_flag = true;
                 spdlog::debug("main window is longer show, terminating...");
                 break;
             }
@@ -356,6 +410,13 @@ int main(int argc, char **argv) {
 
         sup_fltk->do_shutdown();
         sup_fltk->do_process();
+
+        net_thread.join();
+
+        spdlog::trace("waiting hasher threads termination");
+        for (auto &thread : hasher_threads) {
+            thread.join();
+        }
 
         spdlog::trace("everything has been terminated");
     } catch (...) {
