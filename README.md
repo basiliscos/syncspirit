@@ -4,10 +4,10 @@ sites: [github](https://github.com/basiliscos/syncspirit), [abf](https://github.
 [gitflic](https://gitflic.ru/project/basiliscos/syncspirit)
 
 `syncspirit` is a continuous file synchronization program, which synchronizes files between devices.
-It is build using C++ [rotor](https://github.com/basiliscos/cpp-rotor) actor framework. It implements
-[BEP-protocol](https://docs.syncthing.net/specs/bep-v1.html) for files synchronization, or, 
-simplistically speaking, it is [syncthing](https://syncthing.net)-compatible synchronization
-program, which uses [syncthing](https://syncthing.net) infrastructure (for global discovery
+It is built using the C++ [rotor](https://github.com/basiliscos/cpp-rotor) actor framework. It implements
+the [BEP-protocol](https://docs.syncthing.net/specs/bep-v1.html) for files synchronization, or, 
+simplistically speaking, it is a [syncthing](https://syncthing.net)-compatible synchronization
+program, which uses the [syncthing](https://syncthing.net) infrastructure (for global discovery
 and relaying).
 
 Despite being functional, `syncspirit` is much less feature-rich than [syncthing](https://syncthing.net)
@@ -30,7 +30,7 @@ and is still in heavy development.
 
 # missing features
 
-This list is probably incomplete, here are the most important changes:
+This list is probably incomplete. Here are the most important changes:
 
 - [ ] conflict resolution
 
@@ -76,7 +76,7 @@ For more details see [ui-daemon](docs/ui-daemon.md) docs and [configuration](doc
 # design and ideas
 
 [syncthing](https://syncthing.net) is implemented using [go](https://go.dev/) programming
-language, which is a good fit for services. As the result, [syncthing](https://syncthing.net)
+language, which is a good fit for services. As a result, [syncthing](https://syncthing.net)
 itself is written as a web-service, which exposes a REST-API for clients. So, yes, the end-user
 software should also have a front-end, which is usually web-browser (or embeds web-browser),
 which is written in different programming language (e.g. javascript or java).
