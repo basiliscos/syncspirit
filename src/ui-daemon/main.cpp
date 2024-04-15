@@ -101,7 +101,6 @@ int main(int argc, char **argv) {
 #if defined(__linux__)
         pthread_setname_np(pthread_self(), "ss/main");
 #endif
-#if 0
         // clang-format off
         /* parse command-line & config options */
         po::options_description cmdline_descr("Allowed options");
@@ -331,7 +330,6 @@ int main(int argc, char **argv) {
             thread.join();
         }
         spdlog::trace("everything has been terminated");
-#endif
     } catch (...) {
         spdlog::critical("unknown exception");
         // spdlog::critical("Starting failure : {}", ex.what());
