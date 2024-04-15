@@ -255,6 +255,8 @@ int main(int argc, char **argv) {
     try {
         utils::platform_t::startup();
 
+        Fl::args(1, argv);
+
 #if defined(__linux__)
         pthread_setname_np(pthread_self(), "ss/main");
 #endif
@@ -279,8 +281,52 @@ int main(int argc, char **argv) {
         }
 
         utils::set_default(vm["log_level"].as<std::string>());
+        bfs::path config_file_path;
+        if (vm.count("config_dir")) {
+            auto path = vm["config_dir"].as<std::string>();
+            config_file_path = bfs::path{path.c_str()};
+        } else {
+            auto config_default = utils::get_default_config_dir();
+            if (config_default) {
+                config_file_path = config_default.value();
+            } else {
+                spdlog::error("cannot determine default config dir: {}", config_default.error().message());
+                return 1;
+            }
+        }
 
-        auto timeout = pt::milliseconds{500};
+        config_file_path.append("syncspirit.toml");
+        bool populate = !bfs::exists(config_file_path);
+        if (populate) {
+            spdlog::info("Config {} seems does not exit, creating default one...", config_file_path.string());
+            auto cfg_opt = config::generate_config(config_file_path);
+            if (!cfg_opt) {
+                spdlog::error("cannot generate default config: {}", cfg_opt.error().message());
+                return 1;
+            }
+            auto &cfg = cfg_opt.value();
+            std::fstream f_cfg(config_file_path.string(), f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
+            auto r = config::serialize(cfg, f_cfg);
+            if (!r) {
+                spdlog::error("cannot save default config at :: {}", r.error().message());
+                return 1;
+            }
+        }
+        auto config_file_path_str = config_file_path.string();
+        std::ifstream config_file(config_file_path_str);
+        if (!config_file) {
+            spdlog::error("Cannot open config file {}", config_file_path_str);
+            return 1;
+        }
+
+        config::config_result_t cfg_option = config::get_config(config_file, config_file_path.parent_path());
+        if (!cfg_option) {
+            spdlog::error("Config file {} is incorrect :: {}", config_file_path_str, cfg_option.error());
+            return 1;
+        }
+        auto &cfg = cfg_option.value();
+        spdlog::trace("configuration seems OK");
+        auto timeout = pt::milliseconds{cfg.timeout};
 
         auto fltk_ctx = rf::system_context_fltk_t();
         auto sup_fltk = fltk_ctx.create_supervisor<rf::supervisor_fltk_t>()
