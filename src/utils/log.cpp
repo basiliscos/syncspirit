@@ -53,7 +53,7 @@ void set_default(const std::string &level) noexcept {
     spdlog::set_default_logger(logger);
 }
 
-outcome::result<void> init_loggers(const config::log_configs_t &configs, bool overwrite_default) noexcept {
+outcome::result<dist_sink_t> init_loggers(const config::log_configs_t &configs, bool overwrite_default) noexcept {
     using sink_map_t = std::unordered_map<std::string, spdlog::sink_ptr>;
     using logger_map_t = std::unordered_map<std::string, std::shared_ptr<spdlog::logger>>;
 
@@ -62,6 +62,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, bool ov
     using log_t = decltype(prev);
     using guard_t = std::unique_ptr<log_t, std::function<void(log_t *)>>;
     guard_t guard(&prev, [](log_t *logger) { spdlog::set_default_logger(*logger); });
+    auto dist_sink = std::make_shared<spdlog::sinks::dist_sink_mt>();
 
     spdlog::drop_all();
     sink_map_t sink_map;
@@ -88,6 +89,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, bool ov
         for (auto &sink_name : cfg.sinks) {
             default_sinks.push_back(sink_map.at(sink_name));
         }
+        default_sinks.push_back(dist_sink);
         auto logger = std::make_shared<spdlog::logger>("", default_sinks.begin(), default_sinks.end());
         logger->set_level(cfg.level);
         root_level = cfg.level;
@@ -137,7 +139,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, bool ov
     spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%L/%t%$] %v");
 
     guard.release();
-    return outcome::success();
+    return dist_sink;
 }
 
 logger_t get_logger(std::string_view initial_name) noexcept {
