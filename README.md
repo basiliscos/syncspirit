@@ -4,14 +4,14 @@ sites: [github](https://github.com/basiliscos/syncspirit), [abf](https://github.
 [gitflic](https://gitflic.ru/project/basiliscos/syncspirit)
 
 `syncspirit` is a continuous file synchronization program, which synchronizes files between devices.
-It is build using C++ [rotor](github.com/basiliscos/cpp-rotor) actor framework. It implements
-[BEP-protocol](https://docs.syncthing.net/specs/bep-v1.html) for files syncrhonization, or, 
-simplistically speaking, it is [syncthing](https://syncthing.net)-compatible syncrhonization
-program, which uses [syncthing](https://syncthing.net) infrastructure (for global discovery
-and relaying)
+It is built using the C++ [rotor](https://github.com/basiliscos/cpp-rotor) actor framework. It implements
+the [BEP-protocol](https://docs.syncthing.net/specs/bep-v1.html) for files synchronization, or, 
+simplistically speaking, it is a [syncthing](https://syncthing.net)-compatible synchronization
+program, which uses the [syncthing](https://syncthing.net) infrastructure (for global discovery
+and relaying).
 
-Despite of being functional `syncspirit` is much less feature-rich then [syncthing](https://syncthing.net)
-and still is in heavy development.
+Despite being functional, `syncspirit` is much less feature-rich than [syncthing](https://syncthing.net)
+and is still in heavy development.
 
 
 # status
@@ -30,8 +30,7 @@ and still is in heavy development.
 
 # missing features
 
-This list is probably incomplete, here are the most important changes
-
+This list is probably incomplete. Here are the most important changes:
 
 - [ ] conflict resolution
 
@@ -63,22 +62,22 @@ the output should be like
 [![asciicast](https://asciinema.org/a/474217.svg)](https://asciinema.org/a/474217)
 
 i.e. it records some peer, adds a folder, then shares the folder with the peer device, connects to
-the peer and downloads all files into `/tmp/my_dir/data` . The peer device currently can be
-only [syncthing](https://syncthing.net). Then `syncspirit` either exits after 2 minutes of inactivity
-or when you press `ctrl+c`. The output is successful, because I previousy authorized this device
-with [syncthing](https://syncthing.net) web interface, and shared the folder with this device
+the peer and downloads all files into `/tmp/my_dir/data` . The peer device currently can only be
+[syncthing](https://syncthing.net). Then `syncspirit` either exits after 2 minutes of inactivity
+or when you press `ctrl+c`. The output is successful, because I previously authorized this device
+with the [syncthing](https://syncthing.net) web interface, and shared the folder with this device
 (`syncspirit`).
 
 I also assume some familiarity with [syncthing](https://syncthing.net), so you should understand
-whats going on here.
+what's going on here.
 
 For more details see [ui-daemon](docs/ui-daemon.md) docs and [configuration](docs/config.md) docs.
 
 # design and ideas
 
 [syncthing](https://syncthing.net) is implemented using [go](https://go.dev/) programming
-language, which good fits for services. As the result, [syncthing](https://syncthing.net)
-itself is written as web-service, which exposes REST-API for clients. So, yes, the end-user
+language, which is a good fit for services. As a result, [syncthing](https://syncthing.net)
+itself is written as a web-service, which exposes a REST-API for clients. So, yes, the end-user
 software should also have a front-end, which is usually web-browser (or embeds web-browser),
 which is written in different programming language (e.g. javascript or java).
 
@@ -88,17 +87,17 @@ ecological, secure, manageable, have lower CPU and memory pressures.
 
 The [actor model](https://en.wikipedia.org/wiki/Actor_model), blurs the boundaries between
 classical desktop and client-server application models. I think, 
-[rotor](github.com/basiliscos/cpp-rotor) makes it possible to have (and embed) some 
+[rotor](https://github.com/basiliscos/cpp-rotor) makes it possible to have (and embed) some 
 "core" into multiple different user interfaces (GUIs). 
 
-Currently, there syncspirit has only "daemon-ui", i.e. a simple non-interactive application,
-which shows synchronization log, and the only possibility is just to stop it. However, as soon
-as the "core" will be complete, there are plans to develop multiple `syncspirit` UIs:
-[wx-widgets](https://www.wxwidgets.org/), qt, gtk, may be native, may be even native mobile UIs...
+Currently, syncspirit has only a "daemon-ui", i.e. a simple non-interactive application,
+which shows a synchronization log, and the only possibility is just to stop it. However, as soon
+as the "core" is complete, there are plans to develop multiple `syncspirit` UIs:
+[wx-widgets](https://www.wxwidgets.org/), qt, gtk, maybe native, maybe even native mobile UIs...
 
-Another major idea is scripting support: it should be possible to have exposes the "core" to lua 
-scripts, and have some user-defined actions like synchonizing files with external folders including
-flash-sticks, user-defined files ordering and filtering for synchronization, may be even selective
+Another major idea is scripting support: it should be possible to expose the "core" to lua 
+scripts, and have some user-defined actions like synchronizing files with external folders including
+flash-sticks, user-defined files ordering and filtering for synchronization, maybe even selective
 sync, like in [resilio](https://www.resilio.com/). This, however, still needs to be researched,
 after the core completion.
 
@@ -112,8 +111,8 @@ after the core completion.
 
 - linux
 - windows
-- (may be) *nix
-- (may be) mac os x
+- (maybe) *nix
+- (maybe) mac os x
 
 # changes
 
@@ -122,7 +121,7 @@ after the core completion.
 - [build, docs] improved build documentation
 
 ## 0.3.0 (14-Apr-2024)
-- [feature] implemented complete files syncrhonisation
+- [feature] implemented complete files synchronization
 - [feature] added local files watcher and updates streamer
 - [build] switched from git submodules to [conan2](https://conan.io)
 - [win32] better platform support
@@ -130,10 +129,10 @@ after the core completion.
 
 ## 0.2.0 (22-May-2022)
 - [feature] implement [relay transport](https://docs.syncthing.net/specs/relay-v1.html),
-the relay is randombly chosen from the public relays [pool](https://relays.syncthing.net/endpoint)
+the relay is randomly chosen from the public relays [pool](https://relays.syncthing.net/endpoint)
 - [feature] output binary is compressed via [upx](https://upx.github.io)
 - [feature] small optimization, use thread less in overall program
-- [bugfix] sometimes fs::scan_actor request timeout ocurrs, which is fatal
+- [bugfix] sometimes fs::scan_actor request timeout occurs, which is fatal
 - [bugfix] global discovery sometimes skipped announcements
 
 ## 0.1.0 (18-Arp-2022)
