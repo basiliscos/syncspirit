@@ -277,7 +277,7 @@ boost/*:without_wave=True
 ```
 
 ```
-conan install --build=missing -o '*:shared=False' -o shared=False --output-folder . 
+conan install --build=missing -o '*:shared=False' -o shared=False --output-folder . \
     -s build_type=Release --profile:build=default --profile:host=old_linux ..
 source ./conanbuild.sh 
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \

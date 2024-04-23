@@ -117,6 +117,10 @@ after the core completion.
 
 # changes
 
+## 0.3.1 (23-Apr-2024)
+- [feature] added `syncspirit` binary fow windows xp
+- [build, docs] improved build documentation
+
 ## 0.3.0 (14-Apr-2024)
 - [feature] implemented complete files syncrhonisation
 - [feature] added local files watcher and updates streamer
