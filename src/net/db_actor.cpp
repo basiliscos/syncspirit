@@ -6,6 +6,8 @@
 #include "utils/platform.h"
 #include "db/prefix.h"
 #include "db/utils.h"
+#include "../../lib/mbdx/src/internals.h"
+#include "src/internals.h"
 #include "db/error_code.h"
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/close_transaction.h"
@@ -43,13 +45,24 @@ r::plugin::resource_id_t db = 0;
 }
 } // namespace
 
+#if 0
+static void _my_log(MDBX_log_level_t loglevel, const char *function,int line, const char *fmt, va_list args) noexcept
+{
+    vprintf(fmt, args);
+}
+#endif
+
 db_actor_t::db_actor_t(config_t &config)
     : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, db_config{config.db_config},
       cluster{config.cluster} {
     log = utils::get_logger("net.db");
+
+    // mdbx_module_handler({}, {}, {});
+    // mdbx_setup_debug(MDBX_LOG_TRACE, MDBX_DBG_ASSERT, &_my_log);
+
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
-        LOG_CRITICAL(log, "{}, mbdx environment creation error ({}): {}", log->name(), r, mdbx_strerror(r));
+        LOG_CRITICAL(log, "{}, mbdx environment creation error ({}): {}", "net::db", r, mdbx_strerror(r));
         throw std::runtime_error(std::string(mdbx_strerror(r)));
     }
 }

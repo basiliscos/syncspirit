@@ -115,8 +115,7 @@ static uri_container_t _local_interfaces(logger_t &log, std::uint16_t port) noex
                 // IPv4
                 SOCKADDR_IN *ipv4 = reinterpret_cast<SOCKADDR_IN *>(address->Address.lpSockaddr);
 
-                char host[INET_ADDRSTRLEN] = {0};
-                inet_ntop(AF_INET, &(ipv4->sin_addr), host, INET_ADDRSTRLEN);
+                auto host = inet_ntoa(ipv4->sin_addr);
                 auto full = fmt::format("tcp://{}:{}/", host, port);
                 auto uri = utils::parse(full).value();
                 r.emplace_back(std::move(uri));

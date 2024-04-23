@@ -32,7 +32,7 @@ find_package(uriparser REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
-set(SYNCSPIRIT_VERSION "v0.3.0")
+set(SYNCSPIRIT_VERSION "v0.3.1")
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
 set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src/protobuf)
@@ -177,6 +177,7 @@ set(BUILD_SHARED_LIBS false CACHE BOOL "BUILD_SHARED_LIBS")
 set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
 set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
 set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
+set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
 
 add_subdirectory("lib/mbdx")
 
@@ -203,7 +204,7 @@ target_link_libraries(syncspirit_lib
     tomlplusplus::tomlplusplus
     nlohmann_json::nlohmann_json
     lz4::lz4
-    mdbx-static
+    $<IF:$<PLATFORM_ID:Windows>,mdbx,mdbx-static>
     $<$<PLATFORM_ID:Windows>:iphlpapi>
     $<$<PLATFORM_ID:Windows>:ws2_32>
 )
