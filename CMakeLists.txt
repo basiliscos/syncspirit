@@ -177,6 +177,7 @@ set(BUILD_SHARED_LIBS false CACHE BOOL "BUILD_SHARED_LIBS")
 set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
 set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
 set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
+set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
 
 add_subdirectory("lib/mbdx")
 
@@ -203,7 +204,7 @@ target_link_libraries(syncspirit_lib
     tomlplusplus::tomlplusplus
     nlohmann_json::nlohmann_json
     lz4::lz4
-    mdbx-static
+    $<IF:$<PLATFORM_ID:Windows>,mdbx,mdbx-static>
     $<$<PLATFORM_ID:Windows>:iphlpapi>
     $<$<PLATFORM_ID:Windows>:ws2_32>
 )
