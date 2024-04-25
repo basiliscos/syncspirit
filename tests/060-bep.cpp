@@ -77,7 +77,7 @@ TEST_CASE("hello", "[bep]") {
         auto &msg = std::get<proto::message::Hello>(v.message);
         CHECK(msg->device_name() == "test-device");
         CHECK(msg->client_name() == "syncspirit");
-        CHECK(msg->client_version() == "v0.3.0");
+        CHECK(msg->client_version() == "v0.4.0");
     }
 }
 

@@ -6,8 +6,6 @@
 #include "utils/platform.h"
 #include "db/prefix.h"
 #include "db/utils.h"
-#include "../../lib/mbdx/src/internals.h"
-#include "src/internals.h"
 #include "db/error_code.h"
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/close_transaction.h"

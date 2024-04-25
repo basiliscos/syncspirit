@@ -42,7 +42,7 @@ if (CMAKE_BUILD_TYPE MATCHES "^([Rr]elease)|(MinSizeRel)")
         set(DAEMON_TARGET "${DAEMON_TARGET}${CMAKE_EXECUTABLE_SUFFIX}")
 
         set(EXE "syncspirit-fltk${CMAKE_EXECUTABLE_SUFFIX}")
-        add_custom_target(compress_exec ALL
+        add_custom_target(compress-syncspirit-fltk ALL
             COMMAND upx "--force" "-9" "-q" "-o" "${syncspirit_BINARY_DIR}/${DAEMON_TARGET}" ${EXE}
             DEPENDS ${EXE}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
