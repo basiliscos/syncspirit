@@ -6,7 +6,6 @@
 #include <memory>
 #include <string>
 #include <string_view>
-#include <mutex>
 #include <boost/outcome.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/dist_sink.h>
@@ -25,7 +24,7 @@ SYNCSPIRIT_API spdlog::level::level_enum get_log_level(const std::string &log_le
 SYNCSPIRIT_API void set_default(const std::string &level) noexcept;
 
 SYNCSPIRIT_API outcome::result<dist_sink_t> init_loggers(const config::log_configs_t &configs,
-                                                  bool overwrite_default) noexcept;
+                                                         bool overwrite_default) noexcept;
 
 SYNCSPIRIT_API logger_t get_logger(std::string_view name) noexcept;
 
