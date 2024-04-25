@@ -1,23 +1,14 @@
 cmake_minimum_required(VERSION 3.9)
 
-set(FLTK_ABI_VERSION "1.3.9")
-set(FLTK_BUILD_TEST off)
-set(OPTION_USE_XINERAMA off)
-set(OPTION_BUILD_HTML_DOCUMENTATION off)
-set(OPTION_BUILD_PDF_DOCUMENTATION off)
-set(OPTION_USE_GL off)
-set(OPTION_ABI_VERSION 10306)
-add_subdirectory(${syncspirit_SOURCE_DIR}/lib/fltk fltk)
-
 add_executable(syncspirit-fltk WIN32
     main.cpp
 )
 
 target_link_libraries(syncspirit-fltk
     syncspirit_lib
-    fltk
-    $<$<PLATFORM_ID:Windows>:ws2_32>
-    $<$<PLATFORM_ID:Windows>:wsock32>
+    rotor::fltk
+    $<$<PLATFORM_ID:Linux>:jpeg>
+    $<$<PLATFORM_ID:Linux>:png>
 )
 target_include_directories(syncspirit-fltk PUBLIC
     ${syncspirit_SOURCE_DIR}/src
