@@ -11,6 +11,8 @@
 
 using namespace syncspirit::fltk;
 
+static constexpr int col_min_size = 60;
+
 using log_level_t = spdlog::level_t;
 
 struct log_panel_t::log_record_t {
@@ -75,15 +77,22 @@ log_panel_t::log_panel_t(utils::dist_sink_t dist_sink_, int x, int y, int w, int
     // Cols
     cols(4);       // how many columns
     col_header(1); // enable column headers (along top)
+    col_resize_min(col_min_size);
     col_width(0, 280);
     col_width(1, 100);
     col_width(2, 200);
-    col_width(3, 400);
+
+    auto message_col_sz = this->w() - (col_width(0) + col_width(1) + col_width(2));
+    col_width(3, message_col_sz);
+
     col_resize(1); // enable column resizing
     end();         // end the Fl_Table group
 
     bridge_sink = sink_ptr_t(new fltk_sink_t(this));
     dist_sink->add_sink(bridge_sink);
+
+    // receive resize events
+    when(FL_WHEN_CHANGED | when());
 }
 
 log_panel_t::~log_panel_t() {
@@ -102,15 +111,21 @@ void log_panel_t::draw_cell(TableContext context, int row, int col, int x, int y
         fl_font(FL_HELVETICA, 16); // set the font for our drawing operations
         return;
     case CONTEXT_COL_HEADER: // Draw column headers
-        // sprintf(s,"%c",'A'+COL);                // "A", "B", "C", etc.
-        // DrawHeader(s,X,Y,W,H);
         draw_header(col, x, y, w, h);
         return;
     case CONTEXT_CELL: // Draw data in cells
         draw_data(row, col, x, y, w, h);
-        // sprintf(s,"%d",data[ROW][COL]);
-        // DrawData(s,X,Y,W,H);
         return;
+    case CONTEXT_RC_RESIZE:
+    {
+        auto until_last = col_width(0) + col_width(1) + col_width(2);
+        auto last_sz  = this->w() - (until_last + 2);
+        auto delta =  col_min_size - last_sz;
+        if (last_sz >= col_min_size) {
+            col_width(3, last_sz);
+        }
+        return;
+    }
     default:
         return;
     }
