@@ -1,6 +1,8 @@
 #include "log_panel.h"
 
 #include <FL/Fl.H>
+#include <FL/fl_draw.H>
+
 #include <spdlog/sinks/sink.h>
 #include <spdlog/pattern_formatter.h>
 #include <spdlog/fmt/fmt.h>
@@ -16,7 +18,7 @@ struct log_panel_t::log_record_t {
     std::string date;
     std::string source;
     std::string message;
-    size_t thread_id;
+    std::string thread_id;
 };
 
 namespace {
@@ -40,7 +42,7 @@ struct fltk_sink_t final : spdlog::sinks::sink {
 
         auto record = std::make_unique<log_panel_t::log_record_t>(
             msg.level, std::move(date), std::string(source.begin(), source.end()),
-            std::string(message.begin(), message.end()), msg.thread_id);
+            std::string(message.begin(), message.end()), std::to_string(msg.thread_id));
 
         Fl::awake(
             [](void *data) {
@@ -62,22 +64,23 @@ struct fltk_sink_t final : spdlog::sinks::sink {
     spdlog::pattern_formatter date_formatter;
 };
 
-using style_entry_t = Fl_Text_Display::Style_Table_Entry;
-template <int N> using array_of_styles_t = std::array<style_entry_t, N>;
-
-array_of_styles_t<6> styles = {
-    style_entry_t(FL_RED, FL_SCREEN, 18, 0),        style_entry_t(FL_DARK_YELLOW, FL_SCREEN, 18, 0),
-    style_entry_t(FL_DARK_GREEN, FL_SCREEN, 18, 0), style_entry_t(FL_BLUE, FL_SCREEN, 18, 0),
-    style_entry_t(FL_CYAN, FL_SCREEN, 18, 0),       style_entry_t(FL_GRAY0, FL_SCREEN, 18, 0),
-};
-
 } // namespace
 
 log_panel_t::log_panel_t(utils::dist_sink_t dist_sink_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), dist_sink{dist_sink_} {
-
-    buffer(&text_buffer);
-    highlight_data(&style_buffer, styles.data(), styles.size(), 'A', 0, 0);
+    rows(0);            // how many rows
+    row_header(0);      // enable row headers (along left)
+    row_height_all(20); // default height of rows
+    row_resize(0);      // disable row resizing
+    // Cols
+    cols(4);       // how many columns
+    col_header(1); // enable column headers (along top)
+    col_width(0, 280);
+    col_width(1, 100);
+    col_width(2, 200);
+    col_width(3, 400);
+    col_resize(1); // enable column resizing
+    end();         // end the Fl_Table group
 
     bridge_sink = sink_ptr_t(new fltk_sink_t(this));
     dist_sink->add_sink(bridge_sink);
@@ -85,17 +88,78 @@ log_panel_t::log_panel_t(utils::dist_sink_t dist_sink_, int x, int y, int w, int
 
 log_panel_t::~log_panel_t() {
     dist_sink->remove_sink(bridge_sink);
-    buffer(nullptr);
     destroyed = true;
 }
 
 void log_panel_t::append(log_record_ptr_t record) {
-    // auto string = fmt::format("[{}] {} {}\n",  record->thread_id, record->source, record->message);
-    auto string = record->date + record->message + "\n";
-    text_buffer.append(string.data());
-    auto hilight_char = 'A' + (int)record->level;
-    auto hilight_string = std::string(string.size(), hilight_char);
-    style_buffer.append(hilight_string.data());
-
+    rows(rows() + 1);
     records.emplace_back(std::move(record));
+}
+
+void log_panel_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {
+    switch (context) {
+    case CONTEXT_STARTPAGE:        // before page is drawn..
+        fl_font(FL_HELVETICA, 16); // set the font for our drawing operations
+        return;
+    case CONTEXT_COL_HEADER: // Draw column headers
+        // sprintf(s,"%c",'A'+COL);                // "A", "B", "C", etc.
+        // DrawHeader(s,X,Y,W,H);
+        draw_header(col, x, y, w, h);
+        return;
+    case CONTEXT_CELL: // Draw data in cells
+        draw_data(row, col, x, y, w, h);
+        // sprintf(s,"%d",data[ROW][COL]);
+        // DrawData(s,X,Y,W,H);
+        return;
+    default:
+        return;
+    }
+}
+
+void log_panel_t::draw_header(int col, int x, int y, int w, int h) {
+    std::string_view label = col == 0 ? "date" : col == 1 ? "thread" : col == 2 ? "source" : "message";
+    fl_push_clip(x, y, w, h);
+    {
+        fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, row_header_color());
+        fl_color(FL_BLACK);
+        fl_draw(label.data(), x, y, w, h, FL_ALIGN_CENTER);
+    }
+    fl_pop_clip();
+}
+
+void log_panel_t::draw_data(int row, int col, int x, int y, int w, int h) {
+    auto &record = *records.at(static_cast<size_t>(row));
+    std::string *content;
+    fl_push_clip(x, y, w, h);
+    {
+        Fl_Align align = FL_ALIGN_CENTER;
+        int x_offset = 0;
+        int w_adj = 0;
+        switch (col) {
+        case 0:
+            content = &record.date;
+            break;
+        case 1:
+            content = &record.thread_id;
+            align = FL_ALIGN_RIGHT;
+            w_adj = 10;
+            break;
+        case 2:
+            content = &record.source;
+            break;
+        default:
+            content = &record.message;
+            align = FL_ALIGN_LEFT;
+            x_offset = 10;
+            break;
+        }
+
+        fl_color(FL_WHITE);
+        fl_rectf(x, y, w, h);
+        fl_color(FL_GRAY0);
+        fl_draw(content->data(), x + x_offset, y, w - x_offset - w_adj, h, align);
+        fl_color(color());
+        fl_rect(x, y, w, h);
+    }
+    fl_pop_clip();
 }

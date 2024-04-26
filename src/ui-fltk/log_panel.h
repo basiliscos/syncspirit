@@ -1,9 +1,6 @@
 #pragma once
 
-#include <FL/Fl_Window.H>
-#include <FL/Fl_Group.H>
-#include <FL/Fl_Text_Display.H>
-#include <FL/Fl_Text_Buffer.H>
+#include <FL/Fl_Table.H>
 #include <vector>
 #include <memory>
 
@@ -11,8 +8,8 @@
 
 namespace syncspirit::fltk {
 
-struct log_panel_t : Fl_Text_Display {
-    using parent_t = Fl_Text_Display;
+struct log_panel_t : Fl_Table {
+    using parent_t = Fl_Table;
 
     struct log_record_t;
     using log_record_ptr_t = std::unique_ptr<log_record_t>;
@@ -24,12 +21,15 @@ struct log_panel_t : Fl_Text_Display {
 
     void append(log_record_ptr_t record);
 
+    void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
+
   private:
+    void draw_header(int col, int x, int y, int w, int h);
+    void draw_data(int row, int col, int x, int y, int w, int h);
+
     records_t records;
     sink_ptr_t bridge_sink;
     utils::dist_sink_t dist_sink;
-    Fl_Text_Buffer text_buffer;
-    Fl_Text_Buffer style_buffer;
 };
 
 } // namespace syncspirit::fltk
