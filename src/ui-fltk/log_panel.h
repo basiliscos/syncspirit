@@ -29,6 +29,7 @@ struct log_panel_t : Fl_Text_Display {
     sink_ptr_t bridge_sink;
     utils::dist_sink_t dist_sink;
     Fl_Text_Buffer text_buffer;
+    Fl_Text_Buffer style_buffer;
 };
 
 } // namespace syncspirit::fltk

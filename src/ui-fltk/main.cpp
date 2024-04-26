@@ -238,6 +238,7 @@ int main(int argc, char **argv) {
         sup_fltk->do_process();
 
         auto main_window = fltk::main_window_t(std::move(init_result.value()));
+        Fl::visual(FL_DOUBLE | FL_INDEX);
         main_window.show(argc, argv);
 
         auto net_thread = std::thread([&]() {
