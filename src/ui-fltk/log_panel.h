@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 
+#include "log_sink.h"
 #include "utils/log.h"
 
 namespace syncspirit::fltk {
@@ -11,8 +12,6 @@ namespace syncspirit::fltk {
 struct log_panel_t : Fl_Table {
     using parent_t = Fl_Table;
 
-    struct log_record_t;
-    using log_record_ptr_t = std::unique_ptr<log_record_t>;
     using records_t = std::vector<log_record_ptr_t>;
     using sink_ptr_t = spdlog::sink_ptr;
 

@@ -1,9 +1,8 @@
-- update docs
-- fix year of changes
-
-сборка:
- - linux/ubuntu https://www.simplified.guide/ubuntu/build-chroot-environment
- - windows
+log
+ - gather all logs
+ - filter logs by amount
+ - filter logs by component and levels
+ - scroll on new log, may be not
 
 
 - conflict handling is not available

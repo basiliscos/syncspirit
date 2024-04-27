@@ -1,4 +1,5 @@
 #include "log_panel.h"
+#include "log_sink.h"
 
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
@@ -13,7 +14,6 @@ using namespace syncspirit::fltk;
 
 static constexpr int col_min_size = 60;
 
-using log_level_t = spdlog::level_t;
 using color_array_t = std::array<Fl_Color, 12>;
 
 static color_array_t log_colors = {
@@ -25,34 +25,16 @@ static color_array_t log_colors = {
     fl_rgb_color(255, 220, 255), fl_rgb_color(255, 240, 255)  // critical
 };
 
-struct log_panel_t::log_record_t {
-    log_level_t level;
-    std::string date;
-    std::string source;
-    std::string message;
-    std::string thread_id;
-};
-
 static std::atomic_bool destroyed{false};
 
-struct fltk_sink_t final : spdlog::sinks::sink {
-    fltk_sink_t(log_panel_t *widget_) : widget{widget_}, date_formatter("%Y-%m-%d %H:%M:%S.%F") {}
+struct fltk_sink_t final : base_sink_t {
+    fltk_sink_t(log_panel_t *widget_) : widget{widget_} {}
 
-    void log(const spdlog::details::log_msg &msg) override {
+    void forward(log_record_ptr_t record) override {
         struct context_t {
             log_panel_t *widget;
-            log_panel_t::log_record_ptr_t record;
+            log_record_ptr_t record;
         };
-
-        spdlog::memory_buf_t formatted;
-        date_formatter.format(msg, formatted);
-        auto date = std::string(formatted.begin(), formatted.end() - 1);
-        auto source = msg.logger_name;
-        auto message = msg.payload;
-
-        auto record = std::make_unique<log_panel_t::log_record_t>(
-            msg.level, std::move(date), std::string(source.begin(), source.end()),
-            std::string(message.begin(), message.end()), std::to_string(msg.thread_id));
 
         Fl::awake(
             [](void *data) {
@@ -66,12 +48,7 @@ struct fltk_sink_t final : spdlog::sinks::sink {
             new context_t(widget, std::move(record)));
     }
 
-    void flush() override {}
-    void set_pattern(const std::string &) override {}
-    void set_formatter(std::unique_ptr<spdlog::formatter>) override {}
-
     log_panel_t *widget;
-    spdlog::pattern_formatter date_formatter;
 };
 
 log_panel_t::log_panel_t(utils::dist_sink_t dist_sink_, int x, int y, int w, int h)

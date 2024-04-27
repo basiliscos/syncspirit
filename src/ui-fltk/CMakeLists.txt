@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.9)
 
 add_executable(syncspirit-fltk WIN32
     log_panel.cpp
+    log_sink.cpp
     main.cpp
     main_window.cpp
 )
