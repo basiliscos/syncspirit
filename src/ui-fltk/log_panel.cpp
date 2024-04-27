@@ -14,6 +14,16 @@ using namespace syncspirit::fltk;
 static constexpr int col_min_size = 60;
 
 using log_level_t = spdlog::level_t;
+using color_array_t = std::array<Fl_Color, 12>;
+
+static color_array_t log_colors = {
+    fl_rgb_color(220, 255, 220), fl_rgb_color(240, 255, 240), // trace
+    fl_rgb_color(210, 245, 255), fl_rgb_color(230, 250, 255), // debug
+    fl_rgb_color(245, 245, 245), fl_rgb_color(255, 255, 255), // info
+    fl_rgb_color(255, 250, 200), fl_rgb_color(255, 250, 220), // warn
+    fl_rgb_color(255, 220, 220), fl_rgb_color(255, 240, 240), // error
+    fl_rgb_color(255, 220, 255), fl_rgb_color(255, 240, 255)  // critical
+};
 
 struct log_panel_t::log_record_t {
     log_level_t level;
@@ -23,9 +33,7 @@ struct log_panel_t::log_record_t {
     std::string thread_id;
 };
 
-namespace {
-
-std::atomic_bool destroyed{false};
+static std::atomic_bool destroyed{false};
 
 struct fltk_sink_t final : spdlog::sinks::sink {
     fltk_sink_t(log_panel_t *widget_) : widget{widget_}, date_formatter("%Y-%m-%d %H:%M:%S.%F") {}
@@ -65,8 +73,6 @@ struct fltk_sink_t final : spdlog::sinks::sink {
     log_panel_t *widget;
     spdlog::pattern_formatter date_formatter;
 };
-
-} // namespace
 
 log_panel_t::log_panel_t(utils::dist_sink_t dist_sink_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), dist_sink{dist_sink_} {
@@ -116,11 +122,10 @@ void log_panel_t::draw_cell(TableContext context, int row, int col, int x, int y
     case CONTEXT_CELL: // Draw data in cells
         draw_data(row, col, x, y, w, h);
         return;
-    case CONTEXT_RC_RESIZE:
-    {
+    case CONTEXT_RC_RESIZE: {
         auto until_last = col_width(0) + col_width(1) + col_width(2);
-        auto last_sz  = this->w() - (until_last + 2);
-        auto delta =  col_min_size - last_sz;
+        auto last_sz = this->w() - (until_last + 2);
+        auto delta = col_min_size - last_sz;
         if (last_sz >= col_min_size) {
             col_width(3, last_sz);
         }
@@ -169,7 +174,10 @@ void log_panel_t::draw_data(int row, int col, int x, int y, int w, int h) {
             break;
         }
 
-        fl_color(FL_WHITE);
+        auto color_row = row % 2;
+        auto color_index = static_cast<int>(record.level) * 2;
+
+        fl_color(log_colors[color_index + color_row]);
         fl_rectf(x, y, w, h);
         fl_color(FL_GRAY0);
         fl_draw(content->data(), x + x_offset, y, w - x_offset - w_adj, h, align);
