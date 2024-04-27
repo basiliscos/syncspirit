@@ -72,6 +72,17 @@ log_panel_t::log_panel_t(utils::dist_sink_t dist_sink_, int x, int y, int w, int
     end();         // end the Fl_Table group
 
     bridge_sink = sink_ptr_t(new fltk_sink_t(this));
+
+    for (auto &sink : dist_sink->sinks()) {
+        auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
+        if (in_memory_sink) {
+            std::lock_guard lock(in_memory_sink->mutex);
+            records = std::move(in_memory_sink->records);
+            dist_sink->remove_sink(sink);
+            break;
+        }
+    }
+
     dist_sink->add_sink(bridge_sink);
 
     // receive resize events

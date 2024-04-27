@@ -12,7 +12,6 @@ namespace syncspirit::fltk {
 struct log_panel_t : Fl_Table {
     using parent_t = Fl_Table;
 
-    using records_t = std::vector<log_record_ptr_t>;
     using sink_ptr_t = spdlog::sink_ptr;
 
     log_panel_t(utils::dist_sink_t dist_sink, int x, int y, int w, int h);
@@ -26,7 +25,7 @@ struct log_panel_t : Fl_Table {
     void draw_header(int col, int x, int y, int w, int h);
     void draw_data(int row, int col, int x, int y, int w, int h);
 
-    records_t records;
+    log_records_t records;
     sink_ptr_t bridge_sink;
     utils::dist_sink_t dist_sink;
 };

@@ -23,3 +23,8 @@ void base_sink_t::log(const spdlog::details::log_msg &msg) {
 
     forward(std::move(record));
 }
+
+void im_memory_sink_t::forward(log_record_ptr_t record) {
+    std::lock_guard guard(mutex);
+    records.emplace_back(std::move(record));
+}

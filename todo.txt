@@ -1,5 +1,6 @@
 log
- - gather all logs
+ + gather all logs
+ + fix component names
  - filter logs by amount
  - filter logs by component and levels
  - scroll on new log, may be not

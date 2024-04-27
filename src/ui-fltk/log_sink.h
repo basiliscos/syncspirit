@@ -1,6 +1,8 @@
 #pragma once
 
 #include "utils/log.h"
+#include <deque>
+#include <mutex>
 
 namespace syncspirit::fltk {
 
@@ -13,6 +15,7 @@ struct log_record_t {
 };
 
 using log_record_ptr_t = std::unique_ptr<log_record_t>;
+using log_records_t = std::deque<log_record_ptr_t>;
 
 struct base_sink_t : spdlog::sinks::sink {
     base_sink_t();
@@ -26,6 +29,16 @@ struct base_sink_t : spdlog::sinks::sink {
 
   private:
     spdlog::pattern_formatter date_formatter;
+};
+
+struct im_memory_sink_t final : base_sink_t {
+    using base_sink_t::base_sink_t;
+    using mutex_t = std::mutex;
+
+    void forward(log_record_ptr_t) override;
+
+    mutex_t mutex;
+    log_records_t records;
 };
 
 } // namespace syncspirit::fltk

@@ -28,6 +28,7 @@
 #include <FL/Fl_Box.H>
 
 #include "main_window.h"
+#include "log_sink.h"
 
 #if defined(__linux__)
 #include <pthread.h>
@@ -188,6 +189,8 @@ int main(int argc, char **argv) {
             spdlog::error("Loggers initialization failed :: {}", init_result.error().message());
             return 1;
         }
+        auto &dist_sink = init_result.value();
+        dist_sink->add_sink(spdlog::sink_ptr(new fltk::im_memory_sink_t()));
 
         asio::io_context io_context;
         ra::system_context_ptr_t sys_context{new asio_sys_context_t{io_context}};
@@ -237,7 +240,7 @@ int main(int argc, char **argv) {
         // warm-up
         sup_fltk->do_process();
 
-        auto main_window = fltk::main_window_t(std::move(init_result.value()));
+        auto main_window = fltk::main_window_t(std::move(dist_sink));
         Fl::visual(FL_DOUBLE | FL_INDEX);
         main_window.show(argc, argv);
 
