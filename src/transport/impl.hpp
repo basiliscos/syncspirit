@@ -5,8 +5,8 @@
 
 #include "base.h"
 #include "utils/platform.h"
+#include "utils/log.h"
 #include "stream.h"
-#include <spdlog/spdlog.h>
 #include <boost/asio/ssl.hpp>
 
 #ifdef WIN32_LEAN_AND_MEAN
@@ -104,6 +104,7 @@ template <> struct base_impl_t<ssl_socket_t> {
     ssl::context ctx;
     ssl::stream_base::handshake_type role;
     ssl_socket_t sock;
+    utils::logger_t log;
     bool validation_passed = false;
     bool cancelling = false;
     bool active;
@@ -148,11 +149,12 @@ template <> struct base_impl_t<ssl_socket_t> {
           me(config.ssl_junction->me), ctx(get_context(*this, config.ssl_junction->alpn)),
           role(!config.active ? ssl::stream_base::server : ssl::stream_base::client),
           sock(mk_sock(config, ctx, strand)) {
+        log = utils::get_logger("transport.tls");
         if (config.ssl_junction->sni_extension) {
             auto &host = config.uri.host;
             if (!SSL_set_tlsext_host_name(sock.native_handle(), host.c_str())) {
                 sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
-                spdlog::error("http_actor_t:: Set SNI Hostname : {}", ec.message());
+                log->error("http_actor_t:: Set SNI Hostname : {}", ec.message());
             }
         }
         if (me) {
@@ -163,32 +165,32 @@ template <> struct base_impl_t<ssl_socket_t> {
                 auto native = peer_ctx.native_handle();
                 auto peer_cert = X509_STORE_CTX_get_current_cert(native);
                 if (!peer_cert) {
-                    spdlog::warn("no peer certificate");
+                    log->warn("no peer certificate");
                     return false;
                 }
                 auto der_option = utils::as_serialized_der(peer_cert);
                 if (!der_option) {
-                    spdlog::warn("peer certificate cannot be serialized as der : {}", der_option.error().message());
+                    log->warn("peer certificate cannot be serialized as der : {}", der_option.error().message());
                     return false;
                 }
 
                 utils::cert_data_t cert_data{std::move(der_option.value())};
                 auto peer_option = model::device_id_t::from_cert(cert_data);
                 if (!peer_option) {
-                    spdlog::warn("cannot get device_id from peer");
+                    log->warn("cannot get device_id from peer");
                     return false;
                 }
 
                 auto peer = std::move(peer_option.value());
                 if (!actual_peer) {
                     actual_peer = std::move(peer);
-                    spdlog::trace("tls, peer device_id = {}", actual_peer);
+                    log->trace("peer device_id = {}", actual_peer);
                 }
 
                 if (role == ssl::stream_base::handshake_type::client) {
                     if (actual_peer != expected_peer) {
-                        spdlog::warn("unexpected peer device_id. Got: {}, expected: {}", actual_peer.get_value(),
-                                     expected_peer.get_value());
+                        log->warn("unexpected peer device_id. Got: {}, expected: {}", actual_peer.get_value(),
+                                  expected_peer.get_value());
                         return false;
                     }
                 }
@@ -295,7 +297,7 @@ template <> struct impl<tcp_socket_t> {
             sys::error_code ec;
             sock.cancel(ec);
             if (ec) {
-                spdlog::error("impl<tcp::socket>::cancel() :: {}", ec.message());
+                utils::get_logger("transport.sock")->error("impl<tcp::socket>::cancel() :: {}", ec.message());
             }
         }
     }
