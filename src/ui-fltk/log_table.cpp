@@ -1,4 +1,4 @@
-#include "log_panel.h"
+#include "log_table.h"
 #include "log_sink.h"
 
 #include <FL/Fl.H>

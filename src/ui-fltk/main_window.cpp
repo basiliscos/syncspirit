@@ -1,5 +1,5 @@
 #include "main_window.h"
-#include "log_panel.h"
+#include "log_table.h"
 
 using namespace syncspirit::fltk;
 
