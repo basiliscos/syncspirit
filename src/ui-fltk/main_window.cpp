@@ -3,11 +3,11 @@
 
 using namespace syncspirit::fltk;
 
-main_window_t::main_window_t(utils::dist_sink_t dist_sink_) : parent_t(640, 480, "syncspirit-fltk") {
-
+main_window_t::main_window_t(application_t &application_)
+    : parent_t(640, 480, "syncspirit-fltk"), application{application_} {
     int padding = 10;
 
-    log_panel = new log_panel_t(std::move(dist_sink_), padding, padding, w() - padding * 2, h() - padding * 2);
+    log_panel = new log_panel_t(application, padding, padding, w() - padding * 2, h() - padding * 2);
     end();
 
     resizable(this);

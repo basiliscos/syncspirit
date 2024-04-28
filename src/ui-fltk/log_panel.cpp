@@ -51,8 +51,8 @@ struct fltk_sink_t final : base_sink_t {
     log_panel_t *widget;
 };
 
-log_panel_t::log_panel_t(utils::dist_sink_t dist_sink_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), dist_sink{dist_sink_} {
+log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h)
+    : parent_t(x, y, w, h), application{application_} {
     rows(0);            // how many rows
     row_header(0);      // enable row headers (along left)
     row_height_all(20); // default height of rows
@@ -73,6 +73,7 @@ log_panel_t::log_panel_t(utils::dist_sink_t dist_sink_, int x, int y, int w, int
 
     bridge_sink = sink_ptr_t(new fltk_sink_t(this));
 
+    auto &dist_sink = application.dist_sink;
     for (auto &sink : dist_sink->sinks()) {
         auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
         if (in_memory_sink) {
@@ -90,7 +91,7 @@ log_panel_t::log_panel_t(utils::dist_sink_t dist_sink_, int x, int y, int w, int
 }
 
 log_panel_t::~log_panel_t() {
-    dist_sink->remove_sink(bridge_sink);
+    application.dist_sink->remove_sink(bridge_sink);
     destroyed = true;
 }
 

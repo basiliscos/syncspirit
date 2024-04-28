@@ -28,6 +28,7 @@
 #include <FL/Fl_Box.H>
 
 #include "main_window.h"
+#include "application.h"
 #include "log_sink.h"
 
 #if defined(__linux__)
@@ -239,8 +240,9 @@ int main(int argc, char **argv) {
                             .finish();
         // warm-up
         sup_fltk->do_process();
+        auto application = fltk::application_t{std::move(dist_sink)};
 
-        auto main_window = fltk::main_window_t(std::move(dist_sink));
+        auto main_window = fltk::main_window_t(application);
         Fl::visual(FL_DOUBLE | FL_INDEX);
         main_window.show(argc, argv);
 
