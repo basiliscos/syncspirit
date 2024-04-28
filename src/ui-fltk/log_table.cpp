@@ -10,7 +10,7 @@
 #include <atomic>
 #include <array>
 
-using namespace syncspirit::fltk;
+namespace syncspirit::fltk {
 
 static constexpr int col_min_size = 60;
 
@@ -25,27 +25,29 @@ static color_array_t log_colors = {
     fl_rgb_color(255, 220, 255), fl_rgb_color(255, 240, 255)  // critical
 };
 
-static std::atomic_bool destroyed{false};
-
 struct fltk_sink_t final : base_sink_t {
     fltk_sink_t(log_panel_t *widget_) : widget{widget_} {}
 
     void forward(log_record_ptr_t record) override {
-        struct context_t {
-            log_panel_t *widget;
-            log_record_ptr_t record;
-        };
+        auto lock = std::unique_lock(widget->incoming_mutex);
+        widget->incoming_records.push_back(std::move(record));
+        bool size = widget->incoming_records.size();
+        lock.unlock();
 
-        Fl::awake(
-            [](void *data) {
-                auto context = reinterpret_cast<context_t *>(data);
-                auto record = std::move(context->record);
-                if (!destroyed) {
-                    context->widget->append(std::move(record));
-                }
-                delete context;
-            },
-            new context_t(widget, std::move(record)));
+        if (size == 1) {
+            Fl::awake(
+                [](void *data) {
+                    auto widget = reinterpret_cast<log_panel_t *>(data);
+                    auto lock = std::unique_lock(widget->incoming_mutex);
+                    auto &source = widget->incoming_records;
+                    auto &dest = widget->records;
+                    std::move(begin(source), end(source), std::back_insert_iterator(dest));
+                    source.clear();
+                    widget->update();
+                    lock.unlock();
+                },
+                widget);
+        }
     }
 
     log_panel_t *widget;
@@ -92,13 +94,10 @@ log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h
 
 log_panel_t::~log_panel_t() {
     application.dist_sink->remove_sink(bridge_sink);
-    destroyed = true;
+    bridge_sink.reset();
 }
 
-void log_panel_t::append(log_record_ptr_t record) {
-    rows(rows() + 1);
-    records.emplace_back(std::move(record));
-}
+void log_panel_t::update() { rows(records.size()); }
 
 void log_panel_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {
     switch (context) {
@@ -175,3 +174,5 @@ void log_panel_t::draw_data(int row, int col, int x, int y, int w, int h) {
     }
     fl_pop_clip();
 }
+
+} // namespace syncspirit::fltk
