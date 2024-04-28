@@ -30,7 +30,7 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
         files.put(it.item);
     }
 
-    log = utils::get_logger("fs.scan");
+    log = utils::get_logger("fs.scan_task");
 }
 
 scan_task_t::~scan_task_t() {}

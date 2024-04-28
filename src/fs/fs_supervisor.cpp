@@ -16,13 +16,14 @@ r::plugin::resource_id_t model = 0;
 } // namespace
 
 fs_supervisor_t::fs_supervisor_t(config_t &cfg)
-    : parent_t(cfg), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {
-    log = utils::get_logger("fs.supervisor");
-}
+    : parent_t(cfg), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {}
 
 void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("fs::supervisor", false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity("fs.supervisor", false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
@@ -69,22 +70,22 @@ void fs_supervisor_t::launch() noexcept {
 }
 
 void fs_supervisor_t::on_model_request(model::message::model_request_t &req) noexcept {
-    LOG_TRACE(log, "{}, on_model_request", identity);
+    LOG_TRACE(log, "on_model_request");
     if (cluster) {
-        LOG_TRACE(log, "{}, already have cluster, share it", identity);
+        LOG_TRACE(log, "already have cluster, share it");
         reply_to(req, cluster);
         return;
     }
-    LOG_TRACE(log, "{}, no cluster, delaying response", identity);
+    LOG_TRACE(log, "no cluster, delaying response");
     model_request = &req;
 }
 
 void fs_supervisor_t::on_model_response(model::message::model_response_t &res) noexcept {
-    LOG_TRACE(log, "{}, on_model_response", identity);
+    LOG_TRACE(log, "on_model_response");
     resources->release(resource::model);
     auto ee = res.payload.ee;
     if (ee) {
-        LOG_ERROR(log, "{}, cannot get model: {}", identity, ee->message());
+        LOG_ERROR(log, "cannot get model: {}", ee->message());
         return do_shutdown(ee);
     }
     cluster = std::move(res.payload.res.cluster);
@@ -95,12 +96,12 @@ void fs_supervisor_t::on_model_response(model::message::model_response_t &res) n
 }
 
 void fs_supervisor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
 }
 
 void fs_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_model_update", identity);
+    LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
     if (!r) {
@@ -111,7 +112,7 @@ void fs_supervisor_t::on_model_update(model::message::model_update_t &message) n
 
 void fs_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
     auto &diff = *message.payload.diff;
-    LOG_TRACE(log, "{}, on_block_update for {}", identity, diff.file_name);
+    LOG_TRACE(log, "on_block_update for {}", diff.file_name);
     auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());

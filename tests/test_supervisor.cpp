@@ -26,14 +26,14 @@ inline auto rotor::actor_base_t::access<to::on_timer_trigger, request_id_t, bool
 using namespace syncspirit::net;
 using namespace syncspirit::test;
 
-supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) {
-    log = utils::get_logger("net.test_supervisor");
-    auto_finish = cfg.auto_finish;
-}
+supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) { auto_finish = cfg.auto_finish; }
 
 void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::coordinator, false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity(std::string(names::coordinator) + ".test", false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.register_name(names::coordinator, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {

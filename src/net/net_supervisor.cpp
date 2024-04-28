@@ -26,7 +26,7 @@ using namespace syncspirit::net;
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     : parent_t{cfg}, app_config{cfg.app_config}, cluster_copies{cfg.cluster_copies} {
     seed = (size_t)std::time(nullptr);
-    log = utils::get_logger("net.coordinator");
+    auto log = utils::get_logger(names::coordinator);
     auto &files_cfg = app_config.global_announce_config;
     auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
     if (!result) {
@@ -72,7 +72,10 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::coordinator, false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity(names::coordinator, false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.register_name(names::coordinator, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -88,14 +91,14 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
-    LOG_TRACE(log, "{}, on_child_shutdown, '{}' due to {} ", identity, actor->get_identity(), reason->message());
+    LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason->message());
 }
 
 void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
     parent_t::on_child_init(actor, ec);
     auto &child_addr = actor->get_address();
     if (!ec && db_addr && child_addr == db_addr) {
-        LOG_TRACE(log, "{}, on_child_init, db has been launched, let's load it...", identity);
+        LOG_TRACE(log, "on_child_init, db has been launched, let's load it...");
         load_db();
     }
 }
@@ -133,10 +136,10 @@ void net_supervisor_t::seed_model() noexcept {
 void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message) noexcept {
     auto &ee = message.payload.ee;
     if (ee) {
-        LOG_ERROR(log, "{}, cannot load cluster : {}", identity, ee->message());
+        LOG_ERROR(log, "cannot load cluster : {}", ee->message());
         return do_shutdown(ee);
     }
-    LOG_TRACE(log, "{}, on_load_cluster", identity);
+    LOG_TRACE(log, "on_load_cluster");
     load_diff = std::move(message.payload.res.diff);
     if (cluster_copies == 0) {
         seed_model();
@@ -145,7 +148,7 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
 
 void net_supervisor_t::on_model_request(model::message::model_request_t &message) noexcept {
     --cluster_copies;
-    LOG_TRACE(log, "{}, on_cluster_seed, left = {}", identity, cluster_copies);
+    LOG_TRACE(log, "on_cluster_seed, left = {}", cluster_copies);
     auto my_device = cluster->get_device();
     auto device = model::device_ptr_t();
     device = new model::local_device_t(my_device->device_id(), app_config.device_name, "");
@@ -158,7 +161,7 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
 }
 
 void net_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_model_update", identity);
+    LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
     if (!r) {
@@ -174,7 +177,7 @@ void net_supervisor_t::on_model_update(model::message::model_update_t &message) 
 
 void net_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
     auto &diff = *message.payload.diff;
-    LOG_TRACE(log, "{}, on_block_update for {}", identity, diff.file_name);
+    LOG_TRACE(log, "on_block_update for {}", diff.file_name);
     auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());
@@ -183,7 +186,7 @@ void net_supervisor_t::on_block_update(model::message::block_update_t &message) 
 }
 
 void net_supervisor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_contact_update", identity);
+    LOG_TRACE(log, "on_contact_update");
     auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
     if (!r) {
@@ -209,9 +212,9 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &, voi
             files += fi->get_file_infos().size();
         }
         LOG_DEBUG(log,
-                  "{}, load cluster, devices = {}, folders = {}, local files = {}, blocks = {}, ignored devices = {}, "
+                  "load cluster, devices = {}, folders = {}, local files = {}, blocks = {}, ignored devices = {}, "
                   "ignored folders = {}",
-                  identity, devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
+                  devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
                   ignored_folders.size());
 
         cluster_sup = create_actor<cluster_supervisor_t>()
@@ -228,7 +231,7 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &, voi
 }
 
 void net_supervisor_t::launch_net() noexcept {
-    LOG_INFO(log, "{}, launching network services", identity);
+    LOG_INFO(log, "launching network services");
 
     if (app_config.upnp_config.enabled) {
         auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
@@ -331,7 +334,7 @@ void net_supervisor_t::launch_net() noexcept {
 }
 
 void net_supervisor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
     parent_t::on_start();
     auto timeout = shutdown_timeout * 9 / 10;
     auto io_timeout = shutdown_timeout * 8 / 10;

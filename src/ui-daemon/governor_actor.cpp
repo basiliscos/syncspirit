@@ -10,7 +10,6 @@ using namespace syncspirit::daemon;
 
 governor_actor_t::governor_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, commands{std::move(cfg.commands)}, cluster{std::move(cfg.cluster)} {
-    log = utils::get_logger("daemon.governor_actor");
 
     add_callback(this, [&]() {
         process();
@@ -20,7 +19,10 @@ governor_actor_t::governor_actor_t(config_t &cfg)
 
 void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("governor", false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity("deamon.governor", false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ec) {
             if (!ec && phase == r::plugin::registry_plugin_t::phase_t::linking) {
@@ -37,20 +39,20 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void governor_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
     rescan_folders();
     process();
     r::actor_base_t::on_start();
 }
 
 void governor_actor_t::shutdown_start() noexcept {
-    LOG_TRACE(log, "{}, shutdown_start", identity);
+    LOG_TRACE(log, "shutdown_start");
     r::actor_base_t::shutdown_start();
 }
 
 void governor_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     auto custom = message.payload.custom;
-    LOG_TRACE(log, "{}, on_model_update, this = {}, payload = {}", identity, (void *)this, custom);
+    LOG_TRACE(log, "on_model_update, this = {}, payload = {}", (void *)this, custom);
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, nullptr);
     if (!r) {
@@ -68,7 +70,7 @@ void governor_actor_t::on_model_update(model::message::model_update_t &message) 
 }
 
 void governor_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_block_update", identity);
+    LOG_TRACE(log, "on_block_update");
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, nullptr);
     if (!r) {
@@ -79,24 +81,24 @@ void governor_actor_t::on_block_update(model::message::block_update_t &message) 
 
 void governor_actor_t::on_io_error(model::message::io_error_t &reply) noexcept {
     auto &errs = reply.payload.errors;
-    LOG_TRACE(log, "{}, on_io_error, count = {}", identity, errs.size());
+    LOG_TRACE(log, "on_io_error, count = {}", errs.size());
     for (auto &err : errs) {
-        LOG_WARN(log, "{}, on_io_error (ignored) path: {}, problem: {}", identity, err.path, err.ec.message());
+        LOG_WARN(log, "on_io_error (ignored) path: {}, problem: {}", err.path, err.ec.message());
     }
 }
 
 void governor_actor_t::on_scan_completed(fs::message::scan_completed_t &message) noexcept {
     auto &folder_id = message.payload.folder_id;
     auto folder = scanning_folders.by_id(folder_id);
-    LOG_TRACE(log, "{}, on_scan_completed, folder = {}({})", identity, folder->get_label(), folder->get_id());
+    LOG_TRACE(log, "on_scan_completed, folder = {}({})", folder->get_label(), folder->get_id());
     scanning_folders.remove(folder);
 }
 
 void governor_actor_t::process() noexcept {
-    LOG_DEBUG(log, "{}, process", identity);
+    LOG_DEBUG(log, "process");
 NEXT:
     if (commands.empty()) {
-        log->debug("{}, no commands left for processing", identity);
+        log->debug("no commands left for processing");
         return;
     }
     auto &cmd = commands.front();
@@ -108,7 +110,7 @@ NEXT:
 }
 
 void governor_actor_t::track_inactivity() noexcept {
-    LOG_DEBUG(log, "{}, will track inactivity for the next {} seconds", identity, inactivity_seconds);
+    LOG_DEBUG(log, "will track inactivity for the next {} seconds", inactivity_seconds);
     assert(inactivity_seconds);
     auto timeout = r::pt::seconds(inactivity_seconds);
     auto now = clock_t::local_time();
@@ -117,7 +119,7 @@ void governor_actor_t::track_inactivity() noexcept {
 }
 
 void governor_actor_t::on_inactivity_timer(r::request_id_t, bool cancelled) noexcept {
-    LOG_DEBUG(log, "{}, on_inactivity_timer", identity);
+    LOG_DEBUG(log, "on_inactivity_timer");
     if (cancelled) {
         if (state == r::state_t::OPERATIONAL) {
             track_inactivity();
@@ -129,7 +131,7 @@ void governor_actor_t::on_inactivity_timer(r::request_id_t, bool cancelled) noex
     if (now < deadline) {
         return track_inactivity();
     }
-    LOG_INFO(log, "inactivity timeout, exiting...", identity);
+    LOG_INFO(log, "inactivity timeout, exiting...");
     do_shutdown();
 }
 
@@ -152,14 +154,14 @@ void governor_actor_t::schedule_rescan_dirs(const r::pt::time_duration &interval
 }
 
 void governor_actor_t::schedule_rescan_dirs() noexcept {
-    LOG_INFO(log, "{}, scheduling dirs rescan", identity);
+    LOG_INFO(log, "scheduling dirs rescan");
     start_timer(dirs_rescan_interval, *this, &governor_actor_t::on_rescan_timer);
 }
 
 void governor_actor_t::rescan_folders() {
     if (scanning_folders.size() == 0) {
         auto &folders = cluster->get_folders();
-        LOG_INFO(log, "{}, issuing folders ({}) rescan", identity, folders.size());
+        LOG_INFO(log, "issuing folders ({}) rescan", folders.size());
         for (auto it : folders) {
             auto &folder = it.item;
             send<fs::payload::scan_folder_t>(fs_scanner, std::string(folder->get_id()));
@@ -170,7 +172,7 @@ void governor_actor_t::rescan_folders() {
 
 void governor_actor_t::rescan_folder(std::string_view folder_id) noexcept {
     auto folder = cluster->get_folders().by_id(folder_id);
-    LOG_INFO(log, "{}, forcing folder '{}' rescan", identity, folder->get_label());
+    LOG_INFO(log, "forcing folder '{}' rescan", folder->get_label());
     send<fs::payload::scan_folder_t>(fs_scanner, std::string(folder->get_id()));
     scanning_folders.put(folder);
 }

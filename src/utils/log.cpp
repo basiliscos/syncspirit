@@ -136,7 +136,7 @@ outcome::result<dist_sink_t> init_loggers(const config::log_configs_t &configs, 
             spdlog::register_logger(logger);
         }
     }
-    spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%L/%t%$] %v");
+    spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%L/%t%$] {%n} %v");
 
     guard.release();
     return dist_sink;
@@ -144,18 +144,28 @@ outcome::result<dist_sink_t> init_loggers(const config::log_configs_t &configs, 
 
 logger_t get_logger(std::string_view initial_name) noexcept {
     std::string name(initial_name);
-    do {
-        auto l = spdlog::get(name);
-        if (l) {
-            return l;
-        }
+    logger_t result = spdlog::get(name);
+    if (result) {
+        return result;
+    }
+
+    logger_t parent;
+    while (!parent) {
         auto p = name.find_last_of(".");
-        if (p != name.npos && p) {
+        if (p != name.npos) {
             name = name.substr(0, p);
+            parent = spdlog::get(name);
         } else {
-            return spdlog::default_logger();
+            parent = spdlog::default_logger();
         }
-    } while (1);
+    }
+
+    auto &sinks = parent->sinks();
+    auto log_name = std::string(initial_name);
+    result = std::make_shared<spdlog::logger>(log_name, sinks.begin(), sinks.end());
+    result->set_level(parent->level());
+    spdlog::register_logger(result);
+    return result;
 }
 
 } // namespace syncspirit::utils

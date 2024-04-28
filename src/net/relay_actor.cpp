@@ -30,13 +30,15 @@ r::plugin::resource_id_t io_write = 3;
 
 relay_actor_t::relay_actor_t(config_t &config) noexcept
     : r::actor_base_t(config), cluster{std::move(config.cluster)}, config{config.config} {
-    log = utils::get_logger("net.relay");
     http_rx_buff = std::make_shared<payload::http_request_t::rx_buff_t>();
 }
 
 void relay_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("relay", false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity("net.relay", false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::http11_relay, http_client, true).link(true);
         p.discover_name(names::coordinator, coordinator, false).link(false);
@@ -51,7 +53,7 @@ void relay_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void relay_actor_t::shutdown_start() noexcept {
-    LOG_TRACE(log, "{}, shutdown_start", identity);
+    LOG_TRACE(log, "shutdown_start");
     r::actor_base_t::shutdown_start();
 
     if (resources->has(resource::init)) {
@@ -79,7 +81,7 @@ void relay_actor_t::shutdown_start() noexcept {
 }
 
 void relay_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
     connect_to_relay();
 }
@@ -94,8 +96,8 @@ void relay_actor_t::connect_to_relay() noexcept {
         }
         auto &l = relay->location;
         auto &u = relay->uri;
-        LOG_INFO(log, "{}, chosen relay({}) {}:{}, city: {}, country: {}, continent: {}", identity, relay_index,
-                 relay->uri.host, relay->uri.port, l.city, l.country, l.continent);
+        LOG_INFO(log, "chosen relay({}) {}:{}, city: {}, country: {}, continent: {}", relay_index, relay->uri.host,
+                 relay->uri.port, l.city, l.country, l.continent);
 
         auto uri = utils::parse(fmt::format("tcp://{}:{}", u.host, u.port)).value();
         request<payload::connect_request_t>(peer_supervisor, relay->device_id, std::move(uri),
@@ -113,7 +115,7 @@ void relay_actor_t::request_relay_list() noexcept {
     auto timeout = init_timeout * 9 / 10;
     auto url_opt = utils::parse(config.discovery_url);
     if (!url_opt) {
-        LOG_WARN(log, "{}, malformed discovery url '{}'", identity, config.discovery_url);
+        LOG_WARN(log, "malformed discovery url '{}'", config.discovery_url);
         auto ec = utils::make_error_code(utils::error_code_t::malformed_url);
         return do_shutdown(make_error(ec));
     }
@@ -131,7 +133,7 @@ void relay_actor_t::request_relay_list() noexcept {
     auto r = utils::serialize(req, tx_buff);
     if (!r) {
         auto &ec = r.assume_error();
-        LOG_WARN(log, "{}, cannot serialize request: {}'", identity, r.assume_error().message());
+        LOG_WARN(log, "cannot serialize request: {}'", r.assume_error().message());
         return do_shutdown(make_error(ec));
     }
     resources->acquire(resource::http);
@@ -142,12 +144,12 @@ void relay_actor_t::request_relay_list() noexcept {
 }
 
 void relay_actor_t::on_list(message::http_response_t &msg) noexcept {
-    LOG_TRACE(log, "{}, on_list", identity);
+    LOG_TRACE(log, "on_list");
     resources->release(resource::http);
 
     auto &ee = msg.payload.ee;
     if (ee) {
-        LOG_WARN(log, "{}, get public relays failed: {}", identity, ee->message());
+        LOG_WARN(log, "get public relays failed: {}", ee->message());
         auto inner = utils::make_error_code(utils::error_code_t::cannot_get_public_relays);
         return do_shutdown(make_error(inner, ee));
     }
@@ -159,12 +161,12 @@ void relay_actor_t::on_list(message::http_response_t &msg) noexcept {
     auto result = proto::relay::parse_endpoint(body);
     if (!result) {
         auto &ec = result.assume_error();
-        LOG_WARN(log, "{}, cannot parse relays: {}", identity, ec.message());
+        LOG_WARN(log, "cannot parse relays: {}", ec.message());
         return do_shutdown(make_error(ec));
     }
     auto &list = result.assume_value();
     if (list.empty()) {
-        LOG_WARN(log, "{}, empty list of public relays", identity);
+        LOG_WARN(log, "empty list of public relays");
         auto ec = utils::make_error_code(utils::error_code_t::cannot_get_public_relays);
         return do_shutdown(make_error(ec));
     }
@@ -181,7 +183,7 @@ void relay_actor_t::read_master() noexcept {
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg, resource::io_read); };
     resources->acquire(resource::io_read);
     auto buff = asio::buffer(rx_buff.data() + rx_idx, rx_buff.size() - rx_idx);
-    LOG_TRACE(log, "{}, read_master, sz = {}", identity, buff.size());
+    LOG_TRACE(log, "read_master, sz = {}", buff.size());
     master->async_recv(buff, on_read, on_error);
 }
 
@@ -198,7 +200,7 @@ void relay_actor_t::write_master() noexcept {
     }
     auto &item = tx_queue.front();
     transport::io_fn_t on_write = [&](auto sz) {
-        LOG_TRACE(log, "{}, write {} bytes", identity, sz);
+        LOG_TRACE(log, "write {} bytes", sz);
         resources->release(resource::io_write);
         tx_queue.pop_front();
         if (tx_timer) {
@@ -219,15 +221,15 @@ void relay_actor_t::on_connect(message::connect_response_t &res) noexcept {
     if (state > r::state_t::OPERATIONAL) {
         return;
     }
-    LOG_TRACE(log, "{}, on_connect", identity);
+    LOG_TRACE(log, "on_connect");
     auto &ee = res.payload.ee;
     auto &r = relays[relay_index];
     if (ee) {
-        LOG_TRACE(log, "{}, failed to connect to relay {}: {}", identity, r->device_id.get_short(), ee->message());
+        LOG_TRACE(log, "failed to connect to relay {}: {}", r->device_id.get_short(), ee->message());
         relays[relay_index].reset();
         return connect_to_relay();
     }
-    LOG_DEBUG(log, "{}, connected to relay {}", identity, r->device_id.get_short());
+    LOG_DEBUG(log, "connected to relay {}", r->device_id.get_short());
     auto &p = res.payload.res;
     master = std::move(p.transport);
     master_endpoint = std::move(p.remote_endpoint);
@@ -242,10 +244,10 @@ void relay_actor_t::on_connect(message::connect_response_t &res) noexcept {
 }
 
 void relay_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
-    LOG_TRACE(log, "{}, on_io_error: {}", identity, ec.message());
+    LOG_TRACE(log, "on_io_error: {}", ec.message());
     resources->release(resource);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "{}, on_io_error: {}", identity, ec.message());
+        LOG_WARN(log, "on_io_error: {}", ec.message());
         if (state < r::state_t::SHUTTING_DOWN) {
             do_shutdown(make_error(ec));
         }
@@ -255,8 +257,7 @@ void relay_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resour
 void relay_actor_t::on_read(std::size_t bytes) noexcept {
     enum process_t { stop = 1 << 0, more = 1 << 1, incomplete = 1 << 2 };
 
-    LOG_TRACE(log, "{}, on_read: {} bytes, data: {}", identity, bytes,
-              spdlog::to_hex(rx_buff.begin(), rx_buff.begin() + bytes));
+    LOG_TRACE(log, "on_read: {} bytes, data: {}", bytes, spdlog::to_hex(rx_buff.begin(), rx_buff.begin() + bytes));
     resources->release(resource::io_read);
     rx_idx += bytes;
     size_t from = 0;
@@ -271,7 +272,7 @@ void relay_actor_t::on_read(std::size_t bytes) noexcept {
                 if constexpr (std::is_same_v<T, proto::relay::incomplete_t>) {
                     return process_t::incomplete;
                 } else if constexpr (std::is_same_v<T, proto::relay::protocol_error_t>) {
-                    LOG_ERROR(log, "{}, protocol error (master)", identity);
+                    LOG_ERROR(log, "protocol error (master)");
                     auto ec = utils::make_error_code(utils::error_code_t::protocol_error);
                     do_shutdown(make_error(ec));
                     return process_t::stop;
@@ -326,7 +327,7 @@ bool relay_actor_t::on(proto::relay::message_t &msg) noexcept {
                 err = true;
             }
             if (err) {
-                LOG_ERROR(log, "{}, protocol error (master, unexpected message)", identity);
+                LOG_ERROR(log, "protocol error (master, unexpected message)");
                 auto ec = utils::make_error_code(utils::error_code_t::protocol_error);
                 do_shutdown(make_error(ec));
             }
@@ -340,9 +341,9 @@ bool relay_actor_t::on(proto::relay::message_t &msg) noexcept {
 }
 
 bool relay_actor_t::on(proto::relay::response_t &res) noexcept {
-    LOG_DEBUG(log, "{}, on response code = {}", identity, res.code);
+    LOG_DEBUG(log, "on response code = {}", res.code);
     if (res.code) {
-        LOG_WARN(log, "{}, response error, details = {}", identity, res.details);
+        LOG_WARN(log, "response error, details = {}", res.details);
         auto ec = utils::make_error_code(utils::error_code_t::relay_failure);
         do_shutdown(make_error(ec));
         return false;
@@ -363,7 +364,7 @@ bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
     auto diff = model::diff::contact_diff_ptr_t{};
     auto device_opt = model::device_id_t::from_sha256(msg.from);
     if (!device_opt) {
-        LOG_ERROR(log, "{}, not valid device: {}", identity, spdlog::to_hex(msg.from.begin(), msg.from.end()));
+        LOG_ERROR(log, "not valid device: {}", spdlog::to_hex(msg.from.begin(), msg.from.end()));
         auto ec = utils::make_error_code(utils::error_code_t::invalid_deviceid);
         do_shutdown(make_error(ec));
         return false;
@@ -374,8 +375,7 @@ bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
         sys::error_code ec;
         auto ip = asio::ip::make_address(msg.address, ec);
         if (ec) {
-            LOG_ERROR(log, "{}, invalid ip address: {}", identity,
-                      spdlog::to_hex(msg.address.begin(), msg.address.end()));
+            LOG_ERROR(log, "invalid ip address: {}", spdlog::to_hex(msg.address.begin(), msg.address.end()));
             do_shutdown(make_error(ec));
             return false;
         }

@@ -1,6 +1,7 @@
 log
  + gather all logs
- + fix component names
+ - fix component names
+   spdlog::apply_all([&](std::shared_ptr<spdlog::logger> l) {l->flush();});
  - filter logs by amount
  - filter logs by component and levels
  - scroll on new log, may be not

@@ -7,13 +7,14 @@
 
 using namespace syncspirit::hasher;
 
-hasher_supervisor_t::hasher_supervisor_t(config_t &config) : parent_t(config), index{config.index} {
-    log = utils::get_logger("hasher.supervisor");
-}
+hasher_supervisor_t::hasher_supervisor_t(config_t &config) : parent_t(config), index{config.index} {}
 
 void hasher_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("hasher::supervisor", true); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity("hasher.supervisor", false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.discover_name(net::names::coordinator, coordinator, true).link(false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &) { launch(); });

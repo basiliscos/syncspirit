@@ -16,13 +16,14 @@ r::plugin::resource_id_t timer = 1;
 
 resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
     : r::actor_base_t{config}, io_timeout{config.resolve_timeout},
-      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, backend{strand.context()} {
-    log = utils::get_logger("net.resolver");
-}
+      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, backend{strand.context()} {}
 
 void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::resolver, false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity(names::resolver, false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::resolver, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&resolver_actor_t::on_request);

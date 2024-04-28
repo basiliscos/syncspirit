@@ -30,13 +30,14 @@ file_actor_t::write_ack_t::~write_ack_t() {
 }
 
 file_actor_t::file_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, cluster{cfg.cluster}, rw_cache(cfg.mru_size), ro_cache(cfg.mru_size) {
-    log = utils::get_logger("fs.file_actor");
-}
+    : r::actor_base_t{cfg}, cluster{cfg.cluster}, rw_cache(cfg.mru_size), ro_cache(cfg.mru_size) {}
 
 void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("fs::file_actor", false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity(net::names::fs_actor, false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(net::names::fs_actor, address);
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
@@ -53,18 +54,18 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void file_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
 }
 
 void file_actor_t::shutdown_start() noexcept {
-    LOG_TRACE(log, "{}, shutdown_start", identity);
+    LOG_TRACE(log, "shutdown_start");
     r::actor_base_t::shutdown_start();
     rw_cache.clear();
 }
 
 void file_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_model_update", identity);
+    LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, nullptr);
     if (!r) {
@@ -74,7 +75,7 @@ void file_actor_t::on_model_update(model::message::model_update_t &message) noex
 }
 
 void file_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_block_update", identity);
+    LOG_TRACE(log, "on_block_update");
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, nullptr);
     if (!r) {
@@ -84,7 +85,7 @@ void file_actor_t::on_block_update(model::message::block_update_t &message) noex
 }
 
 void file_actor_t::on_block_request(message::block_request_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_block_request", identity);
+    LOG_TRACE(log, "on_block_request");
     auto &p = message.payload;
     auto &dest = p.reply_to;
     auto &req_ptr = message.payload.remote_request;
@@ -98,14 +99,14 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
     auto data = std::string{};
     if (!file_opt) {
         ec = file_opt.assume_error();
-        LOG_ERROR(log, "{}, error opening file {}: {}", identity, path.string(), ec.message());
+        LOG_ERROR(log, "error opening file {}: {}", path.string(), ec.message());
     } else {
         auto &file = file_opt.assume_value();
         auto block_opt = file->read(req.offset(), req.size());
         if (!block_opt) {
             ec = block_opt.assume_error();
-            LOG_WARN(log, "{}, error requesting block; offset = {}, size = {} :: {} ", identity, req.offset(),
-                     req.size(), ec.message());
+            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", req.offset(), req.size(),
+                     ec.message());
         } else {
             data = std::move(block_opt.assume_value());
         }
@@ -120,14 +121,14 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome
 
     if (file.is_deleted()) {
         if (bfs::exists(path, ec)) {
-            LOG_DEBUG(log, "{} removing {}", identity, path.string());
+            LOG_DEBUG(log, "removing {}", path.string());
             auto ok = bfs::remove_all(path, ec);
             if (!ok) {
-                LOG_ERROR(log, "{},  error removing {} : {}", identity, path.string(), ec.message());
+                LOG_ERROR(log, "error removing {} : {}", path.string(), ec.message());
                 return ec;
             }
         } else {
-            LOG_TRACE(log, "{}, {} already abscent, noop", identity, path.string());
+            LOG_TRACE(log, "{} already abscent, noop", path.string());
         }
         return outcome::success();
     }
@@ -150,21 +151,21 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome
 
         bool temporal = sz > 0;
         if (temporal) {
-            LOG_TRACE(log, "{}, touching file {} ({} bytes)", identity, path.string(), sz);
+            LOG_TRACE(log, "touching file {} ({} bytes)", path.string(), sz);
             auto file_opt = open_file_rw(path, &file);
             if (!file_opt) {
                 auto &err = file_opt.assume_error();
-                LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path.string(), err.message());
+                LOG_ERROR(log, "cannot open file: {}: {}", path.string(), err.message());
                 return err;
             }
         } else {
-            LOG_TRACE(log, "{}, touching empty file {}", identity, path.string());
+            LOG_TRACE(log, "touching empty file {}", path.string());
             std::ofstream out;
             out.exceptions(out.failbit | out.badbit);
             try {
                 out.open(path.string());
             } catch (const std::ios_base::failure &e) {
-                LOG_ERROR(log, "{}, error creating {} : {}", identity, path.string(), e.code().message());
+                LOG_ERROR(log, "error creating {} : {}", path.string(), e.code().message());
                 return sys::errc::make_error_code(sys::errc::io_error);
             }
             out.close();
@@ -176,26 +177,25 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome
             }
         }
     } else if (file.is_dir()) {
-        LOG_DEBUG(log, "{}, creating directory {}", identity, path.string());
+        LOG_DEBUG(log, "creating directory {}", path.string());
         bfs::create_directory(path, ec);
         if (ec) {
             return ec;
         }
     } else if (file.is_link()) {
         auto target = bfs::path(file.get_link_target());
-        LOG_DEBUG(log, "{}, creating symlink {} -> {}", identity, path.string(), target.string());
+        LOG_DEBUG(log, "creating symlink {} -> {}", path.string(), target.string());
 
         bool attempt_create =
             !bfs::exists(path, ec) || !bfs::is_symlink(path, ec) || (bfs::read_symlink(path, ec) != target);
         if (attempt_create) {
             bfs::create_symlink(target, path, ec);
             if (ec) {
-                LOG_WARN(log, "{}, error symlinking {} -> {} : {}", identity, path.string(), target.string(),
-                         ec.message());
+                LOG_WARN(log, "error symlinking {} -> {} : {}", path.string(), target.string(), ec.message());
                 return ec;
             }
         } else {
-            LOG_TRACE(log, "{}, no need to create symlink {} -> {}", identity, path.string(), target.string());
+            LOG_TRACE(log, "no need to create symlink {} -> {}", path.string(), target.string());
         }
     }
 
@@ -219,12 +219,12 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     auto path = file->get_path().string();
     auto backend = rw_cache.get(path);
     if (!backend) {
-        LOG_DEBUG(log, "{}, attempt to flush non-opened file {}, re-open it as temporal", identity, path);
+        LOG_DEBUG(log, "attempt to flush non-opened file {}, re-open it as temporal", path);
         auto path_tmp = make_temporal(file->get_path());
         auto result = open_file_rw(path_tmp, file);
         if (!result) {
             auto &ec = result.assume_error();
-            LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path_tmp.string(), ec.message());
+            LOG_ERROR(log, "cannot open file: {}: {}", path_tmp.string(), ec.message());
             return ec;
         }
         backend = std::move(result.assume_value());
@@ -234,11 +234,11 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     auto ok = backend->close(true);
     if (!ok) {
         auto &ec = ok.assume_error();
-        LOG_ERROR(log, "{}, cannot close file: {}: {}", identity, path, ec.message());
+        LOG_ERROR(log, "cannot close file: {}: {}", path, ec.message());
         return ec;
     }
 
-    LOG_INFO(log, "{}, file {} ({} bytes) is now locally available", identity, path, file->get_size());
+    LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
 
     auto ack = model::diff::cluster_diff_ptr_t{};
     ack = new model::diff::modify::finish_file_ack_t(*file);
@@ -257,7 +257,7 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, v
     auto file_opt = open_file_rw(path, file);
     if (!file_opt) {
         auto &err = file_opt.assume_error();
-        LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, path_str, err.message());
+        LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
         return err;
     }
 
@@ -305,14 +305,14 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     auto file_opt = open_file_rw(target_path, target);
     if (!file_opt) {
         auto &err = file_opt.assume_error();
-        LOG_ERROR(log, "{}, cannot open file: {}: {}", identity, target_path.string(), err.message());
+        LOG_ERROR(log, "cannot open file: {}: {}", target_path.string(), err.message());
         return err;
     }
     auto target_backend = std::move(file_opt.assume_value());
     auto source_backend_opt = get_source_for_cloning(source, target_backend);
     if (!source_backend_opt) {
         auto ec = source_backend_opt.assume_error();
-        LOG_ERROR(log, "{}, cannot open file for cloning: {}: {}", identity, target_path.string(), ec.message());
+        LOG_ERROR(log, "cannot open file for cloning: {}: {}", target_path.string(), ec.message());
     }
 
     auto &source_backend = source_backend_opt.assume_value();
@@ -330,7 +330,7 @@ auto file_actor_t::open_file_rw(const boost::filesystem::path &path, model::file
     }
 
     auto size = info->get_size();
-    LOG_TRACE(log, "{}, open_file (model), path = {} ({} bytes)", identity, path.string(), size);
+    LOG_TRACE(log, "open_file (model), path = {} ({} bytes)", path.string(), size);
     // auto opt = file_t::open_write(path, )
     // bfs::path operational_path = temporal ? make_temporal(path) : path;
 
@@ -355,7 +355,7 @@ auto file_actor_t::open_file_rw(const boost::filesystem::path &path, model::file
 }
 
 auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept -> outcome::result<file_ptr_t> {
-    LOG_TRACE(log, "{}, open_file (by path), path = {}", identity, path.string());
+    LOG_TRACE(log, "open_file (by path), path = {}", path.string());
     if (use_cache) {
         auto file = rw_cache.get(path.string());
         if (file) {

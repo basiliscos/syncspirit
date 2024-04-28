@@ -53,14 +53,12 @@ static void _my_log(MDBX_log_level_t loglevel, const char *function,int line, co
 db_actor_t::db_actor_t(config_t &config)
     : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, db_config{config.db_config},
       cluster{config.cluster} {
-    log = utils::get_logger("net.db");
-
     // mdbx_module_handler({}, {}, {});
     // mdbx_setup_debug(MDBX_LOG_TRACE, MDBX_DBG_ASSERT, &_my_log);
-
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
-        LOG_CRITICAL(log, "{}, mbdx environment creation error ({}): {}", "net::db", r, mdbx_strerror(r));
+        auto log = utils::get_logger("net.db");
+        LOG_CRITICAL(log, "mbdx environment creation error ({}): {}", r, mdbx_strerror(r));
         throw std::runtime_error(std::string(mdbx_strerror(r)));
     }
 }
@@ -73,7 +71,10 @@ db_actor_t::~db_actor_t() {
 
 void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("net::db", false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity("net.db", false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
@@ -94,10 +95,10 @@ void db_actor_t::open() noexcept {
     auto &my_device = cluster->get_device();
     auto upper_limit = db_config.upper_limit;
     /* enable automatic size management */
-    LOG_INFO(log, "{}, open, db upper limit = {}", identity, upper_limit);
+    LOG_INFO(log, "open, db upper limit = {}", upper_limit);
     auto r = mdbx_env_set_geometry(env, -1, -1, upper_limit, -1, -1, -1);
     if (r != MDBX_SUCCESS) {
-        LOG_ERROR(log, "{}, open, mbdx set geometry error ({}): {}", identity, r, mdbx_strerror(r));
+        LOG_ERROR(log, "open, mbdx set geometry error ({}): {}", r, mdbx_strerror(r));
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
@@ -105,20 +106,20 @@ void db_actor_t::open() noexcept {
     auto flags = MDBX_WRITEMAP | MDBX_COALESCE | MDBX_LIFORECLAIM | MDBX_EXCLUSIVE | MDBX_NOTLS | MDBX_SAFE_NOSYNC;
     r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
     if (r != MDBX_SUCCESS) {
-        LOG_ERROR(log, "{}, open, mbdx open environment error ({}): {}", identity, r, mdbx_strerror(r));
+        LOG_ERROR(log, "open, mbdx open environment error ({}): {}", r, mdbx_strerror(r));
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
     auto txn = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn) {
-        LOG_ERROR(log, "{}, open, cannot create transaction {}", identity, txn.error().message());
+        LOG_ERROR(log, "open, cannot create transaction {}", txn.error().message());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
 
     auto db_ver = db::get_version(txn.value());
     if (!db_ver) {
-        LOG_ERROR(log, "{}, open, cannot get db version :: {}", identity, db_ver.error().message());
+        LOG_ERROR(log, "open, cannot get db version :: {}", db_ver.error().message());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
@@ -126,7 +127,7 @@ void db_actor_t::open() noexcept {
     LOG_DEBUG(log, "got db version: {}, expected : {} ", version, db::version);
 
     if (!txn) {
-        LOG_ERROR(log, "{}, open, cannot create transaction {}", identity, txn.error().message());
+        LOG_ERROR(log, "open, cannot create transaction {}", txn.error().message());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
@@ -134,11 +135,11 @@ void db_actor_t::open() noexcept {
         txn = db::make_transaction(db::transaction_type_t::RW, txn.value());
         auto r = db::migrate(version, my_device, txn.value());
         if (!r) {
-            LOG_ERROR(log, "{}, open, cannot migrate db {}", identity, r.error().message());
+            LOG_ERROR(log, "open, cannot migrate db {}", r.error().message());
             resources->release(resource::db);
             return do_shutdown(make_error(r.error()));
         }
-        LOG_INFO(log, "{}, open, successfully migrated db: {} -> {} ", identity, version, db::version);
+        LOG_INFO(log, "open, successfully migrated db: {} -> {} ", version, db::version);
     }
     resources->release(resource::db);
 }
@@ -158,13 +159,13 @@ auto db_actor_t::get_txn() noexcept -> outcome::result<db::transaction_t *> {
 auto db_actor_t::commit(bool force) noexcept -> outcome::result<void> {
     assert(txn_holder);
     if (force) {
-        LOG_INFO(log, "{}, committing tx", identity);
+        LOG_INFO(log, "committing tx");
         auto r = txn_holder->commit();
         txn_holder.reset();
         return r;
     }
     if (++uncommitted >= db_config.uncommitted_threshold) {
-        LOG_INFO(log, "{}, committing tx", identity);
+        LOG_INFO(log, "committing tx");
         auto r = txn_holder->commit();
         txn_holder.reset();
         return r;
@@ -174,7 +175,7 @@ auto db_actor_t::commit(bool force) noexcept -> outcome::result<void> {
 
 void db_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
 }
 
 void db_actor_t::shutdown_finish() noexcept {
@@ -182,20 +183,20 @@ void db_actor_t::shutdown_finish() noexcept {
         auto r = commit(true);
         if (!r) {
             auto &err = r.assume_error();
-            LOG_ERROR(log, "{}, cannot commit tx: {}", identity, err.message());
+            LOG_ERROR(log, "cannot commit tx: {}", err.message());
         }
         txn_holder.reset();
     }
     auto r = mdbx_env_close(env);
     if (r != MDBX_SUCCESS) {
-        LOG_ERROR(log, "{}, open, mbdx close error ({}): {}", identity, r, mdbx_strerror(r));
+        LOG_ERROR(log, "open, mbdx close error ({}): {}", r, mdbx_strerror(r));
     }
     env = nullptr;
     r::actor_base_t::shutdown_finish();
 }
 
 void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {
-    LOG_TRACE(log, "{}, on_cluster_load", identity);
+    LOG_TRACE(log, "on_cluster_load");
     using namespace model::diff;
     using container_t = aggregate_t::diffs_t;
 
@@ -262,12 +263,12 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
 }
 
 void db_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_model_update", identity);
+    LOG_TRACE(log, "on_model_update", identity);
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
-        LOG_ERROR(log, "{}, on_model_update error: {}", identity, r.assume_error().message());
+        LOG_ERROR(log, "on_model_update error: {}", r.assume_error().message());
         do_shutdown(ee);
     }
 }
@@ -628,7 +629,7 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
     auto &files_map = folder_info->get_file_infos();
     for (const auto &f : diff.files) {
         auto file = files_map.by_name(f.name());
-        LOG_TRACE(log, "{}, saving {}, seq = {}", identity, file->get_full_name(), file->get_sequence());
+        LOG_TRACE(log, "saving {}, seq = {}", file->get_full_name(), file->get_sequence());
         auto key = file->get_key();
         auto data = file->serialize();
         auto r = db::save({key, data}, txn);

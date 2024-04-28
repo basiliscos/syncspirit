@@ -38,16 +38,15 @@ controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer}, peer_addr{config.peer_addr},
       request_timeout{config.request_timeout}, rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer{0},
       outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
-      blocks_max_requested{config.blocks_max_requested} {
-    log = utils::get_logger("net.controller_actor");
-}
+      blocks_max_requested{config.blocks_max_requested} {}
 
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        std::string id = "controller/";
+        std::string id = "net.controller/";
         id += peer->device_id().get_short();
         p.set_identity(id, false);
+        log = utils::get_logger(identity);
         open_reading = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
@@ -77,17 +76,17 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void controller_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
     send<payload::start_reading_t>(peer_addr, get_address(), true);
 
     send_cluster_config();
 
     resources->acquire(resource::peer);
-    LOG_INFO(log, "{} is online", identity);
+    LOG_INFO(log, "is online");
 }
 
 void controller_actor_t::shutdown_start() noexcept {
-    LOG_TRACE(log, "{}, shutdown_start", identity);
+    LOG_TRACE(log, "shutdown_start");
     if (peer_addr) {
         send<payload::termination_t>(peer_addr, shutdown_reason);
     }
@@ -95,14 +94,14 @@ void controller_actor_t::shutdown_start() noexcept {
 }
 
 void controller_actor_t::shutdown_finish() noexcept {
-    LOG_TRACE(log, "{}, shutdown_finish, blocks_requested = {}", identity, rx_blocks_requested);
+    LOG_TRACE(log, "shutdown_finish, blocks_requested = {}", rx_blocks_requested);
     if (!locked_files.empty()) {
         using diffs_t = model::diff::aggregate_t::diffs_t;
         auto diffs = diffs_t{};
         for (auto &file : locked_files) {
             if (!file->is_unlocking()) {
-                LOG_TRACE(log, "{}, going to unlock {} ({}); is_unlocking {}", identity, file->get_full_name(),
-                          (void *)file.get(), file->is_unlocking());
+                LOG_TRACE(log, "going to unlock {} ({}); is_unlocking {}", file->get_full_name(), (void *)file.get(),
+                          file->is_unlocking());
                 diffs.push_back(new model::diff::modify::lock_file_t(*file, false));
             }
             file->set_unlocking(false);
@@ -111,8 +110,7 @@ void controller_actor_t::shutdown_finish() noexcept {
             file->locally_unlock();
         }
 
-        LOG_DEBUG(log, "{} unlocking {} model files and {} local files", identity, diffs.size(),
-                  locally_locked_files.size());
+        LOG_DEBUG(log, "unlocking {} model files and {} local files", diffs.size(), locally_locked_files.size());
         auto diff = model::diff::cluster_diff_ptr_t{};
         diff = new model::diff::aggregate_t(std::move(diffs));
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
@@ -121,7 +119,7 @@ void controller_actor_t::shutdown_finish() noexcept {
 }
 
 void controller_actor_t::send_cluster_config() noexcept {
-    LOG_TRACE(log, "{}, sending cluster config", identity);
+    LOG_TRACE(log, "sending cluster config");
     auto cluster_config = cluster->generate(*peer);
     fmt::memory_buffer data;
     proto::serialize(data, cluster_config);
@@ -132,14 +130,14 @@ void controller_actor_t::send_cluster_config() noexcept {
 void controller_actor_t::on_transfer_push(message::transfer_push_t &message) noexcept {
     auto sz = message.payload.bytes;
     outgoing_buffer += sz;
-    LOG_TRACE(log, "{}, on_transfer_push, sz = {} (+{})", identity, outgoing_buffer, sz);
+    LOG_TRACE(log, "on_transfer_push, sz = {} (+{})", outgoing_buffer, sz);
 }
 
 void controller_actor_t::on_transfer_pop(message::transfer_pop_t &message) noexcept {
     auto sz = message.payload.bytes;
     assert(outgoing_buffer >= sz);
     outgoing_buffer -= sz;
-    LOG_TRACE(log, "{}, on_transfer_pop, sz = {} (-{})", identity, outgoing_buffer, sz);
+    LOG_TRACE(log, "on_transfer_pop, sz = {} (-{})", outgoing_buffer, sz);
     push_pending();
 }
 
@@ -149,7 +147,7 @@ void controller_actor_t::on_termination(message::termination_signal_t &message) 
         peer_addr.reset();
     }
     auto &ee = message.payload.ee;
-    LOG_TRACE(log, "{}, on_termination reason: {}", identity, ee->message());
+    LOG_TRACE(log, "on_termination reason: {}", ee->message());
     do_shutdown(ee);
 }
 
@@ -179,8 +177,7 @@ void controller_actor_t::push_pending() noexcept {
         expected_sz += file_info->expected_meta_size();
         auto &index = get_index(*file_info);
         *index.add_files() = file_info->as_proto(true);
-        LOG_TRACE(log, "{}, pushing index update for: {}, seq = {}", identity, file_info->get_full_name(),
-                  file_info->get_sequence());
+        LOG_TRACE(log, "pushing index update for: {}, seq = {}", file_info->get_full_name(), file_info->get_sequence());
     }
 
     fmt::memory_buffer data;
@@ -217,7 +214,7 @@ model::file_block_t controller_actor_t::next_block(bool reset) noexcept {
 }
 
 void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
-    LOG_TRACE(log, "{}, on_pull_ready, blocks requested = {}", identity, rx_blocks_requested);
+    LOG_TRACE(log, "on_pull_ready, blocks requested = {}", rx_blocks_requested);
     bool ignore = (rx_blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
                   || (state != r::state_t::OPERATIONAL) // request pool sz = 32505856e are shutting down
         ;
@@ -247,7 +244,7 @@ void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
         if (file) {
             substate |= substate_t::iterating_files;
             if (!file->local_file()) {
-                LOG_DEBUG(log, "{}, next_file = {}", identity, file->get_name());
+                LOG_DEBUG(log, "next_file = {}", file->get_name());
                 file->locally_lock();
                 locally_locked_files.emplace(file);
                 auto diff = model::diff::cluster_diff_ptr_t{};
@@ -267,14 +264,14 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
     assert(file->local_file());
 
     if (file_block.is_locally_available()) {
-        LOG_TRACE(log, "{} cloning locally available block, file = {}, block index = {} / {}", identity,
-                  file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1);
+        LOG_TRACE(log, "cloning locally available block, file = {}, block index = {} / {}", file->get_full_name(),
+                  file_block.block_index(), file->get_blocks().size() - 1);
         auto diff = block_diff_ptr_t(new modify::clone_block_t(file_block, make_callback()));
         push_block_write(std::move(diff));
     } else {
         auto block = file_block.block();
         auto sz = block->get_size();
-        LOG_TRACE(log, "{} request_block on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}", identity,
+        LOG_TRACE(log, "request_block on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}",
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
         request<payload::block_request_t>(peer_addr, file, file_block).send(request_timeout);
         ++rx_blocks_requested;
@@ -291,7 +288,7 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
 }
 
 void controller_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_model_update", identity);
+    LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, const_cast<void *>(message.payload.custom));
     if (!r) {
@@ -313,7 +310,7 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &,
         if (folder_info) {
             auto index_opt = folder_info->generate();
             if (index_opt) {
-                LOG_DEBUG(log, "{}, sending new index", identity);
+                LOG_DEBUG(log, "sending new index");
                 auto index = *index_opt;
                 fmt::memory_buffer data;
                 proto::serialize(data, index);
@@ -440,7 +437,7 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
     auto source_file = folder_info->get_file_infos().by_name(diff.file_name);
     if (source_file->is_locally_available()) {
         using diffs_t = model::diff::aggregate_t::diffs_t;
-        LOG_TRACE(log, "{}, on_block_update, finalizing {}", identity, source_file->get_name());
+        LOG_TRACE(log, "on_block_update, finalizing {}", source_file->get_name());
         auto my_file = source_file->local_file();
         auto diffs = diffs_t{};
         source_file->set_unlocking(true);
@@ -460,13 +457,13 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
 
 auto controller_actor_t::operator()(const model::diff::modify::block_rej_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    LOG_ERROR(log, "{}, on block rej, not implemented", identity);
+    LOG_ERROR(log, "on block rej, not implemented");
     return outcome::success();
 }
 
 void controller_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
     if (message.payload.custom == this) {
-        LOG_TRACE(log, "{}, on_block_update", identity);
+        LOG_TRACE(log, "on_block_update");
         auto &diff = *message.payload.diff;
         auto r = diff.visit(*this, const_cast<void *>(message.payload.custom));
         if (!r) {
@@ -477,11 +474,11 @@ void controller_actor_t::on_block_update(model::message::block_update_t &message
 }
 
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
-    LOG_DEBUG(log, "{}, on_message (ClusterConfig)", identity);
+    LOG_DEBUG(log, "on_message (ClusterConfig)");
     auto diff_opt = cluster->process(*message, *peer);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
-        LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
+        LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
     send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
@@ -489,30 +486,29 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
     auto &msg = *message;
-    LOG_DEBUG(log, "{}, on_message (Index)", identity);
+    LOG_DEBUG(log, "on_message (Index)");
     auto diff_opt = cluster->process(msg, *peer);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
-        LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
+        LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
     auto folder = cluster->get_folders().by_id(msg.folder());
-    LOG_DEBUG(log, "{}, on_message (Index), folder = {}, files = {}", identity, folder->get_label(), msg.files_size());
+    LOG_DEBUG(log, "on_message (Index), folder = {}, files = {}", folder->get_label(), msg.files_size());
     send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 
 void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
-    LOG_TRACE(log, "{}, on_message (IndexUpdate)", identity);
+    LOG_TRACE(log, "on_message (IndexUpdate)");
     auto &msg = *message;
     auto diff_opt = cluster->process(msg, *peer);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
-        LOG_ERROR(log, "{}, error processing message from {} : {}", identity, peer->device_id(), ec.message());
+        LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
     auto folder = cluster->get_folders().by_id(msg.folder());
-    LOG_DEBUG(log, "{}, on_message (IndexUpdate), folder = {}, files = {}", identity, folder->get_label(),
-              msg.files_size());
+    LOG_DEBUG(log, "on_message (IndexUpdate), folder = {}, files = {}", folder->get_label(), msg.files_size());
     send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
 }
 
@@ -522,8 +518,7 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
     auto code = proto::ErrorCode::NO_BEP_ERROR;
 
     if (tx_blocks_requested > blocks_max_requested * constants::tx_blocks_max_factor) {
-        LOG_WARN(log, "{}, peer requesting too many blocks ({}), rejecting current request", identity,
-                 tx_blocks_requested);
+        LOG_WARN(log, "peer requesting too many blocks ({}), rejecting current request", tx_blocks_requested);
         code = proto::ErrorCode::GENERIC;
     } else {
         auto folder = cluster->get_folders().by_id(req->folder());
@@ -541,7 +536,7 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
                     code = proto::ErrorCode::NO_SUCH_FILE;
                 } else {
                     if (!file->is_file()) {
-                        LOG_WARN(log, "{}, attempt to request non-regular file: {}", identity, file->get_name());
+                        LOG_WARN(log, "attempt to request non-regular file: {}", file->get_name());
                         code = proto::ErrorCode::GENERIC;
                     }
                 }
@@ -592,8 +587,8 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
         if (ec.category() == utils::request_error_code_category()) {
             auto file = file_block.file();
             if (!file->is_unreachable()) {
-                LOG_WARN(log, "{}, can't receive block from file '{}': {}; marking unreachable", identity,
-                         file->get_full_name(), ec.message());
+                LOG_WARN(log, "can't receive block from file '{}': {}; marking unreachable", file->get_full_name(),
+                         ec.message());
                 file->mark_unreachable(true);
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 diff = new model::diff::modify::mark_reachable_t(*file, false);
@@ -601,7 +596,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
             }
             pull_ready();
         } else {
-            LOG_WARN(log, "{}, can't receive block : {}", identity, ee->message());
+            LOG_WARN(log, "can't receive block : {}", ee->message());
             do_shutdown(ee);
         }
         return;
@@ -626,14 +621,13 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     auto &path = file->get_path();
 
     if (ee) {
-        LOG_WARN(log, "{}, on_validation failed : {}", identity, ee->message());
+        LOG_WARN(log, "on_validation failed : {}", ee->message());
         do_shutdown(ee);
     } else {
         if (!res.payload.res.valid) {
             if (!file->is_unreachable()) {
                 auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-                LOG_WARN(log, "{}, digest mismatch for '{}'; marking reachable", identity, file->get_full_name(),
-                         ec.message());
+                LOG_WARN(log, "digest mismatch for '{}'; marking reachable", file->get_full_name(), ec.message());
                 file->mark_unreachable(true);
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 diff = new model::diff::modify::mark_reachable_t(*file, false);
@@ -644,7 +638,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
             auto &data = block_res->payload.res.data;
             auto index = payload.block.block_index();
 
-            LOG_TRACE(log, "{}, {}, got block {}, write requests left = {}", identity, file->get_name(), index,
+            LOG_TRACE(log, "{}, got block {}, write requests left = {}", file->get_name(), index,
                       cluster->get_write_requests());
             auto diff = block_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data), make_callback()));
             push_block_write(std::move(diff));
@@ -678,7 +672,7 @@ void controller_actor_t::process_block_write() noexcept {
         block_write_queue.pop_front();
     }
     if (sent) {
-        LOG_TRACE(log, "{}, {} block writes sent, requests left = {}", identity, sent, requests_left);
+        LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
         cluster->modify_write_requests(-sent);
     }
 }

@@ -17,13 +17,14 @@ r::plugin::resource_id_t resolver = 2;
 
 http_actor_t::http_actor_t(config_t &config)
     : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout), request_timeout(config.request_timeout),
-      registry_name{config.registry_name}, keep_alive{config.keep_alive} {
-    log = utils::get_logger("net.http");
-}
+      registry_name{config.registry_name}, keep_alive{config.keep_alive} {}
 
 void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(registry_name, true); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity(registry_name, false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&http_actor_t::on_request);
         p.subscribe_actor(&http_actor_t::on_resolve);
@@ -37,13 +38,13 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void http_actor_t::on_request(message::http_request_t &req) noexcept {
-    LOG_TRACE(log, "{}, on request, url = {}", identity, req.payload.request_payload->url.full);
+    LOG_TRACE(log, "on request, url = {}", req.payload.request_payload->url.full);
     queue.emplace_back(&req);
     process();
 }
 
 void http_actor_t::on_cancel(message::http_cancel_t &req) noexcept {
-    LOG_TRACE(log, "{}, on on_cancel, queue is empty = {}", identity, queue.empty());
+    LOG_TRACE(log, "on_cancel, queue is empty = {}", queue.empty());
     if (queue.empty()) {
         return;
     }
@@ -103,15 +104,15 @@ void http_actor_t::process() noexcept {
                 reuse = deadline > now;
             }
         } else {
-            LOG_DEBUG(log, "{} :: different endpoint is used: {}:{} vs {}:{}", identity, resolved_url.host,
-                      resolved_url.port, url.host, url.port);
+            LOG_DEBUG(log, "different endpoint is used: {}:{} vs {}:{}", resolved_url.host, resolved_url.port, url.host,
+                      url.port);
         }
         if (reuse) {
-            LOG_DEBUG(log, "{} reusing connection", identity);
+            LOG_DEBUG(log, "reusing connection");
             spawn_timer();
             write_request();
         } else {
-            LOG_TRACE(log, "{} will use new connection", identity);
+            LOG_TRACE(log, "will use new connection");
             kept_alive = false;
             transport->cancel();
             return process();
@@ -136,7 +137,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto &ee = res.payload.ee;
 
     if (ee) {
-        LOG_WARN(log, "{}, on_resolve error: {}", identity, ee->message());
+        LOG_WARN(log, "on_resolve error: {}", ee->message());
         reply_with_error(*queue.front(), ee);
         queue.pop_front();
         need_response = false;
@@ -173,7 +174,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 }
 
 void http_actor_t::on_connect(const tcp::endpoint &) noexcept {
-    LOG_TRACE(log, "{}, on_connect", identity);
+    LOG_TRACE(log, "on_connect");
     resources->release(resource::io);
     if (!need_response || stop_io) {
         return process();
@@ -183,7 +184,7 @@ void http_actor_t::on_connect(const tcp::endpoint &) noexcept {
         sys::error_code ec;
         local_address = transport->local_address(ec);
         if (ec) {
-            LOG_WARN(log, "{}, on_connect, get local addr error :: {}", identity, ec.message());
+            LOG_WARN(log, "on_connect, get local addr error :: {}", ec.message());
             reply_with_error(*queue.front(), make_error(ec));
             queue.pop_front();
             need_response = false;
@@ -204,11 +205,11 @@ void http_actor_t::write_request() noexcept {
     auto &payload = *queue.front()->payload.request_payload;
     auto &url = payload.url;
     auto &data = payload.data;
-    LOG_TRACE(log, "{} :: sending {} bytes to {} ", identity, data.size(), url.full);
+    LOG_TRACE(log, "sending {} bytes to {} ", data.size(), url.full);
     auto buff = asio::buffer(data.data(), data.size());
     /*
     std::string write_data{(const char *)buff.data(), data.size()};
-    LOG_DEBUG(log, "{} :: write_request: \n{}", identity, write_data);
+    LOG_DEBUG(log, "write_request: \n{}", write_data);
     */
     transport::io_fn_t on_write = [&](auto arg) { this->on_request_sent(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
@@ -262,7 +263,7 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     kept_alive = false;
     if (ec != asio::error::operation_aborted) {
-        LOG_DEBUG(log, "{}, on_io_error :: {}", identity, ec.message());
+        LOG_DEBUG(log, "on_io_error :: {}", ec.message());
     }
     cancel_io();
     if (!need_response || stop_io) {
@@ -287,7 +288,7 @@ void http_actor_t::on_handshake(bool, utils::x509_t &, const tcp::endpoint &, co
 void http_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "{}, on_handshake_error :: {}", identity, ec.message());
+        LOG_WARN(log, "on_handshake_error :: {}", ec.message());
     }
     if (!need_response || stop_io) {
         return process();
@@ -322,18 +323,18 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 }
 
 void http_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
 }
 
 void http_actor_t::shutdown_finish() noexcept {
-    LOG_TRACE(log, "{}, shutdown_finish", identity);
+    LOG_TRACE(log, "shutdown_finish");
     r::actor_base_t::shutdown_finish();
     transport.reset();
 }
 
 void http_actor_t::on_close_connection(message::http_close_connection_t &) noexcept {
-    LOG_TRACE(log, "{}, on_close_connection", identity);
+    LOG_TRACE(log, "on_close_connection");
     stop_io = true;
     cancel_io();
 }

@@ -20,14 +20,13 @@ template <class> inline constexpr bool always_false_v = false;
 
 scan_actor_t::scan_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, cluster{cfg.cluster}, fs_config{cfg.fs_config},
-      requested_hashes_limit{cfg.requested_hashes_limit} {
-    log = utils::get_logger("scan::actor");
-}
+      requested_hashes_limit{cfg.requested_hashes_limit} {}
 
 void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        p.set_identity("fs::scan_actor", false);
+        p.set_identity(net::names::fs_scanner, false);
+        log = utils::get_logger(identity);
         new_files = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
@@ -46,18 +45,18 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void scan_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
 }
 
 void scan_actor_t::shutdown_finish() noexcept {
-    LOG_TRACE(log, "{}, shutdown_finish", identity);
+    LOG_TRACE(log, "shutdown_finish");
     get_supervisor().shutdown();
     r::actor_base_t::shutdown_finish();
 }
 
 void scan_actor_t::initiate_scan(std::string_view folder_id) noexcept {
-    LOG_DEBUG(log, "{}, initiating scan of {}", identity, folder_id);
+    LOG_DEBUG(log, "initiating scan of {}", folder_id);
     auto task = scan_task_ptr_t(new scan_task_t(cluster, folder_id, fs_config));
     send<payload::scan_progress_t>(address, std::move(task));
 }
@@ -83,7 +82,7 @@ void scan_actor_t::process_queue() noexcept {
 void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
     auto &task = message.payload.task;
     auto folder_id = task->get_folder_id();
-    LOG_TRACE(log, "{}, on_scan, folder = {}", identity, folder_id);
+    LOG_TRACE(log, "on_scan, folder = {}", folder_id);
 
     auto r = task->advance();
     bool stop_processing = false;
@@ -148,7 +147,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
     if (!stop_processing) {
         send<payload::scan_progress_t>(address, std::move(task));
     } else if (completed) {
-        LOG_DEBUG(log, "{}, completed scanning of {}", identity, folder_id);
+        LOG_DEBUG(log, "completed scanning of {}", folder_id);
         send<payload::scan_completed_t>(coordinator, folder_id);
         --progress;
         process_queue();
@@ -158,12 +157,12 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
 auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path, proto::FileInfo &metadata) noexcept
     -> model::io_errors_t {
     file_ptr_t file;
-    LOG_DEBUG(log, "{}, will try to initiate hashing of {}", identity, path.string());
+    LOG_DEBUG(log, "will try to initiate hashing of {}", path.string());
     if (metadata.type() == proto::FileInfoType::FILE) {
         auto opt = file_t::open_read(path);
         if (!opt) {
             auto &ec = opt.assume_error();
-            LOG_WARN(log, "{}, error opening file {}: {}", identity, path.string(), ec.message());
+            LOG_WARN(log, "error opening file {}: {}", path.string(), ec.message());
             model::io_errors_t errs;
             errs.push_back(model::io_error_t{path, ec});
             return errs;
@@ -175,7 +174,7 @@ auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path, pr
 }
 
 void scan_actor_t::on_rehash(message::rehash_needed_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_rehash", identity);
+    LOG_TRACE(log, "on_rehash");
     auto initial = requested_hashes;
     hash_next(message, address);
     if (initial == requested_hashes) {
@@ -184,7 +183,7 @@ void scan_actor_t::on_rehash(message::rehash_needed_t &message) noexcept {
 }
 
 void scan_actor_t::on_hash_anew(message::hash_anew_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_hash_anew", identity);
+    LOG_TRACE(log, "on_hash_anew");
     auto initial = requested_hashes;
     hash_next(message, new_files);
     // file w/o context
@@ -233,7 +232,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     if (res.payload.ee) {
         auto &ee = res.payload.ee;
         auto file = info.get_file();
-        LOG_ERROR(log, "{}, on_hash, file: {}, block = {}, error: {}", identity, file->get_full_name(), rp.block_index,
+        LOG_ERROR(log, "on_hash, file: {}, block = {}, error: {}", file->get_full_name(), rp.block_index,
                   ee->message());
         return do_shutdown(ee);
     }
@@ -266,7 +265,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
         diff = new model::diff::modify::lock_file_t(file, false);
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 
-        LOG_DEBUG(log, "{}, removing temporal of '{}' as it corrupted", identity, file.get_full_name());
+        LOG_DEBUG(log, "removing temporal of '{}' as it corrupted", file.get_full_name());
         auto r = info.remove();
         if (r) {
             model::io_errors_t errors{model::io_error_t{info.get_path(), r.assume_error()}};
@@ -312,8 +311,7 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
     auto &path = info.get_path();
     if (res.payload.ee) {
         auto &ee = res.payload.ee;
-        LOG_ERROR(log, "{}, on_hash_new, file: {}, block = {}, error: {}", identity, path.string(), rp.block_index,
-                  ee->message());
+        LOG_ERROR(log, "on_hash_new, file: {}, block = {}, error: {}", path.string(), rp.block_index, ee->message());
         return do_shutdown(ee);
     }
 
@@ -332,7 +330,7 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
 }
 
 void scan_actor_t::on_remove(const model::file_info_t &file) noexcept {
-    LOG_DEBUG(log, "{}, locally removed {}, updating model", identity, file.get_full_name());
+    LOG_DEBUG(log, "locally removed {}, updating model", file.get_full_name());
     auto folder = file.get_folder_info()->get_folder();
     auto folder_id = std::string(folder->get_id());
     auto fi = file.as_proto(false);

@@ -16,13 +16,14 @@ r::plugin::resource_id_t timer = 0;
 
 dialer_actor_t::dialer_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster},
-      redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}} {
-    log = utils::get_logger("net.acceptor");
-}
+      redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}} {}
 
 void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("dialer", false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity("net.dialer", false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
@@ -36,17 +37,17 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void dialer_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
 }
 
 void dialer_actor_t::shutdown_finish() noexcept {
-    LOG_TRACE(log, "{}, shutdown_finish", identity);
+    LOG_TRACE(log, "shutdown_finish");
     r::actor_base_t::shutdown_finish();
 }
 
 void dialer_actor_t::shutdown_start() noexcept {
-    LOG_TRACE(log, "{}, shutdown_start", identity);
+    LOG_TRACE(log, "shutdown_start");
     r::actor_base_t::shutdown_start();
     while (!redial_map.empty()) {
         auto it = redial_map.begin();
@@ -60,7 +61,7 @@ void dialer_actor_t::shutdown_start() noexcept {
 }
 
 void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
-    LOG_TRACE(log, "{}, on_announce", identity);
+    LOG_TRACE(log, "on_announce");
     auto &devices = cluster->get_devices();
     for (auto it : devices) {
         auto &d = it.item;
@@ -88,19 +89,19 @@ void dialer_actor_t::schedule_redial(const model::device_ptr_t &peer_device) noe
     auto now = clock_t::now();
     if (deadline >= now) {
         auto diff_ms = std::chrono::duration_cast<ms_t>(deadline - now).count();
-        LOG_TRACE(log, "{}, scheduling (re)dial to {} in {} ms", identity, peer_device->device_id(), diff_ms);
+        LOG_TRACE(log, "scheduling (re)dial to {} in {} ms", peer_device->device_id(), diff_ms);
         auto diff = pt::millisec(diff_ms);
         auto redial_timer = start_timer(diff, *this, &dialer_actor_t::on_timer);
         info.timer_id = redial_timer;
         resources->acquire(resource::timer);
     } else {
-        LOG_TRACE(log, "{}, will discover '{}' immediately", identity, peer_device->device_id());
+        LOG_TRACE(log, "will discover '{}' immediately", peer_device->device_id());
         discover(peer_device);
     }
 }
 
 void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexcept {
-    LOG_TRACE(log, "{}, on_timer, cancelled = {}", identity, cancelled);
+    LOG_TRACE(log, "on_timer, cancelled = {}", cancelled);
     using value_t = typename redial_map_t::value_type;
     resources->release(resource::timer);
     auto predicate = [&](const value_t &val) -> bool { return val.second.timer_id == request_id; };
@@ -115,7 +116,7 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
 }
 
 void dialer_actor_t::on_model_update(model::message::model_update_t &msg) noexcept {
-    LOG_TRACE(log, "{}, on_model_update", identity);
+    LOG_TRACE(log, "{}, on_model_update");
     auto &diff = *msg.payload.diff;
     auto r = diff.visit(*this, nullptr);
     if (!r) {

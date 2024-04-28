@@ -93,7 +93,7 @@ file_t::~file_t() {
     if (backend && model) {
         auto result = close(model->is_locally_available());
         if (!result) {
-            auto log = utils::get_logger("fs::file_t");
+            auto log = utils::get_logger("fs.file");
             auto &ec = result.assume_error();
             log->warn("(ignored) error closing file '{}' : {}", path_str, ec.message());
         }

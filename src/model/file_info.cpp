@@ -389,7 +389,6 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
         return false;
     } else {
         assert(r == version_relation_t::conflict);
-        auto log = utils::get_logger("model");
         auto stringify = [](const proto::Vector &vector) -> std::string {
             auto r = std::string();
             for (int i = 0; i < vector.counters_size(); ++i) {
@@ -404,6 +403,7 @@ bool file_info_t::need_download(const file_info_t &other) noexcept {
         auto my_version = stringify(version);
         auto other_version = stringify(other.version);
 
+        auto log = utils::get_logger("model.file_info");
         LOG_CRITICAL(log, "conflict handling is not available for = {}, '{}' vs '{}'", get_full_name(), my_version,
                      other_version);
         return false;
