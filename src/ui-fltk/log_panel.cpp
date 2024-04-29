@@ -149,6 +149,7 @@ log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h
     button_x += filter_input->w() + padding;
 
     auto counter = new counter_label_t(padding + group->w() - 200, button_y, 200, button_h);
+    counter->tooltip("displayed number of records / total number of records");
     records_counter = counter;
 
     group->end();
