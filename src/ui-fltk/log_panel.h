@@ -6,6 +6,7 @@
 
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Toggle_Button.H>
+#include <FL/Fl_Input.H>
 #include <array>
 
 namespace syncspirit::fltk {
@@ -21,6 +22,7 @@ struct log_panel_t : Fl_Group {
 
     void min_display_level(spdlog::level::level_enum level);
     void update();
+    void on_filter(std::string_view filter);
 
     application_t &application;
     sink_ptr_t bridge_sink;
@@ -31,6 +33,7 @@ struct log_panel_t : Fl_Group {
     log_records_t records;
     log_table_t::displayed_records_t displayed_records;
     spdlog::level::level_enum display_level;
+    std::string filter;
 };
 
 } // namespace syncspirit::fltk

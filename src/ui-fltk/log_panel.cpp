@@ -53,6 +53,12 @@ static void set_min_display_level(Fl_Widget *widget, void *data) {
     }
 }
 
+static void on_input_filter(Fl_Widget *widget, void *data) {
+    auto input = reinterpret_cast<Fl_Input *>(widget);
+    auto log_panel = reinterpret_cast<log_panel_t *>(data);
+    log_panel->on_filter(input->value());
+}
+
 log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h)
     : parent_t{x, y, w, h}, application{application_}, display_level{spdlog::level::trace}
 
@@ -121,7 +127,12 @@ log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h
     critical_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::critical));
     critical_button->tooltip("display log records with critical level");
     level_buttons[5] = critical_button;
-    button_x += info_button->w() + 1;
+    button_x += info_button->w() + padding;
+
+    auto filter_input = new Fl_Input(button_x, button_y, 200, button_h, "");
+    filter_input->callback(on_input_filter, this);
+    filter_input->when(FL_WHEN_CHANGED);
+
     group->end();
     group->resizable(nullptr);
 
@@ -153,7 +164,12 @@ log_panel_t::~log_panel_t() {
 void log_panel_t::update() {
     displayed_records.clear();
     for (auto &r : records) {
-        if (r->level >= display_level) {
+        bool display_record = (r->level >= display_level);
+        if (display_record && !filter.empty()) {
+            display_record =
+                (r->source.find(filter) != std::string::npos) || (r->message.find(filter) != std::string::npos);
+        }
+        if (display_record) {
             displayed_records.push_back(r.get());
         }
     }
@@ -162,5 +178,10 @@ void log_panel_t::update() {
 
 void log_panel_t::min_display_level(spdlog::level::level_enum level) {
     display_level = level;
+    update();
+}
+
+void log_panel_t::on_filter(std::string_view filter_) {
+    filter = filter_;
     update();
 }
