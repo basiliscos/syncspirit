@@ -53,7 +53,7 @@ struct fltk_sink_t final : base_sink_t {
 };
 
 log_table_t::log_table_t(application_t &application_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), application{application_} {
+    : parent_t(x, y, w, h), application{application_}, auto_scrolling(true) {
     rows(0);            // how many rows
     row_header(0);      // enable row headers (along left)
     row_height_all(20); // default height of rows
@@ -96,7 +96,12 @@ log_table_t::~log_table_t() {
     bridge_sink.reset();
 }
 
-void log_table_t::update() { rows(records.size()); }
+void log_table_t::update() {
+    rows(records.size());
+    if (auto_scrolling) {
+        row_position(static_cast<int>(records.size()));
+    }
+}
 
 void log_table_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {
     switch (context) {
@@ -172,6 +177,13 @@ void log_table_t::draw_data(int row, int col, int x, int y, int w, int h) {
         fl_rect(x, y, w, h);
     }
     fl_pop_clip();
+}
+
+void log_table_t::autoscroll(bool value) {
+    auto_scrolling = value;
+    if (auto_scrolling) {
+        row_position(static_cast<int>(records.size()));
+    }
 }
 
 } // namespace syncspirit::fltk

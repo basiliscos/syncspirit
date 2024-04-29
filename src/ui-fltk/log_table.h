@@ -7,7 +7,6 @@
 
 #include "log_sink.h"
 #include "application.h"
-#include "utils/log.h"
 
 namespace syncspirit::fltk {
 
@@ -22,6 +21,7 @@ struct log_table_t : Fl_Table {
     ~log_table_t();
 
     void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
+    void autoscroll(bool value);
 
   private:
     using mutex_t = std::mutex;
@@ -34,6 +34,7 @@ struct log_table_t : Fl_Table {
     log_records_t incoming_records;
     log_records_t records;
     sink_ptr_t bridge_sink;
+    bool auto_scrolling;
 
     friend fltk_sink_t;
 };
