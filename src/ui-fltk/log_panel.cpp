@@ -3,6 +3,10 @@
 #include "log_table.h"
 #include "log_colors.h"
 
+#include <spdlog/fmt/fmt.h>
+#include <FL/Fl_Box.H>
+#include <FL/fl_draw.H>
+
 using namespace syncspirit::fltk;
 
 struct syncspirit::fltk::fltk_sink_t final : base_sink_t {
@@ -59,6 +63,16 @@ static void on_input_filter(Fl_Widget *widget, void *data) {
     log_panel->on_filter(input->value());
 }
 
+struct counter_label_t : Fl_Box {
+    using parent_t = Fl_Box;
+    using parent_t::parent_t;
+
+    void draw() override {
+        draw_box(box(), x(), y(), w(), h(), FL_BACKGROUND_COLOR);
+        fl_draw(label(), x(), y(), w(), h(), FL_ALIGN_RIGHT);
+    }
+};
+
 log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h)
     : parent_t{x, y, w, h}, application{application_}, display_level{spdlog::level::trace}
 
@@ -111,7 +125,7 @@ log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h
     warn_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::warn));
     warn_button->tooltip("display log records with warning level and above");
     level_buttons[3] = warn_button;
-    button_x += info_button->w() + 1;
+    button_x += warn_button->w() + 1;
 
     auto error_button = new Fl_Toggle_Button(button_x, button_y, button_h, button_h, " ");
     error_button->color(log_colors[static_cast<int>(spdlog::level::err) * 2]);
@@ -119,7 +133,7 @@ log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h
     error_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::err));
     error_button->tooltip("display log records with error level and above");
     level_buttons[4] = error_button;
-    button_x += info_button->w() + 1;
+    button_x += error_button->w() + 1;
 
     auto critical_button = new Fl_Toggle_Button(button_x, button_y, button_h, button_h, " ");
     critical_button->color(log_colors[static_cast<int>(spdlog::level::critical) * 2]);
@@ -127,14 +141,18 @@ log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h
     critical_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::critical));
     critical_button->tooltip("display log records with critical level");
     level_buttons[5] = critical_button;
-    button_x += info_button->w() + padding;
+    button_x += critical_button->w() + padding;
 
     auto filter_input = new Fl_Input(button_x, button_y, 200, button_h, "");
     filter_input->callback(on_input_filter, this);
     filter_input->when(FL_WHEN_CHANGED);
+    button_x += filter_input->w() + padding;
+
+    auto counter = new counter_label_t(padding + group->w() - 200, button_y, 200, button_h);
+    records_counter = counter;
 
     group->end();
-    group->resizable(nullptr);
+    group->resizable(counter);
 
     end();
 
@@ -174,6 +192,10 @@ void log_panel_t::update() {
         }
     }
     log_table->update();
+
+    char buff[64] = {0};
+    auto message = fmt::format_to(buff, "{}/{}", displayed_records.size(), records.size());
+    records_counter->copy_label(buff);
 }
 
 void log_panel_t::min_display_level(spdlog::level::level_enum level) {

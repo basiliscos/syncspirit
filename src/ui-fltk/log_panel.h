@@ -7,6 +7,7 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Toggle_Button.H>
 #include <FL/Fl_Input.H>
+#include <FL/Fl_Box.H>
 #include <array>
 
 namespace syncspirit::fltk {
@@ -27,6 +28,7 @@ struct log_panel_t : Fl_Group {
     application_t &application;
     sink_ptr_t bridge_sink;
     log_table_t *log_table;
+    Fl_Box *records_counter;
     level_buttons_t level_buttons;
     mutex_t incoming_mutex;
     log_records_t incoming_records;
