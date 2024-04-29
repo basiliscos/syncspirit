@@ -13,13 +13,13 @@ namespace syncspirit::fltk {
 
 struct fltk_sink_t;
 
-struct log_panel_t : Fl_Table {
+struct log_table_t : Fl_Table {
     using parent_t = Fl_Table;
 
     using sink_ptr_t = spdlog::sink_ptr;
 
-    log_panel_t(application_t &application, int x, int y, int w, int h);
-    ~log_panel_t();
+    log_table_t(application_t &application, int x, int y, int w, int h);
+    ~log_table_t();
 
     void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
 

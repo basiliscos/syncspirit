@@ -7,7 +7,6 @@
 #include <spdlog/sinks/sink.h>
 #include <spdlog/pattern_formatter.h>
 #include <spdlog/fmt/fmt.h>
-#include <atomic>
 #include <array>
 
 namespace syncspirit::fltk {
@@ -26,7 +25,7 @@ static color_array_t log_colors = {
 };
 
 struct fltk_sink_t final : base_sink_t {
-    fltk_sink_t(log_panel_t *widget_) : widget{widget_} {}
+    fltk_sink_t(log_table_t *widget_) : widget{widget_} {}
 
     void forward(log_record_ptr_t record) override {
         auto lock = std::unique_lock(widget->incoming_mutex);
@@ -37,7 +36,7 @@ struct fltk_sink_t final : base_sink_t {
         if (size == 1) {
             Fl::awake(
                 [](void *data) {
-                    auto widget = reinterpret_cast<log_panel_t *>(data);
+                    auto widget = reinterpret_cast<log_table_t *>(data);
                     auto lock = std::unique_lock(widget->incoming_mutex);
                     auto &source = widget->incoming_records;
                     auto &dest = widget->records;
@@ -50,10 +49,10 @@ struct fltk_sink_t final : base_sink_t {
         }
     }
 
-    log_panel_t *widget;
+    log_table_t *widget;
 };
 
-log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h)
+log_table_t::log_table_t(application_t &application_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), application{application_} {
     rows(0);            // how many rows
     row_header(0);      // enable row headers (along left)
@@ -92,14 +91,14 @@ log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h
     when(FL_WHEN_CHANGED | when());
 }
 
-log_panel_t::~log_panel_t() {
+log_table_t::~log_table_t() {
     application.dist_sink->remove_sink(bridge_sink);
     bridge_sink.reset();
 }
 
-void log_panel_t::update() { rows(records.size()); }
+void log_table_t::update() { rows(records.size()); }
 
-void log_panel_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {
+void log_table_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {
     switch (context) {
     case CONTEXT_STARTPAGE:        // before page is drawn..
         fl_font(FL_HELVETICA, 16); // set the font for our drawing operations
@@ -112,7 +111,7 @@ void log_panel_t::draw_cell(TableContext context, int row, int col, int x, int y
         return;
     case CONTEXT_RC_RESIZE: {
         auto until_last = col_width(0) + col_width(1) + col_width(2);
-        auto last_sz = this->w() - (until_last + 2);
+        auto last_sz = this->tiw - until_last;
         auto delta = col_min_size - last_sz;
         if (last_sz >= col_min_size) {
             col_width(3, last_sz);
@@ -124,7 +123,7 @@ void log_panel_t::draw_cell(TableContext context, int row, int col, int x, int y
     }
 }
 
-void log_panel_t::draw_header(int col, int x, int y, int w, int h) {
+void log_table_t::draw_header(int col, int x, int y, int w, int h) {
     std::string_view label = col == 0 ? "date" : col == 1 ? "thread" : col == 2 ? "source" : "message";
     fl_push_clip(x, y, w, h);
     {
@@ -135,7 +134,7 @@ void log_panel_t::draw_header(int col, int x, int y, int w, int h) {
     fl_pop_clip();
 }
 
-void log_panel_t::draw_data(int row, int col, int x, int y, int w, int h) {
+void log_table_t::draw_data(int row, int col, int x, int y, int w, int h) {
     auto &record = *records.at(static_cast<size_t>(row));
     std::string *content;
     fl_push_clip(x, y, w, h);
