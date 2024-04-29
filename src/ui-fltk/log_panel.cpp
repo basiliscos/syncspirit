@@ -5,6 +5,34 @@
 
 using namespace syncspirit::fltk;
 
+struct syncspirit::fltk::fltk_sink_t final : base_sink_t {
+    fltk_sink_t(log_panel_t *widget_) : widget{widget_} {}
+
+    void forward(log_record_ptr_t record) override {
+        auto lock = std::unique_lock(widget->incoming_mutex);
+        widget->incoming_records.push_back(std::move(record));
+        bool size = widget->incoming_records.size();
+        lock.unlock();
+
+        if (size == 1) {
+            Fl::awake(
+                [](void *data) {
+                    auto widget = reinterpret_cast<log_panel_t *>(data);
+                    auto lock = std::unique_lock(widget->incoming_mutex);
+                    auto &source = widget->incoming_records;
+                    auto &dest = widget->records;
+                    std::move(begin(source), end(source), std::back_insert_iterator(dest));
+                    source.clear();
+                    widget->update();
+                    lock.unlock();
+                },
+                widget);
+        }
+    }
+
+    log_panel_t *widget;
+};
+
 static void auto_scroll_toggle(Fl_Widget *widget, void *data) {
     auto button = static_cast<Fl_Toggle_Button *>(widget);
     auto log_table = reinterpret_cast<log_table_t *>(data);
@@ -13,10 +41,9 @@ static void auto_scroll_toggle(Fl_Widget *widget, void *data) {
 
 static void set_min_display_level(Fl_Widget *widget, void *data) {
     auto log_panel = static_cast<log_panel_t *>(widget->parent()->parent());
-    auto log_table = static_cast<log_table_t *>(log_panel->log_table);
     auto level_ptr = reinterpret_cast<intptr_t>(data);
     auto level = static_cast<spdlog::level::level_enum>(level_ptr);
-    log_table->min_display_level(level);
+    log_panel->min_display_level(level);
 
     auto &level_buttons = log_panel->level_buttons;
     for (auto it = level_buttons.begin(); it != level_buttons.end(); ++it) {
@@ -26,13 +53,16 @@ static void set_min_display_level(Fl_Widget *widget, void *data) {
     }
 }
 
-log_panel_t::log_panel_t(application_t &application, int x, int y, int w, int h) : parent_t{x, y, w, h} {
+log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h)
+    : parent_t{x, y, w, h}, application{application_}, display_level{spdlog::level::trace}
+
+{
     int padding = 5;
     bool auto_scroll = true;
 
     auto bottom_row = 30;
     auto log_table_h = h - (padding * 2 + bottom_row);
-    auto log_table = new log_table_t(application, padding, padding, w - padding * 2, log_table_h);
+    auto log_table = new log_table_t(displayed_records, padding, padding, w - padding * 2, log_table_h);
     log_table->autoscroll(auto_scroll);
     this->log_table = log_table;
 
@@ -98,4 +128,39 @@ log_panel_t::log_panel_t(application_t &application, int x, int y, int w, int h)
     end();
 
     resizable(log_table);
+
+    bridge_sink = sink_ptr_t(new fltk_sink_t(this));
+
+    auto &dist_sink = application.dist_sink;
+    for (auto &sink : dist_sink->sinks()) {
+        auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
+        if (in_memory_sink) {
+            std::lock_guard lock(in_memory_sink->mutex);
+            records = std::move(in_memory_sink->records);
+            dist_sink->remove_sink(sink);
+            break;
+        }
+    }
+
+    dist_sink->add_sink(bridge_sink);
+}
+
+log_panel_t::~log_panel_t() {
+    application.dist_sink->remove_sink(bridge_sink);
+    bridge_sink.reset();
+}
+
+void log_panel_t::update() {
+    displayed_records.clear();
+    for (auto &r : records) {
+        if (r->level >= display_level) {
+            displayed_records.push_back(r.get());
+        }
+    }
+    log_table->update();
+}
+
+void log_panel_t::min_display_level(spdlog::level::level_enum level) {
+    display_level = level;
+    update();
 }

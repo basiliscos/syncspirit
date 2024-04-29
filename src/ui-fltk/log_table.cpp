@@ -13,36 +13,8 @@ namespace syncspirit::fltk {
 
 static constexpr int col_min_size = 60;
 
-struct fltk_sink_t final : base_sink_t {
-    fltk_sink_t(log_table_t *widget_) : widget{widget_} {}
-
-    void forward(log_record_ptr_t record) override {
-        auto lock = std::unique_lock(widget->incoming_mutex);
-        widget->incoming_records.push_back(std::move(record));
-        bool size = widget->incoming_records.size();
-        lock.unlock();
-
-        if (size == 1) {
-            Fl::awake(
-                [](void *data) {
-                    auto widget = reinterpret_cast<log_table_t *>(data);
-                    auto lock = std::unique_lock(widget->incoming_mutex);
-                    auto &source = widget->incoming_records;
-                    auto &dest = widget->records;
-                    std::move(begin(source), end(source), std::back_insert_iterator(dest));
-                    source.clear();
-                    widget->update();
-                    lock.unlock();
-                },
-                widget);
-        }
-    }
-
-    log_table_t *widget;
-};
-
-log_table_t::log_table_t(application_t &application_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), application{application_}, auto_scrolling(true), display_level{spdlog::level::trace} {
+log_table_t::log_table_t(displayed_records_t &displayed_records_, int x, int y, int w, int h)
+    : parent_t(x, y, w, h), displayed_records{displayed_records_}, auto_scrolling(true) {
     rows(0);            // how many rows
     row_header(0);      // enable row headers (along left)
     row_height_all(20); // default height of rows
@@ -61,37 +33,11 @@ log_table_t::log_table_t(application_t &application_, int x, int y, int w, int h
     col_resize(1); // enable column resizing
     end();         // end the Fl_Table group
 
-    bridge_sink = sink_ptr_t(new fltk_sink_t(this));
-
-    auto &dist_sink = application.dist_sink;
-    for (auto &sink : dist_sink->sinks()) {
-        auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
-        if (in_memory_sink) {
-            std::lock_guard lock(in_memory_sink->mutex);
-            records = std::move(in_memory_sink->records);
-            dist_sink->remove_sink(sink);
-            break;
-        }
-    }
-
-    dist_sink->add_sink(bridge_sink);
-
     // receive resize events
     when(FL_WHEN_CHANGED | when());
 }
 
-log_table_t::~log_table_t() {
-    application.dist_sink->remove_sink(bridge_sink);
-    bridge_sink.reset();
-}
-
 void log_table_t::update() {
-    displayed_records.clear();
-    for (auto &r : records) {
-        if (r->level >= display_level) {
-            displayed_records.push_back(r.get());
-        }
-    }
     rows(displayed_records.size());
     if (auto_scrolling) {
         row_position(static_cast<int>(displayed_records.size()));
@@ -172,11 +118,6 @@ void log_table_t::draw_data(int row, int col, int x, int y, int w, int h) {
         fl_rect(x, y, w, h);
     }
     fl_pop_clip();
-}
-
-void log_table_t::min_display_level(spdlog::level::level_enum level) {
-    display_level = level;
-    update();
 }
 
 void log_table_t::autoscroll(bool value) {
