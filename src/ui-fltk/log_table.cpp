@@ -1,5 +1,6 @@
 #include "log_table.h"
 #include "log_sink.h"
+#include "log_colors.h"
 
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
@@ -7,22 +8,10 @@
 #include <spdlog/sinks/sink.h>
 #include <spdlog/pattern_formatter.h>
 #include <spdlog/fmt/fmt.h>
-#include <array>
 
 namespace syncspirit::fltk {
 
 static constexpr int col_min_size = 60;
-
-using color_array_t = std::array<Fl_Color, 12>;
-
-static color_array_t log_colors = {
-    fl_rgb_color(220, 255, 220), fl_rgb_color(240, 255, 240), // trace
-    fl_rgb_color(210, 245, 255), fl_rgb_color(230, 250, 255), // debug
-    fl_rgb_color(245, 245, 245), fl_rgb_color(255, 255, 255), // info
-    fl_rgb_color(255, 250, 200), fl_rgb_color(255, 250, 220), // warn
-    fl_rgb_color(255, 220, 220), fl_rgb_color(255, 240, 240), // error
-    fl_rgb_color(255, 220, 255), fl_rgb_color(255, 240, 255)  // critical
-};
 
 struct fltk_sink_t final : base_sink_t {
     fltk_sink_t(log_table_t *widget_) : widget{widget_} {}
@@ -53,7 +42,7 @@ struct fltk_sink_t final : base_sink_t {
 };
 
 log_table_t::log_table_t(application_t &application_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), application{application_}, auto_scrolling(true) {
+    : parent_t(x, y, w, h), application{application_}, auto_scrolling(true), display_level{spdlog::level::trace} {
     rows(0);            // how many rows
     row_header(0);      // enable row headers (along left)
     row_height_all(20); // default height of rows
@@ -97,9 +86,15 @@ log_table_t::~log_table_t() {
 }
 
 void log_table_t::update() {
-    rows(records.size());
+    displayed_records.clear();
+    for (auto &r : records) {
+        if (r->level >= display_level) {
+            displayed_records.push_back(r.get());
+        }
+    }
+    rows(displayed_records.size());
     if (auto_scrolling) {
-        row_position(static_cast<int>(records.size()));
+        row_position(static_cast<int>(displayed_records.size()));
     }
 }
 
@@ -140,7 +135,7 @@ void log_table_t::draw_header(int col, int x, int y, int w, int h) {
 }
 
 void log_table_t::draw_data(int row, int col, int x, int y, int w, int h) {
-    auto &record = *records.at(static_cast<size_t>(row));
+    auto &record = *displayed_records.at(static_cast<size_t>(row));
     std::string *content;
     fl_push_clip(x, y, w, h);
     {
@@ -179,10 +174,15 @@ void log_table_t::draw_data(int row, int col, int x, int y, int w, int h) {
     fl_pop_clip();
 }
 
+void log_table_t::min_display_level(spdlog::level::level_enum level) {
+    display_level = level;
+    update();
+}
+
 void log_table_t::autoscroll(bool value) {
     auto_scrolling = value;
     if (auto_scrolling) {
-        row_position(static_cast<int>(records.size()));
+        row_position(static_cast<int>(displayed_records.size()));
     }
 }
 
