@@ -47,6 +47,7 @@ log_panel_t::log_panel_t(application_t &application, int x, int y, int w, int h)
     trace_button->color(log_colors[static_cast<int>(spdlog::level::trace) * 2]);
     trace_button->selection_color(log_colors[static_cast<int>(spdlog::level::trace) * 2 + 1]);
     trace_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::trace));
+    trace_button->tooltip("display log records with trace level and above");
     level_buttons[0] = trace_button;
     button_x += trace_button->w() + 1;
 
@@ -54,6 +55,7 @@ log_panel_t::log_panel_t(application_t &application, int x, int y, int w, int h)
     debug_button->color(log_colors[static_cast<int>(spdlog::level::debug) * 2]);
     debug_button->selection_color(log_colors[static_cast<int>(spdlog::level::debug) * 2 + 1]);
     debug_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::debug));
+    debug_button->tooltip("display log records with debug level and above");
     level_buttons[1] = debug_button;
     button_x += debug_button->w() + 1;
 
@@ -61,6 +63,7 @@ log_panel_t::log_panel_t(application_t &application, int x, int y, int w, int h)
     info_button->color(log_colors[static_cast<int>(spdlog::level::info) * 2]);
     info_button->selection_color(log_colors[static_cast<int>(spdlog::level::info) * 2 + 1]);
     info_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::info));
+    info_button->tooltip("display log records with info level and above");
     level_buttons[2] = info_button;
     button_x += info_button->w() + 1;
 
@@ -68,6 +71,7 @@ log_panel_t::log_panel_t(application_t &application, int x, int y, int w, int h)
     warn_button->color(log_colors[static_cast<int>(spdlog::level::warn) * 2]);
     warn_button->selection_color(log_colors[static_cast<int>(spdlog::level::warn) * 2 + 1]);
     warn_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::warn));
+    warn_button->tooltip("display log records with warning level and above");
     level_buttons[3] = warn_button;
     button_x += info_button->w() + 1;
 
@@ -75,6 +79,7 @@ log_panel_t::log_panel_t(application_t &application, int x, int y, int w, int h)
     error_button->color(log_colors[static_cast<int>(spdlog::level::err) * 2]);
     error_button->selection_color(log_colors[static_cast<int>(spdlog::level::err) * 2 + 1]);
     error_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::err));
+    error_button->tooltip("display log records with error level and above");
     level_buttons[4] = error_button;
     button_x += info_button->w() + 1;
 
@@ -82,6 +87,7 @@ log_panel_t::log_panel_t(application_t &application, int x, int y, int w, int h)
     critical_button->color(log_colors[static_cast<int>(spdlog::level::critical) * 2]);
     critical_button->selection_color(log_colors[static_cast<int>(spdlog::level::critical) * 2 + 1]);
     critical_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::critical));
+    critical_button->tooltip("display log records with critical level");
     level_buttons[5] = critical_button;
     button_x += info_button->w() + 1;
 

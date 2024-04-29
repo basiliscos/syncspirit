@@ -1,5 +1,9 @@
 log
- - log_panel: [ ] autoscroll, filter-by-text, filter-by level[colored buttons]
+ - log_panel:
+   + autoscroll + tooltip
+   - filter-by-text + tooltip
+    - filter-by level[colored buttons] + tooltip
+
  - log_line: show tooltip (Fl_Tooltip)
    spdlog::apply_all([&](std::shared_ptr<spdlog::logger> l) {l->flush();});
  - filter logs by amount
