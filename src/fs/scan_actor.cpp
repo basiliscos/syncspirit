@@ -31,7 +31,7 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(net::names::fs_scanner, address);
-        p.discover_name(net::names::hasher_proxy, hasher_proxy, false).link();
+        p.discover_name(net::names::hasher_proxy, hasher_proxy, true).link();
         p.discover_name(net::names::coordinator, coordinator, true).link(false);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {

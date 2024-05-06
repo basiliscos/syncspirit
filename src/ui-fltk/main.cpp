@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         auto &cfg = cfg_option.value();
-        spdlog::trace("configuration seems OK");
+        spdlog::trace("configuration seems OK, timeout = {}ms"), cfg.timeout;
 
         auto init_result = utils::init_loggers(cfg.log_configs, false);
         if (!init_result) {
@@ -196,7 +196,7 @@ int main(int argc, char **argv) {
         ra::system_context_ptr_t sys_context{new asio_sys_context_t{io_context}};
         auto strand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
-        auto cluster_copies = 1ul;
+        auto cluster_copies = 2ul;
 
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                            .app_config(cfg)
@@ -207,8 +207,32 @@ int main(int argc, char **argv) {
                            .cluster_copies(cluster_copies)
                            .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                            .finish();
-        sup_net->start();
+        // warm-up
         sup_net->do_process();
+
+        auto hasher_count = cfg.hasher_threads;
+        using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
+        std::vector<sys_thread_context_ptr_t> hasher_ctxs;
+        for (uint32_t i = 1; i <= hasher_count; ++i) {
+            hasher_ctxs.push_back(new thread_sys_context_t{});
+            auto &ctx = hasher_ctxs.back();
+            auto sup = ctx->create_supervisor<hasher::hasher_supervisor_t>()
+                .timeout(timeout / 2)
+                .registry_address(sup_net->get_registry_address())
+                .index(i)
+                .finish();
+            sup->do_process();
+        }
+
+        auto fltk_ctx = rf::system_context_fltk_t();
+        auto sup_fltk = fltk_ctx.create_supervisor<fltk::app_supervisor_t>()
+                            .dist_sink(dist_sink)
+                            .timeout(timeout)
+                            .registry_address(sup_net->get_registry_address())
+                            .shutdown_flag(shutdown_flag, r::pt::millisec{50})
+                            .finish();
+        // warm-up
+        sup_fltk->do_process();
 
         thread_sys_context_t fs_context;
         auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
@@ -217,29 +241,7 @@ int main(int argc, char **argv) {
                           .fs_config(cfg.fs_config)
                           .hasher_threads(cfg.hasher_threads)
                           .finish();
-
-        auto hasher_count = cfg.hasher_threads;
-        using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
-        std::vector<sys_thread_context_ptr_t> hasher_ctxs;
-        for (uint32_t i = 1; i <= hasher_count; ++i) {
-            hasher_ctxs.push_back(new thread_sys_context_t{});
-            auto &ctx = hasher_ctxs.back();
-            ctx->create_supervisor<hasher::hasher_supervisor_t>()
-                .timeout(timeout / 2)
-                .registry_address(sup_net->get_registry_address())
-                .index(i)
-                .finish();
-        }
-
-        auto fltk_ctx = rf::system_context_fltk_t();
-        auto sup_fltk = fltk_ctx.create_supervisor<fltk::app_supervisor_t>()
-                            .dist_sink(dist_sink)
-                            .timeout(timeout)
-                            .create_registry()
-                            .shutdown_flag(shutdown_flag, r::pt::millisec{50})
-                            .finish();
-        // warm-up
-        sup_fltk->do_process();
+        fs_sup->do_process();
 
         auto main_window = fltk::main_window_t(*sup_fltk);
         Fl::visual(FL_DOUBLE | FL_INDEX);
@@ -249,15 +251,6 @@ int main(int argc, char **argv) {
             io_context.run();
             shutdown_flag = true;
             spdlog::trace("net thread has been terminated");
-        });
-
-        auto fs_thread = std::thread([&]() {
-#if defined(__linux__)
-            pthread_setname_np(pthread_self(), "ss/fs");
-#endif
-            fs_context.run();
-            shutdown_flag = true;
-            spdlog::trace("fs thread has been terminated");
         });
 
         auto hasher_threads = std::vector<std::thread>();
@@ -276,6 +269,15 @@ int main(int argc, char **argv) {
             });
             hasher_threads.emplace_back(std::move(thread));
         }
+
+        auto fs_thread = std::thread([&]() {
+#if defined(__linux__)
+            pthread_setname_np(pthread_self(), "ss/fs");
+#endif
+            fs_context.run();
+            shutdown_flag = true;
+            spdlog::trace("fs thread has been terminated");
+        });
 
         while (!shutdown_flag) {
             sup_fltk->do_process();

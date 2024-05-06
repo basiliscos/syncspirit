@@ -46,6 +46,7 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void fs_supervisor_t::launch() noexcept {
+    LOG_DEBUG(log, "launching children actors");
     auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
         auto timeout = shutdown_timeout * 9 / 10;
         return create_actor<file_actor_t>()

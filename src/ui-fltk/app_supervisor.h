@@ -38,10 +38,17 @@ struct app_supervisor_t: rf::supervisor_fltk_t,
     template <typename Actor> using config_builder_t = app_supervisor_config_builder_t<Actor>;
 
     explicit app_supervisor_t(config_t& config);
+    void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     utils::dist_sink_t& get_dist_sink();
     model::cluster_ptr_t& get_cluster();
 
 private:
+    void on_model_response(model::message::model_response_t &res) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_block_update(model::message::block_update_t &message) noexcept;
+
+    r::address_ptr_t coordinator;
+    utils::logger_t log;
     utils::dist_sink_t dist_sink;
     model::cluster_ptr_t cluster;
 };
