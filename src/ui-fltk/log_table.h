@@ -4,7 +4,6 @@
 #include <deque>
 
 #include "log_sink.h"
-#include "application.h"
 
 namespace syncspirit::fltk {
 

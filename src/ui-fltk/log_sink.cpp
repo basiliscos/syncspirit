@@ -2,7 +2,7 @@
 
 using namespace syncspirit::fltk;
 
-base_sink_t::base_sink_t() : date_formatter("%Y-%m-%d %H:%M:%S.%F") {}
+base_sink_t::base_sink_t() : date_formatter("%H:%M:%S.%F") {}
 
 void base_sink_t::flush() {}
 

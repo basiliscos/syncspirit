@@ -19,13 +19,13 @@ static void tree_view_callback(Fl_Widget *w, void *data) {
     }
 }
 
-tree_view_t::tree_view_t(application_t &application_, int x, int y, int w, int h):
-    parent_t(x, y, w, h), application{application_}{
+tree_view_t::tree_view_t(app_supervisor_t &supervisor_, int x, int y, int w, int h):
+    parent_t(x, y, w, h), supervisor{supervisor_}{
 
     showroot(false);
-    auto folders_node = new tree_item_t(application, this);
-    auto devices_node = new tree_item_t(application, this);
-    auto self_node = new tree_item_t(application, this);
+    auto folders_node = new tree_item_t(supervisor, this);
+    auto devices_node = new tree_item_t(supervisor, this);
+    auto self_node = new tree_item_t(supervisor, this);
 
     folders_node->label("folders-label");
     devices_node->label("devices");

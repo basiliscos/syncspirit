@@ -8,7 +8,6 @@
 #include <boost/program_options.hpp>
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
-#include <rotor/fltk.hpp>
 #include <spdlog/spdlog.h>
 #include <fstream>
 #include <exception>
@@ -27,8 +26,8 @@
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Box.H>
 
+#include "app_supervisor.h"
 #include "main_window.h"
-#include "application.h"
 #include "log_sink.h"
 
 #if defined(__linux__)
@@ -233,16 +232,16 @@ int main(int argc, char **argv) {
         }
 
         auto fltk_ctx = rf::system_context_fltk_t();
-        auto sup_fltk = fltk_ctx.create_supervisor<rf::supervisor_fltk_t>()
+        auto sup_fltk = fltk_ctx.create_supervisor<fltk::app_supervisor_t>()
+                            .dist_sink(dist_sink)
                             .timeout(timeout)
                             .create_registry()
                             .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                             .finish();
         // warm-up
         sup_fltk->do_process();
-        auto application = fltk::application_t{std::move(dist_sink)};
 
-        auto main_window = fltk::main_window_t(application);
+        auto main_window = fltk::main_window_t(*sup_fltk);
         Fl::visual(FL_DOUBLE | FL_INDEX);
         main_window.show(argc, argv);
 

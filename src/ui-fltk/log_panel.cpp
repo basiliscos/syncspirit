@@ -73,8 +73,8 @@ struct counter_label_t : Fl_Box {
     }
 };
 
-log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h)
-    : parent_t{x, y, w, h}, application{application_}, display_level{spdlog::level::trace}
+log_panel_t::log_panel_t(app_supervisor_t& supervisor_, int x, int y, int w, int h)
+    : parent_t{x, y, w, h}, supervisor{supervisor_}, display_level{spdlog::level::trace}
 
 {
     int padding = 5;
@@ -161,7 +161,7 @@ log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h
 
     bridge_sink = sink_ptr_t(new fltk_sink_t(this));
 
-    auto &dist_sink = application.dist_sink;
+    auto &dist_sink = supervisor.get_dist_sink();
     for (auto &sink : dist_sink->sinks()) {
         auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
         if (in_memory_sink) {
@@ -176,7 +176,7 @@ log_panel_t::log_panel_t(application_t &application_, int x, int y, int w, int h
 }
 
 log_panel_t::~log_panel_t() {
-    application.dist_sink->remove_sink(bridge_sink);
+    supervisor.get_dist_sink()->remove_sink(bridge_sink);
     bridge_sink.reset();
 }
 

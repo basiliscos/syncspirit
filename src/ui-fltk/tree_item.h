@@ -1,6 +1,6 @@
 #pragma once
 
-#include "application.h"
+#include "app_supervisor.h"
 #include <FL/Fl_Tree_Item.H>
 #include <FL/Fl_Tree.H>
 
@@ -8,10 +8,10 @@ namespace syncspirit::fltk {
 
 struct tree_item_t: Fl_Tree_Item {
     using parent_t = Fl_Tree_Item;
-    tree_item_t(application_t &application, Fl_Tree* tree);
+    tree_item_t(app_supervisor_t &supervisor, Fl_Tree* tree);
     virtual void on_select();
 
-    application_t &application;
+    app_supervisor_t &supervisor;
 };
 
 }

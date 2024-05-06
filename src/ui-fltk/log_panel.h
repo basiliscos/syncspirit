@@ -1,6 +1,6 @@
 #pragma once
 
-#include "application.h"
+#include "app_supervisor.h"
 #include "log_sink.h"
 #include "log_table.h"
 
@@ -18,14 +18,14 @@ struct log_panel_t : Fl_Group {
     using level_buttons_t = std::array<Fl_Toggle_Button *, 6>;
     using mutex_t = std::mutex;
 
-    log_panel_t(application_t &application, int x, int y, int w, int h);
+    log_panel_t(app_supervisor_t& supervisor, int x, int y, int w, int h);
     ~log_panel_t();
 
     void min_display_level(spdlog::level::level_enum level);
     void update();
     void on_filter(std::string_view filter);
 
-    application_t &application;
+    app_supervisor_t &supervisor;
     sink_ptr_t bridge_sink;
     log_table_t *log_table;
     Fl_Box *records_counter;
