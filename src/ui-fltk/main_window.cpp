@@ -9,7 +9,7 @@
 using namespace syncspirit::fltk;
 
 main_window_t::main_window_t(application_t &application_)
-    : parent_t(640, 480, "syncspirit-fltk"), application{application_} {
+    : parent_t(700, 480, "syncspirit-fltk"), application{application_} {
 
     auto container = new Fl_Tile(0, 0, w(), h());
     auto content_w = w() / 2;
