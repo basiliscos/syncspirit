@@ -8,6 +8,7 @@ add_executable(syncspirit-fltk WIN32
     log_sink.cpp
     main.cpp
     main_window.cpp
+    tree_view.cpp
 )
 
 target_link_libraries(syncspirit-fltk
