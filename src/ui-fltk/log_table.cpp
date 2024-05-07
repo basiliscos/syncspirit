@@ -23,7 +23,7 @@ log_table_t::log_table_t(displayed_records_t &displayed_records_, int x, int y, 
     cols(4);       // how many columns
     col_header(1); // enable column headers (along top)
     col_resize_min(col_min_size);
-    col_width(0, 280);
+    col_width(0, 170);
     col_width(1, 100);
     col_width(2, 200);
 
@@ -70,7 +70,7 @@ void log_table_t::draw_cell(TableContext context, int row, int col, int x, int y
 }
 
 void log_table_t::draw_header(int col, int x, int y, int w, int h) {
-    std::string_view label = col == 0 ? "date" : col == 1 ? "thread" : col == 2 ? "source" : "message";
+    std::string_view label = col == 0 ? "time" : col == 1 ? "thread" : col == 2 ? "source" : "message";
     fl_push_clip(x, y, w, h);
     {
         fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, row_header_color());
