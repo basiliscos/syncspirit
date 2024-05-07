@@ -10,6 +10,7 @@ add_executable(syncspirit-fltk WIN32
     main_window.cpp
     tree_item.cpp
     tree_view.cpp
+    tree_item/self_device.cpp
 )
 
 target_link_libraries(syncspirit-fltk

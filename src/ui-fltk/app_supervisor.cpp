@@ -56,12 +56,21 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
         return do_shutdown(ee);
     }
     cluster = std::move(res.payload.res.cluster);
+    for(auto listener: load_listeners) {
+        (*listener)(res);
+    }
 }
 
 void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-
 }
 
 void app_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
+}
 
+void app_supervisor_t::add(model_load_listener_t* listener) noexcept {
+    load_listeners.insert(listener);
+}
+
+void app_supervisor_t::remove(model_load_listener_t* listener) noexcept {
+    load_listeners.erase(listener);
 }

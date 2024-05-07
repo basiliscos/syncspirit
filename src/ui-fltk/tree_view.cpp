@@ -1,7 +1,5 @@
 #include "tree_view.h"
-
-#include "tree_item.h"
-
+#include "tree_item/self_device.h"
 
 using namespace syncspirit::fltk;
 
@@ -25,11 +23,10 @@ tree_view_t::tree_view_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     showroot(false);
     auto folders_node = new tree_item_t(supervisor, this);
     auto devices_node = new tree_item_t(supervisor, this);
-    auto self_node = new tree_item_t(supervisor, this);
+    auto self_node = new tree_item::self_device_t(supervisor, this);
 
     folders_node->label("folders-label");
     devices_node->label("devices");
-    self_node->label("self");
 
     add("folders", folders_node);
     add("devices", devices_node);
