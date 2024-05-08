@@ -8,6 +8,7 @@ add_executable(syncspirit-fltk WIN32
     log_sink.cpp
     main.cpp
     main_window.cpp
+    static_table.cpp
     tree_item.cpp
     tree_view.cpp
     tree_item/self_device.cpp

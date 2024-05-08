@@ -7,6 +7,8 @@
 
 #include <rotor/fltk.hpp>
 #include <set>
+#include <FL/Fl_Widget.H>
+#include <FL/Fl_Group.H>
 
 namespace syncspirit::fltk {
 
@@ -51,6 +53,22 @@ struct app_supervisor_t: rf::supervisor_fltk_t,
     void add(model_load_listener_t* listener) noexcept;
     void remove(model_load_listener_t* listener) noexcept;
 
+    template<typename Fn>
+    void replace_content(Fn constructor) noexcept {
+        if (!content) {
+            content = constructor(content);
+        } else {
+            auto parent = content->parent();
+            auto prev = content;
+            parent->remove(prev);
+            content = constructor(prev);
+            parent->add(content);
+            delete prev;
+            // parent->resizable(content);
+            parent->redraw();
+        }
+    }
+
 private:
     using load_listeners_t = std::set<model_load_listener_t*>;
     void on_model_response(model::message::model_response_t &res) noexcept;
@@ -62,6 +80,7 @@ private:
     utils::dist_sink_t dist_sink;
     model::cluster_ptr_t cluster;
     load_listeners_t load_listeners;
+    Fl_Widget* content;
 };
 
 } // namespace syncspirit::fltk

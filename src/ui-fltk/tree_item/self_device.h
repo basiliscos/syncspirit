@@ -10,6 +10,7 @@ struct self_device_t: tree_item_t, private model_load_listener_t {
     ~self_device_t();
 
     void operator()(model::message::model_response_t&) override;
+    void on_select() override;
 };
 
 }

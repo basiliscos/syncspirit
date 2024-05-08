@@ -10,7 +10,7 @@ r::plugin::resource_id_t model = 0;
 } // namespace
 
 app_supervisor_t::app_supervisor_t(config_t& config):parent_t(config),
-    dist_sink(std::move(config.dist_sink)) {
+    dist_sink(std::move(config.dist_sink)), content{nullptr} {
 }
 
 auto app_supervisor_t::get_dist_sink() -> utils::dist_sink_t& {
