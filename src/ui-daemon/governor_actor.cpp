@@ -32,7 +32,7 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&governor_actor_t::on_scan_completed, coordinator);
             }
         });
-        p.discover_name(net::names::fs_scanner, fs_scanner, true).link(false);
+        p.discover_name(net::names::fs_scanner, fs_scanner, true).link(true);
     });
 }
 
