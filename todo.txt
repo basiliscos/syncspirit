@@ -1,12 +1,10 @@
-log
- - log_panel:
-   - log_line: show tooltip
-   - log_line: cut multiline
+static table: select, copy & paste values.
+ - copy pasted
 
-   spdlog::apply_all([&](std::shared_ptr<spdlog::logger> l) {l->flush();});
- - filter logs by amount
- - filter logs by component and levels
+log:
+ select, copy/paste rows, add "export" button"
 
+ local state: files, folders, size
 
 - conflict handling is not available
 
