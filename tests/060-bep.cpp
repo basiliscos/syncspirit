@@ -6,6 +6,7 @@
 #include "model/device_id.h"
 #include "utils/error_code.h"
 #include "utils/uri.h"
+#include "syncspirit-config.h"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -77,7 +78,7 @@ TEST_CASE("hello", "[bep]") {
         auto &msg = std::get<proto::message::Hello>(v.message);
         CHECK(msg->device_name() == "test-device");
         CHECK(msg->client_name() == "syncspirit");
-        CHECK(msg->client_version() == "v0.4.0");
+        CHECK(msg->client_version() == SYNCSPIRIT_VERSION);
     }
 }
 

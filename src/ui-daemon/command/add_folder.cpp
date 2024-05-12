@@ -19,8 +19,9 @@ outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noex
     std::string id;
 
     auto it = pair_iterator_t(in);
+    bool skip_colon = false;
     while (true) {
-        auto r = it.next();
+        auto r = it.next(skip_colon);
         if (r) {
             auto &v = r.value();
             if (v.first == "label") {
@@ -29,6 +30,7 @@ outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noex
                 path = v.second;
             } else if (v.first == "id") {
                 id = v.second;
+                skip_colon = true;
             }
         } else {
             break;
@@ -90,6 +92,8 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
             return false;
         }
     }
+
+    log->debug("{}, going to add folder '{}' on '{}'", actor.get_identity(), folder.label(), folder.path());
 
     auto diff = cluster_diff_ptr_t(new modify::create_folder_t(folder));
     actor.send<model::payload::model_update_t>(actor.coordinator, std::move(diff), this);

@@ -14,7 +14,7 @@ struct pair_iterator_t {
 
     inline pair_iterator_t(std::string_view in_) noexcept : in(in_) {}
 
-    std::optional<pair_t> next() noexcept;
+    std::optional<pair_t> next(bool skip_colon = false) noexcept;
     std::string_view in;
 };
 
