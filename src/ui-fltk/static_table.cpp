@@ -10,7 +10,7 @@ static constexpr int PADDING = 5;
 static_table_t::static_table_t(table_rows_t &&rows, int x, int y, int w, int h):
     parent_t(x, y, w, h), table_rows(std::move(rows)) {
     this->rows(table_rows.size());
-    box(FL_ENGRAVED_BOX);
+    // box(FL_ENGRAVED_BOX);
     row_header(0);
     row_height_all(20);
     row_resize(0);
@@ -19,6 +19,7 @@ static_table_t::static_table_t(table_rows_t &&rows, int x, int y, int w, int h):
     col_width(0, w/2);
     col_width(1, w/2);
     col_resize(1);
+    end();
     when(FL_WHEN_CHANGED | when());
     resizable(this);
 }
@@ -79,10 +80,10 @@ void static_table_t::draw_data(int r, int col, int x, int y, int w, int h) {
             content = &row.label;
             break;
         case 1:
-            align = FL_ALIGN_RIGHT;
+            // align = FL_ALIGN_RIGHT;
             content = &row.value;
-            dx = 0;
-            dw = -PADDING;
+            // dx = 0;
+            // dw = -PADDING;
         }
 
         fl_color(FL_WHITE);
