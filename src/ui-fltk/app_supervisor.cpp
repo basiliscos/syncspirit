@@ -1,6 +1,9 @@
 #include "app_supervisor.h"
 #include "net/names.h"
 
+#include <sstream>
+#include <iomanip>
+
 using namespace syncspirit::fltk;
 
 namespace {
@@ -9,19 +12,16 @@ r::plugin::resource_id_t model = 0;
 }
 } // namespace
 
-app_supervisor_t::app_supervisor_t(config_t& config):parent_t(config),
-    dist_sink(std::move(config.dist_sink)), content{nullptr} {
+app_supervisor_t::app_supervisor_t(config_t &config)
+    : parent_t(config), dist_sink(std::move(config.dist_sink)), content{nullptr} {
+    started_at = clock_t::now();
 }
 
-auto app_supervisor_t::get_dist_sink() -> utils::dist_sink_t& {
-    return dist_sink;
-}
+auto app_supervisor_t::get_dist_sink() -> utils::dist_sink_t & { return dist_sink; }
 
-auto app_supervisor_t::get_cluster() -> model::cluster_ptr_t& {
-    return cluster;
-}
+auto app_supervisor_t::get_cluster() -> model::cluster_ptr_t & { return cluster; }
 
-void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept{
+void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("fltk", false);
@@ -41,10 +41,7 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept{
     });
 
     plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) {
-            p.subscribe_actor(&app_supervisor_t::on_model_response);
-        },
-        r::plugin::config_phase_t::PREINIT);
+        [&](auto &p) { p.subscribe_actor(&app_supervisor_t::on_model_response); }, r::plugin::config_phase_t::PREINIT);
 }
 
 void app_supervisor_t::on_model_response(model::message::model_response_t &res) noexcept {
@@ -56,21 +53,33 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
         return do_shutdown(ee);
     }
     cluster = std::move(res.payload.res.cluster);
-    for(auto listener: load_listeners) {
+    for (auto listener : load_listeners) {
         (*listener)(res);
     }
 }
 
-void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-}
+void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {}
 
-void app_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
-}
+void app_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {}
 
-void app_supervisor_t::add(model_load_listener_t* listener) noexcept {
-    load_listeners.insert(listener);
-}
+void app_supervisor_t::add(model_load_listener_t *listener) noexcept { load_listeners.insert(listener); }
 
-void app_supervisor_t::remove(model_load_listener_t* listener) noexcept {
-    load_listeners.erase(listener);
+void app_supervisor_t::remove(model_load_listener_t *listener) noexcept { load_listeners.erase(listener); }
+
+std::string app_supervisor_t::get_uptime() noexcept {
+    using namespace std;
+    using namespace std::chrono;
+    auto uptime = clock_t::now() - started_at;
+    auto h = duration_cast<hours>(uptime);
+    uptime -= h;
+    auto m = duration_cast<minutes>(uptime);
+    uptime -= m;
+    auto s = duration_cast<seconds>(uptime);
+    uptime -= s;
+
+    std::stringstream out;
+    out.fill('0');
+    out << setw(2) << h << ":" << setw(2) << m << ":" << setw(2) << s;
+
+    return out.str();
 }

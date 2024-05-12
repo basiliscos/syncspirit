@@ -18,7 +18,7 @@ struct log_panel_t : Fl_Group {
     using level_buttons_t = std::array<Fl_Toggle_Button *, 6>;
     using mutex_t = std::mutex;
 
-    log_panel_t(app_supervisor_t& supervisor, int x, int y, int w, int h);
+    log_panel_t(app_supervisor_t &supervisor, int x, int y, int w, int h);
     ~log_panel_t();
 
     void min_display_level(spdlog::level::level_enum level);

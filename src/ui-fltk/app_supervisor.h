@@ -5,8 +5,9 @@
 #include "model/diff/block_visitor.h"
 #include "model/diff/cluster_visitor.h"
 
-#include <rotor/fltk.hpp>
 #include <set>
+#include <chrono>
+#include <rotor/fltk.hpp>
 #include <FL/Fl_Widget.H>
 #include <FL/Fl_Group.H>
 
@@ -14,7 +15,7 @@ namespace syncspirit::fltk {
 
 struct model_load_listener_t {
     virtual ~model_load_listener_t() = default;
-    virtual void operator()(model::message::model_response_t&) = 0;
+    virtual void operator()(model::message::model_response_t &) = 0;
 };
 
 namespace r = rotor;
@@ -38,23 +39,23 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
     }
 };
 
-struct app_supervisor_t: rf::supervisor_fltk_t,
-        private model::diff::cluster_visitor_t,
-        private model::diff::block_visitor_t {
+struct app_supervisor_t : rf::supervisor_fltk_t,
+                          private model::diff::cluster_visitor_t,
+                          private model::diff::block_visitor_t {
     using parent_t = rf::supervisor_fltk_t;
     using config_t = app_supervisor_config_t;
     template <typename Actor> using config_builder_t = app_supervisor_config_builder_t<Actor>;
 
-    explicit app_supervisor_t(config_t& config);
+    explicit app_supervisor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
-    utils::dist_sink_t& get_dist_sink();
-    model::cluster_ptr_t& get_cluster();
+    utils::dist_sink_t &get_dist_sink();
+    model::cluster_ptr_t &get_cluster();
 
-    void add(model_load_listener_t* listener) noexcept;
-    void remove(model_load_listener_t* listener) noexcept;
+    void add(model_load_listener_t *listener) noexcept;
+    void remove(model_load_listener_t *listener) noexcept;
+    std::string get_uptime() noexcept;
 
-    template<typename Fn>
-    void replace_content(Fn constructor) noexcept {
+    template <typename Fn> void replace_content(Fn constructor) noexcept {
         if (!content) {
             content = constructor(content);
         } else {
@@ -69,18 +70,21 @@ struct app_supervisor_t: rf::supervisor_fltk_t,
         }
     }
 
-private:
-    using load_listeners_t = std::set<model_load_listener_t*>;
+  private:
+    using load_listeners_t = std::set<model_load_listener_t *>;
+    using clock_t = std::chrono::high_resolution_clock;
+    using time_point_t = typename clock_t::time_point;
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
 
+    time_point_t started_at;
     r::address_ptr_t coordinator;
     utils::logger_t log;
     utils::dist_sink_t dist_sink;
     model::cluster_ptr_t cluster;
     load_listeners_t load_listeners;
-    Fl_Widget* content;
+    Fl_Widget *content;
 };
 
 } // namespace syncspirit::fltk

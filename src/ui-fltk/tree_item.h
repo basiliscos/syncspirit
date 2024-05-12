@@ -6,12 +6,12 @@
 
 namespace syncspirit::fltk {
 
-struct tree_item_t: Fl_Tree_Item {
+struct tree_item_t : Fl_Tree_Item {
     using parent_t = Fl_Tree_Item;
-    tree_item_t(app_supervisor_t &supervisor, Fl_Tree* tree);
+    tree_item_t(app_supervisor_t &supervisor, Fl_Tree *tree);
     virtual void on_select();
 
     app_supervisor_t &supervisor;
 };
 
-}
+} // namespace syncspirit::fltk

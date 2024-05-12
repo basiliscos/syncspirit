@@ -73,7 +73,7 @@ struct counter_label_t : Fl_Box {
     }
 };
 
-log_panel_t::log_panel_t(app_supervisor_t& supervisor_, int x, int y, int w, int h)
+log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
     : parent_t{x, y, w, h}, supervisor{supervisor_}, display_level{spdlog::level::trace}
 
 {

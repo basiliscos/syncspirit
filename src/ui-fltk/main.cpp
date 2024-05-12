@@ -217,10 +217,10 @@ int main(int argc, char **argv) {
             hasher_ctxs.push_back(new thread_sys_context_t{});
             auto &ctx = hasher_ctxs.back();
             auto sup = ctx->create_supervisor<hasher::hasher_supervisor_t>()
-                .timeout(timeout / 2)
-                .registry_address(sup_net->get_registry_address())
-                .index(i)
-                .finish();
+                           .timeout(timeout / 2)
+                           .registry_address(sup_net->get_registry_address())
+                           .index(i)
+                           .finish();
             sup->do_process();
         }
 

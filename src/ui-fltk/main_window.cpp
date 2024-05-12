@@ -17,7 +17,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_)
     auto content_l = new tree_view_t(supervisor, 0, 0, content_w, content_h);
     content_l->box(FL_ENGRAVED_BOX);
 
-    supervisor.replace_content([&](Fl_Widget*) -> Fl_Widget* {
+    supervisor.replace_content([&](Fl_Widget *) -> Fl_Widget * {
         auto content_r = new Fl_Box(content_w, 0, content_w, content_h, "content r");
         content_r->box(FL_ENGRAVED_BOX);
         return content_r;
