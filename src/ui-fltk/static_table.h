@@ -22,6 +22,8 @@ struct static_table_t : Fl_Table {
 
     void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
 
+    void update_value(std::size_t row, std::string value);
+
   private:
     void draw_data(int row, int col, int x, int y, int w, int h);
     std::pair<int, int> calc_col_widths();

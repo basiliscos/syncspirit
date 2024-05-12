@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../tree_item.h"
+#include "FL/Fl_Widget.H"
 
 namespace syncspirit::fltk::tree_item {
 
@@ -11,6 +12,8 @@ struct self_device_t : tree_item_t, private model_load_listener_t {
 
     void operator()(model::message::model_response_t &) override;
     void on_select() override;
+
+    Fl_Widget *table;
 };
 
 } // namespace syncspirit::fltk::tree_item

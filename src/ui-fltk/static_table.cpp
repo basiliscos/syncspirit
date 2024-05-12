@@ -94,3 +94,8 @@ void static_table_t::draw_data(int r, int col, int x, int y, int w, int h) {
     }
     fl_pop_clip();
 }
+
+void static_table_t::update_value(std::size_t row, std::string value) {
+    table_rows.at(row).value = std::move(value);
+    redraw_range(row, row, 1, 1);
+}
