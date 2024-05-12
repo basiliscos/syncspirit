@@ -5,10 +5,13 @@
 
 using namespace syncspirit::daemon::command;
 
-std::optional<pair_iterator_t::pair_t> pair_iterator_t::next() noexcept {
-    auto colon = in.find(":");
-    if (colon == in.npos) {
-        colon = in.size();
+std::optional<pair_iterator_t::pair_t> pair_iterator_t::next(bool skip_colon) noexcept {
+    auto colon = in.size();
+    if (!skip_colon) {
+        auto colon_pos = in.find(":");
+        if (colon_pos != in.npos) {
+            colon = colon_pos;
+        }
     }
 
     auto it = in.substr(0, colon);

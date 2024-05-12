@@ -116,6 +116,9 @@ after the core completion.
 
 # changes
 
+## 0.3.3 (12-May-2024)
+- [bugfix, win32] governor actor, fix parsing folder path
+
 ## 0.3.2 (11-May-2024)
 - [bugfix] folder scan isn't triggered on startup
 

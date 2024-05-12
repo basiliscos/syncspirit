@@ -32,7 +32,7 @@ find_package(uriparser REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
-set(SYNCSPIRIT_VERSION "v0.3.2")
+set(SYNCSPIRIT_VERSION "v0.3.3")
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
 set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src/protobuf)
