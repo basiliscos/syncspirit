@@ -8,6 +8,7 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 
+using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
 static void on_timeout(void *data) {
@@ -16,6 +17,20 @@ static void on_timeout(void *data) {
     table->update_value(2, self->supervisor.get_uptime());
     Fl::repeat_timeout(1.0, on_timeout, data);
 }
+
+namespace {
+
+struct my_table_t : static_table_t {
+    using parent_t = static_table_t;
+    my_table_t(void *timer_canceller_, table_rows_t &&rows, int x, int y, int w, int h)
+        : parent_t(std::move(rows), x, y, w, h), timer_canceller{timer_canceller_} {}
+
+    ~my_table_t() { Fl::remove_timeout(on_timeout, timer_canceller); }
+
+    void *timer_canceller;
+};
+
+} // namespace
 
 self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree) {
     supervisor.add(this);
@@ -26,7 +41,7 @@ self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree) : pare
 }
 
 self_device_t::~self_device_t() {
-    Fl::remove_timeout(on_timeout, this);
+    supervisor.get_logger()->trace("~self_device_t");
     supervisor.remove(this);
 }
 
@@ -48,7 +63,7 @@ void self_device_t::on_select() {
         data.push_back({"device id", std::string(device_id.get_value())});
         data.push_back({"uptime", supervisor.get_uptime()});
         data.push_back({"version", fmt::format("{} {}", constants::client_name, constants::client_version)});
-        table = new static_table_t(std::move(data), prev->x(), prev->y(), prev->w(), prev->h());
+        table = new my_table_t(this, std::move(data), prev->x(), prev->y(), prev->w(), prev->h());
         return table;
     });
     Fl::add_timeout(1.0, on_timeout, this);

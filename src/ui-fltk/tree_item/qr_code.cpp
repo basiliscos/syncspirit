@@ -12,6 +12,8 @@
 
 using namespace syncspirit::fltk::tree_item;
 
+static constexpr int PADDING = 30;
+
 template <typename T> using guard_t = std::unique_ptr<T, std::function<void(T *)>>;
 
 template <typename T, typename G> guard_t<T> make_guard(T *ptr, G &&fn) {
@@ -35,7 +37,8 @@ void qr_code_t::on_select() {
         auto code = make_guard(code_raw, [](auto ptr) { QRcode_free(ptr); });
 
         supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-            auto min_w = std::min(prev->w(), prev->h());
+            auto min_w = std::min(prev->w() - PADDING, prev->h() - PADDING);
+            min_w = std::max(code->width, min_w);
             auto scale = min_w / code->width;
             auto w = code->width * scale;
             auto extra_w = w % 8;
@@ -52,6 +55,7 @@ void qr_code_t::on_select() {
                     }
                 }
             }
+            bits.clear();
             bits.reserve(bit_set.num_blocks());
             boost::to_block_range(bit_set, std::back_insert_iterator(bits));
             auto box = new Fl_Box(prev->x(), prev->y(), prev->w(), prev->h(), device_id);
