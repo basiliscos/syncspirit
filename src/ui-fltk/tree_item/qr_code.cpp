@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <system_error>
+#include <algorithm>
 #include <qrencode.h>
 #include <boost/dynamic_bitset.hpp>
 
@@ -23,8 +24,8 @@ void qr_code_t::on_select() {
     using bit_set_t = boost::dynamic_bitset<unsigned char>;
     auto &cluster = supervisor.get_cluster();
     if (cluster) {
-        auto &device_id = cluster->get_device()->device_id().get_value();
-        auto code_raw = QRcode_encodeString(device_id.c_str(), 0, QR_ECLEVEL_H, QR_MODE_8, 1);
+        auto device_id = cluster->get_device()->device_id().get_value().c_str();
+        auto code_raw = QRcode_encodeString(device_id, 0, QR_ECLEVEL_H, QR_MODE_8, 1);
         auto &logger = supervisor.get_logger();
         if (!code_raw) {
             auto ec = std::error_code{errno, std::generic_category()};
@@ -34,20 +35,26 @@ void qr_code_t::on_select() {
         auto code = make_guard(code_raw, [](auto ptr) { QRcode_free(ptr); });
 
         supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-            auto w = code->width;
+            auto min_w = std::min(prev->w(), prev->h());
+            auto scale = min_w / code->width;
+            auto w = code->width * scale;
             auto extra_w = w % 8;
             auto line_w = w + (extra_w ? (8 - extra_w) : 0);
             bit_set_t bit_set(std::size_t(w * line_w));
-            logger->debug("qr code v{}, width = {}", code->version, code->width);
+            logger->debug("qr code v{}, width = {}, scale = {}", code->version, code->width, scale);
             for (int i = 0; i < code->width; ++i) {
                 for (int j = 0; j < code->width; ++j) {
                     auto bit = code->data[i * code->width + j] & 1;
-                    bit_set.set(i * line_w + j, bit);
+                    for (int y = i * scale; y < (i + 1) * scale; ++y) {
+                        for (int x = j * scale; x < (j + 1) * scale; ++x) {
+                            bit_set.set(y * line_w + x, bit);
+                        }
+                    }
                 }
             }
             bits.reserve(bit_set.num_blocks());
             boost::to_block_range(bit_set, std::back_insert_iterator(bits));
-            auto box = new Fl_Box(prev->x(), prev->y(), prev->w(), prev->h());
+            auto box = new Fl_Box(prev->x(), prev->y(), prev->w(), prev->h(), device_id);
             image.reset(new Fl_Bitmap(bits.data(), w, w));
             box->image(image.get());
             box->box(FL_ENGRAVED_BOX);
