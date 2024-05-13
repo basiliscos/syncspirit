@@ -1,5 +1,6 @@
 #include "self_device.h"
 
+#include "qr_code.h"
 #include "../static_table.h"
 #include "constants.h"
 
@@ -19,6 +20,9 @@ static void on_timeout(void *data) {
 self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree) {
     supervisor.add(this);
     label("self");
+
+    auto qt_code = new qr_code_t(supervisor, tree);
+    add(prefs(), "qr_code", qt_code);
 }
 
 self_device_t::~self_device_t() {

@@ -54,6 +54,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void add(model_load_listener_t *listener) noexcept;
     void remove(model_load_listener_t *listener) noexcept;
     std::string get_uptime() noexcept;
+    utils::logger_t &get_logger() noexcept;
 
     template <typename Fn> void replace_content(Fn constructor) noexcept {
         if (!content) {

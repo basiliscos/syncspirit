@@ -83,3 +83,5 @@ std::string app_supervisor_t::get_uptime() noexcept {
 
     return out.str();
 }
+
+auto app_supervisor_t::get_logger() noexcept -> utils::logger_t & { return log; }

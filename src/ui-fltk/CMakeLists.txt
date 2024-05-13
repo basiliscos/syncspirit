@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.9)
 
+find_package(libqrencode REQUIRED)
+
 add_executable(syncspirit-fltk WIN32
     app_supervisor.cpp
     log_colors.cpp
@@ -11,6 +13,7 @@ add_executable(syncspirit-fltk WIN32
     static_table.cpp
     tree_item.cpp
     tree_view.cpp
+    tree_item/qr_code.cpp
     tree_item/self_device.cpp
 )
 
@@ -19,6 +22,7 @@ target_link_libraries(syncspirit-fltk
     rotor::fltk
     $<$<PLATFORM_ID:Linux>:jpeg>
     $<$<PLATFORM_ID:Linux>:png>
+    libqrencode::libqrencode
 )
 target_include_directories(syncspirit-fltk PUBLIC
     ${syncspirit_SOURCE_DIR}/src
