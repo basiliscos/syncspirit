@@ -3,6 +3,8 @@
 #include <memory>
 #include <system_error>
 #include <algorithm>
+#include <vector>
+
 #include <qrencode.h>
 #include <boost/dynamic_bitset.hpp>
 
@@ -20,10 +22,70 @@ template <typename T, typename G> guard_t<T> make_guard(T *ptr, G &&fn) {
     return guard_t<T>{ptr, [fn = std::move(fn)](T *it) { fn(it); }};
 }
 
+using code_t = guard_t<QRcode>;
+
+namespace {
+
+struct box_t : Fl_Box {
+    using image_t = std::unique_ptr<Fl_Image>;
+    using bits_t = std::vector<unsigned char>;
+    using bit_set_t = boost::dynamic_bitset<unsigned char>;
+    using parent_t = Fl_Box;
+
+    box_t(code_t code_, int x, int y, int w, int h, const char *label)
+        : parent_t(x, y, w, h, label), code{std::move(code_)}, scale{0} {
+        box(FL_ENGRAVED_BOX);
+        regen_image(w, h);
+    }
+
+    void regen_image(int w, int h) {
+        auto min_w = std::min(w - PADDING, h - PADDING);
+        min_w = std::max(code->width, min_w);
+        auto new_scale = min_w / code->width;
+        if (new_scale == scale) {
+            return;
+        }
+
+        auto img_w = code->width * new_scale;
+        auto extra_w = img_w % 8;
+        auto line_w = img_w + (extra_w ? (8 - extra_w) : 0);
+        bit_set_t bit_set(std::size_t(img_w * line_w));
+        // logger->debug("qr code v{}, width = {}, scale = {}", code->version, code->width, scale);
+        for (int i = 0; i < code->width; ++i) {
+            for (int j = 0; j < code->width; ++j) {
+                auto bit = code->data[i * code->width + j] & 1;
+                for (int y = i * new_scale; y < (i + 1) * new_scale; ++y) {
+                    for (int x = j * new_scale; x < (j + 1) * new_scale; ++x) {
+                        bit_set.set(y * line_w + x, bit);
+                    }
+                }
+            }
+        }
+
+        bits.clear();
+        bits.reserve(bit_set.num_blocks());
+        boost::to_block_range(bit_set, std::back_insert_iterator(bits));
+        qr_image.reset(new Fl_Bitmap(bits.data(), img_w, img_w));
+        image(qr_image.get());
+        scale = new_scale;
+    }
+
+    void resize(int x, int y, int w, int h) override {
+        regen_image(w, h);
+        parent_t::resize(x, y, w, h);
+    }
+
+    code_t code;
+    bits_t bits;
+    image_t qr_image;
+    int scale = 0;
+};
+
+} // namespace
+
 qr_code_t::qr_code_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree) { label("QR code"); }
 
 void qr_code_t::on_select() {
-    using bit_set_t = boost::dynamic_bitset<unsigned char>;
     auto &cluster = supervisor.get_cluster();
     if (cluster) {
         auto device_id = cluster->get_device()->device_id().get_value().c_str();
@@ -37,32 +99,7 @@ void qr_code_t::on_select() {
         auto code = make_guard(code_raw, [](auto ptr) { QRcode_free(ptr); });
 
         supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-            auto min_w = std::min(prev->w() - PADDING, prev->h() - PADDING);
-            min_w = std::max(code->width, min_w);
-            auto scale = min_w / code->width;
-            auto w = code->width * scale;
-            auto extra_w = w % 8;
-            auto line_w = w + (extra_w ? (8 - extra_w) : 0);
-            bit_set_t bit_set(std::size_t(w * line_w));
-            logger->debug("qr code v{}, width = {}, scale = {}", code->version, code->width, scale);
-            for (int i = 0; i < code->width; ++i) {
-                for (int j = 0; j < code->width; ++j) {
-                    auto bit = code->data[i * code->width + j] & 1;
-                    for (int y = i * scale; y < (i + 1) * scale; ++y) {
-                        for (int x = j * scale; x < (j + 1) * scale; ++x) {
-                            bit_set.set(y * line_w + x, bit);
-                        }
-                    }
-                }
-            }
-            bits.clear();
-            bits.reserve(bit_set.num_blocks());
-            boost::to_block_range(bit_set, std::back_insert_iterator(bits));
-            auto box = new Fl_Box(prev->x(), prev->y(), prev->w(), prev->h(), device_id);
-            image.reset(new Fl_Bitmap(bits.data(), w, w));
-            box->image(image.get());
-            box->box(FL_ENGRAVED_BOX);
-            return box;
+            return new box_t(std::move(code), prev->x(), prev->y(), prev->w(), prev->h(), device_id);
         });
     }
 }
