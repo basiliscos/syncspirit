@@ -3,10 +3,19 @@
 #include "log_colors.h"
 #include <FL/fl_draw.H>
 #include <algorithm>
+#include <sstream>
 
 using namespace syncspirit::fltk;
 
 static constexpr int PADDING = 5;
+
+static const char *eol =
+#ifdef _WIN32
+    "\r\n"
+#else
+    "\n"
+#endif
+    ;
 
 static_table_t::static_table_t(table_rows_t &&rows, int x, int y, int w, int h)
     : parent_t(x, y, w, h), table_rows(std::move(rows)) {
@@ -23,6 +32,8 @@ static_table_t::static_table_t(table_rows_t &&rows, int x, int y, int w, int h)
     end();
     when(FL_WHEN_CHANGED | when());
     resizable(this);
+
+    set_visible_focus();
 }
 
 void static_table_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {
@@ -99,4 +110,40 @@ void static_table_t::draw_data(int r, int col, int x, int y, int w, int h) {
 void static_table_t::update_value(std::size_t row, std::string value) {
     table_rows.at(row).value = std::move(value);
     redraw_range(row, row, 1, 1);
+}
+
+std::string static_table_t::gather_selected() {
+    std::stringstream buff;
+    size_t count = 0;
+    for (size_t i = 0; i < table_rows.size(); ++i) {
+        if (row_selected(static_cast<int>(i))) {
+            if (count) {
+                buff << eol;
+            };
+            ++count;
+            auto &row = table_rows.at(i);
+            buff << row.label << "\t" << row.value;
+        }
+    }
+    return buff.str();
+}
+
+int static_table_t::handle(int event) {
+    auto r = parent_t::handle(event);
+    if (event == FL_RELEASE && r) {
+        auto buff = gather_selected();
+        if (buff.size()) {
+            Fl::copy(buff.data(), buff.size(), 0);
+        }
+        take_focus();
+    } else if (event == FL_KEYBOARD) {
+        if ((Fl::event_state() & (FL_CTRL | FL_COMMAND)) && Fl::event_key() == 'c') {
+            auto buff = gather_selected();
+            if (buff.size()) {
+                Fl::copy(buff.data(), buff.size(), 1);
+            }
+        }
+    }
+
+    return r;
 }

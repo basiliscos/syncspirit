@@ -21,11 +21,12 @@ struct static_table_t : Fl_Table_Row {
     static_table_t(table_rows_t &&rows, int x, int y, int w, int h);
 
     void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
-
+    int handle(int event) override;
     void update_value(std::size_t row, std::string value);
 
   private:
     void draw_data(int row, int col, int x, int y, int w, int h);
+    std::string gather_selected();
     std::pair<int, int> calc_col_widths();
 
     table_rows_t table_rows;
