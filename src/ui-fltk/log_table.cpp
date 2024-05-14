@@ -14,7 +14,7 @@ namespace syncspirit::fltk {
 
 static constexpr int col_min_size = 60;
 
-log_table_t::log_table_t(displayed_records_t &displayed_records_, int x, int y, int w, int h)
+log_table_t::log_table_t(log_records_t &displayed_records_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), displayed_records{displayed_records_}, auto_scrolling(true) {
     rows(0);            // how many rows
     row_header(0);      // enable row headers (along left)
@@ -162,11 +162,23 @@ int log_table_t::handle(int event) {
             r = 1;
         }
     } else if (event == FL_UNFOCUS) {
+        selected_records.clear();
+        for (size_t i = 0; i < displayed_records.size(); ++i) {
+            if (row_selected((int)i)) {
+                selected_records.push_back(displayed_records[i]);
+            }
+        }
         select_all_rows(0);
         r = 1;
     }
 
     return r;
+}
+
+log_records_t log_table_t::get_selected() {
+    auto copy = selected_records;
+    selected_records.clear();
+    return copy;
 }
 
 } // namespace syncspirit::fltk

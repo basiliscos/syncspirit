@@ -17,11 +17,10 @@ void base_sink_t::log(const spdlog::details::log_msg &msg) {
     auto source = msg.logger_name;
     auto message = msg.payload;
 
-    auto record =
-        std::make_unique<log_record_t>(msg.level, std::move(date), std::string(source.begin(), source.end()),
-                                       std::string(message.begin(), message.end()), std::to_string(msg.thread_id));
+    auto record = new log_record_t(msg.level, std::move(date), std::string(source.begin(), source.end()),
+                                   std::string(message.begin(), message.end()), std::to_string(msg.thread_id));
 
-    forward(std::move(record));
+    forward(log_record_ptr_t(record));
 }
 
 void im_memory_sink_t::forward(log_record_ptr_t record) {

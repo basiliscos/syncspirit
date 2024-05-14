@@ -33,7 +33,7 @@ struct log_panel_t : Fl_Group {
     mutex_t incoming_mutex;
     log_records_t incoming_records;
     log_records_t records;
-    log_table_t::displayed_records_t displayed_records;
+    log_records_t displayed_records;
     spdlog::level::level_enum display_level;
     std::string filter;
 };

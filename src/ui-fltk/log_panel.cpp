@@ -9,9 +9,7 @@
 #include <FL/Fl_Native_File_Chooser.H>
 #include <boost/algorithm/string/replace.hpp>
 
-#include <variant>
 #include <fstream>
-#include <type_traits>
 
 using namespace syncspirit::fltk;
 
@@ -70,7 +68,6 @@ static void on_input_filter(Fl_Widget *widget, void *data) {
 }
 
 static void export_log(Fl_Widget *widget, void *data) {
-    using log_source_t = std::variant<log_table_t::displayed_records_t *, log_records_t *>;
     auto input = reinterpret_cast<Fl_Input *>(widget);
     auto log_panel = reinterpret_cast<log_panel_t *>(data);
 
@@ -79,6 +76,9 @@ static void export_log(Fl_Widget *widget, void *data) {
     file_chooser.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
     file_chooser.filter("CSV files\t*.csv");
 
+    auto selected_records = log_panel->log_table->get_selected();
+    auto log_source = selected_records.empty() ? &log_panel->records : &selected_records;
+
     auto r = file_chooser.show();
     auto &log = log_panel->supervisor.get_logger();
     if (r == -1) {
@@ -86,15 +86,6 @@ static void export_log(Fl_Widget *widget, void *data) {
         return;
     } else if (r == 1) { // cancel
         return;
-    }
-
-    // detect source
-    auto log_source = log_source_t(&log_panel->records);
-    for (int i = 0; i < (int)log_panel->displayed_records.size(); ++i) {
-        if (log_panel->log_table->row_selected(i)) {
-            log_source = &log_panel->displayed_records;
-            break;
-        }
     }
 
     // write
@@ -107,9 +98,8 @@ static void export_log(Fl_Widget *widget, void *data) {
         return fmt::format("\"{}\"", copy);
     };
 
-    auto size = std::visit([](auto &source) { return source->size(); }, log_source);
-    for (size_t i = 0; i < size; ++i) {
-        auto &record = std::visit([i](auto &source) -> log_record_t & { return *source->at(i); }, log_source);
+    for (size_t i = 0; i < log_source->size(); ++i) {
+        auto &record = *log_source->at(i);
         out << record.level << ", " << record.date << ", " << record.source << ", " << escape_message(record.message)
             << eol;
     }
