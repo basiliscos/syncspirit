@@ -20,6 +20,8 @@ struct log_record_t {
 using log_record_ptr_t = std::unique_ptr<log_record_t>;
 using log_records_t = std::deque<log_record_ptr_t>;
 
-void write(std::ostream &out, const log_record_t &record, std::string_view separator);
+extern const char *eol;
+
+void write(std::ostream &out, const log_record_t &record);
 
 } // namespace syncspirit::fltk

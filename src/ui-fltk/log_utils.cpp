@@ -2,9 +2,17 @@
 
 namespace syncspirit::fltk {
 
-void write(std::ostream &out, const log_record_t &row, std::string_view separator) {
-    out << "(" << static_cast<int>(row.level) << ")" << separator << row.date << separator << row.thread_id << separator
-        << row.source << separator << row.message;
+const char *eol =
+#ifdef _WIN32
+    "\r\n"
+#else
+    "\n"
+#endif
+    ;
+
+void write(std::ostream &out, const log_record_t &row) {
+    out << "(" << static_cast<int>(row.level) << ")"
+        << "\t" << row.date << "\t" << row.thread_id << "\t" << row.source << "\t" << row.message;
     ;
 }
 

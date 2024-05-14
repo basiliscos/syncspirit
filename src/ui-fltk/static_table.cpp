@@ -1,6 +1,7 @@
 #include "static_table.h"
 
 #include "log_colors.h"
+#include "log_utils.h"
 #include <FL/fl_draw.H>
 #include <algorithm>
 #include <sstream>
@@ -8,14 +9,6 @@
 using namespace syncspirit::fltk;
 
 static constexpr int PADDING = 5;
-
-static const char *eol =
-#ifdef _WIN32
-    "\r\n"
-#else
-    "\n"
-#endif
-    ;
 
 static_table_t::static_table_t(table_rows_t &&rows, int x, int y, int w, int h)
     : parent_t(x, y, w, h), table_rows(std::move(rows)) {
@@ -52,8 +45,6 @@ void static_table_t::draw_cell(TableContext context, int row, int col, int x, in
         auto col_widths = calc_col_widths();
         col_width(0, col_widths.first);
         col_width(1, col_widths.second);
-        //        col_width(0, this->tiw/2);
-        //        col_width(1, this->tiw/2);
         return;
     }
     default:

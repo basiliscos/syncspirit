@@ -6,6 +6,12 @@
 #include <spdlog/fmt/fmt.h>
 #include <FL/Fl_Box.H>
 #include <FL/fl_draw.H>
+#include <FL/Fl_Native_File_Chooser.H>
+#include <boost/algorithm/string/replace.hpp>
+
+#include <variant>
+#include <fstream>
+#include <type_traits>
 
 using namespace syncspirit::fltk;
 
@@ -63,6 +69,53 @@ static void on_input_filter(Fl_Widget *widget, void *data) {
     log_panel->on_filter(input->value());
 }
 
+static void export_log(Fl_Widget *widget, void *data) {
+    using log_source_t = std::variant<log_table_t::displayed_records_t *, log_records_t *>;
+    auto input = reinterpret_cast<Fl_Input *>(widget);
+    auto log_panel = reinterpret_cast<log_panel_t *>(data);
+
+    Fl_Native_File_Chooser file_chooser;
+    file_chooser.title("Save synspirit log");
+    file_chooser.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
+    file_chooser.filter("CSV files\t*.csv");
+
+    auto r = file_chooser.show();
+    auto &log = log_panel->supervisor.get_logger();
+    if (r == -1) {
+        log->error("cannot chose file: {}", file_chooser.errmsg());
+        return;
+    } else if (r == 1) { // cancel
+        return;
+    }
+
+    // detect source
+    auto log_source = log_source_t(&log_panel->records);
+    for (int i = 0; i < (int)log_panel->displayed_records.size(); ++i) {
+        if (log_panel->log_table->row_selected(i)) {
+            log_source = &log_panel->displayed_records;
+            break;
+        }
+    }
+
+    // write
+    auto filename = file_chooser.filename();
+    auto out = std::ofstream(filename, std::ofstream::binary);
+    out << "level, date, source, message" << eol;
+
+    auto escape_message = [](const std::string &msg) -> std::string {
+        auto copy = boost::replace_all_copy<std::string>(msg, "\"", "\"\"");
+        return fmt::format("\"{}\"", copy);
+    };
+
+    auto size = std::visit([](auto &source) { return source->size(); }, log_source);
+    for (size_t i = 0; i < size; ++i) {
+        auto &record = std::visit([i](auto &source) -> log_record_t & { return *source->at(i); }, log_source);
+        out << record.level << ", " << record.date << ", " << record.source << ", " << escape_message(record.message)
+            << eol;
+    }
+    log->info("logs wrote to {}", filename);
+}
+
 struct counter_label_t : Fl_Box {
     using parent_t = Fl_Box;
     using parent_t::parent_t;
@@ -96,7 +149,8 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
 
     auto button_x = autoscroll_button->x() + autoscroll_button->w() + padding;
 
-    auto export_button = new Fl_Button(button_x, common_y, 70, common_h, "export");
+    auto export_button = new Fl_Button(button_x, common_y, 80, common_h, "export...");
+    export_button->callback(export_log, this);
     button_x += export_button->w() + padding;
 
     auto trace_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");

@@ -1,6 +1,7 @@
 #include "log_table.h"
 #include "log_sink.h"
 #include "log_colors.h"
+#include "log_utils.h"
 
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
@@ -8,14 +9,6 @@
 #include <spdlog/sinks/sink.h>
 #include <spdlog/pattern_formatter.h>
 #include <spdlog/fmt/fmt.h>
-
-static const char *eol =
-#ifdef _WIN32
-    "\r\n"
-#else
-    "\n"
-#endif
-    ;
 
 namespace syncspirit::fltk {
 
@@ -146,7 +139,7 @@ std::string log_table_t::gather_selected() {
             };
             ++count;
             auto &row = displayed_records.at(i);
-            write(buff, *row, "\t");
+            write(buff, *row);
         }
     }
     return buff.str();
