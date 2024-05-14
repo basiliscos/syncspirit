@@ -7,6 +7,8 @@
 #include <spdlog/fmt/fmt.h>
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
+#include <lz4.h>
+#include <openssl/crypto.h>
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
@@ -79,7 +81,12 @@ void self_device_t::on_select() {
         data.push_back({"device id (short)", device_id_short});
         data.push_back({"device id", device_id});
         data.push_back({"uptime", supervisor.get_uptime()});
-        data.push_back({"version", fmt::format("{} {}", constants::client_name, constants::client_version)});
+        data.push_back({"app version", fmt::format("{} {}", constants::client_name, constants::client_version)});
+        data.push_back({"protobuf version", google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION)});
+        data.push_back({"lz4 version", LZ4_versionString()});
+        data.push_back({"openssl version", OpenSSL_version(0)});
+        data.push_back({"fltk version", fmt::format("{}", Fl::version())});
+
         table = new my_table_t(this, std::move(data), prev->x(), prev->y(), prev->w(), prev->h());
         return table;
     });
