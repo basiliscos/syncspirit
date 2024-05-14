@@ -139,7 +139,9 @@ std::string log_table_t::gather_selected() {
             };
             ++count;
             auto &row = displayed_records.at(i);
-            write(buff, *row);
+            buff << "(" << static_cast<int>(row->level) << ")"
+                 << "\t" << row->date << "\t" << row->thread_id << "\t" << row->source << "\t" << row->message;
+            ;
         }
     }
     return buff.str();

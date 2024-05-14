@@ -28,6 +28,4 @@ using log_records_t = std::deque<log_record_ptr_t>;
 
 extern const char *eol;
 
-void write(std::ostream &out, const log_record_t &record);
-
 } // namespace syncspirit::fltk

@@ -10,10 +10,4 @@ const char *eol =
 #endif
     ;
 
-void write(std::ostream &out, const log_record_t &row) {
-    out << "(" << static_cast<int>(row.level) << ")"
-        << "\t" << row.date << "\t" << row.thread_id << "\t" << row.source << "\t" << row.message;
-    ;
-}
-
 } // namespace syncspirit::fltk
