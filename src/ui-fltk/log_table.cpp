@@ -9,6 +9,14 @@
 #include <spdlog/pattern_formatter.h>
 #include <spdlog/fmt/fmt.h>
 
+static const char *eol =
+#ifdef _WIN32
+    "\r\n"
+#else
+    "\n"
+#endif
+    ;
+
 namespace syncspirit::fltk {
 
 static constexpr int col_min_size = 60;
@@ -35,6 +43,7 @@ log_table_t::log_table_t(displayed_records_t &displayed_records_, int x, int y, 
 
     // receive resize events
     when(FL_WHEN_CHANGED | when());
+    set_visible_focus();
 }
 
 void log_table_t::update() {
@@ -125,6 +134,47 @@ void log_table_t::autoscroll(bool value) {
     if (auto_scrolling) {
         row_position(static_cast<int>(displayed_records.size()));
     }
+}
+
+std::string log_table_t::gather_selected() {
+    std::stringstream buff;
+    size_t count = 0;
+    for (size_t i = 0; i < displayed_records.size(); ++i) {
+        if (row_selected(static_cast<int>(i))) {
+            if (count) {
+                buff << eol;
+            };
+            ++count;
+            auto &row = displayed_records.at(i);
+            buff << "(" << static_cast<int>(row->level) << ")\t" << row->date << "\t" << row->thread_id << "\t"
+                 << row->source << "\t" << row->message << "\t";
+        }
+    }
+    return buff.str();
+}
+
+int log_table_t::handle(int event) {
+    auto r = parent_t::handle(event);
+    if (event == FL_RELEASE && r) {
+        auto buff = gather_selected();
+        if (buff.size()) {
+            Fl::copy(buff.data(), buff.size(), 0);
+        }
+        take_focus();
+    } else if (event == FL_KEYBOARD) {
+        if ((Fl::event_state() & (FL_CTRL | FL_COMMAND)) && Fl::event_key() == 'c') {
+            auto buff = gather_selected();
+            if (buff.size()) {
+                Fl::copy(buff.data(), buff.size(), 1);
+            }
+            r = 1;
+        }
+    } else if (event == FL_UNFOCUS) {
+        select_all_rows(0);
+        r = 1;
+    }
+
+    return r;
 }
 
 } // namespace syncspirit::fltk

@@ -142,7 +142,11 @@ int static_table_t::handle(int event) {
             if (buff.size()) {
                 Fl::copy(buff.data(), buff.size(), 1);
             }
+            r = 1;
         }
+    } else if (event == FL_UNFOCUS) {
+        select_all_rows(0);
+        r = 1;
     }
 
     return r;
