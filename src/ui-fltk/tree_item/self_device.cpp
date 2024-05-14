@@ -32,7 +32,7 @@ struct my_table_t : static_table_t {
 
 } // namespace
 
-self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree) {
+self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree), table{nullptr} {
     supervisor.add(this);
     label("self");
 
@@ -52,15 +52,32 @@ void self_device_t::operator()(model::message::model_response_t &) {
     this->label(label.data());
     recalc_tree();
     tree()->redraw();
+
+    if (table) {
+        auto my_table = static_cast<my_table_t *>(table);
+        auto &id = supervisor.get_cluster()->get_device()->device_id();
+        auto device_id_short = id.get_short();
+        auto device_id = id.get_value();
+        my_table->update_value(0, std::string(device_id_short));
+        my_table->update_value(1, std::string(device_id));
+    }
 }
 
 void self_device_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-        auto &self = *supervisor.get_cluster()->get_device();
-        auto device_id = self.device_id();
         auto data = table_rows_t();
-        data.push_back({"device id (short)", std::string(device_id.get_short())});
-        data.push_back({"device id", std::string(device_id.get_value())});
+
+        auto cluster = supervisor.get_cluster();
+        auto device_id_short = std::string("XXXXXXX");
+        auto device_id = std::string("XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX");
+        if (cluster) {
+            auto &id = supervisor.get_cluster()->get_device()->device_id();
+            device_id_short = id.get_short();
+            device_id = id.get_value();
+        }
+
+        data.push_back({"device id (short)", device_id_short});
+        data.push_back({"device id", device_id});
         data.push_back({"uptime", supervisor.get_uptime()});
         data.push_back({"version", fmt::format("{} {}", constants::client_name, constants::client_version)});
         table = new my_table_t(this, std::move(data), prev->x(), prev->y(), prev->w(), prev->h());

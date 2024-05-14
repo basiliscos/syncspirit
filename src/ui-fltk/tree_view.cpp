@@ -1,6 +1,8 @@
 #include "tree_view.h"
 #include "tree_item/self_device.h"
 
+#include <FL/Fl.H>
+
 using namespace syncspirit::fltk;
 
 static void tree_view_callback(Fl_Widget *w, void *data) {
@@ -35,4 +37,11 @@ tree_view_t::tree_view_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     add("devices/self", self_node);
 
     callback(tree_view_callback);
+
+    Fl::awake(
+        [](void *data) {
+            auto self = reinterpret_cast<tree_view_t *>(data);
+            self->select("devices/self");
+        },
+        this);
 }
