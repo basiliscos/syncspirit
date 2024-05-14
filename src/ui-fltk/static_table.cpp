@@ -1,5 +1,6 @@
 #include "static_table.h"
 
+#include "log_colors.h"
 #include <FL/fl_draw.H>
 #include <algorithm>
 
@@ -85,7 +86,7 @@ void static_table_t::draw_data(int r, int col, int x, int y, int w, int h) {
             // dw = -PADDING;
         }
 
-        fl_color(FL_WHITE);
+        fl_color(row_selected(r) ? table_selection_color : FL_WHITE);
         fl_rectf(x, y, w, h);
         fl_color(FL_GRAY0);
         fl_draw(content->data(), x + dx, y, w + dw, h, align);

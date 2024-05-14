@@ -11,4 +11,6 @@ color_array_t log_colors = {
     fl_rgb_color(255, 220, 255), fl_rgb_color(255, 240, 255)  // critical
 };
 
-}
+Fl_Color table_selection_color = FL_GREEN;
+
+} // namespace syncspirit::fltk

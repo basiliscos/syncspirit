@@ -1,6 +1,6 @@
 #pragma once
 
-#include <FL/Fl_Table.H>
+#include <FL/Fl_Table_Row.H>
 
 #include <string>
 #include <vector>
@@ -15,8 +15,8 @@ struct table_row_t {
 
 using table_rows_t = std::vector<table_row_t>;
 
-struct static_table_t : Fl_Table {
-    using parent_t = Fl_Table;
+struct static_table_t : Fl_Table_Row {
+    using parent_t = Fl_Table_Row;
 
     static_table_t(table_rows_t &&rows, int x, int y, int w, int h);
 

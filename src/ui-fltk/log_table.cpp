@@ -110,7 +110,7 @@ void log_table_t::draw_data(int row, int col, int x, int y, int w, int h) {
         auto color_row = row % 2;
         auto color_index = static_cast<int>(record.level) * 2;
 
-        fl_color(row_selected(row) ? FL_GREEN : log_colors[color_index + color_row]);
+        fl_color(row_selected(row) ? table_selection_color : log_colors[color_index + color_row]);
         fl_rectf(x, y, w, h);
         fl_color(FL_GRAY0);
         fl_draw(content->data(), x + x_offset, y, w - x_offset - w_adj, h, align);
