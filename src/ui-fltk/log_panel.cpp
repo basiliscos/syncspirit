@@ -86,16 +86,20 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     log_table->autoscroll(auto_scroll);
     this->log_table = log_table;
 
-    auto button_y = log_table->h() + padding * 2;
-    auto button_h = bottom_row - padding;
-    auto group = new Fl_Group(0, button_y, log_table->w(), button_h);
+    auto common_y = log_table->h() + padding * 2;
+    auto common_h = bottom_row - padding;
+    auto group = new Fl_Group(0, common_y, log_table->w(), common_h);
 
-    auto autoscroll_button = new Fl_Toggle_Button(padding, button_y, 100, button_h, "auto scroll");
+    auto autoscroll_button = new Fl_Toggle_Button(padding, common_y, 100, common_h, "auto scroll");
     autoscroll_button->value(auto_scroll);
     autoscroll_button->callback(auto_scroll_toggle, log_table);
 
     auto button_x = autoscroll_button->x() + autoscroll_button->w() + padding;
-    auto trace_button = new Fl_Toggle_Button(button_x, button_y, button_h, button_h, " ");
+
+    auto export_button = new Fl_Button(button_x, common_y, 70, common_h, "export");
+    button_x += export_button->w() + padding;
+
+    auto trace_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     trace_button->color(log_colors[static_cast<int>(spdlog::level::trace) * 2]);
     trace_button->selection_color(log_colors[static_cast<int>(spdlog::level::trace) * 2 + 1]);
     trace_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::trace));
@@ -103,7 +107,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     level_buttons[0] = trace_button;
     button_x += trace_button->w() + 1;
 
-    auto debug_button = new Fl_Toggle_Button(button_x, button_y, button_h, button_h, " ");
+    auto debug_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     debug_button->color(log_colors[static_cast<int>(spdlog::level::debug) * 2]);
     debug_button->selection_color(log_colors[static_cast<int>(spdlog::level::debug) * 2 + 1]);
     debug_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::debug));
@@ -111,7 +115,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     level_buttons[1] = debug_button;
     button_x += debug_button->w() + 1;
 
-    auto info_button = new Fl_Toggle_Button(button_x, button_y, button_h, button_h, " ");
+    auto info_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     info_button->color(log_colors[static_cast<int>(spdlog::level::info) * 2]);
     info_button->selection_color(log_colors[static_cast<int>(spdlog::level::info) * 2 + 1]);
     info_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::info));
@@ -119,7 +123,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     level_buttons[2] = info_button;
     button_x += info_button->w() + 1;
 
-    auto warn_button = new Fl_Toggle_Button(button_x, button_y, button_h, button_h, " ");
+    auto warn_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     warn_button->color(log_colors[static_cast<int>(spdlog::level::warn) * 2]);
     warn_button->selection_color(log_colors[static_cast<int>(spdlog::level::warn) * 2 + 1]);
     warn_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::warn));
@@ -127,7 +131,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     level_buttons[3] = warn_button;
     button_x += warn_button->w() + 1;
 
-    auto error_button = new Fl_Toggle_Button(button_x, button_y, button_h, button_h, " ");
+    auto error_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     error_button->color(log_colors[static_cast<int>(spdlog::level::err) * 2]);
     error_button->selection_color(log_colors[static_cast<int>(spdlog::level::err) * 2 + 1]);
     error_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::err));
@@ -135,7 +139,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     level_buttons[4] = error_button;
     button_x += error_button->w() + 1;
 
-    auto critical_button = new Fl_Toggle_Button(button_x, button_y, button_h, button_h, " ");
+    auto critical_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     critical_button->color(log_colors[static_cast<int>(spdlog::level::critical) * 2]);
     critical_button->selection_color(log_colors[static_cast<int>(spdlog::level::critical) * 2 + 1]);
     critical_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::critical));
@@ -143,12 +147,12 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     level_buttons[5] = critical_button;
     button_x += critical_button->w() + padding;
 
-    auto filter_input = new Fl_Input(button_x, button_y, 200, button_h, "");
+    auto filter_input = new Fl_Input(button_x, common_y, 200, common_h, "");
     filter_input->callback(on_input_filter, this);
     filter_input->when(FL_WHEN_CHANGED);
     button_x += filter_input->w() + padding;
 
-    auto counter = new counter_label_t(padding + group->w() - 200, button_y, 200, button_h);
+    auto counter = new counter_label_t(padding + group->w() - 200, common_y, 200, common_h);
     counter->tooltip("displayed number of records / total number of records");
     records_counter = counter;
 

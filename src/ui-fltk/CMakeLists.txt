@@ -6,8 +6,9 @@ add_executable(syncspirit-fltk WIN32
     app_supervisor.cpp
     log_colors.cpp
     log_panel.cpp
-    log_table.cpp
     log_sink.cpp
+    log_table.cpp
+    log_utils.cpp
     main.cpp
     main_window.cpp
     static_table.cpp

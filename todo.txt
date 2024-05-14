@@ -1,8 +1,5 @@
-static table: select, copy & paste values.
- - copy pasted
-
 log:
- select, copy/paste rows, add "export" button"
+  copy/paste rows, add "export" button"
 
  local state: files, folders, size
 
