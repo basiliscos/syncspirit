@@ -63,8 +63,10 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
             auto parent = content->parent();
             auto prev = content;
             parent->remove(prev);
+            parent->begin();
             content = constructor(prev);
             parent->add(content);
+            parent->end();
             delete prev;
             // parent->resizable(content);
             parent->redraw();
