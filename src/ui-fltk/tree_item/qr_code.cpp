@@ -9,7 +9,9 @@
 #include <boost/dynamic_bitset.hpp>
 
 #include <FL/Fl.H>
+#include <FL/Fl_Group.H>
 #include <FL/Fl_Box.H>
+#include <FL/Fl_Button.H>
 #include <FL/Fl_Bitmap.H>
 
 using namespace syncspirit::fltk::tree_item;
@@ -81,6 +83,21 @@ struct box_t : Fl_Box {
     int scale = 0;
 };
 
+struct my_container_t : Fl_Group {
+    using parent_t = Fl_Group;
+    my_container_t(code_t code_, int x, int y, int w, int h, const char *label) : parent_t(x, y, w, h) {
+        auto box = new box_t(std::move(code_), x, y, w, h - 30, nullptr);
+        auto button = new Fl_Button(x, y + box->h(), w, 30, label);
+        button->tooltip("copy to buffer");
+        resizable(box);
+        button->callback([](Fl_Widget *widget, void *) {
+            auto button = static_cast<Fl_Button *>(widget);
+            auto device_id = button->label();
+            Fl::copy(device_id, strlen(device_id), 1);
+        });
+    }
+};
+
 } // namespace
 
 qr_code_t::qr_code_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree) { label("QR code"); }
@@ -99,7 +116,7 @@ void qr_code_t::on_select() {
         auto code = make_guard(code_raw, [](auto ptr) { QRcode_free(ptr); });
 
         supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-            return new box_t(std::move(code), prev->x(), prev->y(), prev->w(), prev->h(), device_id);
+            return new my_container_t(std::move(code), prev->x(), prev->y(), prev->w(), prev->h(), device_id);
         });
     }
 }
