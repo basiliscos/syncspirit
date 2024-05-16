@@ -9,6 +9,8 @@
 #include <FL/Fl_Box.H>
 #include <lz4.h>
 #include <openssl/crypto.h>
+#include <openssl/opensslv.h>
+#include "mdbx.h"
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
@@ -78,13 +80,29 @@ void self_device_t::on_select() {
             device_id = id.get_value();
         }
 
+        auto v = OPENSSL_VERSION_NUMBER;
+        // clang-format off
+        //                    0x1010113fL
+        auto openssl_major  = (0xF0000000L & OPENSSL_VERSION_NUMBER) >> 7 * 4;
+        auto openssl_minor  = (0x0FF00000L & OPENSSL_VERSION_NUMBER) >> 5 * 4;
+        auto openssl_patch  = (0x000FF000L & OPENSSL_VERSION_NUMBER) >> 3 * 4;
+        auto openssl_nibble = (0x00000FF0L & OPENSSL_VERSION_NUMBER) >> 1 * 4;
+        // clang-format on
+        if (openssl_nibble) {
+            openssl_nibble += 'a';
+        }
+
+        auto openssl_version = fmt::format("{}.{}.{}{}", openssl_major, openssl_minor, openssl_patch, openssl_nibble);
+        auto mbdx_version = fmt::format("{}.{}.{}", mdbx_version.major, mdbx_version.minor, mdbx_version.release);
+
         data.push_back({"device id (short)", device_id_short});
         data.push_back({"device id", device_id});
         data.push_back({"uptime", supervisor.get_uptime()});
         data.push_back({"app version", fmt::format("{} {}", constants::client_name, constants::client_version)});
+        data.push_back({"mdbx version", mbdx_version});
         data.push_back({"protobuf version", google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION)});
         data.push_back({"lz4 version", LZ4_versionString()});
-        data.push_back({"openssl version", OpenSSL_version(0)});
+        data.push_back({"openssl version", openssl_version});
         data.push_back({"fltk version", fmt::format("{}", Fl::version())});
 
         table = new my_table_t(this, std::move(data), prev->x(), prev->y(), prev->w(), prev->h());
