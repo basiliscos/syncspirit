@@ -1,6 +1,7 @@
 #include "self_device.h"
 
 #include "qr_code.h"
+#include "settings.h"
 #include "../static_table.h"
 #include "constants.h"
 
@@ -41,7 +42,9 @@ self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree) : pare
     label("self");
 
     auto qt_code = new qr_code_t(supervisor, tree);
+    auto settings = new settings_t(supervisor, tree);
     add(prefs(), "qr_code", qt_code);
+    add(prefs(), "settings", settings);
 }
 
 self_device_t::~self_device_t() {

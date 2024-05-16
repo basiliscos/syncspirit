@@ -14,8 +14,13 @@ add_executable(syncspirit-fltk WIN32
     static_table.cpp
     tree_item.cpp
     tree_view.cpp
+    config/category.cpp
+    config/control.cpp
+    config/property.cpp
+    config/table.cpp
     tree_item/qr_code.cpp
     tree_item/self_device.cpp
+    tree_item/settings.cpp
 )
 
 target_link_libraries(syncspirit-fltk
