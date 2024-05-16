@@ -82,7 +82,7 @@ void self_device_t::on_select() {
 
         auto v = OPENSSL_VERSION_NUMBER;
         // clang-format off
-        //                    0x1010113fL
+        //                     0x1010113fL
         auto openssl_major  = (0xF0000000L & OPENSSL_VERSION_NUMBER) >> 7 * 4;
         auto openssl_minor  = (0x0FF00000L & OPENSSL_VERSION_NUMBER) >> 5 * 4;
         auto openssl_patch  = (0x000FF000L & OPENSSL_VERSION_NUMBER) >> 3 * 4;
