@@ -88,11 +88,12 @@ void self_device_t::on_select() {
         auto openssl_patch  = (0x000FF000L & OPENSSL_VERSION_NUMBER) >> 3 * 4;
         auto openssl_nibble = (0x00000FF0L & OPENSSL_VERSION_NUMBER) >> 1 * 4;
         // clang-format on
+        auto openssl_nibble_c = static_cast<char>(openssl_nibble);
         if (openssl_nibble) {
-            openssl_nibble += 'a';
+            openssl_nibble_c += 'a' - 1;
         }
 
-        auto openssl_version = fmt::format("{}.{}.{}{}", openssl_major, openssl_minor, openssl_patch, openssl_nibble);
+        auto openssl_version = fmt::format("{}.{}.{}{}", openssl_major, openssl_minor, openssl_patch, openssl_nibble_c);
         auto mbdx_version = fmt::format("{}.{}.{}", mdbx_version.major, mdbx_version.minor, mdbx_version.release);
 
         data.push_back({"device id (short)", device_id_short});
