@@ -12,8 +12,13 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_)
     : parent_t(700, 480, "syncspirit-fltk"), supervisor{supervisor_} {
 
     auto container = new Fl_Tile(0, 0, w(), h());
+
+    auto resizeable_area = new Fl_Box(w() * 1. / 6, h() * 1. / 6, w() * 4. / 6, h() * 3. / 6);
+    container->resizable(resizeable_area);
+
     auto content_w = w() / 2;
     auto content_h = h() * 2 / 3;
+
     auto content_l = new tree_view_t(supervisor, 0, 0, content_w, content_h);
     content_l->box(FL_ENGRAVED_BOX);
 
@@ -23,8 +28,8 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_)
         return content_r;
     });
 
-    log_panel = new log_panel_t(supervisor, 0, 0, w(), h() / 3);
-    log_panel->position(0, h() / 3 * 2);
+    log_panel = new log_panel_t(supervisor, 0, 0, w(), h() * 1 / 3);
+    log_panel->position(0, content_l->h());
     log_panel->box(FL_FLAT_BOX);
 
     container->end();
