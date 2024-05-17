@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "utils.h"
 
@@ -8,14 +8,12 @@
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <spdlog/spdlog.h>
-#include "model/device_id.h"
 #include "utils/log.h"
 #include "utils/location.h"
 
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.h>
 
-namespace bfs = boost::filesystem;
 namespace sys = boost::system;
 
 #if defined(__unix__)
@@ -38,7 +36,7 @@ static device_name_t get_device_name() noexcept {
     return device_name;
 }
 
-config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path) {
+config_result_t get_config(std::istream &config, const bfs::path &config_path) {
     main_t cfg;
     cfg.config_path = config_path;
 
@@ -467,7 +465,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
     return outcome::success();
 }
 
-outcome::result<main_t> generate_config(const boost::filesystem::path &config_path) {
+outcome::result<main_t> generate_config(const bfs::path &config_path) {
     auto dir = config_path.parent_path();
     sys::error_code ec;
     bool exists = bfs::exists(dir, ec);
