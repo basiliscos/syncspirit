@@ -47,15 +47,57 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
         return new category_t("db", "database settings", std::move(props));
     }();
 
+    auto c_dialer = [&]() -> category_ptr_t {
+        auto props = properties_t{};
+
+        return new category_t("dialer", "outbound connection scheduler settings", std::move(props));
+    }();
+
     auto c_fs = [&]() -> category_ptr_t {
         auto props = properties_t{};
 
         return new category_t("fs", "filesystem settings", std::move(props));
     }();
 
+    auto c_gd = [&]() -> category_ptr_t {
+        auto props = properties_t{};
+
+        return new category_t("global_discovery", "global peer discovery settings", std::move(props));
+    }();
+
+    auto c_ld = [&]() -> category_ptr_t {
+        auto props = properties_t{};
+
+        return new category_t("local_discovery", "LAN peer discovery settings", std::move(props));
+    }();
+
+    auto c_main = [&]() -> category_ptr_t {
+        auto props = properties_t{};
+
+        return new category_t("main", "main application settings", std::move(props));
+    }();
+
+    auto c_relay = [&]() -> category_ptr_t {
+        auto props = properties_t{};
+
+        return new category_t("relay", "relay network/protocol settings", std::move(props));
+    }();
+
+    auto c_upnp = [&]() -> category_ptr_t {
+        auto props = properties_t{};
+
+        return new category_t("upno", "universal plug and play router settings", std::move(props));
+    }();
+
     r.push_back(std::move(c_bep));
     r.push_back(std::move(c_db));
+    r.push_back(std::move(c_dialer));
     r.push_back(std::move(c_fs));
+    r.push_back(std::move(c_gd));
+    r.push_back(std::move(c_ld));
+    r.push_back(std::move(c_main));
+    r.push_back(std::move(c_relay));
+    r.push_back(std::move(c_upnp));
 
     return r;
 }

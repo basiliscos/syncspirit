@@ -35,7 +35,7 @@ struct category_cell_t final : table_t::cell_t {
     }
 
     void draw(int col, int x, int y, int w, int h) override {
-        Fl_Align align = FL_ALIGN_LEFT;
+        Fl_Align align = FL_ALIGN_RIGHT;
         const char *data = nullptr;
 
         bool restore_font = false;
