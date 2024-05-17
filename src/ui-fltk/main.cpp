@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         auto &cfg = cfg_option.value();
-        spdlog::trace("configuration seems OK, timeout = {}ms"), cfg.timeout;
+        spdlog::trace("configuration seems OK, timeout = {}ms", cfg.timeout);
 
         auto init_result = utils::init_loggers(cfg.log_configs, false);
         if (!init_result) {
@@ -227,6 +227,8 @@ int main(int argc, char **argv) {
         auto fltk_ctx = rf::system_context_fltk_t();
         auto sup_fltk = fltk_ctx.create_supervisor<fltk::app_supervisor_t>()
                             .dist_sink(dist_sink)
+                            .config_path(config_file_path)
+                            .app_config(cfg)
                             .timeout(timeout)
                             .registry_address(sup_net->get_registry_address())
                             .shutdown_flag(shutdown_flag, r::pt::millisec{50})

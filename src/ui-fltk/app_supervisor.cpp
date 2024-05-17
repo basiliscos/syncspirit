@@ -13,11 +13,15 @@ r::plugin::resource_id_t model = 0;
 } // namespace
 
 app_supervisor_t::app_supervisor_t(config_t &config)
-    : parent_t(config), dist_sink(std::move(config.dist_sink)), content{nullptr} {
+    : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
+      app_config(std::move(config.app_config)), content{nullptr} {
     started_at = clock_t::now();
 }
 
 auto app_supervisor_t::get_dist_sink() -> utils::dist_sink_t & { return dist_sink; }
+
+auto app_supervisor_t::get_config_path() -> const bfs::path & { return config_path; }
+auto app_supervisor_t::get_app_config() -> const config::main_t & { return app_config; }
 
 auto app_supervisor_t::get_cluster() -> model::cluster_ptr_t & { return cluster; }
 

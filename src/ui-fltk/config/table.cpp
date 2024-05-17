@@ -47,10 +47,9 @@ void table_t::draw_cell(TableContext context, int row, int col, int x, int y, in
 
 void table_t::draw_data(int r, int col, int x, int y, int w, int h) {
     auto &c = categories.at(static_cast<size_t>(r));
-    std::string *content;
     fl_push_clip(x, y, w, h);
     {
-        Fl_Align align = FL_ALIGN_RIGHT;
+        Fl_Align align = FL_ALIGN_LEFT;
         const char *data = nullptr;
 
         int dw = 0;
@@ -64,7 +63,7 @@ void table_t::draw_data(int r, int col, int x, int y, int w, int h) {
         fl_rectf(x, y, w, h);
         fl_color(FL_WHITE);
         if (data) {
-            fl_draw(content->data(), x, y, w, h, align);
+            fl_draw(data, x, y, w, h, align);
         }
         fl_color(color());
         fl_rect(x, y, w, h);

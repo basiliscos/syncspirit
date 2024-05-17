@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config/main.h"
 #include "utils/log.h"
 #include "model/messages.h"
 #include "model/diff/block_visitor.h"
@@ -10,22 +11,26 @@
 #include <rotor/fltk.hpp>
 #include <FL/Fl_Widget.H>
 #include <FL/Fl_Group.H>
+#include <boost/filesystem.hpp>
 
 namespace syncspirit::fltk {
+
+namespace r = rotor;
+namespace rf = r::fltk;
+namespace bfs = boost::filesystem;
 
 struct model_load_listener_t {
     virtual ~model_load_listener_t() = default;
     virtual void operator()(model::message::model_response_t &) = 0;
 };
 
-namespace r = rotor;
-namespace rf = r::fltk;
-
 struct app_supervisor_config_t : rf::supervisor_config_fltk_t {
     using parent_t = rf::supervisor_config_fltk_t;
     using parent_t::parent_t;
 
     utils::dist_sink_t dist_sink;
+    bfs::path config_path;
+    config::main_t app_config;
 };
 
 template <typename Actor> struct app_supervisor_config_builder_t : rf::supervisor_config_fltk_builder_t<Actor> {
@@ -35,6 +40,16 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
 
     builder_t &&dist_sink(utils::dist_sink_t &value) && noexcept {
         parent_t::config.dist_sink = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&config_path(const bfs::path &value) && noexcept {
+        parent_t::config.config_path = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&app_config(const config::main_t &value) && noexcept {
+        parent_t::config.app_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -49,6 +64,8 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     explicit app_supervisor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     utils::dist_sink_t &get_dist_sink();
+    const bfs::path &get_config_path();
+    const config::main_t &get_app_config();
     model::cluster_ptr_t &get_cluster();
 
     void add(model_load_listener_t *listener) noexcept;
@@ -85,6 +102,8 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     r::address_ptr_t coordinator;
     utils::logger_t log;
     utils::dist_sink_t dist_sink;
+    bfs::path config_path;
+    config::main_t app_config;
     model::cluster_ptr_t cluster;
     load_listeners_t load_listeners;
     Fl_Widget *content;
