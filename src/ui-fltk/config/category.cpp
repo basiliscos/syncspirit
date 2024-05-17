@@ -86,7 +86,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
     auto c_upnp = [&]() -> category_ptr_t {
         auto props = properties_t{};
 
-        return new category_t("upno", "universal plug and play router settings", std::move(props));
+        return new category_t("upnp", "universal plug and play router settings", std::move(props));
     }();
 
     r.push_back(std::move(c_bep));

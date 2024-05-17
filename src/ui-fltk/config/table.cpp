@@ -46,6 +46,7 @@ struct category_cell_t final : table_t::cell_t {
         switch (col) {
         case 0:
             data = category->get_label().data();
+            text_dw = -offset;
             break;
         case 1:
             fl_font(FL_HELVETICA, 14);
