@@ -41,6 +41,15 @@ void uncommited_threshold_t::reflect_to(syncspirit::config::main_t &main) {
 
 const char *uncommited_threshold_t::explanation_ = "how many transactions keep in memory before flushing to storage";
 
+upper_limit_t::upper_limit_t(std::uint32_t value, std::uint32_t default_value)
+    : parent_t("upper_limit", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void upper_limit_t::reflect_to(syncspirit::config::main_t &main) {
+    main.db_config.uncommitted_threshold = native_value;
+}
+
+const char *upper_limit_t::explanation_ = "maximum database size, in bytes";
+
 } // namespace db
 
 } // namespace syncspirit::fltk::config

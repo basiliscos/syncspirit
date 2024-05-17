@@ -15,12 +15,22 @@ struct positive_integer_t : property_t {
 } // namespace impl
 
 namespace db {
+
 struct uncommited_threshold_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 
     static const char *explanation_;
 
     uncommited_threshold_t(std::uint32_t value, std::uint32_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct upper_limit_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    upper_limit_t(std::uint32_t value, std::uint32_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
