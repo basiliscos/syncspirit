@@ -3,6 +3,8 @@
 
 using namespace syncspirit::fltk::config;
 
+static constexpr int col_min_size = 60;
+
 table_t::clip_guart_t::clip_guart_t(int col, int x, int y, int w_, int h) : w{w_} {
     if (w) {
         fl_push_clip(x, y, w, h);
@@ -76,7 +78,7 @@ table_t::table_t(categories_t categories_, int x, int y, int w, int h)
     row_height_all(20);
     row_resize(0);
     cols(4);
-    col_header(0);
+    col_header(1);
     col_width(0, w / 6);
     col_width(1, w / 6);
     col_width(2, w / 6);
@@ -99,17 +101,27 @@ void table_t::draw_cell(TableContext context, int row, int col, int x, int y, in
     case CONTEXT_CELL:
         draw_data(row, col, x, y, w, h);
         return;
+    case CONTEXT_COL_HEADER:
+        draw_header(col, x, y, w, h);
+        return;
     case CONTEXT_RC_RESIZE: {
-        /*
-        auto col_widths = calc_col_widths();
-        col_width(0, col_widths.first);
-        col_width(1, col_widths.second);
-        */
+        auto until_last = col_width(0) + col_width(1) + col_width(2);
+        auto last_sz = this->tiw - until_last;
+        auto delta = col_min_size - last_sz;
+        if (last_sz >= col_min_size) {
+            col_width(3, last_sz);
+        }
         return;
     }
     default:
         return;
     }
+}
+
+void table_t::draw_header(int col, int x, int y, int w, int h) {
+    fl_push_clip(x, y, w, h);
+    { fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, row_header_color()); }
+    fl_pop_clip();
 }
 
 void table_t::draw_data(int r, int col, int x, int y, int w, int h) {

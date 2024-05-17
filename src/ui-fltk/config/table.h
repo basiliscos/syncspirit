@@ -29,6 +29,7 @@ struct table_t : Fl_Table {
     void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
 
   private:
+    void draw_header(int col, int x, int y, int w, int h);
     void draw_data(int row, int col, int x, int y, int w, int h);
     void create_cells();
 
