@@ -12,6 +12,7 @@ category_t::category_t(std::string label_, std::string explanation_, properties_
 
 const std::string &category_t::get_label() const { return label; }
 const std::string &category_t::get_explanation() const { return explanation; }
+const properties_t &category_t::get_properties() const { return properties; }
 
 auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> categories_t {
     auto r = categories_t{};

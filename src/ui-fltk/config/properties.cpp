@@ -5,7 +5,8 @@ namespace syncspirit::fltk::config {
 namespace db {
 
 uncommited_threshold_t::uncommited_threshold_t(std::uint32_t value, std::uint32_t default_value)
-    : property_t("uncommited_threshold", explanation_, std::to_string(value), std::to_string(default_value)) {}
+    : property_t("uncommited_threshold", explanation_, std::to_string(value), std::to_string(default_value),
+                 property_kind_t::positive_integer) {}
 
 void uncommited_threshold_t::reflect_to(syncspirit::config::main_t &main) {
     main.db_config.uncommitted_threshold = native_value;

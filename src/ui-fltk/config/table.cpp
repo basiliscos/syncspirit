@@ -1,5 +1,9 @@
 #include "table.h"
+
 #include <FL/fl_draw.H>
+#include <FL/Fl_Int_Input.H>
+#include <cassert>
+#include <functional>
 
 using namespace syncspirit::fltk::config;
 
@@ -71,8 +75,72 @@ struct category_cell_t final : table_t::cell_t {
     category_ptr_t category;
 };
 
+struct property_description_t {
+    Fl_Widget *widget;
+    table_t::input_value_setter_t setter;
+    table_t::input_value_getter_t getter;
+};
+
+struct property_cell_t final : table_t::cell_t {
+    using parent_t = table_t::cell_t;
+
+    property_cell_t(table_t *table_, property_ptr_t property_, property_description_t descr_)
+        : table{table_}, property{std::move(property_)}, descr{descr_} {}
+
+    void draw(int col, int x, int y, int w, int h) override {
+        switch (col) {
+        case 0:
+            draw_label(x, y, w, h);
+            break;
+        case 1:
+            draw_input(x, y, w, h);
+            break;
+        case 3:
+            draw_explanation(x, y, w, h);
+            break;
+        }
+    }
+
+    void draw_label(int x, int y, int w, int h) {
+        auto label = property->get_label();
+        fl_color(FL_BLACK);
+        fl_draw(label.data(), x, y, w, h, FL_ALIGN_LEFT);
+    }
+
+    void draw_input(int x, int y, int w, int h) {
+#if 0
+        auto input = descr.widget;
+        std::invoke(descr.setter, *table, *property);
+        input->resize(x, y, w, h);
+        input->show();
+        input->redraw();
+        input->take_focus();
+#endif
+        auto value = property->get_value();
+        fl_color(FL_WHITE);
+        fl_rectf(x, y, w, h);
+        fl_color(FL_GRAY0);
+        fl_draw(value.data(), x, y, w, h, FL_ALIGN_LEFT);
+        fl_color(table->color());
+        fl_rect(x, y, w, h);
+    }
+
+    void draw_explanation(int x, int y, int w, int h) {
+        auto text = property->get_explanation();
+        fl_color(FL_BLACK);
+        fl_draw(text.data(), x, y, w, h, FL_ALIGN_LEFT);
+    }
+
+    table_t *table;
+    property_ptr_t property;
+    property_description_t descr;
+};
+
 table_t::table_t(categories_t categories_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), categories{std::move(categories_)} {
+
+    input_int = new Fl_Int_Input(0, 0, 0, 0);
+    input_int->hide();
 
     row_header(0);
     row_height_all(20);
@@ -120,7 +188,7 @@ void table_t::draw_cell(TableContext context, int row, int col, int x, int y, in
 
 void table_t::draw_header(int col, int x, int y, int w, int h) {
     fl_push_clip(x, y, w, h);
-    { fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, row_header_color()); }
+    fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, row_header_color());
     fl_pop_clip();
 }
 
@@ -133,5 +201,18 @@ void table_t::draw_data(int r, int col, int x, int y, int w, int h) {
 void table_t::create_cells() {
     for (auto &c : categories) {
         cells.push_back(cell_ptr_t(new category_cell_t(this, c)));
+        for (auto &p : c->get_properties()) {
+            auto descr = [&]() -> property_description_t {
+                if (p->get_kind() == property_kind_t::positive_integer) {
+                    return property_description_t{input_int, &table_t::set_int};
+                }
+                assert(0 && "should not happen");
+            }();
+            cells.push_back(cell_ptr_t(new property_cell_t(this, p, descr)));
+        }
     }
+}
+
+void table_t::set_int(const property_t &property) {
+    static_cast<Fl_Int_Input *>(input_int)->value(property.get_value().data());
 }

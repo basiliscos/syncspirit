@@ -2,14 +2,17 @@
 
 using namespace syncspirit::fltk::config;
 
-property_t::property_t(std::string label_, std::string explanation_, std::string value_, std::string default_value_)
-    : label{label_}, explanation{explanation_}, value{value_}, default_value{default_value_} {}
+property_t::property_t(std::string label_, std::string explanation_, std::string value_, std::string default_value_,
+                       property_kind_t kind_)
+    : label{label_}, explanation{explanation_}, value{value_}, default_value{default_value_}, kind{kind_} {}
 
 std::string_view property_t::get_label() const noexcept { return label; }
 
 std::string_view property_t::get_explanation() const noexcept { return explanation; }
 
-std::string_view property_t::get_value() const noexcept { return explanation; }
+std::string_view property_t::get_value() const noexcept { return value; }
+
+property_kind_t property_t::get_kind() const noexcept { return kind; }
 
 void property_t::set_value(std::string_view value_) noexcept {
     value = value_;
