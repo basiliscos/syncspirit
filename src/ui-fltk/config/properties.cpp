@@ -2,17 +2,14 @@
 
 namespace syncspirit::fltk::config {
 
-namespace db {
+namespace impl {
 
-uncommited_threshold_t::uncommited_threshold_t(std::uint32_t value, std::uint32_t default_value)
-    : property_t("uncommited_threshold", explanation_, std::to_string(value), std::to_string(default_value),
+positive_integer_t::positive_integer_t(std::string label, std::string explanation, std::string value,
+                                       std::string default_value)
+    : property_t(std::move(label), std::move(explanation), std::move(value), std::move(default_value),
                  property_kind_t::positive_integer) {}
 
-void uncommited_threshold_t::reflect_to(syncspirit::config::main_t &main) {
-    main.db_config.uncommitted_threshold = native_value;
-}
-
-error_ptr_t uncommited_threshold_t::validate_value() noexcept {
+error_ptr_t positive_integer_t::validate_value() noexcept {
     int r;
     auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), r);
 
@@ -30,6 +27,16 @@ error_ptr_t uncommited_threshold_t::validate_value() noexcept {
     // all ok
     native_value = static_cast<std::uint32_t>(r);
     return {};
+}
+} // namespace impl
+
+namespace db {
+
+uncommited_threshold_t::uncommited_threshold_t(std::uint32_t value, std::uint32_t default_value)
+    : parent_t("uncommited_threshold", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void uncommited_threshold_t::reflect_to(syncspirit::config::main_t &main) {
+    main.db_config.uncommitted_threshold = native_value;
 }
 
 const char *uncommited_threshold_t::explanation_ = "how many transactions keep in memory before flushing to storage";
