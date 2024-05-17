@@ -10,7 +10,7 @@ struct positive_integer_t : property_t {
 
     error_ptr_t validate_value() noexcept override;
 
-    std::uint32_t native_value;
+    std::uint64_t native_value;
 };
 } // namespace impl
 
@@ -21,7 +21,7 @@ struct uncommited_threshold_t final : impl::positive_integer_t {
 
     static const char *explanation_;
 
-    uncommited_threshold_t(std::uint32_t value, std::uint32_t default_value);
+    uncommited_threshold_t(std::uint64_t value, std::uint64_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
@@ -30,7 +30,7 @@ struct upper_limit_t final : impl::positive_integer_t {
 
     static const char *explanation_;
 
-    upper_limit_t(std::uint32_t value, std::uint32_t default_value);
+    upper_limit_t(std::uint64_t value, std::uint64_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
