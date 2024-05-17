@@ -30,6 +30,70 @@ error_ptr_t positive_integer_t::validate_value() noexcept {
 }
 } // namespace impl
 
+namespace bep {
+
+blocks_max_requested_t::blocks_max_requested_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("blocks_max_requested", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void blocks_max_requested_t::reflect_to(syncspirit::config::main_t &main) {
+    main.bep_config.blocks_max_requested = native_value;
+}
+
+const char *blocks_max_requested_t::explanation_ = "maximum concurrent block read requests per peer";
+
+blocks_simultaneous_write_t::blocks_simultaneous_write_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("blocks_simultaneous_write", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void blocks_simultaneous_write_t::reflect_to(syncspirit::config::main_t &main) {
+    main.bep_config.blocks_simultaneous_write = native_value;
+}
+
+const char *blocks_simultaneous_write_t::explanation_ = "maximum concurrent block write requests to disk";
+
+connect_timeout_t::connect_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("connect_timeout", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void connect_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.connect_timeout = native_value; }
+
+const char *connect_timeout_t::explanation_ = "maximum time for connection, milliseconds";
+
+request_timeout_t::request_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("request_timeout", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void request_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.request_timeout = native_value; }
+
+const char *request_timeout_t::explanation_ = "maximum time for request, milliseconds";
+
+rx_buff_size_t::rx_buff_size_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("rx_buff_size", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void rx_buff_size_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.rx_buff_size = native_value; }
+
+const char *rx_buff_size_t::explanation_ = "preallocated receive buffer size, bytes";
+
+rx_timeout_t::rx_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("rx_timeout", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void rx_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.rx_timeout = native_value; }
+
+const char *rx_timeout_t::explanation_ = "rx max time, milliseconds";
+
+tx_buff_limit_t::tx_buff_limit_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("tx_buff_limit", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void tx_buff_limit_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.tx_buff_limit = native_value; }
+
+const char *tx_buff_limit_t::explanation_ = "preallocated transmit buffer size";
+
+tx_timeout_t::tx_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("tx_timeout", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void tx_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.tx_timeout = native_value; }
+
+const char *tx_timeout_t::explanation_ = "tx max time, milliseconds";
+
+} // namespace bep
+
 namespace db {
 
 uncommited_threshold_t::uncommited_threshold_t(std::uint64_t value, std::uint64_t default_value)
