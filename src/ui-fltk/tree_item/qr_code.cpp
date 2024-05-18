@@ -85,17 +85,26 @@ struct box_t : Fl_Box {
 
 struct my_container_t : Fl_Group {
     using parent_t = Fl_Group;
-    my_container_t(code_t code_, int x, int y, int w, int h, const char *label) : parent_t(x, y, w, h) {
+    using supervisor_t = syncspirit::fltk::app_supervisor_t;
+    my_container_t(code_t code_, supervisor_t *sup_, int x, int y, int w, int h, const char *label)
+        : parent_t(x, y, w, h), sup{sup_} {
         auto box = new box_t(std::move(code_), x, y, w, h - 30, nullptr);
         auto button = new Fl_Button(x, y + box->h(), w, 30, label);
         button->tooltip("copy to buffer");
         resizable(box);
-        button->callback([](Fl_Widget *widget, void *) {
-            auto button = static_cast<Fl_Button *>(widget);
-            auto device_id = button->label();
-            Fl::copy(device_id, strlen(device_id), 1);
-        });
+        button->callback(
+            [](Fl_Widget *widget, void *data) {
+                auto button = static_cast<Fl_Button *>(widget);
+                auto device_id = button->label();
+                Fl::copy(device_id, strlen(device_id), 1);
+                auto sup = reinterpret_cast<supervisor_t *>(data);
+                auto device_id_short = sup->get_cluster()->get_device()->device_id().get_short();
+                sup->get_logger()->info("device id {} has been copied to clipboard", device_id_short);
+            },
+            sup);
     }
+
+    supervisor_t *sup;
 };
 
 } // namespace
@@ -116,7 +125,8 @@ void qr_code_t::on_select() {
         auto code = make_guard(code_raw, [](auto ptr) { QRcode_free(ptr); });
 
         supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-            return new my_container_t(std::move(code), prev->x(), prev->y(), prev->w(), prev->h(), device_id);
+            return new my_container_t(std::move(code), &supervisor, prev->x(), prev->y(), prev->w(), prev->h(),
+                                      device_id);
         });
     }
 }
