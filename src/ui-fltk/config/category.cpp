@@ -56,13 +56,18 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new dialer::redial_timeout_t(d.redial_timeout, d_def.redial_timeout)),
             // clang-format on
         };
-
         return new category_t("dialer", "outbound connection scheduler settings", std::move(props));
     }();
 
     auto c_fs = [&]() -> category_ptr_t {
-        auto props = properties_t{};
-
+        auto &f = config.fs_config;
+        auto &f_def = default_config.fs_config;
+        auto props = properties_t{
+            // clang-format off
+            property_ptr_t(new fs::mru_size_t(f.mru_size, f_def.mru_size)),
+            property_ptr_t(new fs::mru_size_t(f.temporally_timeout, f_def.temporally_timeout)),
+            // clang-format on
+        };
         return new category_t("fs", "filesystem settings", std::move(props));
     }();
 

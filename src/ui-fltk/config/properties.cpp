@@ -141,4 +141,24 @@ const char *redial_timeout_t::explanation_ = "how often try to redial to connect
 
 } // namespace dialer
 
+namespace fs {
+
+mru_size_t::mru_size_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("mru_size", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void mru_size_t::reflect_to(syncspirit::config::main_t &main) { main.fs_config.mru_size = native_value; }
+
+const char *mru_size_t::explanation_ = "maximum amount of cached/opened files";
+
+temporally_timeout_t::temporally_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("temporally_timeout", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void temporally_timeout_t::reflect_to(syncspirit::config::main_t &main) {
+    main.fs_config.temporally_timeout = native_value;
+}
+
+const char *temporally_timeout_t::explanation_ = "remove incomplete file after this amount of seconds";
+
+} // namespace fs
+
 } // namespace syncspirit::fltk::config
