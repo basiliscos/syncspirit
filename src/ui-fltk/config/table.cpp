@@ -230,10 +230,13 @@ void table_t::create_cells() {
         for (auto &p : c->get_properties()) {
             auto descr = [&]() -> property_description_t {
                 if (p->get_kind() == property_kind_t::positive_integer) {
-                    return property_description_t{row++, input_int, &table_t::set_int, &table_t::save_int};
+                    return property_description_t{row, input_int, &table_t::set_int, &table_t::save_int};
+                } else if (p->get_kind() == property_kind_t::boolean) {
+                    return property_description_t{row, input_int, &table_t::set_int, &table_t::save_int};
                 }
                 assert(0 && "should not happen");
             }();
+            ++row;
             cells.push_back(cell_ptr_t(new property_cell_t(this, p, descr)));
         }
     }

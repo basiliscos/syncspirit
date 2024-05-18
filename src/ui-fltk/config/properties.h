@@ -12,6 +12,14 @@ struct positive_integer_t : property_t {
 
     std::uint64_t native_value;
 };
+
+struct bool_t : property_t {
+    bool_t(bool value, bool default_value, std::string label = "enabled");
+    error_ptr_t validate_value() noexcept override;
+
+    std::uint64_t native_value;
+};
+
 } // namespace impl
 
 namespace bep {
@@ -111,4 +119,25 @@ struct upper_limit_t final : impl::positive_integer_t {
 };
 
 } // namespace db
+
+namespace dialer {
+
+struct enabled_t final : impl::bool_t {
+    using parent_t = impl::bool_t;
+    using parent_t::parent_t;
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct redial_timeout_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    redial_timeout_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+} // namespace dialer
+
 } // namespace syncspirit::fltk::config

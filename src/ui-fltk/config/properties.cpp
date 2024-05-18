@@ -28,6 +28,16 @@ error_ptr_t positive_integer_t::validate_value() noexcept {
     native_value = static_cast<std::uint64_t>(r);
     return {};
 }
+
+bool_t::bool_t(bool value, bool default_value, std::string label)
+    : property_t(std::move(label), "", std::to_string(value), std::to_string(default_value), property_kind_t::boolean) {
+}
+
+error_ptr_t bool_t::validate_value() noexcept {
+    native_value = (value == "true") ? 1 : 0;
+    return {};
+}
+
 } // namespace impl
 
 namespace bep {
@@ -115,5 +125,20 @@ void upper_limit_t::reflect_to(syncspirit::config::main_t &main) {
 const char *upper_limit_t::explanation_ = "maximum database size, in bytes";
 
 } // namespace db
+
+namespace dialer {
+
+void enabled_t::reflect_to(syncspirit::config::main_t &main) { main.dialer_config.enabled = native_value; }
+
+redial_timeout_t::redial_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("redial_timeout", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void redial_timeout_t::reflect_to(syncspirit::config::main_t &main) {
+    main.dialer_config.redial_timeout = native_value;
+}
+
+const char *redial_timeout_t::explanation_ = "how often try to redial to connect offline peers, milliseconds";
+
+} // namespace dialer
 
 } // namespace syncspirit::fltk::config
