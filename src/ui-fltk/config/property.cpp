@@ -24,3 +24,5 @@ void property_t::reset() noexcept { value = default_value; }
 void property_t::undo() noexcept { value = initial_value; }
 
 const error_ptr_t &property_t::validate() noexcept { return error; }
+
+error_ptr_t property_t::validate_value() noexcept { return {}; }

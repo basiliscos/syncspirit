@@ -164,6 +164,9 @@ table_t::table_t(categories_t categories_, int x, int y, int w, int h)
     input_int = new Fl_Int_Input(0, 0, 0, 0);
     input_int->hide();
 
+    input_text = new Fl_Input(0, 0, 0, 0);
+    input_text->hide();
+
     row_header(0);
     row_height_all(20);
     row_resize(0);
@@ -233,6 +236,8 @@ void table_t::create_cells() {
                     return property_description_t{row, input_int, &table_t::set_int, &table_t::save_int};
                 } else if (p->get_kind() == property_kind_t::boolean) {
                     return property_description_t{row, input_int, &table_t::set_int, &table_t::save_int};
+                } else if (p->get_kind() == property_kind_t::text) {
+                    return property_description_t{row, input_text, &table_t::set_text, &table_t::save_text};
                 }
                 assert(0 && "should not happen");
             }();
@@ -273,6 +278,12 @@ void table_t::set_int(const property_t &property) {
 }
 
 void table_t::save_int(property_t &property) { property.set_value(static_cast<Fl_Int_Input *>(input_int)->value()); }
+
+void table_t::set_text(const property_t &property) {
+    static_cast<Fl_Input *>(input_text)->value(property.get_value().data());
+}
+
+void table_t::save_text(property_t &property) { property.set_value(static_cast<Fl_Input *>(input_text)->value()); }
 
 void table_t::try_start_editing(int row, int col) {
     if (col != 1) {

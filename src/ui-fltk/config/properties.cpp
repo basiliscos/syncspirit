@@ -29,6 +29,10 @@ error_ptr_t positive_integer_t::validate_value() noexcept {
     return {};
 }
 
+string_t::string_t(std::string label, std::string explanation, std::string value, std::string default_value)
+    : property_t(std::move(label), std::move(explanation), std::move(value), std::move(default_value),
+                 property_kind_t::text) {}
+
 bool_t::bool_t(bool value, bool default_value, std::string label)
     : property_t(std::move(label), "", std::to_string(value), std::to_string(default_value), property_kind_t::boolean) {
 }
@@ -160,5 +164,63 @@ void temporally_timeout_t::reflect_to(syncspirit::config::main_t &main) {
 const char *temporally_timeout_t::explanation_ = "remove incomplete file after this amount of seconds";
 
 } // namespace fs
+
+namespace global_discovery {
+
+void enabled_t::reflect_to(syncspirit::config::main_t &main) { main.global_announce_config.enabled = native_value; }
+
+announce_url_t::announce_url_t(std::string value, std::string default_value)
+    : parent_t("announce_url", explanation_, std::move(value), std::move(default_value)) {}
+
+void announce_url_t::reflect_to(syncspirit::config::main_t &main) {
+    main.global_announce_config.announce_url = utils::parse(value).value();
+}
+
+const char *announce_url_t::explanation_ = "url of syncthing/private global announce server";
+
+cert_file_t::cert_file_t(std::string value, std::string default_value)
+    : parent_t("cert_file", explanation_, std::move(value), std::move(default_value)) {}
+
+void cert_file_t::reflect_to(syncspirit::config::main_t &main) {
+    main.global_announce_config.cert_file = utils::parse(value).value();
+}
+
+const char *cert_file_t::explanation_ = "this device certificate location";
+
+device_id_t::device_id_t(std::string value, std::string default_value)
+    : parent_t("device_id", explanation_, std::move(value), std::move(default_value)) {}
+
+void device_id_t::reflect_to(syncspirit::config::main_t &main) {
+    main.global_announce_config.device_id = utils::parse(value).value();
+}
+
+const char *device_id_t::explanation_ = "device_id of global/private discovery server";
+
+key_file_t::key_file_t(std::string value, std::string default_value)
+    : parent_t("key_file", explanation_, std::move(value), std::move(default_value)) {}
+
+void key_file_t::reflect_to(syncspirit::config::main_t &main) {
+    main.global_announce_config.key_file = utils::parse(value).value();
+}
+
+const char *key_file_t::explanation_ = "this device key location";
+
+rx_buff_size_t::rx_buff_size_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("rx_buff_size", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void rx_buff_size_t::reflect_to(syncspirit::config::main_t &main) {
+    main.global_announce_config.rx_buff_size = native_value;
+}
+
+const char *rx_buff_size_t::explanation_ = "preallocated receive buffer size, bytes";
+
+timeout_t::timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("timeout", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void timeout_t::reflect_to(syncspirit::config::main_t &main) { main.global_announce_config.timeout = native_value; }
+
+const char *timeout_t::explanation_ = "max request/response time, milliseconds";
+
+} // namespace global_discovery
 
 } // namespace syncspirit::fltk::config

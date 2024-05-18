@@ -33,7 +33,7 @@ struct property_t : boost::intrusive_ref_counter<property_t, boost::thread_unsaf
   protected:
     property_t(std::string label, std::string explanation, std::string value, std::string default_value,
                property_kind_t kind);
-    virtual error_ptr_t validate_value() noexcept = 0;
+    virtual error_ptr_t validate_value() noexcept;
 
     std::string label;
     std::string explanation;

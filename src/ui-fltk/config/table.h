@@ -41,9 +41,13 @@ struct table_t : Fl_Table {
     void set_int(const property_t &);
     void save_int(property_t &);
 
+    void set_text(const property_t &);
+    void save_text(property_t &);
+
     categories_t categories;
     cells_t cells;
     Fl_Widget *input_int;
+    Fl_Widget *input_text;
     cell_t *currently_edited;
 };
 

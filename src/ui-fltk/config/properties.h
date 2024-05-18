@@ -13,6 +13,10 @@ struct positive_integer_t : property_t {
     std::uint64_t native_value;
 };
 
+struct string_t : property_t {
+    string_t(std::string label, std::string explanation, std::string value, std::string default_value);
+};
+
 struct bool_t : property_t {
     bool_t(bool value, bool default_value, std::string label = "enabled");
     error_ptr_t validate_value() noexcept override;
@@ -161,5 +165,74 @@ struct temporally_timeout_t final : impl::positive_integer_t {
 };
 
 } // namespace fs
+
+namespace global_discovery {
+
+struct enabled_t final : impl::bool_t {
+    using parent_t = impl::bool_t;
+    using parent_t::parent_t;
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct announce_url_t final : impl::string_t {
+    using parent_t = impl::string_t;
+
+    static const char *explanation_;
+
+    announce_url_t(std::string value, std::string default_value);
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct cert_file_t final : impl::string_t {
+    using parent_t = impl::string_t;
+
+    static const char *explanation_;
+
+    cert_file_t(std::string value, std::string default_value);
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct device_id_t final : impl::string_t {
+    using parent_t = impl::string_t;
+
+    static const char *explanation_;
+
+    device_id_t(std::string value, std::string default_value);
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct key_file_t final : impl::string_t {
+    using parent_t = impl::string_t;
+
+    static const char *explanation_;
+
+    key_file_t(std::string value, std::string default_value);
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct rx_buff_size_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    rx_buff_size_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct timeout_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    timeout_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+} // namespace global_discovery
 
 } // namespace syncspirit::fltk::config
