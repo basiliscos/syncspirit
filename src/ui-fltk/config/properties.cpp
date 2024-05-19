@@ -223,4 +223,24 @@ const char *timeout_t::explanation_ = "max request/response time, milliseconds";
 
 } // namespace global_discovery
 
+namespace local_discovery {
+
+void enabled_t::reflect_to(syncspirit::config::main_t &main) { main.local_announce_config.enabled = native_value; }
+
+frequency_t::frequency_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("frequency", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void frequency_t::reflect_to(syncspirit::config::main_t &main) { main.local_announce_config.frequency = native_value; }
+
+const char *frequency_t::explanation_ = "how often send announcements in LAN, in milliseconds, milliseconds";
+
+port_t::port_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("port", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void port_t::reflect_to(syncspirit::config::main_t &main) { main.local_announce_config.port = native_value; }
+
+const char *port_t::explanation_ = "upd port used for announcement (should be the same as in syncthing)";
+
+} // namespace local_discovery
+
 } // namespace syncspirit::fltk::config

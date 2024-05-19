@@ -235,4 +235,33 @@ struct timeout_t final : impl::positive_integer_t {
 
 } // namespace global_discovery
 
+namespace local_discovery {
+
+struct enabled_t final : impl::bool_t {
+    using parent_t = impl::bool_t;
+    using parent_t::parent_t;
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct frequency_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    frequency_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct port_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    port_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+} // namespace local_discovery
+
 } // namespace syncspirit::fltk::config

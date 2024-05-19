@@ -89,8 +89,15 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
     }();
 
     auto c_ld = [&]() -> category_ptr_t {
-        auto props = properties_t{};
-
+        auto &l = config.local_announce_config;
+        auto &l_def = default_config.local_announce_config;
+        auto props = properties_t{
+            // clang-format off
+            property_ptr_t(new local_discovery::enabled_t(l.enabled, l_def.enabled)),
+            property_ptr_t(new local_discovery::frequency_t(l.frequency, l_def.frequency)),
+            property_ptr_t(new local_discovery::port_t(l.port, l_def.port)),
+            // clang-format on
+        };
         return new category_t("local_discovery", "LAN peer discovery settings", std::move(props));
     }();
 
