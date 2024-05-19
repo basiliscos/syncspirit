@@ -102,14 +102,29 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
     }();
 
     auto c_main = [&]() -> category_ptr_t {
-        auto props = properties_t{};
-
+        auto &l = config;
+        auto &l_def = default_config;
+        auto props = properties_t{
+            // clang-format off
+            property_ptr_t(new main::default_location_t(l.default_location.string(), l_def.default_location.string())),
+            property_ptr_t(new main::device_name_t(l.device_name, l_def.device_name)),
+            property_ptr_t(new main::hasher_threads_t(l.hasher_threads, l_def.hasher_threads)),
+            property_ptr_t(new main::timeout_t(l.timeout, l_def.timeout)),
+            // clang-format on
+        };
         return new category_t("main", "main application settings", std::move(props));
     }();
 
     auto c_relay = [&]() -> category_ptr_t {
-        auto props = properties_t{};
-
+        auto &l = config.relay_config;
+        auto &l_def = default_config.relay_config;
+        auto props = properties_t{
+            // clang-format off
+            property_ptr_t(new relay::enabled_t(l.enabled, l_def.enabled)),
+            property_ptr_t(new relay::discovery_url_t(l.discovery_url, l_def.discovery_url)),
+            property_ptr_t(new relay::rx_buff_size_t(l.rx_buff_size, l_def.rx_buff_size)),
+            // clang-format on
+        };
         return new category_t("relay", "relay network/protocol settings", std::move(props));
     }();
 

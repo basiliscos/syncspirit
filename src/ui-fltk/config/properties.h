@@ -264,4 +264,76 @@ struct port_t final : impl::positive_integer_t {
 
 } // namespace local_discovery
 
+namespace main {
+
+struct default_location_t final : impl::string_t {
+    using parent_t = impl::string_t;
+
+    static const char *explanation_;
+
+    default_location_t(std::string value, std::string default_value);
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct device_name_t final : impl::string_t {
+    using parent_t = impl::string_t;
+
+    static const char *explanation_;
+
+    device_name_t(std::string value, std::string default_value);
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct hasher_threads_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    hasher_threads_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct timeout_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    timeout_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+} // namespace main
+
+namespace relay {
+
+struct enabled_t final : impl::bool_t {
+    using parent_t = impl::bool_t;
+    using parent_t::parent_t;
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct discovery_url_t final : impl::string_t {
+    using parent_t = impl::string_t;
+
+    static const char *explanation_;
+
+    discovery_url_t(std::string value, std::string default_value);
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct rx_buff_size_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    rx_buff_size_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+} // namespace relay
+
 } // namespace syncspirit::fltk::config

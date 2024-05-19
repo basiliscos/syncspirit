@@ -243,4 +243,60 @@ const char *port_t::explanation_ = "upd port used for announcement (should be th
 
 } // namespace local_discovery
 
+namespace main {
+
+default_location_t::default_location_t(std::string value, std::string default_value)
+    : parent_t("default_location", explanation_, std::move(value), std::move(default_value)) {}
+
+void default_location_t::reflect_to(syncspirit::config::main_t &main) { main.default_location = value; }
+
+const char *default_location_t::explanation_ = "where folders are created by default";
+
+device_name_t::device_name_t(std::string value, std::string default_value)
+    : parent_t("device_name", explanation_, std::move(value), std::move(default_value)) {}
+
+void device_name_t::reflect_to(syncspirit::config::main_t &main) { main.device_name = value; }
+
+const char *device_name_t::explanation_ = "this device name";
+
+hasher_threads_t::hasher_threads_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("hasher_threads", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void hasher_threads_t::reflect_to(syncspirit::config::main_t &main) { main.hasher_threads = native_value; }
+
+const char *hasher_threads_t::explanation_ = "amount cpu cores used for hashing";
+
+timeout_t::timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("timeout", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void timeout_t::reflect_to(syncspirit::config::main_t &main) { main.timeout = native_value; }
+
+const char *timeout_t::explanation_ = "main actors timeout, milliseconds";
+
+} // namespace main
+
+namespace relay {
+
+void enabled_t::reflect_to(syncspirit::config::main_t &main) { main.relay_config.enabled = native_value; }
+
+discovery_url_t::discovery_url_t(std::string value, std::string default_value)
+    : parent_t("discovery_url", explanation_, std::move(value), std::move(default_value)) {}
+
+void discovery_url_t::reflect_to(syncspirit::config::main_t &main) {
+    main.relay_config.discovery_url = utils::parse(value).value();
+}
+
+const char *discovery_url_t::explanation_ = "here pick the list of relay servers pool";
+
+rx_buff_size_t::rx_buff_size_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("rx_buff_size", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void rx_buff_size_t::reflect_to(syncspirit::config::main_t &main) {
+    main.global_announce_config.rx_buff_size = native_value;
+}
+
+const char *rx_buff_size_t::explanation_ = "preallocated receive buffer size, bytes";
+
+} // namespace relay
+
 } // namespace syncspirit::fltk::config
