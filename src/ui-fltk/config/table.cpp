@@ -2,6 +2,8 @@
 
 #include <FL/fl_draw.H>
 #include <FL/Fl_Int_Input.H>
+#include <FL/Fl_Button.H>
+#include <FL/Fl_Group.H>
 #include <cassert>
 #include <functional>
 
@@ -24,6 +26,8 @@ table_t::clip_guart_t::~clip_guart_t() {
 auto table_t::cell_t::clip(int col, int x, int y, int w, int h) -> clip_guart_t {
     return clip_guart_t(col, x, y, w, h);
 }
+
+void table_t::cell_t::resize(int col, int x, int y, int w, int h) {}
 
 struct category_cell_t final : table_t::cell_t {
     using parent_t = table_t::cell_t;
@@ -87,7 +91,26 @@ struct property_cell_t final : table_t::cell_t {
     using parent_t = table_t::cell_t;
 
     property_cell_t(table_t *table_, property_ptr_t property_, property_description_t descr_)
-        : table{table_}, property{std::move(property_)}, descr{descr_}, editing{false} {}
+        : table{table_}, property{std::move(property_)}, descr{descr_}, editing{false} {
+
+        int xx, yy, ww, hh;
+        table->find_cell(table_t::CONTEXT_TABLE, descr.row, 2, xx, yy, ww, hh);
+        group_buttons = new Fl_Group(xx, yy, ww, hh);
+        group_buttons->box(FL_FLAT_BOX);
+
+        group_buttons->begin();
+        int padding = 2;
+        auto button_w = ww / 2 - padding * 3;
+        auto button_h = hh - padding * 2;
+
+        button_undo = new Fl_Button(xx + padding, yy + padding, button_w, button_h, "@undo");
+        button_reset = new Fl_Button(xx + padding + button_w + padding, yy + padding, button_w, button_h, "@refresh");
+
+        group_buttons->end();
+        group_buttons->resizable(group_buttons);
+
+        update_buttons();
+    }
 
     void draw(int col, int x, int y, int w, int h) override {
         switch (col) {
@@ -122,6 +145,20 @@ struct property_cell_t final : table_t::cell_t {
         fl_rect(x, y, w, h);
     }
 
+    void update_buttons() {
+        if (property->same_as_initial()) {
+            button_undo->deactivate();
+        } else {
+            button_undo->activate();
+        }
+
+        if (property->same_as_default()) {
+            button_reset->deactivate();
+        } else {
+            button_reset->activate();
+        }
+    }
+
     void draw_explanation_or_error(int x, int y, int w, int h) {
         auto &err = property->validate();
         const char *text;
@@ -135,6 +172,17 @@ struct property_cell_t final : table_t::cell_t {
         }
         fl_color(FL_BLACK);
         fl_draw(text, x, y, w, h, FL_ALIGN_LEFT);
+    }
+
+    void resize(int col, int x, int y, int w, int h) override {
+        if (col != 2) {
+            return;
+        }
+
+        int xx, yy, ww, hh;
+        table->find_cell(table_t::CONTEXT_TABLE, descr.row, col, xx, yy, ww, hh);
+
+        group_buttons->resize(xx, yy, ww, hh);
     }
 
     void start_edit() {
@@ -157,12 +205,17 @@ struct property_cell_t final : table_t::cell_t {
         std::invoke(descr.saver, *table, *property);
         table->currently_edited = nullptr;
         editing = false;
+
+        update_buttons();
     }
 
     table_t *table;
     property_ptr_t property;
     property_description_t descr;
     bool editing;
+    Fl_Group *group_buttons;
+    Fl_Button *button_undo;
+    Fl_Button *button_reset;
 };
 
 table_t::table_t(categories_t categories_, int x, int y, int w, int h)
@@ -188,10 +241,10 @@ table_t::table_t(categories_t categories_, int x, int y, int w, int h)
     when(FL_WHEN_CHANGED | when());
     resizable(this);
 
-    create_cells();
-    rows(static_cast<int>(cells.size()));
-
     callback([](Fl_Widget *w, void *data) { static_cast<table_t *>(w)->on_callback(); });
+    end();
+
+    create_cells();
 }
 
 void table_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {
@@ -213,6 +266,11 @@ void table_t::draw_cell(TableContext context, int row, int col, int x, int y, in
         if (last_sz >= col_min_size) {
             col_width(3, last_sz);
         }
+
+        for (size_t i = 0; i < cells.size(); ++i) {
+            cells.at(i)->resize(2, x, y, w, h);
+        }
+        init_sizes();
         return;
     }
     default:
@@ -233,7 +291,17 @@ void table_t::draw_data(int r, int col, int x, int y, int w, int h) {
 }
 
 void table_t::create_cells() {
+    int total_rows = 0;
+    for (auto &c : categories) {
+        ++total_rows;
+        for (auto &p : c->get_properties()) {
+            ++total_rows;
+        }
+    }
+
+    rows(total_rows);
     int row = 0;
+    begin();
     for (auto &c : categories) {
         cells.push_back(cell_ptr_t(new category_cell_t(this, c)));
         row++;
@@ -252,6 +320,7 @@ void table_t::create_cells() {
             cells.push_back(cell_ptr_t(new property_cell_t(this, p, descr)));
         }
     }
+    end();
 }
 
 void table_t::on_callback() {
@@ -261,6 +330,7 @@ void table_t::on_callback() {
 
     switch (context) {
     case CONTEXT_CELL: {
+        return;
         switch (Fl::event()) {
         case FL_PUSH:
             done_editing();

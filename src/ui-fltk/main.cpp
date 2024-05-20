@@ -13,7 +13,6 @@
 #include <exception>
 
 #include "syncspirit-config.h"
-#include "constants.h"
 #include "config/utils.h"
 #include "utils/location.h"
 #include "utils/log.h"

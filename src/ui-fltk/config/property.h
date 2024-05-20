@@ -28,6 +28,8 @@ struct property_t : boost::intrusive_ref_counter<property_t, boost::thread_unsaf
     void reset() noexcept;
     void undo() noexcept;
     const error_ptr_t &validate() noexcept;
+    bool same_as_initial() const noexcept;
+    bool same_as_default() const noexcept;
     virtual void reflect_to(syncspirit::config::main_t &main) = 0;
 
   protected:
