@@ -105,6 +105,7 @@ struct property_cell_t : table_t::cell_t {
                 self->done_editing();
             },
             this);
+        button_undo->copy_tooltip("undo to initial");
 
         button_reset = new Fl_Button(xx + padding + button_w + padding, yy + padding, button_w, button_h, "@refresh");
         button_reset->callback(
@@ -115,6 +116,7 @@ struct property_cell_t : table_t::cell_t {
                 self->done_editing();
             },
             this);
+        button_reset->copy_tooltip("reset to default");
 
         group_buttons->end();
         group_buttons->resizable(group_buttons);
