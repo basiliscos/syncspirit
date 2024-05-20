@@ -4,7 +4,8 @@ using namespace syncspirit::fltk::config;
 
 property_t::property_t(std::string label_, std::string explanation_, std::string value_, std::string default_value_,
                        property_kind_t kind_)
-    : label{label_}, explanation{explanation_}, value{value_}, default_value{default_value_}, kind{kind_} {}
+    : label{label_}, explanation{explanation_}, value{value_}, initial_value{value_}, default_value{default_value_},
+      kind{kind_} {}
 
 std::string_view property_t::get_label() const noexcept { return label; }
 

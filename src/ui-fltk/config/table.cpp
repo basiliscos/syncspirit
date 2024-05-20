@@ -27,7 +27,7 @@ auto table_t::cell_t::clip(int col, int x, int y, int w, int h) -> clip_guart_t 
     return clip_guart_t(col, x, y, w, h);
 }
 
-void table_t::cell_t::resize(int col, int x, int y, int w, int h) {}
+void table_t::cell_t::resize(int x, int y, int w, int h) {}
 
 struct category_cell_t final : table_t::cell_t {
     using parent_t = table_t::cell_t;
@@ -80,21 +80,14 @@ struct category_cell_t final : table_t::cell_t {
     category_ptr_t category;
 };
 
-struct property_description_t {
-    int row;
-    Fl_Widget *widget;
-    table_t::input_value_setter_t setter;
-    table_t::input_value_saver_t saver;
-};
-
-struct property_cell_t final : table_t::cell_t {
+struct property_cell_t : table_t::cell_t {
     using parent_t = table_t::cell_t;
 
-    property_cell_t(table_t *table_, property_ptr_t property_, property_description_t descr_)
-        : table{table_}, property{std::move(property_)}, descr{descr_}, editing{false} {
+    property_cell_t(table_t *table_, property_ptr_t property_, int row_)
+        : table{table_}, property{std::move(property_)}, row{row_}, editing{false} {
 
         int xx, yy, ww, hh;
-        table->find_cell(table_t::CONTEXT_TABLE, descr.row, 2, xx, yy, ww, hh);
+        table->find_cell(table_t::CONTEXT_TABLE, row, 2, xx, yy, ww, hh);
         group_buttons = new Fl_Group(xx, yy, ww, hh);
         group_buttons->box(FL_FLAT_BOX);
 
@@ -117,9 +110,6 @@ struct property_cell_t final : table_t::cell_t {
         case 0:
             draw_label(x, y, w, h);
             break;
-        case 1:
-            draw_input(x, y, w, h);
-            break;
         case 3:
             draw_explanation_or_error(x, y, w, h);
             break;
@@ -130,19 +120,6 @@ struct property_cell_t final : table_t::cell_t {
         auto label = property->get_label();
         fl_color(FL_BLACK);
         fl_draw(label.data(), x, y, w, h, FL_ALIGN_LEFT);
-    }
-
-    void draw_input(int x, int y, int w, int h) {
-        if (editing && descr.widget->visible()) {
-            return;
-        }
-        auto value = property->get_value();
-        fl_color(FL_WHITE);
-        fl_rectf(x, y, w, h);
-        fl_color(FL_GRAY0);
-        fl_draw(value.data(), x, y, w, h, FL_ALIGN_LEFT);
-        fl_color(table->color());
-        fl_rect(x, y, w, h);
     }
 
     void update_buttons() {
@@ -157,6 +134,11 @@ struct property_cell_t final : table_t::cell_t {
         } else {
             button_reset->activate();
         }
+    }
+
+    void done_editing() {
+        update_buttons();
+        table->redraw();
     }
 
     void draw_explanation_or_error(int x, int y, int w, int h) {
@@ -174,58 +156,62 @@ struct property_cell_t final : table_t::cell_t {
         fl_draw(text, x, y, w, h, FL_ALIGN_LEFT);
     }
 
-    void resize(int col, int x, int y, int w, int h) override {
-        if (col != 2) {
-            return;
-        }
-
-        int xx, yy, ww, hh;
-        table->find_cell(table_t::CONTEXT_TABLE, descr.row, col, xx, yy, ww, hh);
-
-        group_buttons->resize(xx, yy, ww, hh);
-    }
-
-    void start_edit() {
-        int x, y, w, h;
-        table->find_cell(table_t::CONTEXT_CELL, descr.row, 1, x, y, w, h);
-        auto widget = descr.widget;
-        std::invoke(descr.setter, *table, *property);
-        widget->resize(x, y, w, h);
-        widget->show();
-        widget->take_focus();
-        table->currently_edited = this;
-        editing = true;
-    }
-
-    void done_edit() {
-        auto widget = descr.widget;
-        if (widget->visible()) {
-            widget->hide();
-        }
-        std::invoke(descr.saver, *table, *property);
-        table->currently_edited = nullptr;
-        editing = false;
-
-        update_buttons();
+    void resize(int x, int y, int w, int h) override {
+        [&]() -> void {
+            int xx, yy, ww, hh;
+            table->find_cell(table_t::CONTEXT_TABLE, row, 2, xx, yy, ww, hh);
+            group_buttons->resize(xx, yy, ww, hh);
+        }();
+        [&]() -> void {
+            int xx, yy, ww, hh;
+            table->find_cell(table_t::CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
+            input_generic->resize(xx, yy, ww, hh);
+        }();
     }
 
     table_t *table;
     property_ptr_t property;
-    property_description_t descr;
+    int row;
     bool editing;
+    Fl_Widget *input_generic;
     Fl_Group *group_buttons;
     Fl_Button *button_undo;
     Fl_Button *button_reset;
 };
 
+struct int_cell_t final : property_cell_t {
+    using parent_t = property_cell_t;
+
+    int_cell_t(table_t *table_, property_ptr_t property_, int row_) : parent_t(table_, std::move(property_), row_) {
+        int xx, yy, ww, hh;
+        table->find_cell(table_t::CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
+        auto input = new Fl_Int_Input(xx, yy, ww, hh);
+        input->value(property->get_value().data());
+        input->callback([](Fl_Widget *, void *data) { reinterpret_cast<int_cell_t *>(data)->save_input(); }, this);
+        input_generic = input;
+    }
+
+    void save_input() {
+        auto value = static_cast<Fl_Int_Input *>(input_generic)->value();
+        property->set_value(value);
+        done_editing();
+    }
+};
+
+struct string_cell_t final : property_cell_t {
+    using parent_t = property_cell_t;
+
+    string_cell_t(table_t *table_, property_ptr_t property_, int row_) : parent_t(table_, std::move(property_), row_) {
+        int xx, yy, ww, hh;
+        table->find_cell(table_t::CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
+        auto input = new Fl_Input(xx, yy, ww, hh);
+        input->value(property->get_value().data());
+        input_generic = input;
+    }
+};
+
 table_t::table_t(categories_t categories_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), categories{std::move(categories_)}, currently_edited{nullptr} {
-
-    input_int = new Fl_Int_Input(0, 0, 0, 0);
-    input_int->hide();
-
-    input_text = new Fl_Input(0, 0, 0, 0);
-    input_text->hide();
+    : parent_t(x, y, w, h), categories{std::move(categories_)} {
 
     row_header(0);
     row_height_all(20);
@@ -233,15 +219,14 @@ table_t::table_t(categories_t categories_, int x, int y, int w, int h)
     cols(4);
     col_header(1);
     col_width(0, 220);
-    col_width(1, 650);
+    col_width(1, 570);
     col_width(2, 60);
     col_width(3, w / 2);
     col_resize(1);
-    end();
+
     when(FL_WHEN_CHANGED | when());
     resizable(this);
 
-    callback([](Fl_Widget *w, void *data) { static_cast<table_t *>(w)->on_callback(); });
     end();
 
     create_cells();
@@ -268,7 +253,7 @@ void table_t::draw_cell(TableContext context, int row, int col, int x, int y, in
         }
 
         for (size_t i = 0; i < cells.size(); ++i) {
-            cells.at(i)->resize(2, x, y, w, h);
+            cells.at(i)->resize(x, y, w, h);
         }
         init_sizes();
         return;
@@ -306,78 +291,19 @@ void table_t::create_cells() {
         cells.push_back(cell_ptr_t(new category_cell_t(this, c)));
         row++;
         for (auto &p : c->get_properties()) {
-            auto descr = [&]() -> property_description_t {
+            auto cell_ptr = [&]() -> property_cell_t * {
                 if (p->get_kind() == property_kind_t::positive_integer) {
-                    return property_description_t{row, input_int, &table_t::set_int, &table_t::save_int};
+                    return new int_cell_t(this, p, row);
                 } else if (p->get_kind() == property_kind_t::boolean) {
-                    return property_description_t{row, input_int, &table_t::set_int, &table_t::save_int};
+                    return new int_cell_t(this, p, row);
                 } else if (p->get_kind() == property_kind_t::text) {
-                    return property_description_t{row, input_text, &table_t::set_text, &table_t::save_text};
+                    return new string_cell_t(this, p, row);
                 }
                 assert(0 && "should not happen");
             }();
             ++row;
-            cells.push_back(cell_ptr_t(new property_cell_t(this, p, descr)));
+            cells.push_back(cell_ptr_t(cell_ptr));
         }
     }
     end();
-}
-
-void table_t::on_callback() {
-    auto row = callback_row();
-    auto col = callback_col();
-    auto context = callback_context();
-
-    switch (context) {
-    case CONTEXT_CELL: {
-        return;
-        switch (Fl::event()) {
-        case FL_PUSH:
-            done_editing();
-            if (row != rows() - 1 && col != cols() - 1)
-                try_start_editing(row, col);
-            return;
-        }
-    case CONTEXT_TABLE:      // A table event occurred on dead zone in table
-    case CONTEXT_ROW_HEADER: // A table event occurred on row/column header
-    case CONTEXT_COL_HEADER:
-        done_editing(); // done editing, hide
-        return;
-
-    default:
-        return;
-    }
-    }
-}
-
-void table_t::set_int(const property_t &property) {
-    static_cast<Fl_Int_Input *>(input_int)->value(property.get_value().data());
-}
-
-void table_t::save_int(property_t &property) { property.set_value(static_cast<Fl_Int_Input *>(input_int)->value()); }
-
-void table_t::set_text(const property_t &property) {
-    static_cast<Fl_Input *>(input_text)->value(property.get_value().data());
-}
-
-void table_t::save_text(property_t &property) { property.set_value(static_cast<Fl_Input *>(input_text)->value()); }
-
-void table_t::try_start_editing(int row, int col) {
-    if (col != 1) {
-        return;
-    }
-    auto &cell = cells.at(row);
-    auto property_cell = dynamic_cast<property_cell_t *>(cell.get());
-    if (!property_cell) {
-        return;
-    }
-
-    property_cell->start_edit();
-}
-
-void table_t::done_editing() {
-    if (currently_edited) {
-        auto cell = static_cast<property_cell_t *>(currently_edited);
-        cell->done_edit();
-    }
 }
