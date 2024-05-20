@@ -232,9 +232,9 @@ table_t::table_t(categories_t categories_, int x, int y, int w, int h)
     row_resize(0);
     cols(4);
     col_header(1);
-    col_width(0, w / 6);
-    col_width(1, w / 6);
-    col_width(2, w / 6);
+    col_width(0, 220);
+    col_width(1, 650);
+    col_width(2, 60);
     col_width(3, w / 2);
     col_resize(1);
     end();
