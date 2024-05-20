@@ -20,9 +20,15 @@ void property_t::set_value(std::string_view value_) noexcept {
     error = validate_value();
 }
 
-void property_t::reset() noexcept { value = default_value; }
+void property_t::reset() noexcept {
+    value = default_value;
+    error = {};
+}
 
-void property_t::undo() noexcept { value = initial_value; }
+void property_t::undo() noexcept {
+    value = initial_value;
+    error = {};
+}
 
 const error_ptr_t &property_t::validate() noexcept { return error; }
 

@@ -97,7 +97,24 @@ struct property_cell_t : table_t::cell_t {
         auto button_h = hh - padding * 2;
 
         button_undo = new Fl_Button(xx + padding, yy + padding, button_w, button_h, "@undo");
+        button_undo->callback(
+            [](Fl_Widget *, void *data) {
+                auto self = static_cast<property_cell_t *>(data);
+                self->property->undo();
+                self->load_value();
+                self->done_editing();
+            },
+            this);
+
         button_reset = new Fl_Button(xx + padding + button_w + padding, yy + padding, button_w, button_h, "@refresh");
+        button_reset->callback(
+            [](Fl_Widget *, void *data) {
+                auto self = static_cast<property_cell_t *>(data);
+                self->property->reset();
+                self->load_value();
+                self->done_editing();
+            },
+            this);
 
         group_buttons->end();
         group_buttons->resizable(group_buttons);
@@ -169,6 +186,8 @@ struct property_cell_t : table_t::cell_t {
         }();
     }
 
+    virtual void load_value() = 0;
+
     table_t *table;
     property_ptr_t property;
     int row;
@@ -186,9 +205,14 @@ struct int_cell_t final : property_cell_t {
         int xx, yy, ww, hh;
         table->find_cell(table_t::CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
         auto input = new Fl_Int_Input(xx, yy, ww, hh);
-        input->value(property->get_value().data());
         input->callback([](Fl_Widget *, void *data) { reinterpret_cast<int_cell_t *>(data)->save_input(); }, this);
         input_generic = input;
+        load_value();
+    }
+
+    void load_value() {
+        auto value = property->get_value();
+        static_cast<Fl_Int_Input *>(input_generic)->value(value.data());
     }
 
     void save_input() {
@@ -205,8 +229,13 @@ struct string_cell_t final : property_cell_t {
         int xx, yy, ww, hh;
         table->find_cell(table_t::CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
         auto input = new Fl_Input(xx, yy, ww, hh);
-        input->value(property->get_value().data());
         input_generic = input;
+        load_value();
+    }
+
+    void load_value() {
+        auto value = property->get_value();
+        static_cast<Fl_Input *>(input_generic)->value(value.data());
     }
 };
 
