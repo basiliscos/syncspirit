@@ -98,7 +98,7 @@ struct property_cell_t final : table_t::cell_t {
             draw_input(x, y, w, h);
             break;
         case 3:
-            draw_explanation(x, y, w, h);
+            draw_explanation_or_error(x, y, w, h);
             break;
         }
     }
@@ -122,10 +122,19 @@ struct property_cell_t final : table_t::cell_t {
         fl_rect(x, y, w, h);
     }
 
-    void draw_explanation(int x, int y, int w, int h) {
-        auto text = property->get_explanation();
+    void draw_explanation_or_error(int x, int y, int w, int h) {
+        auto &err = property->validate();
+        const char *text;
+        if (err) {
+            fl_color(FL_RED);
+            fl_rectf(x, y, w, h);
+            fl_color(FL_BLACK);
+            text = err->c_str();
+        } else {
+            text = property->get_explanation().data();
+        }
         fl_color(FL_BLACK);
-        fl_draw(text.data(), x, y, w, h, FL_ALIGN_LEFT);
+        fl_draw(text, x, y, w, h, FL_ALIGN_LEFT);
     }
 
     void start_edit() {
@@ -138,7 +147,6 @@ struct property_cell_t final : table_t::cell_t {
         widget->take_focus();
         table->currently_edited = this;
         editing = true;
-        printf("start_edit\n");
     }
 
     void done_edit() {
@@ -149,7 +157,6 @@ struct property_cell_t final : table_t::cell_t {
         std::invoke(descr.saver, *table, *property);
         table->currently_edited = nullptr;
         editing = false;
-        printf("done_edit\n");
     }
 
     table_t *table;
