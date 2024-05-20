@@ -291,12 +291,39 @@ const char *discovery_url_t::explanation_ = "here pick the list of relay servers
 rx_buff_size_t::rx_buff_size_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("rx_buff_size", explanation_, std::to_string(value), std::to_string(default_value)) {}
 
-void rx_buff_size_t::reflect_to(syncspirit::config::main_t &main) {
-    main.global_announce_config.rx_buff_size = native_value;
-}
+void rx_buff_size_t::reflect_to(syncspirit::config::main_t &main) { main.relay_config.rx_buff_size = native_value; }
 
 const char *rx_buff_size_t::explanation_ = "preallocated receive buffer size, bytes";
 
 } // namespace relay
+
+namespace upnp {
+
+void enabled_t::reflect_to(syncspirit::config::main_t &main) { main.upnp_config.enabled = native_value; }
+
+void debug_t::reflect_to(syncspirit::config::main_t &main) { main.upnp_config.debug = native_value; }
+
+external_port_t::external_port_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("external_port", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void external_port_t::reflect_to(syncspirit::config::main_t &main) { main.upnp_config.external_port = native_value; }
+
+const char *external_port_t::explanation_ = "external (router) port for communication, opened on router";
+
+max_wait_t::max_wait_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("max_wait", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void max_wait_t::reflect_to(syncspirit::config::main_t &main) { main.upnp_config.max_wait = native_value; }
+
+const char *max_wait_t::explanation_ = "router response max wait time, seconds";
+
+rx_buff_size_t::rx_buff_size_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("rx_buff_size", explanation_, std::to_string(value), std::to_string(default_value)) {}
+
+void rx_buff_size_t::reflect_to(syncspirit::config::main_t &main) { main.upnp_config.rx_buff_size = native_value; }
+
+const char *rx_buff_size_t::explanation_ = "preallocated receive buffer size, bytes";
+
+} // namespace upnp
 
 } // namespace syncspirit::fltk::config

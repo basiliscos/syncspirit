@@ -336,4 +336,49 @@ struct rx_buff_size_t final : impl::positive_integer_t {
 
 } // namespace relay
 
+namespace upnp {
+
+struct enabled_t final : impl::bool_t {
+    using parent_t = impl::bool_t;
+    using parent_t::parent_t;
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct debug_t final : impl::bool_t {
+    using parent_t = impl::bool_t;
+    using parent_t::parent_t;
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct external_port_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    external_port_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct max_wait_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    max_wait_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct rx_buff_size_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    rx_buff_size_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+} // namespace upnp
+
 } // namespace syncspirit::fltk::config
