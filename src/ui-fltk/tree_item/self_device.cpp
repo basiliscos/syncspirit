@@ -55,7 +55,7 @@ self_device_t::~self_device_t() {
 void self_device_t::operator()(model::message::model_response_t &) {
     auto &self = *supervisor.get_cluster()->get_device();
     auto device_id = self.device_id().get_short();
-    auto label = fmt::format("self: {}", device_id);
+    auto label = fmt::format("(self) {}, {}", supervisor.get_app_config().device_name, device_id);
     this->label(label.data());
     recalc_tree();
     tree()->redraw();
