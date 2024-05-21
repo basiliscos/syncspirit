@@ -4,6 +4,7 @@
 #include <FL/Fl_Int_Input.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Group.H>
+#include <FL/Fl_Check_Button.H>
 #include <cassert>
 #include <functional>
 
@@ -224,6 +225,30 @@ struct int_cell_t final : property_cell_t {
     }
 };
 
+struct bool_cell_t final : property_cell_t {
+    using parent_t = property_cell_t;
+
+    bool_cell_t(table_t *table_, property_ptr_t property_, int row_) : parent_t(table_, std::move(property_), row_) {
+        int xx, yy, ww, hh;
+        table->find_cell(table_t::CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
+        auto input = new Fl_Check_Button(xx, yy, ww, hh);
+        input->callback([](Fl_Widget *, void *data) { reinterpret_cast<bool_cell_t *>(data)->save_input(); }, this);
+        input_generic = input;
+        load_value();
+    }
+
+    void load_value() {
+        auto value = property->get_value();
+        static_cast<Fl_Check_Button *>(input_generic)->value(value == "true");
+    }
+
+    void save_input() {
+        auto value = static_cast<Fl_Check_Button *>(input_generic)->value();
+        property->set_value(value ? "true" : "");
+        done_editing();
+    }
+};
+
 struct string_cell_t final : property_cell_t {
     using parent_t = property_cell_t;
 
@@ -231,6 +256,7 @@ struct string_cell_t final : property_cell_t {
         int xx, yy, ww, hh;
         table->find_cell(table_t::CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
         auto input = new Fl_Input(xx, yy, ww, hh);
+        input->callback([](Fl_Widget *, void *data) { reinterpret_cast<string_cell_t *>(data)->save_input(); }, this);
         input_generic = input;
         load_value();
     }
@@ -238,6 +264,12 @@ struct string_cell_t final : property_cell_t {
     void load_value() {
         auto value = property->get_value();
         static_cast<Fl_Input *>(input_generic)->value(value.data());
+    }
+
+    void save_input() {
+        auto value = static_cast<Fl_Input *>(input_generic)->value();
+        property->set_value(value);
+        done_editing();
     }
 };
 
@@ -326,7 +358,7 @@ void table_t::create_cells() {
                 if (p->get_kind() == property_kind_t::positive_integer) {
                     return new int_cell_t(this, p, row);
                 } else if (p->get_kind() == property_kind_t::boolean) {
-                    return new int_cell_t(this, p, row);
+                    return new bool_cell_t(this, p, row);
                 } else if (p->get_kind() == property_kind_t::text) {
                     return new string_cell_t(this, p, row);
                 }

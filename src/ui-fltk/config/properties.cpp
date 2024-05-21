@@ -34,8 +34,7 @@ string_t::string_t(std::string label, std::string explanation, std::string value
                  property_kind_t::text) {}
 
 bool_t::bool_t(bool value, bool default_value, std::string label)
-    : property_t(std::move(label), "", std::to_string(value), std::to_string(default_value), property_kind_t::boolean) {
-}
+    : property_t(std::move(label), "", value ? "true" : "", default_value ? "true" : "", property_kind_t::boolean) {}
 
 error_ptr_t bool_t::validate_value() noexcept {
     native_value = (value == "true") ? 1 : 0;
@@ -300,6 +299,8 @@ const char *rx_buff_size_t::explanation_ = "preallocated receive buffer size, by
 namespace upnp {
 
 void enabled_t::reflect_to(syncspirit::config::main_t &main) { main.upnp_config.enabled = native_value; }
+
+debug_t::debug_t(bool value, bool default_value) : parent_t(value, default_value, "debug") {}
 
 void debug_t::reflect_to(syncspirit::config::main_t &main) { main.upnp_config.debug = native_value; }
 
