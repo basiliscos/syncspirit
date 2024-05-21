@@ -162,6 +162,7 @@ int main(int argc, char **argv) {
         }
 
         config_file_path.append("syncspirit.toml");
+        auto config_file_path_str = config_file_path.string();
         bool populate = !bfs::exists(config_file_path);
         if (populate) {
             spdlog::info("Config {} seems does not exit, creating default one...", config_file_path.string());
@@ -171,14 +172,13 @@ int main(int argc, char **argv) {
                 return 1;
             }
             auto &cfg = cfg_opt.value();
-            std::fstream f_cfg(config_file_path.string(), f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
+            std::fstream f_cfg(config_file_path_str, f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
             auto r = config::serialize(cfg, f_cfg);
             if (!r) {
-                spdlog::error("cannot save default config at :: {}", r.error().message());
+                spdlog::error("cannot save default config at {}: {}", config_file_path_str, r.error().message());
                 return 1;
             }
         }
-        auto config_file_path_str = config_file_path.string();
         std::ifstream config_file(config_file_path_str);
         if (!config_file) {
             spdlog::error("Cannot open config file {}", config_file_path_str);

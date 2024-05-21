@@ -7,7 +7,7 @@ namespace syncspirit::fltk::config {
 
 namespace impl {
 struct positive_integer_t : property_t {
-    positive_integer_t(std::string label, std::string explanation, std::string value, std::string default_value);
+    positive_integer_t(std::string label, std::string explanation, std::uint64_t value, std::uint64_t default_value);
 
     error_ptr_t validate_value() noexcept override;
 

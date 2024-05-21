@@ -34,7 +34,7 @@ struct SYNCSPIRIT_API URI {
 
     inline bool operator==(const URI &other) const noexcept { return full == other.full; }
     bool operator<(const URI &other) const noexcept;
-    inline operator bool() const noexcept { return !full.empty(); }
+    explicit inline operator bool() const noexcept { return !full.empty(); }
 
   private:
     void reconstruct() noexcept;

@@ -4,6 +4,7 @@
 #include "config/utils.h"
 #include "../tree_item/settings.h"
 #include <FL/Fl_Button.H>
+#include <fstream>
 
 namespace syncspirit::fltk::config {
 
@@ -33,10 +34,12 @@ control_t::control_t(tree_item_t &tree_item_, int x, int y, int w, int h)
     auto common_w = bottom_group->w() / 2 - PADDING;
     auto common_h = bottom_group->h() - PADDING * 2;
     auto save = new Fl_Button(bottom_group->x(), common_y, common_w, common_h, "save");
+    save->callback([](Fl_Widget *, void *data) { reinterpret_cast<control_t *>(data)->on_save(); }, this);
+
     auto reset = new Fl_Button(save->x() + common_w + PADDING, common_y, common_w, common_h, "defaults");
     reset->callback([](Fl_Widget *, void *data) { reinterpret_cast<control_t *>(data)->on_reset(); }, this);
+
     bottom_group->end();
-    // bottom_group->position(table->x(), table->h());
 
     resizable(table);
     box(FL_FLAT_BOX);
@@ -64,6 +67,23 @@ void control_t::on_setting_modify() {
         }
     }
     static_cast<tree_item::settings_t &>(tree_item).update_label(modified);
+}
+
+void control_t::on_save() {
+    auto &sup = tree_item.supervisor;
+    auto &log = sup.get_logger();
+    auto config_path = sup.get_config_path();
+    auto cfg = reflect(categories);
+    cfg.config_path = config_path;
+
+    auto path = config_path.string();
+    std::fstream f_cfg(path, f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
+    auto r = syncspirit::config::serialize(cfg, f_cfg);
+    if (!r) {
+        log->error("cannot save default config at {}: {}", path, r.error().message());
+    } else {
+        log->info("succesfully stored config at {}. Restart to apply", path);
+    }
 }
 
 } // namespace syncspirit::fltk::config
