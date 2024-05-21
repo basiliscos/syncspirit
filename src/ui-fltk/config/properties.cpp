@@ -53,7 +53,8 @@ path_t::path_t(std::string label, std::string explanation, std::string value, st
     : property_t(std::move(label), std::move(explanation), std::move(value), std::move(default_value), kind) {}
 
 bool_t::bool_t(bool value, bool default_value, std::string label)
-    : property_t(std::move(label), "", value ? "true" : "", default_value ? "true" : "", property_kind_t::boolean) {}
+    : property_t(std::move(label), "", value ? "true" : "", default_value ? "true" : "", property_kind_t::boolean),
+      native_value(value ? 1 : 0) {}
 
 error_ptr_t bool_t::validate_value() noexcept {
     native_value = (value == "true") ? 1 : 0;
