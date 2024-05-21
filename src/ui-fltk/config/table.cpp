@@ -34,6 +34,7 @@ auto table_t::cell_t::clip(int col, int x, int y, int w, int h) -> clip_guart_t 
 }
 
 void table_t::cell_t::resize(int x, int y, int w, int h) {}
+void table_t::cell_t::load_value() {}
 
 struct category_cell_t final : table_t::cell_t {
     using parent_t = table_t::cell_t;
@@ -108,7 +109,6 @@ struct property_cell_t : table_t::cell_t {
                 auto self = static_cast<property_cell_t *>(data);
                 self->property->undo();
                 self->load_value();
-                self->done_editing();
             },
             this);
         button_undo->copy_tooltip("undo to initial");
@@ -119,7 +119,6 @@ struct property_cell_t : table_t::cell_t {
                 auto self = static_cast<property_cell_t *>(data);
                 self->property->reset();
                 self->load_value();
-                self->done_editing();
             },
             this);
         button_reset->copy_tooltip("reset to default");
@@ -161,6 +160,8 @@ struct property_cell_t : table_t::cell_t {
         }
     }
 
+    void load_value() override { done_editing(); }
+
     void done_editing() {
         update_buttons();
         table->redraw();
@@ -194,8 +195,6 @@ struct property_cell_t : table_t::cell_t {
         }();
     }
 
-    virtual void load_value() = 0;
-
     table_t *table;
     property_ptr_t property;
     int row;
@@ -221,6 +220,7 @@ struct int_cell_t final : property_cell_t {
     void load_value() {
         auto value = property->get_value();
         static_cast<Fl_Int_Input *>(input_generic)->value(value.data());
+        parent_t::load_value();
     }
 
     void save_input() {
@@ -242,9 +242,10 @@ struct bool_cell_t final : property_cell_t {
         load_value();
     }
 
-    void load_value() {
+    void load_value() override {
         auto value = property->get_value();
         static_cast<Fl_Check_Button *>(input_generic)->value(value == "true");
+        parent_t::load_value();
     }
 
     void save_input() {
@@ -266,9 +267,10 @@ struct string_cell_t final : property_cell_t {
         load_value();
     }
 
-    void load_value() {
+    void load_value() override {
         auto value = property->get_value();
         static_cast<Fl_Input *>(input_generic)->value(value.data());
+        parent_t::load_value();
     }
 
     void save_input() {
@@ -299,10 +301,11 @@ struct path_cell_t final : property_cell_t {
         load_value();
     }
 
-    void load_value() {
+    void load_value() override {
         auto value = property->get_value();
         auto child_control = static_cast<Fl_Group *>(input_generic)->child(0);
         static_cast<Fl_Input *>(child_control)->value(value.data());
+        parent_t::load_value();
     }
 
     void save_input() {
@@ -342,8 +345,8 @@ struct path_cell_t final : property_cell_t {
     }
 };
 
-table_t::table_t(categories_t categories_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), categories{std::move(categories_)} {
+table_t::table_t(const categories_t &categories_, int x, int y, int w, int h)
+    : parent_t(x, y, w, h), categories{categories_} {
 
     row_header(0);
     row_height_all(20);
@@ -441,4 +444,11 @@ void table_t::create_cells() {
         }
     }
     end();
+}
+
+void table_t::reload_values() {
+    for (auto &c : cells) {
+        c->load_value();
+    }
+    redraw();
 }

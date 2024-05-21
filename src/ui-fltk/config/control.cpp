@@ -11,7 +11,6 @@ static constexpr int PADDING = 5;
 control_t::control_t(tree_item_t &tree_item_, int x, int y, int w, int h)
     : Fl_Group(x, y, w, h, "global app settings"), tree_item{tree_item_} {
 
-    auto categories = categories_t();
     auto &sup = tree_item_.supervisor;
     auto config_path = sup.get_config_path();
     auto defaults_opt = syncspirit::config::generate_config(config_path);
@@ -33,11 +32,22 @@ control_t::control_t(tree_item_t &tree_item_, int x, int y, int w, int h)
     auto common_h = bottom_group->h() - PADDING * 2;
     auto save = new Fl_Button(bottom_group->x(), common_y, common_w, common_h, "save");
     auto reset = new Fl_Button(save->x() + common_w + PADDING, common_y, common_w, common_h, "defaults");
+    reset->callback([](Fl_Widget *, void *data) { reinterpret_cast<control_t *>(data)->on_reset(); }, this);
     bottom_group->end();
     // bottom_group->position(table->x(), table->h());
 
     resizable(table);
     box(FL_FLAT_BOX);
+}
+
+void control_t::on_reset() {
+    for (auto &c : categories) {
+        for (auto &p : c->get_properties()) {
+            p->reset();
+        }
+    }
+    auto table = static_cast<table_t *>(child(0));
+    table->reload_values();
 }
 
 } // namespace syncspirit::fltk::config

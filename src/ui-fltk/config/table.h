@@ -21,6 +21,7 @@ struct table_t : Fl_Table {
         virtual clip_guart_t clip(int col, int x, int y, int w, int h);
         virtual void draw(int col, int x, int y, int w, int h) = 0;
         virtual void resize(int x, int y, int w, int h);
+        virtual void load_value();
     };
 
     using cell_ptr_t = std::unique_ptr<cell_t>;
@@ -29,12 +30,13 @@ struct table_t : Fl_Table {
     using parent_t::tih;
     using parent_t::tiy;
 
-    table_t(categories_t categories, int x, int y, int w, int h);
+    table_t(const categories_t &categories, int x, int y, int w, int h);
     void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
 
     void draw_header(int col, int x, int y, int w, int h);
     void draw_data(int row, int col, int x, int y, int w, int h);
     void create_cells();
+    void reload_values();
 
     categories_t categories;
     cells_t cells;
