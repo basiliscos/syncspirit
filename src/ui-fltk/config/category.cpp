@@ -176,4 +176,16 @@ auto reflect(const categories_t &categories) -> main_cfg_t {
     return cfg;
 }
 
+bool is_valid(const categories_t& categories) {
+    for (auto &c : categories) {
+        for (auto &p : c->get_properties()) {
+            if (auto& err = p->validate(); err) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+
 } // namespace syncspirit::fltk::config

@@ -72,6 +72,11 @@ void control_t::on_setting_modify() {
 void control_t::on_save() {
     auto &sup = tree_item.supervisor;
     auto &log = sup.get_logger();
+    if (!is_valid(categories)) {
+        log->error("config has error, saving is not possible");
+        return;
+    }
+
     auto config_path = sup.get_config_path();
     auto cfg = reflect(categories);
     cfg.config_path = config_path;
