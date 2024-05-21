@@ -37,6 +37,7 @@ struct table_t : Fl_Table {
     void draw_data(int row, int col, int x, int y, int w, int h);
     void create_cells();
     void reload_values();
+    void done_editing();
 
     categories_t categories;
     cells_t cells;

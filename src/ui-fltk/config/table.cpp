@@ -164,7 +164,7 @@ struct property_cell_t : table_t::cell_t {
 
     void done_editing() {
         update_buttons();
-        table->redraw();
+        table->done_editing();
     }
 
     void draw_explanation_or_error(int x, int y, int w, int h) {
@@ -444,6 +444,13 @@ void table_t::create_cells() {
         }
     }
     end();
+}
+
+void table_t::done_editing() {
+    if (auto cb = callback(); cb) {
+        Fl_Widget::do_callback();
+    };
+    redraw();
 }
 
 void table_t::reload_values() {

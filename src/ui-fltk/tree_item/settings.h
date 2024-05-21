@@ -8,6 +8,7 @@ struct settings_t : tree_item_t {
     using parent_t = tree_item_t;
     settings_t(app_supervisor_t &supervisor, Fl_Tree *tree);
 
+    void update_label(bool modified);
     void on_select() override;
 };
 

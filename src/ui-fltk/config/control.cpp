@@ -2,6 +2,7 @@
 
 #include "table.h"
 #include "config/utils.h"
+#include "../tree_item/settings.h"
 #include <FL/Fl_Button.H>
 
 namespace syncspirit::fltk::config {
@@ -24,6 +25,7 @@ control_t::control_t(tree_item_t &tree_item_, int x, int y, int w, int h)
 
     auto bottom_h = 40;
     auto table = new table_t(categories, x + PADDING, y + PADDING, w - PADDING * 2, h - (bottom_h + PADDING * 3));
+    table->callback([](auto, void *data) { reinterpret_cast<control_t *>(data)->on_setting_modify(); }, this);
 
     auto bottom_group = new Fl_Group(x + PADDING, table->y() + table->h() + PADDING, w - PADDING * 2, bottom_h);
     bottom_group->begin();
@@ -48,6 +50,20 @@ void control_t::on_reset() {
     }
     auto table = static_cast<table_t *>(child(0));
     table->reload_values();
+}
+
+void control_t::on_setting_modify() {
+    bool modified = false;
+    for (size_t i = 0; i < categories.size() && !modified; ++i) {
+        auto &c = categories[i];
+        for (auto &p : c->get_properties()) {
+            if (!p->same_as_initial()) {
+                modified = true;
+                break;
+            }
+        }
+    }
+    static_cast<tree_item::settings_t &>(tree_item).update_label(modified);
 }
 
 } // namespace syncspirit::fltk::config

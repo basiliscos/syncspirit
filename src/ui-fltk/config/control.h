@@ -10,6 +10,7 @@ struct control_t : Fl_Group {
     control_t(tree_item_t &tree_item, int x, int y, int w, int h);
 
     void on_reset();
+    void on_setting_modify();
 
     tree_item_t &tree_item;
     categories_t categories;
