@@ -14,13 +14,31 @@ void base_sink_t::log(const spdlog::details::log_msg &msg) {
     spdlog::memory_buf_t formatted;
     date_formatter.format(msg, formatted);
     auto date = std::string(formatted.begin(), formatted.end() - 1);
-    auto source = msg.logger_name;
+    auto source = [&]() { return std::string(msg.logger_name.begin(), msg.logger_name.end()); }();
     auto message = msg.payload;
+    auto message_view = std::string_view(message.begin(), message.end());
+    auto thread_id = std::to_string(msg.thread_id);
 
-    auto record = new log_record_t(msg.level, std::move(date), std::string(source.begin(), source.end()),
-                                   std::string(message.begin(), message.end()), std::to_string(msg.thread_id));
-
-    forward(log_record_ptr_t(record));
+    std::string::size_type pos = 0, prev = 0;
+    int index = 0;
+    while ((pos = message_view.find("\n", prev)) != std::string::npos) {
+        auto sub_message = message_view.substr(prev, pos - prev);
+        auto record = [&]() -> log_record_ptr_t {
+            if (!index) {
+                ++index;
+                return new log_record_t(msg.level, std::move(date), std::move(source), std::string(sub_message),
+                                        std::move(thread_id));
+            } else {
+                return new log_record_t(msg.level, "", "", std::string(sub_message), "");
+            }
+        }();
+        prev = pos + 1;
+        forward(std::move(record));
+    }
+    auto sub_message = message_view.substr(prev);
+    auto record =
+        new log_record_t(msg.level, std::move(date), std::move(source), std::string(sub_message), std::move(thread_id));
+    forward(std::move(record));
 }
 
 void im_memory_sink_t::forward(log_record_ptr_t record) {
