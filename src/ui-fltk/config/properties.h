@@ -17,6 +17,12 @@ struct string_t : property_t {
     string_t(std::string label, std::string explanation, std::string value, std::string default_value);
 };
 
+struct url_t : string_t {
+    using parent_t = string_t;
+    using parent_t::parent_t;
+    error_ptr_t validate_value() noexcept override;
+};
+
 struct path_t : property_t {
     path_t(std::string label, std::string explanation, std::string value, std::string default_value,
            property_kind_t kind = property_kind_t::file);
@@ -180,8 +186,8 @@ struct enabled_t final : impl::bool_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct announce_url_t final : impl::string_t {
-    using parent_t = impl::string_t;
+struct announce_url_t final : impl::url_t {
+    using parent_t = impl::url_t;
 
     static const char *explanation_;
 
@@ -320,8 +326,8 @@ struct enabled_t final : impl::bool_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct discovery_url_t final : impl::string_t {
-    using parent_t = impl::string_t;
+struct discovery_url_t final : impl::url_t {
+    using parent_t = impl::url_t;
 
     static const char *explanation_;
 

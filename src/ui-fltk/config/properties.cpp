@@ -33,6 +33,19 @@ string_t::string_t(std::string label, std::string explanation, std::string value
     : property_t(std::move(label), std::move(explanation), std::move(value), std::move(default_value),
                  property_kind_t::text) {}
 
+error_ptr_t url_t::validate_value() noexcept {
+    auto option = utils::parse(value);
+    if (!option) {
+        return error_ptr_t(new std::string("invalid url"));
+    }
+    auto &new_url = *option;
+    auto original = utils::parse(default_value).value();
+    if (new_url.proto != original.proto) {
+        return error_ptr_t(new std::string("invalid protocol"));
+    }
+    return {};
+}
+
 path_t::path_t(std::string label, std::string explanation, std::string value, std::string default_value,
                property_kind_t kind)
     : property_t(std::move(label), std::move(explanation), std::move(value), std::move(default_value), kind) {}
