@@ -32,6 +32,26 @@ spdlog::level::level_enum get_log_level(const std::string &log_level) noexcept {
     return value;
 }
 
+std::string_view get_level_string(spdlog::level::level_enum level) noexcept {
+    using L = spdlog::level::level_enum;
+    switch (level) {
+    case L::trace:
+        return "trace";
+    case L::debug:
+        return "debug";
+    case L::info:
+        return "info";
+    case L::warn:
+        return "info";
+    case L::err:
+        return "error";
+    case L::critical:
+        return "critical";
+    default:
+        return "off";
+    }
+}
+
 using sink_option_t = outcome::result<spdlog::sink_ptr>;
 
 static sink_option_t make_sink(std::string_view name) noexcept {

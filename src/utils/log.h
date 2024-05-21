@@ -20,6 +20,7 @@ using logger_t = std::shared_ptr<spdlog::logger>;
 using dist_sink_t = std::shared_ptr<spdlog::sinks::dist_sink_mt>;
 
 SYNCSPIRIT_API spdlog::level::level_enum get_log_level(const std::string &log_level) noexcept;
+SYNCSPIRIT_API std::string_view get_level_string(spdlog::level::level_enum) noexcept;
 
 SYNCSPIRIT_API void set_default(const std::string &level) noexcept;
 
