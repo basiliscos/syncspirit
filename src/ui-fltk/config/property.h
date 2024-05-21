@@ -14,6 +14,7 @@ using error_ptr_t = std::unique_ptr<std::string>;
 enum class property_kind_t {
     text,
     file,
+    directory,
     positive_integer,
     boolean,
 };

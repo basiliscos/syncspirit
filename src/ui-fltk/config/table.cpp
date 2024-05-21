@@ -5,10 +5,15 @@
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Check_Button.H>
+#include <FL/Fl_Native_File_Chooser.H>
+#include <boost/filesystem.hpp>
+#include <spdlog/fmt/fmt.h>
+
 #include <cassert>
 #include <functional>
 
 using namespace syncspirit::fltk::config;
+namespace bfs = boost::filesystem;
 
 static constexpr int col_min_size = 60;
 
@@ -273,6 +278,70 @@ struct string_cell_t final : property_cell_t {
     }
 };
 
+struct path_cell_t final : property_cell_t {
+    using parent_t = property_cell_t;
+
+    path_cell_t(table_t *table_, property_ptr_t property_, int row_) : parent_t(table_, std::move(property_), row_) {
+        int xx, yy, ww, hh;
+        auto w = 25;
+        auto p = 2;
+        table->find_cell(table_t::CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
+        auto group = new Fl_Group(xx, yy, ww, hh);
+        group->begin();
+        auto input = new Fl_Input(xx, yy, ww - (w + p * 2), hh);
+        input->callback([](Fl_Widget *, void *data) { reinterpret_cast<path_cell_t *>(data)->save_input(); }, this);
+
+        auto button = new Fl_Button(xx + input->w() + p, yy + p, w, hh - p * 2, "...");
+        button->callback([](Fl_Widget *, void *data) { reinterpret_cast<path_cell_t *>(data)->on_click(); }, this);
+
+        group->end();
+        input_generic = group;
+        load_value();
+    }
+
+    void load_value() {
+        auto value = property->get_value();
+        auto child_control = static_cast<Fl_Group *>(input_generic)->child(0);
+        static_cast<Fl_Input *>(child_control)->value(value.data());
+    }
+
+    void save_input() {
+        auto child_control = static_cast<Fl_Group *>(input_generic)->child(0);
+        auto value = static_cast<Fl_Input *>(child_control)->value();
+        property->set_value(value);
+        done_editing();
+    }
+
+    void on_click() {
+        using T = Fl_Native_File_Chooser::Type;
+        auto k = property->get_kind();
+        auto type = k == property_kind_t::file ? T::BROWSE_FILE : T::BROWSE_DIRECTORY;
+
+        Fl_Native_File_Chooser file_chooser;
+        file_chooser.title(property->get_explanation().data());
+        file_chooser.type(type);
+        if (k == property_kind_t::file) {
+            auto path = bfs::path(property->get_value());
+            auto parent = path.parent_path().string();
+            file_chooser.directory(parent.data());
+
+            auto ext = fmt::format("*{}", path.extension().string());
+            auto filter = fmt::format("{}\t{}", ext, ext);
+            file_chooser.filter(filter.data());
+        }
+
+        auto r = file_chooser.show();
+        if (r != 0) {
+            return;
+        }
+
+        // commit
+        property->set_value(file_chooser.filename());
+        load_value();
+        done_editing();
+    }
+};
+
 table_t::table_t(categories_t categories_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), categories{std::move(categories_)} {
 
@@ -355,12 +424,15 @@ void table_t::create_cells() {
         row++;
         for (auto &p : c->get_properties()) {
             auto cell_ptr = [&]() -> property_cell_t * {
-                if (p->get_kind() == property_kind_t::positive_integer) {
+                auto k = p->get_kind();
+                if (k == property_kind_t::positive_integer) {
                     return new int_cell_t(this, p, row);
-                } else if (p->get_kind() == property_kind_t::boolean) {
+                } else if (k == property_kind_t::boolean) {
                     return new bool_cell_t(this, p, row);
-                } else if (p->get_kind() == property_kind_t::text) {
+                } else if (k == property_kind_t::text) {
                     return new string_cell_t(this, p, row);
+                } else if (k == property_kind_t::file || k == property_kind_t::directory) {
+                    return new path_cell_t(this, p, row);
                 }
                 assert(0 && "should not happen");
             }();

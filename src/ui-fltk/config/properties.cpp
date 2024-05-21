@@ -33,6 +33,10 @@ string_t::string_t(std::string label, std::string explanation, std::string value
     : property_t(std::move(label), std::move(explanation), std::move(value), std::move(default_value),
                  property_kind_t::text) {}
 
+path_t::path_t(std::string label, std::string explanation, std::string value, std::string default_value,
+               property_kind_t kind)
+    : property_t(std::move(label), std::move(explanation), std::move(value), std::move(default_value), kind) {}
+
 bool_t::bool_t(bool value, bool default_value, std::string label)
     : property_t(std::move(label), "", value ? "true" : "", default_value ? "true" : "", property_kind_t::boolean) {}
 
@@ -245,7 +249,8 @@ const char *port_t::explanation_ = "upd port used for announcement (should be th
 namespace main {
 
 default_location_t::default_location_t(std::string value, std::string default_value)
-    : parent_t("default_location", explanation_, std::move(value), std::move(default_value)) {}
+    : parent_t("default_location", explanation_, std::move(value), std::move(default_value),
+               property_kind_t::directory) {}
 
 void default_location_t::reflect_to(syncspirit::config::main_t &main) { main.default_location = value; }
 
