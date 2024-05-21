@@ -143,6 +143,15 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
         return new category_t("upnp", "universal plug and play router settings", std::move(props));
     }();
 
+    auto c_logs = [&]() -> category_ptr_t {
+        auto &sinks = config.log_configs;
+        auto props = properties_t{};
+        for (auto &s : sinks) {
+            props.emplace_back(property_ptr_t(new impl::log_sink_t(s.name, s.sinks, s.level)));
+        }
+        return new category_t("logging", "log sinks & levels", std::move(props));
+    }();
+
     r.push_back(std::move(c_bep));
     r.push_back(std::move(c_db));
     r.push_back(std::move(c_dialer));
@@ -152,6 +161,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
     r.push_back(std::move(c_main));
     r.push_back(std::move(c_relay));
     r.push_back(std::move(c_upnp));
+    r.push_back(std::move(c_logs));
 
     return r;
 }

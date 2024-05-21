@@ -58,6 +58,21 @@ error_ptr_t bool_t::validate_value() noexcept {
     return {};
 }
 
+static std::string join(const std::vector<std::string> &sinks) { return fmt::format("{}", fmt::join(sinks, ", ")); }
+
+log_sink_t::log_sink_t(std::string name, std::vector<std::string> sinks_, spdlog::level::level_enum level_)
+    : property_t(std::move(name), std::to_string(static_cast<int>(level_)), join(sinks_), join(sinks_),
+                 property_kind_t::log_sink),
+      sinks(std::move(sinks_)), level{level_} {}
+
+void log_sink_t::reflect_to(syncspirit::config::main_t &main) {
+    main.log_configs.push_back(syncspirit::config::log_config_t{
+        label,
+        level,
+        sinks,
+    });
+}
+
 } // namespace impl
 
 namespace bep {

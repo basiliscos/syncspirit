@@ -345,6 +345,26 @@ struct path_cell_t final : property_cell_t {
     }
 };
 
+struct log_cell_t final : property_cell_t {
+    using parent_t = property_cell_t;
+
+    log_cell_t(table_t *table_, property_ptr_t property_, int row_) : parent_t(table_, std::move(property_), row_) {
+        group_buttons->hide();
+        int xx, yy, ww, hh;
+        table->find_cell(table_t::CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
+        auto input = new Fl_Input(xx, yy, ww, hh);
+        input->deactivate();
+        input_generic = input;
+        load_value();
+    }
+
+    void load_value() override {
+        auto value = property->get_value();
+        static_cast<Fl_Input *>(input_generic)->value(value.data());
+        parent_t::load_value();
+    }
+};
+
 table_t::table_t(const categories_t &categories_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), categories{categories_} {
 
@@ -436,6 +456,8 @@ void table_t::create_cells() {
                     return new string_cell_t(this, p, row);
                 } else if (k == property_kind_t::file || k == property_kind_t::directory) {
                     return new path_cell_t(this, p, row);
+                } else if (k == property_kind_t::log_sink) {
+                    return new log_cell_t(this, p, row);
                 }
                 assert(0 && "should not happen");
             }();

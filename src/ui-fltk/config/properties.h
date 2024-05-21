@@ -1,6 +1,7 @@
 #pragma once
 
 #include "property.h"
+#include <vector>
 
 namespace syncspirit::fltk::config {
 
@@ -33,6 +34,14 @@ struct bool_t : property_t {
     error_ptr_t validate_value() noexcept override;
 
     std::uint64_t native_value;
+};
+
+struct log_sink_t : property_t {
+    log_sink_t(std::string name, std::vector<std::string> sinks, spdlog::level::level_enum level);
+    void reflect_to(syncspirit::config::main_t &main) override;
+
+    std::vector<std::string> sinks;
+    spdlog::level::level_enum level;
 };
 
 } // namespace impl
