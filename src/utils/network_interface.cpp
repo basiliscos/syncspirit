@@ -50,7 +50,7 @@ static uri_container_t _local_interfaces(logger_t &log, std::uint16_t port) noex
         }
 
         auto full = fmt::format("tcp://{}:{}/", host, port);
-        auto uri = utils::parse(full).value();
+        auto uri = utils::parse(full);
         r.emplace_back(std::move(uri));
     }
 
@@ -132,7 +132,7 @@ uri_container_t local_interfaces(const tcp::endpoint &fallback, logger_t &log) n
     if (r.empty()) {
         auto uri_str = fmt::format("tcp://{0}:{1}/", fallback.address().to_string(), port);
         LOG_DEBUG(log, "falling back into usage {} interface", uri_str);
-        auto uri = utils::parse(uri_str).value();
+        auto uri = utils::parse(uri_str);
         r.emplace_back(std::move(uri));
     }
     return r;

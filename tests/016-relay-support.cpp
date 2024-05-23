@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "proto/relay_support.h"
@@ -262,9 +262,10 @@ TEST_CASE("endpoing parsing", "[relay]") {
     REQUIRE(r);
     REQUIRE(r.value().size() == 1);
     auto relay = r.value()[0];
-    CHECK(relay->uri.full == "relay://130.61.176.206:22067/"
-                             "?id=OAKAXEX-7HE764M-5EWVN7U-SZCQU4D-ZPXF2TY-SNTL2LL-Y5RVGVM-U7WBRA3&pingInterval=1m30s&"
-                             "networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=ina");
+    CHECK(relay->uri->buffer() ==
+          "relay://130.61.176.206:22067/"
+          "?id=OAKAXEX-7HE764M-5EWVN7U-SZCQU4D-ZPXF2TY-SNTL2LL-Y5RVGVM-U7WBRA3&pingInterval=1m30s&"
+          "networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=ina");
     CHECK(relay->device_id.get_short() == "OAKAXEX");
     auto &l = relay->location;
     CHECK(abs(l.latitude - 50.1049) < 0.0001);

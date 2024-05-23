@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -79,7 +79,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
         log = utils::get_logger("fixture");
         relay_config = config::relay_config_t{
             true,
-            "https://some-endpoint.com/",
+            utils::parse("https://some-endpoint.com/"),
             1024 * 1024,
         };
     }
@@ -173,7 +173,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
 
     virtual void accept(const sys::error_code &ec) noexcept {
         LOG_INFO(log, "accept (relay), ec: {}, remote = {}", ec.message(), peer_sock.remote_endpoint());
-        auto uri = utils::parse("tcp://127.0.0.1:0/").value();
+        auto uri = utils::parse("tcp://127.0.0.1:0/");
         auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         relay_trans = transport::initiate_stream(cfg);
         relay_read();
@@ -190,10 +190,10 @@ struct fixture_t : private model::diff::contact_visitor_t {
 
     virtual void on(net::message::connect_request_t &req) noexcept {
         auto &uri = req.payload.request_payload.uri;
-        log->info("requested connect to {}", uri.full);
+        log->info("requested connect to {}", uri);
         auto cfg = transport::transport_config_t{{}, uri, *sup, {}, true};
         tcp::resolver resolver(io_ctx);
-        auto addresses = resolver.resolve(host, std::to_string(uri.port));
+        auto addresses = resolver.resolve(host, uri->port());
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
         auto trans = transport::initiate_stream(cfg);
         transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "active/connect, err: {}", ec.message()); };
@@ -297,7 +297,7 @@ void test_master_connect() {
 
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
             REQUIRE(my_device->get_uris().size() == 1);
-            CHECK(my_device->get_uris()[0].proto == "relay");
+            CHECK(my_device->get_uris()[0]->scheme() == "relay");
 
             sup->shutdown();
             io_ctx.restart();

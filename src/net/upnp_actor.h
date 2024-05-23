@@ -13,7 +13,7 @@ namespace syncspirit {
 namespace net {
 
 struct upnp_actor_config_t : r::actor_config_t {
-    utils::URI descr_url;
+    utils::uri_ptr_t descr_url;
     std::uint32_t rx_buff_size;
     std::uint16_t external_port;
     model::cluster_ptr_t cluster;
@@ -25,7 +25,7 @@ template <typename Actor> struct upnp_actor_config_builder_t : r::actor_config_b
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&descr_url(const utils::URI &value) && noexcept {
+    builder_t &&descr_url(const utils::uri_ptr_t &value) && noexcept {
         parent_t::config.descr_url = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -71,15 +71,15 @@ struct SYNCSPIRIT_API upnp_actor_t : public r::actor_base_t {
     void on_mapping_port(message::http_response_t &res) noexcept;
     void on_unmapping_port(message::http_response_t &res) noexcept;
     void on_validate(message::http_response_t &res) noexcept;
-    void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
+    void make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, fmt::memory_buffer &&tx_buff,
                       bool get_local_address = false) noexcept;
     void request_finish() noexcept;
 
     model::cluster_ptr_t cluster;
     utils::logger_t log;
     asio::ip::address local_address;
-    utils::URI main_url;
-    utils::URI igd_control_url;
+    utils::uri_ptr_t main_url;
+    utils::uri_ptr_t igd_control_url;
     r::address_ptr_t http_client;
     r::address_ptr_t coordinator;
     r::address_ptr_t addr_description; /* for routing */

@@ -173,7 +173,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::relay_connect_requ
             .sink(address)
             .ssl_pair(&ssl_pair)
             .peer_device_id(diff.peer)
-            .uris({std::move(uri.value())})
+            .uris(utils::uri_container_t{std::move(uri)})
             .relay_session(diff.session_key)
             .timeout(timeout)
             .finish();

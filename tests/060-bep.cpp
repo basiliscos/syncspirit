@@ -41,7 +41,7 @@ TEST_CASE("announce", "[bep]") {
     SECTION("make") {
         fmt::memory_buffer out;
         out.resize(1500);
-        payload::URIs uris{utils::parse("tcp://192.168.100.6:22000").value()};
+        payload::URIs uris{utils::parse("tcp://192.168.100.6:22000")};
         auto sz =
             make_announce_message(out, "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD", uris, 1234);
         CHECK(sz == 99);
@@ -67,7 +67,7 @@ TEST_CASE("hello", "[bep]") {
     SECTION("make") {
         fmt::memory_buffer out;
         out.resize(1500);
-        payload::URIs uris{utils::parse("tcp://192.168.100.6:22000").value()};
+        payload::URIs uris{utils::parse("tcp://192.168.100.6:22000")};
         make_hello_message(out, "test-device");
         auto buff = boost::asio::buffer(out.data(), out.size());
         auto r = parse_bep(buff);

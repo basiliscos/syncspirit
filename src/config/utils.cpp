@@ -162,7 +162,7 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         if (!announce_url) {
             return "global_discovery/announce_url is not url";
         }
-        c.announce_url = announce_url.value();
+        c.announce_url = announce_url;
 
         auto device_id = t["device_id"].value<std::string>();
         if (!device_id) {
@@ -242,11 +242,15 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         }
         c.enabled = enabled.value();
 
-        auto discovery_url = t["discovery_url"].value<std::string>();
-        if (!discovery_url) {
+        auto discovery_url_str = t["discovery_url"].value<std::string>();
+        if (!discovery_url_str) {
             return "upnp/discovery_url is incorrect or missing";
         }
-        c.discovery_url = discovery_url.value();
+        auto discovery_url = utils::parse(discovery_url_str.value());
+        if (!discovery_url_str) {
+            return "upnp/discovery_url is non a valid url";
+        }
+        c.discovery_url = discovery_url;
 
         auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
         if (!rx_buff_size) {
@@ -418,7 +422,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                             }}},
         {"global_discovery", toml::table{{
                                  {"enabled", cfg.global_announce_config.enabled},
-                                 {"announce_url", cfg.global_announce_config.announce_url.full},
+                                 {"announce_url", cfg.global_announce_config.announce_url->buffer().data()},
                                  {"device_id", cfg.global_announce_config.device_id},
                                  {"cert_file", cfg.global_announce_config.cert_file},
                                  {"key_file", cfg.global_announce_config.key_file},
@@ -456,7 +460,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                }}},
         {"relay", toml::table{{
                       {"enabled", cfg.relay_config.enabled},
-                      {"discovery_url", cfg.relay_config.discovery_url},
+                      {"discovery_url", cfg.relay_config.discovery_url->buffer().data()},
                       {"rx_buff_size", cfg.relay_config.rx_buff_size},
                   }}},
     }};
@@ -517,7 +521,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     };
     cfg.global_announce_config = global_announce_config_t{
         true,
-        utils::parse("https://discovery.syncthing.net/").value(),
+        utils::parse("https://discovery.syncthing.net/"),
         "LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW",
         cert_file,
         key_file,
@@ -554,10 +558,11 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         0x400000000,   /* upper_limit, 16Gb */
         150,           /* uncommitted_threshold */
     };
+
     cfg.relay_config = relay_config_t {
-        true,                                       /* enabled */
-        "https://relays.syncthing.net/endpoint",    /* discovery url */
-        1024 * 1024,                                /* rx buff size */
+        true,                                                   /* enabled */
+        utils::parse("https://relays.syncthing.net/endpoint"),  /* discovery url */
+        1024 * 1024,                                            /* rx buff size */
     };
     return cfg;
 }

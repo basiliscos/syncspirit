@@ -24,7 +24,7 @@ using device_ptr_t = intrusive_ptr_t<device_t>;
 enum class device_state_t { offline, dialing, online };
 
 struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
-    using uris_t = std::vector<utils::URI>;
+    using uris_t = utils::uri_container_t;
     using name_option_t = std::optional<std::string>;
 
     static outcome::result<device_ptr_t> create(std::string_view key, const db::Device &data) noexcept;

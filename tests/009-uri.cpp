@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "utils/uri.h"
@@ -9,11 +9,11 @@ using namespace syncspirit::utils;
 TEST_CASE("parse IGD control url", "[support]") {
     auto uri = parse("http://192.168.100.1:49652/upnp/control/WANIPConn1");
     REQUIRE((bool)uri);
-    CHECK(uri->port == 49652);
-    CHECK(uri->service == "49652");
-    CHECK(uri->host == "192.168.100.1");
-    CHECK(uri->proto == "http");
-    CHECK(uri->path == "/upnp/control/WANIPConn1");
+    CHECK(uri->port_number() == 49652);
+    CHECK(uri->port() == "49652");
+    CHECK(uri->host() == "192.168.100.1");
+    CHECK(uri->scheme() == "http");
+    CHECK(uri->encoded_path() == "/upnp/control/WANIPConn1");
 
     std::string relay = "relay://188.68.32.45:22067/"
                         "?id=O4LHPKG-O6BQ36W-MUOVKTI-MKAVHSC-Y7EC3U4-DHNLEDE-MZBJWQN-UIX6QAL\u0026pingInterval="

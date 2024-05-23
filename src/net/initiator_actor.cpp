@@ -9,7 +9,6 @@
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "model/diff/peer/peer_state.h"
-#include <sstream>
 #include <algorithm>
 #include <spdlog/fmt/bin_to_hex.h>
 #include <fmt/core.h>
@@ -36,21 +35,23 @@ initiator_actor_t::initiator_actor_t(config_t &cfg)
     auto tmp_identity = "net.init/unknown";
     auto log = utils::get_logger(tmp_identity);
     for (auto &uri : cfg.uris) {
-        if (uri.proto != "tcp" && uri.proto != "relay") {
-            LOG_DEBUG(log, "unsupported proto '{}' for the url '{}'", uri.proto, uri.full);
+        if (uri->scheme() != "tcp" && uri->scheme() != "relay") {
+            LOG_DEBUG(log, "unsupported scheme in the url '{}'", uri);
         } else {
-            if (uri.proto == "relay" && !cfg.relay_enabled) {
-                LOG_DEBUG(log, "{} is not enabled, skipping '{}'", uri.proto, uri.full);
+            if (uri->scheme() == "relay" && !cfg.relay_enabled) {
+                LOG_DEBUG(log, "'relay' is not enabled, skipping '{}'", uri);
             } else {
                 uris.emplace_back(std::move(uri));
             }
         }
     }
-    auto comparator = [](const utils::URI &a, const utils::URI &b) noexcept -> bool {
-        if (a.proto == b.proto) {
-            return std::lexicographical_compare(a.full.begin(), a.full.end(), b.full.begin(), b.full.end());
+    auto comparator = [](const utils::uri_ptr_t &a, const utils::uri_ptr_t &b) noexcept -> bool {
+        if (a->scheme() == b->scheme()) {
+            auto x = a->buffer();
+            auto y = b->buffer();
+            return std::lexicographical_compare(x.begin(), x.end(), y.begin(), y.end());
         }
-        if (a.proto == "relay") {
+        if (a->scheme() == "relay") {
             return true;
         }
         return false;
@@ -121,9 +122,9 @@ void initiator_actor_t::initiate_active() noexcept {
 
     while (uri_idx < uris.size()) {
         auto &uri = uris[uri_idx++];
-        if (uri.proto == "tcp") {
+        if (uri->scheme() == "tcp") {
             initiate_active_tls(uri);
-        } else if (uri.proto == "relay") {
+        } else if (uri->scheme() == "relay") {
             initiate_active_relay(uri);
         } else {
             continue;
@@ -164,7 +165,7 @@ void initiator_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start, alpn = {}", alpn);
     std::string proto;
     if (active_uri) {
-        proto = active_uri->proto;
+        proto = active_uri->scheme();
     } else {
         if (role == role_t::relay_passive) {
             proto = "relay";
@@ -204,34 +205,35 @@ void initiator_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
-void initiator_actor_t::resolve(const utils::URI &uri) noexcept {
-    LOG_DEBUG(log, "resolving {} (transport = {})", uri.full, (void *)transport.get());
+void initiator_actor_t::resolve(const utils::uri_ptr_t &uri) noexcept {
+    LOG_DEBUG(log, "resolving {} (transport = {})", uri, (void *)transport.get());
     pt::time_duration resolve_timeout = init_timeout / 2;
-    auto port = std::to_string(uri.port);
-    request<payload::address_request_t>(resolver, uri.host, port).send(resolve_timeout);
+    auto host = uri->host();
+    auto port = uri->port();
+    request<payload::address_request_t>(resolver, host, port).send(resolve_timeout);
     resources->acquire(resource::resolving);
 }
 
-void initiator_actor_t::initiate_active_tls(const utils::URI &uri) noexcept {
-    LOG_DEBUG(log, "trying '{}' as active tls, alpn = {}", uri.full, alpn);
+void initiator_actor_t::initiate_active_tls(const utils::uri_ptr_t &uri) noexcept {
+    LOG_DEBUG(log, "trying '{}' as active tls, alpn = {}", uri, alpn);
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
     transport = transport::initiate_tls_active(*sup, ssl_pair, peer_device_id, uri, false, alpn);
-    active_uri = &uri;
+    active_uri = uri;
     relaying = false;
     resolve(uri);
 }
 
-void initiator_actor_t::initiate_active_relay(const utils::URI &uri) noexcept {
-    LOG_TRACE(log, "trying '{}' as active relay", uri.full);
+void initiator_actor_t::initiate_active_relay(const utils::uri_ptr_t &uri) noexcept {
+    LOG_TRACE(log, "trying '{}' as active relay", uri);
     auto relay_device = proto::relay::parse_device(uri);
     if (!relay_device) {
-        LOG_WARN(log, "relay url '{}' does not contains valid device_id", uri.full);
+        LOG_WARN(log, "relay url '{}' does not contains valid device_id", uri);
         return initiate_active();
     }
-    active_uri = &uri;
+    active_uri = uri;
     relaying = true;
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
-    transport = transport::initiate_tls_active(*sup, ssl_pair, relay_device.value(), *active_uri);
+    transport = transport::initiate_tls_active(*sup, ssl_pair, relay_device.value(), active_uri);
     resolve(uri);
 }
 
@@ -282,7 +284,7 @@ void initiator_actor_t::on_connect(const tcp::endpoint &) noexcept {
     // auto do_handshake = role == role_t::active;
     auto do_handshake =
         (role == role_t::active) &&
-        (active_uri && ((((active_uri->proto == "relay") && relaying)) || (active_uri->proto == "tcp")));
+        (active_uri && ((((active_uri->scheme() == "relay") && relaying)) || (active_uri->scheme() == "tcp")));
     if (do_handshake) {
         initiate_handshake();
     } else {
@@ -435,12 +437,11 @@ void initiator_actor_t::on_read_relay_active(size_t bytes) noexcept {
     }
     auto &addr = inv->address;
     relay_key = inv->key;
-    auto ip = !addr.empty() ? &addr : &active_uri->host;
-    auto uri_str = fmt::format("tcp://{}:{}", *ip, inv->port);
+    auto ip = !addr.empty() ? addr : active_uri->host();
+    auto uri_str = fmt::format("tcp://{}:{}", ip, inv->port);
     LOG_DEBUG(log, "going to connect to {}, using key: {}", uri_str,
               spdlog::to_hex(relay_key.begin(), relay_key.end()));
-    auto uri_opt = utils::parse(uri_str);
-    auto &uri = uri_opt.value();
+    auto uri = utils::parse(uri_str);
     relaying = false;
 
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);

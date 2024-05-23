@@ -67,7 +67,7 @@ void acceptor_actor_t::on_start() noexcept {
     auto uris = utils::local_interfaces(endpoint, log);
     if (log->level() <= spdlog::level::debug) {
         for (auto &uri : uris) {
-            log->debug("accepting on {}", uri.full);
+            log->debug("accepting on {}", uri);
         }
     }
 

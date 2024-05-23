@@ -22,7 +22,7 @@ template <> void device_t::assign(const db::Device &d) noexcept {
     for (int i = 0; i < d.addresses_size(); ++i) {
         auto uri = utils::parse(d.addresses(i));
         assert(uri);
-        uris.emplace_back(std::move(uri.value()));
+        uris.emplace_back(std::move(uri));
         static_uris.emplace_back(uris.back());
     }
 }
@@ -76,7 +76,7 @@ std::string device_t::serialize() noexcept {
     r.set_paused(paused);
 
     for (auto &address : static_uris) {
-        *r.add_addresses() = address.full;
+        *r.add_addresses() = address->buffer();
     }
 
     return r.SerializeAsString();

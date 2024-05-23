@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 #include <cstdint>
 #include <string>
-#include "../utils/uri.h"
+#include "utils/uri.h"
 
 namespace syncspirit::config {
 
 struct global_announce_config_t {
     bool enabled;
-    syncspirit::utils::URI announce_url;
+    utils::uri_ptr_t announce_url;
     std::string device_id;
     std::string cert_file;
     std::string key_file;

@@ -9,7 +9,6 @@ pugixml/1.13
 rotor/0.30
 spdlog/1.13.0
 tomlplusplus/3.3.0
-uriparser/0.9.7
 zlib/1.2.13
 fltk/1.3.9
 libqrencode/4.1.1

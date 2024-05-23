@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "relay_actor.h"
 #include "names.h"
@@ -69,7 +69,7 @@ void relay_actor_t::shutdown_start() noexcept {
         auto self = cluster->get_device();
         utils::uri_container_t uris;
         for (auto &uri : self->get_uris()) {
-            if (uri.proto != "relay") {
+            if (uri->scheme() != "relay") {
                 uris.emplace_back(uri);
             }
         }
@@ -96,10 +96,12 @@ void relay_actor_t::connect_to_relay() noexcept {
         }
         auto &l = relay->location;
         auto &u = relay->uri;
-        LOG_INFO(log, "chosen relay({}) {}:{}, city: {}, country: {}, continent: {}", relay_index, relay->uri.host,
-                 relay->uri.port, l.city, l.country, l.continent);
+        auto relay_host = std::string_view(relay->uri->host());
+        auto relay_port = std::string_view(relay->uri->port());
+        LOG_INFO(log, "chosen relay({}) {}:{}, city: {}, country: {}, continent: {}", relay_index, relay_host,
+                 relay_port, l.city, l.country, l.continent);
 
-        auto uri = utils::parse(fmt::format("tcp://{}:{}", u.host, u.port)).value();
+        auto uri = utils::parse(fmt::format("tcp://{}:{}", relay_host, relay_port));
         request<payload::connect_request_t>(peer_supervisor, relay->device_id, std::move(uri),
                                             constants::relay_protocol_name)
             .send(init_timeout);
@@ -113,20 +115,16 @@ void relay_actor_t::connect_to_relay() noexcept {
 
 void relay_actor_t::request_relay_list() noexcept {
     auto timeout = init_timeout * 9 / 10;
-    auto url_opt = utils::parse(config.discovery_url);
-    if (!url_opt) {
-        LOG_WARN(log, "malformed discovery url '{}'", config.discovery_url);
-        auto ec = utils::make_error_code(utils::error_code_t::malformed_url);
-        return do_shutdown(make_error(ec));
-    }
+    auto &uri = config.discovery_url;
+    LOG_TRACE(log, "going to request relays list, timeout = {} ms, via {}:{}", timeout.total_milliseconds(),
+              std::string_view(uri->host()), uri->port_number());
 
-    auto uri = url_opt.value();
-    assert(uri.proto == "https");
+    assert(uri->scheme() == "https");
     http::request<http::empty_body> req;
     req.method(http::verb::get);
     req.version(10);
-    req.target(uri.relative());
-    req.set(http::field::host, uri.host);
+    req.target(uri->encoded_path());
+    req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
 
     fmt::memory_buffer tx_buff;

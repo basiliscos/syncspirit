@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -125,7 +125,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
         auto uri_str = fmt::format("tcp://{}:{}/", local_ep.address(), local_ep.port());
         LOG_TRACE(log, "Connecting to {}", uri_str);
 
-        auto uri = utils::parse(uri_str).value();
+        auto uri = utils::parse(uri_str);
         auto cfg = transport::transport_config_t{{}, uri, *sup, {}, true};
         client_trans = transport::initiate_stream(cfg);
 
@@ -171,7 +171,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
 
     virtual void accept(const sys::error_code &ec) noexcept {
         LOG_INFO(log, "accept, ec: {}, remote = {}", ec.message(), peer_sock.remote_endpoint());
-        auto uri = utils::parse("tcp://127.0.0.1:0/").value();
+        auto uri = utils::parse("tcp://127.0.0.1:0/");
         auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         peer_trans = transport::initiate_stream(cfg);
         main();

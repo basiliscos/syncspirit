@@ -73,7 +73,7 @@ void upnp_actor_t::on_start() noexcept {
     make_request(addr_description, main_url, std::move(tx_buff), true);
 }
 
-void upnp_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
+void upnp_actor_t::make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, fmt::memory_buffer &&tx_buff,
                                 bool get_local_address) noexcept {
     resources->acquire(resource::http_req);
     auto timeout = shutdown_timeout * 8 / 9;
@@ -117,17 +117,19 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
 
     rx_buff->consume(msg.payload.res->bytes);
     auto &igd = igd_result.value();
-    std::string control_url = fmt::format("http://{0}:{1}{2}", main_url.host, main_url.port, igd.control_path);
-    std::string descr_url = fmt::format("http://{0}:{1}{2}", main_url.host, main_url.port, igd.description_path);
+    auto host = std::string_view(main_url->host());
+    auto port = std::string_view(main_url->port());
+    std::string control_url = fmt::format("http://{0}:{1}{2}", host, port, igd.control_path);
+    std::string descr_url = fmt::format("http://{0}:{1}{2}", host, port, igd.description_path);
     LOG_DEBUG(log, "IGD control url: {}, description url: {}", control_url, descr_url);
 
-    auto url_option = utils::parse(control_url.c_str());
-    if (!url_option) {
+    auto url = utils::parse(control_url.c_str());
+    if (!url) {
         LOG_ERROR(log, "can't parse IGD url {}", control_url);
         auto ec = utils::make_error_code(utils::error_code_t::unparsable_control_url);
         return do_shutdown(make_error(ec));
     }
-    igd_control_url = url_option.value();
+    igd_control_url = url;
 
     fmt::memory_buffer tx_buff;
     auto res = make_external_ip_request(tx_buff, igd_control_url);
@@ -178,8 +180,8 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
 
     auto local_port = 0;
     for (auto &uri : cluster->get_device()->get_uris()) {
-        if (uri.port) {
-            local_port = uri.port;
+        if (uri->has_port()) {
+            local_port = uri->port_number();
             break;
         }
     }

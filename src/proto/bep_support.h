@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -8,8 +8,6 @@
 #include <boost/asio/buffer.hpp>
 #include <memory>
 #include <variant>
-#include <vector>
-#include <type_traits>
 #include "syncspirit-export.h"
 #include "bep.pb.h"
 #include "utils/uri.h"
@@ -20,7 +18,7 @@ namespace outcome = boost::outcome_v2;
 namespace asio = boost::asio;
 
 namespace payload {
-using URIs = std::vector<utils::URI>;
+using URIs = utils::uri_container_t;
 }
 
 namespace message {

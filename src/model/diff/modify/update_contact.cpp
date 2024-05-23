@@ -5,9 +5,19 @@
 #include "../contact_visitor.h"
 #include "../../cluster.h"
 #include <fmt/core.h>
-#include <algorithm>
+#include <set>
 
+using namespace syncspirit;
 using namespace syncspirit::model::diff::modify;
+
+namespace {
+
+struct comparator_t {
+    bool operator()(const utils::uri_ptr_t &l, const utils::uri_ptr_t &r) const { return *l < *r; }
+};
+} // namespace
+
+using set_t = std::set<utils::uri_ptr_t, comparator_t>;
 
 update_contact_t::update_contact_t(const model::cluster_t &cluster, const model::device_id_t &device_,
                                    const utils::uri_container_t &uris_) noexcept
@@ -18,19 +28,19 @@ update_contact_t::update_contact_t(const model::cluster_t &cluster, const model:
         self = cluster.get_device()->device_id().get_sha256() == device.get_sha256();
     }
 
-    auto copy = uris_;
-    std::sort(begin(copy), end(copy));
-    auto end = std::unique(std::begin(copy), std::end(copy));
-    std::copy(begin(copy), end, std::back_insert_iterator(this->uris));
+    set_t set;
+    std::copy(begin(uris_), end(uris_), std::inserter(set, set.begin()));
+    std::copy(set.begin(), set.end(), std::back_insert_iterator(this->uris));
 }
 
 update_contact_t::update_contact_t(const model::cluster_t &cluster, const ip_addresses_t &addresses) noexcept
     : device{cluster.get_device()->device_id()}, known{true}, self{true} {
+
     auto port = 0;
     auto my_device = cluster.get_device();
     for (auto &uri : my_device->get_uris()) {
-        if (uri.port != 0) {
-            port = uri.port;
+        if (uri->port_number() != 0) {
+            port = uri->port_number();
             break;
         }
     }
@@ -38,12 +48,12 @@ update_contact_t::update_contact_t(const model::cluster_t &cluster, const ip_add
 
     for (auto &addr : addresses) {
         auto uri_str = fmt::format("tcp://{0}:{1}/", addr, port);
-        auto uri = utils::parse(uri_str).value();
+        auto uri = utils::parse(uri_str);
         uris.push_back(uri);
     }
-    std::sort(begin(uris), end(uris));
-    auto end = std::unique(std::begin(uris), std::end(uris));
-    std::copy(begin(uris), end, std::back_insert_iterator(this->uris));
+    set_t set;
+    std::copy(begin(uris), end(uris), std::inserter(set, set.begin()));
+    std::copy(set.begin(), set.end(), std::back_insert_iterator(this->uris));
 }
 
 auto update_contact_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {

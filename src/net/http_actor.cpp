@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "http_actor.h"
-#include "../utils/error_code.h"
+#include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "names.h"
 
 using namespace syncspirit::net;
@@ -38,7 +39,7 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void http_actor_t::on_request(message::http_request_t &req) noexcept {
-    LOG_TRACE(log, "on request, url = {}", req.payload.request_payload->url.full);
+    LOG_TRACE(log, "on request, url = {}", req.payload.request_payload->url);
     queue.emplace_back(&req);
     process();
 }
@@ -95,7 +96,7 @@ void http_actor_t::process() noexcept {
 
     if (keep_alive && kept_alive) {
         bool reuse = false;
-        if (url.host == resolved_url.host && url.port == resolved_url.port) {
+        if (url->host() == resolved_url->host() && url->port() == resolved_url->port()) {
             if (!last_read) {
                 reuse = true;
             } else {
@@ -104,8 +105,7 @@ void http_actor_t::process() noexcept {
                 reuse = deadline > now;
             }
         } else {
-            LOG_DEBUG(log, "different endpoint is used: {}:{} vs {}:{}", resolved_url.host, resolved_url.port, url.host,
-                      url.port);
+            LOG_DEBUG(log, "different endpoint is used: {} vs {}", resolved_url, url);
         }
         if (reuse) {
             LOG_DEBUG(log, "reusing connection");
@@ -119,8 +119,9 @@ void http_actor_t::process() noexcept {
         }
 
     } else {
-        auto port = std::to_string(url.port);
-        resolve_request = request<payload::address_request_t>(resolver, url.host, port).send(resolve_timeout);
+        auto host = url->host();
+        auto port = url->port();
+        resolve_request = request<payload::address_request_t>(resolver, host, port).send(resolve_timeout);
         resources->acquire(resource::resolver);
     }
 }
@@ -205,7 +206,7 @@ void http_actor_t::write_request() noexcept {
     auto &payload = *queue.front()->payload.request_payload;
     auto &url = payload.url;
     auto &data = payload.data;
-    LOG_TRACE(log, "sending {} bytes to {} ", data.size(), url.full);
+    LOG_TRACE(log, "sending {} bytes to {} ", data.size(), url);
     auto buff = asio::buffer(data.data(), data.size());
     /*
     std::string write_data{(const char *)buff.data(), data.size()};

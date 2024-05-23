@@ -51,7 +51,7 @@ struct address_request_t : public r::arc_base_t<address_request_t> {
     using response_t = r::intrusive_ptr_t<address_response_t>;
     std::string host;
     std::string port;
-    address_request_t(const std::string &host_, std::string &port_) : host{host_}, port{port_} {}
+    address_request_t(std::string_view host_, std::string_view port_) : host{host_}, port{port_} {}
 };
 
 struct http_response_t : public r::arc_base_t<http_response_t> {
@@ -72,7 +72,7 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     using ssl_option_t = transport::ssl_option_t;
     using response_t = r::intrusive_ptr_t<http_response_t>;
 
-    utils::URI url;
+    utils::uri_ptr_t url;
     fmt::memory_buffer data;
     rx_buff_ptr_t rx_buff;
     std::size_t rx_buff_size;
@@ -145,7 +145,7 @@ struct connect_response_t {
 struct connect_request_t {
     using response_t = connect_response_t;
     model::device_id_t device_id;
-    utils::URI uri;
+    utils::uri_ptr_t uri;
     std::string_view alpn;
 };
 

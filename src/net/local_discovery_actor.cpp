@@ -161,14 +161,14 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
                 utils::uri_container_t uris;
                 for (int i = 0; i < msg->addresses_size(); ++i) {
                     auto uri = utils::parse(msg->addresses(i).c_str());
-                    if (uri && uri->port) {
-                        uris.emplace_back(std::move(uri.value()));
+                    if (uri && uri->has_port()) {
+                        uris.emplace_back(std::move(uri));
                     }
                 }
                 if (!uris.empty()) {
                     LOG_TRACE(log, "on_read, local peer = {} ", device_id.value().get_value());
                     for (auto &uri : uris) {
-                        LOG_TRACE(log, "on_read, peer is available via {}", uri.full);
+                        LOG_TRACE(log, "on_read, peer is available via {}", uri);
                     }
                     pt::ptime now(pt::microsec_clock::local_time());
 

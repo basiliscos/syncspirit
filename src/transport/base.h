@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -43,7 +43,7 @@ using ssl_option_t = std::optional<ssl_junction_t>;
 
 struct transport_config_t {
     ssl_option_t ssl_junction;
-    utils::URI uri;
+    utils::uri_ptr_t uri;
     ra::supervisor_asio_t &supervisor;
     std::optional<tcp::socket> sock;
     bool active;

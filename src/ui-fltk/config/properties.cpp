@@ -36,13 +36,12 @@ string_t::string_t(std::string label, std::string explanation, std::string value
                  property_kind_t::text) {}
 
 error_ptr_t url_t::validate_value() noexcept {
-    auto option = utils::parse(value);
-    if (!option) {
+    auto new_url = utils::parse(value);
+    if (!new_url) {
         return error_ptr_t(new std::string("invalid url"));
     }
-    auto &new_url = *option;
-    auto original = utils::parse(default_value).value();
-    if (new_url.proto != original.proto) {
+    auto original = utils::parse(default_value);
+    if (new_url->scheme() != original->scheme()) {
         return error_ptr_t(new std::string("invalid protocol"));
     }
     return {};
@@ -205,7 +204,7 @@ announce_url_t::announce_url_t(std::string value, std::string default_value)
     : parent_t("announce_url", explanation_, std::move(value), std::move(default_value)) {}
 
 void announce_url_t::reflect_to(syncspirit::config::main_t &main) {
-    main.global_announce_config.announce_url = utils::parse(value).value();
+    main.global_announce_config.announce_url = utils::parse(value);
 }
 
 const char *announce_url_t::explanation_ = "url of syncthing/private global announce server";
@@ -213,9 +212,7 @@ const char *announce_url_t::explanation_ = "url of syncthing/private global anno
 cert_file_t::cert_file_t(std::string value, std::string default_value)
     : parent_t("cert_file", explanation_, std::move(value), std::move(default_value)) {}
 
-void cert_file_t::reflect_to(syncspirit::config::main_t &main) {
-    main.global_announce_config.cert_file = utils::parse(value).value().full;
-}
+void cert_file_t::reflect_to(syncspirit::config::main_t &main) { main.global_announce_config.cert_file = value; }
 
 const char *cert_file_t::explanation_ = "this device certificate location";
 
@@ -312,7 +309,7 @@ discovery_url_t::discovery_url_t(std::string value, std::string default_value)
     : parent_t("discovery_url", explanation_, std::move(value), std::move(default_value)) {}
 
 void discovery_url_t::reflect_to(syncspirit::config::main_t &main) {
-    main.relay_config.discovery_url = utils::parse(value).value().full;
+    main.relay_config.discovery_url = utils::parse(value);
 }
 
 const char *discovery_url_t::explanation_ = "here pick the list of relay servers pool";

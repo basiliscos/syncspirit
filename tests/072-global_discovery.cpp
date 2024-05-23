@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -10,8 +10,6 @@
 #include "net/global_discovery_actor.h"
 #include "net/names.h"
 #include "net/messages.h"
-
-#include "access.h"
 #include "test_supervisor.h"
 
 #include <nlohmann/json.hpp>
@@ -105,7 +103,7 @@ struct fixture_t {
         gda = sup->create_actor<global_discovery_actor_t>()
                   .cluster(cluster)
                   .ssl_pair(&ssl_pair)
-                  .announce_url(utils::parse("https://discovery.syncthing.net/").value())
+                  .announce_url(utils::parse("https://discovery.syncthing.net/"))
                   .device_id(std::move(global_device_id.value()))
                   .rx_buff_size(32768ul)
                   .io_timeout(5ul)
@@ -147,7 +145,7 @@ struct fixture_t {
 void test_successful_announcement() {
     struct F : fixture_t {
         bool preprocess() noexcept override {
-            auto uri = utils::parse("tcp://127.0.0.1").value();
+            auto uri = utils::parse("tcp://127.0.0.1");
             cluster->get_device()->assign_uris({uri});
 
             SECTION("successful (and empty) announce response") {
@@ -169,7 +167,7 @@ void test_successful_announcement() {
 void test_failed_announcement() {
     struct F : fixture_t {
         bool preprocess() noexcept override {
-            auto uri = utils::parse("tcp://127.0.0.1").value();
+            auto uri = utils::parse("tcp://127.0.0.1");
             cluster->get_device()->assign_uris({uri});
 
             SECTION("successful (and empty) announce response") {
@@ -206,7 +204,7 @@ void test_peer_discovery() {
                 sup->do_process();
 
                 REQUIRE(peer_device->get_uris().size() == 1);
-                CHECK(peer_device->get_uris()[0].full == "tcp://127.0.0.2");
+                CHECK(peer_device->get_uris()[0]->buffer() == "tcp://127.0.0.2");
 
                 // 2nd attempt
                 peer_device->assign_uris({});
@@ -217,7 +215,7 @@ void test_peer_discovery() {
 
                 sup->do_process();
                 REQUIRE(peer_device->get_uris().size() == 1);
-                CHECK(peer_device->get_uris()[0].full == "tcp://127.0.0.2");
+                CHECK(peer_device->get_uris()[0]->buffer() == "tcp://127.0.0.2");
             }
 
             SECTION("gargbage in response") {

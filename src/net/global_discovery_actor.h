@@ -19,7 +19,7 @@ namespace net {
 namespace outcome = boost::outcome_v2;
 
 struct global_discovery_actor_config_t : r::actor_config_t {
-    utils::URI announce_url;
+    utils::uri_ptr_t announce_url;
     model::device_id_t device_id;
     const utils::key_pair_t *ssl_pair;
     std::uint32_t rx_buff_size;
@@ -32,7 +32,7 @@ template <typename Actor> struct global_discovery_actor_config_builder_t : r::ac
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&announce_url(const utils::URI &value) && noexcept {
+    builder_t &&announce_url(const utils::uri_ptr_t &value) && noexcept {
         parent_t::config.announce_url = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -84,7 +84,7 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
     void on_contact_update(model::message::contact_update_t &message) noexcept;
     void on_discovery(message::discovery_notify_t &req) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
-    void make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
+    void make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, fmt::memory_buffer &&tx_buff,
                       const r::message_ptr_t &custom = {}) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::update_contact_t &, void *custom) noexcept override;
@@ -93,7 +93,7 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
     utils::logger_t log;
     r::address_ptr_t http_client;
     r::address_ptr_t coordinator;
-    utils::URI announce_url;
+    utils::uri_ptr_t announce_url;
     model::device_id_t discovery_device_id;
     const utils::key_pair_t &ssl_pair;
     rx_buff_t rx_buff;

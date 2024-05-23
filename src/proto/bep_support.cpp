@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "bep_support.h"
 #include "constants.h"
@@ -12,7 +12,6 @@
 #include <spdlog/spdlog.h>
 
 #include <google/protobuf/any.h>
-#include <sstream>
 
 using namespace syncspirit;
 namespace be = boost::endian;
@@ -218,7 +217,7 @@ std::size_t make_announce_message(fmt::memory_buffer &buff, std::string_view dev
     proto::Announce msg;
     msg.set_instance_id(instance);
     for (auto &uri : uris) {
-        msg.add_addresses(uri.full);
+        msg.add_addresses(uri->buffer());
     }
     msg.set_id(device_name.data(), device_name.size());
 

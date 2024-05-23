@@ -151,7 +151,7 @@ template <> struct base_impl_t<ssl_socket_t> {
           sock(mk_sock(config, ctx, strand)) {
         log = utils::get_logger("transport.tls");
         if (config.ssl_junction->sni_extension) {
-            auto &host = config.uri.host;
+            auto host = config.uri->host();
             if (!SSL_set_tlsext_host_name(sock.native_handle(), host.c_str())) {
                 sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
                 log->error("http_actor_t:: Set SNI Hostname : {}", ec.message());

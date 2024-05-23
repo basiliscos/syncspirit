@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2022-2024 Ivan Baidakou
 
 #include "relay_support.h"
 #include "utils/error_code.h"
@@ -321,15 +321,15 @@ parse_result_t parse(std::string_view data) noexcept {
     }
 }
 
-std::optional<model::device_id_t> parse_device(const utils::URI &uri) noexcept {
-    if (uri.proto != "relay") {
+std::optional<model::device_id_t> parse_device(const utils::uri_ptr_t &uri) noexcept {
+    if (uri->scheme() != "relay") {
         return {};
     }
     auto device_id_str = std::string{};
-    auto q = uri.decompose_query();
-    for (auto &pair : q) {
-        if (pair.first == "id") {
-            device_id_str = std::move(pair.second);
+    auto params = uri->params();
+    for (auto p : params) {
+        if (p.key == "id") {
+            device_id_str = p.value;
             break;
         }
     }
@@ -369,22 +369,21 @@ outcome::result<relay_infos_t> parse_endpoint(std::string_view buff) noexcept {
             continue;
         }
         auto uri_str = url.get<std::string>();
-        auto uri_option = utils::parse(uri_str.c_str());
-        if (!uri_option) {
+        auto uri = utils::parse(uri_str.c_str());
+        if (!uri) {
             continue;
         }
-        auto &uri = uri_option.value();
-        if (uri.proto != "relay") {
+        if (uri->scheme() != "relay") {
             continue;
         }
         auto device_id_str = std::string{};
         auto ping_interval_str = std::string{};
-        auto q = uri.decompose_query();
-        for (auto &pair : q) {
-            if (pair.first == "id") {
-                device_id_str = std::move(pair.second);
-            } else if (pair.first == "pingInterval") {
-                ping_interval_str = std::move(pair.second);
+        auto params = uri->params();
+        for (auto p : params) {
+            if (p.key == "id") {
+                device_id_str = p.value;
+            } else if (p.key == "pingInterval") {
+                ping_interval_str = p.value;
             }
         }
         if (device_id_str.empty()) {

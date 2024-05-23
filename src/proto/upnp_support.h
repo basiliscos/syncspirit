@@ -7,7 +7,6 @@
 #include "syncspirit-export.h"
 #include <fmt/core.h>
 #include <string>
-#include <vector>
 #include <boost/outcome.hpp>
 
 namespace syncspirit::proto {
@@ -28,22 +27,25 @@ SYNCSPIRIT_API outcome::result<model::discovery_result> parse(const char *data, 
 
 SYNCSPIRIT_API outcome::result<void> make_discovery_request(fmt::memory_buffer &buff, std::uint32_t max_wait) noexcept;
 
-SYNCSPIRIT_API outcome::result<void> make_description_request(fmt::memory_buffer &buff, const utils::URI &uri) noexcept;
+SYNCSPIRIT_API outcome::result<void> make_description_request(fmt::memory_buffer &buff,
+                                                              const utils::uri_ptr_t &uri) noexcept;
 
 SYNCSPIRIT_API outcome::result<model::igd_result> parse_igd(const char *data, std::size_t bytes) noexcept;
 
-SYNCSPIRIT_API outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const utils::URI &uri) noexcept;
+SYNCSPIRIT_API outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff,
+                                                              const utils::uri_ptr_t &uri) noexcept;
 
 SYNCSPIRIT_API outcome::result<std::string> parse_external_ip(const char *data, std::size_t bytes) noexcept;
 
-SYNCSPIRIT_API outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const utils::URI &uri,
+SYNCSPIRIT_API outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const utils::uri_ptr_t &uri,
                                                           std::uint16_t external_port, const std::string &internal_ip,
                                                           std::uint16_t internal_port) noexcept;
 
-SYNCSPIRIT_API outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const utils::URI &uri,
+SYNCSPIRIT_API outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const utils::uri_ptr_t &uri,
                                                             std::uint16_t external_port) noexcept;
 
-SYNCSPIRIT_API outcome::result<void> make_mapping_validation_request(fmt::memory_buffer &buff, const utils::URI &uri,
+SYNCSPIRIT_API outcome::result<void> make_mapping_validation_request(fmt::memory_buffer &buff,
+                                                                     const utils::uri_ptr_t &uri,
                                                                      std::uint16_t external_port) noexcept;
 
 SYNCSPIRIT_API outcome::result<bool> parse_mapping(const char *data, std::size_t bytes) noexcept;

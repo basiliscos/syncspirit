@@ -18,6 +18,7 @@ find_package(
         filesystem
         program_options
         system
+        url
     REQUIRED
 )
 find_package(OpenSSL REQUIRED)
@@ -28,7 +29,6 @@ find_package(lz4 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(pugixml REQUIRED)
-find_package(uriparser REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
@@ -197,10 +197,10 @@ target_link_libraries(syncspirit_lib
     Boost::filesystem
     Boost::program_options
     Boost::system
+    Boost::url
     OpenSSL::SSL
     fmt::fmt
     spdlog::spdlog
-    uriparser::uriparser
     tomlplusplus::tomlplusplus
     nlohmann_json::nlohmann_json
     lz4::lz4

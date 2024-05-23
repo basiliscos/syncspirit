@@ -68,7 +68,7 @@ void global_discovery_actor_t::announce() noexcept {
 
     bool has_new = false;
     for (auto &uri : uris) {
-        if (!announced_uris.count(uri.full)) {
+        if (!announced_uris.count(uri->buffer())) {
             has_new = true;
             break;
         }
@@ -78,12 +78,12 @@ void global_discovery_actor_t::announce() noexcept {
     }
 
     for (auto &uri : uris) {
-        announced_uris.emplace(uri.full);
+        announced_uris.emplace(uri->buffer());
     }
     if (log->level() <= spdlog::level::debug) {
         std::string joint_uris;
         for (size_t i = 0; i < uris.size(); ++i) {
-            joint_uris += uris[i].full;
+            joint_uris += uris[i]->buffer();
             if (i + 1 < uris.size()) {
                 joint_uris += ", ";
             }
@@ -213,8 +213,8 @@ void global_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcep
     }
 }
 
-void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::URI &uri, fmt::memory_buffer &&tx_buff,
-                                            const rotor::message_ptr_t &custom) noexcept {
+void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri,
+                                            fmt::memory_buffer &&tx_buff, const rotor::message_ptr_t &custom) noexcept {
     auto timeout = r::pt::millisec{io_timeout};
     transport::ssl_junction_t ssl{discovery_device_id, &ssl_pair, true, ""};
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,

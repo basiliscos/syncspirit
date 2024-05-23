@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -114,8 +114,8 @@ struct fixture_t {
         acceptor.bind(ep);
         acceptor.listen();
         listening_ep = acceptor.local_endpoint();
-        peer_uri = utils::parse(get_uri(listening_ep)).value();
-        log->debug("listening on {}", peer_uri.full);
+        peer_uri = utils::parse(get_uri(listening_ep));
+        log->debug("listening on {}", peer_uri);
         initiate_accept();
 
         cluster = new cluster_t(my_device, 1, 1);
@@ -189,7 +189,7 @@ struct fixture_t {
             .peer_device_id(peer_device->device_id())
             .relay_session(relay_session)
             .relay_enabled(true)
-            .uris({peer_uri})
+            .uris(utils::uri_container_t{peer_uri})
             .cluster(use_model ? cluster : nullptr)
             .sink(sup->get_address())
             .ssl_pair(&my_keys)
@@ -221,7 +221,7 @@ struct fixture_t {
     config::bep_config_t bep_config;
     utils::key_pair_t my_keys;
     utils::key_pair_t peer_keys;
-    utils::URI peer_uri;
+    utils::uri_ptr_t peer_uri;
     model::device_ptr_t my_device;
     model::device_ptr_t peer_device;
     transport::stream_sp_t peer_trans;
@@ -519,7 +519,7 @@ struct passive_relay_fixture_t : fixture_t {
 
     void accept(const sys::error_code &ec) noexcept override {
         LOG_INFO(log, "accept (relay/passive), ec: {}", ec.message());
-        auto uri = utils::parse("tcp://127.0.0.1:0/").value();
+        auto uri = utils::parse("tcp://127.0.0.1:0/");
         auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         peer_trans = transport::initiate_stream(cfg);
 
@@ -690,7 +690,7 @@ struct active_relay_fixture_t : fixture_t {
             relay_trans->async_handshake(handshake_fn, on_error);
             return;
         }
-        auto uri = utils::parse("tcp://127.0.0.1:0/").value();
+        auto uri = utils::parse("tcp://127.0.0.1:0/");
         auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         peer_trans = transport::initiate_stream(cfg);
 

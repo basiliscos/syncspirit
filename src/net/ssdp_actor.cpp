@@ -146,7 +146,7 @@ void ssdp_actor_t::timer_cancel() noexcept {
     }
 }
 
-void ssdp_actor_t::launch_upnp(const URI &igd_uri) noexcept {
+void ssdp_actor_t::launch_upnp(const uri_ptr_t &igd_uri) noexcept {
     LOG_DEBUG(log, "launching upnp");
     auto timeout = shutdown_timeout * 9 / 10;
 

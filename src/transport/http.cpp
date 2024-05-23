@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "utils/format.hpp"
 #include "http.h"
@@ -36,7 +36,7 @@ template <typename Sock> struct http_impl_t : base_impl_t<Sock>, interface_t<htt
 };
 
 http_sp_t initiate_http(transport_config_t &config) noexcept {
-    auto &proto = config.uri.proto;
+    auto proto = config.uri->scheme();
     if (proto == "http") {
         return new http_impl_t<tcp_socket_t>(config);
     } else if (proto == "https") {
