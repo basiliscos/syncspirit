@@ -10,7 +10,6 @@
 #include <spdlog/fmt/fmt.h>
 
 #include <cassert>
-#include <functional>
 
 using namespace syncspirit::fltk::config;
 namespace bfs = boost::filesystem;
