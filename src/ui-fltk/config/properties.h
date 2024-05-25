@@ -221,6 +221,7 @@ struct device_id_t final : impl::string_t {
     static const char *explanation_;
 
     device_id_t(std::string value, std::string default_value);
+    error_ptr_t validate_value() noexcept override;
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };
