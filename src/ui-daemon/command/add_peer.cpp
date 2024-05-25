@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "add_peer.h"
 #include "../governor_actor.h"
@@ -29,7 +29,7 @@ bool add_peer_t::execute(governor_actor_t &actor) noexcept {
     auto &devices = actor.cluster->get_devices();
     auto found = devices.by_sha256(peer.get_sha256());
     if (found) {
-        log->warn("{}, device {} is already added, skipping", actor.get_identity(), peer);
+        log->warn("device {} is already added, skipping", peer);
         return false;
     }
 

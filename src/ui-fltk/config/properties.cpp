@@ -222,7 +222,7 @@ device_id_t::device_id_t(std::string value, std::string default_value)
 
 void device_id_t::reflect_to(syncspirit::config::main_t &main) { main.global_announce_config.device_id = value; }
 
-error_ptr_t device_id_t::validate_value() noexcept  {
+error_ptr_t device_id_t::validate_value() noexcept {
     auto opt = model::device_id_t::from_string(value);
     if (!opt) {
         return error_ptr_t(new std::string("invalid device id"));
@@ -231,7 +231,6 @@ error_ptr_t device_id_t::validate_value() noexcept  {
 }
 
 const char *device_id_t::explanation_ = "device_id of global/private discovery server";
-
 
 key_file_t::key_file_t(std::string value, std::string default_value)
     : parent_t("key_file", explanation_, std::move(value), std::move(default_value)) {}
