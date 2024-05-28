@@ -19,7 +19,7 @@ struct SYNCSPIRIT_API endpoint_t {
 
 using endpoints_t = std::vector<endpoint_t>;
 
-}
+} // namespace syncspirit::utils
 
 namespace std {
 using endpoint_t = syncspirit::utils::endpoint_t;
@@ -32,7 +32,7 @@ template <> struct hash<endpoint_t> {
     }
 };
 
-}
+} // namespace std
 
 namespace syncspirit::utils {
 

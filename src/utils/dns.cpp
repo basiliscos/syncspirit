@@ -19,8 +19,7 @@ std::vector<endpoint_t> parse_dns_servers(std::string_view str) noexcept {
         begin = (end == std::string::npos) ? std::string::npos : end + 1;
         if (end == std::string::npos) {
             begin = std::string::npos;
-        }
-        else {
+        } else {
             begin = end + 1;
             end = str.find(',', begin);
         }
@@ -44,7 +43,7 @@ std::vector<endpoint_t> parse_dns_servers(std::string_view str) noexcept {
         if (colon_start != std::string::npos) {
             auto port_start = colon_start + 1;
             auto port_end = port_start;
-            while(port_end < full_addr.size() && std::isdigit(full_addr[port_end])) {
+            while (port_end < full_addr.size() && std::isdigit(full_addr[port_end])) {
                 ++port_end;
             }
             port_str = full_addr.substr(port_start, port_end - port_start);
@@ -54,4 +53,4 @@ std::vector<endpoint_t> parse_dns_servers(std::string_view str) noexcept {
     return r;
 }
 
-}
+} // namespace syncspirit::utils

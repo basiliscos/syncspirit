@@ -24,9 +24,7 @@ r::plugin::resource_id_t timer = 1;
 
 resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
     : r::actor_base_t{config}, io_timeout{config.resolve_timeout},
-      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()},
-    channel{nullptr}
-{}
+      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, channel{nullptr} {}
 
 void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
     r::actor_base_t::do_initialize(ctx);
@@ -45,9 +43,9 @@ void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
         return do_shutdown(make_error(ec));
     }
 
-    auto servers_guard = make_guard(servers, [](auto str){ ares_free_string(str); });
+    auto servers_guard = make_guard(servers, [](auto str) { ares_free_string(str); });
     LOG_DEBUG(log, "got dns servers: {}", servers);
-    //boost::asio::make_address
+    // boost::asio::make_address
 }
 
 void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {

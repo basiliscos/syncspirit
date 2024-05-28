@@ -78,7 +78,7 @@ struct SYNCSPIRIT_API resolver_actor_t : public r::actor_base_t {
     asio::io_context::strand &strand;
     std::optional<r::request_id_t> timer_id;
     // tcp::resolver backend;
-    ares_channel_t* channel;
+    ares_channel_t *channel;
     Queue queue;
     Cache cache;
 };
