@@ -31,6 +31,7 @@ find_package(spdlog REQUIRED)
 find_package(pugixml REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(c-ares REQUIRED)
 
 set(SYNCSPIRIT_VERSION "v0.4.0")
 
@@ -164,6 +165,7 @@ add_library(syncspirit_lib
     src/transport/http.cpp
     src/utils/base32.cpp
     src/utils/beast_support.cpp
+    src/utils/dns.cpp
     src/utils/error_code.cpp
     src/utils/location.cpp
     src/utils/log.cpp
@@ -204,6 +206,7 @@ target_link_libraries(syncspirit_lib
     tomlplusplus::tomlplusplus
     nlohmann_json::nlohmann_json
     lz4::lz4
+    c-ares::cares
     $<IF:$<PLATFORM_ID:Windows>,mdbx,mdbx-static>
     $<$<PLATFORM_ID:Windows>:iphlpapi>
     $<$<PLATFORM_ID:Windows>:ws2_32>

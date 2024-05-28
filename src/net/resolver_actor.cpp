@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "resolver_actor.h"
+#include "utils/error_code.h"
 #include "names.h"
 
 using namespace syncspirit::net;
 using namespace syncspirit::utils;
 
 namespace {
+
+template <typename T> using guard_t = std::unique_ptr<T, std::function<void(T *)>>;
+
+template <typename T, typename G> guard_t<T> make_guard(T *ptr, G &&fn) {
+    return guard_t<T>{ptr, [fn = std::move(fn)](T *it) { fn(it); }};
+}
+
 namespace resource {
 r::plugin::resource_id_t io = 0;
 r::plugin::resource_id_t timer = 1;
@@ -16,7 +24,31 @@ r::plugin::resource_id_t timer = 1;
 
 resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
     : r::actor_base_t{config}, io_timeout{config.resolve_timeout},
-      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, backend{strand.context()} {}
+      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()},
+    channel{nullptr}
+{}
+
+void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
+    r::actor_base_t::do_initialize(ctx);
+
+    auto status = ares_init_options(&channel, nullptr, 0);
+    if (status != ARES_SUCCESS) {
+        LOG_ERROR(log, "cannot do ares_init, code = {}", static_cast<int>(status));
+        auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+        return do_shutdown(make_error(ec));
+    }
+
+    auto servers = ares_get_servers_csv(channel);
+    if (!servers) {
+        LOG_ERROR(log, "cannot get dns servers");
+        auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+        return do_shutdown(make_error(ec));
+    }
+
+    auto servers_guard = make_guard(servers, [](auto str){ ares_free_string(str); });
+    LOG_DEBUG(log, "got dns servers: {}", servers);
+    //boost::asio::make_address
+}
 
 void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -36,6 +68,11 @@ void resolver_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
 }
 
+void resolver_actor_t::shutdown_finish() noexcept {
+    r::actor_base_t::shutdown_finish();
+    ares_destroy(channel);
+}
+
 void resolver_actor_t::on_request(message::resolve_request_t &req) noexcept {
     queue.emplace_back(&req);
     process();
@@ -52,7 +89,7 @@ void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
     };
     if (matches(queue.front())) {
         assert(resources->has(resource::io));
-        backend.cancel();
+        LOG_WARN(log, "todo, backend.cancel()");
         cancel_timer();
     } else if (queue.size() > 1) {
         auto it = queue.begin();
@@ -77,6 +114,7 @@ void resolver_actor_t::mass_reply(const endpoint_t &endpoint, const std::error_c
 }
 
 void resolver_actor_t::process() noexcept {
+#if 0
     if (resources->has(resource::io)) {
         return;
     }
@@ -92,9 +130,11 @@ void resolver_actor_t::process() noexcept {
     if (queue.empty())
         return;
     resolve_start(*queue_it);
+#endif
 }
 
 void resolver_actor_t::resolve_start(request_ptr_t &req) noexcept {
+#if 0
     if (resources->has_any())
         return;
     if (queue.empty())
@@ -107,9 +147,13 @@ void resolver_actor_t::resolve_start(request_ptr_t &req) noexcept {
 
     timer_id = start_timer(io_timeout, *this, &resolver_actor_t::on_timer);
     resources->acquire(resource::timer);
+#endif
+    LOG_WARN(log, "todo");
+    do_shutdown();
 }
 
 void resolver_actor_t::on_resolve(resolve_results_t results) noexcept {
+#if 0
     resources->release(resource::io);
     if (!queue.empty()) {
         auto &payload = queue.front()->payload.request_payload;
@@ -120,9 +164,11 @@ void resolver_actor_t::on_resolve(resolve_results_t results) noexcept {
     }
     cancel_timer();
     process();
+#endif
 }
 
 void resolver_actor_t::on_resolve_error(const sys::error_code &ec) noexcept {
+#if 0
     resources->release(resource::io);
     if (ec == asio::error::operation_aborted) {
         if (resources->has(resource::io)) {
@@ -140,9 +186,11 @@ void resolver_actor_t::on_resolve_error(const sys::error_code &ec) noexcept {
 
     cancel_timer();
     process();
+#endif
 }
 
 void resolver_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
+#if 0
     resources->release(resource::timer);
     if (cancelled) {
         if (resources->has(resource::io)) {
@@ -161,6 +209,7 @@ void resolver_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     }
     timer_id.reset();
     process();
+#endif
 }
 
 void resolver_actor_t::cancel_timer() noexcept {

@@ -116,6 +116,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::invalid_deviceid:
         r = "invalid device id";
         break;
+    case error_code_t::cares_failure:
+        r = "cares failure";
+        break;
     default:
         r = "unknown";
     }

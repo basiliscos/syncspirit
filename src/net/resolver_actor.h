@@ -4,34 +4,11 @@
 #pragma once
 
 #include "messages.h"
-#include "../utils/log.h"
+#include "utils/log.h"
+#include "utils/dns.h"
 #include <boost/asio.hpp>
 #include <rotor.hpp>
-
-namespace syncspirit {
-namespace net {
-
-struct endpoint_t {
-    std::string host;
-    std::string port;
-    bool operator==(const endpoint_t &other) const noexcept { return host == other.host && port == other.port; }
-};
-
-} // namespace net
-} // namespace syncspirit
-
-namespace std {
-using endpoint_t = syncspirit::net::endpoint_t;
-
-template <> struct hash<endpoint_t> {
-    inline size_t operator()(const endpoint_t &endpoint) const noexcept {
-        auto h1 = std::hash<std::string>()(endpoint.host);
-        auto h2 = std::hash<std::string>()(endpoint.port);
-        return h1 ^ (h2 << 4);
-    }
-};
-
-} // namespace std
+#include <ares.h>
 
 namespace syncspirit {
 namespace net {
@@ -59,18 +36,20 @@ struct SYNCSPIRIT_API resolver_actor_t : public r::actor_base_t {
 
     explicit resolver_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void do_initialize(r::system_context_t *ctx) noexcept override;
     void on_start() noexcept override;
+    void shutdown_finish() noexcept override;
 
   private:
     using request_ptr_t = r::intrusive_ptr_t<message::resolve_request_t>;
     using resolve_results_t = payload::address_response_t::resolve_results_t;
     using Queue = std::list<request_ptr_t>;
-    using Cache = std::unordered_map<endpoint_t, resolve_results_t>;
+    using Cache = std::unordered_map<utils::endpoint_t, resolve_results_t>;
 
     void on_request(message::resolve_request_t &req) noexcept;
     void on_cancel(message::resolve_cancel_t &message) noexcept;
-    void mass_reply(const endpoint_t &endpoint, const resolve_results_t &results) noexcept;
-    void mass_reply(const endpoint_t &endpoint, const std::error_code &ec) noexcept;
+    void mass_reply(const utils::endpoint_t &endpoint, const resolve_results_t &results) noexcept;
+    void mass_reply(const utils::endpoint_t &endpoint, const std::error_code &ec) noexcept;
     void process() noexcept;
     void resolve_start(request_ptr_t &req) noexcept;
     void on_resolve(resolve_results_t results) noexcept;
@@ -78,7 +57,8 @@ struct SYNCSPIRIT_API resolver_actor_t : public r::actor_base_t {
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void cancel_timer() noexcept;
 
-    template <typename ReplyFn> void reply(const endpoint_t &endpoint, ReplyFn &&fn) noexcept {
+    template <typename ReplyFn> void reply(const utils::endpoint_t &endpoint, ReplyFn &&fn) noexcept {
+#if 0
         auto it = queue.begin();
         while (it != queue.end()) {
             auto &message_ptr = *it;
@@ -90,13 +70,15 @@ struct SYNCSPIRIT_API resolver_actor_t : public r::actor_base_t {
                 ++it;
             }
         }
+#endif
     }
 
     utils::logger_t log;
     pt::time_duration io_timeout;
     asio::io_context::strand &strand;
-    tcp::resolver backend;
     std::optional<r::request_id_t> timer_id;
+    // tcp::resolver backend;
+    ares_channel_t* channel;
     Queue queue;
     Cache cache;
 };

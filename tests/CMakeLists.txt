@@ -78,6 +78,10 @@ add_executable(017-fs-utils 017-fs-utils.cpp $<$<PLATFORM_ID:Windows>:win32-reso
 target_link_libraries(017-fs-utils syncspirit_test_lib)
 add_test(017-fs-utils "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/017-fs-utils")
 
+add_executable(018-dns 018-dns.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(018-dns syncspirit_test_lib)
+add_test(018-dns "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/018-dns")
+
 add_executable(020-generic-map 020-generic-map.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(020-generic-map syncspirit_test_lib)
 add_test(020-generic-map "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/020-generic-map")
