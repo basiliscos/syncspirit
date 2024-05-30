@@ -3,6 +3,7 @@
 
 #include "resolver_actor.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "names.h"
 
 using namespace syncspirit::net;
@@ -17,19 +18,38 @@ template <typename T, typename G> guard_t<T> make_guard(T *ptr, G &&fn) {
 }
 
 namespace resource {
-r::plugin::resource_id_t io = 0;
-r::plugin::resource_id_t timer = 1;
+r::plugin::resource_id_t timer = 0;
+r::plugin::resource_id_t send = 1;
+r::plugin::resource_id_t recv = 2;
 } // namespace resource
 } // namespace
 
 resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
-    : r::actor_base_t{config}, io_timeout{config.resolve_timeout},
-      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, channel{nullptr} {}
+    : r::actor_base_t{config}, io_timeout{config.resolve_timeout}, hosts_path{config.hosts_path},
+      resolvconf_path{config.resolvconf_path},
+      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, channel{nullptr} {
+
+    rx_buff.resize(1500);
+    tx_buff = nullptr;
+}
 
 void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
     r::actor_base_t::do_initialize(ctx);
 
-    auto status = ares_init_options(&channel, nullptr, 0);
+    ares_options opts;
+    int opts_mask = 0;
+    memset(&opts, 0, sizeof(opts));
+
+    if (resolvconf_path.size()) {
+        opts.resolvconf_path = const_cast<char *>(resolvconf_path.data());
+        opts_mask |= ARES_OPT_RESOLVCONF;
+    }
+    if (hosts_path.size()) {
+        opts.hosts_path = const_cast<char *>(hosts_path.data());
+        opts_mask |= ARES_OPT_HOSTS_FILE;
+    }
+
+    auto status = ares_init_options(&channel, &opts, opts_mask);
     if (status != ARES_SUCCESS) {
         LOG_ERROR(log, "cannot do ares_init, code = {}", static_cast<int>(status));
         auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
@@ -44,8 +64,40 @@ void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
     }
 
     auto servers_guard = make_guard(servers, [](auto str) { ares_free_string(str); });
-    LOG_DEBUG(log, "got dns servers: {}", servers);
-    // boost::asio::make_address
+    LOG_TRACE(log, "got dns servers: {}", servers);
+
+    auto dns_addresses = utils::parse_dns_servers(servers);
+    if (dns_addresses.empty()) {
+        LOG_ERROR(log, "no valid dns servers found");
+        auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+        return do_shutdown(make_error(ec));
+    }
+
+    auto dns_address = dns_addresses[0];
+    for (auto &addr : dns_addresses) {
+        if (addr.ip.is_v4()) {
+            dns_address = addr;
+            break;
+        }
+    }
+    LOG_DEBUG(log, "selected dns server: {}:{}", dns_address.ip, dns_address.port);
+
+    sys::error_code ec;
+    auto s = udp_socket_t{strand.context()};
+    s.open(boost::asio::ip::udp::v4(), ec);
+    if (ec) {
+        LOG_WARN(log, "init, can't open socket: {}", ec.message());
+        return do_shutdown(make_error(ec));
+    }
+
+    auto endpoint = asio::ip::udp::endpoint(dns_address.ip, dns_address.port);
+    s.connect(endpoint, ec);
+    if (ec) {
+        LOG_WARN(log, "init, can't connect to {}: {}", endpoint, ec.message());
+        return do_shutdown(make_error(ec));
+    }
+
+    sock.reset(new udp_socket_t(std::move(s)));
 }
 
 void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -86,9 +138,11 @@ void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
         return payload.id == request_id && payload.origin == source;
     };
     if (matches(queue.front())) {
+#if 0
         assert(resources->has(resource::io));
         LOG_WARN(log, "todo, backend.cancel()");
         cancel_timer();
+#endif
     } else if (queue.size() > 1) {
         auto it = queue.begin();
         std::advance(it, 1);
@@ -103,115 +157,186 @@ void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
     }
 }
 
-void resolver_actor_t::mass_reply(const endpoint_t &endpoint, const resolve_results_t &results) noexcept {
-    reply(endpoint, [&](auto &message) { reply_to(message, results); });
+void resolver_actor_t::mass_reply(const utils::dns_query_t &query, const resolve_results_t &results) noexcept {
+    reply(query, [&](auto &message) { reply_to(message, results); });
 }
 
-void resolver_actor_t::mass_reply(const endpoint_t &endpoint, const std::error_code &ec) noexcept {
-    reply(endpoint, [&](auto &message) { reply_with_error(message, make_error(ec)); });
+void resolver_actor_t::mass_reply(const utils::dns_query_t &quey, const std::error_code &ec) noexcept {
+    reply(quey, [&](auto &message) { reply_with_error(message, make_error(ec)); });
 }
 
 void resolver_actor_t::process() noexcept {
-#if 0
-    if (resources->has(resource::io)) {
+    if (resources->has(resource::recv) || resources->has(resource::send)) {
         return;
     }
     if (queue.empty())
         return;
     auto queue_it = queue.begin();
     auto &payload = (*queue_it)->payload.request_payload;
-    auto endpoint = endpoint_t{payload->host, payload->port};
-    auto cache_it = cache.find(endpoint);
+    auto &query = *payload;
+    auto cache_it = cache.find(query);
     if (cache_it != cache.end()) {
-        mass_reply(endpoint, cache_it->second);
+        mass_reply(query, cache_it->second);
     }
     if (queue.empty())
         return;
     resolve_start(*queue_it);
-#endif
+}
+
+bool resolver_actor_t::resolve_locally(const utils::dns_query_t &query) noexcept {
+    auto host = query.host.c_str();
+    hostent *host_ent;
+    auto result = ares_gethostbyname_file(channel, host, AF_INET, &host_ent);
+    if (result != ARES_SUCCESS) {
+        LOG_TRACE(log, "host '{}' is not found in hosts file", host);
+    } else {
+        auto guard = make_guard(host_ent, [](auto *ptr) { ares_free_hostent(ptr); });
+        auto results = payload::address_response_t::resolve_results_t();
+        auto p_addr = host_ent->h_addr_list;
+        while (p_addr && *p_addr) {
+            char buff[INET6_ADDRSTRLEN + 1] = {0};
+            auto family = host_ent->h_length == 4 ? AF_INET : AF_INET6;
+            ares_inet_ntop(family, *p_addr, buff, INET6_ADDRSTRLEN);
+            auto addr_string = std::string_view(buff);
+            LOG_DEBUG(log, "{} => {}, resolved via hosts file", host, addr_string);
+
+            auto ec = boost::system::error_code{};
+            auto ip = asio::ip::make_address(buff, ec);
+            if (ec) {
+                LOG_WARN(log, "invalid ip address {}: ", buff, ec.message());
+                continue;
+            }
+            results.emplace_back(tcp::endpoint(ip, query.port));
+            ++p_addr;
+        }
+
+        if (results.size()) {
+            mass_reply(query, std::move(results));
+            return true;
+        }
+    }
+    return false;
 }
 
 void resolver_actor_t::resolve_start(request_ptr_t &req) noexcept {
-#if 0
     if (resources->has_any())
         return;
     if (queue.empty())
         return;
 
-    auto &payload = req->payload.request_payload;
-    auto fwd_resolver = ra::forwarder_t(*this, &resolver_actor_t::on_resolve, &resolver_actor_t::on_resolve_error);
-    backend.async_resolve(payload->host, payload->port, std::move(fwd_resolver));
-    resources->acquire(resource::io);
+    auto &query = *req->payload.request_payload;
+    if (resolve_locally(query)) {
+        return process();
+    }
+
+    auto host = query.host.c_str();
+    ares_dns_record_t *record_raw;
+    auto result = ares_dns_record_create(&record_raw, 0, ARES_FLAG_RD, ARES_OPCODE_QUERY, ARES_RCODE_NOERROR);
+    if (result != ARES_SUCCESS) {
+        LOG_WARN(log, "cannot create dns record: {}", static_cast<int>(result));
+        auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+        reply_with_error(*queue.front(), make_error(ec));
+        return queue.pop_front();
+    }
+    auto record = make_guard(record_raw, [](ares_dns_record_t *ptr) { ares_dns_record_destroy(ptr); });
+
+    result = ares_dns_record_query_add(record.get(), host, ARES_REC_TYPE_A, ARES_CLASS_IN);
+    if (result != ARES_SUCCESS) {
+        LOG_WARN(log, "cannot record dns query: {}", static_cast<int>(result));
+        auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+        reply_with_error(*queue.front(), make_error(ec));
+        return queue.pop_front();
+    }
+
+    assert(this->tx_buff == nullptr);
+    size_t buff_sz;
+    result = ares_dns_write(record.get(), &this->tx_buff, &buff_sz);
+    if (result != ARES_SUCCESS) {
+        LOG_WARN(log, "cannot serialized dns query: {}", static_cast<int>(result));
+        auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+        reply_with_error(*queue.front(), make_error(ec));
+        return queue.pop_front();
+    }
+
+    auto fwd_read = ra::forwarder_t(*this, &resolver_actor_t::on_read, &resolver_actor_t::on_read_error);
+    auto rx_buff = asio::buffer(this->rx_buff.data(), this->rx_buff.size());
+    sock->async_receive(rx_buff, std::move(fwd_read));
+    resources->acquire(resource::recv);
+
+    auto fwd_write = ra::forwarder_t(*this, &resolver_actor_t::on_write, &resolver_actor_t::on_write_error);
+    auto tx_buff = asio::buffer(this->tx_buff, buff_sz);
+    sock->async_send(tx_buff, std::move(fwd_write));
+    resources->acquire(resource::send);
 
     timer_id = start_timer(io_timeout, *this, &resolver_actor_t::on_timer);
     resources->acquire(resource::timer);
-#endif
-    LOG_WARN(log, "todo");
-    do_shutdown();
-}
-
-void resolver_actor_t::on_resolve(resolve_results_t results) noexcept {
-#if 0
-    resources->release(resource::io);
-    if (!queue.empty()) {
-        auto &payload = queue.front()->payload.request_payload;
-        auto endpoint = endpoint_t{payload->host, payload->port};
-        auto pair = cache.emplace(endpoint, results);
-        auto &it = pair.first;
-        mass_reply(it->first, it->second);
-    }
-    cancel_timer();
-    process();
-#endif
-}
-
-void resolver_actor_t::on_resolve_error(const sys::error_code &ec) noexcept {
-#if 0
-    resources->release(resource::io);
-    if (ec == asio::error::operation_aborted) {
-        if (resources->has(resource::io)) {
-            auto ec = r::make_error_code(r::error_code_t::cancelled);
-            reply_with_error(*queue.front(), make_error(ec));
-            queue.pop_front();
-        }
-    } else {
-        if (!queue.empty()) {
-            auto &payload = *queue.front()->payload.request_payload;
-            auto endpoint = endpoint_t{payload.host, payload.port};
-            mass_reply(endpoint, ec);
-        }
-    }
-
-    cancel_timer();
-    process();
-#endif
+    current_query = req;
 }
 
 void resolver_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
-#if 0
     resources->release(resource::timer);
     if (cancelled) {
-        if (resources->has(resource::io)) {
-            auto ec = r::make_error_code(r::error_code_t::cancelled);
-            reply_with_error(*queue.front(), make_error(ec));
-            queue.pop_front();
+        if (resources->has(resource::recv) || resources->has(resource::send)) {
+            sys::error_code ec;
+            sock->cancel(ec);
+            if (ec) {
+                LOG_WARN(log, "cannot cancel socket: {}", ec.message());
+            }
+            // reply_with_error(*current_query, make_error(ec));
+            // queue.pop_front();
         }
     } else {
-        if (!queue.empty()) {
+        if (!queue.empty() && current_query) {
             // could be actually some other ec...
             auto ec = r::make_error_code(r::error_code_t::request_timeout);
-            auto &payload = queue.front()->payload.request_payload;
-            auto endpoint = endpoint_t{payload->host, payload->port};
-            mass_reply(endpoint, ec);
+            auto &payload = current_query->payload.request_payload;
+            mass_reply(*payload, ec);
+            current_query.reset();
         }
     }
     timer_id.reset();
     process();
-#endif
 }
 
 void resolver_actor_t::cancel_timer() noexcept {
     if (timer_id) {
         r::actor_base_t::cancel_timer(*timer_id);
+    }
+}
+
+void resolver_actor_t::on_write(size_t bytes) noexcept {
+    resources->release(resource::send);
+    ares_free_string(tx_buff);
+    tx_buff = nullptr;
+}
+
+void resolver_actor_t::on_write_error(const sys::error_code &ec) noexcept {
+    resources->release(resource::send);
+    if (ec != asio::error::operation_aborted) {
+        LOG_WARN(log, "on_write_error, error = {}", ec.message());
+        if (current_query) {
+            auto &payload = current_query->payload.request_payload;
+            mass_reply(*payload, ec);
+            current_query.reset();
+        }
+    }
+}
+
+void resolver_actor_t::on_read(size_t bytes) noexcept {
+    resources->release(resource::recv);
+
+    // auto status = ares_dns_parse();
+    // aaa
+}
+
+void resolver_actor_t::on_read_error(const sys::error_code &ec) noexcept {
+    resources->release(resource::recv);
+    if (ec != asio::error::operation_aborted) {
+        LOG_WARN(log, "on_read_error, error = {}", ec.message());
+        if (current_query) {
+            auto &payload = current_query->payload.request_payload;
+            mass_reply(*payload, ec);
+            current_query.reset();
+        }
     }
 }

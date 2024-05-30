@@ -18,6 +18,7 @@
 #include "model/cluster.h"
 #include "transport/base.h"
 #include "proto/bep_support.h"
+#include "utils/dns.h"
 
 namespace syncspirit {
 namespace net {
@@ -41,17 +42,15 @@ namespace payload {
 using cluster_config_ptr_t = std::unique_ptr<proto::ClusterConfig>;
 
 struct address_response_t : public r::arc_base_t<address_response_t> {
-    using resolve_results_t = tcp::resolver::results_type;
+    using resolve_results_t = std::vector<tcp::endpoint>;
 
     explicit address_response_t(resolve_results_t results_) : results{results_} {};
     resolve_results_t results;
 };
 
-struct address_request_t : public r::arc_base_t<address_request_t> {
+struct address_request_t : r::arc_base_t<address_request_t>, utils::dns_query_t {
     using response_t = r::intrusive_ptr_t<address_response_t>;
-    std::string host;
-    std::string port;
-    address_request_t(std::string_view host_, std::string_view port_) : host{host_}, port{port_} {}
+    address_request_t(std::string_view host_, std::uint16_t port_) : utils::dns_query_t{std::string(host_), port_} {}
 };
 
 struct http_response_t : public r::arc_base_t<http_response_t> {

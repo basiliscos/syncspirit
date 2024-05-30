@@ -39,16 +39,21 @@ std::vector<endpoint_t> parse_dns_servers(std::string_view str) noexcept {
         if (ec) {
             continue;
         }
-        auto port_str = std::string_view("53");
+        std::uint16_t port = 53;
         if (colon_start != std::string::npos) {
             auto port_start = colon_start + 1;
             auto port_end = port_start;
             while (port_end < full_addr.size() && std::isdigit(full_addr[port_end])) {
                 ++port_end;
             }
-            port_str = full_addr.substr(port_start, port_end - port_start);
+            auto port_str = full_addr.substr(port_start, port_end - port_start);
+            uint16_t p;
+            auto result = std::from_chars(port_str.begin(), port_str.end(), p);
+            if (result.ec == std::errc()) {
+                port = p;
+            }
         }
-        r.emplace_back(endpoint_t{ip_addr, std::string(port_str)});
+        r.emplace_back(endpoint_t{ip_addr, port});
     }
     return r;
 }

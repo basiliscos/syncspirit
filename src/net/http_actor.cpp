@@ -120,7 +120,7 @@ void http_actor_t::process() noexcept {
 
     } else {
         auto host = url->host();
-        auto port = url->port();
+        auto port = url->port_number();
         resolve_request = request<payload::address_request_t>(resolver, host, port).send(resolve_timeout);
         resources->acquire(resource::resolver);
     }

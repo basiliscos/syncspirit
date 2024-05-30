@@ -209,7 +209,7 @@ void initiator_actor_t::resolve(const utils::uri_ptr_t &uri) noexcept {
     LOG_DEBUG(log, "resolving {} (transport = {})", uri, (void *)transport.get());
     pt::time_duration resolve_timeout = init_timeout / 2;
     auto host = uri->host();
-    auto port = uri->port();
+    auto port = uri->port_number();
     request<payload::address_request_t>(resolver, host, port).send(resolve_timeout);
     resources->acquire(resource::resolving);
 }

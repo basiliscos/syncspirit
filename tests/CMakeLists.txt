@@ -189,3 +189,7 @@ add_test(078-relay "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/078-relay")
 add_executable(079-peer 079-peer.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(079-peer syncspirit_test_lib)
 add_test(079-peer "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/079-peer")
+
+add_executable(080-resolver 080-resolver.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(080-resolver syncspirit_test_lib)
+add_test(080-resolver "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/080-resolver")
