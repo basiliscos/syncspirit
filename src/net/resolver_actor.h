@@ -61,12 +61,13 @@ struct SYNCSPIRIT_API resolver_actor_t : public r::actor_base_t {
 
     void on_request(message::resolve_request_t &req) noexcept;
     void on_cancel(message::resolve_cancel_t &message) noexcept;
-    void mass_reply(const utils::dns_query_t &query, const resolve_results_t &results) noexcept;
+    void mass_reply(const utils::dns_query_t &query, const resolve_results_t &results, bool update_cache) noexcept;
     void mass_reply(const utils::dns_query_t &query, const std::error_code &ec) noexcept;
     void process() noexcept;
     void resolve_start(request_ptr_t &req) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void cancel_timer() noexcept;
+    bool resolve_as_ip(const utils::dns_query_t &query) noexcept;
     bool resolve_locally(const utils::dns_query_t &query) noexcept;
     void on_read(size_t bytes) noexcept;
     void on_read_error(const sys::error_code &ec) noexcept;

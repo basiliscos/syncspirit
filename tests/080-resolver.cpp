@@ -5,10 +5,8 @@
 #include <rotor.hpp>
 #include <rotor/asio.hpp>
 #include "test-utils.h"
-#include "test_supervisor.h"
-#include "access.h"
+#include "utils/error_code.h"
 #include "net/resolver_actor.h"
-#include "access.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit;
@@ -115,7 +113,16 @@ void test_local_resolver() {
             sup->do_process();
             REQUIRE(sup->responses.size() == 1);
 
-            auto &results = sup->responses.at(0)->payload.res->results;
+            auto results = sup->responses.at(0)->payload.res->results;
+            REQUIRE(results.size() == 1);
+            REQUIRE(results.at(0) == asio::ip::make_address("127.0.0.2"));
+
+            // cache hit
+            sup->request<payload::address_request_t>(resolver->get_address(), "lclhst", 123).send(timeout);
+            sup->do_process();
+            REQUIRE(sup->responses.size() == 2);
+
+            results = sup->responses.at(1)->payload.res->results;
             REQUIRE(results.size() == 1);
             REQUIRE(results.at(0) == asio::ip::make_address("127.0.0.2"));
         }
@@ -126,7 +133,6 @@ void test_local_resolver() {
 void test_success_resolver() {
     struct F : fixture_t {
         void main() noexcept override {
-
             auto local_port = remote_resolver.local_endpoint().port();
             write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
             write_file(hosts_path, "");
@@ -166,17 +172,126 @@ void test_success_resolver() {
     F().run();
 }
 
+void test_success_ip() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto local_port = remote_resolver.local_endpoint().port();
+            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
+            write_file(hosts_path, "");
+
+            resolver = sup->create_actor<resolver_actor_t>()
+                           .resolve_timeout(timeout / 2)
+                           .hosts_path(hosts_path.c_str())
+                           .resolvconf_path(resolv_conf_path.c_str())
+                           .timeout(timeout)
+                           .finish();
+
+            sup->do_process();
+
+            sup->request<payload::address_request_t>(resolver->get_address(), "127.0.0.1", 80).send(timeout);
+            sup->do_process();
+
+            REQUIRE(sup->responses.size() == 1);
+
+            auto &results = sup->responses.at(0)->payload.res->results;
+            REQUIRE(results.size() == 1);
+            REQUIRE(results.at(0) == asio::ip::make_address("127.0.0.1"));
+        }
+    };
+    F().run();
+}
+
+void test_garbage() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto local_port = remote_resolver.local_endpoint().port();
+            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
+            write_file(hosts_path, "");
+
+            auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
+            remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
+                log->info("received {} bytes from resolver", bytes);
+                const unsigned char reply[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                auto reply_str = std::string_view(reinterpret_cast<const char *>(reply), sizeof(reply));
+                auto buff = asio::buffer(reply_str.data(), reply_str.size());
+                remote_resolver.async_send_to(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) {
+                    log->info("sent {} bytes to resolver", bytes);
+                });
+            });
+
+            resolver = sup->create_actor<resolver_actor_t>()
+                           .resolve_timeout(timeout / 2)
+                           .hosts_path(hosts_path.c_str())
+                           .resolvconf_path(resolv_conf_path.c_str())
+                           .timeout(timeout)
+                           .finish();
+
+            sup->do_process();
+
+            sup->request<payload::address_request_t>(resolver->get_address(), "google.com", 80).send(timeout);
+            io_ctx.run();
+            REQUIRE(sup->responses.size() == 1);
+
+            auto &ee = sup->responses.at(0)->payload.ee;
+            REQUIRE(ee);
+            REQUIRE(ee->ec.value() == static_cast<int>(utils::error_code_t::cares_failure));
+        }
+    };
+    F().run();
+}
+
+void test_wrong_reply() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto local_port = remote_resolver.local_endpoint().port();
+            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
+            write_file(hosts_path, "");
+
+            auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
+            remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
+                log->info("received {} bytes from resolver", bytes);
+                const unsigned char reply[] = {0x0e, 0x51, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,
+                                               0x00, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f,
+                                               0x63, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00, 0x01, 0x00,
+                                               0x01, 0x00, 0x00, 0x01, 0x02, 0x00, 0x04, 0x8e, 0xfa, 0xcb, 0x8e};
+                auto reply_str = std::string_view(reinterpret_cast<const char *>(reply), sizeof(reply));
+                auto buff = asio::buffer(reply_str.data(), reply_str.size());
+                remote_resolver.async_send_to(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) {
+                    log->info("sent {} bytes to resolver", bytes);
+                });
+            });
+
+            resolver = sup->create_actor<resolver_actor_t>()
+                           .resolve_timeout(timeout / 2)
+                           .hosts_path(hosts_path.c_str())
+                           .resolvconf_path(resolv_conf_path.c_str())
+                           .timeout(timeout)
+                           .finish();
+
+            sup->do_process();
+
+            sup->request<payload::address_request_t>(resolver->get_address(), "google.com", 80).send(timeout);
+            io_ctx.run();
+            REQUIRE(sup->responses.size() == 1);
+
+            auto &ee = sup->responses.at(0)->payload.ee;
+            REQUIRE(ee);
+            REQUIRE(ee->ec.value() == static_cast<int>(utils::error_code_t::cares_failure));
+        }
+    };
+    F().run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_local_resolver, "test_local_resolver", "[resolver]");
     REGISTER_TEST_CASE(test_success_resolver, "test_success_resolver", "[resolver]");
+    REGISTER_TEST_CASE(test_success_ip, "test_success_ip", "[resolver]");
+    REGISTER_TEST_CASE(test_garbage, "test_garbage", "[resolver]");
+    REGISTER_TEST_CASE(test_wrong_reply, "test_wrong_reply", "[resolver]");
     return 1;
 }
 
 // timeout
-// garbage
-// wrong
 // cancel
-// success
-// cache hit
 
 static int v = _init();

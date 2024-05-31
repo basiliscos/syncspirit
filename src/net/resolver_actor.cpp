@@ -157,8 +157,11 @@ void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
     }
 }
 
-void resolver_actor_t::mass_reply(const utils::dns_query_t &query, const resolve_results_t &results) noexcept {
+void resolver_actor_t::mass_reply(const utils::dns_query_t &query, const resolve_results_t &results,
+                                  bool update_cache) noexcept {
     reply(query, [&](auto &message) { reply_to(message, results); });
+    current_query.reset();
+    cache[query] = results;
 }
 
 void resolver_actor_t::mass_reply(const utils::dns_query_t &quey, const std::error_code &ec) noexcept {
@@ -176,7 +179,9 @@ void resolver_actor_t::process() noexcept {
     auto &query = *payload;
     auto cache_it = cache.find(query);
     if (cache_it != cache.end()) {
-        mass_reply(query, cache_it->second);
+        mass_reply(query, cache_it->second, false);
+        LOG_TRACE(log, "cache hit for '{}'", query.host);
+        return process();
     }
     if (queue.empty())
         return;
@@ -200,7 +205,7 @@ bool resolver_actor_t::resolve_locally(const utils::dns_query_t &query) noexcept
             auto addr_string = std::string_view(buff);
             LOG_DEBUG(log, "{} => {}, resolved via hosts file", host, addr_string);
 
-            auto ec = boost::system::error_code{};
+            auto ec = sys::error_code{};
             auto ip = asio::ip::make_address(buff, ec);
             if (ec) {
                 LOG_WARN(log, "invalid ip address {}: ", buff, ec.message());
@@ -211,10 +216,24 @@ bool resolver_actor_t::resolve_locally(const utils::dns_query_t &query) noexcept
         }
 
         if (results.size()) {
-            mass_reply(query, std::move(results));
+            mass_reply(query, std::move(results), true);
             return true;
         }
     }
+    return false;
+}
+
+bool resolver_actor_t::resolve_as_ip(const utils::dns_query_t &query) noexcept {
+    sys::error_code ec;
+    auto ip = asio::ip::make_address(query.host, ec);
+    if (!ec) {
+        auto results = payload::address_response_t::resolve_results_t();
+        LOG_DEBUG(log, "{} resolved as ip address", query.host);
+        results.emplace_back(std::move(ip));
+        mass_reply(query, std::move(results), false);
+        return true;
+    }
+
     return false;
 }
 
@@ -225,6 +244,9 @@ void resolver_actor_t::resolve_start(request_ptr_t &req) noexcept {
         return;
 
     auto &query = *req->payload.request_payload;
+    if (resolve_as_ip(query)) {
+        return process();
+    }
     if (resolve_locally(query)) {
         return process();
     }
@@ -291,7 +313,6 @@ void resolver_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
             auto ec = r::make_error_code(r::error_code_t::request_timeout);
             auto &payload = current_query->payload.request_payload;
             mass_reply(*payload, ec);
-            current_query.reset();
         }
     }
     timer_id.reset();
@@ -317,7 +338,6 @@ void resolver_actor_t::on_write_error(const sys::error_code &ec) noexcept {
         if (current_query) {
             auto &payload = current_query->payload.request_payload;
             mass_reply(*payload, ec);
-            current_query.reset();
         }
         process();
     }
@@ -330,7 +350,6 @@ void resolver_actor_t::on_read_error(const sys::error_code &ec) noexcept {
         if (current_query) {
             auto &payload = current_query->payload.request_payload;
             mass_reply(*payload, ec);
-            current_query.reset();
         }
         process();
     }
@@ -346,7 +365,7 @@ void resolver_actor_t::on_read(size_t bytes) noexcept {
         LOG_WARN(log, "cannot parse dns reply: {}", static_cast<int>(result));
         auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
         mass_reply(*current_query->payload.request_payload, ec);
-        current_query.reset();
+        return process();
     }
     auto record = make_guard(record_raw, [](ares_dns_record_t *ptr) { ares_dns_record_destroy(ptr); });
 
@@ -355,7 +374,7 @@ void resolver_actor_t::on_read(size_t bytes) noexcept {
         LOG_WARN(log, "dns reply contains no answers: {}", static_cast<int>(result));
         auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
         mass_reply(*current_query->payload.request_payload, ec);
-        current_query.reset();
+        return process();
     }
 
     char addr_buff[INET6_ADDRSTRLEN + 1] = {0};
@@ -365,6 +384,13 @@ void resolver_actor_t::on_read(size_t bytes) noexcept {
         auto resource_record = ares_dns_record_rr_get_const(record_raw, ARES_SECTION_ANSWER, i);
         size_t keys_cnt;
         auto name = ares_dns_rr_get_name(resource_record);
+        auto &requested_host = current_query->payload.request_payload->host;
+        if (name != requested_host) {
+            LOG_WARN(log, "dns reply for '{}', it is asked for: '{}'", name, requested_host);
+            auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+            mass_reply(*current_query->payload.request_payload, ec);
+            return process();
+        }
         const ares_dns_rr_key_t *keys = ares_dns_rr_get_keys(ares_dns_rr_get_type(resource_record), &keys_cnt);
         for (size_t k = 0; k < keys_cnt; k++) {
             auto key = keys[k];
@@ -389,7 +415,6 @@ void resolver_actor_t::on_read(size_t bytes) noexcept {
         }
     }
 
-    mass_reply(*current_query->payload.request_payload, results);
-    current_query.reset();
+    mass_reply(*current_query->payload.request_payload, results, true);
     process();
 }
