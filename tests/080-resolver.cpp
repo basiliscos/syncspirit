@@ -117,7 +117,7 @@ void test_local_resolver() {
 
             auto &results = sup->responses.at(0)->payload.res->results;
             REQUIRE(results.size() == 1);
-            REQUIRE(results.at(0) == tcp::endpoint(asio::ip::make_address("127.0.0.2"), 123));
+            REQUIRE(results.at(0) == asio::ip::make_address("127.0.0.2"));
         }
     };
     F().run();
@@ -138,7 +138,7 @@ void test_success_resolver() {
                                                0x00, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f,
                                                0x6d, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00, 0x01, 0x00,
                                                0x01, 0x00, 0x00, 0x01, 0x02, 0x00, 0x04, 0x8e, 0xfa, 0xcb, 0x8e};
-                auto reply_str = std::string_view(reinterpret_cast<const char*>(reply), sizeof(reply));
+                auto reply_str = std::string_view(reinterpret_cast<const char *>(reply), sizeof(reply));
                 auto buff = asio::buffer(reply_str.data(), reply_str.size());
                 remote_resolver.async_send_to(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) {
                     log->info("sent {} bytes to resolver", bytes);
@@ -160,14 +160,14 @@ void test_success_resolver() {
 
             auto &results = sup->responses.at(0)->payload.res->results;
             REQUIRE(results.size() == 1);
-            // REQUIRE(results.at(0) == tcp::endpoint(asio::ip::make_address("127.0.0.2"), 123));
+            REQUIRE(results.at(0) == asio::ip::make_address("142.250.203.142"));
         }
     };
     F().run();
 }
 
 int _init() {
-    // REGISTER_TEST_CASE(test_local_resolver, "test_local_resolver", "[resolver]");
+    REGISTER_TEST_CASE(test_local_resolver, "test_local_resolver", "[resolver]");
     REGISTER_TEST_CASE(test_success_resolver, "test_success_resolver", "[resolver]");
     return 1;
 }

@@ -206,7 +206,7 @@ bool resolver_actor_t::resolve_locally(const utils::dns_query_t &query) noexcept
                 LOG_WARN(log, "invalid ip address {}: ", buff, ec.message());
                 continue;
             }
-            results.emplace_back(tcp::endpoint(ip, query.port));
+            results.emplace_back(std::move(ip));
             ++p_addr;
         }
 
@@ -340,7 +340,7 @@ void resolver_actor_t::on_read(size_t bytes) noexcept {
     resources->release(resource::recv);
 
     ares_dns_record_t *record_raw;
-    auto data = reinterpret_cast<const unsigned char*>(rx_buff.data());
+    auto data = reinterpret_cast<const unsigned char *>(rx_buff.data());
     auto result = ares_dns_parse(data, bytes, ARES_DNS_PARSE_AN_BASE_RAW, &record_raw);
     if (result != ARES_SUCCESS) {
         LOG_WARN(log, "cannot parse dns reply: {}", static_cast<int>(result));
@@ -360,12 +360,13 @@ void resolver_actor_t::on_read(size_t bytes) noexcept {
 
     char addr_buff[INET6_ADDRSTRLEN + 1] = {0};
     auto port = current_query->payload.request_payload->port;
+    auto results = payload::address_response_t::resolve_results_t();
     for (size_t i = 0; i < answers_count; ++i) {
         auto resource_record = ares_dns_record_rr_get_const(record_raw, ARES_SECTION_ANSWER, i);
         size_t keys_cnt;
         auto name = ares_dns_rr_get_name(resource_record);
         const ares_dns_rr_key_t *keys = ares_dns_rr_get_keys(ares_dns_rr_get_type(resource_record), &keys_cnt);
-        for (size_t k = 0; k<keys_cnt; k++) {
+        for (size_t k = 0; k < keys_cnt; k++) {
             auto key = keys[k];
             auto type = ares_dns_rr_key_datatype(key);
             if (type == ARES_DATATYPE_INADDR) {
@@ -375,16 +376,20 @@ void resolver_actor_t::on_read(size_t bytes) noexcept {
                 auto ep = tcp::endpoint(ip, port);
 
                 LOG_DEBUG(log, "{} => {}, resolved", name, ep);
-            }
-            else  if (type == ARES_DATATYPE_BIN) {
+            } else if (type == ARES_DATATYPE_BIN) {
                 size_t length;
                 auto data = ares_dns_rr_get_bin(resource_record, key, &length);
                 if (length == 4) {
                     ares_inet_ntop(AF_INET, data, addr_buff, sizeof(addr_buff));
                     auto ip = asio::ip::make_address(addr_buff);
                     LOG_DEBUG(log, "resolved: {} => {}", name, ip);
+                    results.emplace_back(ip);
                 }
             }
         }
     }
+
+    mass_reply(*current_query->payload.request_payload, results);
+    current_query.reset();
+    process();
 }

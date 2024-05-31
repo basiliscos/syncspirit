@@ -9,6 +9,8 @@
 namespace syncspirit::utils {
 
 using size_t = typename std::string::size_type;
+using tcp = boost::asio::ip::tcp;
+using udp = boost::asio::ip::udp;
 
 std::vector<endpoint_t> parse_dns_servers(std::string_view str) noexcept {
     std::vector<endpoint_t> r;
@@ -57,5 +59,19 @@ std::vector<endpoint_t> parse_dns_servers(std::string_view str) noexcept {
     }
     return r;
 }
+
+template <typename Protocol, typename Endpoint>
+auto make_endpoints(const std::vector<ip::address> &addresses, std::uint16_t port) noexcept -> std::vector<Endpoint> {
+    using R = std::vector<Endpoint>;
+    R r;
+    r.reserve(addresses.size());
+    for (auto &ip : addresses) {
+        r.emplace_back(ip, port);
+    }
+    return r;
+}
+
+template auto make_endpoints<tcp, typename tcp::endpoint>(const std::vector<ip::address> &addresses,
+                                                          std::uint16_t port) noexcept -> std::vector<tcp::endpoint>;
 
 } // namespace syncspirit::utils

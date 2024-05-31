@@ -12,20 +12,23 @@
 
 namespace syncspirit::utils {
 
+namespace ip = boost::asio::ip;
+
 struct SYNCSPIRIT_API endpoint_t {
-    boost::asio::ip::address ip;
+    ip::address ip;
     std::uint16_t port;
     bool operator==(const endpoint_t &other) const noexcept { return ip == other.ip && port == other.port; }
 };
 
 struct SYNCSPIRIT_API dns_query_t {
     std::string host;
-    std::uint16_t port;
-
     bool operator==(const dns_query_t &other) const noexcept = default;
 };
 
 using endpoints_t = std::vector<endpoint_t>;
+
+template <typename Protocol, typename Endpoint = typename Protocol::endpoint>
+std::vector<Endpoint> make_endpoints(const std::vector<ip::address> &addresses, std::uint16_t port) noexcept;
 
 } // namespace syncspirit::utils
 
@@ -33,11 +36,7 @@ namespace std {
 using dns_query_t = syncspirit::utils::dns_query_t;
 
 template <> struct hash<dns_query_t> {
-    inline size_t operator()(const dns_query_t &query) const noexcept {
-        auto h1 = std::hash<std::string>()(query.host);
-        auto h2 = std::hash<std::uint16_t>()(query.port);
-        return h1 ^ (h2 << 4);
-    }
+    inline size_t operator()(const dns_query_t &query) const noexcept { return std::hash<std::string>()(query.host); }
 };
 
 } // namespace std
