@@ -129,8 +129,10 @@ struct fixture_t : private model::diff::contact_visitor_t {
         auto cfg = transport::transport_config_t{{}, uri, *sup, {}, true};
         client_trans = transport::initiate_stream(cfg);
 
-        tcp::resolver resolver(io_ctx);
-        auto addresses = resolver.resolve(host, std::to_string(local_ep.port()));
+
+        auto ip = asio::ip::make_address(host);
+        auto peer_ep = tcp::endpoint(ip, local_ep.port());
+        auto addresses = std::vector<tcp::endpoint>{peer_ep};
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
 
         transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "active/connect, err: {}", ec.message()); };

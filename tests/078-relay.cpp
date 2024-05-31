@@ -192,8 +192,10 @@ struct fixture_t : private model::diff::contact_visitor_t {
         auto &uri = req.payload.request_payload.uri;
         log->info("requested connect to {}", uri);
         auto cfg = transport::transport_config_t{{}, uri, *sup, {}, true};
-        tcp::resolver resolver(io_ctx);
-        auto addresses = resolver.resolve(host, uri->port());
+
+        auto ip = asio::ip::make_address(host);
+        auto peer_ep = tcp::endpoint(ip, uri->port_number());
+        auto addresses = std::vector<tcp::endpoint>{peer_ep};
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
         auto trans = transport::initiate_stream(cfg);
         transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "active/connect, err: {}", ec.message()); };

@@ -153,8 +153,9 @@ struct fixture_t {
     virtual void on_peer_handshake() noexcept { LOG_INFO(log, "peer handshake"); }
 
     void initiate_active() noexcept {
-        tcp::resolver resolver(io_ctx);
-        auto addresses = resolver.resolve(host, std::to_string(listening_ep.port()));
+        auto ip = asio::ip::make_address(host);
+        auto ep = tcp::endpoint(ip, listening_ep.port());
+        auto addresses = std::vector<tcp::endpoint>{ep};
         peer_trans = transport::initiate_tls_active(*sup, peer_keys, my_device->device_id(), peer_uri);
 
         transport::error_fn_t on_error = [&](auto &ec) {
