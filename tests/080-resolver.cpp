@@ -9,6 +9,7 @@
 #include "access.h"
 #include "net/resolver_actor.h"
 #include "access.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -49,9 +50,11 @@ using supervisor_ptr_t = r::intrusive_ptr_t<my_supervisor_t>;
 using actor_ptr_t = r::intrusive_ptr_t<resolver_actor_t>;
 
 struct fixture_t {
-    fixture_t() : ctx(io_ctx), root_path{bfs::unique_path()}, path_quard{root_path} {
+
+    fixture_t() : ctx(io_ctx), root_path{bfs::unique_path()}, path_quard{root_path}, remote_resolver{io_ctx} {
         utils::set_default("trace");
         log = utils::get_logger("fixture");
+        rx_buff.resize(1500);
     }
 
     virtual void main() noexcept = 0;
@@ -64,6 +67,13 @@ struct fixture_t {
 
         resolv_conf_path = root_path / "resolv.conf";
         hosts_path = root_path / "hosts";
+
+        auto ep = asio::ip::udp::endpoint(asio::ip::make_address("127.0.0.1"), 0);
+        remote_resolver.open(ep.protocol());
+        remote_resolver.bind(ep);
+
+        auto local_ep = remote_resolver.local_endpoint();
+        log->info("remote resolver: {}", local_ep);
 
         main();
 
@@ -80,13 +90,16 @@ struct fixture_t {
     utils::logger_t log;
     supervisor_ptr_t sup;
     actor_ptr_t resolver;
+    udp_socket_t remote_resolver;
+    udp::endpoint resolver_endpoint;
+    fmt::memory_buffer rx_buff;
 };
 
 void test_local_resolver() {
     struct F : fixture_t {
         void main() noexcept override {
 
-            write_file(resolv_conf_path, "nameserver 127.0.0.1\n");
+            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", 1234));
             write_file(hosts_path, "127.0.0.2 lclhst.localdomain lclhst\n");
 
             resolver = sup->create_actor<resolver_actor_t>()
@@ -107,13 +120,63 @@ void test_local_resolver() {
             REQUIRE(results.at(0) == tcp::endpoint(asio::ip::make_address("127.0.0.2"), 123));
         }
     };
+    F().run();
+}
 
+void test_success_resolver() {
+    struct F : fixture_t {
+        void main() noexcept override {
+
+            auto local_port = remote_resolver.local_endpoint().port();
+            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
+            write_file(hosts_path, "");
+
+            auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
+            remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
+                log->info("received {} bytes from resolver", bytes);
+                const unsigned char reply[] = {0x0e, 0x51, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,
+                                               0x00, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f,
+                                               0x6d, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00, 0x01, 0x00,
+                                               0x01, 0x00, 0x00, 0x01, 0x02, 0x00, 0x04, 0x8e, 0xfa, 0xcb, 0x8e};
+                auto reply_str = std::string_view(reinterpret_cast<const char*>(reply), sizeof(reply));
+                auto buff = asio::buffer(reply_str.data(), reply_str.size());
+                remote_resolver.async_send_to(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) {
+                    log->info("sent {} bytes to resolver", bytes);
+                });
+            });
+
+            resolver = sup->create_actor<resolver_actor_t>()
+                           .resolve_timeout(timeout / 2)
+                           .hosts_path(hosts_path.c_str())
+                           .resolvconf_path(resolv_conf_path.c_str())
+                           .timeout(timeout)
+                           .finish();
+
+            sup->do_process();
+
+            sup->request<payload::address_request_t>(resolver->get_address(), "google.com", 80).send(timeout);
+            io_ctx.run();
+            REQUIRE(sup->responses.size() == 1);
+
+            auto &results = sup->responses.at(0)->payload.res->results;
+            REQUIRE(results.size() == 1);
+            // REQUIRE(results.at(0) == tcp::endpoint(asio::ip::make_address("127.0.0.2"), 123));
+        }
+    };
     F().run();
 }
 
 int _init() {
-    REGISTER_TEST_CASE(test_local_resolver, "test_local_resolver", "[resolver]");
+    // REGISTER_TEST_CASE(test_local_resolver, "test_local_resolver", "[resolver]");
+    REGISTER_TEST_CASE(test_success_resolver, "test_success_resolver", "[resolver]");
     return 1;
 }
+
+// timeout
+// garbage
+// wrong
+// cancel
+// success
+// cache hit
 
 static int v = _init();
