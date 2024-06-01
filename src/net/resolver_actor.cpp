@@ -138,11 +138,8 @@ void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
         return payload.id == request_id && payload.origin == source;
     };
     if (matches(queue.front())) {
-#if 0
-        assert(resources->has(resource::io));
-        LOG_WARN(log, "todo, backend.cancel()");
+        assert(timer_id);
         cancel_timer();
-#endif
     } else if (queue.size() > 1) {
         auto it = queue.begin();
         std::advance(it, 1);
@@ -342,24 +339,24 @@ void resolver_actor_t::on_write_error(const sys::error_code &ec) noexcept {
     resources->release(resource::send);
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "on_write_error, error = {}", ec.message());
-        if (current_query) {
-            auto &payload = current_query->payload.request_payload;
-            mass_reply(*payload, ec);
-        }
-        process();
     }
+    if (current_query) {
+        auto &payload = current_query->payload.request_payload;
+        mass_reply(*payload, ec);
+    }
+    process();
 }
 
 void resolver_actor_t::on_read_error(const sys::error_code &ec) noexcept {
     resources->release(resource::recv);
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "on_read_error, error = {}", ec.message());
-        if (current_query) {
-            auto &payload = current_query->payload.request_payload;
-            mass_reply(*payload, ec);
-        }
-        process();
     }
+    if (current_query) {
+        auto &payload = current_query->payload.request_payload;
+        mass_reply(*payload, ec);
+    }
+    process();
 }
 
 void resolver_actor_t::on_read(size_t bytes) noexcept {

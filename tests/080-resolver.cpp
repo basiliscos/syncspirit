@@ -357,6 +357,37 @@ void test_timeout() {
     F().run();
 }
 
+void test_cancellation() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto local_port = remote_resolver.local_endpoint().port();
+            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
+            write_file(hosts_path, "");
+
+            resolver = sup->create_actor<resolver_actor_t>()
+                           .resolve_timeout(timeout / 2)
+                           .hosts_path(hosts_path.c_str())
+                           .resolvconf_path(resolv_conf_path.c_str())
+                           .timeout(timeout)
+                           .finish();
+
+            sup->do_process();
+
+            auto resolver_address = resolver->get_address();
+            auto request = sup->request<payload::address_request_t>(resolver_address, "google.com", 80).send(timeout);
+            sup->send<message::resolve_cancel_t::payload_t>(resolver_address, request, sup->get_address());
+
+            io_ctx.run();
+            REQUIRE(sup->responses.size() == 1);
+
+            auto &ee = sup->responses.at(0)->payload.ee;
+            REQUIRE(ee);
+            REQUIRE(ee->ec.value() == static_cast<int>(asio::error::operation_aborted));
+        }
+    };
+    F().run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_local_resolver, "test_local_resolver", "[resolver]");
     REGISTER_TEST_CASE(test_success_resolver, "test_success_resolver", "[resolver]");
@@ -365,10 +396,8 @@ int _init() {
     REGISTER_TEST_CASE(test_garbage, "test_garbage", "[resolver]");
     REGISTER_TEST_CASE(test_wrong, "test_wrong", "[resolver]");
     REGISTER_TEST_CASE(test_timeout, "test_timeout", "[resolver]");
+    REGISTER_TEST_CASE(test_cancellation, "test_cancellation", "[resolver]");
     return 1;
 }
-
-// timeout
-// cancel
 
 static int v = _init();
