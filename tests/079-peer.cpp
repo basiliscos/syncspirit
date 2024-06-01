@@ -129,7 +129,6 @@ struct fixture_t : private model::diff::contact_visitor_t {
         auto cfg = transport::transport_config_t{{}, uri, *sup, {}, true};
         client_trans = transport::initiate_stream(cfg);
 
-
         auto ip = asio::ip::make_address(host);
         auto peer_ep = tcp::endpoint(ip, local_ep.port());
         auto addresses = std::vector<tcp::endpoint>{peer_ep};

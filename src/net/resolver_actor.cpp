@@ -368,6 +368,30 @@ void resolver_actor_t::on_read(size_t bytes) noexcept {
         return process();
     }
     auto record = make_guard(record_raw, [](ares_dns_record_t *ptr) { ares_dns_record_destroy(ptr); });
+    auto query_count = ares_dns_record_query_cnt(record_raw);
+    if (query_count != 1) {
+        LOG_WARN(log, "dns reply query count mismatch {}, expected: 1", query_count);
+        auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+        mass_reply(*current_query->payload.request_payload, ec);
+        return process();
+    }
+    const char *queried_name;
+    ares_dns_rec_type_t queried_type;
+    ares_dns_class_t queried_class;
+    result = ares_dns_record_query_get(record_raw, 0, &queried_name, &queried_type, &queried_class);
+    if (result != ARES_SUCCESS) {
+        LOG_WARN(log, "cannot get initial query from dns reply: {}", static_cast<int>(result));
+        auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+        mass_reply(*current_query->payload.request_payload, ec);
+        return process();
+    }
+    auto &requested_host = current_query->payload.request_payload->host;
+    if (queried_name != requested_host) {
+        LOG_WARN(log, "dns reply for '{}', it is asked for: '{}'", queried_name, requested_host);
+        auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+        mass_reply(*current_query->payload.request_payload, ec);
+        return process();
+    }
 
     auto answers_count = ares_dns_record_rr_cnt(record_raw, ARES_SECTION_ANSWER);
     if (answers_count < 1) {
@@ -384,13 +408,6 @@ void resolver_actor_t::on_read(size_t bytes) noexcept {
         auto resource_record = ares_dns_record_rr_get_const(record_raw, ARES_SECTION_ANSWER, i);
         size_t keys_cnt;
         auto name = ares_dns_rr_get_name(resource_record);
-        auto &requested_host = current_query->payload.request_payload->host;
-        if (name != requested_host) {
-            LOG_WARN(log, "dns reply for '{}', it is asked for: '{}'", name, requested_host);
-            auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
-            mass_reply(*current_query->payload.request_payload, ec);
-            return process();
-        }
         const ares_dns_rr_key_t *keys = ares_dns_rr_get_keys(ares_dns_rr_get_type(resource_record), &keys_cnt);
         for (size_t k = 0; k < keys_cnt; k++) {
             auto key = keys[k];

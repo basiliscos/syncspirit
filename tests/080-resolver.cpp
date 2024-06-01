@@ -240,7 +240,53 @@ void test_garbage() {
     F().run();
 }
 
-void test_wrong_reply() {
+void test_multi_replies() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto local_port = remote_resolver.local_endpoint().port();
+            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
+            write_file(hosts_path, "");
+
+            auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
+            remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
+                log->info("received {} bytes from resolver", bytes);
+                const unsigned char reply[] = {
+                    0x5e, 0x60, 0x81, 0x80, 0x00, 0x01, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x06, 0x72, 0x65, 0x6c,
+                    0x61, 0x79, 0x73, 0x09, 0x73, 0x79, 0x6e, 0x63, 0x74, 0x68, 0x69, 0x6e, 0x67, 0x03, 0x6e, 0x65,
+                    0x74, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00, 0x05, 0x00, 0x01, 0x00, 0x00, 0x05, 0x31,
+                    0x00, 0x0d, 0x0a, 0x70, 0x61, 0x72, 0x2d, 0x6b, 0x38, 0x73, 0x2d, 0x76, 0x34, 0xc0, 0x13, 0xc0,
+                    0x32, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x67, 0x00, 0x04, 0x33, 0x9f, 0x56, 0xd0, 0xc0,
+                    0x32, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x67, 0x00, 0x04, 0x33, 0x9f, 0x4b, 0x11};
+                auto reply_str = std::string_view(reinterpret_cast<const char *>(reply), sizeof(reply));
+                auto buff = asio::buffer(reply_str.data(), reply_str.size());
+                remote_resolver.async_send_to(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) {
+                    log->info("sent {} bytes to resolver", bytes);
+                });
+            });
+
+            resolver = sup->create_actor<resolver_actor_t>()
+                           .resolve_timeout(timeout / 2)
+                           .hosts_path(hosts_path.c_str())
+                           .resolvconf_path(resolv_conf_path.c_str())
+                           .timeout(timeout)
+                           .finish();
+
+            sup->do_process();
+
+            sup->request<payload::address_request_t>(resolver->get_address(), "relays.syncthing.net", 80).send(timeout);
+            io_ctx.run();
+            REQUIRE(sup->responses.size() == 1);
+
+            auto &results = sup->responses.at(0)->payload.res->results;
+            REQUIRE(results.size() == 2);
+            REQUIRE(results.at(0) == asio::ip::make_address("51.159.86.208"));
+            REQUIRE(results.at(1) == asio::ip::make_address("51.159.75.17"));
+        }
+    };
+    F().run();
+}
+
+void test_wrong() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
@@ -251,8 +297,8 @@ void test_wrong_reply() {
             remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
                 log->info("received {} bytes from resolver", bytes);
                 const unsigned char reply[] = {0x0e, 0x51, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,
-                                               0x00, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f,
-                                               0x63, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00, 0x01, 0x00,
+                                               0x00, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x61,
+                                               0x6d, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00, 0x01, 0x00,
                                                0x01, 0x00, 0x00, 0x01, 0x02, 0x00, 0x04, 0x8e, 0xfa, 0xcb, 0x8e};
                 auto reply_str = std::string_view(reinterpret_cast<const char *>(reply), sizeof(reply));
                 auto buff = asio::buffer(reply_str.data(), reply_str.size());
@@ -287,7 +333,8 @@ int _init() {
     REGISTER_TEST_CASE(test_success_resolver, "test_success_resolver", "[resolver]");
     REGISTER_TEST_CASE(test_success_ip, "test_success_ip", "[resolver]");
     REGISTER_TEST_CASE(test_garbage, "test_garbage", "[resolver]");
-    REGISTER_TEST_CASE(test_wrong_reply, "test_wrong_reply", "[resolver]");
+    REGISTER_TEST_CASE(test_multi_replies, "test_multi_replies", "[resolver]");
+    REGISTER_TEST_CASE(test_wrong, "test_wrong", "[resolver]");
     return 1;
 }
 

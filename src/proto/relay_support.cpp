@@ -396,39 +396,32 @@ outcome::result<relay_infos_t> parse_endpoint(std::string_view buff) noexcept {
 
         auto ping_interval = parse_interval(ping_interval_str);
 
-        auto &location = it["location"];
-        if (!location.is_object()) {
-            continue;
+        auto location = location_t{};
+        auto &j_location = it["location"];
+        if (j_location.is_object()) {
+            auto &latitude = j_location["latitude"];
+            if (latitude.is_number_float()) {
+                location.latitude = latitude.get<float>();
+            }
+            auto &longitude = j_location["longitude"];
+            if (longitude.is_number_float()) {
+                location.longitude = longitude.get<float>();
+            }
+            auto &city = j_location["city"];
+            if (city.is_string()) {
+                location.city = city.get<std::string>();
+            }
+            auto &country = j_location["country"];
+            if (country.is_string()) {
+                location.country = country.get<std::string>();
+            }
+            auto &continent = j_location["continent"];
+            if (continent.is_string()) {
+                location.continent = continent.get<std::string>();
+            }
         }
-        auto &latitude = location["latitude"];
-        if (!latitude.is_number_float()) {
-            continue;
-        }
-        auto &longitude = location["longitude"];
-        if (!longitude.is_number_float()) {
-            continue;
-        }
-        auto &city = location["city"];
-        if (!city.is_string()) {
-            continue;
-        }
-        auto &country = location["country"];
-        if (!country.is_string()) {
-            continue;
-        }
-        auto &continent = location["continent"];
-        if (!continent.is_string()) {
-            continue;
-        }
-        auto relay = relay_info_ptr_t{new relay_info_t{std::move(uri), device_id.value(),
-                                                       location_t{
-                                                           latitude.get<float>(),
-                                                           longitude.get<float>(),
-                                                           city.get<std::string>(),
-                                                           country.get<std::string>(),
-                                                           continent.get<std::string>(),
-                                                       },
-                                                       ping_interval}};
+        auto relay =
+            relay_info_ptr_t{new relay_info_t{std::move(uri), device_id.value(), std::move(location), ping_interval}};
         r.emplace_back(std::move(relay));
     }
     return r;
