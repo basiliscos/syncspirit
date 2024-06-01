@@ -37,19 +37,14 @@ struct my_table_t : static_table_t {
 
 } // namespace
 
-self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree), table{nullptr} {
-    supervisor.add(this);
+self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree)
+    : parent_t(supervisor, tree), table{nullptr}, model_sub(supervisor.add(this)) {
     label("self");
 
     auto qt_code = new qr_code_t(supervisor, tree);
     auto settings = new settings_t(supervisor, tree);
     add(prefs(), "qr_code", qt_code);
     add(prefs(), "settings", settings);
-}
-
-self_device_t::~self_device_t() {
-    supervisor.get_logger()->trace("~self_device_t");
-    supervisor.remove(this);
 }
 
 void self_device_t::operator()(model::message::model_response_t &) {

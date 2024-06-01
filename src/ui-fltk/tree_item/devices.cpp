@@ -73,16 +73,28 @@ struct devices_widget_t : Fl_Scroll {
 
 } // namespace
 
-devices_t::devices_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree) {
+devices_t::devices_t(app_supervisor_t &supervisor, Fl_Tree *tree)
+    : parent_t(supervisor, tree), model_sub(supervisor.add(this)) {
     label("devices");
-
-    auto self_node = new tree_item::self_device_t(supervisor, tree);
-
-    add(prefs(), "self", self_node);
+    build_tree();
 }
 
 void devices_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
         return new devices_widget_t(supervisor, prev->x(), prev->y(), prev->w(), prev->h());
     });
+}
+
+void devices_t::operator()(model::message::model_response_t &) { build_tree(); }
+
+void devices_t::build_tree() {
+    if (children()) {
+        return;
+    }
+    if (!supervisor.get_cluster()) {
+        return;
+    }
+
+    auto self_node = new tree_item::self_device_t(supervisor, tree());
+    add(prefs(), "self", self_node);
 }

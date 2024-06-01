@@ -12,6 +12,11 @@ r::plugin::resource_id_t model = 0;
 }
 } // namespace
 
+model_subscription_t::model_subscription_t(model_load_listener_t *listener_, app_supervisor_t *owner_)
+    : listener{listener_}, owner{owner_} {}
+
+model_subscription_t::~model_subscription_t() { owner->remove(listener); }
+
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
       app_config(std::move(config.app_config)), content{nullptr} {
@@ -74,7 +79,10 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
 
 void app_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {}
 
-void app_supervisor_t::add(model_load_listener_t *listener) noexcept { load_listeners.insert(listener); }
+auto app_supervisor_t::add(model_load_listener_t *listener) noexcept -> model_subscription_t {
+    load_listeners.insert(listener);
+    return model_subscription_t(listener, this);
+}
 
 void app_supervisor_t::remove(model_load_listener_t *listener) noexcept { load_listeners.erase(listener); }
 
