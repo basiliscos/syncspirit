@@ -85,16 +85,36 @@ void devices_t::on_select() {
     });
 }
 
-void devices_t::operator()(model::message::model_response_t &) { build_tree(); }
+void devices_t::operator()(model::message::model_response_t &) {
+    clear_children();
+    build_tree();
+}
 
 void devices_t::build_tree() {
     if (children()) {
         return;
     }
-    if (!supervisor.get_cluster()) {
+    auto &cluster = supervisor.get_cluster();
+    if (!cluster) {
         return;
     }
+    auto &devices = cluster->get_devices();
 
+    tree()->begin();
     auto self_node = new tree_item::self_device_t(supervisor, tree());
     add(prefs(), "self", self_node);
+
+    for (auto it : devices) {
+        if (it.item == cluster->get_device()) {
+            continue;
+        }
+        add_device(it.item);
+    }
+    tree()->end();
+}
+
+void devices_t::add_device(const model::device_ptr_t &device) {
+    auto device_node = new tree_item_t(supervisor, tree());
+    auto label = fmt::format("{}, {}", device->get_name(), device->device_id().get_short());
+    device_node->label(label.data());
 }
