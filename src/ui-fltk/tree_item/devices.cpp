@@ -6,9 +6,11 @@
 #include <FL/Fl_Box.H>
 
 #include "model/device_id.h"
+#include "model/diff/modify/update_peer.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit;
+using namespace syncspirit::model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
@@ -54,15 +56,14 @@ struct devices_widget_t : Fl_Scroll {
         auto found = devices.by_sha256(peer.get_sha256());
         if (found) {
             log->error("device {} is already added", peer);
+            return;
         }
 
         db::Device db_dev;
         db_dev.set_name(input_label->value());
 
-#if 0
         auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(db_dev), peer.get_sha256()));
-        actor.send<model::payload::model_update_t>(actor.coordinator, std::move(diff), &actor);
-#endif
+        supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
     }
 
     app_supervisor_t &supervisor;

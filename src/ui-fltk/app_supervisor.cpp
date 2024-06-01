@@ -62,7 +62,15 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
     }
 }
 
-void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {}
+void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "on_model_update");
+    auto &diff = *message.payload.diff;
+    auto r = diff.apply(*cluster);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        LOG_ERROR(log, "todo, handle cluster apply failure {} ", ee->message());
+    }
+}
 
 void app_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {}
 

@@ -90,6 +90,10 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
         }
     }
 
+    template <typename Payload, typename... Args> void send_model(Args &&...args) {
+        send<Payload>(coordinator, std::forward<Args>(args)...);
+    }
+
   private:
     using load_listeners_t = std::set<model_load_listener_t *>;
     using clock_t = std::chrono::high_resolution_clock;
