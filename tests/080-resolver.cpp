@@ -357,8 +357,6 @@ void test_timeout() {
     F().run();
 }
 
-
-
 int _init() {
     REGISTER_TEST_CASE(test_local_resolver, "test_local_resolver", "[resolver]");
     REGISTER_TEST_CASE(test_success_resolver, "test_success_resolver", "[resolver]");
