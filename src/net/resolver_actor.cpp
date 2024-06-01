@@ -297,13 +297,18 @@ void resolver_actor_t::resolve_start(request_ptr_t &req) noexcept {
 
 void resolver_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::timer);
-    if (cancelled) {
-        if (resources->has(resource::recv) || resources->has(resource::send)) {
+    auto cancel_socket = [this]() {
+        if (sock) {
             sys::error_code ec;
             sock->cancel(ec);
             if (ec) {
                 LOG_WARN(log, "cannot cancel socket: {}", ec.message());
             }
+        }
+    };
+    if (cancelled) {
+        if (resources->has(resource::recv) || resources->has(resource::send)) {
+            cancel_socket();
             // reply_with_error(*current_query, make_error(ec));
             // queue.pop_front();
         }
@@ -312,7 +317,9 @@ void resolver_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
             // could be actually some other ec...
             auto ec = r::make_error_code(r::error_code_t::request_timeout);
             auto &payload = current_query->payload.request_payload;
+            LOG_DEBUG(log, "timeout while resolving '{}'", payload->host);
             mass_reply(*payload, ec);
+            cancel_socket();
         }
     }
     timer_id.reset();
@@ -433,5 +440,6 @@ void resolver_actor_t::on_read(size_t bytes) noexcept {
     }
 
     mass_reply(*current_query->payload.request_payload, results, true);
+    cancel_timer();
     process();
 }
