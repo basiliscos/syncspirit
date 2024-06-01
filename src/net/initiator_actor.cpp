@@ -209,7 +209,7 @@ void initiator_actor_t::resolve(const utils::uri_ptr_t &uri) noexcept {
     LOG_DEBUG(log, "resolving {} (transport = {})", uri, (void *)transport.get());
     pt::time_duration resolve_timeout = init_timeout / 2;
     auto host = uri->host();
-    auto port = uri->port();
+    auto port = uri->port_number();
     request<payload::address_request_t>(resolver, host, port).send(resolve_timeout);
     resources->acquire(resource::resolving);
 }
@@ -254,10 +254,13 @@ void initiator_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
         }
     }
 
-    auto &addresses = res.payload.res->results;
+    auto &ips = res.payload.res->results;
+    auto port = res.payload.req->payload.request_payload->port;
+    auto endpoints = utils::make_endpoints<tcp, tcp::endpoint>(ips, port);
+
     transport::connect_fn_t on_connect = [&](const auto &arg) { this->on_connect(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg, resource::connect); };
-    transport->async_connect(addresses, on_connect, on_error);
+    transport->async_connect(std::move(endpoints), on_connect, on_error);
     resources->acquire(resource::connect);
 }
 

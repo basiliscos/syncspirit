@@ -120,7 +120,7 @@ void http_actor_t::process() noexcept {
 
     } else {
         auto host = url->host();
-        auto port = url->port();
+        auto port = url->port_number();
         resolve_request = request<payload::address_request_t>(resolver, host, port).send(resolve_timeout);
         resources->acquire(resource::resolver);
     }
@@ -165,10 +165,13 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
         return process();
     }
 
-    auto &addresses = res.payload.res->results;
+    auto &ips = res.payload.res->results;
+    auto port = res.payload.req->payload.request_payload->port;
+    auto endpoints = utils::make_endpoints<tcp, tcp::endpoint>(ips, port);
+
     transport::connect_fn_t on_connect = [&](const auto &arg) { this->on_connect(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
-    transport->async_connect(addresses, on_connect, on_error);
+    transport->async_connect(std::move(endpoints), on_connect, on_error);
     resources->acquire(resource::io);
     spawn_timer();
     resolved_url = payload->url;

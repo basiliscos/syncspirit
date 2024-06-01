@@ -6,10 +6,12 @@
 namespace syncspirit::utils {
 
 uri_t::uri_t(boost::urls::url_view view) : parent_t(view) {
-    if (scheme() == "http") {
-        set_port_number(80);
-    } else if (scheme() == "https") {
-        set_port_number(443);
+    if (!has_port()) {
+        if (scheme() == "http") {
+            set_port_number(80);
+        } else if (scheme() == "https") {
+            set_port_number(443);
+        }
     }
 }
 

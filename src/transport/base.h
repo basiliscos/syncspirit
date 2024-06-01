@@ -24,7 +24,7 @@ using tcp = asio::ip::tcp;
 
 using strand_t = asio::io_context::strand;
 using resolver_t = tcp::resolver;
-using resolved_hosts_t = resolver_t::results_type;
+using resolved_hosts_t = std::vector<tcp::endpoint>;
 
 using connect_fn_t = std::function<void(const tcp::endpoint &)>;
 using error_fn_t = std::function<void(const sys::error_code &)>;
