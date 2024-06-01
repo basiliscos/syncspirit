@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -9,8 +9,10 @@
 namespace syncspirit::model::diff {
 
 namespace load {
+struct devices_t;
+struct ignored_devices_t;
 struct load_cluster_t;
-}
+} // namespace load
 
 namespace peer {
 struct cluster_remove_t;
@@ -37,6 +39,8 @@ struct update_peer_t;
 template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual ~generic_visitor_t() = default;
 
+    virtual outcome::result<void> operator()(const load::devices_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const load::ignored_devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::load_cluster_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::cluster_remove_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::cluster_update_t &, void *custom) noexcept;

@@ -34,11 +34,4 @@ tree_view_t::tree_view_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     add("devices", devices_node);
 
     callback(tree_view_callback);
-
-    Fl::awake(
-        [](void *data) {
-            auto self = reinterpret_cast<tree_view_t *>(data);
-            self->select("devices/self");
-        },
-        this);
 }

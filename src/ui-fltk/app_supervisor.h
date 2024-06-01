@@ -21,18 +21,19 @@ namespace bfs = boost::filesystem;
 
 struct app_supervisor_t;
 
-struct model_load_listener_t {
-    virtual ~model_load_listener_t() = default;
-    virtual void operator()(model::message::model_response_t &) = 0;
+struct model_listener_t {
+    virtual ~model_listener_t() = default;
+    virtual void operator()(model::message::model_response_t &);
+    virtual void operator()(model::message::model_update_t &);
 };
 
 struct model_subscription_t {
-    model_subscription_t(model_load_listener_t *listener, app_supervisor_t *owner);
+    model_subscription_t(model_listener_t *listener, app_supervisor_t *owner);
     model_subscription_t(model_subscription_t &&) = default;
     ~model_subscription_t();
 
     app_supervisor_t *owner;
-    model_load_listener_t *listener;
+    model_listener_t *listener;
 };
 
 struct app_supervisor_config_t : rf::supervisor_config_fltk_t {
@@ -79,8 +80,8 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     const config::main_t &get_app_config();
     model::cluster_ptr_t &get_cluster();
 
-    model_subscription_t add(model_load_listener_t *listener) noexcept;
-    void remove(model_load_listener_t *listener) noexcept;
+    model_subscription_t add(model_listener_t *listener) noexcept;
+    void remove(model_listener_t *listener) noexcept;
     std::string get_uptime() noexcept;
     utils::logger_t &get_logger() noexcept;
 
@@ -106,7 +107,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     }
 
   private:
-    using load_listeners_t = std::set<model_load_listener_t *>;
+    using load_listeners_t = std::set<model_listener_t *>;
     using clock_t = std::chrono::high_resolution_clock;
     using time_point_t = typename clock_t::time_point;
     void on_model_response(model::message::model_response_t &res) noexcept;

@@ -12,7 +12,10 @@ r::plugin::resource_id_t model = 0;
 }
 } // namespace
 
-model_subscription_t::model_subscription_t(model_load_listener_t *listener_, app_supervisor_t *owner_)
+void model_listener_t::operator()(model::message::model_response_t &) {}
+void model_listener_t::operator()(model::message::model_update_t &) {}
+
+model_subscription_t::model_subscription_t(model_listener_t *listener_, app_supervisor_t *owner_)
     : listener{listener_}, owner{owner_} {}
 
 model_subscription_t::~model_subscription_t() { owner->remove(listener); }
@@ -75,16 +78,19 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
         auto ee = make_error(r.assume_error());
         LOG_ERROR(log, "todo, handle cluster apply failure {} ", ee->message());
     }
+    for (auto listener : load_listeners) {
+        (*listener)(message);
+    }
 }
 
 void app_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {}
 
-auto app_supervisor_t::add(model_load_listener_t *listener) noexcept -> model_subscription_t {
+auto app_supervisor_t::add(model_listener_t *listener) noexcept -> model_subscription_t {
     load_listeners.insert(listener);
     return model_subscription_t(listener, this);
 }
 
-void app_supervisor_t::remove(model_load_listener_t *listener) noexcept { load_listeners.erase(listener); }
+void app_supervisor_t::remove(model_listener_t *listener) noexcept { load_listeners.erase(listener); }
 
 std::string app_supervisor_t::get_uptime() noexcept {
     using namespace std;

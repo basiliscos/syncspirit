@@ -1,5 +1,6 @@
 #include "devices.h"
 #include "self_device.h"
+#include "peer_device.h"
 #include <FL/Fl_Scroll.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Input.H>
@@ -7,6 +8,7 @@
 
 #include "model/device_id.h"
 #include "model/diff/modify/update_peer.h"
+#include "model/diff/load/load_cluster.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit;
@@ -85,15 +87,25 @@ void devices_t::on_select() {
     });
 }
 
-void devices_t::operator()(model::message::model_response_t &) {
-    clear_children();
+void devices_t::operator()(model::message::model_update_t &update) {
+    auto _ = update.payload.diff->visit(*this, nullptr);
     build_tree();
 }
 
+auto devices_t::operator()(const diff::modify::update_peer_t &diff, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto devices_t::operator()(const diff::load::load_cluster_t &diff, void *data) noexcept -> outcome::result<void> {
+    return diff.diff::aggregate_t::visit(*this, data);
+}
+
+auto devices_t::operator()(const diff::load::devices_t &diff, void *) noexcept -> outcome::result<void> {
+    build_tree();
+    return outcome::success();
+}
+
 void devices_t::build_tree() {
-    if (children()) {
-        return;
-    }
     auto &cluster = supervisor.get_cluster();
     if (!cluster) {
         return;
@@ -101,8 +113,10 @@ void devices_t::build_tree() {
     auto &devices = cluster->get_devices();
 
     tree()->begin();
-    auto self_node = new tree_item::self_device_t(supervisor, tree());
-    add(prefs(), "self", self_node);
+    if (children() == 0) {
+        auto self_node = new tree_item::self_device_t(supervisor, tree());
+        add(prefs(), "self", self_node);
+    }
 
     for (auto it : devices) {
         if (it.item == cluster->get_device()) {
@@ -113,8 +127,18 @@ void devices_t::build_tree() {
     tree()->end();
 }
 
+tree_item_t *devices_t::get_self_device() { return static_cast<tree_item_t *>(child(0)); }
+
 void devices_t::add_device(const model::device_ptr_t &device) {
-    auto device_node = new tree_item_t(supervisor, tree());
-    auto label = fmt::format("{}, {}", device->get_name(), device->device_id().get_short());
-    device_node->label(label.data());
+    for (int i = 1; i < children(); ++i) {
+        auto node = dynamic_cast<peer_device_t *>(child(i));
+        if (node) {
+            if (node->peer == device) {
+                return;
+            }
+        }
+    }
+
+    auto device_node = new peer_device_t(device, supervisor, tree());
+    add(prefs(), device_node->label(), device_node);
 }

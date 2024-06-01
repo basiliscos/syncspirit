@@ -11,6 +11,7 @@ struct SYNCSPIRIT_API devices_t final : cluster_diff_t {
     template <typename T> devices_t(T &&devices_) noexcept : devices{std::forward<T>(devices_)} {}
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     container_t devices;
 };

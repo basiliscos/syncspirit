@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "devices.h"
-#include "../../cluster.h"
-#include "../../misc/error_code.h"
+#include "model/cluster.h"
+#include "model/misc/error_code.h"
+#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit::model::diff::load;
 
@@ -31,4 +32,8 @@ auto devices_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result
     }
     assert(device_map.by_sha256(local_device->device_id().get_sha256()));
     return outcome::success();
+}
+
+auto devices_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+    return visitor(*this, custom);
 }

@@ -1,9 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "cluster_visitor.h"
 
 using namespace syncspirit::model::diff;
+
+auto cluster_visitor_t::operator()(const load::devices_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto cluster_visitor_t::operator()(const load::ignored_devices_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
 
 auto cluster_visitor_t::operator()(const load::load_cluster_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
