@@ -10,23 +10,21 @@ using namespace syncspirit::fltk;
 
 static constexpr int PADDING = 5;
 
-static_table_t::static_table_t(table_rows_t &&rows, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), table_rows(std::move(rows)) {
-    this->rows(table_rows.size());
+static_table_t::static_table_t(table_rows_t &&rows_, int x, int y, int w, int h)
+    : parent_t(x, y, w, h), table_rows(std::move(rows_)) {
     // box(FL_ENGRAVED_BOX);
     row_header(0);
     row_height_all(20);
     row_resize(0);
     cols(2);
-    col_header(0);
-    col_width(0, w / 2);
-    col_width(1, w / 2);
+    col_header(1);
     col_resize(1);
     end();
     when(FL_WHEN_CHANGED | when());
     resizable(this);
 
     set_visible_focus();
+    rows(table_rows.size());
 }
 
 void static_table_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {
@@ -34,17 +32,36 @@ void static_table_t::draw_cell(TableContext context, int row, int col, int x, in
     case CONTEXT_STARTPAGE: {
         fl_font(FL_HELVETICA, 16);
         auto col_widths = calc_col_widths();
-        col_width(0, col_widths.first);
-        col_width(1, col_widths.second);
+        if (!col_widths.invalid) {
+            auto col_min_size = std::min(col_widths.w1_min, col_widths.w2_min);
+            if (col_width(0) < col_min_size || col_width(1) < col_min_size) {
+                col_width(0, col_widths.w1);
+                col_width(1, col_widths.w2);
+            }
+        }
         return;
     }
+    case CONTEXT_COL_HEADER:
+        fl_push_clip(x, y, w, h);
+        fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, row_header_color());
+        fl_pop_clip();
+        return;
     case CONTEXT_CELL:
         draw_data(row, col, x, y, w, h);
         return;
     case CONTEXT_RC_RESIZE: {
+        auto w0 = col_width(0);
         auto col_widths = calc_col_widths();
-        col_width(0, col_widths.first);
-        col_width(1, col_widths.second);
+        auto col_min_size = std::min(col_widths.w1_min, col_widths.w2_min);
+        if (w0 < col_min_size) {
+            col_width(0, col_min_size);
+            w0 = col_min_size;
+        }
+        auto last_sz = this->tiw - w0;
+        if (last_sz >= col_min_size) {
+            col_width(1, last_sz);
+        }
+        init_sizes();
         return;
     }
     default:
@@ -52,20 +69,34 @@ void static_table_t::draw_cell(TableContext context, int row, int col, int x, in
     }
 }
 
-std::pair<int, int> static_table_t::calc_col_widths() {
-    std::pair<int, int> r = {0, 0};
+void static_table_t::resize(int x, int y, int w, int h) {
+    parent_t::resize(x, y, w, h);
+    auto col_widths = calc_col_widths();
+    col_width(0, col_widths.w1);
+    col_width(1, col_widths.w2);
+    init_sizes();
+    redraw();
+}
+
+auto static_table_t::calc_col_widths() -> col_sizes_t {
+    fl_font(FL_HELVETICA, 16);
+    col_sizes_t r = {0, 0, 0, 0};
     for (auto &row : table_rows) {
         int x, y, w, h;
         fl_text_extents(row.label.data(), x, y, w, h);
-        r.first = std::max(r.first, w + PADDING * 2);
+        r.w1_min = std::max(r.w1_min, w + PADDING * 2);
         fl_text_extents(row.value.data(), x, y, w, h);
-        r.second = std::max(r.second, w + PADDING * 2);
+        r.w2_min = std::max(r.w2_min, w + PADDING * 2);
     }
-    auto delta = tiw - (r.first + r.second);
-    if (r.first + r.second < tiw) {
-        r.first += delta / 2;
-        r.second += delta / 2;
+    r.w1 = r.w1_min;
+    r.w2 = r.w2_min;
+    auto w = tiw;
+    auto delta = w - (r.w1 + r.w2);
+    if (r.w1 + r.w2 < w) {
+        r.w1 += delta * (double(r.w1_min) / r.w2_min);
+        r.w2 = w - r.w1;
     }
+    r.invalid = r.w1_min == PADDING * 2;
     return r;
 }
 
