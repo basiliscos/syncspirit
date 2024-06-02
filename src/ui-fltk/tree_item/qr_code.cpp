@@ -16,7 +16,7 @@
 
 using namespace syncspirit::fltk::tree_item;
 
-static constexpr int PADDING = 30;
+static constexpr int PADDING = 10;
 
 template <typename T> using guard_t = std::unique_ptr<T, std::function<void(T *)>>;
 
@@ -28,20 +28,40 @@ using code_t = guard_t<QRcode>;
 
 namespace {
 
-struct box_t : Fl_Box {
+using supervisor_t = syncspirit::fltk::app_supervisor_t;
+
+struct qr_button_t : Fl_Button {
     using image_t = std::unique_ptr<Fl_Image>;
     using bits_t = std::vector<unsigned char>;
     using bit_set_t = boost::dynamic_bitset<unsigned char>;
-    using parent_t = Fl_Box;
+    using parent_t = Fl_Button;
 
-    box_t(code_t code_, int x, int y, int w, int h, const char *label)
-        : parent_t(x, y, w, h, label), code{std::move(code_)}, scale{0} {
-        box(FL_ENGRAVED_BOX);
+    qr_button_t(supervisor_t *sup_, code_t code_, int x, int y, int w, int h, const char *label_)
+        : parent_t(x, y, w, h), sup{sup_}, code{std::move(code_)}, scale{0}, data{label_} {
         regen_image(w, h);
+        tooltip("copy device id to clipboard");
+
+        int xx, yy, ww, hh;
+        recalc_dimensions(x, y, w, h, xx, yy, ww, hh);
+        this->x(xx);
+        this->y(yy);
+        this->w(ww);
+        this->h(hh);
+
+        callback(
+            [](Fl_Widget *widget, void *data) {
+                auto button = static_cast<qr_button_t *>(widget);
+                auto device_id = button->data;
+                Fl::copy(device_id, strlen(device_id), 1);
+                auto sup = reinterpret_cast<supervisor_t *>(data);
+                auto device_id_short = sup->get_cluster()->get_device()->device_id().get_short();
+                sup->get_logger()->info("device id {} has been copied to clipboard", device_id_short);
+            },
+            sup);
     }
 
     void regen_image(int w, int h) {
-        auto min_w = std::min(w - PADDING, h - PADDING);
+        auto min_w = std::min(w - PADDING * 2, h - PADDING * 2);
         min_w = std::max(code->width, min_w);
         auto new_scale = min_w / code->width;
         if (new_scale == scale) {
@@ -72,15 +92,32 @@ struct box_t : Fl_Box {
         scale = new_scale;
     }
 
-    void resize(int x, int y, int w, int h) override {
-        regen_image(w, h);
-        parent_t::resize(x, y, w, h);
+    void recalc_dimensions(int x, int y, int w, int h, int &xx, int &yy, int &ww, int &hh) {
+        auto img = image();
+        ww = img->w() + PADDING * 2;
+        hh = img->h() + PADDING * 2;
+        xx = x + w / 2 - ww / 2;
+        yy = y + h / 2 - hh / 2;
     }
 
+    void resize(int, int, int, int) override {
+        int x = parent()->x();
+        int y = parent()->y();
+        int w = parent()->w();
+        int h = parent()->h();
+        regen_image(w, h);
+        auto img = image();
+        int xx, yy, ww, hh;
+        recalc_dimensions(x, y, w, h, xx, yy, ww, hh);
+        parent_t::resize(xx, yy, ww, hh);
+    }
+
+    supervisor_t *sup;
     code_t code;
     bits_t bits;
     image_t qr_image;
     int scale = 0;
+    const char *data;
 };
 
 struct my_container_t : Fl_Group {
@@ -88,20 +125,9 @@ struct my_container_t : Fl_Group {
     using supervisor_t = syncspirit::fltk::app_supervisor_t;
     my_container_t(code_t code_, supervisor_t *sup_, int x, int y, int w, int h, const char *label)
         : parent_t(x, y, w, h), sup{sup_} {
-        auto box = new box_t(std::move(code_), x, y, w, h - 30, nullptr);
-        auto button = new Fl_Button(x, y + box->h(), w, 30, label);
-        button->tooltip("copy to buffer");
-        resizable(box);
-        button->callback(
-            [](Fl_Widget *widget, void *data) {
-                auto button = static_cast<Fl_Button *>(widget);
-                auto device_id = button->label();
-                Fl::copy(device_id, strlen(device_id), 1);
-                auto sup = reinterpret_cast<supervisor_t *>(data);
-                auto device_id_short = sup->get_cluster()->get_device()->device_id().get_short();
-                sup->get_logger()->info("device id {} has been copied to clipboard", device_id_short);
-            },
-            sup);
+        box(FL_FLAT_BOX);
+        auto button = new qr_button_t(sup_, std::move(code_), x, y, w, h, label);
+        resizable(button);
     }
 
     supervisor_t *sup;
