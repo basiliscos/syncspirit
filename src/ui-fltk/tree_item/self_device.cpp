@@ -40,9 +40,9 @@ struct my_table_t : static_table_t {
 self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), table{nullptr}, model_sub(supervisor.add(this)) {
 
-    auto qt_code = new qr_code_t(supervisor, tree);
+    auto qr_code = new qr_code_t(supervisor, tree);
     auto settings = new settings_t(supervisor, tree);
-    add(prefs(), "qr_code", qt_code);
+    add(prefs(), "qr_code", qr_code);
     add(prefs(), "settings", settings);
 
     update_label();
