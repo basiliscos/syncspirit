@@ -76,9 +76,9 @@ struct devices_widget_t : Fl_Scroll {
 } // namespace
 
 devices_t::devices_t(app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree), model_sub(supervisor.add(this)) {
-    label("devices");
+    : parent_t(supervisor, tree), model_sub(supervisor.add(this)), devices_count{0} {
     build_tree();
+    update_label();
 }
 
 void devices_t::on_select() {
@@ -90,6 +90,7 @@ void devices_t::on_select() {
 void devices_t::operator()(model::message::model_update_t &update) {
     auto _ = update.payload.diff->visit(*this, nullptr);
     build_tree();
+    update_label();
 }
 
 auto devices_t::operator()(const diff::modify::update_peer_t &diff, void *) noexcept -> outcome::result<void> {
@@ -102,6 +103,7 @@ auto devices_t::operator()(const diff::load::load_cluster_t &diff, void *data) n
 
 auto devices_t::operator()(const diff::load::devices_t &diff, void *) noexcept -> outcome::result<void> {
     build_tree();
+    update_label();
     return outcome::success();
 }
 
@@ -124,7 +126,13 @@ void devices_t::build_tree() {
         }
         add_device(it.item);
     }
+    devices_count = devices.size();
     tree()->end();
+}
+
+void devices_t::update_label() {
+    auto l = fmt::format("devices ({})", devices_count);
+    this->label(l.data());
 }
 
 tree_item_t *devices_t::get_self_device() { return static_cast<tree_item_t *>(child(0)); }

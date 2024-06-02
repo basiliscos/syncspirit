@@ -11,6 +11,9 @@ namespace syncspirit::fltk {
 struct table_row_t {
     std::string label;
     std::string value;
+
+    template <typename L, typename V>
+    table_row_t(L &&label_, V &&value_) : label{std::forward<L>(label_)}, value{std::forward<V>(value_)} {}
 };
 
 using table_rows_t = std::vector<table_row_t>;
