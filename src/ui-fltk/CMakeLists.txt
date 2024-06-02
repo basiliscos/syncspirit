@@ -11,6 +11,7 @@ add_executable(syncspirit-fltk WIN32
     log_utils.cpp
     main.cpp
     main_window.cpp
+    qr_button.cpp
     static_table.cpp
     tree_item.cpp
     tree_view.cpp
