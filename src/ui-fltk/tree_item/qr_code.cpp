@@ -111,10 +111,11 @@ struct my_container_t : Fl_Group {
 
 qr_code_t::qr_code_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree) { label("QR code"); }
 
+void qr_code_t::set_device(model::device_ptr_t device_) { device = std::move(device_); }
+
 void qr_code_t::on_select() {
-    auto &cluster = supervisor.get_cluster();
-    if (cluster) {
-        auto device_id = cluster->get_device()->device_id().get_value().c_str();
+    if (device) {
+        auto device_id = device->device_id().get_value().c_str();
         auto code_raw = QRcode_encodeString(device_id, 0, QR_ECLEVEL_H, QR_MODE_8, 1);
         auto &logger = supervisor.get_logger();
         if (!code_raw) {
