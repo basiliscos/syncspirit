@@ -3,11 +3,14 @@
 #include "qr_code.h"
 #include "settings.h"
 #include "../static_table.h"
+#include "../qr_button.h"
 #include "constants.h"
 
 #include <spdlog/fmt/fmt.h>
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
+#include <FL/Fl_Tile.H>
+
 #include <lz4.h>
 #include <openssl/crypto.h>
 #include <openssl/opensslv.h>
@@ -46,7 +49,6 @@ self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree)
     add(prefs(), "settings", settings);
 
     update_label();
-
     Fl::awake(
         [](void *data) {
             auto self = reinterpret_cast<self_device_t *>(data);
@@ -68,58 +70,69 @@ void self_device_t::operator()(model::message::model_response_t &) {
     update_label();
     recalc_tree();
     tree()->redraw();
-
-    if (table) {
-        auto my_table = static_cast<my_table_t *>(table);
-        auto &id = supervisor.get_cluster()->get_device()->device_id();
-        auto device_id_short = id.get_short();
-        auto device_id = id.get_value();
-        my_table->update_value(0, std::string(device_id_short));
-        my_table->update_value(1, std::string(device_id));
-    }
 }
 
 void self_device_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-        auto data = table_rows_t();
+        int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
+        int bot_h = 100;
 
-        auto cluster = supervisor.get_cluster();
-        auto device_id_short = std::string("XXXXXXX");
-        auto device_id = std::string("XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX");
-        if (cluster) {
-            auto &id = supervisor.get_cluster()->get_device()->device_id();
-            device_id_short = id.get_short();
-            device_id = id.get_value();
-        }
+        // auto group = new Fl_Group(x, y, w, h);
+        auto group = new Fl_Tile(x, y, w, h);
+        auto resizeable_area = new Fl_Box(x + w * 1. / 6, y + h * 1. / 2, w * 4. / 6, h / 2. - bot_h);
+        group->resizable(resizeable_area);
 
-        auto v = OPENSSL_VERSION_NUMBER;
-        // clang-format off
-        //                     0x1010113fL
-        auto openssl_major  = (0xF0000000L & OPENSSL_VERSION_NUMBER) >> 7 * 4;
-        auto openssl_minor  = (0x0FF00000L & OPENSSL_VERSION_NUMBER) >> 5 * 4;
-        auto openssl_patch  = (0x000FF000L & OPENSSL_VERSION_NUMBER) >> 3 * 4;
-        auto openssl_nibble = (0x00000FF0L & OPENSSL_VERSION_NUMBER) >> 1 * 4;
-        // clang-format on
-        auto openssl_nibble_c = static_cast<char>(openssl_nibble);
-        if (openssl_nibble) {
-            openssl_nibble_c += 'a' - 1;
-        }
+        group->begin();
+        auto top = [&]() -> Fl_Widget * {
+            auto data = table_rows_t();
 
-        auto openssl_version = fmt::format("{}.{}.{}{}", openssl_major, openssl_minor, openssl_patch, openssl_nibble_c);
-        auto mbdx_version = fmt::format("{}.{}.{}", mdbx_version.major, mdbx_version.minor, mdbx_version.release);
+            auto cluster = supervisor.get_cluster();
+            auto device_id_short = std::string("XXXXXXX");
+            auto device_id = std::string("XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX");
+            if (cluster) {
+                auto &id = supervisor.get_cluster()->get_device()->device_id();
+                device_id_short = id.get_short();
+                device_id = id.get_value();
+            }
 
-        data.push_back({"device id (short)", device_id_short});
-        data.push_back({"device id", device_id});
-        data.push_back({"uptime", supervisor.get_uptime()});
-        data.push_back({"app version", fmt::format("{} {}", constants::client_name, constants::client_version)});
-        data.push_back({"mdbx version", mbdx_version});
-        data.push_back({"protobuf version", google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION)});
-        data.push_back({"lz4 version", LZ4_versionString()});
-        data.push_back({"openssl version", openssl_version});
-        data.push_back({"fltk version", fmt::format("{}", Fl::version())});
+            auto v = OPENSSL_VERSION_NUMBER;
+            // clang-format off
+            //                     0x1010113fL
+            auto openssl_major  = (0xF0000000L & OPENSSL_VERSION_NUMBER) >> 7 * 4;
+            auto openssl_minor  = (0x0FF00000L & OPENSSL_VERSION_NUMBER) >> 5 * 4;
+            auto openssl_patch  = (0x000FF000L & OPENSSL_VERSION_NUMBER) >> 3 * 4;
+            auto openssl_nibble = (0x00000FF0L & OPENSSL_VERSION_NUMBER) >> 1 * 4;
+            // clang-format on
+            auto openssl_nibble_c = static_cast<char>(openssl_nibble);
+            if (openssl_nibble) {
+                openssl_nibble_c += 'a' - 1;
+            }
 
-        table = new my_table_t(this, std::move(data), prev->x(), prev->y(), prev->w(), prev->h());
-        return table;
+            auto openssl_version =
+                fmt::format("{}.{}.{}{}", openssl_major, openssl_minor, openssl_patch, openssl_nibble_c);
+            auto mbdx_version = fmt::format("{}.{}.{}", mdbx_version.major, mdbx_version.minor, mdbx_version.release);
+
+            data.push_back({"device id (short)", device_id_short});
+            data.push_back({"device id", device_id});
+            data.push_back({"uptime", supervisor.get_uptime()});
+            data.push_back({"app version", fmt::format("{} {}", constants::client_name, constants::client_version)});
+            data.push_back({"mdbx version", mbdx_version});
+            data.push_back({"protobuf version", google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION)});
+            data.push_back({"lz4 version", LZ4_versionString()});
+            data.push_back({"openssl version", openssl_version});
+            data.push_back({"fltk version", fmt::format("{}", Fl::version())});
+
+            table = new my_table_t(this, std::move(data), prev->x(), prev->y(), prev->w(), prev->h() - bot_h);
+            return table;
+        }();
+        auto bot = [&]() -> Fl_Widget * {
+            auto device = supervisor.get_cluster()->get_device();
+            return new qr_button_t(device, supervisor, prev->x(), top->y() + top->h(), prev->w(), bot_h);
+        }();
+        group->add(top);
+        group->add(bot);
+        group->end();
+        return group;
     });
     Fl::add_timeout(1.0, on_timeout, this);
 }
