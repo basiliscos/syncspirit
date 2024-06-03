@@ -4,9 +4,24 @@
 #include "../qr_button.h"
 
 #include <FL/Fl_Tile.H>
+#include <FL/Fl_Button.H>
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
+
+static widgetable_ptr_t make_button(peer_device_t &) {
+    struct widget_t final : widgetable_t {
+        using parent_t = widgetable_t;
+        using parent_t::parent_t;
+
+        const Fl_Widget *get_widget() const override { return widget; }
+        void create_widget(int x, int y, int w, int h) const { widget = new Fl_Button(x, y, w, h, "delete"); }
+
+        mutable Fl_Widget *widget;
+    };
+
+    return new widget_t();
+}
 
 peer_device_t::peer_device_t(model::device_ptr_t peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), peer{std::move(peer_)} {
@@ -30,13 +45,15 @@ void peer_device_t::on_select() {
         auto top = [&]() -> Fl_Widget * {
             auto data = table_rows_t();
 
-            auto cluster = supervisor.get_cluster();
             auto device_id = peer->device_id().get_value();
             auto device_id_short = peer->device_id().get_short();
 
-            data.push_back({"name", peer->get_name()});
-            data.push_back({"device id (short)", device_id_short});
+            data.push_back({"name", std::string(peer->get_name())});
+            data.push_back({"device id (short)", std::string(device_id_short)});
             data.push_back({"device id", device_id});
+
+            // auto button = new Fl_Button(0, 0, 50, 20, "delete");
+            data.push_back({"actions", make_button(*this)});
             table = new static_table_t(std::move(data), x, y, w, h - bot_h);
             return table;
         }();

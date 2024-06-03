@@ -25,6 +25,7 @@ static_table_t::static_table_t(table_rows_t &&rows_, int x, int y, int w, int h)
 
     set_visible_focus();
     rows(table_rows.size());
+    create_widgets();
 }
 
 void static_table_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {
@@ -85,7 +86,7 @@ auto static_table_t::calc_col_widths() -> col_sizes_t {
         int x, y, w, h;
         fl_text_extents(row.label.data(), x, y, w, h);
         r.w1_min = std::max(r.w1_min, w + PADDING * 2);
-        fl_text_extents(row.value.data(), x, y, w, h);
+        std::visit([&](auto &&arg) { calc_dimensions(arg, x, y, w, h); }, row.value);
         r.w2_min = std::max(r.w2_min, w + PADDING * 2);
     }
     r.w1 = r.w1_min;
@@ -102,31 +103,12 @@ auto static_table_t::calc_col_widths() -> col_sizes_t {
 
 void static_table_t::draw_data(int r, int col, int x, int y, int w, int h) {
     auto &row = table_rows.at(static_cast<size_t>(r));
-    std::string *content;
-    fl_push_clip(x, y, w, h);
-    {
-        Fl_Align align = FL_ALIGN_LEFT;
-        int dx = PADDING;
-        int dw = 0;
-        switch (col) {
-        case 0:
-            content = &row.label;
-            break;
-        case 1:
-            // align = FL_ALIGN_RIGHT;
-            content = &row.value;
-            // dx = 0;
-            // dw = -PADDING;
-        }
-
-        fl_color(row_selected(r) ? table_selection_color : FL_WHITE);
-        fl_rectf(x, y, w, h);
-        fl_color(FL_GRAY0);
-        fl_draw(content->data(), x + dx, y, w + dw, h, align);
-        fl_color(color());
-        fl_rect(x, y, w, h);
+    bool selected = row_selected(r);
+    if (col == 0) {
+        draw_label(row.label, selected, x, y, w, h);
+    } else {
+        std::visit([&](auto &&arg) { draw_value(arg, selected, x, y, w, h); }, row.value);
     }
-    fl_pop_clip();
 }
 
 void static_table_t::update_value(std::size_t row, std::string value) {
@@ -144,7 +126,10 @@ std::string static_table_t::gather_selected() {
             };
             ++count;
             auto &row = table_rows.at(i);
+#if 0
             buff << row.label << "\t" << row.value;
+#endif
+            buff << row.label;
         }
     }
     return buff.str();
@@ -172,4 +157,52 @@ int static_table_t::handle(int event) {
     }
 
     return r;
+}
+
+void static_table_t::draw_text(const std::string &text, bool selected, int x, int y, int w, int h) {
+    fl_push_clip(x, y, w, h);
+    {
+        Fl_Align align = FL_ALIGN_LEFT;
+        int dx = PADDING;
+        int dw = 0;
+
+        fl_color(selected ? table_selection_color : FL_WHITE);
+        fl_rectf(x, y, w, h);
+        fl_color(FL_GRAY0);
+        fl_draw(text.data(), x + dx, y, w + dw, h, align);
+        fl_color(color());
+        fl_rect(x, y, w, h);
+    }
+    fl_pop_clip();
+}
+
+void static_table_t::calc_dimensions(const std::string &str, int &x, int &y, int &w, int &h) {
+    fl_text_extents(str.data(), x, y, w, h);
+}
+
+void static_table_t::calc_dimensions(const widgetable_ptr_t &, int &, int &, int &, int &) {}
+
+void static_table_t::draw_label(const std::string &value, bool selected, int x, int y, int w, int h) {
+    draw_text(value, selected, x, y, w, h);
+}
+
+void static_table_t::draw_value(const std::string &value, bool selected, int x, int y, int w, int h) {
+    draw_text(value, selected, x, y, w, h);
+}
+
+void static_table_t::draw_value(const widgetable_ptr_t &, bool, int, int, int, int) {}
+
+void static_table_t::create_widgets() {
+    for (int i = 0; i < static_cast<int>(table_rows.size()); ++i) {
+        auto &row = table_rows[i];
+        std::visit([&](auto &&arg) { make_widget(arg, i); }, row.value);
+    }
+}
+
+void static_table_t::make_widget(const std::string &, int) {}
+
+void static_table_t::make_widget(const widgetable_ptr_t &w, int row) {
+    int xx, yy, ww, hh;
+    find_cell(CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
+    w->create_widget(xx, yy, ww, hh);
 }
