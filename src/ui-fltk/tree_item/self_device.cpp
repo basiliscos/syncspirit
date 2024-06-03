@@ -1,6 +1,5 @@
 #include "self_device.h"
 
-#include "qr_code.h"
 #include "settings.h"
 #include "../static_table.h"
 #include "../qr_button.h"
@@ -8,7 +7,6 @@
 
 #include <spdlog/fmt/fmt.h>
 #include <FL/Fl.H>
-#include <FL/Fl_Box.H>
 #include <FL/Fl_Tile.H>
 
 #include <lz4.h>
@@ -43,9 +41,7 @@ struct my_table_t : static_table_t {
 self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), table{nullptr}, model_sub(supervisor.add(this)) {
 
-    auto qr_code = new qr_code_t(supervisor, tree);
     auto settings = new settings_t(supervisor, tree);
-    add(prefs(), "qr_code", qr_code);
     add(prefs(), "settings", settings);
 
     update_label();
@@ -62,8 +58,6 @@ void self_device_t::update_label() {
     auto device_id = self->device_id().get_short();
     auto label = fmt::format("(self) {}, {}", supervisor.get_app_config().device_name, device_id);
     this->label(label.data());
-
-    static_cast<qr_code_t *>(child(0))->set_device(std::move(self));
 }
 
 void self_device_t::operator()(model::message::model_response_t &) {
@@ -122,12 +116,12 @@ void self_device_t::on_select() {
             data.push_back({"openssl version", openssl_version});
             data.push_back({"fltk version", fmt::format("{}", Fl::version())});
 
-            table = new my_table_t(this, std::move(data), prev->x(), prev->y(), prev->w(), prev->h() - bot_h);
+            table = new my_table_t(this, std::move(data), x, y, w, h - bot_h);
             return table;
         }();
         auto bot = [&]() -> Fl_Widget * {
             auto device = supervisor.get_cluster()->get_device();
-            return new qr_button_t(device, supervisor, prev->x(), top->y() + top->h(), prev->w(), bot_h);
+            return new qr_button_t(device, supervisor, x, y + top->h(), w, bot_h);
         }();
         group->add(top);
         group->add(bot);

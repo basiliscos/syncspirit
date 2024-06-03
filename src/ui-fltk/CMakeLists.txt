@@ -22,7 +22,6 @@ add_executable(syncspirit-fltk WIN32
     config/table.cpp
     tree_item/devices.cpp
     tree_item/peer_device.cpp
-    tree_item/qr_code.cpp
     tree_item/self_device.cpp
     tree_item/settings.cpp
 )
