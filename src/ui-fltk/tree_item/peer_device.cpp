@@ -9,13 +9,23 @@
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-static widgetable_ptr_t make_button(peer_device_t &) {
+static widgetable_ptr_t make_actions(peer_device_t &) {
+    static constexpr int padding = 2;
     struct widget_t final : widgetable_t {
         using parent_t = widgetable_t;
         using parent_t::parent_t;
 
         const Fl_Widget *get_widget() const override { return widget; }
-        void create_widget(int x, int y, int w, int h) const { widget = new Fl_Button(x, y, w, h, "delete"); }
+        void create_widget(int x, int y, int w, int h) const {
+            auto group = new Fl_Group(x, y, w, h);
+            group->begin();
+            group->box(FL_FLAT_BOX);
+            auto yy = y + padding, ww = w / 2 - padding / 2, hh = h - padding * 2;
+            auto apply = new Fl_Button(x + padding, yy, ww, hh, "apply");
+            auto remove = new Fl_Button(apply->x() + apply->w() + padding / 2, yy, ww, hh, "remove");
+            group->end();
+            widget = group;
+        }
 
         mutable Fl_Widget *widget;
     };
@@ -52,8 +62,7 @@ void peer_device_t::on_select() {
             data.push_back({"device id (short)", std::string(device_id_short)});
             data.push_back({"device id", device_id});
 
-            // auto button = new Fl_Button(0, 0, 50, 20, "delete");
-            data.push_back({"actions", make_button(*this)});
+            data.push_back({"actions", make_actions(*this)});
             table = new static_table_t(std::move(data), x, y, w, h - bot_h);
             return table;
         }();
