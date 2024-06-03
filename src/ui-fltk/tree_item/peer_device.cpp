@@ -1,22 +1,25 @@
 #include "peer_device.h"
 
-#include "../static_table.h"
 #include "../qr_button.h"
 
 #include <FL/Fl_Tile.H>
 #include <FL/Fl_Button.H>
+#include <FL/Fl_Input.H>
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-static widgetable_ptr_t make_actions(peer_device_t &) {
-    static constexpr int padding = 2;
-    struct widget_t final : widgetable_t {
-        using parent_t = widgetable_t;
-        using parent_t::parent_t;
+static constexpr int padding = 2;
 
-        const Fl_Widget *get_widget() const override { return widget; }
-        void create_widget(int x, int y, int w, int h) const {
+Fl_Widget *peer_device_t::peer_widget_t::get_widget() { return widget; }
+
+static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
+    struct widget_t final : peer_device_t::peer_widget_t {
+        using parent_t = peer_widget_t;
+
+        widget_t(peer_device_t &container_) : container{container_} {}
+
+        void create_widget(int x, int y, int w, int h) override {
             auto group = new Fl_Group(x, y, w, h);
             group->begin();
             group->box(FL_FLAT_BOX);
@@ -27,10 +30,36 @@ static widgetable_ptr_t make_actions(peer_device_t &) {
             widget = group;
         }
 
-        mutable Fl_Widget *widget;
+        peer_device_t &container;
     };
 
-    return new widget_t();
+    return new widget_t(container);
+}
+
+static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
+    struct widget_t final : peer_device_t::peer_widget_t {
+        using parent_t = peer_widget_t;
+
+        widget_t(peer_device_t &container_) : container{container_}, input{nullptr} {}
+
+        void create_widget(int x, int y, int w, int h) override {
+            auto group = new Fl_Group(x, y, w, h);
+            group->begin();
+            group->box(FL_FLAT_BOX);
+            auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
+
+            input = new Fl_Input(x + padding, yy, ww, hh);
+            input->value(container.peer->get_name().data());
+
+            group->end();
+            widget = group;
+        }
+
+        peer_device_t &container;
+        mutable Fl_Input *input;
+    };
+
+    return new widget_t(container);
 }
 
 peer_device_t::peer_device_t(model::device_ptr_t peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
@@ -58,11 +87,11 @@ void peer_device_t::on_select() {
             auto device_id = peer->device_id().get_value();
             auto device_id_short = peer->device_id().get_short();
 
-            data.push_back({"name", std::string(peer->get_name())});
+            data.push_back({"name", record(make_name(*this))});
             data.push_back({"device id (short)", std::string(device_id_short)});
             data.push_back({"device id", device_id});
 
-            data.push_back({"actions", make_actions(*this)});
+            data.push_back({"actions", record(make_actions(*this))});
             table = new static_table_t(std::move(data), x, y, w, h - bot_h);
             return table;
         }();
@@ -72,4 +101,9 @@ void peer_device_t::on_select() {
         group->end();
         return group;
     });
+}
+
+widgetable_ptr_t peer_device_t::record(peer_widget_ptr_t widget) {
+    widgets.push_back(widget);
+    return widget;
 }

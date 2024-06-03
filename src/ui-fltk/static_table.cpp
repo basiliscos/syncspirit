@@ -10,6 +10,15 @@ using namespace syncspirit::fltk;
 
 static constexpr int PADDING = 5;
 
+static void resize_value(const std::string &, int, int, int, int) {}
+static void resize_value(widgetable_ptr_t &widget, int x, int y, int w, int h) {
+    auto impl = widget->get_widget();
+    if (impl) {
+        impl->resize(x, y, w, h);
+        impl->redraw();
+    };
+}
+
 static_table_t::static_table_t(table_rows_t &&rows_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), table_rows(std::move(rows_)) {
     // box(FL_ENGRAVED_BOX);
@@ -61,6 +70,16 @@ void static_table_t::draw_cell(TableContext context, int row, int col, int x, in
         auto last_sz = this->tiw - w0;
         if (last_sz >= col_min_size) {
             col_width(1, last_sz);
+        }
+        for (int i = 0; i < rows(); ++i) {
+            auto &row = table_rows.at(static_cast<size_t>(i));
+            std::visit(
+                [&](auto &&arg) {
+                    int xx, yy, ww, hh;
+                    find_cell(CONTEXT_TABLE, i, 1, xx, yy, ww, hh);
+                    resize_value(arg, xx, yy, ww, hh);
+                },
+                row.value);
         }
         init_sizes();
         return;

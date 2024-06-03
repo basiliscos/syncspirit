@@ -17,8 +17,8 @@ namespace syncspirit::fltk {
 struct widgetable_t : boost::intrusive_ref_counter<widgetable_t, boost::thread_unsafe_counter> {
     widgetable_t() = default;
     virtual ~widgetable_t() = default;
-    virtual void create_widget(int x, int y, int w, int h) const = 0;
-    virtual const Fl_Widget *get_widget() const = 0;
+    virtual void create_widget(int x, int y, int w, int h) = 0;
+    virtual Fl_Widget *get_widget() = 0;
 };
 
 using widgetable_ptr_t = boost::intrusive_ptr<widgetable_t>;
