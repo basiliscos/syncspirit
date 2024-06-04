@@ -146,15 +146,15 @@ std::string static_table_t::gather_selected() {
     size_t count = 0;
     for (size_t i = 0; i < table_rows.size(); ++i) {
         if (row_selected(static_cast<int>(i))) {
-            if (count) {
-                buff << eol;
-            };
-            ++count;
             auto &row = table_rows.at(i);
-#if 0
-            buff << row.label << "\t" << row.value;
-#endif
-            buff << row.label;
+            auto value = std::get_if<std::string>(&row.value);
+            if (value) {
+                if (count) {
+                    buff << eol;
+                };
+                ++count;
+                buff << row.label << "\t" << *value;
+            }
         }
     }
     return buff.str();
