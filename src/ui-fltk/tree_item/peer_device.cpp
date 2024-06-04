@@ -185,6 +185,7 @@ void peer_device_t::on_select() {
             auto cert_name = peer->get_cert_name();
 
             data.push_back({"name", record(make_name(*this))});
+            data.push_back({"state", get_state()});
             data.push_back({"cert name", cert_name.value_or("")});
             data.push_back({"device id (short)", std::string(device_id_short)});
             data.push_back({"device id", device_id});
@@ -208,4 +209,15 @@ void peer_device_t::on_select() {
 widgetable_ptr_t peer_device_t::record(peer_widget_ptr_t widget) {
     widgets.push_back(widget);
     return widget;
+}
+
+std::string peer_device_t::get_state() {
+    switch (peer->get_state()) {
+    case model::device_state_t::online:
+        return "online";
+    case model::device_state_t::dialing:
+        return "dialing";
+    default:
+        return "offline";
+    }
 }

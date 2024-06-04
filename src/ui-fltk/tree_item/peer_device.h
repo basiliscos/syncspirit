@@ -27,6 +27,7 @@ struct peer_device_t : tree_item_t {
     const model::device_t &get_device() const;
     void on_select() override;
     widgetable_ptr_t record(peer_widget_ptr_t);
+    std::string get_state();
 
     model::device_ptr_t peer;
     Fl_Widget *table;
