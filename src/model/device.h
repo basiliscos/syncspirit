@@ -46,6 +46,8 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     inline const name_option_t get_cert_name() const noexcept { return cert_name; }
     inline proto::Compression get_compression() const noexcept { return compression; }
     inline bool is_introducer() const noexcept { return introducer; }
+    inline bool has_auto_accept() const noexcept { return auto_accept; }
+    inline bool is_paused() const noexcept { return paused; }
     inline bool get_skip_introduction_removals() const noexcept { return skip_introduction_removals; }
     inline auto &get_remote_folder_infos() noexcept { return remote_folder_infos; }
 

@@ -5,6 +5,7 @@
 #include <FL/Fl_Tile.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Input.H>
+#include <FL/Fl_Check_Button.H>
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
@@ -13,6 +14,26 @@ static constexpr int padding = 2;
 
 peer_device_t::peer_widget_t::peer_widget_t(peer_device_t &container_) : container{container_} {}
 Fl_Widget *peer_device_t::peer_widget_t::get_widget() { return widget; }
+
+struct checkbox_widget_t : peer_device_t::peer_widget_t {
+    using parent_t = peer_widget_t;
+    using parent_t::parent_t;
+
+    Fl_Widget *create_widget(int x, int y, int w, int h) override {
+        auto group = new Fl_Group(x, y, w, h);
+        group->begin();
+        group->box(FL_FLAT_BOX);
+        auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
+
+        input = new Fl_Check_Button(x + padding, yy, ww, hh);
+
+        group->end();
+        widget = group;
+        return widget;
+    }
+
+    mutable Fl_Check_Button *input;
+};
 
 static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
     struct widget_t final : peer_device_t::peer_widget_t {
@@ -60,6 +81,51 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
     return new widget_t(container);
 }
 
+static peer_device_t::peer_widget_ptr_t make_introducer(peer_device_t &container) {
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto widget = parent_t::create_widget(x, y, w, h);
+            input->value(container.peer->is_introducer());
+            return widget;
+        }
+    };
+
+    return new widget_t(container);
+}
+
+static peer_device_t::peer_widget_ptr_t make_auto_accept(peer_device_t &container) {
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto widget = parent_t::create_widget(x, y, w, h);
+            input->value(container.peer->has_auto_accept());
+            return widget;
+        }
+    };
+
+    return new widget_t(container);
+}
+
+static peer_device_t::peer_widget_ptr_t make_paused(peer_device_t &container) {
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto widget = parent_t::create_widget(x, y, w, h);
+            input->value(container.peer->is_paused());
+            return widget;
+        }
+    };
+
+    return new widget_t(container);
+}
+
 peer_device_t::peer_device_t(model::device_ptr_t peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), peer{std::move(peer_)} {
     auto name = peer->get_name();
@@ -88,6 +154,9 @@ void peer_device_t::on_select() {
             data.push_back({"name", record(make_name(*this))});
             data.push_back({"device id (short)", std::string(device_id_short)});
             data.push_back({"device id", device_id});
+            data.push_back({"introducer", record(make_introducer(*this))});
+            data.push_back({"auto accept", record(make_auto_accept(*this))});
+            data.push_back({"paused", record(make_paused(*this))});
 
             data.push_back({"actions", record(make_actions(*this))});
             table = new static_table_t(std::move(data), x, y, w, h - bot_h);
