@@ -19,6 +19,12 @@ static void resize_value(widgetable_ptr_t &widget, int x, int y, int w, int h) {
     };
 }
 
+static int handle_value(const std::string &, int) { return 0; }
+static int handle_value(widgetable_ptr_t &widget, int event) {
+    auto impl = widget->get_widget();
+    return impl ? impl->handle(event) : 0;
+}
+
 static_table_t::static_table_t(table_rows_t &&rows_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), table_rows(std::move(rows_)) {
     // box(FL_ENGRAVED_BOX);
@@ -175,12 +181,21 @@ int static_table_t::handle(int event) {
         r = 1;
     }
 
+    // unselect rows with custom widgets
+    for (size_t i = 0; i < table_rows.size(); ++i) {
+        auto custom = std::get_if<widgetable_ptr_t>(&table_rows[i].value);
+        if (custom && row_selected(i)) {
+            select_row(i, 0);
+        }
+    }
+
     return r;
 }
 
 void static_table_t::draw_text(const std::string &text, bool selected, int x, int y, int w, int h) {
     fl_push_clip(x, y, w, h);
     {
+        fl_font(FL_HELVETICA, 16);
         Fl_Align align = FL_ALIGN_LEFT;
         int dx = PADDING;
         int dw = 0;
@@ -223,5 +238,6 @@ void static_table_t::make_widget(const std::string &, int) {}
 void static_table_t::make_widget(const widgetable_ptr_t &w, int row) {
     int xx, yy, ww, hh;
     find_cell(CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
-    w->create_widget(xx, yy, ww, hh);
+    auto backend = w->create_widget(xx, yy, ww, hh);
+    add(backend);
 }

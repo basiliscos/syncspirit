@@ -19,7 +19,7 @@ static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
 
         widget_t(peer_device_t &container_) : container{container_} {}
 
-        void create_widget(int x, int y, int w, int h) override {
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto group = new Fl_Group(x, y, w, h);
             group->begin();
             group->box(FL_FLAT_BOX);
@@ -28,6 +28,7 @@ static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
             auto remove = new Fl_Button(apply->x() + apply->w() + padding / 2, yy, ww, hh, "remove");
             group->end();
             widget = group;
+            return widget;
         }
 
         peer_device_t &container;
@@ -42,7 +43,7 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
 
         widget_t(peer_device_t &container_) : container{container_}, input{nullptr} {}
 
-        void create_widget(int x, int y, int w, int h) override {
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto group = new Fl_Group(x, y, w, h);
             group->begin();
             group->box(FL_FLAT_BOX);
@@ -53,6 +54,7 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
 
             group->end();
             widget = group;
+            return widget;
         }
 
         peer_device_t &container;
