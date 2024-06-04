@@ -6,6 +6,7 @@
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Check_Button.H>
+#include <FL/Fl_Choice.H>
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
@@ -66,11 +67,13 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
             group->begin();
             group->box(FL_FLAT_BOX);
             auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
+            ww = std::min(300, ww);
 
             input = new Fl_Input(x + padding, yy, ww, hh);
             input->value(container.peer->get_name().data());
 
             group->end();
+            group->resizable(nullptr);
             widget = group;
             return widget;
         }
@@ -126,6 +129,35 @@ static peer_device_t::peer_widget_ptr_t make_paused(peer_device_t &container) {
     return new widget_t(container);
 }
 
+static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &container) {
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto group = new Fl_Group(x, y, w, h);
+            group->begin();
+            group->box(FL_FLAT_BOX);
+            auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
+            ww = std::min(150, ww);
+
+            input = new Fl_Choice(x + padding, yy, ww, hh);
+            input->add("metadata");
+            input->add("never");
+            input->add("always");
+            input->value(0);
+
+            group->end();
+            group->resizable(nullptr);
+            widget = group;
+            return widget;
+        }
+        mutable Fl_Choice *input;
+    };
+
+    return new widget_t(container);
+}
+
 peer_device_t::peer_device_t(model::device_ptr_t peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), peer{std::move(peer_)} {
     auto name = peer->get_name();
@@ -158,6 +190,7 @@ void peer_device_t::on_select() {
             data.push_back({"introducer", record(make_introducer(*this))});
             data.push_back({"auto accept", record(make_auto_accept(*this))});
             data.push_back({"paused", record(make_paused(*this))});
+            data.push_back({"compression", record(make_compressions(*this))});
 
             data.push_back({"actions", record(make_actions(*this))});
             table = new static_table_t(std::move(data), x, y, w, h - bot_h);
