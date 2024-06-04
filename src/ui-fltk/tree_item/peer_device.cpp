@@ -149,8 +149,10 @@ void peer_device_t::on_select() {
 
             auto device_id = peer->device_id().get_value();
             auto device_id_short = peer->device_id().get_short();
+            auto cert_name = peer->get_cert_name();
 
             data.push_back({"name", record(make_name(*this))});
+            data.push_back({"cert name", cert_name.value_or("")});
             data.push_back({"device id (short)", std::string(device_id_short)});
             data.push_back({"device id", device_id});
             data.push_back({"introducer", record(make_introducer(*this))});
