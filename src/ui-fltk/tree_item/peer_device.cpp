@@ -49,8 +49,14 @@ static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
             auto apply = new Fl_Button(x + padding, yy, ww, hh, "apply");
             auto reset = new Fl_Button(apply->x() + ww + padding * 2, yy, ww, hh, "reset");
             auto remove = new Fl_Button(reset->x() + ww + padding * 2, yy, ww, hh, "remove");
+            remove->color(FL_RED);
             group->end();
             widget = group;
+
+            apply->callback([](auto, void* data){ static_cast<peer_device_t*>(data)->on_apply(); }, &container);
+            reset->callback([](auto, void* data){ static_cast<peer_device_t*>(data)->on_reset(); }, &container);
+            remove->callback([](auto, void* data){ static_cast<peer_device_t*>(data)->on_remove(); }, &container);
+
             return widget;
         }
     };
@@ -221,3 +227,8 @@ std::string peer_device_t::get_state() {
         return "offline";
     }
 }
+
+
+void peer_device_t::on_apply() {}
+void peer_device_t::on_reset() {}
+void peer_device_t::on_remove() {}

@@ -29,6 +29,10 @@ struct peer_device_t : tree_item_t {
     widgetable_ptr_t record(peer_widget_ptr_t);
     std::string get_state();
 
+    void on_remove();
+    void on_apply();
+    void on_reset();
+
     model::device_ptr_t peer;
     Fl_Widget *table;
     widgets_t widgets;
