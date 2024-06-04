@@ -45,9 +45,10 @@ static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
             auto group = new Fl_Group(x, y, w, h);
             group->begin();
             group->box(FL_FLAT_BOX);
-            auto yy = y + padding, ww = w / 2 - padding / 2, hh = h - padding * 2;
+            auto yy = y + padding, ww = 100, hh = h - padding * 2;
             auto apply = new Fl_Button(x + padding, yy, ww, hh, "apply");
-            auto remove = new Fl_Button(apply->x() + apply->w() + padding / 2, yy, ww, hh, "remove");
+            auto reset = new Fl_Button(apply->x() + ww + padding * 2, yy, ww, hh, "reset");
+            auto remove = new Fl_Button(reset->x() + ww + padding * 2, yy, ww, hh, "remove");
             group->end();
             widget = group;
             return widget;
