@@ -138,7 +138,6 @@ void peer_device_t::on_select() {
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         int bot_h = 100;
 
-        // auto group = new Fl_Group(x, y, w, h);
         auto group = new Fl_Tile(x, y, w, h);
         auto resizeable_area = new Fl_Box(x + w * 1. / 6, y + h * 1. / 2, w * 4. / 6, h / 2. - bot_h);
         group->resizable(resizeable_area);
