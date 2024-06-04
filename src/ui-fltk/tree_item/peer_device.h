@@ -12,10 +12,11 @@ struct peer_device_t : tree_item_t {
 
     struct peer_widget_t : widgetable_t {
         using parent_t = widgetable_t;
-        using parent_t::parent_t;
+        peer_widget_t(peer_device_t &container);
 
         Fl_Widget *get_widget() override;
         Fl_Widget *widget = nullptr;
+        peer_device_t &container;
     };
 
     using peer_widget_ptr_t = boost::intrusive_ptr<peer_widget_t>;

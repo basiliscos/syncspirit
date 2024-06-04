@@ -11,13 +11,13 @@ using namespace syncspirit::fltk::tree_item;
 
 static constexpr int padding = 2;
 
+peer_device_t::peer_widget_t::peer_widget_t(peer_device_t &container_) : container{container_} {}
 Fl_Widget *peer_device_t::peer_widget_t::get_widget() { return widget; }
 
 static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
     struct widget_t final : peer_device_t::peer_widget_t {
         using parent_t = peer_widget_t;
-
-        widget_t(peer_device_t &container_) : container{container_} {}
+        using parent_t::parent_t;
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto group = new Fl_Group(x, y, w, h);
@@ -30,8 +30,6 @@ static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
             widget = group;
             return widget;
         }
-
-        peer_device_t &container;
     };
 
     return new widget_t(container);
@@ -40,8 +38,7 @@ static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
 static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
     struct widget_t final : peer_device_t::peer_widget_t {
         using parent_t = peer_widget_t;
-
-        widget_t(peer_device_t &container_) : container{container_}, input{nullptr} {}
+        using parent_t::parent_t;
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto group = new Fl_Group(x, y, w, h);
@@ -57,7 +54,6 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
             return widget;
         }
 
-        peer_device_t &container;
         mutable Fl_Input *input;
     };
 
