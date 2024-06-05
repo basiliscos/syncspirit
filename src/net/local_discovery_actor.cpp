@@ -66,7 +66,7 @@ void local_discovery_actor_t::init() noexcept {
 
     sock.bind(listen_endpoint, ec);
     if (ec) {
-        LOG_WARN(log, "init, can't bind socket :: {}", ec.message());
+        LOG_WARN(log, "init, can't bind socket {} :: {}", listen_endpoint, ec.message());
         return do_shutdown(make_error(ec));
     }
 }
