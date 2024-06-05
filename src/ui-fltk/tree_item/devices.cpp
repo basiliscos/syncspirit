@@ -88,7 +88,7 @@ void devices_t::on_select() {
 }
 
 void devices_t::operator()(model::message::model_update_t &update) {
-    auto _ = update.payload.diff->visit(*this, nullptr);
+    std::ignore = update.payload.diff->visit(*this, nullptr);
     build_tree();
     update_label();
 }

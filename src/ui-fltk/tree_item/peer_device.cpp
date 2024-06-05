@@ -9,6 +9,7 @@
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Choice.H>
+#include <tuple>
 
 using namespace syncspirit;
 using namespace syncspirit::fltk;
@@ -181,7 +182,7 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
                 input->value(0);
             } else if (c == C::NEVER) {
                 input->value(1);
-            } else if (c == C::ALWAYS) {
+            } else {
                 input->value(2);
             }
         }
@@ -197,10 +198,27 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
 }
 
 peer_device_t::peer_device_t(model::device_ptr_t peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree), peer{std::move(peer_)} {
+    : parent_t(supervisor, tree), model_sub(supervisor.add(this)), peer{std::move(peer_)} {
+    update_label();
+}
+
+void peer_device_t::update_label() {
     auto name = peer->get_name();
-    auto label = fmt::format("{}, {}", name, peer->device_id().get_short());
-    this->label(label.data());
+    auto value = fmt::format("{}, {}", name, peer->device_id().get_short());
+    label(value.data());
+    tree()->redraw();
+}
+
+void peer_device_t::operator()(model::message::model_update_t &update) {
+    std::ignore = update.payload.diff->visit(*this, nullptr);
+}
+
+auto peer_device_t::operator()(const diff::modify::update_peer_t &diff, void *) noexcept -> outcome::result<void> {
+    if (diff.peer_id == peer->device_id().get_sha256()) {
+        on_change();
+        update_label();
+    }
+    return outcome::success();
 }
 
 void peer_device_t::on_select() {
