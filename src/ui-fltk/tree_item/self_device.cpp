@@ -19,9 +19,11 @@ using namespace syncspirit::fltk::tree_item;
 
 static void on_timeout(void *data) {
     auto self = reinterpret_cast<self_device_t *>(data);
-    auto table = static_cast<syncspirit::fltk::static_table_t *>(self->table);
-    table->update_value(2, self->supervisor.get_uptime());
-    Fl::repeat_timeout(1.0, on_timeout, data);
+    auto table = static_cast<syncspirit::fltk::static_table_t *>(self->content);
+    if (table) {
+        table->update_value(2, self->supervisor.get_uptime());
+        Fl::repeat_timeout(1.0, on_timeout, data);
+    }
 }
 
 namespace {
@@ -39,7 +41,7 @@ struct my_table_t : static_table_t {
 } // namespace
 
 self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree), table{nullptr}, model_sub(supervisor.add(this)) {
+    : parent_t(supervisor, tree), model_sub(supervisor.add(this)) {
 
     auto settings = new settings_t(supervisor, tree);
     add(prefs(), "settings", settings);
@@ -116,8 +118,8 @@ void self_device_t::on_select() {
             data.push_back({"openssl version", openssl_version});
             data.push_back({"fltk version", fmt::format("{}", Fl::version())});
 
-            table = new my_table_t(this, std::move(data), x, y, w, h - bot_h);
-            return table;
+            content = new my_table_t(this, std::move(data), x, y, w, h - bot_h);
+            return content;
         }();
         auto bot = [&]() -> Fl_Widget * {
             auto device = supervisor.get_cluster()->get_device();

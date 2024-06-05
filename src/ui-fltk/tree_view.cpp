@@ -12,8 +12,10 @@ static void tree_view_callback(Fl_Widget *w, void *data) {
     case FL_TREE_REASON_SELECTED:
         item->on_select();
         break;
+    case FL_TREE_REASON_DESELECTED:
+        item->on_desect();
+        break;
         /*
-      case FL_TREE_REASON_DESELECTED: [..]
       case FL_TREE_REASON_RESELECTED: [..]
       case FL_TREE_REASON_OPENED: [..]
       case FL_TREE_REASON_CLOSED: [..]

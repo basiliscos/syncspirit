@@ -13,7 +13,6 @@ struct self_device_t : tree_item_t, private model_listener_t {
     void on_select() override;
     void update_label();
 
-    Fl_Widget *table;
     model_subscription_t model_sub;
 };
 

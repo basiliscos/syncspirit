@@ -29,6 +29,7 @@ struct peer_device_t : tree_item_t, private model_listener_t, private model::dif
 
     void operator()(model::message::model_update_t &) override;
     outcome::result<void> operator()(const diff::modify::update_peer_t &, void *custom) noexcept override;
+    outcome::result<void> operator()(const diff::peer::peer_state_t &, void *custom) noexcept override;
 
     const model::device_t &get_device() const;
     widgetable_ptr_t record(peer_widget_ptr_t);
@@ -43,7 +44,6 @@ struct peer_device_t : tree_item_t, private model_listener_t, private model::dif
 
     model_subscription_t model_sub;
     model::device_ptr_t peer;
-    Fl_Widget *table;
     widgets_t widgets;
     Fl_Widget *apply_button;
     Fl_Widget *reset_button;

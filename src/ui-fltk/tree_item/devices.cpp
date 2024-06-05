@@ -83,7 +83,9 @@ devices_t::devices_t(app_supervisor_t &supervisor, Fl_Tree *tree)
 
 void devices_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-        return new devices_widget_t(supervisor, prev->x(), prev->y(), prev->w(), prev->h());
+        auto widget = new devices_widget_t(supervisor, prev->x(), prev->y(), prev->w(), prev->h());
+        content = widget;
+        return widget;
     });
 }
 

@@ -3,6 +3,7 @@
 #include "../qr_button.h"
 
 #include "model/diff/modify/update_peer.h"
+#include "model/diff/peer/peer_state.h"
 
 #include <FL/Fl_Tile.H>
 #include <FL/Fl_Button.H>
@@ -204,13 +205,22 @@ peer_device_t::peer_device_t(model::device_ptr_t peer_, app_supervisor_t &superv
 
 void peer_device_t::update_label() {
     auto name = peer->get_name();
-    auto value = fmt::format("{}, {}", name, peer->device_id().get_short());
+    auto id = peer->device_id().get_short();
+    auto value = fmt::format("{}, {} [{}]", name, id, get_state());
     label(value.data());
     tree()->redraw();
 }
 
 void peer_device_t::operator()(model::message::model_update_t &update) {
     std::ignore = update.payload.diff->visit(*this, nullptr);
+}
+
+auto peer_device_t::operator()(const diff::peer::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
+    if (diff.peer_id == peer->device_id().get_sha256()) {
+        on_change();
+        update_label();
+    }
+    return outcome::success();
 }
 
 auto peer_device_t::operator()(const diff::modify::update_peer_t &diff, void *) noexcept -> outcome::result<void> {
@@ -250,8 +260,8 @@ void peer_device_t::on_select() {
             data.push_back({"compression", record(make_compressions(*this))});
 
             data.push_back({"actions", record(make_actions(*this))});
-            table = new static_table_t(std::move(data), x, y, w, h - bot_h);
-            return table;
+            content = new static_table_t(std::move(data), x, y, w, h - bot_h);
+            return content;
         }();
         auto bot = [&]() -> Fl_Widget * { return new qr_button_t(peer, supervisor, x, y + top->h(), w, bot_h); }();
         group->add(top);
@@ -278,6 +288,9 @@ std::string peer_device_t::get_state() {
 }
 
 void peer_device_t::on_change() {
+    if (!content) {
+        return;
+    }
     auto initial_data = peer->serialize();
     auto current = db::Device();
     auto ok = current.ParseFromArray(initial_data.data(), initial_data.size());
@@ -293,6 +306,8 @@ void peer_device_t::on_change() {
         apply_button->deactivate();
         reset_button->deactivate();
     }
+
+    static_cast<static_table_t*>(content)->update_value(1, get_state());
 }
 
 void peer_device_t::on_apply() {
