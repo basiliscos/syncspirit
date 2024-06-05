@@ -2,12 +2,15 @@
 
 #include "../qr_button.h"
 
+#include "model/diff/modify/update_peer.h"
+
 #include <FL/Fl_Tile.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Choice.H>
 
+using namespace syncspirit;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
@@ -16,6 +19,7 @@ static constexpr int padding = 2;
 peer_device_t::peer_widget_t::peer_widget_t(peer_device_t &container_) : container{container_} {}
 Fl_Widget *peer_device_t::peer_widget_t::get_widget() { return widget; }
 void peer_device_t::peer_widget_t::reset() {}
+void peer_device_t::peer_widget_t::store(db::Device &) {}
 
 struct checkbox_widget_t : peer_device_t::peer_widget_t {
     using parent_t = peer_widget_t;
@@ -91,6 +95,8 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
 
         void reset() override { input->value(container.peer->get_name().data()); }
 
+        void store(db::Device &device) override { device.set_name(input->value()); };
+
         mutable Fl_Input *input;
     };
 
@@ -103,6 +109,8 @@ static peer_device_t::peer_widget_ptr_t make_introducer(peer_device_t &container
         using parent_t::parent_t;
 
         void reset() override { input->value(container.peer->is_introducer()); }
+
+        void store(db::Device &device) override { device.set_introducer(input->value()); };
     };
 
     return new widget_t(container);
@@ -114,6 +122,7 @@ static peer_device_t::peer_widget_ptr_t make_auto_accept(peer_device_t &containe
         using parent_t::parent_t;
 
         void reset() override { input->value(container.peer->has_auto_accept()); }
+        void store(db::Device &device) override { device.set_auto_accept(input->value()); };
     };
 
     return new widget_t(container);
@@ -125,6 +134,7 @@ static peer_device_t::peer_widget_ptr_t make_paused(peer_device_t &container) {
         using parent_t::parent_t;
 
         void reset() override { input->value(container.peer->is_paused()); }
+        void store(db::Device &device) override { device.set_paused(input->value()); };
     };
 
     return new widget_t(container);
@@ -157,7 +167,7 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
         }
 
         void reset() override {
-            using C = syncspirit::proto::Compression;
+            using C = proto::Compression;
             auto c = container.peer->get_compression();
             if (c == C::METADATA) {
                 input->value(0);
@@ -167,6 +177,10 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
                 input->value(2);
             }
         }
+
+        void store(db::Device &device) override {
+            device.set_compression(static_cast<proto::Compression>(input->value()));
+        };
 
         mutable Fl_Choice *input;
     };
@@ -237,7 +251,20 @@ std::string peer_device_t::get_state() {
     }
 }
 
-void peer_device_t::on_apply() {}
+void peer_device_t::on_apply() {
+    using namespace model::diff;
+    ;
+    auto data = peer->serialize();
+    auto device = db::Device();
+    auto ok = device.ParseFromArray(data.data(), data.size());
+    for (auto &w : widgets) {
+        w->store(device);
+    }
+
+    auto device_id = peer->device_id().get_sha256();
+    auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(device), device_id));
+    supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
+}
 
 void peer_device_t::on_reset() {
     for (auto &w : widgets) {
