@@ -202,6 +202,37 @@ void test_success_ip() {
     F().run();
 }
 
+void test_success_ipv6() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto local_port = remote_resolver.local_endpoint().port();
+            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
+            write_file(hosts_path, "");
+
+            resolver = sup->create_actor<resolver_actor_t>()
+                           .resolve_timeout(timeout / 2)
+                           .hosts_path(hosts_path.c_str())
+                           .resolvconf_path(resolv_conf_path.c_str())
+                           .timeout(timeout)
+                           .finish();
+
+            sup->do_process();
+
+            sup->request<payload::address_request_t>(resolver->get_address(),
+                                                     "[fde8:6819:8685:4d00:be03:58ff:fe74:c854]", 80)
+                .send(timeout);
+            sup->do_process();
+
+            REQUIRE(sup->responses.size() == 1);
+
+            auto &results = sup->responses.at(0)->payload.res->results;
+            REQUIRE(results.size() == 1);
+            REQUIRE(results.at(0) == asio::ip::make_address("fde8:6819:8685:4d00:be03:58ff:fe74:c854"));
+        }
+    };
+    F().run();
+}
+
 void test_garbage() {
     struct F : fixture_t {
         void main() noexcept override {
@@ -392,6 +423,7 @@ int _init() {
     REGISTER_TEST_CASE(test_local_resolver, "test_local_resolver", "[resolver]");
     REGISTER_TEST_CASE(test_success_resolver, "test_success_resolver", "[resolver]");
     REGISTER_TEST_CASE(test_success_ip, "test_success_ip", "[resolver]");
+    REGISTER_TEST_CASE(test_success_ipv6, "test_success_ipv6", "[resolver]");
     REGISTER_TEST_CASE(test_multi_replies, "test_multi_replies", "[resolver]");
     REGISTER_TEST_CASE(test_garbage, "test_garbage", "[resolver]");
     REGISTER_TEST_CASE(test_wrong, "test_wrong", "[resolver]");

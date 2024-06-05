@@ -109,7 +109,7 @@ outcome::result<void> make_description_request(fmt::memory_buffer &buff, const u
     http::request<http::empty_body> req;
     req.method(http::verb::get);
     req.version(http_version);
-    req.target(uri->encoded_path());
+    req.target(uri->encoded_target());
     req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
 
@@ -140,7 +140,7 @@ outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const u
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_GetExternalIPAddress);
     req.method(http::verb::post);
     req.version(http_version);
-    req.target(uri->encoded_path());
+    req.target(uri->encoded_target());
     req.set(http::field::connection, "close");
     req.set(http::field::host, uri->host());
     req.set(http::field::soapaction, soap_action);
@@ -178,7 +178,7 @@ outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const uri_p
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_AddPortMapping);
     req.method(http::verb::post);
     req.version(http_version);
-    req.target(uri->encoded_path());
+    req.target(uri->encoded_target());
     req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
     req.set(http::field::soapaction, soap_action);
@@ -212,7 +212,7 @@ outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const uri
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_DeletePortMapping);
     req.method(http::verb::post);
     req.version(http_version);
-    req.target(uri->encoded_path());
+    req.target(uri->encoded_target());
     req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
     req.set(http::field::soapaction, soap_action);
@@ -241,7 +241,7 @@ outcome::result<void> make_mapping_validation_request(fmt::memory_buffer &buff, 
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_GetSpecificPortMappingEntry);
     req.method(http::verb::post);
     req.version(http_version);
-    req.target(uri->encoded_path());
+    req.target(uri->encoded_target());
     req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
     req.set(http::field::soapaction, soap_action);

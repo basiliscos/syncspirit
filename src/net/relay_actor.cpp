@@ -123,7 +123,7 @@ void relay_actor_t::request_relay_list() noexcept {
     http::request<http::empty_body> req;
     req.method(http::verb::get);
     req.version(10);
-    req.target(uri->encoded_path());
+    req.target(uri->encoded_target());
     req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
 

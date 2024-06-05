@@ -32,7 +32,7 @@ outcome::result<uri_ptr_t> make_announce_request(fmt::memory_buffer &buff, const
     req.method(http::verb::post);
     req.version(11);
     req.keep_alive(true);
-    req.target(uri->encoded_path());
+    req.target(uri->encoded_target());
     req.set(http::field::host, uri->host());
     req.set(http::field::content_type, "application/json");
 
@@ -48,7 +48,7 @@ outcome::result<uri_ptr_t> make_announce_request(fmt::memory_buffer &buff, const
 
 outcome::result<uri_ptr_t> make_discovery_request(fmt::memory_buffer &buff, const uri_ptr_t &announce_uri,
                                                   const model::device_id_t device_id) noexcept {
-    auto target = fmt::format("?device={}", device_id.get_value());
+    auto target = fmt::format("device={}", device_id.get_value());
     auto uri = announce_uri->clone();
     uri->set_query(target);
 
@@ -56,7 +56,7 @@ outcome::result<uri_ptr_t> make_discovery_request(fmt::memory_buffer &buff, cons
     req.method(http::verb::get);
     req.version(11);
     req.keep_alive(true);
-    req.target(uri->encoded_path());
+    req.target(uri->encoded_target());
     req.set(http::field::host, uri->host());
 
     fmt::memory_buffer tx_buff;

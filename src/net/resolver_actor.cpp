@@ -222,7 +222,14 @@ bool resolver_actor_t::resolve_locally(const utils::dns_query_t &query) noexcept
 
 bool resolver_actor_t::resolve_as_ip(const utils::dns_query_t &query) noexcept {
     sys::error_code ec;
-    auto ip = asio::ip::make_address(query.host, ec);
+    auto host = std::string_view(query.host);
+    if (host.size() && host[0] == '[') {
+        auto idx = host.find_last_of(']');
+        if (idx != host.npos) {
+            host = host.substr(1, idx - 1);
+        }
+    }
+    auto ip = asio::ip::make_address(host, ec);
     if (!ec) {
         auto results = payload::address_response_t::resolve_results_t();
         LOG_DEBUG(log, "{} resolved as ip address", query.host);
