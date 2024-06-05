@@ -32,6 +32,7 @@ struct checkbox_widget_t : peer_device_t::peer_widget_t {
         auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
 
         input = new Fl_Check_Button(x + padding, yy, ww, hh);
+        input->callback([](auto, void *data) { reinterpret_cast<peer_device_t *>(data)->on_change(); }, &container);
 
         group->end();
         widget = group;
@@ -55,6 +56,8 @@ static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
             auto apply = new Fl_Button(x + padding, yy, ww, hh, "apply");
             auto reset = new Fl_Button(apply->x() + ww + padding * 2, yy, ww, hh, "reset");
             auto remove = new Fl_Button(reset->x() + ww + padding * 2, yy, ww, hh, "remove");
+            apply->deactivate();
+            reset->deactivate();
             remove->color(FL_RED);
             group->end();
             widget = group;
@@ -64,6 +67,8 @@ static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
             remove->callback([](auto, void *data) { static_cast<peer_device_t *>(data)->on_remove(); }, &container);
 
             this->reset();
+            container.apply_button = apply;
+            container.reset_button = reset;
             return widget;
         }
     };
@@ -84,6 +89,8 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
             ww = std::min(300, ww);
 
             input = new Fl_Input(x + padding, yy, ww, hh);
+            input->when(input->when() | FL_WHEN_CHANGED);
+            input->callback([](auto, void *data) { reinterpret_cast<peer_device_t *>(data)->on_change(); }, &container);
 
             group->end();
             group->resizable(nullptr);
@@ -157,6 +164,7 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
             input->add("never");
             input->add("always");
             input->value(0);
+            input->callback([](auto, void *data) { reinterpret_cast<peer_device_t *>(data)->on_change(); }, &container);
 
             group->end();
             group->resizable(nullptr);
@@ -251,12 +259,30 @@ std::string peer_device_t::get_state() {
     }
 }
 
+void peer_device_t::on_change() {
+    auto initial_data = peer->serialize();
+    auto current = db::Device();
+    auto ok = current.ParseFromArray(initial_data.data(), initial_data.size());
+    assert(ok);
+    for (auto &w : widgets) {
+        w->store(current);
+    }
+    auto current_data = current.SerializeAsString();
+    if (initial_data != current_data) {
+        apply_button->activate();
+        reset_button->activate();
+    } else {
+        apply_button->deactivate();
+        reset_button->deactivate();
+    }
+}
+
 void peer_device_t::on_apply() {
     using namespace model::diff;
-    ;
     auto data = peer->serialize();
     auto device = db::Device();
     auto ok = device.ParseFromArray(data.data(), data.size());
+    assert(ok);
     for (auto &w : widgets) {
         w->store(device);
     }
@@ -270,6 +296,7 @@ void peer_device_t::on_reset() {
     for (auto &w : widgets) {
         w->reset();
     }
+    on_change();
 }
 
 void peer_device_t::on_remove() {}

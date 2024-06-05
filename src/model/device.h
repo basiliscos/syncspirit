@@ -36,7 +36,8 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     bool operator==(const device_t &other) const noexcept { return other.id == id; }
     bool operator!=(const device_t &other) const noexcept { return other.id != id; }
 
-    std::string serialize() noexcept;
+    std::string serialize(db::Device &device) const noexcept;
+    std::string serialize() const noexcept;
     inline bool is_dynamic() const noexcept { return static_uris.empty(); }
     inline device_state_t get_state() const noexcept { return state; }
     void update_state(device_state_t new_state);

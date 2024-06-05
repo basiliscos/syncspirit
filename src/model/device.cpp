@@ -63,8 +63,7 @@ uint64_t device_t::as_uint() noexcept {
     return id;
 }
 
-std::string device_t::serialize() noexcept {
-    db::Device r;
+std::string device_t::serialize(db::Device &r) const noexcept {
     r.set_name(name);
     r.set_compression(compression);
     if (cert_name) {
@@ -80,6 +79,11 @@ std::string device_t::serialize() noexcept {
     }
 
     return r.SerializeAsString();
+}
+
+std::string device_t::serialize() const noexcept {
+    db::Device r;
+    return serialize(r);
 }
 
 void device_t::update_state(device_state_t new_state) { state = new_state; }
