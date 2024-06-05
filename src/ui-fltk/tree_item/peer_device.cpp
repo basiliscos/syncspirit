@@ -15,6 +15,7 @@ static constexpr int padding = 2;
 
 peer_device_t::peer_widget_t::peer_widget_t(peer_device_t &container_) : container{container_} {}
 Fl_Widget *peer_device_t::peer_widget_t::get_widget() { return widget; }
+void peer_device_t::peer_widget_t::reset() {}
 
 struct checkbox_widget_t : peer_device_t::peer_widget_t {
     using parent_t = peer_widget_t;
@@ -30,6 +31,7 @@ struct checkbox_widget_t : peer_device_t::peer_widget_t {
 
         group->end();
         widget = group;
+        reset();
         return widget;
     }
 
@@ -53,10 +55,11 @@ static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
             group->end();
             widget = group;
 
-            apply->callback([](auto, void* data){ static_cast<peer_device_t*>(data)->on_apply(); }, &container);
-            reset->callback([](auto, void* data){ static_cast<peer_device_t*>(data)->on_reset(); }, &container);
-            remove->callback([](auto, void* data){ static_cast<peer_device_t*>(data)->on_remove(); }, &container);
+            apply->callback([](auto, void *data) { static_cast<peer_device_t *>(data)->on_apply(); }, &container);
+            reset->callback([](auto, void *data) { static_cast<peer_device_t *>(data)->on_reset(); }, &container);
+            remove->callback([](auto, void *data) { static_cast<peer_device_t *>(data)->on_remove(); }, &container);
 
+            this->reset();
             return widget;
         }
     };
@@ -77,13 +80,16 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
             ww = std::min(300, ww);
 
             input = new Fl_Input(x + padding, yy, ww, hh);
-            input->value(container.peer->get_name().data());
 
             group->end();
             group->resizable(nullptr);
             widget = group;
+
+            reset();
             return widget;
         }
+
+        void reset() override { input->value(container.peer->get_name().data()); }
 
         mutable Fl_Input *input;
     };
@@ -96,11 +102,7 @@ static peer_device_t::peer_widget_ptr_t make_introducer(peer_device_t &container
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
-        Fl_Widget *create_widget(int x, int y, int w, int h) override {
-            auto widget = parent_t::create_widget(x, y, w, h);
-            input->value(container.peer->is_introducer());
-            return widget;
-        }
+        void reset() override { input->value(container.peer->is_introducer()); }
     };
 
     return new widget_t(container);
@@ -111,11 +113,7 @@ static peer_device_t::peer_widget_ptr_t make_auto_accept(peer_device_t &containe
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
-        Fl_Widget *create_widget(int x, int y, int w, int h) override {
-            auto widget = parent_t::create_widget(x, y, w, h);
-            input->value(container.peer->has_auto_accept());
-            return widget;
-        }
+        void reset() override { input->value(container.peer->has_auto_accept()); }
     };
 
     return new widget_t(container);
@@ -126,11 +124,7 @@ static peer_device_t::peer_widget_ptr_t make_paused(peer_device_t &container) {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
-        Fl_Widget *create_widget(int x, int y, int w, int h) override {
-            auto widget = parent_t::create_widget(x, y, w, h);
-            input->value(container.peer->is_paused());
-            return widget;
-        }
+        void reset() override { input->value(container.peer->is_paused()); }
     };
 
     return new widget_t(container);
@@ -157,8 +151,23 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
             group->end();
             group->resizable(nullptr);
             widget = group;
+
+            reset();
             return widget;
         }
+
+        void reset() override {
+            using C = syncspirit::proto::Compression;
+            auto c = container.peer->get_compression();
+            if (c == C::METADATA) {
+                input->value(0);
+            } else if (c == C::NEVER) {
+                input->value(1);
+            } else if (c == C::ALWAYS) {
+                input->value(2);
+            }
+        }
+
         mutable Fl_Choice *input;
     };
 
@@ -228,7 +237,12 @@ std::string peer_device_t::get_state() {
     }
 }
 
-
 void peer_device_t::on_apply() {}
-void peer_device_t::on_reset() {}
+
+void peer_device_t::on_reset() {
+    for (auto &w : widgets) {
+        w->reset();
+    }
+}
+
 void peer_device_t::on_remove() {}

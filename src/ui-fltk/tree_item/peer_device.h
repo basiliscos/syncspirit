@@ -15,6 +15,8 @@ struct peer_device_t : tree_item_t {
         peer_widget_t(peer_device_t &container);
 
         Fl_Widget *get_widget() override;
+        virtual void reset();
+
         Fl_Widget *widget = nullptr;
         peer_device_t &container;
     };
