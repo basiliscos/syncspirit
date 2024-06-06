@@ -17,11 +17,12 @@ uri_t::uri_t(boost::urls::url_view view) : parent_t(view) {
 
 uri_ptr_t uri_t::clone() const { return new uri_t(*this); }
 
-uri_ptr_t parse(const boost::string_view str) {
+uri_ptr_t parse(std::string_view str) {
     auto result = boost::urls::parse_uri(str);
     if (result) {
         return new uri_t(result.value());
     }
     return {};
 }
+
 } // namespace syncspirit::utils

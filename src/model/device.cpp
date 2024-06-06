@@ -18,6 +18,7 @@ template <> void device_t::assign(const db::Device &d) noexcept {
     auto_accept = d.auto_accept();
     paused = d.paused();
     skip_introduction_removals = d.skip_introduction_removals();
+    static_uris.clear();
 
     for (int i = 0; i < d.addresses_size(); ++i) {
         auto uri = utils::parse(d.addresses(i));

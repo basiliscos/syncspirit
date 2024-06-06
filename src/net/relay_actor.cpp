@@ -96,7 +96,7 @@ void relay_actor_t::connect_to_relay() noexcept {
         }
         auto &l = relay->location;
         auto &u = relay->uri;
-        auto relay_host = std::string_view(relay->uri->host());
+        auto relay_host = relay->uri->host();
         auto relay_port = std::string_view(relay->uri->port());
         LOG_INFO(log, "chosen relay({}) {}:{}, city: {}, country: {}, continent: {}", relay_index, relay_host,
                  relay_port, l.city, l.country, l.continent);
