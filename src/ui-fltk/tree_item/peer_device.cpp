@@ -4,12 +4,14 @@
 
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/peer_state.h"
+#include "utils/format.hpp"
 
 #include <FL/Fl_Tile.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Choice.H>
+#include <FL/Fl_Input_Choice.H>
 #include <tuple>
 
 using namespace syncspirit;
@@ -211,6 +213,72 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
     return new widget_t(container);
 }
 
+static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container) {
+    struct widget_t final : peer_device_t::peer_widget_t {
+        using parent_t = peer_widget_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto group = new Fl_Group(x, y, w, h);
+            group->begin();
+            group->box(FL_FLAT_BOX);
+            auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
+            ww = std::min(300, ww);
+            input = new Fl_Input_Choice(x + padding, yy, ww, hh);
+            input->when(input->when() | FL_WHEN_CHANGED);
+            input->callback([](auto, void *data) { reinterpret_cast<widget_t *>(data)->on_change(); }, this);
+
+            group->end();
+            widget = group;
+
+            reset();
+            return widget;
+        }
+
+        void reset() override {
+            auto &uris = container.peer->get_uris();
+            input->add("dynamic");
+            input->add("static");
+
+            if (uris.empty()) {
+                input->menubutton()->value(0);
+                input->value("dynamic");
+                input->input()->deactivate();
+            } else {
+                input->menubutton()->value(1);
+                input->input()->activate();
+                auto value = fmt::format("{}", fmt::join(uris, ", "));
+                input->value(value.data());
+            }
+        }
+
+        bool store(db::Device &device) override {
+            // device.set_name(input->value());
+            return true;
+        };
+
+        void on_change() {
+            auto menu = input->menubutton();
+            if (menu->changed()) {
+                if (menu->value() == 0) {
+                    input->value("dynamic");
+                    input->input()->deactivate();
+                } else {
+                    auto &uris = container.peer->get_uris();
+                    auto value = fmt::format("{}", fmt::join(uris, ", "));
+                    input->value(value.data());
+                    input->input()->activate();
+                    input->input()->take_focus();
+                }
+            }
+        }
+
+        mutable Fl_Input_Choice *input;
+    };
+
+    return new widget_t(container);
+}
+
 peer_device_t::peer_device_t(model::device_ptr_t peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), model_sub(supervisor.add(this)), peer{std::move(peer_)} {
     update_label();
@@ -263,6 +331,7 @@ void peer_device_t::on_select() {
             auto cert_name = peer->get_cert_name();
 
             data.push_back({"name", record(make_name(*this))});
+            data.push_back({"address", record(make_addresses(*this))});
             data.push_back({"state", get_state()});
             data.push_back({"cert name", cert_name.value_or("")});
             data.push_back({"device id (short)", std::string(device_id_short)});
