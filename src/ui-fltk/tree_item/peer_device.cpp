@@ -392,7 +392,7 @@ void peer_device_t::on_change() {
         reset_button->deactivate();
     }
 
-    static_cast<static_table_t *>(content)->update_value(1, get_state());
+    static_cast<static_table_t *>(content)->update_value(2, get_state());
 }
 
 void peer_device_t::on_apply() {
