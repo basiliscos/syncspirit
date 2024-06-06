@@ -16,7 +16,7 @@ struct peer_device_t : tree_item_t, private model_listener_t, private model::dif
 
         Fl_Widget *get_widget() override;
         virtual void reset();
-        virtual void store(db::Device &device);
+        virtual bool store(db::Device &device);
 
         Fl_Widget *widget = nullptr;
         peer_device_t &container;

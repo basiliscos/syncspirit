@@ -21,7 +21,7 @@ static constexpr int padding = 2;
 peer_device_t::peer_widget_t::peer_widget_t(peer_device_t &container_) : container{container_} {}
 Fl_Widget *peer_device_t::peer_widget_t::get_widget() { return widget; }
 void peer_device_t::peer_widget_t::reset() {}
-void peer_device_t::peer_widget_t::store(db::Device &) {}
+bool peer_device_t::peer_widget_t::store(db::Device &) { return true; }
 
 struct checkbox_widget_t : peer_device_t::peer_widget_t {
     using parent_t = peer_widget_t;
@@ -104,7 +104,10 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
 
         void reset() override { input->value(container.peer->get_name().data()); }
 
-        void store(db::Device &device) override { device.set_name(input->value()); };
+        bool store(db::Device &device) override {
+            device.set_name(input->value());
+            return true;
+        };
 
         mutable Fl_Input *input;
     };
@@ -119,7 +122,10 @@ static peer_device_t::peer_widget_ptr_t make_introducer(peer_device_t &container
 
         void reset() override { input->value(container.peer->is_introducer()); }
 
-        void store(db::Device &device) override { device.set_introducer(input->value()); };
+        bool store(db::Device &device) override {
+            device.set_introducer(input->value());
+            return true;
+        };
     };
 
     return new widget_t(container);
@@ -131,7 +137,10 @@ static peer_device_t::peer_widget_ptr_t make_auto_accept(peer_device_t &containe
         using parent_t::parent_t;
 
         void reset() override { input->value(container.peer->has_auto_accept()); }
-        void store(db::Device &device) override { device.set_auto_accept(input->value()); };
+        bool store(db::Device &device) override {
+            device.set_auto_accept(input->value());
+            return true;
+        };
     };
 
     return new widget_t(container);
@@ -143,7 +152,10 @@ static peer_device_t::peer_widget_ptr_t make_paused(peer_device_t &container) {
         using parent_t::parent_t;
 
         void reset() override { input->value(container.peer->is_paused()); }
-        void store(db::Device &device) override { device.set_paused(input->value()); };
+        bool store(db::Device &device) override {
+            device.set_paused(input->value());
+            return true;
+        };
     };
 
     return new widget_t(container);
@@ -188,8 +200,9 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
             }
         }
 
-        void store(db::Device &device) override {
+        bool store(db::Device &device) override {
             device.set_compression(static_cast<proto::Compression>(input->value()));
+            return true;
         };
 
         mutable Fl_Choice *input;
@@ -295,12 +308,15 @@ void peer_device_t::on_change() {
     auto current = db::Device();
     auto ok = current.ParseFromArray(initial_data.data(), initial_data.size());
     assert(ok);
+    bool valid = true;
     for (auto &w : widgets) {
-        w->store(current);
+        valid = valid && w->store(current);
     }
     auto current_data = current.SerializeAsString();
     if (initial_data != current_data) {
-        apply_button->activate();
+        if (valid) {
+            apply_button->activate();
+        }
         reset_button->activate();
     } else {
         apply_button->deactivate();
@@ -316,13 +332,15 @@ void peer_device_t::on_apply() {
     auto device = db::Device();
     auto ok = device.ParseFromArray(data.data(), data.size());
     assert(ok);
+    bool valid = true;
     for (auto &w : widgets) {
-        w->store(device);
+        valid = valid && w->store(device);
     }
-
-    auto device_id = peer->device_id().get_sha256();
-    auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(device), device_id));
-    supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
+    if (valid) {
+        auto device_id = peer->device_id().get_sha256();
+        auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(device), device_id));
+        supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
+    }
 }
 
 void peer_device_t::on_reset() {
