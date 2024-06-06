@@ -156,6 +156,7 @@ struct fixture_t {
         auto ip = asio::ip::make_address(host);
         auto ep = tcp::endpoint(ip, listening_ep.port());
         auto addresses = std::vector<tcp::endpoint>{ep};
+        auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
         peer_trans = transport::initiate_tls_active(*sup, peer_keys, my_device->device_id(), peer_uri);
 
         transport::error_fn_t on_error = [&](auto &ec) {
@@ -166,7 +167,7 @@ struct fixture_t {
             active_connect();
         };
 
-        peer_trans->async_connect(addresses, on_connect, on_error);
+        peer_trans->async_connect(addresses_ptr, on_connect, on_error);
     }
 
     virtual void active_connect() {

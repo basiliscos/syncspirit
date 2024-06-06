@@ -245,9 +245,9 @@ template <typename T> struct impl;
 template <> struct impl<tcp_socket_t> {
     using socket_t = tcp_socket_t;
 
-    template <typename Owner> inline static void async_connect(Owner owner, const resolved_hosts_t &hosts) noexcept {
+    template <typename Owner> inline static void async_connect(Owner owner, resolved_hosts_t hosts) noexcept {
         auto &sock = owner->backend->get_physical_layer();
-        asio::async_connect(sock, hosts.begin(), hosts.end(), [owner](auto ec, auto it) mutable {
+        asio::async_connect(sock, hosts->begin(), hosts->end(), [owner, hosts](auto ec, auto it) mutable {
             auto &strand = owner->backend->strand;
             if (ec) {
                 strand.post([ec = ec, owner = std::move(owner)]() mutable {
@@ -258,12 +258,15 @@ template <> struct impl<tcp_socket_t> {
                 });
                 return;
             }
-            // dirty hack?
             using T = std::remove_cv_t<decltype(it)>;
             if constexpr (std::is_same_v<T, tcp::endpoint>) {
-                strand.post([addr = it, owner = std::move(owner)]() mutable { owner->success(addr); });
+                strand.post([addr = it, owner = std::move(owner), hosts = std::move(hosts)]() mutable {
+                    owner->success(addr);
+                });
             } else {
-                strand.post([addr = *it, owner = std::move(owner)]() mutable { owner->success(addr); });
+                strand.post([addr = *it, owner = std::move(owner), hosts = std::move(hosts)]() mutable {
+                    owner->success(addr);
+                });
             }
         });
     }
@@ -306,8 +309,8 @@ template <> struct impl<tcp_socket_t> {
 template <> struct impl<ssl_socket_t> {
     using socket_t = ssl_socket_t;
 
-    template <typename Owner> inline static void async_connect(Owner owner, const resolved_hosts_t &hosts) noexcept {
-        impl<tcp_socket_t>::async_connect<Owner>(std::move(owner), hosts);
+    template <typename Owner> inline static void async_connect(Owner owner, resolved_hosts_t hosts) noexcept {
+        impl<tcp_socket_t>::async_connect<Owner>(std::move(owner), std::move(hosts));
     }
 
     template <typename Owner> inline static void async_handshake(Owner owner) noexcept {
@@ -359,10 +362,9 @@ template <typename T, typename Sock, typename P> struct interface_t : P {
 
     inline self_t &get_self() noexcept { return static_cast<self_t &>(*this); }
 
-    void async_connect(const resolved_hosts_t &hosts, connect_fn_t &on_connect,
-                       error_fn_t &on_error) noexcept override {
+    void async_connect(resolved_hosts_t hosts, connect_fn_t &on_connect, error_fn_t &on_error) noexcept override {
         auto curry = curry_connect<self_t>(get_self(), on_connect, on_error);
-        impl<Sock>::async_connect(std::move(curry), hosts);
+        impl<Sock>::async_connect(std::move(curry), std::move(hosts));
     }
 
     void async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) noexcept override {

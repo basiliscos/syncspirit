@@ -61,17 +61,17 @@ std::vector<endpoint_t> parse_dns_servers(std::string_view str) noexcept {
 }
 
 template <typename Protocol, typename Endpoint>
-auto make_endpoints(const std::vector<ip::address> &addresses, std::uint16_t port) noexcept -> std::vector<Endpoint> {
+auto make_endpoints(const std::vector<ip::address> &addresses, std::uint16_t port) noexcept -> addresses_t<Endpoint> {
     using R = std::vector<Endpoint>;
     R r;
     r.reserve(addresses.size());
     for (auto &ip : addresses) {
         r.emplace_back(ip, port);
     }
-    return r;
+    return std::make_shared<R>(std::move(r));
 }
 
 template auto make_endpoints<tcp, typename tcp::endpoint>(const std::vector<ip::address> &addresses,
-                                                          std::uint16_t port) noexcept -> std::vector<tcp::endpoint>;
+                                                          std::uint16_t port) noexcept -> addresses_t<tcp::endpoint>;
 
 } // namespace syncspirit::utils

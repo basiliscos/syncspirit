@@ -205,7 +205,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
             LOG_INFO(log, "active/connected");
             sup->reply_to(*ptr, trans, ep);
         };
-        trans->async_connect(*addresses_ptr, on_connect, on_error);
+        trans->async_connect(addresses_ptr, on_connect, on_error);
     }
 
     void send_relay(const proto::relay::message_t &msg) noexcept {

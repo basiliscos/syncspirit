@@ -8,6 +8,7 @@
 #include <string>
 #include <cstdint>
 #include <boost/asio.hpp>
+#include <memory>
 #include "syncspirit-export.h"
 
 namespace syncspirit::utils {
@@ -27,8 +28,10 @@ struct SYNCSPIRIT_API dns_query_t {
 
 using endpoints_t = std::vector<endpoint_t>;
 
+template <typename Endpoint> using addresses_t = std::shared_ptr<std::vector<Endpoint>>;
+
 template <typename Protocol, typename Endpoint = typename Protocol::endpoint>
-std::vector<Endpoint> make_endpoints(const std::vector<ip::address> &addresses, std::uint16_t port) noexcept;
+addresses_t<Endpoint> make_endpoints(const std::vector<ip::address> &addresses, std::uint16_t port) noexcept;
 
 } // namespace syncspirit::utils
 

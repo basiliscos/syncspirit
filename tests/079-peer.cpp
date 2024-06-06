@@ -140,7 +140,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
             main();
         };
 
-        client_trans->async_connect(*addresses_ptr, on_connect, on_error);
+        client_trans->async_connect(addresses_ptr, on_connect, on_error);
 
         io_ctx.run();
     }
