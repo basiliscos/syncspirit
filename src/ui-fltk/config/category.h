@@ -11,6 +11,7 @@ struct category_t : boost::intrusive_ref_counter<category_t, boost::thread_unsaf
     using parent_t = boost::intrusive_ref_counter<category_t, boost::thread_unsafe_counter>;
 
     category_t(std::string label, std::string explanation, properties_t properties);
+    virtual ~category_t() = default;
     const std::string &get_label() const;
     const std::string &get_explanation() const;
     const properties_t &get_properties() const;

@@ -52,6 +52,7 @@ struct static_table_t : Fl_Table_Row {
     int handle(int event) override;
     void resize(int x, int y, int w, int h) override;
     void update_value(std::size_t row, std::string value);
+    table_rows_t &get_rows();
 
   private:
     void create_widgets();

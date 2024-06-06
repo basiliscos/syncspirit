@@ -227,6 +227,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
             input = new Fl_Input_Choice(x + padding, yy, ww, hh);
             input->when(input->when() | FL_WHEN_CHANGED);
             input->callback([](auto, void *data) { reinterpret_cast<widget_t *>(data)->on_change(); }, this);
+            input->tooltip("comma-separated urls like tcp://ip:port");
 
             group->end();
             widget = group;
@@ -247,14 +248,39 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
             } else {
                 input->menubutton()->value(1);
                 input->input()->activate();
-                auto value = fmt::format("{}", fmt::join(uris, ", "));
+                auto value = fmt::format("{}", fmt::join(uris, ","));
                 input->value(value.data());
             }
         }
 
         bool store(db::Device &device) override {
-            // device.set_name(input->value());
-            return true;
+            device.clear_addresses();
+            if (input->menubutton()->value() == 0) {
+                return true;
+            } else {
+                std::vector<std::string_view> addresses;
+                std::string_view data = input->input()->value();
+                auto left = data;
+                while (left.size()) {
+                    auto e = left.find_first_of(",");
+                    auto piece = left.substr(0, e);
+                    auto url = utils::parse(piece);
+                    if (url) {
+                        addresses.push_back(piece);
+                        if (e != left.npos) {
+                            left = left.substr(piece.size() + 1);
+                        } else {
+                            left = {};
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+                for (auto addr : addresses) {
+                    *device.add_addresses() = addr;
+                }
+                return true;
+            }
         };
 
         void on_change() {
@@ -271,6 +297,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
                     input->input()->take_focus();
                 }
             }
+            container.on_change();
         }
 
         mutable Fl_Input_Choice *input;
@@ -392,7 +419,13 @@ void peer_device_t::on_change() {
         reset_button->deactivate();
     }
 
-    static_cast<static_table_t *>(content)->update_value(2, get_state());
+    auto &table = *static_cast<static_table_t *>(content);
+    auto &rows = table.get_rows();
+    for (size_t i = 0; i < rows.size(); ++i) {
+        if (rows[i].label == "state") {
+            table.update_value(i, get_state());
+        }
+    }
 }
 
 void peer_device_t::on_apply() {

@@ -210,7 +210,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     bridge_sink = sink_ptr_t(new fltk_sink_t(this));
 
     auto &dist_sink = supervisor.get_dist_sink();
-    for (auto &sink : dist_sink->sinks()) {
+    for (auto sink : dist_sink->sinks()) {
         auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
         if (in_memory_sink) {
             std::lock_guard lock(in_memory_sink->mutex);

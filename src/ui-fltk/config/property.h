@@ -15,6 +15,8 @@ enum class property_kind_t { text, file, directory, positive_integer, boolean, l
 
 struct property_t : boost::intrusive_ref_counter<property_t, boost::thread_unsafe_counter> {
     using parent_t = boost::intrusive_ref_counter<property_t, boost::thread_unsafe_counter>;
+    virtual ~property_t() = default;
+
     std::string_view get_label() const noexcept;
     std::string_view get_explanation() const noexcept;
     std::string_view get_value() const noexcept;

@@ -141,6 +141,8 @@ void static_table_t::update_value(std::size_t row, std::string value) {
     redraw_range(row, row, 1, 1);
 }
 
+auto static_table_t::get_rows() -> table_rows_t & { return table_rows; }
+
 std::string static_table_t::gather_selected() {
     std::stringstream buff;
     size_t count = 0;
