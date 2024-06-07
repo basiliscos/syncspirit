@@ -238,15 +238,17 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
 
         void reset() override {
             auto &uris = container.peer->get_uris();
+            input->clear();
             input->add("dynamic");
             input->add("static");
+            auto menu = input->menubutton();
 
             if (uris.empty()) {
-                input->menubutton()->value(0);
+                menu->value(0);
                 input->value("dynamic");
                 input->input()->deactivate();
             } else {
-                input->menubutton()->value(1);
+                menu->value(1);
                 input->input()->activate();
                 auto value = fmt::format("{}", fmt::join(uris, ","));
                 input->value(value.data());
@@ -256,13 +258,18 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
         bool store(db::Device &device) override {
             device.clear_addresses();
             if (input->menubutton()->value() == 0) {
+                printf("\ntrue\n");
                 return true;
             } else {
                 std::vector<std::string_view> addresses;
                 std::string_view data = input->input()->value();
                 auto left = data;
                 while (left.size()) {
-                    auto e = left.find_first_of(",");
+                    if (left.front() == ' ' || left.front() == ',') {
+                        left = left.substr(1);
+                        continue;
+                    }
+                    auto e = left.find_first_of(", ");
                     auto piece = left.substr(0, e);
                     auto url = utils::parse(piece);
                     if (url) {
@@ -273,12 +280,14 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
                             left = {};
                         }
                     } else {
+                        printf("\nfalse\n");
                         return false;
                     }
                 }
                 for (auto addr : addresses) {
                     *device.add_addresses() = addr;
                 }
+                printf("\true %d\n", addresses.size());
                 return true;
             }
         };
