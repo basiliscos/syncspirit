@@ -237,7 +237,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
         }
 
         void reset() override {
-            auto &uris = container.peer->get_uris();
+            auto &uris = container.peer->get_static_uris();
             input->clear();
             input->add("dynamic");
             input->add("static");
@@ -258,7 +258,6 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
         bool store(db::Device &device) override {
             device.clear_addresses();
             if (input->menubutton()->value() == 0) {
-                printf("\ntrue\n");
                 return true;
             } else {
                 std::vector<std::string_view> addresses;
@@ -280,14 +279,12 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
                             left = {};
                         }
                     } else {
-                        printf("\nfalse\n");
                         return false;
                     }
                 }
                 for (auto addr : addresses) {
                     *device.add_addresses() = addr;
                 }
-                printf("\true %d\n", addresses.size());
                 return true;
             }
         };
@@ -299,7 +296,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
                     input->value("dynamic");
                     input->input()->deactivate();
                 } else {
-                    auto &uris = container.peer->get_uris();
+                    auto &uris = container.peer->get_static_uris();
                     auto value = fmt::format("{}", fmt::join(uris, ", "));
                     input->value(value.data());
                     input->input()->activate();

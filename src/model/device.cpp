@@ -19,12 +19,12 @@ template <> void device_t::assign(const db::Device &d) noexcept {
     paused = d.paused();
     skip_introduction_removals = d.skip_introduction_removals();
     static_uris.clear();
+    uris.clear();
 
     for (int i = 0; i < d.addresses_size(); ++i) {
         auto uri = utils::parse(d.addresses(i));
         assert(uri);
-        uris.emplace_back(std::move(uri));
-        static_uris.emplace_back(uris.back());
+        static_uris.emplace_back(uri);
     }
 }
 

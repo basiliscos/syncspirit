@@ -53,6 +53,7 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     inline auto &get_remote_folder_infos() noexcept { return remote_folder_infos; }
 
     inline const uris_t &get_uris() const noexcept { return uris; }
+    inline const uris_t &get_static_uris() const noexcept { return static_uris; }
 
     void assign_uris(const uris_t &uris) noexcept;
 
