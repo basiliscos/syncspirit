@@ -63,7 +63,8 @@ auto cluster_supervisor_t::operator()(const model::diff::peer::peer_state_t &dif
     -> outcome::result<void> {
     if (!cluster->is_tainted() && diff.known) {
         auto peer = cluster->get_devices().by_sha256(diff.peer_id);
-        LOG_TRACE(log, "visiting peer_state_t, {}, state: {}", peer->device_id(), (int)diff.state);
+        LOG_TRACE(log, "visiting peer_state_t, {}, state: {}, has been online: {}", peer->device_id(), (int)diff.state,
+                  diff.has_been_online);
         if (diff.state == model::device_state_t::online) {
             /* auto addr = */
             create_actor<controller_actor_t>()

@@ -26,6 +26,7 @@
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/cluster_remove.h"
 #include "model/diff/peer/update_folder.h"
+#include "model/diff/peer/peer_state.h"
 #include "model/diff/cluster_visitor.h"
 #include <string_view>
 
@@ -636,6 +637,36 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
         if (!r) {
             return r.assume_error();
         }
+    }
+
+    return commit(true);
+}
+
+auto db_actor_t::operator()(const model::diff::peer::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    if (!diff.has_been_online || !diff.known) {
+        return outcome::success();
+    }
+
+    auto &device_id = diff.peer_id;
+    auto device = cluster->get_devices().by_sha256(device_id);
+    assert(device);
+
+    auto key = device->get_key();
+    auto data = device->serialize();
+
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto r = db::save({key, data}, txn);
+    if (!r) {
+        return r.assume_error();
     }
 
     return commit(true);

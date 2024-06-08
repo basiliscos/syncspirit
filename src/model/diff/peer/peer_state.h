@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -29,6 +29,7 @@ struct SYNCSPIRIT_API peer_state_t final : cluster_diff_t {
     std::string client_name;
     model::device_state_t state;
     bool known;
+    bool has_been_online;
 };
 
 } // namespace syncspirit::model::diff::peer

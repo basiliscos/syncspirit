@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include <catch2/catch_all.hpp>
 #include "test-utils.h"
 #include "diff-builder.h"
 #include "model/diff/peer/cluster_remove.h"
-#include "model/diff/modify/unshare_folder.h"
+#include "model/diff/peer/peer_state.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -599,6 +599,40 @@ void test_local_update() {
     F().run();
 };
 
+void test_peer_going_offline() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            auto builder = diff_builder_t(*cluster);
+            builder.update_peer(sha256).apply(*sup);
+
+            db::Device db_peer;
+            auto peer = cluster->get_devices().by_sha256(sha256);
+            REQUIRE(db_peer.last_seen() == 0);
+            peer->update_state(device_state_t::online);
+
+            auto diff = diff::cluster_diff_ptr_t(
+                new model::diff::peer::peer_state_t(*cluster, sha256, sup->get_address(), device_state_t::offline));
+            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->do_process();
+
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+
+            auto cluster_clone = make_cluster();
+            REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+            auto peer_clone = cluster_clone->get_devices().by_sha256(sha256);
+            db::Device db_peer_clone;
+            peer_clone->serialize(db_peer_clone);
+            CHECK((peer->get_last_seen() - peer_clone->get_last_seen()).total_seconds() < 2);
+            CHECK(db_peer_clone.last_seen() != 0);
+        }
+    };
+    F().run();
+};
+
 int _init() {
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
     REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
@@ -607,7 +641,7 @@ int _init() {
     REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
     REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
     REGISTER_TEST_CASE(test_local_update, "test_local_update", "[db]");
-    REGISTER_TEST_CASE(test_unsharing_folder, "test_unsharing_folder", "[db]");
+    REGISTER_TEST_CASE(test_peer_going_offline, "test_peer_going_offline", "[db]");
     return 1;
 }
 
