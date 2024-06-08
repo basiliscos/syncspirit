@@ -340,6 +340,11 @@ void peer_device_t::operator()(model::message::model_update_t &update) {
 
 auto peer_device_t::operator()(const diff::peer::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
     if (diff.peer_id == peer->device_id().get_sha256()) {
+        if (diff.state == model::device_state_t::online) {
+            peer_endpoint = diff.endpoint;
+        } else {
+            peer_endpoint.reset();
+        }
         on_change();
         update_label();
     }
@@ -372,9 +377,11 @@ void peer_device_t::on_select() {
             auto device_id = peer->device_id().get_value();
             auto device_id_short = peer->device_id().get_short();
             auto cert_name = peer->get_cert_name();
+            auto endpoint = peer_endpoint ? fmt::format("{}", peer_endpoint.value()) : "";
 
             data.push_back({"name", record(make_name(*this))});
-            data.push_back({"address", record(make_addresses(*this))});
+            data.push_back({"addresses", record(make_addresses(*this))});
+            data.push_back({"endpoint", endpoint});
             data.push_back({"state", get_state()});
             data.push_back({"cert name", cert_name.value_or("")});
             data.push_back({"device id (short)", std::string(device_id_short)});
@@ -439,6 +446,9 @@ void peer_device_t::on_change() {
     for (size_t i = 0; i < rows.size(); ++i) {
         if (rows[i].label == "state") {
             table.update_value(i, get_state());
+        } else if (rows[i].label == "endpoint") {
+            auto endpoint = peer_endpoint ? fmt::format("{}", *peer_endpoint) : "";
+            table.update_value(i, endpoint);
         }
     }
 }

@@ -3,12 +3,15 @@
 #include "model/device.h"
 #include "../tree_item.h"
 #include "../static_table.h"
+#include <boost/asio.hpp>
 #include <vector>
+#include <optional>
 
 namespace syncspirit::fltk::tree_item {
 
 struct peer_device_t : tree_item_t, private model_listener_t, private model::diff::cluster_visitor_t {
     using parent_t = tree_item_t;
+    using endpoint_t = std::optional<boost::asio::ip::tcp::endpoint>;
 
     struct peer_widget_t : widgetable_t {
         using parent_t = widgetable_t;
@@ -44,7 +47,9 @@ struct peer_device_t : tree_item_t, private model_listener_t, private model::dif
 
     model_subscription_t model_sub;
     model::device_ptr_t peer;
+    endpoint_t peer_endpoint;
     widgets_t widgets;
+
     Fl_Widget *apply_button;
     Fl_Widget *reset_button;
 };
