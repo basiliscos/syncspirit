@@ -137,7 +137,9 @@ void static_table_t::draw_data(int r, int col, int x, int y, int w, int h) {
 }
 
 void static_table_t::update_value(std::size_t row, std::string value) {
-    table_rows.at(row).value = std::move(value);
+    auto &v = table_rows.at(row).value;
+    assert(std::get_if<std::string>(&v));
+    v = std::move(value);
     redraw_range(row, row, 1, 1);
 }
 

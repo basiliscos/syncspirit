@@ -238,10 +238,11 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
 
         void reset() override {
             auto &uris = container.peer->get_static_uris();
-            input->clear();
-            input->add("dynamic");
-            input->add("static");
             auto menu = input->menubutton();
+            input->clear();
+            menu->add("dynamic", 0, 0, 0, (uris.empty() ? FL_MENU_INACTIVE : 0));
+            menu->add("static", 0, 0, 0, (uris.empty() ? 0 : FL_MENU_INACTIVE));
+            auto items = menu->menu();
 
             if (uris.empty()) {
                 menu->value(0);
@@ -257,7 +258,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
 
         bool store(db::Device &device) override {
             device.clear_addresses();
-            if (input->menubutton()->value() == 0) {
+            if (input->input()->active() == 0) {
                 return true;
             } else {
                 std::vector<std::string_view> addresses;
@@ -294,6 +295,9 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
             if (menu->changed()) {
                 if (menu->value() == 0) {
                     input->value("dynamic");
+                    menu->clear();
+                    menu->add("dynamic", 0, 0, 0, FL_MENU_INACTIVE);
+                    menu->add("static", 0, 0, 0, 0);
                     input->input()->deactivate();
                 } else {
                     auto &uris = container.peer->get_static_uris();
@@ -301,6 +305,9 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
                     input->value(value.data());
                     input->input()->activate();
                     input->input()->take_focus();
+                    menu->clear();
+                    menu->add("dynamic", 0, 0, 0, 0);
+                    menu->add("static", 0, 0, 0, FL_MENU_INACTIVE);
                 }
             }
             container.on_change();
@@ -347,6 +354,7 @@ auto peer_device_t::operator()(const diff::modify::update_peer_t &diff, void *) 
 
 void peer_device_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
+        widgets.clear();
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         int bot_h = 100;
 
@@ -424,7 +432,6 @@ void peer_device_t::on_change() {
         apply_button->deactivate();
         reset_button->deactivate();
     }
-
     auto &table = *static_cast<static_table_t *>(content);
     auto &rows = table.get_rows();
     for (size_t i = 0; i < rows.size(); ++i) {
