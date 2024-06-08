@@ -639,6 +639,7 @@ int _init() {
     REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
     REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
     REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
+    REGISTER_TEST_CASE(test_unsharing_folder, "test_unsharing_folder", "[db]");
     REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
     REGISTER_TEST_CASE(test_local_update, "test_local_update", "[db]");
     REGISTER_TEST_CASE(test_peer_going_offline, "test_peer_going_offline", "[db]");
