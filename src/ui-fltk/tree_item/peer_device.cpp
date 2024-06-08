@@ -20,6 +20,8 @@ using namespace syncspirit::fltk::tree_item;
 
 static constexpr int padding = 2;
 
+static std::string format_urls(const utils::uri_container_t &uris) { return fmt::format("{}", fmt::join(uris, ",")); }
+
 peer_device_t::peer_widget_t::peer_widget_t(peer_device_t &container_) : container{container_} {}
 Fl_Widget *peer_device_t::peer_widget_t::get_widget() { return widget; }
 void peer_device_t::peer_widget_t::reset() {}
@@ -251,7 +253,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
             } else {
                 menu->value(1);
                 input->input()->activate();
-                auto value = fmt::format("{}", fmt::join(uris, ","));
+                auto value = format_urls(uris);
                 input->value(value.data());
             }
         }
@@ -301,7 +303,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
                     input->input()->deactivate();
                 } else {
                     auto &uris = container.peer->get_static_uris();
-                    auto value = fmt::format("{}", fmt::join(uris, ", "));
+                    auto value = format_urls(uris);
                     input->value(value.data());
                     input->input()->activate();
                     input->input()->take_focus();
