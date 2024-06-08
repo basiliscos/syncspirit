@@ -20,6 +20,7 @@ template <> void device_t::assign(const db::Device &d) noexcept {
     skip_introduction_removals = d.skip_introduction_removals();
     static_uris.clear();
     uris.clear();
+    last_seen = pt::from_time_t(d.last_seen());
 
     for (int i = 0; i < d.addresses_size(); ++i) {
         auto uri = utils::parse(d.addresses(i));
@@ -75,6 +76,11 @@ std::string device_t::serialize(db::Device &r) const noexcept {
     r.set_auto_accept(auto_accept);
     r.set_paused(paused);
 
+    pt::ptime epoch(boost::gregorian::date(1970, 1, 1));
+    auto time_diff = last_seen - epoch;
+    auto last_seen_time = time_diff.ticks() / time_diff.ticks_per_second();
+    r.set_last_seen(last_seen_time);
+
     for (auto &address : static_uris) {
         *r.add_addresses() = address->buffer();
     }
@@ -87,7 +93,12 @@ std::string device_t::serialize() const noexcept {
     return serialize(r);
 }
 
-void device_t::update_state(device_state_t new_state) { state = new_state; }
+void device_t::update_state(device_state_t new_state) {
+    if (state == device_state_t::online | new_state == device_state_t::online) {
+        last_seen = pt::microsec_clock::local_time();
+    }
+    state = new_state;
+}
 
 std::string_view device_t::get_key() const noexcept { return id.get_key(); }
 

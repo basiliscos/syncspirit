@@ -13,7 +13,7 @@ message Device {
     bool            skip_introduction_removals  = 7;
     bool            auto_accept                 = 8;
     bool            paused                      = 9;
-    // last_seen?
+    int64           last_seen                   = 10;
 }
 
 message IgnoredFolder {

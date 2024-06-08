@@ -13,10 +13,12 @@
 #include "bep.pb.h"
 #include "structs.pb.h"
 #include <boost/outcome.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace syncspirit::model {
 
 namespace outcome = boost::outcome_v2;
+namespace pt = boost::posix_time;
 
 struct device_t;
 using device_ptr_t = intrusive_ptr_t<device_t>;
@@ -51,6 +53,7 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     inline bool is_paused() const noexcept { return paused; }
     inline bool get_skip_introduction_removals() const noexcept { return skip_introduction_removals; }
     inline auto &get_remote_folder_infos() noexcept { return remote_folder_infos; }
+    inline const pt::ptime &get_last_seen() const noexcept { return last_seen; }
 
     inline const uris_t &get_uris() const noexcept { return uris; }
     inline const uris_t &get_static_uris() const noexcept { return static_uris; }
@@ -76,6 +79,7 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     bool skip_introduction_removals;
     device_state_t state = device_state_t::offline;
     remote_folder_infos_map_t remote_folder_infos;
+    pt::ptime last_seen;
 };
 
 struct local_device_t final : device_t {

@@ -378,8 +378,10 @@ void peer_device_t::on_select() {
             auto device_id_short = peer->device_id().get_short();
             auto cert_name = peer->get_cert_name();
             auto endpoint = peer_endpoint ? fmt::format("{}", peer_endpoint.value()) : "";
+            auto last_seen = peer_endpoint ? "now" : model::pt::to_simple_string(peer->get_last_seen());
 
             data.push_back({"name", record(make_name(*this))});
+            data.push_back({"last_seen", last_seen});
             data.push_back({"addresses", record(make_addresses(*this))});
             data.push_back({"endpoint", endpoint});
             data.push_back({"state", get_state()});
@@ -446,6 +448,9 @@ void peer_device_t::on_change() {
     for (size_t i = 0; i < rows.size(); ++i) {
         if (rows[i].label == "state") {
             table.update_value(i, get_state());
+        } else if (rows[i].label == "last_seen") {
+            auto last_seen = peer_endpoint ? "now" : model::pt::to_simple_string(peer->get_last_seen());
+            table.update_value(i, last_seen);
         } else if (rows[i].label == "endpoint") {
             auto endpoint = peer_endpoint ? fmt::format("{}", *peer_endpoint) : "";
             table.update_value(i, endpoint);
