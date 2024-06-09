@@ -61,6 +61,10 @@ auto cluster_visitor_t::operator()(const modify::remove_blocks_t &, void *) noex
     return outcome::success();
 }
 
+auto cluster_visitor_t::operator()(const modify::remove_unknown_folders_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
 auto cluster_visitor_t::operator()(const modify::file_availability_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }

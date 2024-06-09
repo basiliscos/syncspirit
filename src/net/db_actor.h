@@ -71,7 +71,9 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;
     outcome::result<void> operator()(const model::diff::modify::create_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::share_folder_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::generic_remove_t &) noexcept;
     outcome::result<void> operator()(const model::diff::modify::remove_blocks_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::remove_unknown_folders_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::unshare_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;

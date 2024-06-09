@@ -114,6 +114,7 @@ add_library(syncspirit_lib
     src/model/diff/modify/relay_connect_request.cpp
     src/model/diff/modify/remove_blocks.cpp
     src/model/diff/modify/remove_peer.cpp
+    src/model/diff/modify/remove_unknown_folders.cpp
     src/model/diff/modify/share_folder.cpp
     src/model/diff/modify/unshare_folder.cpp
     src/model/diff/modify/update_contact.cpp

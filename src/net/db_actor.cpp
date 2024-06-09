@@ -23,6 +23,7 @@
 #include "model/diff/modify/local_update.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_blocks.h"
+#include "model/diff/modify/remove_unknown_folders.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/cluster_remove.h"
@@ -364,8 +365,7 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, voi
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *) noexcept
-    -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -379,6 +379,15 @@ auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, vo
         }
     }
     return outcome::success();
+}
+auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff));
+}
+
+auto db_actor_t::operator()(const model::diff::modify::remove_unknown_folders_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff));
 }
 
 auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, void *custom) noexcept
