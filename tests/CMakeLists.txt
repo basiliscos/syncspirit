@@ -126,6 +126,10 @@ add_executable(038-diff-clone_finish-file 038-diff-clone_finish-file.cpp $<$<PLA
 target_link_libraries(038-diff-clone_finish-file syncspirit_test_lib)
 add_test(038-diff-clone_finish-file "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/038-diff-clone_finish-file")
 
+add_executable(039-diff-remove-peer 039-diff-remove-peer.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(039-diff-remove-peer syncspirit_test_lib)
+add_test(039-diff-remove-peer "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/039-diff-remove-peer")
+
 add_executable(050-file_iterator 050-file_iterator.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(050-file_iterator syncspirit_test_lib)
 add_test(050-file_iterator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-file_iterator")

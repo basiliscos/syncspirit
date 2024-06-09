@@ -53,6 +53,10 @@ auto cluster_visitor_t::operator()(const modify::update_peer_t &, void *) noexce
     return outcome::success();
 }
 
+auto cluster_visitor_t::operator()(const modify::remove_peer_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
 auto cluster_visitor_t::operator()(const modify::file_availability_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
