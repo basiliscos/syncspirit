@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "unshare_folder.h"
-#include "../cluster_visitor.h"
-#include "../../cluster.h"
-#include "../../misc/error_code.h"
-#include "../../../utils/format.hpp"
+#include "model/diff/cluster_visitor.h"
+#include "model/cluster.h"
+#include "model/misc/error_code.h"
+#include "utils/format.hpp"
 #include "structs.pb.h"
 
 using namespace syncspirit::model::diff::modify;
@@ -65,6 +65,13 @@ auto unshare_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     }
 
     folder_infos.remove(folder_info);
+
+    auto &blocks = cluster.get_blocks();
+    for (auto &block_key : removed_blocks) {
+        auto block_hash = block_key.substr(1);
+        auto b = blocks.get(block_hash);
+        blocks.remove(b);
+    }
 
     LOG_TRACE(log, "applyging unshare_folder_t, folder {} with device {}", folder_id, peer->device_id());
 

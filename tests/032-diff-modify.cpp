@@ -110,6 +110,10 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             auto bi_1 = block_info_t::create(*b1).value();
             auto bi_2 = block_info_t::create(*b2).value();
 
+            auto &blocks = cluster->get_blocks();
+            blocks.put(bi_1);
+            blocks.put(bi_2);
+
             auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file_1, fi_peer).value();
             fi_peer->get_file_infos().put(file_peer);
             fi_peer->set_max_sequence(file_peer->get_sequence());
@@ -123,6 +127,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
 
             auto diff_unshare = diff::cluster_diff_ptr_t();
             auto raw_diff = new diff::modify::unshare_folder_t(*cluster, peer_id.get_sha256(), db_folder.id());
+            REQUIRE(cluster->get_blocks().size() == 2);
             REQUIRE(raw_diff->removed_files.size() == 1);
             REQUIRE(*raw_diff->removed_files.begin() == file_peer->get_key());
             REQUIRE(raw_diff->removed_blocks.size() == 1);
@@ -130,6 +135,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             diff_unshare = raw_diff;
             REQUIRE(diff_unshare->apply(*cluster));
             REQUIRE(!folder->get_folder_infos().by_device(*peer_device));
+            REQUIRE(cluster->get_blocks().size() == 1);
         }
     }
 
