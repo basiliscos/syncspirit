@@ -107,9 +107,10 @@ add_library(syncspirit_lib
     src/model/diff/modify/file_availability.cpp
     src/model/diff/modify/finish_file.cpp
     src/model/diff/modify/finish_file_ack.cpp
+    src/model/diff/modify/generic_remove.cpp
     src/model/diff/modify/lock_file.cpp
-    src/model/diff/modify/mark_reachable.cpp
     src/model/diff/modify/local_update.cpp
+    src/model/diff/modify/mark_reachable.cpp
     src/model/diff/modify/relay_connect_request.cpp
     src/model/diff/modify/remove_blocks.cpp
     src/model/diff/modify/remove_peer.cpp

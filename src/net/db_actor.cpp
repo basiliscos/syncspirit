@@ -372,7 +372,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, vo
 
     assert(txn_holder);
     auto &txn = *txn_holder;
-    for (auto &key : diff.removed_blocks) {
+    for (auto &key : diff.keys) {
         auto r = db::remove(key, txn);
         if (!r) {
             return r.assume_error();
