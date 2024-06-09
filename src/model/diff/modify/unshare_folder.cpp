@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "unshare_folder.h"
+#include "model/diff/modify/remove_blocks.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
@@ -26,6 +27,7 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, std::string_
     folder_info_key = folder_info->get_key();
 
     auto &file_infos = folder_info->get_file_infos();
+    keys_t removed_blocks;
     for (auto &fi : file_infos) {
         auto &file_info = *fi.item;
         removed_files.emplace(std::string(file_info.get_key()));
@@ -41,6 +43,9 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, std::string_
                 removed_blocks.emplace(std::string(b->get_key()));
             }
         }
+    }
+    if (removed_blocks.size()) {
+        inner_diff.reset(new remove_blocks_t(std::move(removed_blocks)));
     }
 }
 
@@ -66,14 +71,10 @@ auto unshare_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
 
     folder_infos.remove(folder_info);
 
-    auto &blocks = cluster.get_blocks();
-    for (auto &block_key : removed_blocks) {
-        auto block_hash = block_key.substr(1);
-        auto b = blocks.get(block_hash);
-        blocks.remove(b);
-    }
-
     LOG_TRACE(log, "applyging unshare_folder_t, folder {} with device {}", folder_id, peer->device_id());
+    if (inner_diff) {
+        return inner_diff->apply(cluster);
+    }
 
     return outcome::success();
 }

@@ -34,6 +34,7 @@ struct local_update_t;
 struct share_folder_t;
 struct update_peer_t;
 struct remove_peer_t;
+struct remove_blocks_t;
 } // namespace modify
 
 template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
@@ -59,6 +60,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const modify::unshare_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::update_peer_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_peer_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::remove_blocks_t &, void *custom) noexcept;
 };
 
 using cluster_visitor_t = generic_visitor_t<tag::cluster>;

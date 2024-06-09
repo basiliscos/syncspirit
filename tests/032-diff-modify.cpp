@@ -130,8 +130,6 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             REQUIRE(cluster->get_blocks().size() == 2);
             REQUIRE(raw_diff->removed_files.size() == 1);
             REQUIRE(*raw_diff->removed_files.begin() == file_peer->get_key());
-            REQUIRE(raw_diff->removed_blocks.size() == 1);
-            REQUIRE(*raw_diff->removed_blocks.begin() == bi_1->get_key());
             diff_unshare = raw_diff;
             REQUIRE(diff_unshare->apply(*cluster));
             REQUIRE(!folder->get_folder_infos().by_device(*peer_device));
