@@ -315,14 +315,13 @@ void test_cluster_update_and_remove() {
 
             auto &uf = *cluster->get_unknown_folders().front();
             using keys_t = diff::peer::cluster_remove_t::keys_t;
-            keys_t updated_folders{std::string(folder_id)};
             keys_t removed_folder_infos{std::string(peer_folder_info->get_key())};
             keys_t removed_files{std::string(peer_file->get_key())};
             keys_t removed_blocks{std::string(block->get_key())};
             keys_t removed_unknown_folders{std::string(uf.get_key())};
             auto diff = model::diff::cluster_diff_ptr_t{};
-            diff = new diff::peer::cluster_remove_t(sha256, updated_folders, removed_folder_infos, removed_files,
-                                                    removed_blocks, removed_unknown_folders);
+            diff = new diff::peer::cluster_remove_t(sha256, removed_folder_infos, removed_files, removed_blocks,
+                                                    removed_unknown_folders);
             sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
             sup->do_process();
 

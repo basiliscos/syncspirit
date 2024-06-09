@@ -139,8 +139,8 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         }
 
         auto remove = cluster_diff_ptr_t(new cluster_remove_t(
-            source.device_id().get_sha256(), std::move(updated_folders), std::move(removed_folders),
-            std::move(removed_files_final), std::move(removed_blocks), std::move(removed_unknown_folders)));
+            source.device_id().get_sha256(), std::move(removed_folders), std::move(removed_files_final),
+            std::move(removed_blocks), std::move(removed_unknown_folders)));
         auto diffs = aggregate_t::diffs_t{std::move(ptr), std::move(remove)};
         auto container = cluster_diff_ptr_t(new aggregate_t(std::move(diffs)));
         return outcome::success(std::move(container));
