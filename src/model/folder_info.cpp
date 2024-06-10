@@ -17,6 +17,14 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder_info);
 
+auto folder_info_t::decompose_key(std::string_view key) -> decomposed_key_t {
+    assert(key.size() == folder_info_t::data_length);
+    auto device_id = key.substr(1, device_id_t::digest_length);
+    auto folder_id = key.substr(1 + device_id.size(), uuid_length);
+    auto folder_info_id = key.substr(1 + device_id.size() + folder_id.size(), uuid_length);
+    return decomposed_key_t{device_id, folder_id, folder_info_id};
+}
+
 outcome::result<folder_info_ptr_t> folder_info_t::create(std::string_view key, const db::FolderInfo &data,
                                                          const device_ptr_t &device_,
                                                          const folder_ptr_t &folder_) noexcept {

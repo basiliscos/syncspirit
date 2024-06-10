@@ -35,13 +35,12 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     modified_folders_t updated_folders;
     modified_folders_t remote_folders;
     keys_t removed_files;
-    keys_t removed_blocks;
-    keys_t removed_unknown_folders;
+    cluster_diff_ptr_t inner_diff;
 
   private:
     cluster_update_t(const model::device_t &source, unknown_folders_t unknown_folders, modified_folders_t reset_folders,
-                     modified_folders_t updated_folders, modified_folders_t remote_folders, keys_t removed_blocks,
-                     keys_t removed_unknown_folders) noexcept;
+                     modified_folders_t updated_folders, modified_folders_t remote_folders,
+                     cluster_diff_ptr_t inner_diff) noexcept;
 };
 
 } // namespace syncspirit::model::diff::peer

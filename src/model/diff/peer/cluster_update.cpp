@@ -2,7 +2,10 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "cluster_update.h"
-#include "cluster_remove.h"
+#include "../modify/remove_blocks.h"
+#include "../modify/remove_files.h"
+#include "../modify/remove_folder_infos.h"
+#include "../modify/remove_unknown_folders.h"
 #include "model/cluster.h"
 #include "model/diff/aggregate.h"
 #include "model/diff/cluster_visitor.h"
@@ -24,10 +27,9 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     modified_folders_t updated;
     modified_folders_t reset;
     modified_folders_t remote;
+    file_infos_map_t removed_files;
     keys_t removed_folders;
-    keys_t removed_files_final;
     keys_t removed_unknown_folders;
-    string_map removed_files;
     keys_t removed_blocks;
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
@@ -36,13 +38,16 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         auto &blocks = fi->get_blocks();
         for (auto &block : blocks) {
             auto predicate = [&](const model::file_block_t fb) -> bool {
-                auto r = removed_files.get(fb.file()->get_key());
-                return !r.empty();
+                auto &same_blocks = fb.block()->get_file_blocks();
+                auto is_deleted = [&](const model::file_block_t &b) -> bool {
+                    return (bool)removed_files.get(b.file()->get_name());
+                };
+                return std::none_of(begin(same_blocks), end(same_blocks), is_deleted);
             };
             auto &file_blocks = block->get_file_blocks();
             bool remove = std::all_of(file_blocks.begin(), file_blocks.end(), predicate);
             if (remove) {
-                removed_blocks.emplace(std::string(block->get_hash()));
+                removed_blocks.emplace(std::string(block->get_key()));
             }
         }
     };
@@ -115,9 +120,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                 removed_folders.emplace(folder_info->get_key());
                 auto &files = folder_info->get_file_infos();
                 for (auto it : files) {
-                    auto key = std::string(it.item->get_key());
-                    removed_files_final.emplace(key);
-                    removed_files.put(std::move(key));
+                    removed_files.put(it.item);
                 }
                 for (auto it : files) {
                     remove_blocks(it.item);
@@ -129,36 +132,48 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         }
     }
 
-    ptr = new cluster_update_t(source, std::move(unknown), std::move(reset), updated, remote, removed_blocks,
-                               removed_unknown_folders);
-    bool wrap = !removed_blocks.empty() || !removed_folders.empty() || !removed_unknown_folders.empty();
-    if (wrap) {
-        keys_t updated_folders;
-        for (auto &info : updated) {
-            updated_folders.emplace(info.folder_id);
-        }
-
-        auto remove = cluster_diff_ptr_t(new cluster_remove_t(
-            source.device_id().get_sha256(), std::move(removed_folders), std::move(removed_files_final),
-            std::move(removed_blocks), std::move(removed_unknown_folders)));
-        auto diffs = aggregate_t::diffs_t{std::move(ptr), std::move(remove)};
-        auto container = cluster_diff_ptr_t(new aggregate_t(std::move(diffs)));
-        return outcome::success(std::move(container));
+    auto diffs = aggregate_t::diffs_t();
+    if (removed_files.size()) {
+        diffs.emplace_back(new modify::remove_files_t(source, std::move(removed_files)));
     }
+    if (removed_folders.size()) {
+        diffs.emplace_back(new modify::remove_folder_infos_t(std::move(removed_folders)));
+    }
+    if (!removed_blocks.empty()) {
+        diffs.emplace_back(new modify::remove_blocks_t(std::move(removed_blocks)));
+    }
+    if (!removed_unknown_folders.empty()) {
+        diffs.emplace_back(new modify::remove_unknown_folders_t(std::move(removed_unknown_folders)));
+    }
+
+    auto inner_diff = cluster_diff_ptr_t();
+    if (!diffs.empty()) {
+        inner_diff.reset(new aggregate_t(std::move(diffs)));
+    }
+
+    ptr = new cluster_update_t(source, std::move(unknown), std::move(reset), updated, remote, std::move(inner_diff));
     return outcome::success(std::move(ptr));
 }
 
 cluster_update_t::cluster_update_t(const model::device_t &source, unknown_folders_t unknown_folders,
                                    modified_folders_t reset_folders_, modified_folders_t updated_folders_,
-                                   modified_folders_t remote_folders_, keys_t removed_blocks_,
-                                   keys_t removed_unknown_folders_) noexcept
+                                   modified_folders_t remote_folders_, cluster_diff_ptr_t inner_diff_) noexcept
     : source_peer(source), new_unknown_folders{std::move(unknown_folders)}, reset_folders{std::move(reset_folders_)},
       updated_folders{std::move(updated_folders_)}, remote_folders{std::move(remote_folders_)},
-      removed_blocks{removed_blocks_}, removed_unknown_folders{std::move(removed_unknown_folders_)} {}
+      inner_diff{std::move(inner_diff_)} {}
 
 auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "applying cluster_update_t");
     auto &folders = cluster.get_folders();
+    auto &devices = cluster.get_devices();
+    auto peer = cluster.get_devices().by_sha256(source_peer.device_id().get_sha256());
+
+    if (inner_diff) {
+        auto r = inner_diff->apply(cluster);
+        if (r.has_error()) {
+            return r;
+        }
+    }
 
     for (auto &info : updated_folders) {
         auto folder = folders.by_id(info.folder_id);
@@ -174,33 +189,17 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
         auto folder = folders.by_id(info.folder_id);
         assert(folder);
         auto &folder_infos = folder->get_folder_infos();
-        auto folder_info = folder_infos.by_device_id(info.device.id());
-        folder_infos.remove(folder_info);
         db::FolderInfo db_fi;
         db_fi.set_index_id(info.device.index_id());
         db_fi.set_max_sequence(info.device.max_sequence());
-        auto opt = folder_info_t::create(cluster.next_uuid(), db_fi, folder_info->get_device(), folder);
+        auto opt = folder_info_t::create(cluster.next_uuid(), db_fi, peer, folder);
         if (!opt) {
             return opt.assume_error();
         }
         folder_infos.put(opt.assume_value());
     }
 
-    auto &blocks = cluster.get_blocks();
-    for (auto &id : removed_blocks) {
-        auto block = blocks.get(id);
-        blocks.remove(block);
-    }
-
     auto &unknown = cluster.get_unknown_folders();
-    for (auto &key : removed_unknown_folders) {
-        for (auto it = unknown.begin(), prev = unknown.before_begin(); it != unknown.end(); prev = it, ++it) {
-            if ((**it).get_key() == key) {
-                unknown.erase_after(prev);
-                break;
-            }
-        }
-    }
 
     for (auto &folder : new_unknown_folders) {
         db::UnknownFolder db;
@@ -228,8 +227,6 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
         unknown.emplace_front(std::move(opt.value()));
     }
 
-    auto &devices = cluster.get_devices();
-    auto peer = cluster.get_devices().by_sha256(source_peer.device_id().get_sha256());
     auto &peer_remote_folders = peer->get_remote_folder_infos();
     peer_remote_folders.clear();
     for (auto &info : remote_folders) {

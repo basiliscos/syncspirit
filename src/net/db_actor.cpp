@@ -23,6 +23,8 @@
 #include "model/diff/modify/local_update.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_blocks.h"
+#include "model/diff/modify/remove_files.h"
+#include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/remove_unknown_folders.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
@@ -381,6 +383,15 @@ auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) n
     return outcome::success();
 }
 auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff));
+}
+
+auto db_actor_t::operator()(const model::diff::modify::remove_files_t &diff, void *) noexcept -> outcome::result<void> {
+    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff));
+}
+
+auto db_actor_t::operator()(const model::diff::modify::remove_folder_infos_t &diff, void *) noexcept
     -> outcome::result<void> {
     return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff));
 }

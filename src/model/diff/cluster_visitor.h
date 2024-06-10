@@ -36,6 +36,8 @@ struct update_peer_t;
 struct generic_remove_t;
 struct remove_peer_t;
 struct remove_blocks_t;
+struct remove_files_t;
+struct remove_folder_infos_t;
 struct remove_unknown_folders_t;
 } // namespace modify
 
@@ -63,6 +65,8 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const modify::update_peer_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_peer_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_blocks_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::remove_files_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::remove_folder_infos_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_unknown_folders_t &, void *custom) noexcept;
 };
 

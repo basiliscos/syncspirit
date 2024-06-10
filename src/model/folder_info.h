@@ -24,6 +24,14 @@ using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
 struct SYNCSPIRIT_API folder_info_t final : arc_base_t<folder_info_t> {
 
+    struct decomposed_key_t {
+        std::string_view device_id;
+        std::string_view folder_uuid;
+        std::string_view folder_info_id;
+    };
+
+    static decomposed_key_t decompose_key(std::string_view key);
+
     static outcome::result<folder_info_ptr_t> create(std::string_view key, const db::FolderInfo &data,
                                                      const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     static outcome::result<folder_info_ptr_t> create(const uuid_t &uuid, const db::FolderInfo &data,
