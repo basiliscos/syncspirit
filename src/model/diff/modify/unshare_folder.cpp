@@ -15,12 +15,9 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, std::string_
                                    std::string_view folder_id_) noexcept
     : peer_id{peer_device_}, folder_id{folder_id_} {
 
-    auto &folders = cluster.get_folders();
-    auto &devices = cluster.get_devices();
+    auto folder = cluster.get_folders().by_id(folder_id);
+    auto peer = cluster.get_devices().by_sha256(peer_id);
     auto &blocks = cluster.get_blocks();
-
-    auto folder = folders.by_id(folder_id);
-    auto peer = devices.by_sha256(peer_id);
 
     auto &folder_infos = folder->get_folder_infos();
     auto folder_info = folder_infos.by_device_id(peer_id);
