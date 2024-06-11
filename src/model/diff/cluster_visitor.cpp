@@ -17,10 +17,6 @@ auto cluster_visitor_t::operator()(const load::load_cluster_t &, void *) noexcep
     return outcome::success();
 }
 
-auto cluster_visitor_t::operator()(const peer::cluster_remove_t &, void *) noexcept -> outcome::result<void> {
-    return outcome::success();
-}
-
 auto cluster_visitor_t::operator()(const peer::cluster_update_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }

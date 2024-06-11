@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -17,6 +17,7 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     int remove_blocks = 0;
     int remove_files = 0;
     int remove_folders = 0;
+    int remove_unknown_folders = 0;
 
     my_cluster_update_visitor_t(F &&fn_) : fn{std::forward<F>(fn_)} {}
 
@@ -36,6 +37,10 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     }
     outcome::result<void> operator()(const diff::modify::remove_folder_infos_t &, void *) noexcept override {
         ++remove_folders;
+        return outcome::success();
+    }
+    outcome::result<void> operator()(const diff::modify::remove_unknown_folders_t &, void *) noexcept override {
+        ++remove_unknown_folders;
         return outcome::success();
     }
 };
@@ -298,6 +303,12 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
+    db::UnknownFolder db_u_folder;
+    db_u_folder.mutable_folder()->set_id("1111-2222");
+    db_u_folder.mutable_folder()->set_label("unknown");
+    auto u_folder = unknown_folder_t::create(cluster->next_uuid(), db_u_folder, peer_device->device_id()).value();
+    auto &unknown_folders = cluster->get_unknown_folders();
+    unknown_folders.push_front(u_folder);
 
     auto folder_info_my = folder_info_ptr_t();
     auto folder_info_peer = folder_info_ptr_t();
@@ -410,6 +421,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     CHECK(visitor.remove_blocks == 1);
     CHECK(visitor.remove_files == 1);
     CHECK(visitor.remove_folders == 1);
+    CHECK(visitor.remove_unknown_folders == 1);
 }
 
 TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
@@ -514,6 +526,73 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
 
     auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
     REQUIRE(diff_opt);
+}
+
+TEST_CASE("cluster update nothing shared", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id_1 =
+        device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto peer_id_2 =
+        device_id_t::from_string("EAMTZPW-Q4QYERN-D57DHFS-AUP2OMG-PAHOR3R-ZWLKGAA-WQC5SVW-UJ5NXQA").value();
+
+    auto peer_device = device_t::create(peer_id_1, "peer-device").value();
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+    auto &blocks_map = cluster->get_blocks();
+
+    auto bi1 = proto::BlockInfo();
+    bi1.set_size(5);
+    bi1.set_hash(utils::sha256_digest("12345").value());
+    auto b1 = block_info_t::create(bi1).assume_value();
+    blocks_map.put(b1);
+
+    db::Folder db_folder;
+    db_folder.set_id("1234-5678");
+    db_folder.set_label("my-label");
+    db_folder.set_path("/my/path");
+    auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+
+    cluster->get_folders().put(folder);
+
+    auto folder_info_my = folder_info_ptr_t();
+    auto folder_info_peer = folder_info_ptr_t();
+    {
+        db::FolderInfo db_fi;
+        db_fi.set_index_id(5ul);
+        db_fi.set_max_sequence(10l);
+        folder_info_my = folder_info_t::create(cluster->next_uuid(), db_fi, my_device, folder).value();
+        folder->get_folder_infos().put(folder_info_my);
+    }
+    {
+        db::FolderInfo db_fi;
+        db_fi.set_index_id(6ul);
+        db_fi.set_max_sequence(0l);
+        folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi, peer_device, folder).value();
+        folder->get_folder_infos().put(folder_info_peer);
+
+        proto::FileInfo pr_fi_peer;
+        pr_fi_peer.set_name("a/c.txt");
+        pr_fi_peer.set_size(5ul);
+        pr_fi_peer.set_block_size(5ul);
+        auto fi_peer = file_info_t::create(cluster->next_uuid(), pr_fi_peer, folder_info_peer).value();
+        folder_info_peer->add(fi_peer, false);
+        fi_peer->assign_block(b1, 0);
+
+        REQUIRE(folder_info_peer->get_file_infos().size() == 1);
+    }
+
+    auto cc = std::make_unique<proto::ClusterConfig>();
+    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+    REQUIRE(diff_opt);
+    auto opt = diff_opt.value()->apply(*cluster);
+    REQUIRE(opt);
+
+    CHECK(blocks_map.size() == 0);
+    CHECK(folder_info_peer->get_file_infos().size() == 0);
+    CHECK(folder->is_shared_with(*peer_device));
+    CHECK(folder->is_shared_with(*peer_device)->get_file_infos().size() == 0);
 }
 
 TEST_CASE("cluster update with remote folders", "[model]") {

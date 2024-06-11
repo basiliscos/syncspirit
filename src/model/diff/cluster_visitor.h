@@ -15,7 +15,6 @@ struct load_cluster_t;
 } // namespace load
 
 namespace peer {
-struct cluster_remove_t;
 struct cluster_update_t;
 struct peer_state_t;
 struct update_folder_t;
@@ -47,7 +46,6 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const load::devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::ignored_devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::load_cluster_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const peer::cluster_remove_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::cluster_update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::peer_state_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::update_folder_t &, void *custom) noexcept;

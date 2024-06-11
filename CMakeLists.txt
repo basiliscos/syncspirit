@@ -122,7 +122,6 @@ add_library(syncspirit_lib
     src/model/diff/modify/update_contact.cpp
     src/model/diff/modify/update_peer.cpp
     src/model/diff/peer/peer_state.cpp
-    src/model/diff/peer/cluster_remove.cpp
     src/model/diff/peer/cluster_update.cpp
     src/model/diff/peer/update_folder.cpp
     src/model/misc/block_iterator.cpp
