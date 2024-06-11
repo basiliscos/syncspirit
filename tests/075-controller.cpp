@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -15,7 +15,6 @@
 #include "utils/error_code.h"
 #include "proto/bep_support.h"
 #include <boost/core/demangle.hpp>
-#include <vector>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -956,8 +955,9 @@ void test_my_sharing() {
             REQUIRE((*peer_cluster_msg)->folders_size() == 1);
 
             // unshare folder_1
+            auto peer_fi = folder_1->get_folder_infos().by_device(*peer_device);
             peer_actor->messages.clear();
-            diff_builder_t(*cluster).unshare_folder(sha256, folder_1->get_id()).apply(*sup);
+            diff_builder_t(*cluster).unshare_folder(*peer_fi).apply(*sup);
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(peer_actor->messages.size() == 1);

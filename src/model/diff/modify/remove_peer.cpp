@@ -16,8 +16,8 @@ static auto make_unshare(const cluster_t &cluster, const device_t &peer) -> aggr
     auto &folders = cluster.get_folders();
     for (auto it : folders) {
         auto &f = it.item;
-        if (f->is_shared_with(peer)) {
-            r.emplace_back(new unshare_folder_t(cluster, peer.device_id().get_sha256(), f->get_id()));
+        if (auto fi = f->is_shared_with(peer); fi) {
+            r.emplace_back(new unshare_folder_t(cluster, *fi));
         }
     }
     return r;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -126,10 +126,8 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             file_my->assign_block(bi_2, 1);
 
             auto diff_unshare = diff::cluster_diff_ptr_t();
-            auto raw_diff = new diff::modify::unshare_folder_t(*cluster, peer_id.get_sha256(), db_folder.id());
+            auto raw_diff = new diff::modify::unshare_folder_t(*cluster, *fi_peer);
             REQUIRE(cluster->get_blocks().size() == 2);
-            REQUIRE(raw_diff->removed_files.size() == 1);
-            REQUIRE(*raw_diff->removed_files.begin() == file_peer->get_key());
             diff_unshare = raw_diff;
             REQUIRE(diff_unshare->apply(*cluster));
             REQUIRE(!folder->get_folder_infos().by_device(*peer_device));

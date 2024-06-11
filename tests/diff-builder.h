@@ -60,7 +60,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     cluster_configurer_t configure_cluster(std::string_view sha256) noexcept;
     index_maker_t make_index(std::string_view sha256, std::string_view folder_id) noexcept;
     diff_builder_t &share_folder(std::string_view sha256, std::string_view folder_id) noexcept;
-    diff_builder_t &unshare_folder(std::string_view sha256, std::string_view folder_id) noexcept;
+    diff_builder_t &unshare_folder(model::folder_info_t &fi) noexcept;
     diff_builder_t &clone_file(const model::file_info_t &source) noexcept;
     diff_builder_t &finish_file(const model::file_info_t &source) noexcept;
     diff_builder_t &finish_file_ack(const model::file_info_t &source) noexcept;

@@ -387,7 +387,7 @@ void test_unsharing_folder() {
             auto peer_file = peer_folder_info->get_file_infos().by_name("a.txt");
             REQUIRE(peer_file);
 
-            builder.unshare_folder(sha256, folder_id).apply(*sup);
+            builder.unshare_folder(*peer_folder_info).apply(*sup);
 
             sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();

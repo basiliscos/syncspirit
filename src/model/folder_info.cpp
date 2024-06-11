@@ -77,9 +77,9 @@ void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
     actualized = max_sequence == 0;
 }
 
-std::string_view folder_info_t::get_key() noexcept { return std::string_view(key, data_length); }
+std::string_view folder_info_t::get_key() const noexcept { return std::string_view(key, data_length); }
 
-std::string_view folder_info_t::get_uuid() noexcept {
+std::string_view folder_info_t::get_uuid() const noexcept {
     return std::string_view(key + 1 + device_id_t::digest_length + uuid_length, uuid_length);
 }
 

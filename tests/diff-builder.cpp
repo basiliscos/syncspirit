@@ -146,8 +146,8 @@ diff_builder_t &diff_builder_t::share_folder(std::string_view sha256, std::strin
     return *this;
 }
 
-diff_builder_t &diff_builder_t::unshare_folder(std::string_view sha256, std::string_view folder_id) noexcept {
-    diffs.emplace_back(new diff::modify::unshare_folder_t(cluster, sha256, folder_id));
+diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcept {
+    diffs.emplace_back(new diff::modify::unshare_folder_t(cluster, fi));
     return *this;
 }
 

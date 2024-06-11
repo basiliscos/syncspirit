@@ -134,7 +134,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
 
     auto diffs = aggregate_t::diffs_t();
     if (removed_files.size()) {
-        diffs.emplace_back(new modify::remove_files_t(source, std::move(removed_files)));
+        diffs.emplace_back(new modify::remove_files_t(source, removed_files));
     }
     if (removed_folders.size()) {
         diffs.emplace_back(new modify::remove_folder_infos_t(std::move(removed_folders)));
