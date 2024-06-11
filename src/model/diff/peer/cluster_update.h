@@ -35,7 +35,6 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     modified_folders_t updated_folders;
     modified_folders_t remote_folders;
     keys_t removed_files;
-    cluster_diff_ptr_t inner_diff;
 
   private:
     cluster_update_t(const model::device_t &source, unknown_folders_t unknown_folders, modified_folders_t reset_folders,

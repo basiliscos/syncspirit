@@ -47,12 +47,12 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model:
     removed_folders.emplace(folder_info.get_key());
     diffs.emplace_back(new modify::remove_folder_infos_t(std::move(removed_folders)));
 
-    inner_diff.reset(new aggregate_t(std::move(diffs)));
+    inner.reset(new aggregate_t(std::move(diffs)));
 }
 
 auto unshare_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "applyging unshare_folder_t");
-    return inner_diff->apply(cluster);
+    return inner->apply(cluster);
 }
 
 auto unshare_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

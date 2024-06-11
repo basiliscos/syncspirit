@@ -303,9 +303,8 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
         }
     }
 
-    auto &inner = diff.inner_diff;
-    if (inner) {
-        auto r = inner->visit(*this, custom);
+    if (diff.inner) {
+        auto r = diff.inner->visit(*this, custom);
         if (r.has_error()) {
             return r.assume_error();
         }
@@ -422,7 +421,7 @@ auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, v
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto r = diff.inner_diff->visit(*this, custom);
+    auto r = diff.inner->visit(*this, custom);
     if (!r) {
         return r.assume_error();
     }

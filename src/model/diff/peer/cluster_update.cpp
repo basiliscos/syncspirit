@@ -180,12 +180,12 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         }
     }
 
-    auto inner_diff = cluster_diff_ptr_t();
+    auto inner = cluster_diff_ptr_t();
     if (!diffs.empty()) {
-        inner_diff.reset(new aggregate_t(std::move(diffs)));
+        inner.reset(new aggregate_t(std::move(diffs)));
     }
 
-    ptr = new cluster_update_t(source, std::move(unknown), std::move(reset), updated, remote, std::move(inner_diff));
+    ptr = new cluster_update_t(source, std::move(unknown), std::move(reset), updated, remote, std::move(inner));
     return outcome::success(std::move(ptr));
 }
 
@@ -193,8 +193,9 @@ cluster_update_t::cluster_update_t(const model::device_t &source, unknown_folder
                                    modified_folders_t reset_folders_, modified_folders_t updated_folders_,
                                    modified_folders_t remote_folders_, cluster_diff_ptr_t inner_diff_) noexcept
     : source_peer(source), new_unknown_folders{std::move(unknown_folders)}, reset_folders{std::move(reset_folders_)},
-      updated_folders{std::move(updated_folders_)}, remote_folders{std::move(remote_folders_)},
-      inner_diff{std::move(inner_diff_)} {}
+      updated_folders{std::move(updated_folders_)}, remote_folders{std::move(remote_folders_)} {
+    inner = std::move(inner_diff_);
+}
 
 auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "applying cluster_update_t");
@@ -202,8 +203,8 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     auto &devices = cluster.get_devices();
     auto peer = cluster.get_devices().by_sha256(source_peer.device_id().get_sha256());
 
-    if (inner_diff) {
-        auto r = inner_diff->apply(cluster);
+    if (inner) {
+        auto r = inner->apply(cluster);
         if (r.has_error()) {
             return r;
         }

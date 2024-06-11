@@ -22,8 +22,8 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     my_cluster_update_visitor_t(F &&fn_) : fn{std::forward<F>(fn_)} {}
 
     outcome::result<void> operator()(const diff::peer::cluster_update_t &diff, void *custom) noexcept override {
-        if (diff.inner_diff) {
-            std::ignore = diff.inner_diff->visit(*this, custom);
+        if (diff.inner) {
+            std::ignore = diff.inner->visit(*this, custom);
         }
         return fn(diff);
     }

@@ -15,7 +15,6 @@ struct SYNCSPIRIT_API unshare_folder_t final : cluster_diff_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string peer_id;
-    cluster_diff_ptr_t inner_diff;
 };
 
 } // namespace syncspirit::model::diff::modify
