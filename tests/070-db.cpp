@@ -4,7 +4,7 @@
 #include <catch2/catch_all.hpp>
 #include "test-utils.h"
 #include "diff-builder.h"
-#include "model/diff/peer/cluster_remove.h"
+#include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/peer_state.h"
 #include "test_supervisor.h"
 #include "access.h"
@@ -313,15 +313,15 @@ void test_cluster_update_and_remove() {
                 REQUIRE(!cluster_clone->get_unknown_folders().empty());
             }
 
-            auto &uf = *cluster->get_unknown_folders().front();
-            using keys_t = diff::peer::cluster_remove_t::keys_t;
-            keys_t removed_folder_infos{std::string(peer_folder_info->get_key())};
-            keys_t removed_files{std::string(peer_file->get_key())};
-            keys_t removed_blocks{std::string(block->get_key())};
-            keys_t removed_unknown_folders{std::string(uf.get_key())};
-            auto diff = model::diff::cluster_diff_ptr_t{};
-            diff = new diff::peer::cluster_remove_t(sha256, removed_folder_infos, removed_files, removed_blocks,
-                                                    removed_unknown_folders);
+            auto pr_msg = proto::ClusterConfig();
+            auto pr_f = pr_msg.add_folders();
+            pr_f->set_id(folder_id);
+            auto pr_device = pr_f->add_devices();
+            pr_device->set_id(std::string(peer_device->device_id().get_sha256()));
+            pr_device->set_max_sequence(1);
+            pr_device->set_index_id(peer_folder_info->get_index() + 1);
+            auto diff = diff::peer::cluster_update_t::create(*cluster, *peer_device, pr_msg).value();
+
             sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
             sup->do_process();
 

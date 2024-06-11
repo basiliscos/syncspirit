@@ -28,8 +28,8 @@
 #include "model/diff/modify/remove_unknown_folders.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
-#include "model/diff/peer/cluster_remove.h"
 #include "model/diff/peer/update_folder.h"
+#include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/peer_state.h"
 #include "model/diff/cluster_visitor.h"
 #include <string_view>
@@ -278,13 +278,9 @@ void db_actor_t::on_model_update(model::message::model_update_t &message) noexce
     }
 }
 
-auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &, void *) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     if (cluster->is_tainted()) {
-        return outcome::success();
-    }
-
-    auto &unknown = cluster->get_unknown_folders();
-    if (unknown.empty()) {
         return outcome::success();
     }
 
@@ -293,15 +289,28 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &, void *)
         return txn_opt.assume_error();
     }
     auto &txn = *txn_opt.assume_value();
-    for (auto &uf : unknown) {
-        auto key = uf->get_key();
-        auto data = uf->serialize();
 
-        auto r = db::save({key, data}, txn);
-        if (!r) {
+    auto &unknown = cluster->get_unknown_folders();
+    if (!unknown.empty()) {
+        for (auto &uf : unknown) {
+            auto key = uf->get_key();
+            auto data = uf->serialize();
+
+            auto r = db::save({key, data}, txn);
+            if (!r) {
+                return r.assume_error();
+            }
+        }
+    }
+
+    auto &inner = diff.inner_diff;
+    if (inner) {
+        auto r = inner->visit(*this, custom);
+        if (r.has_error()) {
             return r.assume_error();
         }
     }
+
     return commit(true);
 }
 
@@ -384,21 +393,21 @@ auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) n
 }
 auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *) noexcept
     -> outcome::result<void> {
-    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff));
+    return (*this)(diff);
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_files_t &diff, void *) noexcept -> outcome::result<void> {
-    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff));
+    return (*this)(diff);
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_folder_infos_t &diff, void *) noexcept
     -> outcome::result<void> {
-    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff));
+    return (*this)(diff);
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_unknown_folders_t &diff, void *) noexcept
     -> outcome::result<void> {
-    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff));
+    return (*this)(diff);
 }
 
 auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, void *custom) noexcept
@@ -577,45 +586,6 @@ auto db_actor_t::operator()(const model::diff::modify::local_update_t &diff, voi
             return r.assume_error();
         }
     }
-    return commit(true);
-}
-
-auto db_actor_t::operator()(const model::diff::peer::cluster_remove_t &diff, void *) noexcept -> outcome::result<void> {
-    if (cluster->is_tainted()) {
-        return outcome::success();
-    }
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
-
-    for (auto &key : diff.removed_folder_infos) {
-        auto r = db::remove(key, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-    for (auto &key : diff.removed_files) {
-        auto r = db::remove(key, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-    for (auto &key : diff.removed_blocks) {
-        auto r = db::remove(key, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-    for (auto &key : diff.removed_unknown_folders) {
-        auto r = db::remove(key, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-
     return commit(true);
 }
 

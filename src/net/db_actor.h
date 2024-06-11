@@ -10,7 +10,6 @@
 #include "mdbx.h"
 #include "utils/log.h"
 #include "db/transaction.h"
-#include <optional>
 
 namespace syncspirit {
 namespace net {
@@ -82,7 +81,6 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> operator()(const model::diff::modify::finish_file_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::local_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::cluster_remove_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *) noexcept override;
 

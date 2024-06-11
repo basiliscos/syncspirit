@@ -54,21 +54,20 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         }
     };
 
-    auto remove_folder = [&](const model::folder_info_t& folder_info) noexcept {
+    auto remove_folder = [&](const model::folder_info_t &folder_info) noexcept {
         removed_folders.emplace(folder_info.get_key());
         auto &files = folder_info.get_file_infos();
-        for (auto it : files) {
-            removed_files.put(it.item);
-        }
-        for (auto it : files) {
-            remove_blocks(it.item);
+        for (auto &it_f : files) {
+            auto &file = it_f.item;
+            removed_files.put(file);
+            remove_blocks(file);
         }
     };
 
     for (int i = 0; i < message.folders_size(); ++i) {
         auto &f = message.folders(i);
         auto folder = folders.by_id(f.id());
-        LOG_TRACE(log, "cluster_update_t, folder = '{}'", f.label());
+        LOG_TRACE(log, "cluster_update_t, folder = '{}' ({}) ", f.label(), f.id());
         if (!folder) {
             for (int i = 0; i < f.devices_size(); ++i) {
                 auto &d = f.devices(i);
@@ -152,8 +151,8 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
 
     auto diffs = aggregate_t::diffs_t();
 
-    for (auto it_f: folders) {
-        auto& folder = it_f.item;
+    for (auto it_f : folders) {
+        auto &folder = it_f.item;
         auto folder_info = folder->get_folder_infos().by_device(source);
         if (folder_info) {
             if (!confirmed_folders.contains(folder_info->get_key())) {
@@ -176,7 +175,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         diffs.emplace_back(new modify::remove_unknown_folders_t(std::move(removed_unknown_folders)));
     }
     if (reshared_folders.size()) {
-        for (auto& it: reshared_folders) {
+        for (auto &it : reshared_folders) {
             diffs.emplace_back(new modify::share_folder_t(source.device_id().get_sha256(), it));
         }
     }
