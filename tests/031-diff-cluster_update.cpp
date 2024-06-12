@@ -18,6 +18,7 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     int remove_files = 0;
     int remove_folders = 0;
     int remove_unknown_folders = 0;
+    int add_unknown_folders = 0;
     int updated_folders = 0;
 
     my_cluster_update_visitor_t(F &&fn_) : fn{std::forward<F>(fn_)} {}
@@ -46,6 +47,10 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     }
     outcome::result<void> operator()(const diff::modify::update_folder_info_t &, void *) noexcept override {
         ++updated_folders;
+        return outcome::success();
+    }
+    outcome::result<void> operator()(const diff::modify::add_unknown_folders_t &, void *) noexcept override {
+        ++add_unknown_folders;
         return outcome::success();
     }
 };
@@ -79,17 +84,11 @@ TEST_CASE("cluster update, new folder", "[model]") {
         auto r_a = diff->apply(*cluster);
         CHECK(r_a);
 
-        std::vector<proto::Folder> unknown;
-        auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
-            unknown = diff.new_unknown_folders;
-            return outcome::success();
-        });
+        auto visitor = my_cluster_update_visitor_t([&](auto &diff) { return outcome::success(); });
         auto r_v = diff->visit(visitor, nullptr);
         REQUIRE(r_v);
-        REQUIRE(unknown.size() == 1);
-        REQUIRE(unknown[0].id() == folder.id());
-        REQUIRE(unknown[0].label() == folder.label());
         REQUIRE(!cluster->get_unknown_folders().empty());
+        REQUIRE(visitor.add_unknown_folders == 1);
         auto uf = cluster->get_unknown_folders().front();
         CHECK(uf->device_id() == peer_device->device_id());
         CHECK(uf->get_id() == "some-id");
@@ -103,7 +102,6 @@ TEST_CASE("cluster update, new folder", "[model]") {
         auto mfi = db_uf.mutable_folder_info();
         mfi->set_max_sequence(d_peer->max_sequence());
         mfi->set_index_id(d_peer->index_id());
-        unknown = {};
 
         diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
         REQUIRE(diff_opt);
@@ -111,8 +109,8 @@ TEST_CASE("cluster update, new folder", "[model]") {
         r_a = diff->apply(*cluster);
         CHECK(r_a);
         REQUIRE(!cluster->get_unknown_folders().empty());
-        (void)diff->visit(visitor, nullptr);
-        CHECK(unknown.empty());
+        std::ignore = diff->visit(visitor, nullptr);
+        REQUIRE(visitor.add_unknown_folders == 1);
 
         // max-id changed
         d_peer->set_max_sequence(15);
@@ -122,9 +120,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         r_a = diff->apply(*cluster);
         CHECK(r_a);
         (void)diff->visit(visitor, nullptr);
-        REQUIRE(unknown.size() == 1);
-        REQUIRE(unknown[0].id() == folder.id());
-        REQUIRE(unknown[0].label() == folder.label());
+        REQUIRE(visitor.add_unknown_folders == 2);
         REQUIRE(!cluster->get_unknown_folders().empty());
         uf = cluster->get_unknown_folders().front();
         CHECK(uf->device_id() == peer_device->device_id());

@@ -21,6 +21,7 @@ struct update_folder_t;
 } // namespace peer
 
 namespace modify {
+struct add_unknown_folders_t;
 struct clone_file_t;
 struct create_folder_t;
 struct file_availability_t;
@@ -51,6 +52,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const peer::peer_state_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::update_folder_t &, void *custom) noexcept;
 
+    virtual outcome::result<void> operator()(const modify::add_unknown_folders_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::clone_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::create_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::file_availability_t &, void *custom) noexcept;

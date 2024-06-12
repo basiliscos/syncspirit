@@ -6,7 +6,7 @@
 #include <memory>
 #include <set>
 #include "proto/bep_support.h"
-#include "../cluster_diff.h"
+#include "model/diff/cluster_diff.h"
 #include "model/device.h"
 #include "model/folder_info.h"
 #include "utils/string_comparator.hpp"
@@ -15,7 +15,6 @@ namespace syncspirit::model::diff::peer {
 
 struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     using message_t = proto::ClusterConfig;
-    using unknown_folders_t = std::vector<proto::Folder>;
     struct update_info_t {
         std::string folder_id;
         proto::Device device;
@@ -30,13 +29,12 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     model::device_t source_peer;
-    unknown_folders_t new_unknown_folders;
     modified_folders_t remote_folders;
     keys_t removed_files;
 
   private:
-    cluster_update_t(const model::device_t &source, unknown_folders_t unknown_folders,
-                     modified_folders_t remote_folders, cluster_diff_ptr_t inner_diff) noexcept;
+    cluster_update_t(const model::device_t &source, modified_folders_t remote_folders,
+                     cluster_diff_ptr_t inner_diff) noexcept;
 };
 
 } // namespace syncspirit::model::diff::peer

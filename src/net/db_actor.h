@@ -68,6 +68,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;
+    outcome::result<void> operator()(const model::diff::modify::add_unknown_folders_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::create_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::share_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::generic_remove_t &) noexcept;

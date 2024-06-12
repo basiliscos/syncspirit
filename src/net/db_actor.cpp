@@ -17,6 +17,7 @@
 #include "model/diff/load/ignored_folders.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/load/unknown_folders.h"
+#include "model/diff/modify/add_unknown_folders.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/finish_file_ack.h"
@@ -375,6 +376,38 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, voi
     auto r = db::save({fi_key, fi_data}, txn);
     if (!r) {
         return r.assume_error();
+    }
+
+    return commit(true);
+}
+
+auto db_actor_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto &unknown = cluster->get_unknown_folders();
+    for (auto &item : diff.container) {
+        for (auto &uf : unknown) {
+            if (uf->device_id().get_sha256() == item.peer_id) {
+                if (uf->get_id() == item.db.folder().id()) {
+                    auto key = uf->get_key();
+                    auto data = uf->serialize();
+
+                    auto r = db::save({key, data}, txn);
+                    if (!r) {
+                        return r.assume_error();
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     return commit(true);

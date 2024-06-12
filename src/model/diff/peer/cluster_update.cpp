@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "cluster_update.h"
+#include "model/diff/modify/add_unknown_folders.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_files.h"
 #include "model/diff/modify/remove_folder_infos.h"
@@ -24,7 +25,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
 
     auto update_diffs = aggregate_t::diffs_t();
     auto &known_unknowns = cluster.get_unknown_folders();
-    unknown_folders_t unknown;
+    auto new_unknown_folders = diff::modify::add_unknown_folders_t::container_t{};
     modified_folders_t remote;
     file_infos_map_t removed_files;
     keys_t removed_folders;
@@ -64,6 +65,25 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         }
     };
 
+    auto add_unknown = [&](const proto::Folder &f, const proto::Device &d) noexcept {
+        using item_t = decltype(new_unknown_folders)::value_type;
+        LOG_TRACE(log, "cluster_update_t, (add/update) unknown folder = {}", f.label());
+        db::UnknownFolder db;
+        auto fi = db.mutable_folder_info();
+        auto db_f = db.mutable_folder();
+        fi->set_index_id(d.index_id());
+        fi->set_max_sequence(d.max_sequence());
+        db_f->set_id(f.id());
+        db_f->set_label(f.label());
+        db_f->set_read_only(f.read_only());
+        db_f->set_ignore_permissions(f.ignore_permissions());
+        db_f->set_ignore_delete(f.ignore_delete());
+        db_f->set_disable_temp_indexes(f.disable_temp_indexes());
+        db_f->set_paused(f.paused());
+
+        new_unknown_folders.emplace_front(item_t{std::move(db), std::string(source.device_id().get_sha256())});
+    };
+
     for (int i = 0; i < message.folders_size(); ++i) {
         auto &f = message.folders(i);
         auto folder = folders.by_id(f.id());
@@ -79,14 +99,12 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                             bool actual = uf->get_index() == d.index_id() && uf->get_max_sequence() == d.max_sequence();
                             if (!actual) {
                                 removed_unknown_folders.emplace(std::string(uf->get_key()));
-                                unknown.emplace_back(f);
-                                LOG_TRACE(log, "cluster_update_t, unknown folder = {}", f.label());
+                                add_unknown(f, d);
                             }
                         }
                         goto NEXT_FOLDER;
                     }
-                    unknown.emplace_back(f);
-                    LOG_TRACE(log, "cluster_update_t, unknown folder = {}", f.label());
+                    add_unknown(f, d);
                     goto NEXT_FOLDER;
                 }
             }
@@ -191,6 +209,10 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
             diffs.emplace_back(new modify::share_folder_t(source.device_id().get_sha256(), it));
         }
     }
+    if (!new_unknown_folders.empty()) {
+        auto diff = cluster_diff_ptr_t(new modify::add_unknown_folders_t(std::move(new_unknown_folders)));
+        update_diffs.emplace_back(std::move(diff));
+    }
     std::move(update_diffs.begin(), update_diffs.end(), std::back_insert_iterator(diffs));
 
     auto inner = cluster_diff_ptr_t();
@@ -198,13 +220,13 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         inner.reset(new aggregate_t(std::move(diffs)));
     }
 
-    ptr = new cluster_update_t(source, std::move(unknown), remote, std::move(inner));
+    ptr = new cluster_update_t(source, remote, std::move(inner));
     return outcome::success(std::move(ptr));
 }
 
-cluster_update_t::cluster_update_t(const model::device_t &source, unknown_folders_t unknown_folders,
-                                   modified_folders_t remote_folders_, cluster_diff_ptr_t inner_diff_) noexcept
-    : source_peer(source), new_unknown_folders{std::move(unknown_folders)}, remote_folders{std::move(remote_folders_)} {
+cluster_update_t::cluster_update_t(const model::device_t &source, modified_folders_t remote_folders_,
+                                   cluster_diff_ptr_t inner_diff_) noexcept
+    : source_peer(source), remote_folders{std::move(remote_folders_)} {
     inner = std::move(inner_diff_);
 }
 
@@ -219,33 +241,6 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
         if (r.has_error()) {
             return r;
         }
-    }
-
-    auto &unknown = cluster.get_unknown_folders();
-    for (auto &folder : new_unknown_folders) {
-        db::UnknownFolder db;
-        auto fi = db.mutable_folder_info();
-        for (int i = 0; i < folder.devices_size(); ++i) {
-            auto &d = folder.devices(i);
-            if (d.id() == source_peer.device_id().get_sha256()) {
-                fi->set_index_id(d.index_id());
-                fi->set_max_sequence(d.max_sequence());
-                break;
-            }
-        }
-        auto f = db.mutable_folder();
-        f->set_id(folder.id());
-        f->set_label(folder.label());
-        f->set_read_only(folder.read_only());
-        f->set_ignore_permissions(folder.ignore_permissions());
-        f->set_ignore_delete(folder.ignore_delete());
-        f->set_disable_temp_indexes(folder.disable_temp_indexes());
-        f->set_paused(folder.paused());
-        auto opt = unknown_folder_t::create(cluster.next_uuid(), db, source_peer.device_id());
-        if (!opt) {
-            return opt.assume_error();
-        }
-        unknown.emplace_front(std::move(opt.value()));
     }
 
     auto &peer_remote_folders = peer->get_remote_folder_infos();
