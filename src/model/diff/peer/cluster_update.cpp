@@ -127,24 +127,23 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                 continue;
             }
 
-            auto update_info = update_info_t{f.id(), d};
+            db::FolderInfo db;
+            db.set_index_id(d.index_id());
+            db.set_max_sequence(d.max_sequence());
+            bool do_update = false;
             if (d.index_id() != folder_info->get_index()) {
-                db::FolderInfo db;
-                db.set_index_id(d.index_id());
-                db.set_max_sequence(d.max_sequence());
-                auto diff = cluster_diff_ptr_t(new modify::update_folder_info_t(std::move(db), source, *folder));
-                update_diffs.emplace_back(std::move(diff));
-                remove_folder(*folder_info);
                 LOG_TRACE(log, "cluster_update_t, reseting folder: {}, new index = {:#x}, max_seq = {}", f.label(),
                           d.index_id(), d.max_sequence());
+                remove_folder(*folder_info);
+                do_update = true;
 
             } else if (d.max_sequence() > folder_info->get_max_sequence()) {
                 LOG_TRACE(log, "cluster_update_t, updating folder = {}, index = {:#x}, max seq = {} -> {}",
                           folder->get_label(), folder_info->get_index(), folder_info->get_max_sequence(),
                           d.max_sequence());
-                db::FolderInfo db;
-                db.set_index_id(d.index_id());
-                db.set_max_sequence(d.max_sequence());
+                do_update = true;
+            }
+            if (do_update) {
                 auto diff = cluster_diff_ptr_t(new modify::update_folder_info_t(std::move(db), source, *folder));
                 update_diffs.emplace_back(std::move(diff));
             }
