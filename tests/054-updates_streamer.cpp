@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/misc/updates_streamer.h"
@@ -37,11 +37,7 @@ TEST_CASE("updates_streamer", "[model]") {
     REQUIRE(diff->apply(*cluster));
 
     auto add_remote = [&](std::uint64_t index, std::int64_t sequence) {
-        auto pr_device = proto::Device();
-        pr_device.set_id(std::string(my_id.get_sha256()));
-        pr_device.set_index_id(index);
-        pr_device.set_max_sequence(sequence);
-        auto remote_folder = remote_folder_info_t::create(pr_device, peer_device, folder).value();
+        auto remote_folder = remote_folder_info_t::create(index, sequence, peer_device, folder).value();
         peer_device->get_remote_folder_infos().put(remote_folder);
     };
 

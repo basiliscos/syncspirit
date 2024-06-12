@@ -255,7 +255,8 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
         assert(folder);
         auto device = devices.by_sha256(info.device.id());
         assert(device);
-        auto opt = remote_folder_info_t::create(info.device, device, folder);
+        auto& d = info.device;
+        auto opt = remote_folder_info_t::create(d.index_id(), d.max_sequence(), device, folder);
         if (!opt) {
             return opt.assume_error();
         }
