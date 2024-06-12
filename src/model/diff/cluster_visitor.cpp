@@ -45,6 +45,10 @@ auto cluster_visitor_t::operator()(const modify::unshare_folder_t &, void *) noe
     return outcome::success();
 }
 
+auto cluster_visitor_t::operator()(const modify::update_folder_info_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
 auto cluster_visitor_t::operator()(const modify::update_peer_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }

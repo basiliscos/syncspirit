@@ -18,6 +18,7 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     int remove_files = 0;
     int remove_folders = 0;
     int remove_unknown_folders = 0;
+    int updated_folders = 0;
 
     my_cluster_update_visitor_t(F &&fn_) : fn{std::forward<F>(fn_)} {}
 
@@ -41,6 +42,10 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     }
     outcome::result<void> operator()(const diff::modify::remove_unknown_folders_t &, void *) noexcept override {
         ++remove_unknown_folders;
+        return outcome::success();
+    }
+    outcome::result<void> operator()(const diff::modify::update_folder_info_t &, void *) noexcept override {
+        ++updated_folders;
         return outcome::success();
     }
 };
@@ -185,13 +190,13 @@ TEST_CASE("cluster update, new folder", "[model]") {
             bool visited = false;
             auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
                 visited = true;
-                CHECK(diff.reset_folders.size() == 0);
                 CHECK(diff.updated_folders.size() == 0);
                 return outcome::success();
             });
             auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
+            REQUIRE(visitor.updated_folders == 0);
         }
 
         SECTION("max sequence increased") {
@@ -209,7 +214,6 @@ TEST_CASE("cluster update, new folder", "[model]") {
             bool visited = false;
             auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
                 visited = true;
-                CHECK(diff.reset_folders.size() == 0);
                 REQUIRE(diff.updated_folders.size() == 1);
                 auto &info = diff.updated_folders[0];
                 CHECK(info.folder_id == folder->get_id());
@@ -219,6 +223,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
+            REQUIRE(visitor.updated_folders == 0);
         }
     }
 
@@ -275,13 +280,13 @@ TEST_CASE("cluster update, new folder", "[model]") {
             bool visited = false;
             auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
                 visited = true;
-                CHECK(diff.reset_folders.size() == 1);
                 CHECK(diff.updated_folders.size() == 0);
                 return outcome::success();
             });
             auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
+            REQUIRE(visitor.updated_folders == 1);
         }
     }
 }
@@ -409,10 +414,6 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     bool visited = false;
     auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
         visited = true;
-        REQUIRE(diff.reset_folders.size() == 1);
-        REQUIRE(diff.reset_folders[0].folder_id == folder->get_id());
-        REQUIRE(diff.reset_folders[0].device.id() == peer_id.get_sha256());
-        CHECK(diff.updated_folders.size() == 0);
         return outcome::success();
     });
     auto r_v = diff->visit(visitor, nullptr);
@@ -422,6 +423,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     CHECK(visitor.remove_files == 1);
     CHECK(visitor.remove_folders == 1);
     CHECK(visitor.remove_unknown_folders == 1);
+    CHECK(visitor.updated_folders == 1);
 }
 
 TEST_CASE("cluster update for a folder, which was not shared", "[model]") {

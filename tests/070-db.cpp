@@ -335,8 +335,9 @@ void test_cluster_update_and_remove() {
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
                 REQUIRE(cluster_clone->get_blocks().size() == 0);
                 auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
-                REQUIRE(fis.size() == 1);
-                REQUIRE(!fis.by_device(*peer_device));
+                REQUIRE(fis.size() == 2);
+                auto folder_info = fis.by_device(*peer_device);
+                REQUIRE(folder_info);
                 REQUIRE(fis.by_device(*cluster->get_device()));
                 REQUIRE(cluster_clone->get_unknown_folders().empty());
             }

@@ -120,6 +120,7 @@ add_library(syncspirit_lib
     src/model/diff/modify/share_folder.cpp
     src/model/diff/modify/unshare_folder.cpp
     src/model/diff/modify/update_contact.cpp
+    src/model/diff/modify/update_folder_info.cpp
     src/model/diff/modify/update_peer.cpp
     src/model/diff/peer/peer_state.cpp
     src/model/diff/peer/cluster_update.cpp
