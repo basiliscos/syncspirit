@@ -179,7 +179,9 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         if (confirmed_unknown_folders.contains(uf->get_key())) {
             continue;
         }
-        removed_unknown_folders.emplace(std::string(uf->get_key()));
+        if (uf->device_id() == source.device_id()) {
+            removed_unknown_folders.emplace(std::string(uf->get_key()));
+        }
     }
 
     auto diffs = aggregate_t::diffs_t();
