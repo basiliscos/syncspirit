@@ -13,10 +13,13 @@
 #include "model/diff/aggregate.h"
 #include "model/diff/cluster_visitor.h"
 #include "utils/format.hpp"
+#include "utils/string_comparator.hpp"
 #include <spdlog/fmt/bin_to_hex.h>
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit::model::diff::peer;
+
+using keys_t = std::set<std::string, syncspirit::utils::string_comparator_t>;
 
 auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, const message_t &message) noexcept
     -> outcome::result<cluster_diff_ptr_t> {
@@ -226,7 +229,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
 
 cluster_update_t::cluster_update_t(const model::device_t &source, modified_folders_t remote_folders_,
                                    cluster_diff_ptr_t inner_diff_) noexcept
-    : source_peer(source), remote_folders{std::move(remote_folders_)} {
+    : peer_id(source.device_id().get_sha256()), remote_folders{std::move(remote_folders_)} {
     inner = std::move(inner_diff_);
 }
 
@@ -234,7 +237,7 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     LOG_TRACE(log, "applying cluster_update_t");
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
-    auto peer = cluster.get_devices().by_sha256(source_peer.device_id().get_sha256());
+    auto peer = cluster.get_devices().by_sha256(peer_id);
 
     if (inner) {
         auto r = inner->apply(cluster);
