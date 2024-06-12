@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+
 #include "relay_connect_request.h"
 #include "../contact_visitor.h"
 

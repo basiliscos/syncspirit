@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+
 #include "update_folder_info.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"

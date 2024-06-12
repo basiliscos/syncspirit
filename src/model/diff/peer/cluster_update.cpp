@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "cluster_update.h"
-#include "../modify/remove_blocks.h"
-#include "../modify/remove_files.h"
-#include "../modify/remove_folder_infos.h"
-#include "../modify/remove_unknown_folders.h"
-#include "../modify/share_folder.h"
-#include "../modify/update_folder_info.h"
+#include "model/diff/modify/remove_blocks.h"
+#include "model/diff/modify/remove_files.h"
+#include "model/diff/modify/remove_folder_infos.h"
+#include "model/diff/modify/remove_unknown_folders.h"
+#include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/update_folder_info.h"
 #include "model/cluster.h"
 #include "model/diff/aggregate.h"
 #include "model/diff/cluster_visitor.h"
