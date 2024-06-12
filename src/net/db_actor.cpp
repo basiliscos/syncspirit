@@ -27,6 +27,7 @@
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/remove_unknown_folders.h"
 #include "model/diff/modify/unshare_folder.h"
+#include "model/diff/modify/update_folder_info.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/diff/peer/cluster_update.h"
@@ -57,7 +58,7 @@ static void _my_log(MDBX_log_level_t loglevel, const char *function,int line, co
 
 db_actor_t::db_actor_t(config_t &config)
     : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, db_config{config.db_config},
-      cluster{config.cluster} {
+      cluster{config.cluster}, txn_counter{0} {
     // mdbx_module_handler({}, {}, {});
     // mdbx_setup_debug(MDBX_LOG_TRACE, MDBX_DBG_ASSERT, &_my_log);
     auto r = mdbx_env_create(&env);
@@ -158,22 +159,26 @@ auto db_actor_t::get_txn() noexcept -> outcome::result<db::transaction_t *> {
         txn_holder.reset(new db::transaction_t(std::move(txn.assume_value())));
         uncommitted = 0;
     }
+    ++txn_counter;
     return txn_holder.get();
 }
 
 auto db_actor_t::commit(bool force) noexcept -> outcome::result<void> {
     assert(txn_holder);
-    if (force) {
-        LOG_INFO(log, "committing tx");
-        auto r = txn_holder->commit();
-        txn_holder.reset();
-        return r;
-    }
-    if (++uncommitted >= db_config.uncommitted_threshold) {
-        LOG_INFO(log, "committing tx");
-        auto r = txn_holder->commit();
-        txn_holder.reset();
-        return r;
+    --txn_counter;
+    if (txn_counter == 0) {
+        if (force) {
+            LOG_INFO(log, "committing tx");
+            auto r = txn_holder->commit();
+            txn_holder.reset();
+            return r;
+        }
+        if (++uncommitted >= db_config.uncommitted_threshold) {
+            LOG_INFO(log, "committing tx");
+            auto r = txn_holder->commit();
+            txn_holder.reset();
+            return r;
+        }
     }
     return outcome::success();
 }
@@ -380,15 +385,20 @@ auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) n
         return outcome::success();
     }
 
-    assert(txn_holder);
-    auto &txn = *txn_holder;
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
     for (auto &key : diff.keys) {
         auto r = db::remove(key, txn);
         if (!r) {
             return r.assume_error();
         }
     }
-    return outcome::success();
+
+    return commit(false);
 }
 auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *) noexcept
     -> outcome::result<void> {
@@ -448,6 +458,33 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void
     auto &txn = *txn_opt.assume_value();
 
     auto r = db::save({key, data}, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
+auto db_actor_t::operator()(const model::diff::modify::update_folder_info_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto device = cluster->get_devices().by_sha256(diff.device_id);
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_info = folder->get_folder_infos().by_device(*device);
+    assert(folder_info);
+
+    auto fi_key = folder_info->get_key();
+    auto fi_data = folder_info->serialize();
+    auto r = db::save({fi_key, fi_data}, txn);
     if (!r) {
         return r.assume_error();
     }
