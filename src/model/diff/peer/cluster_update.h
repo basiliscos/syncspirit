@@ -31,14 +31,12 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
 
     model::device_t source_peer;
     unknown_folders_t new_unknown_folders;
-    modified_folders_t updated_folders;
     modified_folders_t remote_folders;
     keys_t removed_files;
 
   private:
     cluster_update_t(const model::device_t &source, unknown_folders_t unknown_folders,
-                     modified_folders_t updated_folders, modified_folders_t remote_folders,
-                     cluster_diff_ptr_t inner_diff) noexcept;
+                     modified_folders_t remote_folders, cluster_diff_ptr_t inner_diff) noexcept;
 };
 
 } // namespace syncspirit::model::diff::peer

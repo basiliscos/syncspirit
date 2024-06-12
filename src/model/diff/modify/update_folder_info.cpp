@@ -15,17 +15,24 @@ auto update_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outc
         return make_error_code(error_code_t::no_such_device);
     }
     auto folder = cluster.get_folders().by_id(folder_id);
+    auto &folder_infos = folder->get_folder_infos();
+    auto fi = folder_infos.by_device(*device);
+    if (fi) {
+        fi->set_max_sequence(item.max_sequence());
+        LOG_TRACE(log, "applyging update_folder_info_t (update), device {}, folder = {}", device->device_id(),
+                  folder->get_label());
+    } else {
+        auto fi_opt = folder_info_t::create(cluster.next_uuid(), item, device, folder);
+        if (!fi_opt) {
+            return fi_opt.assume_error();
+        }
 
-    auto fi_opt = folder_info_t::create(cluster.next_uuid(), item, device, folder);
-    if (!fi_opt) {
-        return fi_opt.assume_error();
+        auto &fi = fi_opt.value();
+        folder->add(fi);
+
+        LOG_TRACE(log, "applyging update_folder_info_t (new/reset), device {}, folder = {}", device->device_id(),
+                  folder->get_label());
     }
-
-    auto &fi = fi_opt.value();
-    folder->add(fi);
-
-    LOG_TRACE(log, "applyging update_folder_info_t, device {}", device->device_id(), folder->get_label());
-
     return outcome::success();
 }
 

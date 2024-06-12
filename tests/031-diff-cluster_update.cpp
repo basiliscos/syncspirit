@@ -156,10 +156,8 @@ TEST_CASE("cluster update, new folder", "[model]") {
             db_fi.set_index_id(6ul);
             db_fi.set_max_sequence(10l);
             folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi, peer_device, folder).value();
-            folder->get_folder_infos().put(folder_info_my);
+            folder->get_folder_infos().put(folder_info_peer);
         }
-        folder->get_folder_infos().put(folder_info_my);
-        folder->get_folder_infos().put(folder_info_peer);
 
         auto cc = std::make_unique<proto::ClusterConfig>();
         auto p_folder = cc->add_folders();
@@ -190,7 +188,6 @@ TEST_CASE("cluster update, new folder", "[model]") {
             bool visited = false;
             auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
                 visited = true;
-                CHECK(diff.updated_folders.size() == 0);
                 return outcome::success();
             });
             auto r_v = diff->visit(visitor, nullptr);
@@ -200,7 +197,8 @@ TEST_CASE("cluster update, new folder", "[model]") {
         }
 
         SECTION("max sequence increased") {
-            p_peer->set_max_sequence(folder_info_peer->get_max_sequence() + 1);
+            auto max_seq = folder_info_peer->get_max_sequence() + 1;
+            p_peer->set_max_sequence(max_seq);
             p_peer->set_index_id(folder_info_peer->get_index());
 
             auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
@@ -214,16 +212,13 @@ TEST_CASE("cluster update, new folder", "[model]") {
             bool visited = false;
             auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
                 visited = true;
-                REQUIRE(diff.updated_folders.size() == 1);
-                auto &info = diff.updated_folders[0];
-                CHECK(info.folder_id == folder->get_id());
-                CHECK(info.device.id() == peer_device->device_id().get_sha256());
                 return outcome::success();
             });
             auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
-            REQUIRE(visitor.updated_folders == 0);
+            REQUIRE(visitor.updated_folders == 1);
+            REQUIRE(folder_info_peer->get_max_sequence() == max_seq);
         }
     }
 
@@ -250,10 +245,8 @@ TEST_CASE("cluster update, new folder", "[model]") {
             db_fi.set_index_id(6ul);
             db_fi.set_max_sequence(10l);
             folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi, peer_device, folder).value();
-            folder->get_folder_infos().put(folder_info_my);
+            folder->get_folder_infos().put(folder_info_peer);
         }
-        folder->get_folder_infos().put(folder_info_my);
-        folder->get_folder_infos().put(folder_info_peer);
 
         auto cc = std::make_unique<proto::ClusterConfig>();
         auto p_folder = cc->add_folders();
@@ -280,7 +273,6 @@ TEST_CASE("cluster update, new folder", "[model]") {
             bool visited = false;
             auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
                 visited = true;
-                CHECK(diff.updated_folders.size() == 0);
                 return outcome::success();
             });
             auto r_v = diff->visit(visitor, nullptr);
@@ -676,3 +668,10 @@ TEST_CASE("cluster update with remote folders", "[model]") {
         CHECK(fi);
     }
 }
+
+int _init() {
+    utils::set_default("trace");
+    return 1;
+}
+
+static int v = _init();
