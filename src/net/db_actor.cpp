@@ -309,11 +309,9 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
         }
     }
 
-    if (diff.inner) {
-        auto r = diff.inner->visit(*this, custom);
-        if (r.has_error()) {
-            return r.assume_error();
-        }
+    auto r = diff.model::diff::aggregate_t::visit(*this, custom);
+    if (r.has_error()) {
+        return r.assume_error();
     }
 
     return commit(true);

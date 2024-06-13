@@ -24,7 +24,6 @@ using keys_t = std::set<std::string, syncspirit::utils::string_comparator_t>;
 
 auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, const message_t &message) noexcept
     -> outcome::result<cluster_diff_ptr_t> {
-    auto ptr = cluster_diff_ptr_t();
     auto log = get_log();
 
     auto update_diffs = aggregate_t::diffs_t();
@@ -224,19 +223,13 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     }
     std::move(update_diffs.begin(), update_diffs.end(), std::back_insert_iterator(diffs));
 
-    auto inner = cluster_diff_ptr_t();
-    if (!diffs.empty()) {
-        inner.reset(new aggregate_t(std::move(diffs)));
-    }
-
-    ptr = new cluster_update_t(source, std::move(inner));
+    auto ptr = cluster_diff_ptr_t();
+    ptr = new cluster_update_t(source, std::move(diffs));
     return outcome::success(std::move(ptr));
 }
 
-cluster_update_t::cluster_update_t(const model::device_t &source, cluster_diff_ptr_t inner_diff_) noexcept
-    : peer_id(source.device_id().get_sha256()) {
-    inner = std::move(inner_diff_);
-}
+cluster_update_t::cluster_update_t(const model::device_t &source, aggregate_t::diffs_t diffs_) noexcept
+    : aggregate_t{std::move(diffs_)}, peer_id(source.device_id().get_sha256()) {}
 
 auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "applying cluster_update_t");
@@ -244,11 +237,9 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     auto peer = cluster.get_devices().by_sha256(peer_id);
     peer->get_remote_folder_infos().clear();
 
-    if (inner) {
-        auto r = inner->apply(cluster);
-        if (r.has_error()) {
-            return r;
-        }
+    auto r = aggregate_t::apply_impl(cluster);
+    if (r.has_error()) {
+        return r;
     }
 
     return outcome::success();
