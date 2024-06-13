@@ -462,8 +462,8 @@ auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, v
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto r = diff.inner->visit(*this, custom);
-    if (!r) {
+    auto r = diff.model::diff::aggregate_t::visit(*this, custom);
+    if (r.has_error()) {
         return r.assume_error();
     }
 

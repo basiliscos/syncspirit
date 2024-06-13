@@ -11,7 +11,9 @@
 
 using namespace syncspirit::model::diff::modify;
 
-unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model::folder_info_t &folder_info) noexcept {
+unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model::folder_info_t &folder_info) noexcept
+    : aggregate_t() {
+
     auto &peer = *folder_info.get_device();
     peer_id = peer.device_id().get_sha256();
     auto &blocks = cluster.get_blocks();
@@ -36,7 +38,6 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model:
         }
     }
 
-    auto diffs = aggregate_t::diffs_t();
     if (removed_files.size()) {
         diffs.emplace_back(new modify::remove_files_t(peer, removed_files));
     }
@@ -46,13 +47,11 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model:
     auto removed_folders = remove_folder_infos_t::unique_keys_t();
     removed_folders.emplace(folder_info.get_key());
     diffs.emplace_back(new modify::remove_folder_infos_t(std::move(removed_folders)));
-
-    inner.reset(new aggregate_t(std::move(diffs)));
 }
 
 auto unshare_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "applyging unshare_folder_t");
-    return inner->apply(cluster);
+    return aggregate_t::apply_impl(cluster);
 }
 
 auto unshare_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
