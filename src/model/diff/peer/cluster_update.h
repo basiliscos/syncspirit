@@ -14,11 +14,6 @@ namespace syncspirit::model::diff::peer {
 
 struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     using message_t = proto::ClusterConfig;
-    struct update_info_t {
-        std::string folder_id;
-        proto::Device device;
-    };
-    using modified_folders_t = std::vector<update_info_t>;
 
     static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, const model::device_t &source,
                                                       const message_t &message) noexcept;
@@ -27,11 +22,8 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string peer_id;
-    modified_folders_t remote_folders;
-
   private:
-    cluster_update_t(const model::device_t &source, modified_folders_t remote_folders,
-                     cluster_diff_ptr_t inner_diff) noexcept;
+    cluster_update_t(const model::device_t &source, cluster_diff_ptr_t inner_diff) noexcept;
 };
 
 } // namespace syncspirit::model::diff::peer

@@ -37,7 +37,7 @@ TEST_CASE("updates_streamer", "[model]") {
     REQUIRE(diff->apply(*cluster));
 
     auto add_remote = [&](std::uint64_t index, std::int64_t sequence) {
-        auto remote_folder = remote_folder_info_t::create(index, sequence, peer_device, folder).value();
+        auto remote_folder = remote_folder_info_t::create(index, sequence, *peer_device, *folder).value();
         peer_device->get_remote_folder_infos().put(remote_folder);
     };
 

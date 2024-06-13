@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "cluster_update.h"
+#include "model/diff/modify/add_remote_folder_infos.h"
 #include "model/diff/modify/add_unknown_folders.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_files.h"
@@ -29,7 +30,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     auto update_diffs = aggregate_t::diffs_t();
     auto &known_unknowns = cluster.get_unknown_folders();
     auto new_unknown_folders = diff::modify::add_unknown_folders_t::container_t{};
-    modified_folders_t remote;
+    auto remote_folders = diff::modify::add_remote_folder_infos_t::container_t{};
     file_infos_map_t removed_files;
     keys_t removed_folders;
     keys_t removed_unknown_folders;
@@ -134,8 +135,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                 continue;
             }
             if (*device != source) {
-                auto info = update_info_t{f.id(), d};
-                remote.emplace_back(std::move(info));
+                remote_folders.emplace_front(f.id(), d.index_id(), d.max_sequence());
                 LOG_TRACE(log, "cluster_update_t, remote folder = {}", f.label());
                 continue;
             }
@@ -218,6 +218,10 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         auto diff = cluster_diff_ptr_t(new modify::add_unknown_folders_t(std::move(new_unknown_folders)));
         update_diffs.emplace_back(std::move(diff));
     }
+    if (!remote_folders.empty()) {
+        auto diff = cluster_diff_ptr_t(new modify::add_remote_folder_infos_t(source, std::move(remote_folders)));
+        update_diffs.emplace_back(std::move(diff));
+    }
     std::move(update_diffs.begin(), update_diffs.end(), std::back_insert_iterator(diffs));
 
     auto inner = cluster_diff_ptr_t();
@@ -225,42 +229,26 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         inner.reset(new aggregate_t(std::move(diffs)));
     }
 
-    ptr = new cluster_update_t(source, remote, std::move(inner));
+    ptr = new cluster_update_t(source, std::move(inner));
     return outcome::success(std::move(ptr));
 }
 
-cluster_update_t::cluster_update_t(const model::device_t &source, modified_folders_t remote_folders_,
-                                   cluster_diff_ptr_t inner_diff_) noexcept
-    : peer_id(source.device_id().get_sha256()), remote_folders{std::move(remote_folders_)} {
+cluster_update_t::cluster_update_t(const model::device_t &source, cluster_diff_ptr_t inner_diff_) noexcept
+    : peer_id(source.device_id().get_sha256()) {
     inner = std::move(inner_diff_);
 }
 
 auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "applying cluster_update_t");
     auto &folders = cluster.get_folders();
-    auto &devices = cluster.get_devices();
     auto peer = cluster.get_devices().by_sha256(peer_id);
+    peer->get_remote_folder_infos().clear();
 
     if (inner) {
         auto r = inner->apply(cluster);
         if (r.has_error()) {
             return r;
         }
-    }
-
-    auto &peer_remote_folders = peer->get_remote_folder_infos();
-    peer_remote_folders.clear();
-    for (auto &info : remote_folders) {
-        auto folder = folders.by_id(info.folder_id);
-        assert(folder);
-        auto device = devices.by_sha256(info.device.id());
-        assert(device);
-        auto& d = info.device;
-        auto opt = remote_folder_info_t::create(d.index_id(), d.max_sequence(), device, folder);
-        if (!opt) {
-            return opt.assume_error();
-        }
-        peer_remote_folders.put(opt.assume_value());
     }
 
     return outcome::success();

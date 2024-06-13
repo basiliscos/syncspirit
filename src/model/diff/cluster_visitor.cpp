@@ -37,6 +37,11 @@ auto cluster_visitor_t::operator()(const modify::clone_file_t &, void *) noexcep
     return outcome::success();
 }
 
+auto cluster_visitor_t::operator()(const modify::add_remote_folder_infos_t &, void *) noexcept
+    -> outcome::result<void> {
+    return outcome::success();
+}
+
 auto cluster_visitor_t::operator()(const modify::add_unknown_folders_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
