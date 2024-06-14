@@ -3,6 +3,7 @@
 
 #include "remove_peer.h"
 #include "unshare_folder.h"
+#include "remove_blocks.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
@@ -11,20 +12,31 @@ using namespace syncspirit::model;
 using namespace syncspirit::model::diff;
 using namespace syncspirit::model::diff::modify;
 
-static auto make_unshare(const cluster_t &cluster, const device_t &peer) -> aggregate_t::diffs_t {
+using blocks_t = remove_blocks_t::unique_keys_t;
+
+static auto make_unshare(const cluster_t &cluster, const device_t &peer, blocks_t &removed_blocks)
+    -> aggregate_t::diffs_t {
     aggregate_t::diffs_t r;
     auto &folders = cluster.get_folders();
     for (auto it : folders) {
         auto &f = it.item;
         if (auto fi = f->is_shared_with(peer); fi) {
-            r.emplace_back(new unshare_folder_t(cluster, *fi));
+            r.emplace_back(new unshare_folder_t(cluster, *fi, &removed_blocks));
         }
     }
     return r;
 }
 
 remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept
-    : aggregate_t(make_unshare(cluster, peer)), peer_id{peer.device_id().get_sha256()} {}
+    : aggregate_t(), peer_id{peer.device_id().get_sha256()} {
+
+    auto removed_blocks = blocks_t{};
+
+    diffs = make_unshare(cluster, peer, removed_blocks);
+    if (removed_blocks.size()) {
+        diffs.emplace_back(cluster_diff_ptr_t(new remove_blocks_t(std::move(removed_blocks))));
+    }
+}
 
 auto remove_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto peer = cluster.get_devices().by_sha256(peer_id);

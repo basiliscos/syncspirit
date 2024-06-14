@@ -4,14 +4,14 @@
 #include "unshare_folder.h"
 #include "remove_files.h"
 #include "remove_folder_infos.h"
-#include "remove_blocks.h"
 #include "model/diff/aggregate.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
 
 using namespace syncspirit::model::diff::modify;
 
-unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model::folder_info_t &folder_info) noexcept
+unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model::folder_info_t &folder_info,
+                                   blocks_t *blocks_for_removal) noexcept
     : aggregate_t() {
 
     auto &peer = *folder_info.get_device();
@@ -20,7 +20,8 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model:
 
     auto &file_infos = folder_info.get_file_infos();
     auto removed_files = file_infos_map_t();
-    auto removed_blocks = remove_blocks_t::unique_keys_t();
+    auto local_removed_blocks = remove_blocks_t::unique_keys_t();
+    auto &removed_blocks = blocks_for_removal ? *blocks_for_removal : local_removed_blocks;
     for (auto &fi : file_infos) {
         removed_files.put(fi.item);
         auto &file_info = *fi.item;
@@ -41,8 +42,8 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model:
     if (removed_files.size()) {
         diffs.emplace_back(new modify::remove_files_t(peer, removed_files));
     }
-    if (removed_blocks.size()) {
-        diffs.emplace_back(cluster_diff_ptr_t(new remove_blocks_t(std::move(removed_blocks))));
+    if (local_removed_blocks.size()) {
+        diffs.emplace_back(cluster_diff_ptr_t(new remove_blocks_t(std::move(local_removed_blocks))));
     }
     auto removed_folders = remove_folder_infos_t::unique_keys_t();
     removed_folders.emplace(folder_info.get_key());
