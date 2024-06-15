@@ -14,7 +14,7 @@ struct SYNCSPIRIT_API remove_peer_t final : aggregate_t {
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
-    std::string peer_id;
+    std::string peer_key;
 };
 
 } // namespace syncspirit::model::diff::modify

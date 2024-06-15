@@ -633,6 +633,71 @@ void test_peer_going_offline() {
     F().run();
 };
 
+void test_remove_peer() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto folder_id = "1234-5678";
+            auto unknown_folder_id = "5678-999";
+
+            auto file = proto::FileInfo();
+            file.set_name("a.txt");
+            file.set_size(5ul);
+            file.set_block_size(5ul);
+            file.set_sequence(6ul);
+            auto b = file.add_blocks();
+            b->set_size(5ul);
+            b->set_hash(utils::sha256_digest("12345").value());
+
+            auto builder = diff_builder_t(*cluster);
+            builder.update_peer(sha256)
+                .apply(*sup)
+                .create_folder(folder_id, "/my/path")
+                .configure_cluster(sha256)
+                .add(sha256, folder_id, 5, file.sequence())
+                .add(sha256, unknown_folder_id, 5, 5)
+                .finish()
+                .share_folder(sha256, folder_id)
+                .apply(*sup)
+                .make_index(sha256, folder_id)
+                .add(file)
+                .finish()
+                .apply(*sup);
+
+            REQUIRE(!cluster->get_unknown_folders().empty());
+
+            REQUIRE(cluster->get_blocks().size() == 1);
+            auto block = cluster->get_blocks().get(b->hash());
+            REQUIRE(block);
+
+            auto folder = cluster->get_folders().by_id(folder_id);
+            auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
+
+            REQUIRE(peer_folder_info);
+            CHECK(peer_folder_info->get_max_sequence() == 6ul);
+            REQUIRE(peer_folder_info->get_file_infos().size() == 1);
+            auto peer_file = peer_folder_info->get_file_infos().by_name("a.txt");
+            REQUIRE(peer_file);
+
+            builder.remove_peer(*peer_device).apply(*sup);
+
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            REQUIRE(!reply->payload.ee);
+
+            auto cluster_clone = make_cluster();
+            {
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                CHECK(cluster_clone->get_unknown_folders().empty());
+                CHECK(cluster_clone->get_devices().size() == 1);
+                REQUIRE(cluster_clone->get_blocks().size() == 0);
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
     REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
@@ -643,6 +708,7 @@ int _init() {
     REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
     REGISTER_TEST_CASE(test_local_update, "test_local_update", "[db]");
     REGISTER_TEST_CASE(test_peer_going_offline, "test_peer_going_offline", "[db]");
+    REGISTER_TEST_CASE(test_remove_peer, "test_remove_peer", "[db]");
     return 1;
 }
 

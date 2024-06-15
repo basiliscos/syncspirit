@@ -29,7 +29,7 @@ static auto make_unshare(const cluster_t &cluster, const device_t &peer, blocks_
 }
 
 remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept
-    : aggregate_t(), peer_id{peer.device_id().get_sha256()} {
+    : aggregate_t(), peer_key{peer.get_key()} {
 
     auto removed_blocks = blocks_t{};
 
@@ -52,7 +52,9 @@ remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noe
 }
 
 auto remove_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto peer = cluster.get_devices().by_sha256(peer_id);
+    auto sha256 = peer_key.substr(1);
+    assert(sha256.size() == device_id_t::digest_length);
+    auto peer = cluster.get_devices().by_sha256(sha256);
     if (!peer) {
         return make_error_code(error_code_t::device_does_not_exist);
     }
@@ -73,9 +75,5 @@ auto remove_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
 
 auto remove_peer_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting remove_peer_t");
-    auto r = aggregate_t::visit(visitor, custom);
-    if (!r) {
-        return r;
-    }
     return visitor(*this, custom);
 }

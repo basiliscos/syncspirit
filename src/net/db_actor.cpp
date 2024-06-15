@@ -26,6 +26,7 @@
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_files.h"
 #include "model/diff/modify/remove_folder_infos.h"
+#include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/remove_unknown_folders.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_folder_info.h"
@@ -464,6 +465,30 @@ auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, v
 
     auto r = diff.model::diff::aggregate_t::visit(*this, custom);
     if (r.has_error()) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
+auto db_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto r = diff.model::diff::aggregate_t::visit(*this, custom);
+    if (r.has_error()) {
+        return r.assume_error();
+    }
+    r = db::remove(diff.peer_key, txn);
+    if (!r) {
         return r.assume_error();
     }
 

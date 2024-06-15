@@ -172,11 +172,10 @@ diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const p
     return *this;
 }
 
-diff_builder_t &diff_builder_t::remove_peer(const model::device_t& peer) noexcept {
+diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcept {
     diffs.emplace_back(new diff::modify::remove_peer_t(cluster, peer));
     return *this;
 }
-
 
 diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target, size_t block_index, std::string data,
                                              dispose_callback_t callback) noexcept {
