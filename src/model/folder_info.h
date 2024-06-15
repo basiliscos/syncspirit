@@ -24,12 +24,20 @@ using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
 struct SYNCSPIRIT_API folder_info_t final : arc_base_t<folder_info_t> {
 
+    struct decomposed_key_t {
+        std::string_view device_id;
+        std::string_view folder_uuid;
+        std::string_view folder_info_id;
+    };
+
+    static decomposed_key_t decompose_key(std::string_view key);
+
     static outcome::result<folder_info_ptr_t> create(std::string_view key, const db::FolderInfo &data,
                                                      const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     static outcome::result<folder_info_ptr_t> create(const uuid_t &uuid, const db::FolderInfo &data,
                                                      const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
-    std::string_view get_key() noexcept;
-    std::string_view get_uuid() noexcept;
+    std::string_view get_key() const noexcept;
+    std::string_view get_uuid() const noexcept;
 
     bool operator==(const folder_info_t &other) const noexcept;
     bool operator!=(const folder_info_t &other) const noexcept { return !(*this == other); }
@@ -44,6 +52,7 @@ struct SYNCSPIRIT_API folder_info_t final : arc_base_t<folder_info_t> {
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
     void set_max_sequence(std::int64_t value) noexcept;
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
+    inline const file_infos_map_t &get_file_infos() const noexcept { return file_infos; }
     bool is_actual() noexcept;
     std::optional<proto::Index> generate() noexcept;
 

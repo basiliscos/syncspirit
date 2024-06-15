@@ -2,37 +2,33 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "unshare_folder.h"
+#include "remove_files.h"
+#include "remove_folder_infos.h"
+#include "model/diff/aggregate.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
-#include "model/misc/error_code.h"
-#include "utils/format.hpp"
-#include "structs.pb.h"
 
 using namespace syncspirit::model::diff::modify;
 
-unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, std::string_view peer_device_,
-                                   std::string_view folder_id_) noexcept
-    : peer_id{peer_device_}, folder_id{folder_id_} {
+unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model::folder_info_t &folder_info,
+                                   blocks_t *blocks_for_removal) noexcept
+    : aggregate_t() {
 
-    auto &folders = cluster.get_folders();
-    auto &devices = cluster.get_devices();
+    auto &peer = *folder_info.get_device();
+    peer_id = peer.device_id().get_sha256();
     auto &blocks = cluster.get_blocks();
 
-    auto folder = folders.by_id(folder_id);
-    auto peer = devices.by_sha256(peer_id);
-
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_info = folder_infos.by_device_id(peer_id);
-    folder_info_key = folder_info->get_key();
-
-    auto &file_infos = folder_info->get_file_infos();
+    auto &file_infos = folder_info.get_file_infos();
+    auto removed_files = file_infos_map_t();
+    auto local_removed_blocks = remove_blocks_t::unique_keys_t();
+    auto &removed_blocks = blocks_for_removal ? *blocks_for_removal : local_removed_blocks;
     for (auto &fi : file_infos) {
+        removed_files.put(fi.item);
         auto &file_info = *fi.item;
-        removed_files.emplace(std::string(file_info.get_key()));
         for (auto &b : file_info.get_blocks()) {
             bool remove_block = true;
             for (auto &fb : b->get_file_blocks()) {
-                if (*fb.file()->get_folder_info()->get_device() != *peer) {
+                if (*fb.file()->get_folder_info()->get_device() != peer) {
                     remove_block = false;
                     break;
                 }
@@ -42,40 +38,21 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, std::string_
             }
         }
     }
+
+    if (removed_files.size()) {
+        diffs.emplace_back(new modify::remove_files_t(peer, removed_files));
+    }
+    if (local_removed_blocks.size()) {
+        diffs.emplace_back(cluster_diff_ptr_t(new remove_blocks_t(std::move(local_removed_blocks))));
+    }
+    auto removed_folders = remove_folder_infos_t::unique_keys_t();
+    removed_folders.emplace(folder_info.get_key());
+    diffs.emplace_back(new modify::remove_folder_infos_t(std::move(removed_folders)));
 }
 
 auto unshare_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto &folders = cluster.get_folders();
-    auto folder = folders.by_id(folder_id);
-    if (!folder) {
-        return make_error_code(error_code_t::folder_does_not_exist);
-    }
-
-    auto &devices = cluster.get_devices();
-
-    auto peer = devices.by_sha256(peer_id);
-    if (!peer) {
-        return make_error_code(error_code_t::device_does_not_exist);
-    }
-
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_info = folder_infos.by_device_id(peer_id);
-    if (!folder_info) {
-        return make_error_code(error_code_t::folder_is_not_shared);
-    }
-
-    folder_infos.remove(folder_info);
-
-    auto &blocks = cluster.get_blocks();
-    for (auto &block_key : removed_blocks) {
-        auto block_hash = block_key.substr(1);
-        auto b = blocks.get(block_hash);
-        blocks.remove(b);
-    }
-
-    LOG_TRACE(log, "applyging unshare_folder_t, folder {} with device {}", folder_id, peer->device_id());
-
-    return outcome::success();
+    LOG_TRACE(log, "applyging unshare_folder_t");
+    return aggregate_t::apply_impl(cluster);
 }
 
 auto unshare_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

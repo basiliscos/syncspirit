@@ -46,11 +46,18 @@ struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
 
     using blocks_t = std::vector<block_info_ptr_t>;
 
+    struct decomposed_key_t {
+        std::string_view folder_info_id;
+        std::string_view file_id;
+    };
+
     static outcome::result<file_info_ptr_t> create(std::string_view key, const db::FileInfo &data,
                                                    const folder_info_ptr_t &folder_info_) noexcept;
     static outcome::result<file_info_ptr_t> create(const uuid_t &uuid, const proto::FileInfo &info_,
                                                    const folder_info_ptr_t &folder_info_) noexcept;
     static std::string create_key(const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept;
+
+    static decomposed_key_t decompose_key(std::string_view key);
 
     ~file_info_t();
 

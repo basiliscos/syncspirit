@@ -3,18 +3,14 @@
 
 #pragma once
 
-#include "../aggregate.h"
-#include "model/device.h"
+#include "generic_remove.h"
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API remove_peer_t final : aggregate_t {
-
-    remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept;
+struct SYNCSPIRIT_API remove_blocks_t final : generic_remove_t {
+    using generic_remove_t::generic_remove_t;
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
-
-    std::string peer_key;
 };
 
 } // namespace syncspirit::model::diff::modify

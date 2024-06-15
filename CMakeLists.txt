@@ -95,6 +95,8 @@ add_library(syncspirit_lib
     src/model/diff/load/ignored_folders.cpp
     src/model/diff/load/load_cluster.cpp
     src/model/diff/load/unknown_folders.cpp
+    src/model/diff/modify/add_remote_folder_infos.cpp
+    src/model/diff/modify/add_unknown_folders.cpp
     src/model/diff/modify/append_block.cpp
     src/model/diff/modify/block_ack.cpp
     src/model/diff/modify/block_rej.cpp
@@ -107,17 +109,22 @@ add_library(syncspirit_lib
     src/model/diff/modify/file_availability.cpp
     src/model/diff/modify/finish_file.cpp
     src/model/diff/modify/finish_file_ack.cpp
+    src/model/diff/modify/generic_remove.cpp
     src/model/diff/modify/lock_file.cpp
-    src/model/diff/modify/mark_reachable.cpp
     src/model/diff/modify/local_update.cpp
+    src/model/diff/modify/mark_reachable.cpp
     src/model/diff/modify/relay_connect_request.cpp
+    src/model/diff/modify/remove_blocks.cpp
+    src/model/diff/modify/remove_files.cpp
+    src/model/diff/modify/remove_folder_infos.cpp
     src/model/diff/modify/remove_peer.cpp
+    src/model/diff/modify/remove_unknown_folders.cpp
     src/model/diff/modify/share_folder.cpp
     src/model/diff/modify/unshare_folder.cpp
     src/model/diff/modify/update_contact.cpp
+    src/model/diff/modify/update_folder_info.cpp
     src/model/diff/modify/update_peer.cpp
     src/model/diff/peer/peer_state.cpp
-    src/model/diff/peer/cluster_remove.cpp
     src/model/diff/peer/cluster_update.cpp
     src/model/diff/peer/update_folder.cpp
     src/model/misc/block_iterator.cpp

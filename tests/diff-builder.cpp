@@ -14,6 +14,7 @@
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
+#include "model/diff/modify/remove_peer.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 
@@ -146,8 +147,8 @@ diff_builder_t &diff_builder_t::share_folder(std::string_view sha256, std::strin
     return *this;
 }
 
-diff_builder_t &diff_builder_t::unshare_folder(std::string_view sha256, std::string_view folder_id) noexcept {
-    diffs.emplace_back(new diff::modify::unshare_folder_t(cluster, sha256, folder_id));
+diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcept {
+    diffs.emplace_back(new diff::modify::unshare_folder_t(cluster, fi));
     return *this;
 }
 
@@ -168,6 +169,11 @@ diff_builder_t &diff_builder_t::finish_file_ack(const model::file_info_t &source
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
     diffs.emplace_back(new diff::modify::local_update_t(cluster, folder_id, file_));
+    return *this;
+}
+
+diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcept {
+    diffs.emplace_back(new diff::modify::remove_peer_t(cluster, peer));
     return *this;
 }
 

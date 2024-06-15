@@ -3,18 +3,22 @@
 
 #pragma once
 
-#include "../aggregate.h"
 #include "model/device.h"
+#include "model/folder.h"
+#include "../cluster_diff.h"
+#include "structs.pb.h"
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API remove_peer_t final : aggregate_t {
+struct SYNCSPIRIT_API update_folder_info_t final : cluster_diff_t {
+    update_folder_info_t(db::FolderInfo db, const device_t &device, const folder_t &folder) noexcept;
 
-    remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept;
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
-    std::string peer_key;
+    db::FolderInfo item;
+    std::string device_id;
+    std::string folder_id;
 };
 
 } // namespace syncspirit::model::diff::modify

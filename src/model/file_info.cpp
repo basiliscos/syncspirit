@@ -20,6 +20,13 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
 
+auto file_info_t::decompose_key(std::string_view key) -> decomposed_key_t {
+    assert(key.size() == file_info_t::data_length);
+    auto fi_key = key.substr(1, uuid_length);
+    auto file_id = key.substr(1 + uuid_length);
+    return {fi_key, file_id};
+}
+
 outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const db::FileInfo &data,
                                                      const folder_info_ptr_t &folder_info_) noexcept {
     if (key.size() != data_length) {

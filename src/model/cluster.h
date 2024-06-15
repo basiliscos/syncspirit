@@ -13,11 +13,9 @@
 #include "block_info.h"
 #include "diff/cluster_diff.h"
 
-#include <vector>
 #include <random>
 #include <forward_list>
 #include <boost/uuid/random_generator.hpp>
-#include <unordered_map>
 
 namespace syncspirit::model {
 

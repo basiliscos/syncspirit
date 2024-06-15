@@ -17,10 +17,6 @@ auto cluster_visitor_t::operator()(const load::load_cluster_t &, void *) noexcep
     return outcome::success();
 }
 
-auto cluster_visitor_t::operator()(const peer::cluster_remove_t &, void *) noexcept -> outcome::result<void> {
-    return outcome::success();
-}
-
 auto cluster_visitor_t::operator()(const peer::cluster_update_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
@@ -41,6 +37,15 @@ auto cluster_visitor_t::operator()(const modify::clone_file_t &, void *) noexcep
     return outcome::success();
 }
 
+auto cluster_visitor_t::operator()(const modify::add_remote_folder_infos_t &, void *) noexcept
+    -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto cluster_visitor_t::operator()(const modify::add_unknown_folders_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
 auto cluster_visitor_t::operator()(const modify::share_folder_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
@@ -49,11 +54,30 @@ auto cluster_visitor_t::operator()(const modify::unshare_folder_t &, void *) noe
     return outcome::success();
 }
 
+auto cluster_visitor_t::operator()(const modify::update_folder_info_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
 auto cluster_visitor_t::operator()(const modify::update_peer_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
 
 auto cluster_visitor_t::operator()(const modify::remove_peer_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto cluster_visitor_t::operator()(const modify::remove_blocks_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto cluster_visitor_t::operator()(const modify::remove_files_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+auto cluster_visitor_t::operator()(const modify::remove_folder_infos_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto cluster_visitor_t::operator()(const modify::remove_unknown_folders_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
 

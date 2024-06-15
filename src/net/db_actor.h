@@ -10,7 +10,6 @@
 #include "mdbx.h"
 #include "utils/log.h"
 #include "db/transaction.h"
-#include <optional>
 
 namespace syncspirit {
 namespace net {
@@ -69,15 +68,22 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;
+    outcome::result<void> operator()(const model::diff::modify::add_unknown_folders_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::create_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::share_folder_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::generic_remove_t &) noexcept;
+    outcome::result<void> operator()(const model::diff::modify::remove_blocks_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::remove_files_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::remove_folder_infos_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::remove_unknown_folders_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::unshare_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::update_folder_info_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::finish_file_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::local_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::cluster_remove_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *) noexcept override;
 
@@ -88,6 +94,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     config::db_config_t db_config;
     model::cluster_ptr_t cluster;
     transaction_ptr_t txn_holder;
+    std::uint32_t txn_counter;
     size_t uncommitted;
 };
 
