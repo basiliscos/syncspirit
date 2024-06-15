@@ -69,6 +69,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
                                  dispose_callback_t) noexcept;
     diff_builder_t &clone_block(const model::file_block_t &, dispose_callback_t) noexcept;
     diff_builder_t &ack_block(const model::diff::modify::block_transaction_t &) noexcept;
+    diff_builder_t &remove_peer(const model::device_t& peer) noexcept;
 
   private:
     using bdiffs_t = std::deque<model::diff::block_diff_ptr_t>;

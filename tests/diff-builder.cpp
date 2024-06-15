@@ -14,6 +14,7 @@
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
+#include "model/diff/modify/remove_peer.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 
@@ -170,6 +171,12 @@ diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const p
     diffs.emplace_back(new diff::modify::local_update_t(cluster, folder_id, file_));
     return *this;
 }
+
+diff_builder_t &diff_builder_t::remove_peer(const model::device_t& peer) noexcept {
+    diffs.emplace_back(new diff::modify::remove_peer_t(cluster, peer));
+    return *this;
+}
+
 
 diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target, size_t block_index, std::string data,
                                              dispose_callback_t callback) noexcept {

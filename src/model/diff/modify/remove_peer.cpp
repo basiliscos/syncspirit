@@ -4,6 +4,7 @@
 #include "remove_peer.h"
 #include "unshare_folder.h"
 #include "remove_blocks.h"
+#include "remove_unknown_folders.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
@@ -35,6 +36,18 @@ remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noe
     diffs = make_unshare(cluster, peer, removed_blocks);
     if (removed_blocks.size()) {
         diffs.emplace_back(cluster_diff_ptr_t(new remove_blocks_t(std::move(removed_blocks))));
+    }
+
+    auto removed_unknown_folders = remove_unknown_folders_t::unique_keys_t{};
+    for (auto &uf : cluster.get_unknown_folders()) {
+        if (uf->device_id() == peer.device_id()) {
+            removed_unknown_folders.emplace(uf->get_key());
+        }
+    }
+    if (removed_unknown_folders.size()) {
+        auto diff = cluster_diff_ptr_t{};
+        diff.reset(new remove_unknown_folders_t(std::move(removed_unknown_folders)));
+        diffs.emplace_back(diff);
     }
 }
 

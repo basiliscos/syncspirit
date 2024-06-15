@@ -6,7 +6,6 @@
 #include "diff-builder.h"
 
 #include "model/cluster.h"
-#include "model/diff/modify/remove_peer.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -21,8 +20,9 @@ TEST_CASE("remove peer", "[model]") {
     auto peer_device = device_t::create(peer_id, "peer-device").value();
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
-    cluster->get_devices().put(my_device);
-    cluster->get_devices().put(peer_device);
+    auto& devices = cluster->get_devices();
+    devices.put(my_device);
+    devices.put(peer_device);
 
     auto &blocks_map = cluster->get_blocks();
     auto builder = diff_builder_t(*cluster);
@@ -58,12 +58,11 @@ TEST_CASE("remove peer", "[model]") {
         REQUIRE(cluster->get_blocks().size() == 1);
         REQUIRE(cluster->get_devices().size() == 2);
 
-        auto diff = diff::cluster_diff_ptr_t(new diff::modify::remove_peer_t(*cluster, *peer_device));
-        REQUIRE(diff->apply(*cluster));
-
+        REQUIRE(builder.remove_peer(*peer_device).apply());
         CHECK(cluster->get_blocks().size() == 0);
         CHECK(cluster->get_devices().size() == 1);
         CHECK(!folder->is_shared_with(*peer_device));
+        CHECK(devices.size() == 1);
     }
 
     SECTION("3 files, 2 shared files, 2 shared folders, 3 block, 2 shared blocks") {
@@ -146,12 +145,26 @@ TEST_CASE("remove peer", "[model]") {
         REQUIRE(cluster->get_blocks().size() == 3);
         REQUIRE(cluster->get_devices().size() == 2);
 
-        auto diff = diff::cluster_diff_ptr_t(new diff::modify::remove_peer_t(*cluster, *peer_device));
-        REQUIRE(diff->apply(*cluster));
-
+        REQUIRE(builder.remove_peer(*peer_device).apply());
         CHECK(cluster->get_blocks().size() == 1);
         CHECK(cluster->get_devices().size() == 1);
         CHECK(!f1->is_shared_with(*peer_device));
         CHECK(!f2->is_shared_with(*peer_device));
+        CHECK(devices.size() == 1);
+    }
+
+    SECTION("unknown folders are removed") {
+        db::UnknownFolder db_uf;
+        auto mf = db_uf.mutable_folder();
+        mf->set_id("1234");
+        auto mfi = db_uf.mutable_folder_info();
+        mfi->set_max_sequence(5);
+        mfi->set_index_id(10);
+
+        auto uf = unknown_folder_t::create(cluster->next_uuid(), db_uf, peer_device->device_id()).value();
+        auto& unknown_folders = cluster->get_unknown_folders();
+        unknown_folders.emplace_front(uf);
+        REQUIRE(builder.remove_peer(*peer_device).apply());
+        CHECK(devices.size() == 1);
     }
 }
