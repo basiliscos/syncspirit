@@ -6,7 +6,6 @@
 #include "initiator_actor.h"
 #include "names.h"
 #include "../constants.h"
-#include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "model/diff/peer/peer_state.h"
 #include "model/diff/modify/connect_request.h"
@@ -188,7 +187,7 @@ auto peer_supervisor_t::operator()(const model::diff::modify::update_contact_t &
     if (!diff.self && diff.known) {
         auto &devices = cluster->get_devices();
         auto peer = devices.by_sha256(diff.device.get_sha256());
-        if (peer->get_state() == model::device_state_t::offline) {
+        if (peer && peer->get_state() == model::device_state_t::offline) {
             auto &uris = diff.uris;
             auto connect_timeout = r::pt::milliseconds{bep_config.connect_timeout};
             LOG_DEBUG(log, "initiating connection with {}", peer->device_id());
