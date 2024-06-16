@@ -152,6 +152,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     outcome::result<void> operator()(const model::diff::modify::mark_reachable_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_rej_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
 
     model::cluster_ptr_t cluster;
     model::device_ptr_t peer;

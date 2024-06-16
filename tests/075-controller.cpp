@@ -1087,6 +1087,19 @@ void test_uploading() {
     F(true, 10).run();
 }
 
+void test_peer_removal() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &builder) noexcept override {
+            builder.remove_peer(*peer_device).apply(*sup);
+            CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+            CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+            CHECK(target->get_shutdown_reason()->root()->ec == utils::error_code_t::peer_has_been_removed);
+        }
+    };
+    F(true, 10).run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
@@ -1096,6 +1109,7 @@ int _init() {
     REGISTER_TEST_CASE(test_my_sharing, "test_my_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
+    REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     return 1;
 }
 

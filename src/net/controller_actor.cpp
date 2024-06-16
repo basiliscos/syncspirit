@@ -16,6 +16,7 @@
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/finish_file_ack.h"
 #include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
@@ -458,6 +459,17 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
 auto controller_actor_t::operator()(const model::diff::modify::block_rej_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     LOG_ERROR(log, "on block rej, not implemented");
+    return outcome::success();
+}
+
+auto controller_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    if (diff.get_peer_sha256() == peer->device_id().get_sha256()) {
+        LOG_DEBUG(log, "on remove_peer_t, initiating self destruction");
+        auto ec = utils::make_error_code(utils::error_code_t::peer_has_been_removed);
+        auto reason = make_error(ec);
+        do_shutdown(reason);
+    }
     return outcome::success();
 }
 
