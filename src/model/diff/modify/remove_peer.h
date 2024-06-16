@@ -13,6 +13,7 @@ struct SYNCSPIRIT_API remove_peer_t final : aggregate_t {
     remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept;
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
+    std::string_view get_peer_sha256() const noexcept;
 
     std::string peer_key;
 };

@@ -52,7 +52,7 @@ remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noe
 }
 
 auto remove_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto sha256 = peer_key.substr(1);
+    auto sha256 = get_peer_sha256();
     assert(sha256.size() == device_id_t::digest_length);
     auto peer = cluster.get_devices().by_sha256(sha256);
     if (!peer) {
@@ -72,6 +72,8 @@ auto remove_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
     cluster.get_devices().remove(peer);
     return outcome::success();
 }
+
+std::string_view remove_peer_t::get_peer_sha256() const noexcept { return std::string_view(peer_key).substr(1); }
 
 auto remove_peer_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting remove_peer_t");
