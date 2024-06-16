@@ -99,8 +99,11 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto diff = model::diff::cluster_diff_ptr_t();
                 auto state = model::device_state_t::dialing;
                 auto sha256 = peer_device_id.get_sha256();
-                diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
-                send<model::payload::model_update_t>(coordinator, std::move(diff));
+                auto peer = cluster->get_devices().by_sha256(sha256);
+                if (peer) {
+                    diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
+                    send<model::payload::model_update_t>(coordinator, std::move(diff));
+                }
             }
             initiate_active();
         } else if (role == role_t::passive) {
@@ -196,11 +199,14 @@ void initiator_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish");
     bool notify_offline = role == role_t::active && !success && cluster;
     if (notify_offline) {
-        auto diff = model::diff::cluster_diff_ptr_t();
         auto state = model::device_state_t::offline;
         auto sha256 = peer_device_id.get_sha256();
-        diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
-        send<model::payload::model_update_t>(coordinator, std::move(diff));
+        auto peer = cluster->get_devices().by_sha256(sha256);
+        if (peer) {
+            auto diff = model::diff::cluster_diff_ptr_t();
+            diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
+        }
     }
     r::actor_base_t::shutdown_finish();
 }
