@@ -32,6 +32,7 @@ struct peer_device_t : tree_item_t, private model_listener_t, private model::dif
 
     void operator()(model::message::model_update_t &) override;
     outcome::result<void> operator()(const diff::modify::update_peer_t &, void *custom) noexcept override;
+    outcome::result<void> operator()(const diff::modify::remove_peer_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const diff::peer::peer_state_t &, void *custom) noexcept override;
 
     const model::device_t &get_device() const;

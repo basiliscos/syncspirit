@@ -78,7 +78,8 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
         auto ee = make_error(r.assume_error());
         LOG_ERROR(log, "todo, handle cluster apply failure {} ", ee->message());
     }
-    for (auto listener : load_listeners) {
+    auto listeners_copy = load_listeners;
+    for (auto listener : listeners_copy) {
         (*listener)(message);
     }
 }

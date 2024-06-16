@@ -2,6 +2,7 @@
 
 #include "../qr_button.h"
 
+#include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/peer_state.h"
 #include "utils/format.hpp"
@@ -12,9 +13,11 @@
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Input_Choice.H>
+#include "FL/fl_ask.H"
 #include <tuple>
 
 using namespace syncspirit;
+using namespace model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
@@ -359,6 +362,17 @@ auto peer_device_t::operator()(const diff::modify::update_peer_t &diff, void *) 
     return outcome::success();
 }
 
+auto peer_device_t::operator()(const diff::modify::remove_peer_t &diff, void *) noexcept -> outcome::result<void> {
+    if (diff.get_peer_sha256() == peer->device_id().get_sha256()) {
+        auto t = tree();
+        auto prev = t->next_item(this, FL_Up, true);
+        t->remove(this);
+        t->select(prev, 1);
+        t->redraw();
+    }
+    return outcome::success();
+}
+
 void peer_device_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
         widgets.clear();
@@ -459,7 +473,6 @@ void peer_device_t::on_change() {
 }
 
 void peer_device_t::on_apply() {
-    using namespace model::diff;
     auto data = peer->serialize();
     auto device = db::Device();
     auto ok = device.ParseFromArray(data.data(), data.size());
@@ -482,4 +495,12 @@ void peer_device_t::on_reset() {
     on_change();
 }
 
-void peer_device_t::on_remove() {}
+void peer_device_t::on_remove() {
+    auto r = fl_choice("Empty trash?", "Yes", "No", nullptr);
+    if (r != 0) {
+        return;
+    }
+    auto &cluster = *supervisor.get_cluster();
+    auto diff = cluster_diff_ptr_t(new modify::remove_peer_t(cluster, *peer));
+    supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
+}
