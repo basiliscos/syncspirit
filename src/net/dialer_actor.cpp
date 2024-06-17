@@ -16,7 +16,7 @@ r::plugin::resource_id_t timer = 0;
 
 dialer_actor_t::dialer_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster},
-      redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}} {}
+      redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}}, announced{false} {}
 
 void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -62,6 +62,7 @@ void dialer_actor_t::shutdown_start() noexcept {
 
 void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
     LOG_TRACE(log, "on_announce");
+    announced = true;
     auto &devices = cluster->get_devices();
     for (auto it : devices) {
         auto &d = it.item;
@@ -126,7 +127,7 @@ void dialer_actor_t::on_model_update(model::message::model_update_t &msg) noexce
 }
 
 auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
-    if (diff.known) {
+    if (announced && diff.known) {
         auto &devices = cluster->get_devices();
         auto peer = devices.by_sha256(diff.peer_id);
 

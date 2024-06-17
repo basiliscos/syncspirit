@@ -24,6 +24,7 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Box.H>
+#include <FL/fl_utf8.h>
 
 #include "app_supervisor.h"
 #include "main_window.h"
@@ -279,6 +280,8 @@ int main(int argc, char **argv) {
             shutdown_flag = true;
             spdlog::trace("fs thread has been terminated");
         });
+
+        spdlog::debug("utf8 local support: {}", fl_utf8locale());
 
         while (!shutdown_flag) {
             sup_fltk->do_process();

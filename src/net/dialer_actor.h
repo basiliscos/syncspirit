@@ -74,6 +74,7 @@ struct SYNCSPIRIT_API dialer_actor_t : public r::actor_base_t, private model::di
 
     r::address_ptr_t coordinator;
     redial_map_t redial_map;
+    bool announced;
 };
 
 } // namespace net

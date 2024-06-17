@@ -25,6 +25,7 @@ pugixml/*:no_exceptions=True
 rotor/*:enable_asio=True
 rotor/*:enable_thread=True
 rotor/*:enable_fltk=True
+fltk/*:with_xft=True
 
 [generators]
 CMakeDeps
