@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "dialer_actor.h"
+#include "model/diff/modify/update_contact.h"
 #include "model/diff/peer/peer_state.h"
 #include "names.h"
 #include "../utils/format.hpp"
@@ -39,6 +40,13 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void dialer_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
+    auto &devices = cluster->get_devices();
+    for (auto it : devices) {
+        auto &d = it.item;
+        if (d != cluster->get_device()) {
+            schedule_redial(d);
+        }
+    }
 }
 
 void dialer_actor_t::shutdown_finish() noexcept {
@@ -74,11 +82,18 @@ void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
 
 void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
     if (peer_device->is_dynamic()) {
+        if (!announced) {
+            return;
+        }
         auto &device_id = peer_device->device_id();
         auto &info = redial_map.at(peer_device);
         send<payload::discovery_notification_t>(coordinator, device_id);
         info.last_attempt = clock_t::now();
         schedule_redial(peer_device);
+    } else {
+        auto &uris = peer_device->get_static_uris();
+        auto diff = new model::diff::modify::update_contact_t(*cluster, peer_device->device_id(), uris);
+        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     }
 }
 

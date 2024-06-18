@@ -5,10 +5,8 @@
 #include "access.h"
 #include "model/cluster.h"
 #include "model/diff/peer/peer_state.h"
-#include "utils/error_code.h"
 
 #include "net/dialer_actor.h"
-#include "net/names.h"
 #include "access.h"
 #include "test_supervisor.h"
 
@@ -22,8 +20,10 @@ namespace {
 struct fixture_t {
     using discovery_msg_t = net::message::discovery_notify_t;
     using discovery_ptr_t = r::intrusive_ptr_t<discovery_msg_t>;
+    using contact_update_msg_t = model::message::contact_update_t;
+    using contact_update_ptr_t = r::intrusive_ptr_t<contact_update_msg_t>;
 
-    fixture_t() noexcept { utils::set_default("trace"); }
+    fixture_t(bool start_dialer_) noexcept : start_dialer{start_dialer_} { utils::set_default("trace"); }
 
     virtual void run() noexcept {
         auto peer_id =
@@ -44,6 +44,8 @@ struct fixture_t {
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<discovery_msg_t>([&](discovery_msg_t &msg) { discovery = &msg; }));
+                p.subscribe_actor(
+                    r::lambda<contact_update_msg_t>([&](contact_update_msg_t &msg) { contact_update = &msg; }));
             });
         };
 
@@ -57,10 +59,11 @@ struct fixture_t {
 
         auto cfg = config::dialer_config_t{true, 500};
         auto dialer = sup->create_actor<dialer_actor_t>().cluster(cluster).dialer_config(cfg).timeout(timeout).finish();
-        sup->do_process();
-
-        CHECK(static_cast<r::actor_base_t *>(dialer.get())->access<to::state>() == r::state_t::OPERATIONAL);
         target_addr = dialer->get_address();
+        if (start_dialer) {
+            sup->do_process();
+            CHECK(static_cast<r::actor_base_t *>(dialer.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        }
         main();
 
         sup->shutdown();
@@ -71,12 +74,14 @@ struct fixture_t {
 
     virtual void main() noexcept {}
 
+    bool start_dialer;
     r::address_ptr_t target_addr;
     r::pt::time_duration timeout = r::pt::millisec{10};
     cluster_ptr_t cluster;
     device_ptr_t peer_device;
     r::intrusive_ptr_t<supervisor_t> sup;
     r::system_context_t ctx;
+    contact_update_ptr_t contact_update;
     discovery_ptr_t discovery;
 };
 
@@ -84,6 +89,7 @@ struct fixture_t {
 
 void test_dialer() {
     struct F : fixture_t {
+        using fixture_t::fixture_t;
         void main() noexcept override {
             sup->send<net::payload::announce_notification_t>(sup->get_address());
             sup->do_process();
@@ -122,13 +128,31 @@ void test_dialer() {
                 CHECK(discovery);
                 CHECK(sup->timers.size() == 1);
             }
+
+            REQUIRE(!contact_update);
         }
     };
-    F().run();
+    F(true).run();
+}
+
+void test_static_address() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main() noexcept override {
+            REQUIRE(!contact_update);
+            auto uri = utils::parse("tcp://127.0.0.1");
+            peer_device->set_static_uris({uri});
+
+            sup->do_process();
+            REQUIRE(contact_update);
+        }
+    };
+    F(false).run();
 }
 
 int _init() {
     REGISTER_TEST_CASE(test_dialer, "test_dialer", "[net]");
+    REGISTER_TEST_CASE(test_static_address, "test_static_address", "[net]");
     return 1;
 }
 

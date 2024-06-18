@@ -57,6 +57,7 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
 
     inline const uris_t &get_uris() const noexcept { return uris; }
     inline const uris_t &get_static_uris() const noexcept { return static_uris; }
+    void set_static_uris(uris_t) noexcept;
 
     void assign_uris(const uris_t &uris) noexcept;
 

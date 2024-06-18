@@ -22,11 +22,13 @@ template <> void device_t::assign(const db::Device &d) noexcept {
     uris.clear();
     last_seen = pt::from_time_t(d.last_seen());
 
+    auto uris = uris_t{};
     for (int i = 0; i < d.addresses_size(); ++i) {
         auto uri = utils::parse(d.addresses(i));
         assert(uri);
-        static_uris.emplace_back(uri);
+        uris.emplace_back(uri);
     }
+    set_static_uris(std::move(uris));
 }
 
 outcome::result<device_ptr_t> device_t::create(std::string_view key, const db::Device &data) noexcept {
@@ -101,6 +103,8 @@ void device_t::update_state(device_state_t new_state) {
 }
 
 std::string_view device_t::get_key() const noexcept { return id.get_key(); }
+
+void device_t::set_static_uris(uris_t uris) noexcept { static_uris = std::move(uris); }
 
 void device_t::assign_uris(const uris_t &uris_) noexcept { uris = uris_; }
 
