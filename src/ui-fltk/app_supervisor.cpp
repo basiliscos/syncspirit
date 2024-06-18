@@ -14,6 +14,7 @@ r::plugin::resource_id_t model = 0;
 
 void model_listener_t::operator()(model::message::model_response_t &) {}
 void model_listener_t::operator()(model::message::model_update_t &) {}
+void model_listener_t::operator()(model::message::contact_update_t &) {}
 
 model_subscription_t::model_subscription_t(model_listener_t *listener_, app_supervisor_t *owner_)
     : listener{listener_}, owner{owner_} {}

@@ -70,15 +70,23 @@ diff_builder_t &index_maker_t::finish() noexcept {
 diff_builder_t::diff_builder_t(model::cluster_t &cluster_) noexcept : cluster{cluster_} {}
 
 diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
-    assert(!(diffs.empty() && bdiffs.empty()));
+    auto has_diffs = [&]() -> bool { return !diffs.empty() || !bdiffs.empty() || !cdiffs.empty(); };
+    assert(has_diffs());
 
-    while (!(diffs.empty() && bdiffs.empty())) {
-        auto diffs_vector = diff::aggregate_t::diffs_t{};
-        std::move(diffs.begin(), diffs.end(), std::back_insert_iterator(diffs_vector));
-        auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs_vector)));
-        auto &addr = sup.get_address();
-        sup.send<model::payload::model_update_t>(addr, std::move(diff), nullptr);
-        diffs.clear();
+    auto &addr = sup.get_address();
+    while (has_diffs()) {
+        if (!diffs.empty()) {
+            auto diffs_vector = diff::aggregate_t::diffs_t{};
+            std::move(diffs.begin(), diffs.end(), std::back_insert_iterator(diffs_vector));
+            auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs_vector)));
+            sup.send<model::payload::model_update_t>(addr, std::move(diff), nullptr);
+            diffs.clear();
+        }
+
+        for (auto &diff : cdiffs) {
+            sup.send<model::payload::contact_update_t>(addr, std::move(diff), nullptr);
+        }
+        cdiffs.clear();
 
         for (auto &diff : bdiffs) {
             sup.send<model::payload::block_update_t>(addr, std::move(diff), nullptr);
@@ -100,6 +108,15 @@ auto diff_builder_t::apply() noexcept -> outcome::result<void> {
             return r;
         }
         diffs.pop_front();
+    }
+
+    while (!cdiffs.empty()) {
+        auto &d = cdiffs.front();
+        r = d->apply(cluster);
+        if (!r) {
+            return r;
+        }
+        cdiffs.pop_front();
     }
 
     while (!bdiffs.empty()) {
@@ -181,9 +198,9 @@ diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcep
 
 diff_builder_t &diff_builder_t::update_state(const model::device_t &peer, const r::address_ptr_t &peer_addr,
                                              model::device_state_t state) noexcept {
-    model::diff::cluster_diff_ptr_t diff;
+    model::diff::contact_diff_ptr_t diff;
     diff.reset(new model::diff::peer::peer_state_t(cluster, peer.device_id().get_sha256(), peer_addr, state));
-    diffs.emplace_back(std::move(diff));
+    cdiffs.emplace_back(std::move(diff));
     return *this;
 }
 

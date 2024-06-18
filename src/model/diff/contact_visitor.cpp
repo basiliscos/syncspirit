@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "contact_visitor.h"
 
@@ -14,5 +14,9 @@ auto contact_visitor_t::operator()(const modify::update_contact_t &, void *) noe
 }
 
 auto contact_visitor_t::operator()(const modify::relay_connect_request_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto contact_visitor_t::operator()(const peer::peer_state_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }

@@ -242,10 +242,10 @@ void peer_actor_t::shutdown_finish() noexcept {
     auto device = cluster->get_devices().by_sha256(sha256);
     auto state = device->get_state();
     if (state != model::device_state_t::offline) {
-        auto diff = model::diff::cluster_diff_ptr_t();
+        auto diff = model::diff::contact_diff_ptr_t();
         auto state = model::device_state_t::offline;
         diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, state);
-        send<model::payload::model_update_t>(coordinator, std::move(diff));
+        send<model::payload::contact_update_t>(coordinator, std::move(diff));
     }
 }
 
@@ -329,11 +329,11 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
                     auto ec = utils::make_error_code(utils::error_code_t::already_connected);
                     return do_shutdown(make_error(ec));
                 }
-                auto diff = cluster_diff_ptr_t();
+                auto diff = contact_diff_ptr_t();
                 auto state = model::device_state_t::online;
                 diff = new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), state, cert_name,
                                               peer_endpoint, msg->client_name());
-                send<model::payload::model_update_t>(coordinator, std::move(diff));
+                send<model::payload::contact_update_t>(coordinator, std::move(diff));
             } else {
                 LOG_WARN(log, "read_hello, unexpected_message");
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);

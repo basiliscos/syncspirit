@@ -341,6 +341,10 @@ void peer_device_t::operator()(model::message::model_update_t &update) {
     std::ignore = update.payload.diff->visit(*this, nullptr);
 }
 
+void peer_device_t::operator()(model::message::contact_update_t &update) {
+    std::ignore = update.payload.diff->visit(*this, nullptr);
+}
+
 auto peer_device_t::operator()(const diff::peer::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
     if (diff.peer_id == peer->device_id().get_sha256()) {
         if (diff.state == model::device_state_t::online) {

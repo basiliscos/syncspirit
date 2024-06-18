@@ -39,7 +39,9 @@ template <typename Actor> struct dialer_actor_config_builder_t : r::actor_config
     }
 };
 
-struct SYNCSPIRIT_API dialer_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
+struct SYNCSPIRIT_API dialer_actor_t : public r::actor_base_t,
+                                       private model::diff::cluster_visitor_t,
+                                       private model::diff::contact_visitor_t {
     using config_t = dialer_actor_config_t;
     template <typename Actor> using config_builder_t = dialer_actor_config_builder_t<Actor>;
 
@@ -60,6 +62,7 @@ struct SYNCSPIRIT_API dialer_actor_t : public r::actor_base_t, private model::di
 
     void on_announce(message::announce_notification_t &message) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
+    void on_contact_update(model::message::contact_update_t &) noexcept;
 
     void discover(const model::device_ptr_t &device) noexcept;
     void remove(const model::device_ptr_t &device) noexcept;

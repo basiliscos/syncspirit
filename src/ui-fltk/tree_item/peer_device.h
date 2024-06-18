@@ -9,7 +9,10 @@
 
 namespace syncspirit::fltk::tree_item {
 
-struct peer_device_t : tree_item_t, private model_listener_t, private model::diff::cluster_visitor_t {
+struct peer_device_t : tree_item_t,
+                       private model_listener_t,
+                       private model::diff::cluster_visitor_t,
+                       private model::diff::contact_visitor_t {
     using parent_t = tree_item_t;
     using endpoint_t = std::optional<boost::asio::ip::tcp::endpoint>;
 
@@ -31,6 +34,7 @@ struct peer_device_t : tree_item_t, private model_listener_t, private model::dif
     peer_device_t(model::device_ptr_t peer, app_supervisor_t &supervisor, Fl_Tree *tree);
 
     void operator()(model::message::model_update_t &) override;
+    void operator()(model::message::contact_update_t &) override;
     outcome::result<void> operator()(const diff::modify::update_peer_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const diff::modify::remove_peer_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const diff::peer::peer_state_t &, void *custom) noexcept override;

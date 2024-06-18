@@ -25,6 +25,7 @@ struct model_listener_t {
     virtual ~model_listener_t() = default;
     virtual void operator()(model::message::model_response_t &);
     virtual void operator()(model::message::model_update_t &);
+    virtual void operator()(model::message::contact_update_t &);
 };
 
 struct model_subscription_t {

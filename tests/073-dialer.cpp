@@ -120,8 +120,6 @@ void test_dialer() {
                 CHECK(discovery);
                 CHECK(sup->timers.size() == 1);
             }
-
-            REQUIRE(!contact_update);
         }
     };
     F(true).run();

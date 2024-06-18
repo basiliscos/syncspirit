@@ -96,13 +96,13 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         resources->acquire(resource::initializing);
         if (role == role_t::active) {
             if (cluster) {
-                auto diff = model::diff::cluster_diff_ptr_t();
+                auto diff = model::diff::contact_diff_ptr_t();
                 auto state = model::device_state_t::dialing;
                 auto sha256 = peer_device_id.get_sha256();
                 auto peer = cluster->get_devices().by_sha256(sha256);
                 if (peer) {
                     diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
-                    send<model::payload::model_update_t>(coordinator, std::move(diff));
+                    send<model::payload::contact_update_t>(coordinator, std::move(diff));
                 }
             }
             initiate_active();
@@ -203,9 +203,9 @@ void initiator_actor_t::shutdown_finish() noexcept {
         auto sha256 = peer_device_id.get_sha256();
         auto peer = cluster->get_devices().by_sha256(sha256);
         if (peer) {
-            auto diff = model::diff::cluster_diff_ptr_t();
+            auto diff = model::diff::contact_diff_ptr_t();
             diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
-            send<model::payload::model_update_t>(coordinator, std::move(diff));
+            send<model::payload::contact_update_t>(coordinator, std::move(diff));
         }
     }
     r::actor_base_t::shutdown_finish();

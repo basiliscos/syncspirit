@@ -25,10 +25,6 @@ auto cluster_visitor_t::operator()(const peer::update_folder_t &, void *) noexce
     return outcome::success();
 }
 
-auto cluster_visitor_t::operator()(const peer::peer_state_t &, void *) noexcept -> outcome::result<void> {
-    return outcome::success();
-}
-
 auto cluster_visitor_t::operator()(const modify::create_folder_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }

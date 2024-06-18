@@ -16,7 +16,6 @@ struct load_cluster_t;
 
 namespace peer {
 struct cluster_update_t;
-struct peer_state_t;
 struct update_folder_t;
 } // namespace peer
 
@@ -50,7 +49,6 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const load::ignored_devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::load_cluster_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::cluster_update_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const peer::peer_state_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::update_folder_t &, void *custom) noexcept;
 
     virtual outcome::result<void> operator()(const modify::add_remote_folder_infos_t &, void *custom) noexcept;
