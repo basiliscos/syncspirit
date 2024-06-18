@@ -9,6 +9,7 @@
 #include "utils/error_code.h"
 #include "http_actor.h"
 #include "model/diff/modify/update_contact.h"
+#include "model/diff/peer/peer_state.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit::net;
@@ -42,7 +43,6 @@ void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexc
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&global_discovery_actor_t::on_contact_update, coordinator);
-                plugin->subscribe_actor(&global_discovery_actor_t::on_discovery, coordinator);
             }
         });
     });
@@ -143,9 +143,9 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     resources->release(resource::http);
     http_request.reset();
     auto &custom = message.payload.req->payload.request_payload->custom;
-    auto msg = static_cast<message::discovery_notify_t *>(custom.get());
-    auto &device_id = msg->payload.device_id;
-    auto sha256 = device_id.get_sha256();
+    auto msg = static_cast<model::message::contact_update_t *>(custom.get());
+    auto diff = static_cast<model::diff::peer::peer_state_t *>(msg->payload.diff.get());
+    auto sha256 = diff->peer_id;
     auto it = discovering_devices.find(sha256);
     discovering_devices.erase(it);
 
@@ -160,6 +160,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
             auto &body = http_res.body();
             LOG_WARN(log, "parsing discovery error = {}, body({}):\n {}", reason, body.size(), body);
         } else {
+            auto device_id = model::device_id_t::from_sha256(sha256).value();
             auto &uris = res.value();
             if (!uris.empty()) {
                 using namespace model::diff;
@@ -174,31 +175,10 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     }
 }
 
-void global_discovery_actor_t::on_discovery(message::discovery_notify_t &req) noexcept {
-    LOG_TRACE(log, "on_discovery");
-
-    auto &device_id = req.payload.device_id;
-    auto sha256 = device_id.get_sha256();
-    if (discovering_devices.count(sha256)) {
-        LOG_TRACE(log, "device '{}' is already discovering, skip", device_id.get_short());
-        return;
-    }
-
-    fmt::memory_buffer tx_buff;
-    auto r = proto::make_discovery_request(tx_buff, announce_url, req.payload.device_id);
-    if (!r) {
-        LOG_TRACE(log, "error making discovery request :: {}", r.error().message());
-        return do_shutdown(make_error(r.error()));
-    }
-
-    discovering_devices.emplace(sha256);
-    make_request(addr_discovery, r.value(), std::move(tx_buff), &req);
-}
-
 void global_discovery_actor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
     LOG_TRACE(log, "on_contact_update");
     auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this, nullptr);
+    auto r = diff.visit(*this, &message);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -214,7 +194,7 @@ void global_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcep
 }
 
 void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri,
-                                            fmt::memory_buffer &&tx_buff, const rotor::message_ptr_t &custom) noexcept {
+                                            fmt::memory_buffer &&tx_buff, const custom_msg_ptr_t &custom) noexcept {
     auto timeout = r::pt::millisec{io_timeout};
     transport::ssl_junction_t ssl{discovery_device_id, &ssl_pair, true, ""};
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
@@ -244,5 +224,32 @@ auto global_discovery_actor_t::operator()(const model::diff::modify::update_cont
         }
         announce();
     }
+    return outcome::success();
+}
+
+auto global_discovery_actor_t::operator()(const model::diff::peer::peer_state_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if ((state != r::state_t::OPERATIONAL) || (diff.state != model::device_state_t::discovering)) {
+        return outcome::success();
+    }
+
+    auto sha256 = diff.peer_id;
+    if (discovering_devices.count(sha256)) {
+        auto device_id = model::device_id_t::from_sha256(sha256).value();
+        LOG_TRACE(log, "device '{}' is already discovering, skip", device_id.get_short());
+        return outcome::success();
+    }
+
+    auto peer = cluster->get_devices().by_sha256(sha256);
+    fmt::memory_buffer tx_buff;
+    auto r = proto::make_discovery_request(tx_buff, announce_url, peer->device_id());
+    if (!r) {
+        LOG_ERROR(log, "error making discovery request :: {}", r.error().message());
+        return r.error();
+    }
+
+    discovering_devices.emplace(sha256);
+    auto msg = reinterpret_cast<model::message::contact_update_t *>(custom);
+    make_request(addr_discovery, r.value(), std::move(tx_buff), msg);
     return outcome::success();
 }

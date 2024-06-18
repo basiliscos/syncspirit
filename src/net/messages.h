@@ -102,10 +102,6 @@ struct announce_notification_t {
     r::address_ptr_t source;
 };
 
-struct discovery_notification_t {
-    model::device_id_t device_id;
-};
-
 struct load_cluster_response_t {
     model::diff::cluster_diff_ptr_t diff;
 };
@@ -177,8 +173,6 @@ using http_request_t = r::request_traits_t<payload::http_request_t>::request::me
 using http_response_t = r::request_traits_t<payload::http_request_t>::response::message_t;
 using http_cancel_t = r::request_traits_t<payload::http_request_t>::cancel::message_t;
 using http_close_connection_t = r::message_t<payload::http_close_connection_t>;
-
-using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
 
 using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;

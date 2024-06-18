@@ -77,17 +77,18 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
     using rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
     using discovering_devices_t = std::set<std::string, utils::string_comparator_t>;
     using uris_t = std::unordered_set<std::string>;
+    using custom_msg_ptr_t = r::intrusive_ptr_t<model::message::contact_update_t>;
 
     void announce() noexcept;
     void on_announce_response(message::http_response_t &message) noexcept;
     void on_discovery_response(message::http_response_t &message) noexcept;
     void on_contact_update(model::message::contact_update_t &message) noexcept;
-    void on_discovery(message::discovery_notify_t &req) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, fmt::memory_buffer &&tx_buff,
-                      const r::message_ptr_t &custom = {}) noexcept;
+                      const custom_msg_ptr_t &custom = {}) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::update_contact_t &, void *custom) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *custom) noexcept override;
 
     model::device_id_t device_id;
     utils::logger_t log;

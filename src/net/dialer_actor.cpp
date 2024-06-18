@@ -10,6 +10,8 @@
 
 namespace syncspirit::net {
 
+using state_t = model::device_state_t;
+
 namespace {
 namespace resource {
 r::plugin::resource_id_t timer = 0;
@@ -89,7 +91,9 @@ void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
         }
         auto &device_id = peer_device->device_id();
         auto &info = redial_map.at(peer_device);
-        send<payload::discovery_notification_t>(coordinator, device_id);
+        auto diff = model::diff::contact_diff_ptr_t();
+        diff = new model::diff::peer::peer_state_t(*cluster, device_id.get_sha256(), nullptr, state_t::discovering);
+        send<model::payload::contact_update_t>(coordinator, std::move(diff));
         info.last_attempt = clock_t::now();
         schedule_redial(peer_device);
     } else {
@@ -161,9 +165,9 @@ auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &diff, voi
         auto peer = devices.by_sha256(diff.peer_id);
 
         if (peer) {
-            if (diff.state == model::device_state_t::offline) {
+            if (diff.state == state_t::offline) {
                 schedule_redial(peer);
-            } else {
+            } else if (diff.state == state_t::online) {
                 auto it = redial_map.find(peer);
                 if (it != redial_map.end()) {
                     auto &info = it->second;

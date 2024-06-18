@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
+#include "diff-builder.h"
 #include "access.h"
 #include "model/cluster.h"
 #include "model/diff/modify/update_contact.h"
@@ -190,7 +191,7 @@ void test_peer_discovery() {
     struct F : fixture_t {
         void main() noexcept override {
 
-            sup->send<net::payload::discovery_notification_t>(sup->get_address(), peer_device->device_id());
+            auto builder = diff_builder_t(*cluster);
             http::response<http::string_body> res;
 
             auto j = json::object();
@@ -201,7 +202,7 @@ void test_peer_discovery() {
                 res.body() = j.dump();
 
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
-                sup->do_process();
+                builder.update_state(*peer_device, {}, model::device_state_t::discovering).apply(*sup);
 
                 REQUIRE(peer_device->get_uris().size() == 1);
                 CHECK(peer_device->get_uris()[0]->buffer() == "tcp://127.0.0.2");
@@ -211,16 +212,16 @@ void test_peer_discovery() {
                 res = {};
                 res.body() = j.dump();
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
-                sup->send<net::payload::discovery_notification_t>(sup->get_address(), peer_device->device_id());
+                builder.update_state(*peer_device, {}, model::device_state_t::discovering).apply(*sup);
 
-                sup->do_process();
                 REQUIRE(peer_device->get_uris().size() == 1);
                 CHECK(peer_device->get_uris()[0]->buffer() == "tcp://127.0.0.2");
             }
 
             SECTION("gargbage in response") {
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
-                sup->do_process();
+                builder.update_state(*peer_device, {}, model::device_state_t::discovering).apply(*sup);
+
                 REQUIRE(peer_device->get_uris().size() == 0);
                 CHECK(static_cast<r::actor_base_t *>(gda.get())->access<to::state>() == r::state_t::OPERATIONAL);
             }

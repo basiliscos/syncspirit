@@ -15,13 +15,14 @@ using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
 
+using state_t = model::device_state_t;
+
 namespace {
 
-struct fixture_t {
-    using discovery_msg_t = net::message::discovery_notify_t;
-    using discovery_ptr_t = r::intrusive_ptr_t<discovery_msg_t>;
-    using contact_update_msg_t = model::message::contact_update_t;
-    using contact_update_ptr_t = r::intrusive_ptr_t<contact_update_msg_t>;
+struct fixture_t : private model::diff::contact_visitor_t {
+    using msg_t = model::message::contact_update_t;
+    using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
+    using messages_t = std::vector<msg_ptr_t>;
 
     fixture_t(bool start_dialer_) noexcept : start_dialer{start_dialer_} { utils::set_default("trace"); }
 
@@ -43,9 +44,10 @@ struct fixture_t {
         sup->cluster = cluster;
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                p.subscribe_actor(r::lambda<discovery_msg_t>([&](discovery_msg_t &msg) { discovery = &msg; }));
-                p.subscribe_actor(
-                    r::lambda<contact_update_msg_t>([&](contact_update_msg_t &msg) { contact_update = &msg; }));
+                p.subscribe_actor(r::lambda<msg_t>([&](msg_t &msg) {
+                    std::ignore = msg.payload.diff->apply(*cluster);
+                    messages.emplace_back(&msg);
+                }));
             });
         };
 
@@ -81,8 +83,7 @@ struct fixture_t {
     device_ptr_t peer_device;
     r::intrusive_ptr_t<supervisor_t> sup;
     r::system_context_t ctx;
-    contact_update_ptr_t contact_update;
-    discovery_ptr_t discovery;
+    messages_t messages;
 };
 
 } // namespace
@@ -91,33 +92,36 @@ void test_dialer() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main() noexcept override {
+            REQUIRE(messages.empty());
+            REQUIRE(peer_device->get_state() == state_t::offline);
+
             sup->send<net::payload::announce_notification_t>(sup->get_address());
             sup->do_process();
-            CHECK(discovery);
-
-            discovery.reset();
             REQUIRE(sup->timers.size() == 1);
 
             SECTION("peer is not online => discover it on timeout") {
                 sup->do_invoke_timer((*sup->timers.begin())->request_id);
                 sup->do_process();
-                CHECK(discovery);
+                REQUIRE(messages.size() == 2);
+                REQUIRE(peer_device->get_state() == state_t::discovering);
                 CHECK(sup->timers.size() == 1);
             }
 
             SECTION("peer online & offline") {
+                messages.clear();
                 auto builder = diff_builder_t(*cluster);
                 builder.update_state(*peer_device, {}, model::device_state_t::online).apply(*sup);
-                CHECK(!discovery);
+                CHECK(messages.size() == 1);
                 CHECK(sup->timers.size() == 0);
 
                 builder.update_state(*peer_device, {}, model::device_state_t::offline).apply(*sup);
-                CHECK(!discovery);
+                CHECK(messages.size() == 2);
                 CHECK(sup->timers.size() == 1);
 
                 sup->do_invoke_timer((*sup->timers.begin())->request_id);
                 sup->do_process();
-                CHECK(discovery);
+                CHECK(messages.size() == 3);
+                CHECK(peer_device->get_state() == state_t::discovering);
                 CHECK(sup->timers.size() == 1);
             }
         }
@@ -129,12 +133,14 @@ void test_static_address() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main() noexcept override {
-            REQUIRE(!contact_update);
+            REQUIRE(messages.empty());
+            REQUIRE(peer_device->get_state() == state_t::offline);
             auto uri = utils::parse("tcp://127.0.0.1");
             peer_device->set_static_uris({uri});
 
             sup->do_process();
-            REQUIRE(contact_update);
+            REQUIRE(peer_device->get_state() == state_t::offline);
+            REQUIRE(messages.size() == 1);
         }
     };
     F(false).run();

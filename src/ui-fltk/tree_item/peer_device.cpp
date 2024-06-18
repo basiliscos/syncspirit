@@ -432,6 +432,8 @@ std::string peer_device_t::get_state() {
     switch (peer->get_state()) {
     case model::device_state_t::online:
         return "online";
+    case model::device_state_t::discovering:
+        return "discovering";
     case model::device_state_t::dialing:
         return "dialing";
     default:
