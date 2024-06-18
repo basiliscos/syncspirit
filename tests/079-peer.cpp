@@ -8,11 +8,11 @@
 #include "utils/format.hpp"
 #include "model/cluster.h"
 #include "model/messages.h"
-#include "model/diff/peer/peer_state.h"
 #include "net/names.h"
 #include "net/messages.h"
 #include "net/peer_actor.h"
 #include "transport/stream.h"
+#include "diff-builder.h"
 
 #include <rotor/asio.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -148,12 +148,8 @@ struct fixture_t : private model::diff::contact_visitor_t {
     virtual void main() noexcept {}
 
     virtual actor_ptr_t create_actor() noexcept {
-
-        auto diff = model::diff::cluster_diff_ptr_t();
-        auto state = model::device_state_t::dialing;
-        auto sha256 = peer_device->device_id().get_sha256();
-        diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
-        sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
+        auto builder = diff_builder_t(*cluster);
+        builder.update_state(*peer_device, {}, model::device_state_t::dialing).apply(*sup);
 
         auto bep_config = config::bep_config_t();
         bep_config.rx_buff_size = 1024;

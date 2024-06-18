@@ -5,7 +5,6 @@
 #include "test-utils.h"
 #include "diff-builder.h"
 #include "model/diff/peer/cluster_update.h"
-#include "model/diff/peer/peer_state.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -612,10 +611,7 @@ void test_peer_going_offline() {
             REQUIRE(db_peer.last_seen() == 0);
             peer->update_state(device_state_t::online);
 
-            auto diff = diff::cluster_diff_ptr_t(
-                new model::diff::peer::peer_state_t(*cluster, sha256, sup->get_address(), device_state_t::offline));
-            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-            sup->do_process();
+            builder.update_state(*peer, {}, device_state_t::offline).apply(*sup);
 
             sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();

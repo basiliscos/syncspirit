@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -9,7 +9,6 @@
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/file_availability.h"
 #include "model/diff/modify/update_contact.h"
-#include "model/diff/peer/peer_state.h"
 #include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit;
@@ -28,15 +27,13 @@ TEST_CASE("peer state update", "[model]") {
     cluster->get_devices().put(peer_device);
 
     rotor::address_ptr_t addr;
-    auto diff = diff::cluster_diff_ptr_t(
-        new diff::peer::peer_state_t(*cluster, peer_id.get_sha256(), addr, device_state_t::online));
-    CHECK(peer_device->get_state() == model::device_state_t::offline);
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(peer_device->get_state() == model::device_state_t::offline);
 
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::online).apply());
     CHECK(peer_device->get_state() == model::device_state_t::online);
 
-    diff = new diff::peer::peer_state_t(*cluster, peer_id.get_sha256(), addr, device_state_t::offline);
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::offline).apply());
     CHECK(peer_device->get_state() == model::device_state_t::offline);
 }
 

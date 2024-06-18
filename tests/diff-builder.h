@@ -11,7 +11,7 @@
 #include "syncspirit-test-export.h"
 #include "model/device.h"
 #include "model/file_info.h"
-#include "model/diff/cluster_diff.h"
+#include "model/diff/contact_diff.h"
 #include "model/diff/block_diff.h"
 #include "model/diff/aggregate.h"
 #include "model/diff/modify/block_transaction.h"
@@ -70,13 +70,17 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &clone_block(const model::file_block_t &, dispose_callback_t) noexcept;
     diff_builder_t &ack_block(const model::diff::modify::block_transaction_t &) noexcept;
     diff_builder_t &remove_peer(const model::device_t &peer) noexcept;
+    diff_builder_t &update_state(const model::device_t &peer, const r::address_ptr_t &peer_addr,
+                                 model::device_state_t state) noexcept;
 
   private:
     using bdiffs_t = std::deque<model::diff::block_diff_ptr_t>;
     using diffs_t = std::deque<model::diff::cluster_diff_ptr_t>;
+    using cdiff_t = std::deque<model::diff::contact_diff_ptr_t>;
     model::cluster_t &cluster;
     diffs_t diffs;
     bdiffs_t bdiffs;
+    cdiff_t cdiffs;
     friend struct cluster_configurer_t;
     friend struct index_maker_t;
 };

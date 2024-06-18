@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
-#include "model/diff/peer/peer_state.h"
+#include "diff-builder.h"
 
 #include "net/dialer_actor.h"
 #include "access.h"
@@ -106,20 +106,12 @@ void test_dialer() {
             }
 
             SECTION("peer online & offline") {
-                auto diff = model::diff::cluster_diff_ptr_t{};
-                auto sample_addr = sup->get_address();
-                auto peer_id = peer_device->device_id().get_sha256();
-                diff = new model::diff::peer::peer_state_t(*cluster, peer_id, sample_addr, device_state_t::online);
-                sup->send<model::payload::model_update_t>(sup->get_address(), diff);
-
-                sup->do_process();
+                auto builder = diff_builder_t(*cluster);
+                builder.update_state(*peer_device, {}, model::device_state_t::online).apply(*sup);
                 CHECK(!discovery);
                 CHECK(sup->timers.size() == 0);
 
-                diff = new model::diff::peer::peer_state_t(*cluster, peer_id, sample_addr, device_state_t::offline);
-                sup->send<model::payload::model_update_t>(sup->get_address(), diff);
-
-                sup->do_process();
+                builder.update_state(*peer_device, {}, model::device_state_t::offline).apply(*sup);
                 CHECK(!discovery);
                 CHECK(sup->timers.size() == 1);
 
