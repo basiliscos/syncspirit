@@ -149,14 +149,45 @@ void test_static_address() {
             sup->do_process();
             REQUIRE(peer_device->get_state() == state_t::offline);
             REQUIRE(messages.size() == 1);
+
+            diff_builder_t(*cluster).remove_peer(*peer_device).apply(*sup);
+            REQUIRE(sup->timers.size() == 0);
+            REQUIRE(messages.size() == 1);
         }
     };
     F(false).run();
 }
 
+void test_peer_removal() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main() noexcept override {
+            REQUIRE(messages.empty());
+            REQUIRE(peer_device->get_state() == state_t::offline);
+
+            SECTION("with announce") {
+                sup->send<net::payload::announce_notification_t>(sup->get_address());
+                sup->do_process();
+                REQUIRE(sup->timers.size() == 1);
+
+                diff_builder_t(*cluster).remove_peer(*peer_device).apply(*sup);
+                REQUIRE(sup->timers.size() == 0);
+            }
+
+            SECTION("without announce") {
+                diff_builder_t(*cluster).remove_peer(*peer_device).apply(*sup);
+                REQUIRE(sup->timers.size() == 0);
+            }
+        }
+    };
+    F(true).run();
+}
+
+
 int _init() {
     REGISTER_TEST_CASE(test_dialer, "test_dialer", "[net]");
     REGISTER_TEST_CASE(test_static_address, "test_static_address", "[net]");
+    REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     return 1;
 }
 
