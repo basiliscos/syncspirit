@@ -149,7 +149,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
 
     virtual actor_ptr_t create_actor() noexcept {
         auto builder = diff_builder_t(*cluster);
-        builder.update_state(*peer_device, {}, model::device_state_t::dialing).apply(*sup);
+        builder.update_state(*peer_device, {}, model::device_state_t::connecting).apply(*sup);
 
         auto bep_config = config::bep_config_t();
         bep_config.rx_buff_size = 1024;
