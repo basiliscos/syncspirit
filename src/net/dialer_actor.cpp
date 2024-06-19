@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "dialer_actor.h"
+#include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/update_contact.h"
 #include "model/diff/peer/peer_state.h"
 #include "names.h"
@@ -144,14 +145,12 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
 
 void dialer_actor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "on_model_update");
-#if 0
     auto &diff = *msg.payload.diff;
     auto r = diff.visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
-#endif
 }
 
 void dialer_actor_t::on_contact_update(model::message::contact_update_t &msg) noexcept {
@@ -181,6 +180,21 @@ auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &diff, voi
                     }
                 }
             }
+        }
+    }
+    return outcome::success();
+}
+
+auto dialer_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    for (auto it = redial_map.begin(); it != redial_map.end(); ++it) {
+        if (it->first->device_id().get_sha256() == diff.get_peer_sha256()) {
+            auto &info = it->second;
+            if (info.timer_id.has_value()) {
+                cancel_timer(*info.timer_id);
+            }
+            redial_map.erase(it);
+            break;
         }
     }
     return outcome::success();

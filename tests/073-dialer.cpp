@@ -124,6 +124,14 @@ void test_dialer() {
                 CHECK(peer_device->get_state() == state_t::discovering);
                 CHECK(sup->timers.size() == 1);
             }
+
+            SECTION("remove peer") {
+                auto builder = diff_builder_t(*cluster);
+                builder.remove_peer(*peer_device).apply(*sup);
+
+                REQUIRE(messages.size() == 1);
+                CHECK(sup->timers.size() == 0);
+            }
         }
     };
     F(true).run();
