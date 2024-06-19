@@ -139,6 +139,7 @@ void global_discovery_actor_t::on_announce_response(message::http_response_t &me
 }
 
 void global_discovery_actor_t::on_discovery_response(message::http_response_t &message) noexcept {
+    using namespace model::diff;
     LOG_TRACE(log, "on_discovery_response");
     resources->release(resource::http);
     http_request.reset();
@@ -150,6 +151,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     discovering_devices.erase(it);
 
     auto &ee = message.payload.ee;
+    bool found = false;
     if (ee) {
         LOG_WARN(log, "discovery failed = {}", ee->message());
     } else {
@@ -163,15 +165,21 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
             auto device_id = model::device_id_t::from_sha256(sha256).value();
             auto &uris = res.value();
             if (!uris.empty()) {
-                using namespace model::diff;
                 auto diff = model::diff::contact_diff_ptr_t{};
                 diff = new modify::update_contact_t(*cluster, device_id, uris);
                 send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
                 LOG_DEBUG(log, "on_discovery_response, found some URIs for {}", device_id);
+                found = true;
             } else {
                 LOG_DEBUG(log, "on_discovery_response, no known URIs for {}", device_id);
             }
         }
+    }
+    if (!found) {
+        using state_t = model::device_state_t;
+        auto diff = model::diff::contact_diff_ptr_t();
+        diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state_t::offline);
+        send<model::payload::contact_update_t>(coordinator, std::move(diff));
     }
 }
 

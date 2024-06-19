@@ -113,6 +113,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     using time_point_t = typename clock_t::time_point;
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_contact_update(model::message::contact_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
 
     time_point_t started_at;

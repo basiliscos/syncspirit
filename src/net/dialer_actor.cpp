@@ -85,16 +85,15 @@ void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
 }
 
 void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
+    if ((peer_device->is_dynamic() && !announced) || (state != r::state_t::OPERATIONAL)) {
+        return;
+    }
+    redial_map[peer_device].last_attempt = clock_t::now();
     if (peer_device->is_dynamic()) {
-        if (!announced) {
-            return;
-        }
         auto &device_id = peer_device->device_id();
-        auto &info = redial_map.at(peer_device);
         auto diff = model::diff::contact_diff_ptr_t();
         diff = new model::diff::peer::peer_state_t(*cluster, device_id.get_sha256(), nullptr, state_t::discovering);
         send<model::payload::contact_update_t>(coordinator, std::move(diff));
-        info.last_attempt = clock_t::now();
         schedule_redial(peer_device);
     } else {
         auto &uris = peer_device->get_static_uris();
@@ -106,15 +105,20 @@ void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
 void dialer_actor_t::schedule_redial(const model::device_ptr_t &peer_device) noexcept {
     using ms_t = std::chrono::milliseconds;
     auto &info = redial_map[peer_device];
+    if (info.timer_id.has_value()) {
+        return;
+    }
+
     auto delta = ms_t(redial_timeout.total_milliseconds());
     auto deadline = info.last_attempt + delta;
     auto now = clock_t::now();
     if (deadline >= now) {
         auto diff_ms = std::chrono::duration_cast<ms_t>(deadline - now).count();
-        LOG_TRACE(log, "scheduling (re)dial to {} in {} ms", peer_device->device_id(), diff_ms);
         auto diff = pt::millisec(diff_ms);
         auto redial_timer = start_timer(diff, *this, &dialer_actor_t::on_timer);
         info.timer_id = redial_timer;
+        LOG_TRACE(log, "scheduling (re)dial to {} in {} ms, timer_id = {}", peer_device->device_id(), diff_ms,
+                  redial_timer);
         resources->acquire(resource::timer);
     } else {
         LOG_TRACE(log, "will discover '{}' immediately", peer_device->device_id());
@@ -123,7 +127,7 @@ void dialer_actor_t::schedule_redial(const model::device_ptr_t &peer_device) noe
 }
 
 void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexcept {
-    LOG_TRACE(log, "on_timer, cancelled = {}", cancelled);
+    LOG_TRACE(log, "on_timer, cancelled = {}, timer_id = {}", cancelled, request_id);
     using value_t = typename redial_map_t::value_type;
     resources->release(resource::timer);
     auto predicate = [&](const value_t &val) -> bool { return val.second.timer_id == request_id; };
