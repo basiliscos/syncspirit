@@ -85,11 +85,12 @@ void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
 }
 
 void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
-    if ((peer_device->is_dynamic() && !announced) || (state != r::state_t::OPERATIONAL)) {
+    auto dynamic = peer_device->is_dynamic();
+    if ((dynamic && !announced) || (state != r::state_t::OPERATIONAL)) {
         return;
     }
     redial_map[peer_device].last_attempt = clock_t::now();
-    if (peer_device->is_dynamic()) {
+    if (dynamic) {
         auto &device_id = peer_device->device_id();
         auto diff = model::diff::contact_diff_ptr_t();
         diff = new model::diff::peer::peer_state_t(*cluster, device_id.get_sha256(), nullptr, state_t::discovering);
