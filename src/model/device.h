@@ -23,7 +23,7 @@ namespace pt = boost::posix_time;
 struct device_t;
 using device_ptr_t = intrusive_ptr_t<device_t>;
 
-enum class device_state_t { offline, discovering, dialing, online };
+enum class device_state_t { offline, discovering, connecting, online };
 
 struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     using uris_t = utils::uri_container_t;

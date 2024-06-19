@@ -95,16 +95,6 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&initiator_actor_t::on_resolve);
         resources->acquire(resource::initializing);
         if (role == role_t::active) {
-            if (cluster) {
-                auto diff = model::diff::contact_diff_ptr_t();
-                auto state = model::device_state_t::dialing;
-                auto sha256 = peer_device_id.get_sha256();
-                auto peer = cluster->get_devices().by_sha256(sha256);
-                if (peer) {
-                    diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
-                    send<model::payload::contact_update_t>(coordinator, std::move(diff));
-                }
-            }
             initiate_active();
         } else if (role == role_t::passive) {
             initiate_passive();
@@ -114,7 +104,20 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::resolver, resolver).link(false);
-        p.discover_name(names::coordinator, coordinator).link(false);
+        p.discover_name(names::coordinator, coordinator).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking && role == role_t::active) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                auto diff = model::diff::contact_diff_ptr_t();
+                auto state = model::device_state_t::connecting;
+                auto sha256 = peer_device_id.get_sha256();
+                auto peer = cluster->get_devices().by_sha256(sha256);
+                if (peer) {
+                    diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
+                    send<model::payload::contact_update_t>(coordinator, std::move(diff));
+                }
+            }
+        });
     });
 }
 

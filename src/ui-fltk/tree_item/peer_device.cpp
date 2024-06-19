@@ -434,8 +434,8 @@ std::string peer_device_t::get_state() {
         return "online";
     case model::device_state_t::discovering:
         return "discovering";
-    case model::device_state_t::dialing:
-        return "dialing";
+    case model::device_state_t::connecting:
+        return "connecting";
     default:
         return "offline";
     }

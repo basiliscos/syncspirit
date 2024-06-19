@@ -183,7 +183,6 @@ void test_peer_removal() {
     F(true).run();
 }
 
-
 int _init() {
     REGISTER_TEST_CASE(test_dialer, "test_dialer", "[net]");
     REGISTER_TEST_CASE(test_static_address, "test_static_address", "[net]");
