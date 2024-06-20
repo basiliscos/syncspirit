@@ -120,6 +120,7 @@ void devices_t::build_tree() {
     if (children() == 0) {
         auto self_node = new tree_item::self_device_t(supervisor, tree());
         add(prefs(), "self", self_node);
+        tree()->close(self_node, 0);
     }
 
     for (auto it : devices) {
@@ -151,4 +152,5 @@ void devices_t::add_device(const model::device_ptr_t &device) {
 
     auto device_node = new peer_device_t(device, supervisor, tree());
     add(prefs(), device_node->label(), device_node);
+    tree()->close(device_node, 0);
 }

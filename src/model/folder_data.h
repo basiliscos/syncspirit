@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -16,8 +16,13 @@ struct SYNCSPIRIT_API folder_data_t {
     enum class foldet_type_t { send = 0, receive, send_and_receive };
     enum class pull_order_t { random = 0, alphabetic, largest, oldest, newest };
 
-    const std::string &get_label() noexcept { return label; }
-    std::string_view get_id() const noexcept { return id; }
+    inline const std::string &get_label() noexcept { return label; }
+    inline std::string_view get_id() const noexcept { return id; }
+    inline bool is_read_only() const noexcept { return read_only; }
+    inline bool is_deletion_ignored() const noexcept { return ignore_delete; }
+    inline bool are_permissions_ignored() const noexcept { return ignore_permissions; }
+    inline bool are_temp_indixes_disabled() const noexcept { return disable_temp_indixes; }
+    inline bool is_paused() const noexcept { return paused; }
 
   protected:
     inline const bfs::path &get_path() noexcept { return path; }

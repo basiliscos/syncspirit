@@ -80,8 +80,6 @@ void self_device_t::on_select() {
 
         group->begin();
         auto top = [&]() -> Fl_Widget * {
-            auto data = table_rows_t();
-
             auto cluster = supervisor.get_cluster();
             auto device_id_short = std::string("XXXXXXX");
             auto device_id = std::string("XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX");
@@ -108,6 +106,7 @@ void self_device_t::on_select() {
                 fmt::format("{}.{}.{}{}", openssl_major, openssl_minor, openssl_patch, openssl_nibble_c);
             auto mbdx_version = fmt::format("{}.{}.{}", mdbx_version.major, mdbx_version.minor, mdbx_version.release);
 
+            auto data = table_rows_t();
             data.push_back({"device id (short)", device_id_short});
             data.push_back({"device id", device_id});
             data.push_back({"uptime", supervisor.get_uptime()});

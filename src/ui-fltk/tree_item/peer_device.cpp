@@ -1,6 +1,7 @@
 #include "peer_device.h"
 
 #include "../qr_button.h"
+#include "unknown_folders.h"
 
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/update_peer.h"
@@ -327,6 +328,9 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
 peer_device_t::peer_device_t(model::device_ptr_t peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), model_sub(supervisor.add(this)), peer{std::move(peer_)} {
     update_label();
+
+    auto unknown_folders = new unknown_folders_t(peer, supervisor, tree);
+    add(prefs(), unknown_folders->label(), unknown_folders);
 }
 
 void peer_device_t::update_label() {

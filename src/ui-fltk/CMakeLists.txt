@@ -24,6 +24,8 @@ add_executable(syncspirit-fltk WIN32
     tree_item/peer_device.cpp
     tree_item/self_device.cpp
     tree_item/settings.cpp
+    tree_item/unknown_folder.cpp
+    tree_item/unknown_folders.cpp
 )
 
 target_link_libraries(syncspirit-fltk
