@@ -286,6 +286,7 @@ void net_supervisor_t::launch_net() noexcept {
                 .device_id(std::move(global_device))
                 .rx_buff_size(gcfg.rx_buff_size)
                 .io_timeout(gcfg.timeout)
+                .debug(gcfg.debug)
                 .spawner_address(spawner)
                 .finish();
         };

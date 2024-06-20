@@ -154,6 +154,12 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         }
         c.enabled = enabled.value();
 
+        auto debug = t["debug"].value<bool>();
+        if (!debug) {
+            return "global_discovery/debug is incorrect or missing";
+        }
+        c.debug = debug.value();
+
         auto url = t["announce_url"].value<std::string>();
         if (!url) {
             return "global_discovery/announce_url is incorrect or missing";
@@ -206,6 +212,12 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         }
         c.enabled = enabled.value();
 
+        auto debug = t["debug"].value<bool>();
+        if (!debug) {
+            return "upnp/debug is incorrect or missing";
+        }
+        c.debug = debug.value();
+
         auto max_wait = t["max_wait"].value<std::uint32_t>();
         if (!max_wait) {
             return "upnp/max_wait is incorrect or missing";
@@ -223,12 +235,6 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
             return "upnp/rx_buff_size is incorrect or missing";
         }
         c.rx_buff_size = rx_buff_size.value();
-
-        auto debug = t["debug"].value<bool>();
-        if (!debug) {
-            return "upnp/debug is incorrect or missing";
-        }
-        c.debug = debug.value();
     };
 
     // relay
@@ -241,6 +247,12 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
             return "relay/enabled is incorrect or missing";
         }
         c.enabled = enabled.value();
+
+        auto debug = t["debug"].value<bool>();
+        if (!debug) {
+            return "relay/debug is incorrect or missing";
+        }
+        c.debug = debug.value();
 
         auto discovery_url_str = t["discovery_url"].value<std::string>();
         if (!discovery_url_str) {
@@ -428,6 +440,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                             }}},
         {"global_discovery", toml::table{{
                                  {"enabled", cfg.global_announce_config.enabled},
+                                 {"debug", cfg.global_announce_config.debug},
                                  {"announce_url", cfg.global_announce_config.announce_url->buffer().data()},
                                  {"device_id", cfg.global_announce_config.device_id},
                                  {"cert_file", cfg.global_announce_config.cert_file},
@@ -437,10 +450,10 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                              }}},
         {"upnp", toml::table{{
                      {"enabled", cfg.upnp_config.enabled},
+                     {"debug", cfg.upnp_config.debug},
                      {"max_wait", cfg.upnp_config.max_wait},
                      {"external_port", cfg.upnp_config.external_port},
                      {"rx_buff_size", cfg.upnp_config.rx_buff_size},
-                     {"debug", cfg.upnp_config.debug},
                  }}},
         {"bep", toml::table{{
                     {"rx_buff_size", cfg.bep_config.rx_buff_size},
@@ -467,6 +480,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                }}},
         {"relay", toml::table{{
                       {"enabled", cfg.relay_config.enabled},
+                      {"debug", cfg.relay_config.debug},
                       {"discovery_url", cfg.relay_config.discovery_url->buffer().data()},
                       {"rx_buff_size", cfg.relay_config.rx_buff_size},
                   }}},
@@ -527,7 +541,8 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         30000   /* frequency */
     };
     cfg.global_announce_config = global_announce_config_t{
-        true,
+        true,                                                   /* enabled */
+        false,                                                  /* debug */
         utils::parse("https://discovery.syncthing.net/"),
         "LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW",
         cert_file,
@@ -538,10 +553,10 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     };
     cfg.upnp_config = upnp_config_t {
         true,       /* enabled */
+        false,      /* debug */
         1,          /* max_wait */
         22001,      /* external port */
-        64 * 1024,  /* rx_buff */
-        false,      /* debug */
+        64 * 1024   /* rx_buff */
     };
     cfg.bep_config = bep_config_t {
         16 * 1024 * 1024,   /* rx_buff_size */
@@ -569,6 +584,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
 
     cfg.relay_config = relay_config_t {
         true,                                                   /* enabled */
+        false,                                                  /* debug */
         utils::parse("https://relays.syncthing.net/endpoint"),  /* discovery url */
         1024 * 1024,                                            /* rx buff size */
     };

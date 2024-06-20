@@ -32,9 +32,10 @@ bool operator==(const db_config_t &lhs, const db_config_t &rhs) noexcept {
 }
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && *lhs.announce_url == *rhs.announce_url && lhs.device_id == rhs.device_id &&
-           lhs.cert_file == rhs.cert_file && lhs.key_file == rhs.key_file && lhs.rx_buff_size == rhs.rx_buff_size &&
-           lhs.timeout == rhs.timeout && lhs.reannounce_after == rhs.reannounce_after;
+    return lhs.enabled == rhs.enabled && lhs.debug == rhs.debug && *lhs.announce_url == *rhs.announce_url &&
+           lhs.device_id == rhs.device_id && lhs.cert_file == rhs.cert_file && lhs.key_file == rhs.key_file &&
+           lhs.rx_buff_size == rhs.rx_buff_size && lhs.timeout == rhs.timeout &&
+           lhs.reannounce_after == rhs.reannounce_after;
 }
 
 bool operator==(const local_announce_config_t &lhs, const local_announce_config_t &rhs) noexcept {
@@ -51,7 +52,7 @@ bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept {
 }
 
 bool operator==(const relay_config_t &lhs, const relay_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && *lhs.discovery_url == *rhs.discovery_url &&
+    return lhs.enabled == rhs.enabled && lhs.debug == rhs.debug && *lhs.discovery_url == *rhs.discovery_url &&
            lhs.rx_buff_size == rhs.rx_buff_size;
 }
 

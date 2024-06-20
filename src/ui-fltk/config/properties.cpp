@@ -210,6 +210,10 @@ namespace global_discovery {
 
 void enabled_t::reflect_to(syncspirit::config::main_t &main) { main.global_announce_config.enabled = native_value; }
 
+debug_t::debug_t(bool value, bool default_value) : parent_t(value, default_value, "debug") {}
+
+void debug_t::reflect_to(syncspirit::config::main_t &main) { main.global_announce_config.debug = native_value; }
+
 announce_url_t::announce_url_t(std::string value, std::string default_value)
     : parent_t("announce_url", explanation_, std::move(value), std::move(default_value)) {}
 
@@ -322,6 +326,10 @@ const char *timeout_t::explanation_ = "main actors timeout, milliseconds";
 namespace relay {
 
 void enabled_t::reflect_to(syncspirit::config::main_t &main) { main.relay_config.enabled = native_value; }
+
+debug_t::debug_t(bool value, bool default_value) : parent_t(value, default_value, "debug") {}
+
+void debug_t::reflect_to(syncspirit::config::main_t &main) { main.relay_config.debug = native_value; }
 
 discovery_url_t::discovery_url_t(std::string value, std::string default_value)
     : parent_t("discovery_url", explanation_, std::move(value), std::move(default_value)) {}

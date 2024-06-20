@@ -25,6 +25,7 @@ struct global_discovery_actor_config_t : r::actor_config_t {
     std::uint32_t rx_buff_size;
     std::uint32_t io_timeout;
     model::cluster_ptr_t cluster;
+    bool debug = false;
 };
 
 template <typename Actor> struct global_discovery_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -59,6 +60,11 @@ template <typename Actor> struct global_discovery_actor_config_builder_t : r::ac
 
     builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&debug(bool value) && noexcept {
+        parent_t::config.debug = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -101,6 +107,7 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
     std::uint32_t rx_buff_size;
     std::uint32_t io_timeout;
     bool announced = false;
+    bool debug = false;
     r::address_ptr_t addr_announce;  /* for routing */
     r::address_ptr_t addr_discovery; /* for routing */
     std::optional<r::request_id_t> timer_request;

@@ -204,6 +204,14 @@ struct enabled_t final : impl::bool_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
+struct debug_t final : impl::bool_t {
+    using parent_t = impl::bool_t;
+    using parent_t::parent_t;
+
+    debug_t(bool value, bool default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
 struct announce_url_t final : impl::url_t {
     using parent_t = impl::url_t;
 
@@ -342,6 +350,14 @@ struct enabled_t final : impl::bool_t {
     using parent_t = impl::bool_t;
     using parent_t::parent_t;
 
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct debug_t final : impl::bool_t {
+    using parent_t = impl::bool_t;
+    using parent_t::parent_t;
+
+    debug_t(bool value, bool default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 

@@ -10,6 +10,7 @@ namespace syncspirit::config {
 
 struct global_announce_config_t {
     bool enabled;
+    bool debug;
     utils::uri_ptr_t announce_url;
     std::string device_id;
     std::string cert_file;

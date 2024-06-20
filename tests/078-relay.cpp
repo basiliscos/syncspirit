@@ -79,6 +79,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
         log = utils::get_logger("fixture");
         relay_config = config::relay_config_t{
             true,
+            true,
             utils::parse("https://some-endpoint.com/"),
             1024 * 1024,
         };

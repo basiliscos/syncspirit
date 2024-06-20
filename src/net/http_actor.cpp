@@ -211,10 +211,10 @@ void http_actor_t::write_request() noexcept {
     auto &data = payload.data;
     LOG_TRACE(log, "sending {} bytes to {} ", data.size(), url);
     auto buff = asio::buffer(data.data(), data.size());
-    /*
-    std::string write_data{(const char *)buff.data(), data.size()};
-    LOG_DEBUG(log, "write_request: \n{}", write_data);
-    */
+    if (payload.debug) {
+        std::string_view write_data{(const char *)buff.data(), data.size()};
+        LOG_DEBUG(log, "request ({}):\n{}", data.size(), write_data);
+    }
     transport::io_fn_t on_write = [&](auto arg) { this->on_request_sent(arg); };
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
     transport->async_send(buff, on_write, on_error);
@@ -239,11 +239,13 @@ void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
 void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     resources->release(resource::io);
     response_size = bytes;
-    /*
-    auto &rx_buff = *queue.front()->payload.request_payload->rx_buff;
-    std::string data{(const char *)rx_buff.data().data(), bytes};
-    LOG_DEBUG(log, "http_actor_t::on_request_read ({}): \n{}", registry_name, data);
-    */
+
+    auto &req = *queue.front();
+    if (req.payload.request_payload->debug) {
+        auto &rx_buff = *queue.front()->payload.request_payload->rx_buff;
+        std::string_view data{(const char *)rx_buff.data().data(), bytes};
+        LOG_DEBUG(log, "response ({}):\n{}", bytes, data);
+    }
     if (keep_alive && http_response.keep_alive()) {
         kept_alive = true;
         last_read = clock_t::local_time();
@@ -256,7 +258,7 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
         cancel_timer(*timer_request);
     }
 
-    reply_to(*queue.front(), std::move(http_response), response_size, std::move(local_address));
+    reply_to(req, std::move(http_response), response_size, std::move(local_address));
     queue.pop_front();
     need_response = false;
 

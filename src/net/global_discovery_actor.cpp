@@ -24,7 +24,7 @@ r::plugin::resource_id_t http = 1;
 global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, device_id{cfg.device_id}, announce_url{cfg.announce_url},
       discovery_device_id{std::move(cfg.device_id)}, ssl_pair{*cfg.ssl_pair}, rx_buff_size{cfg.rx_buff_size},
-      io_timeout(cfg.io_timeout), cluster{cfg.cluster} {
+      io_timeout(cfg.io_timeout), debug{cfg.debug}, cluster{cfg.cluster} {
     rx_buff = std::make_shared<rx_buff_t::element_type>(rx_buff_size);
 }
 
@@ -210,7 +210,7 @@ void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils:
     auto timeout = r::pt::millisec{io_timeout};
     transport::ssl_junction_t ssl{discovery_device_id, &ssl_pair, true, ""};
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
-                                                        rx_buff_size, std::move(ssl), custom)
+                                                        rx_buff_size, std::move(ssl), debug, custom)
                        .send(timeout);
     resources->acquire(resource::http);
 }

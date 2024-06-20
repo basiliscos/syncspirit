@@ -137,7 +137,7 @@ void relay_actor_t::request_relay_list() noexcept {
     resources->acquire(resource::http);
     transport::ssl_junction_t ssl{model::device_id_t{}, nullptr, true, {}};
     http_request = request<payload::http_request_t>(http_client, uri, std::move(tx_buff), http_rx_buff,
-                                                    config.rx_buff_size, std::move(ssl))
+                                                    config.rx_buff_size, std::move(ssl), config.debug)
                        .send(timeout);
 }
 

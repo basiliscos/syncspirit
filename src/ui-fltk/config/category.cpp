@@ -78,6 +78,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
         auto props = properties_t{
             // clang-format off
             property_ptr_t(new global_discovery::enabled_t(g.enabled, g_def.enabled)),
+            property_ptr_t(new global_discovery::debug_t(g.debug, g_def.debug)),
             property_ptr_t(new global_discovery::cert_file_t(g.cert_file, g_def.cert_file)),
             property_ptr_t(new global_discovery::key_file_t(g.key_file, g_def.key_file)),
             property_ptr_t(new global_discovery::announce_url_t(g.announce_url->buffer(), g_def.announce_url->buffer())),
@@ -122,6 +123,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
         auto props = properties_t{
             // clang-format off
             property_ptr_t(new relay::enabled_t(l.enabled, l_def.enabled)),
+            property_ptr_t(new relay::debug_t(l.enabled, l_def.enabled)),
             property_ptr_t(new relay::discovery_url_t(l.discovery_url->buffer(), l_def.discovery_url->buffer())),
             property_ptr_t(new relay::rx_buff_size_t(l.rx_buff_size, l_def.rx_buff_size)),
             // clang-format on
