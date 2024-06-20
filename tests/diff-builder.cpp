@@ -15,10 +15,10 @@
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/remove_peer.h"
-#include "model/diff/modify/update_contact.h"
+#include "model/diff/contact/update_contact.h"
+#include "model/diff/contact/peer_state.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
-#include "model/diff/peer/peer_state.h"
 
 #include <algorithm>
 
@@ -199,7 +199,7 @@ diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcep
 diff_builder_t &diff_builder_t::update_state(const model::device_t &peer, const r::address_ptr_t &peer_addr,
                                              model::device_state_t state) noexcept {
     model::diff::contact_diff_ptr_t diff;
-    diff.reset(new model::diff::peer::peer_state_t(cluster, peer.device_id().get_sha256(), peer_addr, state));
+    diff.reset(new model::diff::contact::peer_state_t(cluster, peer.device_id().get_sha256(), peer_addr, state));
     cdiffs.emplace_back(std::move(diff));
     return *this;
 }

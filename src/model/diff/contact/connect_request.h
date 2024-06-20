@@ -8,7 +8,7 @@
 #include "../contact_diff.h"
 #include "model/cluster.h"
 
-namespace syncspirit::model::diff::modify {
+namespace syncspirit::model::diff::contact {
 
 namespace asio = boost::asio;
 using tcp = asio::ip::tcp;
@@ -27,4 +27,4 @@ struct SYNCSPIRIT_API connect_request_t final : contact_diff_t {
     mutable mutex_t mutex;
 };
 
-} // namespace syncspirit::model::diff::modify
+} // namespace syncspirit::model::diff::contact

@@ -8,7 +8,7 @@
 #include "utils/format.hpp"
 #include "model/cluster.h"
 #include "model/messages.h"
-#include "model/diff/modify/relay_connect_request.h"
+#include "model/diff/contact/relay_connect_request.h"
 #include "net/names.h"
 #include "net/messages.h"
 #include "net/relay_actor.h"
@@ -350,7 +350,7 @@ void test_passive() {
             }
         }
 
-        outcome::result<void> operator()(const model::diff::modify::relay_connect_request_t &diff,
+        outcome::result<void> operator()(const model::diff::contact::relay_connect_request_t &diff,
                                          void *) noexcept override {
             CHECK(diff.peer == peer_device->device_id());
             CHECK(diff.session_key == session_key);

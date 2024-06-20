@@ -37,7 +37,7 @@ struct peer_device_t : tree_item_t,
     void operator()(model::message::contact_update_t &) override;
     outcome::result<void> operator()(const diff::modify::update_peer_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const diff::modify::remove_peer_t &, void *custom) noexcept override;
-    outcome::result<void> operator()(const diff::peer::peer_state_t &, void *custom) noexcept override;
+    outcome::result<void> operator()(const diff::contact::peer_state_t &, void *custom) noexcept override;
 
     const model::device_t &get_device() const;
     widgetable_ptr_t record(peer_widget_ptr_t);

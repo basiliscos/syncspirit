@@ -7,7 +7,7 @@
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "hasher/hasher_proxy_actor.h"
-#include "model/diff/peer/peer_state.h"
+#include "model/diff/contact/peer_state.h"
 
 using namespace syncspirit::net;
 
@@ -59,7 +59,7 @@ void cluster_supervisor_t::on_contact_update(model::message::contact_update_t &m
     }
 }
 
-auto cluster_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff, void *) noexcept
+auto cluster_supervisor_t::operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept
     -> outcome::result<void> {
     if (!cluster->is_tainted() && diff.known) {
         auto peer = cluster->get_devices().by_sha256(diff.peer_id);

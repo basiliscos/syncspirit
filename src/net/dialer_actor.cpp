@@ -3,8 +3,8 @@
 
 #include "dialer_actor.h"
 #include "model/diff/modify/remove_peer.h"
-#include "model/diff/modify/update_contact.h"
-#include "model/diff/peer/peer_state.h"
+#include "model/diff/contact/update_contact.h"
+#include "model/diff/contact/peer_state.h"
 #include "names.h"
 #include "utils/format.hpp"
 #include <cassert>
@@ -94,12 +94,12 @@ void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
     if (dynamic) {
         auto &device_id = peer_device->device_id();
         auto diff = model::diff::contact_diff_ptr_t();
-        diff = new model::diff::peer::peer_state_t(*cluster, device_id.get_sha256(), nullptr, state_t::discovering);
+        diff = new model::diff::contact::peer_state_t(*cluster, device_id.get_sha256(), nullptr, state_t::discovering);
         send<model::payload::contact_update_t>(coordinator, std::move(diff));
         schedule_redial(peer_device);
     } else {
         auto &uris = peer_device->get_static_uris();
-        auto diff = new model::diff::modify::update_contact_t(*cluster, peer_device->device_id(), uris);
+        auto diff = new model::diff::contact::update_contact_t(*cluster, peer_device->device_id(), uris);
         send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     }
 }
@@ -163,7 +163,8 @@ void dialer_actor_t::on_contact_update(model::message::contact_update_t &msg) no
     }
 }
 
-auto dialer_actor_t::operator()(const model::diff::peer::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
+auto dialer_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept
+    -> outcome::result<void> {
     if (announced && diff.known) {
         auto &devices = cluster->get_devices();
         auto peer = devices.by_sha256(diff.peer_id);

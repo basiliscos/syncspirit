@@ -5,7 +5,7 @@
 #include "model/cluster.h"
 #include "model/diff/contact_visitor.h"
 
-using namespace syncspirit::model::diff::peer;
+using namespace syncspirit::model::diff::contact;
 
 peer_state_t::peer_state_t(cluster_t &cluster, std::string_view peer_id_, const r::address_ptr_t &peer_addr_,
                            model::device_state_t state_, std::string cert_name_, tcp::endpoint endpoint_,

@@ -87,8 +87,8 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
     void make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, fmt::memory_buffer &&tx_buff,
                       const custom_msg_ptr_t &custom = {}) noexcept;
 
-    outcome::result<void> operator()(const model::diff::modify::update_contact_t &, void *custom) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *custom) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::update_contact_t &, void *custom) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *custom) noexcept override;
 
     model::device_id_t device_id;
     utils::logger_t log;

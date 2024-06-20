@@ -5,18 +5,18 @@
 
 using namespace syncspirit::model::diff;
 
-auto contact_visitor_t::operator()(const modify::connect_request_t &, void *) noexcept -> outcome::result<void> {
+auto contact_visitor_t::operator()(const contact::connect_request_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
 
-auto contact_visitor_t::operator()(const modify::update_contact_t &, void *) noexcept -> outcome::result<void> {
+auto contact_visitor_t::operator()(const contact::update_contact_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
 
-auto contact_visitor_t::operator()(const modify::relay_connect_request_t &, void *) noexcept -> outcome::result<void> {
+auto contact_visitor_t::operator()(const contact::relay_connect_request_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
 
-auto contact_visitor_t::operator()(const peer::peer_state_t &, void *) noexcept -> outcome::result<void> {
+auto contact_visitor_t::operator()(const contact::peer_state_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }

@@ -5,7 +5,7 @@
 #include "diff-builder.h"
 #include "access.h"
 #include "model/cluster.h"
-#include "model/diff/modify/update_contact.h"
+#include "model/diff/contact/update_contact.h"
 #include "utils/tls.h"
 #include "utils/error_code.h"
 #include "net/global_discovery_actor.h"
@@ -235,7 +235,7 @@ void test_late_announcement() {
         void main() noexcept override {
 
             auto diff = model::diff::contact_diff_ptr_t{};
-            diff = new model::diff::modify::update_contact_t(*cluster, {"127.0.0.3"});
+            diff = new model::diff::contact::update_contact_t(*cluster, {"127.0.0.3"});
             sup->send<model::payload::contact_update_t>(sup->get_address(), diff);
 
             http::response<http::string_body> res;

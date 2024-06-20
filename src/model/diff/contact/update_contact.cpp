@@ -8,7 +8,7 @@
 #include <set>
 
 using namespace syncspirit;
-using namespace syncspirit::model::diff::modify;
+using namespace syncspirit::model::diff::contact;
 
 namespace {
 

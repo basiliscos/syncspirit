@@ -69,7 +69,7 @@ struct SYNCSPIRIT_API dialer_actor_t : public r::actor_base_t,
     void schedule_redial(const model::device_ptr_t &device) noexcept;
     void on_timer(r::request_id_t request_id, bool cancelled) noexcept;
 
-    outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
 
     utils::logger_t log;

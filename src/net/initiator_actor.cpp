@@ -8,7 +8,7 @@
 #include "proto/relay_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
-#include "model/diff/peer/peer_state.h"
+#include "model/diff/contact/peer_state.h"
 #include <algorithm>
 #include <spdlog/fmt/bin_to_hex.h>
 #include <fmt/core.h>
@@ -111,7 +111,7 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto sha256 = peer_device_id.get_sha256();
                 auto peer = cluster && cluster->get_devices().by_sha256(sha256);
                 if (peer) {
-                    diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
+                    diff = new model::diff::contact::peer_state_t(*cluster, sha256, nullptr, state);
                     send<model::payload::contact_update_t>(coordinator, std::move(diff));
                 }
             }
@@ -205,7 +205,7 @@ void initiator_actor_t::shutdown_finish() noexcept {
         auto peer = cluster->get_devices().by_sha256(sha256);
         if (peer) {
             auto diff = model::diff::contact_diff_ptr_t();
-            diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state);
+            diff = new model::diff::contact::peer_state_t(*cluster, sha256, nullptr, state);
             send<model::payload::contact_update_t>(coordinator, std::move(diff));
         }
     }

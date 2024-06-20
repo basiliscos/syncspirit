@@ -8,8 +8,8 @@
 #include "utils/beast_support.h"
 #include "utils/error_code.h"
 #include "http_actor.h"
-#include "model/diff/modify/update_contact.h"
-#include "model/diff/peer/peer_state.h"
+#include "model/diff/contact/update_contact.h"
+#include "model/diff/contact/peer_state.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit::net;
@@ -145,7 +145,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     http_request.reset();
     auto &custom = message.payload.req->payload.request_payload->custom;
     auto msg = static_cast<model::message::contact_update_t *>(custom.get());
-    auto diff = static_cast<model::diff::peer::peer_state_t *>(msg->payload.diff.get());
+    auto diff = static_cast<model::diff::contact::peer_state_t *>(msg->payload.diff.get());
     auto sha256 = diff->peer_id;
     auto it = discovering_devices.find(sha256);
     discovering_devices.erase(it);
@@ -169,7 +169,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
                 found = true;
                 if (cluster->get_devices().by_sha256(sha256)) {
                     auto diff = model::diff::contact_diff_ptr_t{};
-                    diff = new modify::update_contact_t(*cluster, device_id, uris);
+                    diff = new contact::update_contact_t(*cluster, device_id, uris);
                     send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
                 } else {
                     LOG_DEBUG(log, "on_discovery_response, device '{}' is no longer exist", device_id);
@@ -182,7 +182,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     if (!found) {
         using state_t = model::device_state_t;
         auto diff = model::diff::contact_diff_ptr_t();
-        diff = new model::diff::peer::peer_state_t(*cluster, sha256, nullptr, state_t::offline);
+        diff = new model::diff::contact::peer_state_t(*cluster, sha256, nullptr, state_t::offline);
         send<model::payload::contact_update_t>(coordinator, std::move(diff));
     }
 }
@@ -228,7 +228,7 @@ void global_discovery_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
-auto global_discovery_actor_t::operator()(const model::diff::modify::update_contact_t &diff, void *) noexcept
+auto global_discovery_actor_t::operator()(const model::diff::contact::update_contact_t &diff, void *) noexcept
     -> outcome::result<void> {
     if (diff.self && state == r::state_t::OPERATIONAL) {
         if (resources->has(resource::timer)) {
@@ -239,7 +239,7 @@ auto global_discovery_actor_t::operator()(const model::diff::modify::update_cont
     return outcome::success();
 }
 
-auto global_discovery_actor_t::operator()(const model::diff::peer::peer_state_t &diff, void *custom) noexcept
+auto global_discovery_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if ((state != r::state_t::OPERATIONAL) || (diff.state != model::device_state_t::discovering)) {
         return outcome::success();

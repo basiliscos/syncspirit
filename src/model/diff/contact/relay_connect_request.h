@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -9,7 +9,7 @@
 #include "model/cluster.h"
 #include "model/device_id.h"
 
-namespace syncspirit::model::diff::modify {
+namespace syncspirit::model::diff::contact {
 
 namespace asio = boost::asio;
 using tcp = asio::ip::tcp;
@@ -25,4 +25,4 @@ struct SYNCSPIRIT_API relay_connect_request_t final : contact_diff_t {
     tcp::endpoint relay;
 };
 
-} // namespace syncspirit::model::diff::modify
+} // namespace syncspirit::model::diff::contact

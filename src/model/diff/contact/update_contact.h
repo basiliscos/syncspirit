@@ -6,7 +6,7 @@
 #include "../contact_diff.h"
 #include "model/cluster.h"
 
-namespace syncspirit::model::diff::modify {
+namespace syncspirit::model::diff::contact {
 
 struct SYNCSPIRIT_API update_contact_t final : contact_diff_t {
     using ip_addresses_t = std::vector<std::string_view>;
@@ -24,4 +24,4 @@ struct SYNCSPIRIT_API update_contact_t final : contact_diff_t {
     bool self;
 };
 
-} // namespace syncspirit::model::diff::modify
+} // namespace syncspirit::model::diff::contact

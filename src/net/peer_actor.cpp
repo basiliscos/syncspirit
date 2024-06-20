@@ -9,7 +9,7 @@
 #include "utils/format.hpp"
 #include "proto/bep_support.h"
 #include "model/messages.h"
-#include "model/diff/peer/peer_state.h"
+#include "model/diff/contact/peer_state.h"
 #include <boost/core/demangle.hpp>
 #include <sstream>
 
@@ -244,7 +244,7 @@ void peer_actor_t::shutdown_finish() noexcept {
     if (state != model::device_state_t::offline) {
         auto diff = model::diff::contact_diff_ptr_t();
         auto state = model::device_state_t::offline;
-        diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, state);
+        diff = new model::diff::contact::peer_state_t(*cluster, sha256, address, state);
         send<model::payload::contact_update_t>(coordinator, std::move(diff));
     }
 }
@@ -331,8 +331,8 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
                 }
                 auto diff = contact_diff_ptr_t();
                 auto state = model::device_state_t::online;
-                diff = new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), state, cert_name,
-                                              peer_endpoint, msg->client_name());
+                diff = new contact::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), state, cert_name,
+                                                 peer_endpoint, msg->client_name());
                 send<model::payload::contact_update_t>(coordinator, std::move(diff));
             } else {
                 LOG_WARN(log, "read_hello, unexpected_message");

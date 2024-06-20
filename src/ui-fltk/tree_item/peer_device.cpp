@@ -4,7 +4,7 @@
 
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/update_peer.h"
-#include "model/diff/peer/peer_state.h"
+#include "model/diff/contact/peer_state.h"
 #include "utils/format.hpp"
 
 #include <FL/Fl_Tile.H>
@@ -345,7 +345,7 @@ void peer_device_t::operator()(model::message::contact_update_t &update) {
     std::ignore = update.payload.diff->visit(*this, nullptr);
 }
 
-auto peer_device_t::operator()(const diff::peer::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
+auto peer_device_t::operator()(const diff::contact::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
     if (diff.peer_id == peer->device_id().get_sha256()) {
         if (diff.state == model::device_state_t::online) {
             peer_endpoint = diff.endpoint;

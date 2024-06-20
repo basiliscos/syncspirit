@@ -8,7 +8,7 @@
 #include "model/device.h"
 #include <boost/asio/ip/tcp.hpp>
 
-namespace syncspirit::model::diff::peer {
+namespace syncspirit::model::diff::contact {
 
 namespace r = rotor;
 using tcp = boost::asio::ip::tcp;
@@ -31,4 +31,4 @@ struct SYNCSPIRIT_API peer_state_t final : contact_diff_t {
     bool has_been_online;
 };
 
-} // namespace syncspirit::model::diff::peer
+} // namespace syncspirit::model::diff::contact

@@ -7,6 +7,7 @@
 #include "db/prefix.h"
 #include "db/utils.h"
 #include "db/error_code.h"
+#include "model/diff/contact/peer_state.h"
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/close_transaction.h"
 #include "model/diff/load/devices.h"
@@ -33,7 +34,6 @@
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/diff/peer/cluster_update.h"
-#include "model/diff/peer/peer_state.h"
 #include "model/diff/cluster_visitor.h"
 #include <string_view>
 
@@ -740,7 +740,7 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::peer::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }

@@ -9,8 +9,8 @@
 #include "utils/format.hpp"
 #include "model/messages.h"
 #include "model/diff/contact_diff.h"
-#include "model/diff/modify/connect_request.h"
-#include "model/diff/modify/update_contact.h"
+#include "model/diff/contact/connect_request.h"
+#include "model/diff/contact/update_contact.h"
 
 using namespace syncspirit::net;
 using namespace syncspirit::model::diff;
@@ -72,7 +72,7 @@ void acceptor_actor_t::on_start() noexcept {
     }
 
     auto diff = model::diff::contact_diff_ptr_t{};
-    diff = new modify::update_contact_t(*cluster, cluster->get_device()->device_id(), uris);
+    diff = new contact::update_contact_t(*cluster, cluster->get_device()->device_id(), uris);
     send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     accept_next();
     r::actor_base_t::on_start();
@@ -115,7 +115,7 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
     LOG_TRACE(log, "on_accept, peer = {}", remote);
 
     auto diff = model::diff::contact_diff_ptr_t{};
-    diff = new modify::connect_request_t(std::move(peer), remote);
+    diff = new contact::connect_request_t(std::move(peer), remote);
     send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     accept_next();
 }

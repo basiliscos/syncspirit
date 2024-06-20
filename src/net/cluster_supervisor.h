@@ -62,7 +62,7 @@ struct SYNCSPIRIT_API cluster_supervisor_t : public ra::supervisor_asio_t, priva
   private:
     void on_contact_update(model::message::contact_update_t &) noexcept;
 
-    outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
 
     utils::logger_t log;
     r::address_ptr_t coordinator;

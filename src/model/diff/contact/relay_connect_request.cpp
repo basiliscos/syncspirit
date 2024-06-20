@@ -4,7 +4,7 @@
 #include "relay_connect_request.h"
 #include "../contact_visitor.h"
 
-using namespace syncspirit::model::diff::modify;
+using namespace syncspirit::model::diff::contact;
 
 relay_connect_request_t::relay_connect_request_t(model::device_id_t peer_, std::string session_key_,
                                                  tcp::endpoint relay_) noexcept

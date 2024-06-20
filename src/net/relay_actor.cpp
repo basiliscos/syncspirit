@@ -7,8 +7,8 @@
 #include "utils/error_code.h"
 #include "utils/beast_support.h"
 #include "model/messages.h"
-#include "model/diff/modify/update_contact.h"
-#include "model/diff/modify/relay_connect_request.h"
+#include "model/diff/contact/update_contact.h"
+#include "model/diff/contact/relay_connect_request.h"
 #include <spdlog/fmt/bin_to_hex.h>
 #include "messages.h"
 #include <cstdlib>
@@ -75,7 +75,7 @@ void relay_actor_t::shutdown_start() noexcept {
         }
         using namespace model::diff;
         auto diff = model::diff::contact_diff_ptr_t{};
-        diff = new modify::update_contact_t(*cluster, self->device_id(), uris);
+        diff = new contact::update_contact_t(*cluster, self->device_id(), uris);
         send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     }
 }
@@ -353,7 +353,7 @@ bool relay_actor_t::on(proto::relay::response_t &res) noexcept {
     uris.emplace_back(relays[relay_index]->uri);
     using namespace model::diff;
     auto diff = model::diff::contact_diff_ptr_t{};
-    diff = new modify::update_contact_t(*cluster, self->device_id(), uris);
+    diff = new contact::update_contact_t(*cluster, self->device_id(), uris);
     send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     return true;
 }
@@ -382,8 +382,8 @@ bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
         relay_ep = asio::ip::tcp::endpoint{master_endpoint.address(), (uint16_t)msg.port};
     }
 
-    diff = new model::diff::modify::relay_connect_request_t(std::move(device_opt.value()), std::move(msg.key),
-                                                            std::move(relay_ep));
+    diff = new model::diff::contact::relay_connect_request_t(std::move(device_opt.value()), std::move(msg.key),
+                                                             std::move(relay_ep));
     send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     return true;
 }
