@@ -3,8 +3,9 @@
 
 #include "dialer_actor.h"
 #include "model/diff/modify/remove_peer.h"
-#include "model/diff/contact/update_contact.h"
+#include "model/diff/contact/dial_request.h"
 #include "model/diff/contact/peer_state.h"
+#include "model/diff/contact/update_contact.h"
 #include "names.h"
 #include "utils/format.hpp"
 #include <cassert>
@@ -21,7 +22,8 @@ r::plugin::resource_id_t timer = 0;
 
 dialer_actor_t::dialer_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster},
-      redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}}, announced{false} {}
+      redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}},
+      skip_discovers{config.dialer_config.skip_discovers}, announced{false} {}
 
 void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -85,21 +87,51 @@ void dialer_actor_t::on_announce(message::announce_notification_t &) noexcept {
     }
 }
 
-void dialer_actor_t::discover(const model::device_ptr_t &peer_device) noexcept {
+void dialer_actor_t::discover_or_dial(const model::device_ptr_t &peer_device) noexcept {
     auto dynamic = peer_device->is_dynamic();
     if ((dynamic && !announced) || (state != r::state_t::OPERATIONAL)) {
         return;
     }
-    redial_map[peer_device].last_attempt = clock_t::now();
-    if (dynamic) {
-        auto &device_id = peer_device->device_id();
+
+    auto &info = redial_map[peer_device];
+    info.last_attempt = clock_t::now();
+    auto &device_id = peer_device->device_id();
+    bool do_dial = false;
+    bool do_discover = false;
+    bool do_update = false;
+
+    if (!dynamic) {
+        if (peer_device->get_uris().size()) {
+            do_dial = true;
+        } else {
+            do_update = true;
+        }
+    } else {
+        if (!peer_device->get_uris().size()) {
+            do_discover = true;
+        } else if (info.skip_discovers) {
+            --info.skip_discovers;
+            do_dial = true;
+        } else {
+            do_discover = true;
+        }
+    }
+
+    if (do_discover) {
         auto diff = model::diff::contact_diff_ptr_t();
         diff = new model::diff::contact::peer_state_t(*cluster, device_id.get_sha256(), nullptr, state_t::discovering);
         send<model::payload::contact_update_t>(coordinator, std::move(diff));
-        schedule_redial(peer_device);
-    } else {
+    }
+    if (do_dial) {
+        auto diff = new model::diff::contact::dial_request_t(*peer_device);
+        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+        LOG_TRACE(log, "discover_or_dial, dialing to {} (dynamic = {}, discover attempts left = {})", device_id,
+                  dynamic, info.skip_discovers);
+    }
+    if (do_update) {
+        // will dial indirectly
         auto &uris = peer_device->get_static_uris();
-        auto diff = new model::diff::contact::update_contact_t(*cluster, peer_device->device_id(), uris);
+        auto diff = new model::diff::contact::update_contact_t(*cluster, device_id, uris);
         send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     }
 }
@@ -124,7 +156,7 @@ void dialer_actor_t::schedule_redial(const model::device_ptr_t &peer_device) noe
         resources->acquire(resource::timer);
     } else {
         LOG_TRACE(log, "will discover '{}' immediately", peer_device->device_id());
-        discover(peer_device);
+        discover_or_dial(peer_device);
     }
 }
 
@@ -139,7 +171,7 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
     auto &info = it->second;
     info.timer_id.reset();
     if (!cancelled) {
-        discover(peer);
+        discover_or_dial(peer);
     }
 }
 
@@ -165,24 +197,51 @@ void dialer_actor_t::on_contact_update(model::message::contact_update_t &msg) no
 
 auto dialer_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept
     -> outcome::result<void> {
-    if (announced && diff.known) {
-        auto &devices = cluster->get_devices();
-        auto peer = devices.by_sha256(diff.peer_id);
+    if (!diff.known) {
+        return outcome::success();
+    }
+    auto &devices = cluster->get_devices();
+    auto peer = devices.by_sha256(diff.peer_id);
 
-        if (peer) {
-            if (diff.state == state_t::offline) {
-                schedule_redial(peer);
-            } else if (diff.state == state_t::online) {
-                auto it = redial_map.find(peer);
-                if (it != redial_map.end()) {
-                    auto &info = it->second;
-                    if (info.timer_id) {
-                        cancel_timer(*info.timer_id);
-                    }
+    if (peer) {
+        if (diff.state == state_t::offline) {
+            schedule_redial(peer);
+        } else if (diff.state == state_t::online) {
+            auto it = redial_map.find(peer);
+            if (it != redial_map.end()) {
+                auto &info = it->second;
+                if (info.timer_id) {
+                    cancel_timer(*info.timer_id);
                 }
             }
         }
     }
+
+    return outcome::success();
+}
+
+auto dialer_actor_t::operator()(const model::diff::contact::update_contact_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    auto &devices = cluster->get_devices();
+    auto peer = devices.by_sha256(diff.device.get_sha256());
+    if (!peer || peer == cluster->get_device()) {
+        return outcome::success();
+    }
+
+    using state_t = model::device_state_t;
+    auto state = peer->get_state();
+    if (peer->get_uris().size() && (state == state_t::offline || state == state_t::discovering)) {
+        LOG_TRACE(log, "dialing to {}", peer->device_id());
+        auto diff = new model::diff::contact::dial_request_t(*peer);
+        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+        if (state == state_t::discovering) {
+            auto it = redial_map.find(peer);
+            if (it != redial_map.end()) {
+                it->second.skip_discovers = skip_discovers;
+            }
+        }
+    }
+
     return outcome::success();
 }
 

@@ -54,6 +54,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             // clang-format off
             property_ptr_t(new dialer::enabled_t(d.enabled, d_def.enabled)),
             property_ptr_t(new dialer::redial_timeout_t(d.redial_timeout, d_def.redial_timeout)),
+            property_ptr_t(new dialer::skip_discovers_t(d.skip_discovers, d_def.skip_discovers)),
             // clang-format on
         };
         return new category_t("dialer", "outbound connection scheduler settings", std::move(props));

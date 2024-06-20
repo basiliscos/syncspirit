@@ -328,6 +328,12 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
             return "dialer/redial_timeout is incorrect or missing";
         }
         c.redial_timeout = redial_timeout.value();
+
+        auto skip_discovers = t["skip_discovers"].value<std::uint32_t>();
+        if (!skip_discovers) {
+            return "dialer/skip_discovers is incorrect or missing";
+        }
+        c.skip_discovers = skip_discovers.value();
     }
 
     // fs
@@ -449,6 +455,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"dialer", toml::table{{
                        {"enabled", cfg.dialer_config.enabled},
                        {"redial_timeout", cfg.dialer_config.redial_timeout},
+                       {"skip_discovers", cfg.dialer_config.skip_discovers},
                    }}},
         {"fs", toml::table{{
                    {"temporally_timeout", cfg.fs_config.temporally_timeout},
@@ -548,7 +555,8 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     };
     cfg.dialer_config = dialer_config_t {
         true,       /* enabled */
-        5 * 60000   /* redial timeout */
+        5 * 60000,  /* redial timeout */
+        10          /* skip_discovers */
     };
     cfg.fs_config = fs_config_t {
         86400000,   /* temporally_timeout, 24h default */

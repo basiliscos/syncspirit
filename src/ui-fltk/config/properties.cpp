@@ -175,6 +175,15 @@ void redial_timeout_t::reflect_to(syncspirit::config::main_t &main) {
 
 const char *redial_timeout_t::explanation_ = "how often try to redial to connect offline peers, milliseconds";
 
+skip_discovers_t::skip_discovers_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("skip_discovers", explanation_, value, default_value) {}
+
+void skip_discovers_t::reflect_to(syncspirit::config::main_t &main) {
+    main.dialer_config.skip_discovers = native_value;
+}
+
+const char *skip_discovers_t::explanation_ = "when peer addresses are known, how many times skip rediscovering them";
+
 } // namespace dialer
 
 namespace fs {

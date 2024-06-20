@@ -204,6 +204,14 @@ diff_builder_t &diff_builder_t::update_state(const model::device_t &peer, const 
     return *this;
 }
 
+diff_builder_t &diff_builder_t::update_contact(const model::device_id_t &device,
+                                               const utils::uri_container_t &uris) noexcept {
+    model::diff::contact_diff_ptr_t diff;
+    diff.reset(new model::diff::contact::update_contact_t(cluster, device, uris));
+    cdiffs.emplace_back(std::move(diff));
+    return *this;
+}
+
 diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target, size_t block_index, std::string data,
                                              dispose_callback_t callback) noexcept {
     bdiffs.emplace_back(new diff::modify::append_block_t(target, block_index, std::move(data), std::move(callback)));

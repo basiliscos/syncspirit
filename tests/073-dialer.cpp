@@ -4,6 +4,7 @@
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
+#include "model/diff/contact/dial_request.h"
 #include "diff-builder.h"
 
 #include "net/dialer_actor.h"
@@ -59,7 +60,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
         auto global_device_id =
             model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW");
 
-        auto cfg = config::dialer_config_t{true, 500};
+        auto cfg = config::dialer_config_t{true, 500, 1};
         auto dialer = sup->create_actor<dialer_actor_t>().cluster(cluster).dialer_config(cfg).timeout(timeout).finish();
         target_addr = dialer->get_address();
         if (start_dialer) {
@@ -92,27 +93,23 @@ void test_dialer() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main() noexcept override {
+            auto builder = diff_builder_t(*cluster);
+
             REQUIRE(messages.empty());
             REQUIRE(peer_device->get_state() == state_t::offline);
 
             sup->send<net::payload::announce_notification_t>(sup->get_address());
             sup->do_process();
-            REQUIRE(sup->timers.size() == 1);
 
             SECTION("peer is not online => discover it on timeout") {
-                sup->do_invoke_timer((*sup->timers.begin())->request_id);
-                sup->do_process();
-                REQUIRE(messages.size() == 2);
+                REQUIRE(messages.size() == 1);
                 REQUIRE(peer_device->get_state() == state_t::discovering);
-                CHECK(sup->timers.size() == 1);
             }
 
             SECTION("peer online & offline") {
                 messages.clear();
-                auto builder = diff_builder_t(*cluster);
                 builder.update_state(*peer_device, {}, model::device_state_t::online).apply(*sup);
                 CHECK(messages.size() == 1);
-                CHECK(sup->timers.size() == 0);
 
                 builder.update_state(*peer_device, {}, model::device_state_t::offline).apply(*sup);
                 CHECK(messages.size() == 2);
@@ -122,14 +119,35 @@ void test_dialer() {
                 sup->do_process();
                 CHECK(messages.size() == 3);
                 CHECK(peer_device->get_state() == state_t::discovering);
+                CHECK(sup->timers.size() == 0);
+
+                auto uri = utils::parse("tcp://127.0.0.1");
+                builder.update_contact(peer_device->device_id(), {uri}).apply(*sup);
+                REQUIRE(messages.size() == 5);
+                CHECK(peer_device->get_state() == state_t::discovering);
+                CHECK(sup->timers.size() == 0);
+                auto diff = messages.back()->payload.diff;
+                REQUIRE(dynamic_cast<diff::contact::dial_request_t *>(diff.get()));
+
+                builder.update_state(*peer_device, {}, model::device_state_t::offline).apply(*sup);
                 CHECK(sup->timers.size() == 1);
+                sup->do_invoke_timer((*sup->timers.begin())->request_id);
+                sup->do_process();
+                REQUIRE(messages.size() == 7);
+                CHECK(peer_device->get_state() == state_t::offline);
+                CHECK(sup->timers.size() == 0);
+                diff = messages.back()->payload.diff;
+                REQUIRE(dynamic_cast<diff::contact::dial_request_t *>(diff.get()));
             }
 
             SECTION("remove peer") {
-                auto builder = diff_builder_t(*cluster);
-                builder.remove_peer(*peer_device).apply(*sup);
+                SECTION("start discover") {
+                    builder.update_state(*peer_device, {}, model::device_state_t::offline).apply(*sup);
+                    CHECK(messages.size() == 2);
+                    CHECK(sup->timers.size() == 1);
+                }
 
-                REQUIRE(messages.size() == 1);
+                builder.remove_peer(*peer_device).apply(*sup);
                 CHECK(sup->timers.size() == 0);
             }
         }
@@ -141,6 +159,8 @@ void test_static_address() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main() noexcept override {
+            auto builder = diff_builder_t(*cluster);
+
             REQUIRE(messages.empty());
             REQUIRE(peer_device->get_state() == state_t::offline);
             auto uri = utils::parse("tcp://127.0.0.1");
@@ -148,11 +168,27 @@ void test_static_address() {
 
             sup->do_process();
             REQUIRE(peer_device->get_state() == state_t::offline);
-            REQUIRE(messages.size() == 1);
+            REQUIRE(messages.size() == 2);
+            auto diff = messages.back()->payload.diff;
+            REQUIRE(dynamic_cast<diff::contact::dial_request_t *>(diff.get()));
 
-            diff_builder_t(*cluster).remove_peer(*peer_device).apply(*sup);
-            REQUIRE(sup->timers.size() == 0);
-            REQUIRE(messages.size() == 1);
+            builder.update_state(*peer_device, {}, model::device_state_t::offline).apply(*sup);
+            CHECK(sup->timers.size() == 1);
+
+            SECTION("remove") {
+                builder.remove_peer(*peer_device).apply(*sup);
+                CHECK(sup->timers.size() == 0);
+                REQUIRE(messages.size() == 3);
+            }
+
+            SECTION("invoke") {
+                sup->do_invoke_timer((*sup->timers.begin())->request_id);
+                sup->do_process();
+                REQUIRE(messages.size() == 4);
+
+                auto diff = messages.back()->payload.diff;
+                REQUIRE(dynamic_cast<diff::contact::dial_request_t *>(diff.get()));
+            }
         }
     };
     F(false).run();
@@ -168,7 +204,6 @@ void test_peer_removal() {
             SECTION("with announce") {
                 sup->send<net::payload::announce_notification_t>(sup->get_address());
                 sup->do_process();
-                REQUIRE(sup->timers.size() == 1);
 
                 diff_builder_t(*cluster).remove_peer(*peer_device).apply(*sup);
                 REQUIRE(sup->timers.size() == 0);

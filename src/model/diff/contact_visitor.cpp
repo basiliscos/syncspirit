@@ -9,6 +9,10 @@ auto contact_visitor_t::operator()(const contact::connect_request_t &, void *) n
     return outcome::success();
 }
 
+auto contact_visitor_t::operator()(const contact::dial_request_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
 auto contact_visitor_t::operator()(const contact::update_contact_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }

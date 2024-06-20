@@ -19,7 +19,8 @@ bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
 }
 
 bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.redial_timeout == rhs.redial_timeout;
+    return lhs.enabled == rhs.enabled && lhs.redial_timeout == rhs.redial_timeout &&
+           lhs.skip_discovers == rhs.skip_discovers;
 }
 
 bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {

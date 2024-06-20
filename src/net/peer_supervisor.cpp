@@ -10,7 +10,7 @@
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/contact/connect_request.h"
 #include "model/diff/contact/relay_connect_request.h"
-#include "model/diff/contact/update_contact.h"
+#include "model/diff/contact/dial_request.h"
 #include "model/misc/error_code.h"
 
 using namespace syncspirit::net;
@@ -182,29 +182,26 @@ auto peer_supervisor_t::operator()(const model::diff::contact::relay_connect_req
     return outcome::success();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::contact::update_contact_t &diff, void *) noexcept
+auto peer_supervisor_t::operator()(const model::diff::contact::dial_request_t &diff, void *) noexcept
     -> outcome::result<void> {
-    if (!diff.self && diff.known) {
-        auto &devices = cluster->get_devices();
-        auto peer = devices.by_sha256(diff.device.get_sha256());
-        if (peer && peer->get_state() == model::device_state_t::offline) {
-            auto &uris = diff.uris;
-            auto connect_timeout = r::pt::milliseconds{bep_config.connect_timeout};
-            LOG_DEBUG(log, "initiating connection with {}", peer->device_id());
-            create_actor<initiator_actor_t>()
-                .router(*locality_leader)
-                .sink(address)
-                .ssl_pair(&ssl_pair)
-                .peer_device_id(diff.device)
-                .uris(uris)
-                .relay_enabled(relay_config.enabled)
-                .cluster(cluster)
-                .init_timeout(connect_timeout * (uris.size() + 1))
-                .shutdown_timeout(connect_timeout)
-                .finish();
-        } else {
-            LOG_DEBUG(log, "peer '{}' is not offline, dropping connection", peer->device_id());
-        }
+    auto &devices = cluster->get_devices();
+    auto peer = devices.by_sha256(diff.peer_id);
+    if (peer && peer->get_state() != model::device_state_t::online) {
+        auto &uris = peer->get_uris();
+        LOG_DEBUG(log, "initiating connection with {} ({} addresses)", peer->device_id(), uris.size());
+        assert(uris.size());
+        auto connect_timeout = r::pt::milliseconds{bep_config.connect_timeout};
+        create_actor<initiator_actor_t>()
+            .router(*locality_leader)
+            .sink(address)
+            .ssl_pair(&ssl_pair)
+            .peer_device_id(peer->device_id())
+            .uris(uris)
+            .relay_enabled(relay_config.enabled)
+            .cluster(cluster)
+            .init_timeout(connect_timeout * (uris.size() + 1))
+            .shutdown_timeout(connect_timeout)
+            .finish();
     }
     return outcome::success();
 }
