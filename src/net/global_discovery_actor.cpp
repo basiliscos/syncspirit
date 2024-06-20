@@ -165,11 +165,15 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
             auto device_id = model::device_id_t::from_sha256(sha256).value();
             auto &uris = res.value();
             if (!uris.empty()) {
-                auto diff = model::diff::contact_diff_ptr_t{};
-                diff = new modify::update_contact_t(*cluster, device_id, uris);
-                send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
                 LOG_DEBUG(log, "on_discovery_response, found some URIs for {}", device_id);
                 found = true;
+                if (cluster->get_devices().by_sha256(sha256)) {
+                    auto diff = model::diff::contact_diff_ptr_t{};
+                    diff = new modify::update_contact_t(*cluster, device_id, uris);
+                    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+                } else {
+                    LOG_DEBUG(log, "on_discovery_response, device '{}' is no longer exist", device_id);
+                }
             } else {
                 LOG_DEBUG(log, "on_discovery_response, no known URIs for {}", device_id);
             }
@@ -249,15 +253,19 @@ auto global_discovery_actor_t::operator()(const model::diff::peer::peer_state_t 
     }
 
     auto peer = cluster->get_devices().by_sha256(sha256);
-    fmt::memory_buffer tx_buff;
-    auto r = proto::make_discovery_request(tx_buff, announce_url, peer->device_id());
-    if (!r) {
-        LOG_ERROR(log, "error making discovery request :: {}", r.error().message());
-        return r.error();
-    }
+    if (!peer) {
+        LOG_ERROR(log, "no peer device '{}'", peer->device_id());
+    } else {
+        fmt::memory_buffer tx_buff;
+        auto r = proto::make_discovery_request(tx_buff, announce_url, peer->device_id());
+        if (!r) {
+            LOG_ERROR(log, "error making discovery request: {}", r.error().message());
+            return r.error();
+        }
 
-    discovering_devices.emplace(sha256);
-    auto msg = reinterpret_cast<model::message::contact_update_t *>(custom);
-    make_request(addr_discovery, r.value(), std::move(tx_buff), msg);
+        discovering_devices.emplace(sha256);
+        auto msg = reinterpret_cast<model::message::contact_update_t *>(custom);
+        make_request(addr_discovery, r.value(), std::move(tx_buff), msg);
+    }
     return outcome::success();
 }
