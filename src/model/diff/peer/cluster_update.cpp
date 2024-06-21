@@ -104,8 +104,8 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                                 removed_unknown_folders.emplace(std::string(uf->get_key()));
                                 add_unknown(f, d);
                             }
+                            goto NEXT_FOLDER;
                         }
-                        goto NEXT_FOLDER;
                     }
                     add_unknown(f, d);
                     goto NEXT_FOLDER;

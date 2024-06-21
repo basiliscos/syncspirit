@@ -126,7 +126,27 @@ TEST_CASE("cluster update, new folder", "[model]") {
         CHECK(uf->get_max_sequence() == 15);
         CHECK(uf->get_index() == 22ul);
         CHECK(std::distance(cluster->get_unknown_folders().begin(), cluster->get_unknown_folders().end()) == 1);
+
+        // change unknown folder
+        cc = std::make_unique<proto::ClusterConfig>();
+        folder_ptr = cc->add_folders();
+        folder_ptr->set_id("some-id-n");
+        folder_ptr->set_label("some-label-N");
+        d_peer = folder_ptr->add_devices();
+        d_peer->set_id(std::string(peer_id.get_sha256()));
+        d_peer->set_name(std::string(peer_device->get_name()));
+        d_peer->set_max_sequence(10);
+        d_peer->set_index_id(22ul);
+
+        diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+        REQUIRE(diff_opt);
+
+        r_a = diff_opt.value()->apply(*cluster);
+        CHECK(r_a);
+
+        CHECK(std::distance(cluster->get_unknown_folders().begin(), cluster->get_unknown_folders().end()) == 1);
     }
+
     SECTION("existing folder") {
         db::Folder db_folder;
         db_folder.set_id("1234-5678");
