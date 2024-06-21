@@ -123,7 +123,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     bfs::path config_path;
     config::main_t app_config;
     model::cluster_ptr_t cluster;
-    load_listeners_t load_listeners;
+    load_listeners_t model_listeners;
     Fl_Widget *content;
 };
 

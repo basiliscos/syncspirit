@@ -67,7 +67,7 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
         return do_shutdown(ee);
     }
     cluster = std::move(res.payload.res.cluster);
-    for (auto listener : load_listeners) {
+    for (auto listener : model_listeners) {
         (*listener)(res);
     }
 }
@@ -80,7 +80,7 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
         auto ee = make_error(r.assume_error());
         LOG_ERROR(log, "todo, handle cluster apply failure {} ", ee->message());
     }
-    auto listeners_copy = load_listeners;
+    auto listeners_copy = model_listeners;
     for (auto listener : listeners_copy) {
         (*listener)(message);
     }
@@ -94,7 +94,7 @@ void app_supervisor_t::on_contact_update(model::message::contact_update_t &messa
         auto ee = make_error(r.assume_error());
         LOG_ERROR(log, "todo, handle cluster apply failure {} ", ee->message());
     }
-    auto listeners_copy = load_listeners;
+    auto listeners_copy = model_listeners;
     for (auto listener : listeners_copy) {
         (*listener)(message);
     }
@@ -103,11 +103,11 @@ void app_supervisor_t::on_contact_update(model::message::contact_update_t &messa
 void app_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {}
 
 auto app_supervisor_t::add(model_listener_t *listener) noexcept -> model_subscription_t {
-    load_listeners.insert(listener);
+    model_listeners.insert(listener);
     return model_subscription_t(listener, this);
 }
 
-void app_supervisor_t::remove(model_listener_t *listener) noexcept { load_listeners.erase(listener); }
+void app_supervisor_t::remove(model_listener_t *listener) noexcept { model_listeners.erase(listener); }
 
 std::string app_supervisor_t::get_uptime() noexcept {
     using namespace std;

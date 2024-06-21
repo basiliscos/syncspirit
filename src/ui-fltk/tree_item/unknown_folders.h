@@ -17,6 +17,16 @@ struct unknown_folders_t : tree_item_t, private model_listener_t, private model:
 
     unknown_folders_t(model::device_ptr_t peer, app_supervisor_t &supervisor, Fl_Tree *tree);
 
+    void add_unknown_folder(model::unknown_folder_ptr_t uf);
+
+    void operator()(model::message::model_update_t &) override;
+
+    outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::add_unknown_folders_t &,
+                                     void *custom) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::remove_unknown_folders_t &,
+                                     void *custom) noexcept override;
+
     model_subscription_t model_sub;
     model::device_ptr_t peer;
 };
