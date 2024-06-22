@@ -15,15 +15,18 @@ namespace syncspirit::db {
 using discr_t = std::byte;
 
 namespace prefix {
-static const constexpr discr_t misc{0x01};
-static const constexpr discr_t device{0x10};
-static const constexpr discr_t folder{0x11};
-static const constexpr discr_t folder_info{0x12};
-static const constexpr discr_t file_info{0x13};
-static const constexpr discr_t ignored_device{0x14};
-static const constexpr discr_t ignored_folder{0x15};
-static const constexpr discr_t unknown_folder{0x16};
-static const constexpr discr_t block_info{0x17};
+// clang-format off
+static const constexpr discr_t misc           {0x01};
+static const constexpr discr_t device         {0x10};
+static const constexpr discr_t folder         {0x11};
+static const constexpr discr_t folder_info    {0x12};
+static const constexpr discr_t file_info      {0x13};
+static const constexpr discr_t ignored_device {0x14};
+static const constexpr discr_t ignored_folder {0x15};
+static const constexpr discr_t unknown_folder {0x16};
+static const constexpr discr_t block_info     {0x17};
+static const constexpr discr_t unknown_device {0x18};
+// clang-format on
 } // namespace prefix
 
 struct SYNCSPIRIT_API value_t {

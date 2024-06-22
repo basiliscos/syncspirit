@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "folder.h"
 #include "ignored_folder.h"
-#include "../db/prefix.h"
+#include "db/prefix.h"
 #include "structs.pb.h"
 #include "misc/error_code.h"
 
@@ -46,7 +46,7 @@ outcome::result<void> ignored_folder_t::assign_fields(std::string_view data) noe
     db::IgnoredFolder folder;
     auto ok = folder.ParseFromArray(data.data(), data.size());
     if (!ok) {
-        return make_error_code(error_code_t::ignored_device_deserialization_failure);
+        return make_error_code(error_code_t::ignored_folder_deserialization_failure);
     }
     label = folder.label();
     return outcome::success();

@@ -146,6 +146,7 @@ add_library(syncspirit_lib
     src/model/ignored_device.cpp
     src/model/ignored_folder.cpp
     src/model/remote_folder_info.cpp
+    src/model/unknown_device.cpp
     src/model/unknown_folder.cpp
     src/net/acceptor_actor.cpp
     src/net/cluster_supervisor.cpp

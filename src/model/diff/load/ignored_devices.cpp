@@ -9,13 +9,28 @@ using namespace syncspirit::model::diff::load;
 
 auto ignored_devices_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto &map = cluster.get_ignored_devices();
+
     for (auto &pair : devices) {
-        auto option = ignored_device_t::create(pair.key, pair.value);
+        auto key = pair.key;
+        auto sha256 = key.substr(1, ignored_device_t::digest_length);
+        auto device_id_opt = device_id_t::from_sha256(sha256);
+        if (!device_id_opt) {
+            return make_error_code(error_code_t::malformed_deviceid);
+        }
+        auto &device_id = *device_id_opt;
+
+        auto data = pair.value;
+        db::SomeDevice db;
+        auto ok = db.ParseFromArray(data.data(), data.size());
+        if (!ok) {
+            return make_error_code(error_code_t::some_device_deserialization_failure);
+        }
+        auto option = ignored_device_t::create(device_id, db);
         if (!option) {
             return option.assume_error();
         }
-        auto &device = option.value();
-        map.put(device);
+        auto &ignored_device = option.assume_value();
+        map.put(std::move(ignored_device));
     }
     return outcome::success();
 }

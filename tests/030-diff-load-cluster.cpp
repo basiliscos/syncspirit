@@ -108,16 +108,17 @@ TEST_CASE("loading cluster (base)", "[model]") {
     }
 
     SECTION("ignored_devices") {
+        db::SomeDevice db_device;
+        db_device.set_label("my-label");
+        db_device.set_address("tcp://127.0.0.1");
+        db_device.set_last_seen(0);
+
         auto device_id =
             device_id_t::from_string("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7").value();
 
-        auto id = ignored_device_t::create(device_id).value();
+        auto id = ignored_device_t::create(device_id, db_device).value();
         auto key = id->get_key();
         auto data = id->serialize();
-
-        auto target = ignored_device_ptr_t();
-
-        SECTION("directly") { target = ignored_device_t::create(key, data).value(); }
 
         SECTION("via diff") {
             diff::load::container_t devices;
@@ -126,12 +127,12 @@ TEST_CASE("loading cluster (base)", "[model]") {
             REQUIRE(diff->apply(*cluster));
             auto &map = cluster->get_ignored_devices();
             REQUIRE(map.size() == 1);
-            target = map.get(device_id.get_sha256());
-        }
 
-        REQUIRE(target);
-        CHECK(target->get_sha256() == id->get_sha256());
-        CHECK(target->get_key() == id->get_key());
+            auto target = map.get(device_id.get_sha256());
+            REQUIRE(target);
+            CHECK(target->get_sha256() == id->get_sha256());
+            CHECK(target->get_key() == id->get_key());
+        }
     }
 
     SECTION("folders") {

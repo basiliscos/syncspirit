@@ -9,6 +9,7 @@
 #include "ignored_device.h"
 #include "ignored_folder.h"
 #include "folder.h"
+#include "unknown_device.h"
 #include "unknown_folder.h"
 #include "block_info.h"
 #include "diff/cluster_diff.h"
@@ -33,6 +34,7 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     ignored_devices_map_t &get_ignored_devices() noexcept;
     ignored_folders_map_t &get_ignored_folders() noexcept;
     folders_map_t &get_folders() noexcept;
+    unknown_devices_map_t &get_unknown_devices() noexcept;
     unknown_folders_t &get_unknown_folders() noexcept;
 
     const folders_map_t &get_folders() const noexcept;
@@ -63,6 +65,7 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     ignored_devices_map_t ignored_devices;
     ignored_folders_map_t ignored_folders;
     unknown_folders_t unknown_folders;
+    unknown_devices_map_t unknown_devices;
     bool tainted = false;
     int32_t write_requests;
 };
