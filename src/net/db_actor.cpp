@@ -17,6 +17,7 @@
 #include "model/diff/load/ignored_devices.h"
 #include "model/diff/load/ignored_folders.h"
 #include "model/diff/load/load_cluster.h"
+#include "model/diff/load/unknown_devices.h"
 #include "model/diff/load/unknown_folders.h"
 #include "model/diff/modify/add_unknown_folders.h"
 #include "model/diff/modify/create_folder.h"
@@ -254,6 +255,11 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         return reply_with_error(request, make_error(file_infos_opt.error()));
     }
 
+    auto unknown_devices_opt = db::load(db::prefix::unknown_device, txn);
+    if (!unknown_devices_opt) {
+        return reply_with_error(request, make_error(unknown_devices_opt.error()));
+    }
+
     auto unknown_folders_opt = db::load(db::prefix::unknown_folder, txn);
     if (!unknown_folders_opt) {
         return reply_with_error(request, make_error(unknown_folders_opt.error()));
@@ -267,6 +273,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     container.emplace_back(new load::folders_t(std::move(folders_opt.value())));
     container.emplace_back(new load::folder_infos_t(std::move(folder_infos_opt.value())));
     container.emplace_back(new load::file_infos_t(std::move(file_infos_opt.value())));
+    container.emplace_back(new load::unknown_devices_t(std::move(unknown_devices_opt.value())));
     container.emplace_back(new load::unknown_folders_t(std::move(unknown_folders_opt.value())));
     container.emplace_back(new load::close_transaction_t(std::move(txn)));
 

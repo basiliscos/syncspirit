@@ -178,6 +178,38 @@ void test_folder_creation() {
     F().run();
 }
 
+void test_miscellaneous() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto d_id1 =
+                device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW").value();
+            auto d_id2 =
+                device_id_t::from_string("XBOWTOU-Y7H6RM6-D7WT3UB-7P2DZ5G-R6GNZG6-T5CCG54-SGVF3U5-LBM7RQB").value();
+
+            db::SomeDevice sd_1;
+            sd_1.set_label("x1");
+            auto unknown_device = unknown_device_t::create(d_id1, sd_1).value();
+
+            db::SomeDevice sd_2;
+            sd_2.set_label("x2");
+            auto ignored_device = ignored_device_t::create(d_id2, sd_2).value();
+
+            cluster->get_unknown_devices().put(unknown_device);
+            cluster->get_ignored_devices().put(ignored_device);
+
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            auto cluster_clone = make_cluster();
+            REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+
+            REQUIRE(cluster_clone->get_unknown_devices().by_sha256(d_id1.get_sha256()));
+            REQUIRE(cluster_clone->get_ignored_devices().by_sha256(d_id2.get_sha256()));
+        }
+    };
+    F().run();
+}
+
 void test_peer_updating() {
     struct F : fixture_t {
         void main() noexcept override {
@@ -696,6 +728,7 @@ void test_remove_peer() {
 
 int _init() {
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
+    REGISTER_TEST_CASE(test_miscellaneous, "test_miscellaneous", "[db]");
     REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
     REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
     REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");

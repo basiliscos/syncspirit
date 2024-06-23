@@ -201,6 +201,7 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &, voi
         auto &ignored_devices = cluster->get_ignored_devices();
         auto &ignored_folders = cluster->get_ignored_folders();
         auto &unknown_folders = cluster->get_unknown_folders();
+        auto &unknown_devices = cluster->get_unknown_devices();
         auto &devices = cluster->get_devices();
         auto &folders = cluster->get_folders();
         size_t files = 0;
@@ -215,9 +216,9 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &, voi
         auto unknown_folders_sz = std::distance(unknown_folders.begin(), unknown_folders.end());
         LOG_DEBUG(log,
                   "load cluster, devices = {}, folders = {}, local files = {}, blocks = {}, ignored devices = {}, "
-                  "ignored folders = {}, unknown folders = {}",
+                  "ignored folders = {}, unknown folders = {}, unknown devices = {}",
                   devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
-                  ignored_folders.size(), unknown_folders_sz);
+                  ignored_folders.size(), unknown_folders_sz, unknown_devices.size());
 
         cluster_sup = create_actor<cluster_supervisor_t>()
                           .timeout(shutdown_timeout * 9 / 10)

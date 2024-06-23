@@ -13,6 +13,10 @@ auto cluster_visitor_t::operator()(const load::ignored_devices_t &, void *) noex
     return outcome::success();
 }
 
+auto cluster_visitor_t::operator()(const load::unknown_devices_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
 auto cluster_visitor_t::operator()(const load::load_cluster_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }

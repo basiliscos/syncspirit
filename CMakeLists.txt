@@ -99,6 +99,7 @@ add_library(syncspirit_lib
     src/model/diff/load/ignored_devices.cpp
     src/model/diff/load/ignored_folders.cpp
     src/model/diff/load/load_cluster.cpp
+    src/model/diff/load/unknown_devices.cpp
     src/model/diff/load/unknown_folders.cpp
     src/model/diff/modify/add_remote_folder_infos.cpp
     src/model/diff/modify/add_unknown_folders.cpp

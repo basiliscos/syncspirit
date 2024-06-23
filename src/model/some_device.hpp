@@ -50,8 +50,8 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
     static const constexpr size_t data_length = digest_length + 1;
 
     struct SYNCSPIRIT_API map_t : public generic_map_t<ptr_t, 1> {
-        using parent_t = generic_map_t<ptr_t, 2>;
-        ptr_t by_sha256(std::string_view key) noexcept { return get_index<0>(key); }
+        using parent_t = generic_map_t<ptr_t, 1>;
+        ptr_t by_sha256(std::string_view value) noexcept { return this->template get<0>(value); }
     };
 
   private:
@@ -71,15 +71,5 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
     some_device_t(std::string_view key) noexcept;
     char hash[data_length];
 };
-
-#if 0
-template<char prefix> using some_device_ptr_t = typename some_device_t<prefix>::ptr_t;
-
-template<>
-template<char prefix>
-SYNCSPIRIT_API std::string_view get_index<0>(const some_device_ptr_t<prefix> &item) noexcept {
-    return item->get_sha256();
-}
-#endif
 
 } // namespace syncspirit::model

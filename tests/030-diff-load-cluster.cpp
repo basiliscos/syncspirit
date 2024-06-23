@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -11,6 +11,7 @@
 #include "model/diff/load/file_infos.h"
 #include "model/diff/load/folder_infos.h"
 #include "model/diff/load/folders.h"
+#include "model/diff/load/unknown_devices.h"
 #include "db/prefix.h"
 
 using namespace syncspirit;
@@ -126,6 +127,34 @@ TEST_CASE("loading cluster (base)", "[model]") {
             auto diff = diff::cluster_diff_ptr_t(new diff::load::ignored_devices_t(devices));
             REQUIRE(diff->apply(*cluster));
             auto &map = cluster->get_ignored_devices();
+            REQUIRE(map.size() == 1);
+
+            auto target = map.get(device_id.get_sha256());
+            REQUIRE(target);
+            CHECK(target->get_sha256() == id->get_sha256());
+            CHECK(target->get_key() == id->get_key());
+        }
+    }
+
+    SECTION("unknown_devices") {
+        db::SomeDevice db_device;
+        db_device.set_label("my-label");
+        db_device.set_address("tcp://127.0.0.1");
+        db_device.set_last_seen(0);
+
+        auto device_id =
+            device_id_t::from_string("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7").value();
+
+        auto id = unknown_device_t::create(device_id, db_device).value();
+        auto key = id->get_key();
+        auto data = id->serialize();
+
+        SECTION("via diff") {
+            diff::load::container_t devices;
+            devices.emplace_back(diff::load::pair_t{key, data});
+            auto diff = diff::cluster_diff_ptr_t(new diff::load::unknown_devices_t(devices));
+            REQUIRE(diff->apply(*cluster));
+            auto &map = cluster->get_unknown_devices();
             REQUIRE(map.size() == 1);
 
             auto target = map.get(device_id.get_sha256());
