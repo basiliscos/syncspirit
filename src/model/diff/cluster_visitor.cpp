@@ -42,6 +42,14 @@ auto cluster_visitor_t::operator()(const modify::add_remote_folder_infos_t &, vo
     return outcome::success();
 }
 
+auto cluster_visitor_t::operator()(const modify::add_ignored_device_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto cluster_visitor_t::operator()(const modify::add_unknown_device_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
 auto cluster_visitor_t::operator()(const modify::add_unknown_folders_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
@@ -74,6 +82,14 @@ auto cluster_visitor_t::operator()(const modify::remove_files_t &, void *) noexc
     return outcome::success();
 }
 auto cluster_visitor_t::operator()(const modify::remove_folder_infos_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto cluster_visitor_t::operator()(const modify::remove_ignored_device_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto cluster_visitor_t::operator()(const modify::remove_unknown_device_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
 

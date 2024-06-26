@@ -19,6 +19,8 @@
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/load/unknown_devices.h"
 #include "model/diff/load/unknown_folders.h"
+#include "model/diff/modify/add_ignored_device.h"
+#include "model/diff/modify/add_unknown_device.h"
 #include "model/diff/modify/add_unknown_folders.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/clone_file.h"
@@ -28,13 +30,16 @@
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_files.h"
 #include "model/diff/modify/remove_folder_infos.h"
+#include "model/diff/modify/remove_ignored_device.h"
 #include "model/diff/modify/remove_peer.h"
+#include "model/diff/modify/remove_unknown_device.h"
 #include "model/diff/modify/remove_unknown_folders.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_folder_info.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/diff/peer/cluster_update.h"
+
 #include "model/diff/cluster_visitor.h"
 #include <string_view>
 
@@ -431,6 +436,52 @@ auto db_actor_t::operator()(const model::diff::modify::add_unknown_folders_t &di
     return commit(true);
 }
 
+auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+    auto device = cluster->get_ignored_devices().by_sha256(diff.device_id.get_sha256());
+
+    auto key = device->get_key();
+    auto data = device->serialize();
+
+    auto r = db::save({key, data}, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
+auto db_actor_t::operator()(const model::diff::modify::add_unknown_device_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+    auto device = cluster->get_unknown_devices().by_sha256(diff.device_id.get_sha256());
+
+    auto key = device->get_key();
+    auto data = device->serialize();
+
+    auto r = db::save({key, data}, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
 auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -507,6 +558,46 @@ auto db_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void
         return r.assume_error();
     }
     r = db::remove(diff.peer_key, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
+auto db_actor_t::operator()(const model::diff::modify::remove_ignored_device_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto r = db::remove(diff.device_key, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
+auto db_actor_t::operator()(const model::diff::modify::remove_unknown_device_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto r = db::remove(diff.device_key, txn);
     if (!r) {
         return r.assume_error();
     }

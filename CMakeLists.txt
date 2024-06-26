@@ -102,6 +102,8 @@ add_library(syncspirit_lib
     src/model/diff/load/unknown_devices.cpp
     src/model/diff/load/unknown_folders.cpp
     src/model/diff/modify/add_remote_folder_infos.cpp
+    src/model/diff/modify/add_ignored_device.cpp
+    src/model/diff/modify/add_unknown_device.cpp
     src/model/diff/modify/add_unknown_folders.cpp
     src/model/diff/modify/append_block.cpp
     src/model/diff/modify/block_ack.cpp
@@ -122,6 +124,8 @@ add_library(syncspirit_lib
     src/model/diff/modify/remove_files.cpp
     src/model/diff/modify/remove_folder_infos.cpp
     src/model/diff/modify/remove_peer.cpp
+    src/model/diff/modify/remove_ignored_device.cpp
+    src/model/diff/modify/remove_unknown_device.cpp
     src/model/diff/modify/remove_unknown_folders.cpp
     src/model/diff/modify/share_folder.cpp
     src/model/diff/modify/unshare_folder.cpp
@@ -186,8 +190,8 @@ add_library(syncspirit_lib
     src/utils/uri.cpp
 )
 
-set(BUILD_SHARED_LIBS false CACHE BOOL "BUILD_SHARED_LIBS")
-set(MDBX_BUILD_TOOLS false CACHE BOOL "MDBX_BUILD_TOOLS")
+set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
+set(MDBX_BUILD_TOOLS true CACHE BOOL "MDBX_BUILD_TOOLS")
 set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
 set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
 set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")

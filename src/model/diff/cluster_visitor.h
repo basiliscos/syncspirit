@@ -21,7 +21,9 @@ struct update_folder_t;
 } // namespace peer
 
 namespace modify {
+struct add_ignored_device_t;
 struct add_remote_folder_infos_t;
+struct add_unknown_device_t;
 struct add_unknown_folders_t;
 struct clone_file_t;
 struct create_folder_t;
@@ -40,6 +42,8 @@ struct remove_peer_t;
 struct remove_blocks_t;
 struct remove_files_t;
 struct remove_folder_infos_t;
+struct remove_ignored_device_t;
+struct remove_unknown_device_t;
 struct remove_unknown_folders_t;
 } // namespace modify
 
@@ -54,6 +58,8 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const peer::update_folder_t &, void *custom) noexcept;
 
     virtual outcome::result<void> operator()(const modify::add_remote_folder_infos_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::add_ignored_device_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::add_unknown_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::add_unknown_folders_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::clone_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::create_folder_t &, void *custom) noexcept;
@@ -71,6 +77,8 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const modify::remove_blocks_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_files_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_folder_infos_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::remove_ignored_device_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::remove_unknown_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_unknown_folders_t &, void *custom) noexcept;
 };
 

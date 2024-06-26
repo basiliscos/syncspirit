@@ -10,6 +10,8 @@
 
 #include "syncspirit-test-export.h"
 #include "model/device.h"
+#include "model/ignored_device.h"
+#include "model/unknown_device.h"
 #include "model/file_info.h"
 #include "model/diff/contact_diff.h"
 #include "model/diff/block_diff.h"
@@ -73,6 +75,10 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &update_state(const model::device_t &peer, const r::address_ptr_t &peer_addr,
                                  model::device_state_t state) noexcept;
     diff_builder_t &update_contact(const model::device_id_t &device, const utils::uri_container_t &uris) noexcept;
+    diff_builder_t &add_ignored_device(const model::device_id_t &device, db::SomeDevice db_device) noexcept;
+    diff_builder_t &add_unknown_device(const model::device_id_t &device, db::SomeDevice db_device) noexcept;
+    diff_builder_t &remove_ignored_device(const model::ignored_device_t &device) noexcept;
+    diff_builder_t &remove_unknown_device(const model::unknown_device_t &device) noexcept;
 
   private:
     using bdiffs_t = std::deque<model::diff::block_diff_ptr_t>;

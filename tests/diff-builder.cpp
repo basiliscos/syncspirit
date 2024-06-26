@@ -3,6 +3,8 @@
 
 #include "diff-builder.h"
 #include "model/messages.h"
+#include "model/diff/modify/add_ignored_device.h"
+#include "model/diff/modify/add_unknown_device.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/clone_block.h"
@@ -15,6 +17,8 @@
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/remove_peer.h"
+#include "model/diff/modify/remove_ignored_device.h"
+#include "model/diff/modify/remove_unknown_device.h"
 #include "model/diff/contact/update_contact.h"
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/peer/cluster_update.h"
@@ -226,5 +230,27 @@ diff_builder_t &diff_builder_t::clone_block(const model::file_block_t &file_bloc
 
 diff_builder_t &diff_builder_t::ack_block(const model::diff::modify::block_transaction_t &diff) noexcept {
     bdiffs.emplace_back(new diff::modify::block_ack_t(diff));
+    return *this;
+}
+
+diff_builder_t &diff_builder_t::add_ignored_device(const model::device_id_t &device,
+                                                   db::SomeDevice db_device) noexcept {
+    diffs.emplace_back(new diff::modify::add_ignored_device_t(device, db_device));
+    return *this;
+}
+
+diff_builder_t &diff_builder_t::add_unknown_device(const model::device_id_t &device,
+                                                   db::SomeDevice db_device) noexcept {
+    diffs.emplace_back(new diff::modify::add_unknown_device_t(device, db_device));
+    return *this;
+}
+
+diff_builder_t &diff_builder_t::remove_ignored_device(const model::ignored_device_t &device) noexcept {
+    diffs.emplace_back(new diff::modify::remove_ignored_device_t(device));
+    return *this;
+}
+
+diff_builder_t &diff_builder_t::remove_unknown_device(const model::unknown_device_t &device) noexcept {
+    diffs.emplace_back(new diff::modify::remove_unknown_device_t(device));
     return *this;
 }
