@@ -27,7 +27,6 @@ struct SYNCSPIRIT_API peer_state_t final : contact_diff_t {
     tcp::endpoint endpoint;
     std::string client_name;
     model::device_state_t state;
-    bool known;
     bool has_been_online;
 };
 

@@ -197,9 +197,6 @@ void dialer_actor_t::on_contact_update(model::message::contact_update_t &msg) no
 
 auto dialer_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept
     -> outcome::result<void> {
-    if (!diff.known) {
-        return outcome::success();
-    }
     auto &devices = cluster->get_devices();
     auto peer = devices.by_sha256(diff.peer_id);
 

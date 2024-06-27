@@ -843,7 +843,7 @@ auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void
         return outcome::success();
     }
 
-    if (!diff.has_been_online || !diff.known) {
+    if (!diff.has_been_online) {
         return outcome::success();
     }
 

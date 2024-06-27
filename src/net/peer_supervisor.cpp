@@ -126,17 +126,6 @@ void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
         .finish();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept
-    -> outcome::result<void> {
-    auto &peer_addr = diff.peer_addr;
-    if (!diff.known && diff.state == model::device_state_t::online) {
-        auto ec = model::make_error_code(model::error_code_t::unknown_device);
-        auto ee = make_error(ec);
-        send<r::payload::shutdown_trigger_t>(address, peer_addr, ee);
-    }
-    return outcome::success();
-}
-
 auto peer_supervisor_t::operator()(const model::diff::contact::connect_request_t &diff, void *) noexcept
     -> outcome::result<void> {
 

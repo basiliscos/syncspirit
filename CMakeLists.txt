@@ -87,9 +87,11 @@ add_library(syncspirit_lib
     src/model/diff/cluster_visitor.cpp
     src/model/diff/contact/connect_request.cpp
     src/model/diff/contact/dial_request.cpp
-    src/model/diff/contact/update_contact.cpp
+    src/model/diff/contact/ignored_connected.cpp
     src/model/diff/contact/relay_connect_request.cpp
     src/model/diff/contact/peer_state.cpp
+    src/model/diff/contact/unknown_connected.cpp
+    src/model/diff/contact/update_contact.cpp
     src/model/diff/load/blocks.cpp
     src/model/diff/load/close_transaction.cpp
     src/model/diff/load/devices.cpp

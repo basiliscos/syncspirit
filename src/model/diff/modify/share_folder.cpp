@@ -22,7 +22,7 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
 
     auto peer = devices.by_sha256(peer_id);
     if (!peer) {
-        return make_error_code(error_code_t::device_does_not_exist);
+        return make_error_code(error_code_t::no_such_device);
     }
     auto index = uint64_t{0};
     auto max_sequence = int64_t{0};

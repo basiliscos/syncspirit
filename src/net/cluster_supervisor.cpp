@@ -61,7 +61,7 @@ void cluster_supervisor_t::on_contact_update(model::message::contact_update_t &m
 
 auto cluster_supervisor_t::operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept
     -> outcome::result<void> {
-    if (!cluster->is_tainted() && diff.known) {
+    if (!cluster->is_tainted()) {
         auto peer = cluster->get_devices().by_sha256(diff.peer_id);
         LOG_TRACE(log, "visiting peer_state_t, {}, state: {}, has been online: {}", peer->device_id(), (int)diff.state,
                   diff.has_been_online);

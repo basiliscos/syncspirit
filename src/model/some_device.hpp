@@ -23,6 +23,10 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
 
     using ptr_t = intrusive_ptr_t<some_device_t>;
 
+    some_device_t(const some_device_t &other) : label{other.label}, address{other.address}, last_seen{other.last_seen} {
+        std::copy(other.hash, other.hash + data_length, hash);
+    }
+
     static outcome::result<ptr_t> create(const device_id_t &id, const db::SomeDevice &db) noexcept {
         return ptr_t(new some_device_t(id, db));
     }
@@ -45,6 +49,7 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
     std::string_view get_label() const noexcept { return label; }
     std::string_view get_address() const noexcept { return address; }
     const pt::ptime &get_last_seen() const noexcept { return last_seen; }
+    void set_last_seen(const pt::ptime &value) noexcept { last_seen = value; }
 
     static const constexpr size_t digest_length = 32;
     static const constexpr size_t data_length = digest_length + 1;

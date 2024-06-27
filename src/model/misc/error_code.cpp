@@ -21,6 +21,9 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::no_such_device:
         r = "no such device";
         break;
+    case error_code_t::device_already_exists:
+        r = "device already exists";
+        break;
     case error_code_t::no_such_folder:
         r = "no such folder";
         break;
@@ -101,9 +104,6 @@ std::string error_code_category_t::message(int c) const {
         break;
     case error_code_t::folder_does_not_exist:
         r = "folder does not exist";
-        break;
-    case error_code_t::device_does_not_exist:
-        r = "device does not exist";
         break;
     case error_code_t::folder_is_already_shared:
         r = "folder is already shared";

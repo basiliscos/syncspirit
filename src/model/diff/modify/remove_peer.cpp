@@ -56,7 +56,7 @@ auto remove_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
     assert(sha256.size() == device_id_t::digest_length);
     auto peer = cluster.get_devices().by_sha256(sha256);
     if (!peer) {
-        return make_error_code(error_code_t::device_does_not_exist);
+        return make_error_code(error_code_t::no_such_device);
     }
     if (*peer == *cluster.get_device()) {
         return make_error_code(error_code_t::cannot_remove_self);

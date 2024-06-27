@@ -13,17 +13,13 @@ peer_state_t::peer_state_t(cluster_t &cluster, std::string_view peer_id_, const 
     : peer_id{peer_id_}, peer_addr{peer_addr_}, cert_name{cert_name_}, endpoint{endpoint_}, client_name{client_name_},
       state{state_}, has_been_online{false} {
     auto peer = cluster.get_devices().by_sha256(peer_id);
-    known = (bool)peer;
-    if (peer && state == device_state_t::offline) {
-        has_been_online = peer->get_state() == device_state_t::online;
-    }
+    assert(peer);
+    has_been_online = (state == device_state_t::offline) && (peer->get_state() == device_state_t::online);
 }
 
 auto peer_state_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    if (known) {
-        auto peer = cluster.get_devices().by_sha256(peer_id);
-        peer->update_state(state);
-    }
+    auto peer = cluster.get_devices().by_sha256(peer_id);
+    peer->update_state(state);
     return outcome::success();
 }
 

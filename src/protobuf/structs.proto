@@ -90,14 +90,8 @@ message BlockInfo {
     int32           size        = 2;
 }
 
-message UnknownDevice {
-    string label                     = 1;
-    string address                   = 2;
-    int64 last_seen                  = 3;
-}
-
 message SomeDevice {
-    string label                     = 1;
-    string address                   = 2;
-    int64 last_seen                  = 3;
+    string label    = 1;
+    string address  = 2;
+    int64 last_seen = 3;
 }

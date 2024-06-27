@@ -13,7 +13,7 @@ auto contact_visitor_t::operator()(const contact::dial_request_t &, void *) noex
     return outcome::success();
 }
 
-auto contact_visitor_t::operator()(const contact::update_contact_t &, void *) noexcept -> outcome::result<void> {
+auto contact_visitor_t::operator()(const contact::ignored_connected_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
 
@@ -22,5 +22,13 @@ auto contact_visitor_t::operator()(const contact::relay_connect_request_t &, voi
 }
 
 auto contact_visitor_t::operator()(const contact::peer_state_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto contact_visitor_t::operator()(const contact::unknown_connected_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto contact_visitor_t::operator()(const contact::update_contact_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
