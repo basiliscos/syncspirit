@@ -35,7 +35,7 @@ void unknown_folders_t::operator()(model::message::model_update_t &update) {
 
 auto unknown_folders_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return diff.model::diff::aggregate_t::visit(*this, custom);
+    return diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
 }
 
 auto unknown_folders_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *) noexcept

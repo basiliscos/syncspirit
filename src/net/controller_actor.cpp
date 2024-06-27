@@ -4,7 +4,6 @@
 #include "controller_actor.h"
 #include "names.h"
 #include "constants.h"
-#include "model/diff/aggregate.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/block_rej.h"
@@ -97,7 +96,7 @@ void controller_actor_t::shutdown_start() noexcept {
 void controller_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish, blocks_requested = {}", rx_blocks_requested);
     if (!locked_files.empty()) {
-        using diffs_t = model::diff::aggregate_t::diffs_t;
+        using diffs_t = model::diff::cluster_aggregate_diff_t::diffs_t;
         auto diffs = diffs_t{};
         for (auto &file : locked_files) {
             if (!file->is_unlocking()) {
@@ -113,7 +112,7 @@ void controller_actor_t::shutdown_finish() noexcept {
 
         LOG_DEBUG(log, "unlocking {} model files and {} local files", diffs.size(), locally_locked_files.size());
         auto diff = model::diff::cluster_diff_ptr_t{};
-        diff = new model::diff::aggregate_t(std::move(diffs));
+        diff = new model::diff::cluster_aggregate_diff_t(std::move(diffs));
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
     r::actor_base_t::shutdown_finish();
@@ -437,7 +436,7 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
     auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto source_file = folder_info->get_file_infos().by_name(diff.file_name);
     if (source_file->is_locally_available()) {
-        using diffs_t = model::diff::aggregate_t::diffs_t;
+        using diffs_t = model::diff::cluster_aggregate_diff_t::diffs_t;
         LOG_TRACE(log, "on_block_update, finalizing {}", source_file->get_name());
         auto my_file = source_file->local_file();
         auto diffs = diffs_t{};
@@ -445,7 +444,7 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
         diffs.push_back(new model::diff::modify::lock_file_t(*source_file, false));
         diffs.push_back(new model::diff::modify::finish_file_t(*my_file));
         auto diff = model::diff::cluster_diff_ptr_t{};
-        diff = new model::diff::aggregate_t(std::move(diffs));
+        diff = new model::diff::cluster_aggregate_diff_t(std::move(diffs));
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
 

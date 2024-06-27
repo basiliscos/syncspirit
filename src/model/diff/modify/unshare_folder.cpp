@@ -4,7 +4,6 @@
 #include "unshare_folder.h"
 #include "remove_files.h"
 #include "remove_folder_infos.h"
-#include "model/diff/aggregate.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
 
@@ -12,7 +11,7 @@ using namespace syncspirit::model::diff::modify;
 
 unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model::folder_info_t &folder_info,
                                    blocks_t *blocks_for_removal) noexcept
-    : aggregate_t() {
+    : parent_t() {
 
     auto &peer = *folder_info.get_device();
     peer_id = peer.device_id().get_sha256();
@@ -52,7 +51,7 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model:
 
 auto unshare_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "applyging unshare_folder_t");
-    return aggregate_t::apply_impl(cluster);
+    return parent_t::apply_impl(cluster);
 }
 
 auto unshare_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

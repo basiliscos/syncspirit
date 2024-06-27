@@ -77,7 +77,6 @@ add_library(syncspirit_lib
     src/hasher/hasher_actor.cpp
     src/hasher/hasher_proxy_actor.cpp
     src/hasher/hasher_supervisor.cpp
-    src/model/diff/aggregate.cpp
     src/model/diff/base_diff.cpp
     src/model/diff/block_diff.cpp
     src/model/diff/block_visitor.cpp

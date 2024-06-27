@@ -80,9 +80,9 @@ diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
     auto &addr = sup.get_address();
     while (has_diffs()) {
         if (!diffs.empty()) {
-            auto diffs_vector = diff::aggregate_t::diffs_t{};
+            auto diffs_vector = diff::cluster_aggregate_diff_t::diffs_t{};
             std::move(diffs.begin(), diffs.end(), std::back_insert_iterator(diffs_vector));
-            auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs_vector)));
+            auto diff = diff::cluster_diff_ptr_t(new diff::cluster_aggregate_diff_t(std::move(diffs_vector)));
             sup.send<model::payload::model_update_t>(addr, std::move(diff), nullptr);
             diffs.clear();
         }

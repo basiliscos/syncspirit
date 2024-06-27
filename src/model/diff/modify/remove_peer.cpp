@@ -16,8 +16,8 @@ using namespace syncspirit::model::diff::modify;
 using blocks_t = remove_blocks_t::unique_keys_t;
 
 static auto make_unshare(const cluster_t &cluster, const device_t &peer, blocks_t &removed_blocks)
-    -> aggregate_t::diffs_t {
-    aggregate_t::diffs_t r;
+    -> cluster_aggregate_diff_t::diffs_t {
+    cluster_aggregate_diff_t::diffs_t r;
     auto &folders = cluster.get_folders();
     for (auto it : folders) {
         auto &f = it.item;
@@ -29,7 +29,7 @@ static auto make_unshare(const cluster_t &cluster, const device_t &peer, blocks_
 }
 
 remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept
-    : aggregate_t(), peer_key{peer.get_key()} {
+    : parent_t(), peer_key{peer.get_key()} {
 
     auto removed_blocks = blocks_t{};
 
@@ -64,7 +64,7 @@ auto remove_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
 
     LOG_TRACE(log, "applyging remove_peer_t (start), for device '{}' ({})", peer->device_id().get_short(),
               peer->get_name());
-    auto r = aggregate_t::apply_impl(cluster);
+    auto r = parent_t::apply_impl(cluster);
     if (!r) {
         return r;
     }

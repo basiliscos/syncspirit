@@ -7,7 +7,7 @@
 #include "diff-builder.h"
 
 #include "model/cluster.h"
-#include "model/diff/aggregate.h"
+#include "model/diff/cluster_diff.h"
 #include "model/diff/modify/clone_file.h"
 #include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"

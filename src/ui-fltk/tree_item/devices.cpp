@@ -100,7 +100,7 @@ auto devices_t::operator()(const diff::modify::update_peer_t &diff, void *) noex
 }
 
 auto devices_t::operator()(const diff::load::load_cluster_t &diff, void *data) noexcept -> outcome::result<void> {
-    return diff.diff::aggregate_t::visit(*this, data);
+    return diff.diff::cluster_aggregate_diff_t::visit(*this, data);
 }
 
 auto devices_t::operator()(const diff::load::devices_t &diff, void *) noexcept -> outcome::result<void> {

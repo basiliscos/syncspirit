@@ -13,9 +13,9 @@
 #include "model/ignored_device.h"
 #include "model/unknown_device.h"
 #include "model/file_info.h"
+#include "model/diff/cluster_diff.h"
 #include "model/diff/contact_diff.h"
 #include "model/diff/block_diff.h"
-#include "model/diff/aggregate.h"
 #include "model/diff/modify/block_transaction.h"
 
 namespace syncspirit::test {

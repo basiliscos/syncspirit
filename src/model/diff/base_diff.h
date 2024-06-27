@@ -30,6 +30,8 @@ struct SYNCSPIRIT_API base_diff_t : boost::intrusive_ref_counter<base_diff_t, bo
     utils::logger_t log;
 };
 
+template <typename T> using diff_ptr_t = boost::intrusive_ptr<T>;
+
 } // namespace diff
 
 } // namespace syncspirit::model

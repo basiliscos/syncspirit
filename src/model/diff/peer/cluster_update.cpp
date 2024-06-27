@@ -11,7 +11,6 @@
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/update_folder_info.h"
 #include "model/cluster.h"
-#include "model/diff/aggregate.h"
 #include "model/diff/cluster_visitor.h"
 #include "utils/format.hpp"
 #include "utils/string_comparator.hpp"
@@ -26,7 +25,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     -> outcome::result<cluster_diff_ptr_t> {
     auto log = get_log();
 
-    auto update_diffs = aggregate_t::diffs_t();
+    auto update_diffs = cluster_aggregate_diff_t::diffs_t();
     auto &known_unknowns = cluster.get_unknown_folders();
     auto new_unknown_folders = diff::modify::add_unknown_folders_t::container_t{};
     auto remote_folders = diff::modify::add_remote_folder_infos_t::container_t{};
@@ -183,7 +182,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         }
     }
 
-    auto diffs = aggregate_t::diffs_t();
+    auto diffs = cluster_aggregate_diff_t::diffs_t();
 
     for (auto it_f : folders) {
         auto &folder = it_f.item;
@@ -228,8 +227,8 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     return outcome::success(std::move(ptr));
 }
 
-cluster_update_t::cluster_update_t(const model::device_t &source, aggregate_t::diffs_t diffs_) noexcept
-    : aggregate_t{std::move(diffs_)}, peer_id(source.device_id().get_sha256()) {}
+cluster_update_t::cluster_update_t(const model::device_t &source, cluster_aggregate_diff_t::diffs_t diffs_) noexcept
+    : cluster_aggregate_diff_t{std::move(diffs_)}, peer_id(source.device_id().get_sha256()) {}
 
 auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "applying cluster_update_t");
@@ -237,7 +236,7 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     auto peer = cluster.get_devices().by_sha256(peer_id);
     peer->get_remote_folder_infos().clear();
 
-    auto r = aggregate_t::apply_impl(cluster);
+    auto r = cluster_aggregate_diff_t::apply_impl(cluster);
     if (r.has_error()) {
         return r;
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/cluster.h"
@@ -9,7 +9,6 @@
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
-#include "model/diff/aggregate.h"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -355,13 +354,13 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     db_folder2.set_label("my-label-2");
     db_folder2.set_path("/my/path");
 
-    auto diffs = diff::aggregate_t::diffs_t{};
+    auto diffs = diff::cluster_aggregate_diff_t::diffs_t{};
     diffs.push_back(new diff::modify::create_folder_t(db_folder1));
     diffs.push_back(new diff::modify::create_folder_t(db_folder2));
     diffs.push_back(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder1.id()));
     diffs.push_back(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder2.id()));
 
-    auto diff = diff::cluster_diff_ptr_t(new diff::aggregate_t(std::move(diffs)));
+    auto diff = diff::cluster_diff_ptr_t(new diff::cluster_aggregate_diff_t(std::move(diffs)));
     REQUIRE(diff->apply(*cluster));
     auto folder1 = folders.by_id(db_folder1.id());
     auto folder2 = folders.by_id(db_folder2.id());

@@ -217,7 +217,7 @@ void db_actor_t::shutdown_finish() noexcept {
 void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {
     LOG_TRACE(log, "on_cluster_load");
     using namespace model::diff;
-    using container_t = aggregate_t::diffs_t;
+    using container_t = cluster_aggregate_diff_t::diffs_t;
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn_opt) {
@@ -334,7 +334,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
         }
     }
 
-    auto r = diff.model::diff::aggregate_t::visit(*this, custom);
+    auto r = diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
     if (r.has_error()) {
         return r.assume_error();
     }
@@ -533,7 +533,7 @@ auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, v
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto r = diff.model::diff::aggregate_t::visit(*this, custom);
+    auto r = diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
     if (r.has_error()) {
         return r.assume_error();
     }
@@ -553,7 +553,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto r = diff.model::diff::aggregate_t::visit(*this, custom);
+    auto r = diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
     if (r.has_error()) {
         return r.assume_error();
     }
