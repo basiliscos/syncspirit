@@ -82,11 +82,7 @@ void peer_supervisor_t::on_peer_ready(message::peer_connected_t &msg) noexcept {
     auto &p = msg.payload;
     auto &d = p.peer_device_id;
     auto peer = cluster->get_devices().by_sha256(d.get_sha256());
-    if (!peer) {
-        LOG_INFO(log, "unknown peer '{}' for the cluster", d.get_value());
-        return;
-    }
-    if (peer->get_state() == model::device_state_t::online) {
+    if (peer && peer->get_state() == model::device_state_t::online) {
         LOG_DEBUG(log, "peer '{}' is already online, ignoring request", d.get_short());
         return;
     }

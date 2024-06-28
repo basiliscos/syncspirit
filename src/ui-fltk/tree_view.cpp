@@ -1,5 +1,6 @@
 #include "tree_view.h"
 #include "tree_item/devices.h"
+#include "tree_item/unknown_devices.h"
 
 #include <FL/Fl.H>
 
@@ -29,11 +30,13 @@ tree_view_t::tree_view_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     showroot(false);
     auto folders_node = new tree_item_t(supervisor, this);
     auto devices_node = new tree_item::devices_t(supervisor, this);
+    auto unknown_devices_node = new tree_item::unknown_devices_t(supervisor, this);
 
     folders_node->label("folders-label");
 
     add("folders", folders_node);
     add("devices", devices_node);
+    add("devices", unknown_devices_node);
 
     callback(tree_view_callback);
 }
