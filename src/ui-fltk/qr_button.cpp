@@ -33,8 +33,9 @@ struct button_t : Fl_Button {
     using bit_set_t = boost::dynamic_bitset<unsigned char>;
     using parent_t = Fl_Button;
 
-    button_t(app_supervisor_t &sup_, code_t code_, int x, int y, int w, int h, const char *label_)
-        : parent_t(x, y, w, h), sup{sup_}, code{std::move(code_)}, scale{0}, data{label_} {
+    button_t(app_supervisor_t &sup_, code_t code_, int x, int y, int w, int h, const char *label_,
+             std::string_view short_id_)
+        : parent_t(x, y, w, h), sup{sup_}, code{std::move(code_)}, scale{0}, data{label_}, short_id(short_id_) {
         regen_image(w, h);
         tooltip("copy device id to clipboard");
 
@@ -51,8 +52,7 @@ struct button_t : Fl_Button {
                 auto device_id = button->data;
                 Fl::copy(device_id, strlen(device_id), 1);
                 auto sup = reinterpret_cast<app_supervisor_t *>(data);
-                auto device_id_short = sup->get_cluster()->get_device()->device_id().get_short();
-                sup->get_logger()->info("device id {} has been copied to clipboard", device_id_short);
+                sup->get_logger()->info("device id {} has been copied to clipboard", button->short_id);
             },
             &sup);
     }
@@ -115,6 +115,7 @@ struct button_t : Fl_Button {
     image_t qr_image;
     int scale = 0;
     const char *data;
+    std::string short_id;
 };
 
 } // namespace
@@ -125,6 +126,7 @@ qr_button_t::qr_button_t(const model::device_id_t &device_, app_supervisor_t &su
     box(FL_FLAT_BOX);
 
     auto device_id_raw = device_id.get_value().c_str();
+    auto device_id_short = device_id.get_short();
     auto code_raw = QRcode_encodeString(device_id_raw, 0, QR_ECLEVEL_H, QR_MODE_8, 1);
     auto &logger = supervisor.get_logger();
     if (!code_raw) {
@@ -133,7 +135,7 @@ qr_button_t::qr_button_t(const model::device_id_t &device_, app_supervisor_t &su
         return;
     }
     auto code = make_guard(code_raw, [](auto ptr) { QRcode_free(ptr); });
-    auto button = new button_t(supervisor, std::move(code), x, y, w, h, device_id_raw);
+    auto button = new button_t(supervisor, std::move(code), x, y, w, h, device_id_raw, device_id_short);
     resizable(button);
 }
 
