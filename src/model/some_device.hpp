@@ -23,9 +23,7 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
 
     using ptr_t = intrusive_ptr_t<some_device_t>;
 
-    some_device_t(const some_device_t &other) : label{other.label}, address{other.address}, last_seen{other.last_seen} {
-        std::copy(other.hash, other.hash + data_length, hash);
-    }
+    some_device_t(const some_device_t &&other) = delete;
 
     static outcome::result<ptr_t> create(const device_id_t &id, const db::SomeDevice &db) noexcept {
         return ptr_t(new some_device_t(id, db));
@@ -44,12 +42,16 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
         auto time_diff = last_seen - epoch;
         auto last_seen_time = time_diff.ticks() / time_diff.ticks_per_second();
 
-        db.set_label(label);
+        db.set_name(name);
+        db.set_client_name(client_name);
+        db.set_client_version(client_version);
         db.set_address(address);
         db.set_last_seen(last_seen_time);
     }
 
-    std::string_view get_label() const noexcept { return label; }
+    std::string_view get_name() const noexcept { return name; }
+    std::string_view get_client_name() const noexcept { return client_name; }
+    std::string_view get_client_version() const noexcept { return client_version; }
     std::string_view get_address() const noexcept { return address; }
     const pt::ptime &get_last_seen() const noexcept { return last_seen; }
     void set_last_seen(const pt::ptime &value) noexcept { last_seen = value; }
@@ -62,17 +64,25 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
         ptr_t by_sha256(std::string_view value) noexcept { return this->template get<0>(value); }
     };
 
+    void assign(const db::SomeDevice &db) noexcept {
+        name = db.name();
+        client_name = db.client_name();
+        client_version = db.client_version();
+        address = db.address();
+        last_seen = pt::from_time_t(db.last_seen());
+    }
+
   private:
     some_device_t(const device_id_t &device_id, const db::SomeDevice &db) noexcept {
         auto sha256 = device_id.get_sha256();
         hash[0] = prefix;
         std::copy(sha256.begin(), sha256.end(), hash + 1);
-        label = db.label();
-        address = db.address();
-        last_seen = pt::from_time_t(db.last_seen());
+        assign(db);
     }
 
-    std::string label;
+    std::string name;
+    std::string client_name;
+    std::string client_version;
     std::string address;
     pt::ptime last_seen;
 

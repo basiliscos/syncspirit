@@ -6,6 +6,7 @@
 
 #include "utils/tls.h"
 #include "utils/format.hpp"
+#include "proto/bep_support.h"
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "net/names.h"
@@ -13,6 +14,7 @@
 #include "net/peer_actor.h"
 #include "transport/stream.h"
 #include "diff-builder.h"
+#include "constants.h"
 
 #include <rotor/asio.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -73,22 +75,35 @@ using actor_ptr_t = r::intrusive_ptr_t<peer_actor_t>;
 
 struct fixture_t : private model::diff::contact_visitor_t {
     using acceptor_t = asio::ip::tcp::acceptor;
-    using diff_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
         utils::set_default("trace");
         log = utils::get_logger("fixture");
     }
 
-    virtual void run() noexcept {
-
+    virtual void run(bool add_peer = true) noexcept {
+        known_peer = add_peer;
         auto strand = std::make_shared<asio::io_context::strand>(io_ctx);
         sup = ctx.create_supervisor<supervisor_t>().strand(strand).timeout(timeout).create_registry().finish();
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                using diff_t = typename diff_ptr_t::element_type;
-                p.subscribe_actor(r::lambda<diff_t>([&](diff_t &msg) {
-                    LOG_INFO(log, "received diff message");
+                using cluster_diff_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
+                using cluster_diff_t = typename cluster_diff_ptr_t::element_type;
+                using contact_diff_ptr_t = r::intrusive_ptr_t<model::message::contact_update_t>;
+                using contact_diff_t = typename contact_diff_ptr_t::element_type;
+
+                p.subscribe_actor(r::lambda<cluster_diff_t>([&](cluster_diff_t &msg) {
+                    LOG_INFO(log, "received cluster diff message");
+                    auto &diff = msg.payload.diff;
+                    auto r = diff->apply(*cluster);
+                    if (!r) {
+                        LOG_ERROR(log, "error updating model: {}", r.assume_error().message());
+                        sup->do_shutdown();
+                    }
+                }));
+
+                p.subscribe_actor(r::lambda<contact_diff_t>([&](contact_diff_t &msg) {
+                    LOG_INFO(log, "received contact diff message");
                     auto &diff = msg.payload.diff;
                     auto r = diff->apply(*cluster);
                     if (!r) {
@@ -111,7 +126,9 @@ struct fixture_t : private model::diff::contact_visitor_t {
 
         cluster = new cluster_t(my_device, 1, 1);
         cluster->get_devices().put(my_device);
-        cluster->get_devices().put(peer_device);
+        if (add_peer) {
+            cluster->get_devices().put(peer_device);
+        }
 
         auto ep = asio::ip::tcp::endpoint(asio::ip::make_address(host), 0);
         acceptor.open(ep.protocol());
@@ -134,25 +151,30 @@ struct fixture_t : private model::diff::contact_visitor_t {
         auto addresses = std::vector<tcp::endpoint>{peer_ep};
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
 
-        transport::error_fn_t on_error = [&](auto &ec) { LOG_WARN(log, "active/connect, err: {}", ec.message()); };
+        transport::error_fn_t on_error = [&](auto &ec) { on_client_error(ec); };
         transport::connect_fn_t on_connect = [addresses_ptr, this](const tcp::endpoint &ep) {
             LOG_INFO(log, "active/connected");
-            main();
+            // main();
         };
 
         client_trans->async_connect(addresses_ptr, on_connect, on_error);
 
         io_ctx.run();
+        CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
     }
 
     virtual void main() noexcept {}
 
-    virtual actor_ptr_t create_actor() noexcept {
-        auto builder = diff_builder_t(*cluster);
-        builder.update_state(*peer_device, {}, model::device_state_t::connecting).apply(*sup);
+    virtual actor_ptr_t create_actor(uint32_t rx_timeout = 2000) noexcept {
+        if (known_peer) {
+            auto builder = diff_builder_t(*cluster);
+            builder.update_state(*peer_device, {}, model::device_state_t::connecting).apply(*sup);
+        }
 
         auto bep_config = config::bep_config_t();
         bep_config.rx_buff_size = 1024;
+        bep_config.rx_buff_size = rx_timeout;
+
         return sup->create_actor<actor_ptr_t::element_type>()
             .timeout(timeout)
             .cluster(cluster)
@@ -162,9 +184,11 @@ struct fixture_t : private model::diff::contact_visitor_t {
             .peer_device_id(peer_device->device_id())
             .device_name("peer-device")
             .peer_proto("tcp")
-            .escalate_failure()
+            .autoshutdown_supervisor(true)
             .finish();
     }
+
+    virtual void on_client_error(const sys::error_code &ec) noexcept { LOG_WARN(log, "client err: {}", ec.message()); }
 
     virtual void accept(const sys::error_code &ec) noexcept {
         LOG_INFO(log, "accept, ec: {}, remote = {}", ec.message(), peer_sock.remote_endpoint());
@@ -172,6 +196,33 @@ struct fixture_t : private model::diff::contact_visitor_t {
         auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         peer_trans = transport::initiate_stream(cfg);
         main();
+    }
+
+    virtual void on_client_write(std::size_t bytes) noexcept { LOG_INFO(log, "client sent {} bytes", bytes); }
+
+    virtual void on_client_read(std::size_t bytes) noexcept {
+        LOG_INFO(log, "client received {} bytes", bytes);
+        auto result = proto::parse_bep(asio::buffer(rx_buff, bytes)).value();
+        auto hello = std::get_if<proto::message::Hello>(&result.message);
+        if (hello) {
+            return on_hello(std::move(*hello));
+        }
+    }
+
+    virtual void on_hello(proto::message::Hello msg) noexcept {
+        LOG_INFO(log, "client received hello message from {}, {}/{}", msg->device_name(), msg->client_name(),
+                 msg->client_version());
+    }
+
+    virtual void send_hello() noexcept {
+        proto::make_hello_message(tx_buff, "self-name");
+        transport::io_fn_t on_write = [&](size_t bytes) { on_client_write(bytes); };
+        transport::io_fn_t on_read = [&](size_t bytes) { on_client_read(bytes); };
+        transport::error_fn_t on_error = [&](auto &ec) { on_client_error(ec); };
+        auto tx_buff_ = asio::buffer(tx_buff.data(), tx_buff.size());
+        auto rx_buff_ = asio::buffer(rx_buff, sizeof(rx_buff));
+        client_trans->async_recv(rx_buff_, on_read, on_error);
+        client_trans->async_send(tx_buff_, on_write, on_error);
     }
 
     cluster_ptr_t cluster;
@@ -187,22 +238,124 @@ struct fixture_t : private model::diff::contact_visitor_t {
     model::device_ptr_t my_device;
     transport::stream_sp_t peer_trans;
     transport::stream_sp_t client_trans;
+    fmt::memory_buffer tx_buff;
+    char rx_buff[2000];
+    bool known_peer = false;
 };
 
 void test_shutdown_on_hello_timeout() {
     struct F : fixture_t {
-        void main() noexcept override { auto act = create_actor(); }
+        void main() noexcept override { auto act = create_actor(1); }
 
-        void run() noexcept override {
-            fixture_t::run();
+        void run(bool add_peer = true) noexcept override {
+            fixture_t::run(add_peer);
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
         }
     };
     F().run();
 }
 
+void test_online_on_hello() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            create_actor();
+            send_hello();
+        }
+
+        void on_hello(proto::message::Hello msg) noexcept override {
+            auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
+            CHECK(peer->get_state() == device_state_t::online);
+        }
+    };
+    F().run();
+}
+
+void test_hello_from_unknown() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            create_actor();
+            send_hello();
+        }
+
+        void on_hello(proto::message::Hello msg) noexcept override {
+            CHECK(cluster->get_devices().size() == 1);
+            auto &unknown_devices = cluster->get_unknown_devices();
+            CHECK(unknown_devices.size() == 1);
+            auto peer = unknown_devices.by_sha256(peer_device->device_id().get_sha256());
+            REQUIRE(peer);
+            CHECK(peer->get_name() == "self-name");
+            CHECK(peer->get_client_name() == constants::client_name);
+            CHECK(peer->get_client_version() == constants::client_version);
+            CHECK(peer->get_address() == "tcp://0.0.0.0:0");
+
+            auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
+            CHECK(delta.seconds() <= 2);
+        }
+    };
+    F().run(false);
+}
+
+void test_hello_from_known_unknown() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            diff_builder_t(*cluster).add_unknown_device(peer_device->device_id(), {}).apply(*sup);
+            REQUIRE(cluster->get_unknown_devices().size() == 1);
+            create_actor();
+            send_hello();
+        }
+
+        void on_hello(proto::message::Hello msg) noexcept override {
+            CHECK(cluster->get_devices().size() == 1);
+            auto &unknown_devices = cluster->get_unknown_devices();
+            CHECK(unknown_devices.size() == 1);
+            auto peer = unknown_devices.by_sha256(peer_device->device_id().get_sha256());
+            REQUIRE(peer);
+            CHECK(peer->get_name() == "self-name");
+            CHECK(peer->get_client_name() == constants::client_name);
+            CHECK(peer->get_client_version() == constants::client_version);
+            CHECK(peer->get_address() == "tcp://0.0.0.0:0");
+
+            auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
+            CHECK(delta.seconds() <= 2);
+        }
+    };
+    F().run(false);
+}
+
+void test_hello_from_ignored() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            diff_builder_t(*cluster).add_ignored_device(peer_device->device_id(), {}).apply(*sup);
+            REQUIRE(cluster->get_ignored_devices().size() == 1);
+            create_actor();
+            send_hello();
+        }
+
+        void on_hello(proto::message::Hello msg) noexcept override {
+            CHECK(cluster->get_devices().size() == 1);
+            auto &ignored_devices = cluster->get_ignored_devices();
+            CHECK(ignored_devices.size() == 1);
+            auto peer = ignored_devices.by_sha256(peer_device->device_id().get_sha256());
+            REQUIRE(peer);
+            CHECK(peer->get_name() == "self-name");
+            CHECK(peer->get_client_name() == constants::client_name);
+            CHECK(peer->get_client_version() == constants::client_version);
+            CHECK(peer->get_address() == "tcp://0.0.0.0:0");
+
+            auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
+            CHECK(delta.seconds() <= 2);
+            REQUIRE(cluster->get_unknown_devices().size() == 0);
+        }
+    };
+    F().run(false);
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_shutdown_on_hello_timeout, "test_shutdown_on_hello_timeout", "[peer]");
+    REGISTER_TEST_CASE(test_online_on_hello, "test_online_on_hello", "[peer]");
+    REGISTER_TEST_CASE(test_hello_from_unknown, "test_hello_from_unknown", "[peer]");
+    REGISTER_TEST_CASE(test_hello_from_known_unknown, "test_hello_from_known_unknown", "[peer]");
+    REGISTER_TEST_CASE(test_hello_from_ignored, "test_hello_from_ignored", "[peer]");
     return 1;
 }
 

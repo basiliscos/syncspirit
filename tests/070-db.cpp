@@ -187,11 +187,11 @@ void test_miscellaneous() {
                 device_id_t::from_string("XBOWTOU-Y7H6RM6-D7WT3UB-7P2DZ5G-R6GNZG6-T5CCG54-SGVF3U5-LBM7RQB").value();
 
             db::SomeDevice sd_1;
-            sd_1.set_label("x1");
+            sd_1.set_name("x1");
             auto unknown_device = unknown_device_t::create(d_id1, sd_1).value();
 
             db::SomeDevice sd_2;
-            sd_2.set_label("x2");
+            sd_2.set_name("x2");
             auto ignored_device = ignored_device_t::create(d_id2, sd_2).value();
 
             auto builder = diff_builder_t(*cluster);

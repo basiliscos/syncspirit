@@ -9,16 +9,14 @@
 
 using namespace syncspirit::model::diff::contact;
 
-unknown_connected_t::unknown_connected_t(cluster_t &cluster, const model::unknown_device_t &peer) noexcept
-    : device{peer} {
+unknown_connected_t::unknown_connected_t(cluster_t &cluster, const model::device_id_t &device_id_,
+                                         db::SomeDevice db_device_) noexcept
+    : device_id{device_id_}, db_device{std::move(db_device_)} {
     auto &unknown_devices = cluster.get_unknown_devices();
-    auto sha256 = device.get_sha256();
-    device.set_last_seen(pt::microsec_clock::local_time());
+    auto sha256 = device_id.get_sha256();
     if (!unknown_devices.by_sha256(sha256)) {
         auto device_id = device_id_t::from_sha256(sha256).value();
-        db::SomeDevice db;
-        device.serialize(db);
-        inner.reset(new modify::add_unknown_device_t(device_id, db));
+        inner.reset(new modify::add_unknown_device_t(device_id, db_device));
     }
 }
 
@@ -31,11 +29,11 @@ auto unknown_connected_t::apply_impl(cluster_t &cluster) const noexcept -> outco
     }
 
     auto &unknown_devices = cluster.get_unknown_devices();
-    auto prev = unknown_devices.by_sha256(device.get_sha256());
+    auto prev = unknown_devices.by_sha256(device_id.get_sha256());
     if (!prev) {
         return make_error_code(error_code_t::no_such_device);
     }
-    prev->set_last_seen(device.get_last_seen());
+    prev->assign(db_device);
     return outcome::success();
 }
 

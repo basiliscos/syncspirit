@@ -110,7 +110,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
     SECTION("ignored_devices") {
         db::SomeDevice db_device;
-        db_device.set_label("my-label");
+        db_device.set_name("my-label");
         db_device.set_address("tcp://127.0.0.1");
         db_device.set_last_seen(0);
 
@@ -138,7 +138,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
     SECTION("unknown_devices") {
         db::SomeDevice db_device;
-        db_device.set_label("my-label");
+        db_device.set_name("my-label");
         db_device.set_address("tcp://127.0.0.1");
         db_device.set_last_seen(0);
 

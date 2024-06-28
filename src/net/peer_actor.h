@@ -130,6 +130,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     void read_hello(proto::message::message_t &&msg) noexcept;
     void read_controlled(proto::message::message_t &&msg) noexcept;
 
+    void handle_hello(proto::message::Hello &&) noexcept;
     void handle_ping(proto::message::Ping &&) noexcept;
     void handle_close(proto::message::Close &&) noexcept;
     void handle_response(proto::message::Response &&) noexcept;

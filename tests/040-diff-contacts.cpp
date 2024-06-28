@@ -24,9 +24,9 @@ TEST_CASE("unknown device connected", "[model]") {
     devices.put(my_device);
 
     db::SomeDevice db_device;
-    auto unknown_device = unknown_device_t::create(peer_id, db_device).value();
+    db_device.set_name("a name");
     auto diff = model::diff::contact_diff_ptr_t{};
-    auto diff_raw = new model::diff::contact::unknown_connected_t(*cluster, *unknown_device);
+    auto diff_raw = new model::diff::contact::unknown_connected_t(*cluster, peer_id, db_device);
     CHECK(diff_raw->inner);
     diff = diff_raw;
     REQUIRE(diff->apply(*cluster));
@@ -35,19 +35,13 @@ TEST_CASE("unknown device connected", "[model]") {
     auto unknown = cluster->get_unknown_devices().by_sha256(peer_id.get_sha256());
     REQUIRE(unknown);
 
-    auto delta = pt::microsec_clock::local_time() - unknown->get_last_seen();
-    CHECK(delta.seconds() <= 2);
-
-    diff_raw = new model::diff::contact::unknown_connected_t(*cluster, *unknown_device);
+    diff_raw = new model::diff::contact::unknown_connected_t(*cluster, peer_id, db_device);
     CHECK(!diff_raw->inner);
     diff = diff_raw;
     REQUIRE(diff->apply(*cluster));
 
     unknown = cluster->get_unknown_devices().by_sha256(peer_id.get_sha256());
     REQUIRE(unknown);
-
-    delta = pt::microsec_clock::local_time() - unknown->get_last_seen();
-    CHECK(delta.seconds() <= 2);
 }
 
 TEST_CASE("ignored device connected", "[model]") {
@@ -61,15 +55,13 @@ TEST_CASE("ignored device connected", "[model]") {
     devices.put(my_device);
 
     db::SomeDevice db_device;
+    db_device.set_name("a name");
     auto buider = diff_builder_t(*cluster);
     REQUIRE(buider.add_ignored_device(peer_id, db_device).apply());
     auto &ignored_devices = cluster->get_ignored_devices();
     auto ignored_device = ignored_devices.by_sha256(peer_id.get_sha256());
 
     auto diff = model::diff::contact_diff_ptr_t{};
-    diff = new model::diff::contact::ignored_connected_t(*cluster, *ignored_device);
+    diff = new model::diff::contact::ignored_connected_t(*cluster, peer_id, db_device);
     REQUIRE(diff->apply(*cluster));
-
-    auto delta = pt::microsec_clock::local_time() - ignored_device->get_last_seen();
-    CHECK(delta.seconds() <= 2);
 }

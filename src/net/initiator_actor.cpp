@@ -8,9 +8,7 @@
 #include "proto/relay_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
-#include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/peer_state.h"
-#include "model/diff/contact/unknown_connected.h"
 #include <algorithm>
 #include <spdlog/fmt/bin_to_hex.h>
 #include <fmt/core.h>
@@ -207,20 +205,6 @@ void initiator_actor_t::shutdown_finish() noexcept {
         if (auto peer = cluster->get_devices().by_sha256(sha256); peer) {
             auto diff = model::diff::contact_diff_ptr_t();
             diff = new model::diff::contact::peer_state_t(*cluster, sha256, nullptr, state);
-            send<model::payload::contact_update_t>(coordinator, std::move(diff));
-        } else if (auto peer = cluster->get_unknown_devices().by_sha256(sha256); peer) {
-            auto diff = model::diff::contact_diff_ptr_t();
-            diff = new model::diff::contact::unknown_connected_t(*cluster, *peer);
-            send<model::payload::contact_update_t>(coordinator, std::move(diff));
-        } else if (auto peer = cluster->get_ignored_devices().by_sha256(sha256); peer) {
-            auto diff = model::diff::contact_diff_ptr_t();
-            diff = new model::diff::contact::ignored_connected_t(*cluster, *peer);
-            send<model::payload::contact_update_t>(coordinator, std::move(diff));
-        } else {
-            auto db_peer = db::SomeDevice();
-            db_peer.set_address(active_uri->buffer());
-            auto unknown_peer = model::unknown_device_t::create(peer_device_id, db_peer).value();
-            auto diff = new model::diff::contact::unknown_connected_t(*cluster, *unknown_peer);
             send<model::payload::contact_update_t>(coordinator, std::move(diff));
         }
     }

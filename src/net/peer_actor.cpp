@@ -10,6 +10,8 @@
 #include "proto/bep_support.h"
 #include "model/messages.h"
 #include "model/diff/contact/peer_state.h"
+#include "model/diff/contact/ignored_connected.h"
+#include "model/diff/contact/unknown_connected.h"
 #include <boost/core/demangle.hpp>
 #include <sstream>
 
@@ -240,8 +242,7 @@ void peer_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
     auto sha256 = peer_device_id.get_sha256();
     auto device = cluster->get_devices().by_sha256(sha256);
-    auto state = device->get_state();
-    if (state != model::device_state_t::offline) {
+    if (device && device->get_state() != model::device_state_t::offline) {
         auto diff = model::diff::contact_diff_ptr_t();
         auto state = model::device_state_t::offline;
         diff = new model::diff::contact::peer_state_t(*cluster, sha256, address, state);
@@ -316,24 +317,12 @@ void peer_actor_t::on_transfer(message::transfer_data_t &message) noexcept {
 }
 
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
-    using namespace model::diff;
     LOG_TRACE(log, "read_hello");
     std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
-                LOG_TRACE(log, "read_hello, from {} ({} {})", msg->device_name(), msg->client_name(),
-                          msg->client_version());
-                auto peer = cluster->get_devices().by_sha256(peer_device_id.get_sha256());
-                if (peer && peer->get_state() == model::device_state_t::online) {
-                    auto ec = utils::make_error_code(utils::error_code_t::already_connected);
-                    return do_shutdown(make_error(ec));
-                }
-                auto diff = contact_diff_ptr_t();
-                auto state = model::device_state_t::online;
-                diff = new contact::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), state, cert_name,
-                                                 peer_endpoint, msg->client_name());
-                send<model::payload::contact_update_t>(coordinator, std::move(diff));
+                return handle_hello(std::move(msg));
             } else {
                 LOG_WARN(log, "read_hello, unexpected_message");
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
@@ -375,6 +364,51 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
         read_action = &peer_actor_t::read_controlled;
         read_more();
     }
+}
+
+void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
+    using namespace model::diff;
+    auto &device_name = msg->device_name();
+    auto &client_name = msg->client_name();
+    auto &client_version = msg->client_version();
+    auto sha_s256 = peer_device_id.get_sha256();
+    LOG_DEBUG(log, "read_hello, from {} ({} {})", device_name, client_name, client_version);
+    auto diff = contact_diff_ptr_t();
+    auto db = db::SomeDevice();
+    auto fill_db_and_shutdown = [&]() {
+        auto address = fmt::format("{}://{}", peer_proto, peer_endpoint);
+
+        db.set_name(device_name);
+        db.set_client_name(client_name);
+        db.set_client_version(client_version);
+        db.set_address(std::move(address));
+
+        pt::ptime epoch(boost::gregorian::date(1970, 1, 1));
+        auto now = pt::microsec_clock::local_time();
+        auto time_diff = now - epoch;
+        auto time_value = time_diff.ticks() / time_diff.ticks_per_second();
+        db.set_last_seen(time_value);
+        LOG_INFO(log, "device {} is unknown/ignored, shutting down", device_name);
+        do_shutdown();
+    };
+
+    if (auto known_peer = cluster->get_devices().by_sha256(sha_s256); known_peer) {
+        if (known_peer->get_state() == model::device_state_t::online) {
+            auto ec = utils::make_error_code(utils::error_code_t::already_connected);
+            return do_shutdown(make_error(ec));
+        }
+        auto state = model::device_state_t::online;
+        diff = new contact::peer_state_t(*cluster, sha_s256, get_address(), state, cert_name, peer_endpoint,
+                                         msg->client_name());
+    } else if (auto peer = cluster->get_ignored_devices().by_sha256(sha_s256)) {
+        fill_db_and_shutdown();
+        diff = new model::diff::contact::ignored_connected_t(*cluster, peer_device_id, std::move(db));
+    } else {
+        fill_db_and_shutdown();
+        diff = new model::diff::contact::unknown_connected_t(*cluster, peer_device_id, std::move(db));
+    }
+
+    send<model::payload::contact_update_t>(coordinator, std::move(diff));
 }
 
 void peer_actor_t::handle_ping(proto::message::Ping &&) noexcept { log->trace("handle_ping"); }
