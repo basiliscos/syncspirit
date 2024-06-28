@@ -121,7 +121,7 @@ void self_device_t::on_select() {
             return content;
         }();
         auto bot = [&]() -> Fl_Widget * {
-            auto device = supervisor.get_cluster()->get_device();
+            auto &device = supervisor.get_cluster()->get_device()->device_id();
             return new qr_button_t(device, supervisor, x, y + top->h(), w, bot_h);
         }();
         group->add(top);

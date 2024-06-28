@@ -419,7 +419,9 @@ void peer_device_t::on_select() {
             content = new static_table_t(std::move(data), x, y, w, h - bot_h);
             return content;
         }();
-        auto bot = [&]() -> Fl_Widget * { return new qr_button_t(peer, supervisor, x, y + top->h(), w, bot_h); }();
+        auto bot = [&]() -> Fl_Widget * {
+            return new qr_button_t(peer->device_id(), supervisor, x, y + top->h(), w, bot_h);
+        }();
         group->add(top);
         group->add(bot);
         group->end();

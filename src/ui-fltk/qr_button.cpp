@@ -119,13 +119,13 @@ struct button_t : Fl_Button {
 
 } // namespace
 
-qr_button_t::qr_button_t(model::device_ptr_t device_, app_supervisor_t &supervisor_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), device{std::move(device_)}, supervisor{supervisor_} {
+qr_button_t::qr_button_t(const model::device_id_t &device_, app_supervisor_t &supervisor_, int x, int y, int w, int h)
+    : parent_t(x, y, w, h), device_id{device_}, supervisor{supervisor_} {
 
     box(FL_FLAT_BOX);
 
-    auto device_id = device->device_id().get_value().c_str();
-    auto code_raw = QRcode_encodeString(device_id, 0, QR_ECLEVEL_H, QR_MODE_8, 1);
+    auto device_id_raw = device_id.get_value().c_str();
+    auto code_raw = QRcode_encodeString(device_id_raw, 0, QR_ECLEVEL_H, QR_MODE_8, 1);
     auto &logger = supervisor.get_logger();
     if (!code_raw) {
         auto ec = std::error_code{errno, std::generic_category()};
@@ -133,7 +133,7 @@ qr_button_t::qr_button_t(model::device_ptr_t device_, app_supervisor_t &supervis
         return;
     }
     auto code = make_guard(code_raw, [](auto ptr) { QRcode_free(ptr); });
-    auto button = new button_t(supervisor, std::move(code), x, y, w, h, device_id);
+    auto button = new button_t(supervisor, std::move(code), x, y, w, h, device_id_raw);
     resizable(button);
 }
 

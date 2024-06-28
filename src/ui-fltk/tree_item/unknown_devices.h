@@ -1,7 +1,5 @@
 #pragma once
 
-#pragma once
-
 #include "../tree_item.h"
 
 namespace syncspirit::fltk::tree_item {
@@ -18,8 +16,8 @@ struct unknown_devices_t : tree_item_t, private model_listener_t, private model:
 #if 0
     outcome::result<void> operator()(const diff::modify::update_peer_t &, void *custom) noexcept override;
     tree_item_t *get_self_device();
-    void add_device(const model::unknown_device_t &device);
 #endif
+    void add_device(const model::unknown_device_ptr_t &device);
 
     model_subscription_t model_sub;
 };
