@@ -216,6 +216,12 @@ void initiator_actor_t::shutdown_finish() noexcept {
             auto diff = model::diff::contact_diff_ptr_t();
             diff = new model::diff::contact::ignored_connected_t(*cluster, *peer);
             send<model::payload::contact_update_t>(coordinator, std::move(diff));
+        } else {
+            auto db_peer = db::SomeDevice();
+            db_peer.set_address(active_uri->buffer());
+            auto unknown_peer = model::unknown_device_t::create(peer_device_id, db_peer).value();
+            auto diff = new model::diff::contact::unknown_connected_t(*cluster, *unknown_peer);
+            send<model::payload::contact_update_t>(coordinator, std::move(diff));
         }
     }
     r::actor_base_t::shutdown_finish();

@@ -130,6 +130,10 @@ add_executable(039-diff-remove-peer 039-diff-remove-peer.cpp $<$<PLATFORM_ID:Win
 target_link_libraries(039-diff-remove-peer syncspirit_test_lib)
 add_test(039-diff-remove-peer "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/039-diff-remove-peer")
 
+add_executable(040-diff-contacts 040-diff-contacts.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(040-diff-contacts syncspirit_test_lib)
+add_test(040-diff-contacts "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/040-diff-contacts")
+
 add_executable(050-file_iterator 050-file_iterator.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(050-file_iterator syncspirit_test_lib)
 add_test(050-file_iterator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-file_iterator")

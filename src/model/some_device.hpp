@@ -34,16 +34,19 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
     std::string_view get_key() const noexcept { return std::string_view(hash, data_length); }
     std::string_view get_sha256() const noexcept { return std::string_view(hash + 1, digest_length); }
     std::string serialize() noexcept {
+        db::SomeDevice db;
+        serialize(db);
+        return db.SerializeAsString();
+    }
+
+    void serialize(db::SomeDevice db) const noexcept {
         pt::ptime epoch(boost::gregorian::date(1970, 1, 1));
         auto time_diff = last_seen - epoch;
         auto last_seen_time = time_diff.ticks() / time_diff.ticks_per_second();
 
-        db::SomeDevice db;
         db.set_label(label);
         db.set_address(address);
         db.set_last_seen(last_seen_time);
-
-        return db.SerializeAsString();
     }
 
     std::string_view get_label() const noexcept { return label; }
