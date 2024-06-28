@@ -7,7 +7,9 @@
 #include "db/prefix.h"
 #include "db/utils.h"
 #include "db/error_code.h"
+#include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/peer_state.h"
+#include "model/diff/contact/unknown_connected.h"
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/close_transaction.h"
 #include "model/diff/load/devices.h"
@@ -849,6 +851,58 @@ auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void
 
     auto &device_id = diff.peer_id;
     auto device = cluster->get_devices().by_sha256(device_id);
+    assert(device);
+
+    auto key = device->get_key();
+    auto data = device->serialize();
+
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto r = db::save({key, data}, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
+auto db_actor_t::operator()(const model::diff::contact::ignored_connected_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto device = cluster->get_ignored_devices().by_sha256(diff.device_id.get_sha256());
+    assert(device);
+
+    auto key = device->get_key();
+    auto data = device->serialize();
+
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto r = db::save({key, data}, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
+auto db_actor_t::operator()(const model::diff::contact::unknown_connected_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto device = cluster->get_unknown_devices().by_sha256(diff.device_id.get_sha256());
     assert(device);
 
     auto key = device->get_key();

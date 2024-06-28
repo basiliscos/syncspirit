@@ -37,7 +37,7 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
         return db.SerializeAsString();
     }
 
-    void serialize(db::SomeDevice db) const noexcept {
+    void serialize(db::SomeDevice &db) const noexcept {
         pt::ptime epoch(boost::gregorian::date(1970, 1, 1));
         auto time_diff = last_seen - epoch;
         auto last_seen_time = time_diff.ticks() / time_diff.ticks_per_second();

@@ -73,6 +73,8 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t,
 
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::ignored_connected_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::unknown_connected_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_unknown_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_unknown_folders_t &, void *) noexcept override;
