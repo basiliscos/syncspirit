@@ -19,6 +19,7 @@ void unknown_devices_t::update_label() {
     auto count = cluster ? cluster->get_unknown_devices().size() : 0;
     auto l = fmt::format("unknown devices ({})", count);
     label(l.data());
+    tree()->redraw();
 }
 
 void unknown_devices_t::build_tree() {
@@ -65,11 +66,18 @@ auto unknown_devices_t::operator()(const diff::load::unknown_devices_t &diff, vo
 
 auto unknown_devices_t::operator()(const diff::contact::unknown_connected_t &diff, void *) noexcept
     -> outcome::result<void> {
-    for (int i = 0; i < children(); ++i) {
-        auto node = static_cast<unknown_device_t *>(child(i));
-        if (node->device->get_sha256() == diff.device_id.get_sha256()) {
-            node->refresh();
-            break;
+    if (diff.inner) {
+        auto &unknown_device = supervisor.get_cluster()->get_unknown_devices();
+        auto device = unknown_device.by_sha256(diff.device_id.get_sha256());
+        add_device(device);
+        update_label();
+    } else {
+        for (int i = 0; i < children(); ++i) {
+            auto node = static_cast<unknown_device_t *>(child(i));
+            if (node->device->get_sha256() == diff.device_id.get_sha256()) {
+                node->refresh();
+                break;
+            }
         }
     }
     return outcome::success();
