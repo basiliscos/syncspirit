@@ -106,6 +106,7 @@ void fs_supervisor_t::on_model_update(model::message::model_update_t &message) n
     auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
     if (!r) {
+        LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
         auto ee = make_error(r.assume_error());
         return do_shutdown(ee);
     }
@@ -116,6 +117,7 @@ void fs_supervisor_t::on_block_update(model::message::block_update_t &message) n
     LOG_TRACE(log, "on_block_update for {}", diff.file_name);
     auto r = diff.apply(*cluster);
     if (!r) {
+        LOG_ERROR(log, "error applying block diff: {}", r.assume_error().message());
         auto ee = make_error(r.assume_error());
         return do_shutdown(ee);
     }

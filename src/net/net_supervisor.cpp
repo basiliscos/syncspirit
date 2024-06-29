@@ -165,6 +165,7 @@ void net_supervisor_t::on_model_update(model::message::model_update_t &message) 
     auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
     if (!r) {
+        LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
