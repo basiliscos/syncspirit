@@ -2,6 +2,7 @@
 
 #include "unknown_device.h"
 #include "model/diff/load/load_cluster.h"
+#include "model/diff/contact/unknown_connected.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model::diff;
@@ -46,6 +47,10 @@ void unknown_devices_t::operator()(model::message::model_update_t &update) {
     update_label();
 }
 
+void unknown_devices_t::operator()(model::message::contact_update_t &diff) {
+    std::ignore = diff.payload.diff->visit(*this, nullptr);
+}
+
 auto unknown_devices_t::operator()(const diff::load::load_cluster_t &diff, void *data) noexcept
     -> outcome::result<void> {
     return diff.diff::cluster_aggregate_diff_t::visit(*this, data);
@@ -55,5 +60,17 @@ auto unknown_devices_t::operator()(const diff::load::unknown_devices_t &diff, vo
     -> outcome::result<void> {
     build_tree();
     update_label();
+    return outcome::success();
+}
+
+auto unknown_devices_t::operator()(const diff::contact::unknown_connected_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    for (int i = 0; i < children(); ++i) {
+        auto node = static_cast<unknown_device_t *>(child(i));
+        if (node->device->get_sha256() == diff.device_id.get_sha256()) {
+            node->refresh();
+            break;
+        }
+    }
     return outcome::success();
 }

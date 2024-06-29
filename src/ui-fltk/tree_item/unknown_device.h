@@ -14,6 +14,7 @@ struct unknown_device_t : tree_item_t, private model_listener_t, private model::
 
     unknown_device_t(model::unknown_device_ptr_t device, app_supervisor_t &supervisor, Fl_Tree *tree);
     void update_label();
+    void refresh();
 
     void on_select() override;
 

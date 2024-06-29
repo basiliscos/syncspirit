@@ -50,7 +50,7 @@ void unknown_device_t::on_select() {
             data.push_back({"address", std::string(device->get_address())});
             data.push_back({"last_seen", last_seen});
             int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-            auto content = new static_table_t(std::move(data), x, y, w, h - bot_h);
+            content = new static_table_t(std::move(data), x, y, w, h - bot_h);
             return content;
         }();
         auto bot = [&]() -> Fl_Widget * { return new qr_button_t(device_id, supervisor, x, y + top->h(), w, bot_h); }();
@@ -59,4 +59,27 @@ void unknown_device_t::on_select() {
         group->end();
         return group;
     });
+}
+
+void unknown_device_t::refresh() {
+    update_label();
+    if (content) {
+        auto &table = *static_cast<static_table_t *>(content);
+        auto &rows = table.get_rows();
+        for (size_t i = 0; i < rows.size(); ++i) {
+            if (rows[i].label == "name") {
+                table.update_value(i, std::string(device->get_name()));
+            } else if (rows[i].label == "client") {
+                table.update_value(i, std::string(device->get_client_name()));
+            } else if (rows[i].label == "client version") {
+                table.update_value(i, std::string(device->get_client_version()));
+            } else if (rows[i].label == "address") {
+                table.update_value(i, std::string(device->get_address()));
+            } else if (rows[i].label == "last_seen") {
+                auto last_seen = model::pt::to_simple_string(device->get_last_seen());
+                table.update_value(i, last_seen);
+            }
+        }
+        content->redraw();
+    }
 }
