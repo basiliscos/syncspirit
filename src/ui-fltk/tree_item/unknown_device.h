@@ -17,6 +17,9 @@ struct unknown_device_t : tree_item_t, private model_listener_t, private model::
     void refresh();
 
     void on_select() override;
+    void on_connect();
+    void on_ignore();
+    void on_remove();
 
     model::unknown_device_ptr_t device;
 };

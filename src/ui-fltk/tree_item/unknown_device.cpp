@@ -6,12 +6,48 @@
 #include "../qr_button.h"
 
 #include <FL/Fl_Tile.H>
+#include <FL/Fl_Button.H>
 #include <spdlog/fmt/fmt.h>
 
 using namespace syncspirit;
 using namespace model::diff;
 using namespace fltk;
 using namespace fltk::tree_item;
+
+static constexpr int padding = 2;
+
+static widgetable_ptr_t make_actions(unknown_device_t &container) {
+    struct widget_t final : widgetable_t {
+        using parent_t = widgetable_t;
+        widget_t(unknown_device_t &container_) : widget{nullptr}, container{container_} {}
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto group = new Fl_Group(x, y, w, h);
+            group->begin();
+            group->box(FL_FLAT_BOX);
+            auto yy = y + padding, ww = 100, hh = h - padding * 2;
+            auto connect = new Fl_Button(x + padding, yy, ww, hh, "connect");
+            auto ignore = new Fl_Button(connect->x() + ww + padding * 2, yy, ww, hh, "ignore");
+            auto remove = new Fl_Button(ignore->x() + ww + padding * 2, yy, ww, hh, "remove");
+            remove->color(FL_RED);
+            group->end();
+
+            connect->callback([](auto, void *data) { static_cast<unknown_device_t *>(data)->on_connect(); },
+                              &container);
+            ignore->callback([](auto, void *data) { static_cast<unknown_device_t *>(data)->on_ignore(); }, &container);
+            remove->callback([](auto, void *data) { static_cast<unknown_device_t *>(data)->on_remove(); }, &container);
+
+            widget = group;
+            return widget;
+        }
+        Fl_Widget *get_widget() override { return widget; };
+
+        Fl_Widget *widget;
+        unknown_device_t &container;
+    };
+
+    return new widget_t(container);
+}
 
 unknown_device_t::unknown_device_t(model::unknown_device_ptr_t device_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), device{std::move(device_)} {
@@ -49,6 +85,7 @@ void unknown_device_t::on_select() {
             data.push_back({"client version", std::string(device->get_client_version())});
             data.push_back({"address", std::string(device->get_address())});
             data.push_back({"last_seen", last_seen});
+            data.push_back({"actions", make_actions(*this)});
             int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
             content = new static_table_t(std::move(data), x, y, w, h - bot_h);
             return content;
@@ -83,3 +120,9 @@ void unknown_device_t::refresh() {
         content->redraw();
     }
 }
+
+void unknown_device_t::on_connect() {}
+
+void unknown_device_t::on_ignore() {}
+
+void unknown_device_t::on_remove() {}
