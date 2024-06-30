@@ -607,7 +607,8 @@ auto db_actor_t::operator()(const model::diff::modify::remove_unknown_device_t &
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void *) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -627,6 +628,11 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void
 
     auto r = db::save({key, data}, txn);
     if (!r) {
+        return r.assume_error();
+    }
+
+    r = diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
+    if (r.has_error()) {
         return r.assume_error();
     }
 

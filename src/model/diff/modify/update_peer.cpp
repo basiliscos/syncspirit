@@ -38,7 +38,7 @@ auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
     auto peer = devices.by_sha256(peer_id);
     if (!peer) {
         if (!diffs.empty()) {
-            LOG_TRACE(log, "update_peer_t, removing unknown/ignored device {}", peer->device_id());
+            LOG_TRACE(log, "update_peer_t, removing unknown/ignored device");
             auto r = parent_t::apply_impl(cluster);
             if (!r) {
                 return r;
