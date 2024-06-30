@@ -53,7 +53,7 @@ unknown_folder_t::unknown_folder_t(model::unknown_folder_ptr_t folder_, app_supe
     label(l.c_str());
 }
 
-void unknown_folder_t::on_select() {
+bool unknown_folder_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
         auto data = table_rows_t();
         data.push_back({"id", std::string(folder->get_id())});
@@ -70,4 +70,5 @@ void unknown_folder_t::on_select() {
         auto content = new static_table_t(std::move(data), x, y, w, h);
         return content;
     });
+    return true;
 }

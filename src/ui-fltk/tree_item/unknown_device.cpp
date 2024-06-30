@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
 #include "unknown_device.h"
+#include "model/diff/modify/remove_unknown_device.h"
 #include "../static_table.h"
 #include "../qr_button.h"
 
@@ -63,7 +64,7 @@ void unknown_device_t::update_label() {
     tree()->redraw();
 }
 
-void unknown_device_t::on_select() {
+bool unknown_device_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
         auto device_id = model::device_id_t::from_sha256(device->get_sha256()).value();
 
@@ -96,6 +97,7 @@ void unknown_device_t::on_select() {
         group->end();
         return group;
     });
+    return true;
 }
 
 void unknown_device_t::refresh() {
@@ -125,4 +127,8 @@ void unknown_device_t::on_connect() {}
 
 void unknown_device_t::on_ignore() {}
 
-void unknown_device_t::on_remove() {}
+void unknown_device_t::on_remove() {
+    auto diff = cluster_diff_ptr_t{};
+    diff = new modify::remove_unknown_device_t(*device);
+    supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
+}

@@ -77,8 +77,8 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster);
     if (!r) {
+        LOG_ERROR(log, "error applying block diff: {}", r.assume_error().message());
         auto ee = make_error(r.assume_error());
-        LOG_ERROR(log, "todo, handle cluster apply failure {} ", ee->message());
     }
     auto listeners_copy = model_listeners;
     for (auto listener : listeners_copy) {

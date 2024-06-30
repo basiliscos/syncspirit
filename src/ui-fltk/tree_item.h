@@ -12,8 +12,9 @@ namespace diff = model::diff;
 struct tree_item_t : Fl_Tree_Item {
     using parent_t = Fl_Tree_Item;
     tree_item_t(app_supervisor_t &supervisor, Fl_Tree *tree);
-    virtual void on_select();
+    virtual bool on_select();
     virtual void on_desect();
+    void select_other();
 
     app_supervisor_t &supervisor;
     Fl_Widget *content;

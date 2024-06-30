@@ -81,12 +81,13 @@ devices_t::devices_t(app_supervisor_t &supervisor, Fl_Tree *tree)
     update_label();
 }
 
-void devices_t::on_select() {
+bool devices_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
         auto widget = new devices_widget_t(supervisor, prev->x(), prev->y(), prev->w(), prev->h());
         content = widget;
         return widget;
     });
+    return true;
 }
 
 void devices_t::operator()(model::message::model_update_t &update) {

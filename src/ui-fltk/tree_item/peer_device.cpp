@@ -372,16 +372,12 @@ auto peer_device_t::operator()(const diff::modify::update_peer_t &diff, void *) 
 
 auto peer_device_t::operator()(const diff::modify::remove_peer_t &diff, void *) noexcept -> outcome::result<void> {
     if (diff.get_peer_sha256() == peer->device_id().get_sha256()) {
-        auto t = tree();
-        auto prev = t->next_item(this, FL_Up, true);
-        t->remove(this);
-        t->select(prev, 1);
-        t->redraw();
+        select_other();
     }
     return outcome::success();
 }
 
-void peer_device_t::on_select() {
+bool peer_device_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
         widgets.clear();
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
@@ -427,6 +423,7 @@ void peer_device_t::on_select() {
         group->end();
         return group;
     });
+    return true;
 }
 
 widgetable_ptr_t peer_device_t::record(peer_widget_ptr_t widget) {

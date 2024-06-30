@@ -47,7 +47,7 @@ struct peer_device_t : tree_item_t,
     std::string get_state();
     void update_label();
 
-    void on_select() override;
+    bool on_select() override;
     void on_change();
     void on_remove();
     void on_apply();

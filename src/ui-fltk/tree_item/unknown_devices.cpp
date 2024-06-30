@@ -3,6 +3,7 @@
 #include "unknown_device.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/contact/unknown_connected.h"
+#include "model/diff/modify/remove_unknown_device.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model::diff;
@@ -66,18 +67,23 @@ auto unknown_devices_t::operator()(const diff::load::unknown_devices_t &diff, vo
 
 auto unknown_devices_t::operator()(const diff::contact::unknown_connected_t &diff, void *) noexcept
     -> outcome::result<void> {
-    if (diff.inner) {
-        auto &unknown_device = supervisor.get_cluster()->get_unknown_devices();
-        auto device = unknown_device.by_sha256(diff.device_id.get_sha256());
-        add_device(device);
-        update_label();
-    } else {
-        for (int i = 0; i < children(); ++i) {
-            auto node = static_cast<unknown_device_t *>(child(i));
-            if (node->device->get_sha256() == diff.device_id.get_sha256()) {
-                node->refresh();
-                break;
-            }
+    for (int i = 0; i < children(); ++i) {
+        auto node = static_cast<unknown_device_t *>(child(i));
+        if (node->device->get_sha256() == diff.device_id.get_sha256()) {
+            node->refresh();
+            break;
+        }
+    }
+    return outcome::success();
+}
+
+auto unknown_devices_t::operator()(const diff::modify::remove_unknown_device_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    for (int i = 0; i < children(); ++i) {
+        auto node = static_cast<unknown_device_t *>(child(i));
+        if (node->device->get_sha256() == diff.get_device_sha256()) {
+            node->select_other();
+            break;
         }
     }
     return outcome::success();

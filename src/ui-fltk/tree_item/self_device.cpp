@@ -68,7 +68,7 @@ void self_device_t::operator()(model::message::model_response_t &) {
     tree()->redraw();
 }
 
-void self_device_t::on_select() {
+bool self_device_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         int bot_h = 100;
@@ -130,4 +130,5 @@ void self_device_t::on_select() {
         return group;
     });
     Fl::add_timeout(1.0, on_timeout, this);
+    return true;
 }

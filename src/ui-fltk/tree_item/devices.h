@@ -12,7 +12,7 @@ struct devices_t : tree_item_t, private model_listener_t, private model::diff::c
 
     void build_tree();
     void update_label();
-    void on_select() override;
+    bool on_select() override;
     void operator()(model::message::model_update_t &) override;
     outcome::result<void> operator()(const diff::load::load_cluster_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const diff::load::devices_t &, void *custom) noexcept override;

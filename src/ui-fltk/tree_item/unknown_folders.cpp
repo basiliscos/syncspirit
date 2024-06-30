@@ -68,9 +68,7 @@ auto unknown_folders_t::operator()(const model::diff::modify::remove_unknown_fol
         for (int i = 0; i < children(); ++i) {
             auto node = static_cast<unknown_folder_t *>(child(i));
             if (node->folder->get_key() == key) {
-                auto prev = tree()->next_item(this, FL_Up, true);
-                tree()->select(prev, 1);
-                remove_child(node);
+                select_other();
                 ++removed;
             }
         }
