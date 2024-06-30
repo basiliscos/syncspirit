@@ -506,7 +506,7 @@ void peer_device_t::on_reset() {
 }
 
 void peer_device_t::on_remove() {
-    auto r = fl_choice("Empty trash?", "Yes", "No", nullptr);
+    auto r = fl_choice("Are you sure?", "Yes", "No", nullptr);
     if (r != 0) {
         return;
     }
