@@ -131,7 +131,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
             auto target = map.get(device_id.get_sha256());
             REQUIRE(target);
-            CHECK(target->get_sha256() == id->get_sha256());
+            CHECK(target->get_device_id() == id->get_device_id());
             CHECK(target->get_key() == id->get_key());
         }
     }
@@ -159,7 +159,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
             auto target = map.get(device_id.get_sha256());
             REQUIRE(target);
-            CHECK(target->get_sha256() == id->get_sha256());
+            CHECK(target->get_device_id() == id->get_device_id());
             CHECK(target->get_key() == id->get_key());
         }
     }

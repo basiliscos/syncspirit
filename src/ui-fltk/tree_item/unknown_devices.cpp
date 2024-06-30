@@ -3,6 +3,7 @@
 #include "unknown_device.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/contact/unknown_connected.h"
+#include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/remove_unknown_device.h"
 
 using namespace syncspirit;
@@ -69,7 +70,7 @@ auto unknown_devices_t::operator()(const diff::contact::unknown_connected_t &dif
     -> outcome::result<void> {
     for (int i = 0; i < children(); ++i) {
         auto node = static_cast<unknown_device_t *>(child(i));
-        if (node->device->get_sha256() == diff.device_id.get_sha256()) {
+        if (node->device->get_device_id() == diff.device_id) {
             node->refresh();
             break;
         }
@@ -81,10 +82,15 @@ auto unknown_devices_t::operator()(const diff::modify::remove_unknown_device_t &
     -> outcome::result<void> {
     for (int i = 0; i < children(); ++i) {
         auto node = static_cast<unknown_device_t *>(child(i));
-        if (node->device->get_sha256() == diff.get_device_sha256()) {
+        if (node->device->get_device_id().get_sha256() == diff.get_device_sha256()) {
             node->select_other();
             break;
         }
     }
     return outcome::success();
+}
+
+auto unknown_devices_t::operator()(const diff::modify::update_peer_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
 }

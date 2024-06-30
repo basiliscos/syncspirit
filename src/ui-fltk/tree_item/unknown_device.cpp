@@ -3,6 +3,7 @@
 
 #include "unknown_device.h"
 #include "model/diff/modify/remove_unknown_device.h"
+#include "model/diff/modify/update_peer.h"
 #include "../static_table.h"
 #include "../qr_button.h"
 
@@ -57,8 +58,7 @@ unknown_device_t::unknown_device_t(model::unknown_device_ptr_t device_, app_supe
 
 void unknown_device_t::update_label() {
     auto name = device->get_name();
-    auto device_id = model::device_id_t::from_sha256(device->get_sha256()).value();
-    auto id = device_id.get_short();
+    auto id = device->get_device_id().get_short();
     auto value = fmt::format("{}, {}", name, id);
     label(value.data());
     tree()->redraw();
@@ -66,7 +66,7 @@ void unknown_device_t::update_label() {
 
 bool unknown_device_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-        auto device_id = model::device_id_t::from_sha256(device->get_sha256()).value();
+        auto &device_id = device->get_device_id();
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         int bot_h = 100;
@@ -123,7 +123,15 @@ void unknown_device_t::refresh() {
     }
 }
 
-void unknown_device_t::on_connect() {}
+void unknown_device_t::on_connect() {
+    db::Device db_dev;
+    db_dev.set_name(std::string(device->get_name()));
+
+    auto diff = cluster_diff_ptr_t();
+    auto &cluster = *supervisor.get_cluster();
+    diff = new modify::update_peer_t(std::move(db_dev), device->get_device_id(), cluster);
+    supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
+}
 
 void unknown_device_t::on_ignore() {}
 

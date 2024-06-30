@@ -30,7 +30,7 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
     }
 
     std::string_view get_key() const noexcept { return std::string_view(hash, data_length); }
-    std::string_view get_sha256() const noexcept { return std::string_view(hash + 1, digest_length); }
+    const device_id_t &get_device_id() const noexcept { return device_id; }
     std::string serialize() noexcept {
         db::SomeDevice db;
         serialize(db);
@@ -73,7 +73,7 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
     }
 
   private:
-    some_device_t(const device_id_t &device_id, const db::SomeDevice &db) noexcept {
+    some_device_t(const device_id_t &device_id_, const db::SomeDevice &db) noexcept : device_id{device_id_} {
         auto sha256 = device_id.get_sha256();
         hash[0] = prefix;
         std::copy(sha256.begin(), sha256.end(), hash + 1);
@@ -85,8 +85,8 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
     std::string client_version;
     std::string address;
     pt::ptime last_seen;
+    device_id_t device_id;
 
-    some_device_t(std::string_view key) noexcept;
     char hash[data_length];
 };
 

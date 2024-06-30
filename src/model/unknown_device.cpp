@@ -6,7 +6,7 @@
 namespace syncspirit::model {
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const unknown_device_ptr_t &item) noexcept {
-    return item->get_sha256();
+    return item->get_device_id().get_sha256();
 }
 
 } // namespace syncspirit::model
