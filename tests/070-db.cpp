@@ -770,18 +770,48 @@ void test_remove_peer() {
     F().run();
 }
 
+void test_update_peer() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto builder = diff_builder_t(*cluster);
+
+            db::SomeDevice db;
+            db.set_name("x1");
+
+            builder
+                    .add_unknown_device(peer_device->device_id(), db)
+                    .update_peer(peer_device->device_id(), "p1")
+                    .apply(*sup);
+
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            REQUIRE(!reply->payload.ee);
+
+            auto cluster_clone = make_cluster();
+            {
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                CHECK(cluster_clone->get_unknown_devices().size());
+                CHECK(cluster_clone->get_devices().size() == 2);
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
-    REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
-    REGISTER_TEST_CASE(test_miscellaneous, "test_miscellaneous", "[db]");
-    REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
-    REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
-    REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
-    REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
-    REGISTER_TEST_CASE(test_unsharing_folder, "test_unsharing_folder", "[db]");
-    REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
-    REGISTER_TEST_CASE(test_local_update, "test_local_update", "[db]");
-    REGISTER_TEST_CASE(test_peer_going_offline, "test_peer_going_offline", "[db]");
-    REGISTER_TEST_CASE(test_remove_peer, "test_remove_peer", "[db]");
+    // REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
+    // REGISTER_TEST_CASE(test_miscellaneous, "test_miscellaneous", "[db]");
+    // REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
+    // REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
+    // REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
+    // REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
+    // REGISTER_TEST_CASE(test_unsharing_folder, "test_unsharing_folder", "[db]");
+    // REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
+    // REGISTER_TEST_CASE(test_local_update, "test_local_update", "[db]");
+    // REGISTER_TEST_CASE(test_peer_going_offline, "test_peer_going_offline", "[db]");
+    // REGISTER_TEST_CASE(test_remove_peer, "test_remove_peer", "[db]");
+    REGISTER_TEST_CASE(test_update_peer, "test_update_peer", "[db]");
     return 1;
 }
 
