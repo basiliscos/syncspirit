@@ -54,7 +54,8 @@ struct devices_widget_t : Fl_Scroll {
         }
 
         auto &peer = *device_opt;
-        auto &devices = supervisor.get_cluster()->get_devices();
+        auto &cluster = *supervisor.get_cluster();
+        auto &devices = cluster.get_devices();
         auto found = devices.by_sha256(peer.get_sha256());
         if (found) {
             log->error("device {} is already added", peer);
@@ -64,7 +65,7 @@ struct devices_widget_t : Fl_Scroll {
         db::Device db_dev;
         db_dev.set_name(input_label->value());
 
-        auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(db_dev), peer.get_sha256()));
+        auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(db_dev), peer, cluster));
         supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
     }
 

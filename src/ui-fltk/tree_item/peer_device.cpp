@@ -491,8 +491,9 @@ void peer_device_t::on_apply() {
         valid = valid && w->store(device);
     }
     if (valid) {
-        auto device_id = peer->device_id().get_sha256();
-        auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(device), device_id));
+        auto &device_id = peer->device_id();
+        auto &cluster = *supervisor.get_cluster();
+        auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(device), device_id, cluster));
         supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
     }
 }
