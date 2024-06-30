@@ -11,23 +11,9 @@ using namespace syncspirit::model::diff::contact;
 
 unknown_connected_t::unknown_connected_t(cluster_t &cluster, const model::device_id_t &device_id_,
                                          db::SomeDevice db_device_) noexcept
-    : device_id{device_id_}, db_device{std::move(db_device_)} {
-    auto &unknown_devices = cluster.get_unknown_devices();
-    auto sha256 = device_id.get_sha256();
-    if (!unknown_devices.by_sha256(sha256)) {
-        auto device_id = device_id_t::from_sha256(sha256).value();
-        inner.reset(new modify::add_unknown_device_t(device_id, db_device));
-    }
-}
+    : device_id{device_id_}, db_device{std::move(db_device_)} {}
 
 auto unknown_connected_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    if (inner) {
-        auto r = inner->apply(cluster);
-        if (!r) {
-            return r;
-        }
-    }
-
     auto &unknown_devices = cluster.get_unknown_devices();
     auto prev = unknown_devices.by_sha256(device_id.get_sha256());
     if (!prev) {

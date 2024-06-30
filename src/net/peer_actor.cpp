@@ -12,6 +12,7 @@
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/unknown_connected.h"
+#include "model/diff/modify/add_unknown_device.h"
 #include <boost/core/demangle.hpp>
 #include <sstream>
 
@@ -405,6 +406,12 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
         diff = new model::diff::contact::ignored_connected_t(*cluster, peer_device_id, std::move(db));
     } else {
         fill_db_and_shutdown();
+        if (auto peer = cluster->get_unknown_devices().by_sha256(sha_s256); !peer) {
+            auto cluster_diff = cluster_diff_ptr_t{};
+            cluster_diff = new model::diff::modify::add_unknown_device_t(peer_device_id, db);
+            send<model::payload::model_update_t>(coordinator, std::move(cluster_diff));
+        }
+        // send add unknown device diff
         diff = new model::diff::contact::unknown_connected_t(*cluster, peer_device_id, std::move(db));
     }
 

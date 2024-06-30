@@ -4,7 +4,6 @@
 #pragma once
 
 #include "../contact_diff.h"
-#include "../cluster_diff.h"
 #include "model/unknown_device.h"
 
 namespace syncspirit::model::diff::contact {
@@ -17,7 +16,6 @@ struct SYNCSPIRIT_API unknown_connected_t final : contact_diff_t {
 
     model::device_id_t device_id;
     db::SomeDevice db_device;
-    cluster_diff_ptr_t inner;
 };
 
 } // namespace syncspirit::model::diff::contact
