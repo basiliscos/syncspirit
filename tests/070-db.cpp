@@ -187,8 +187,6 @@ void test_miscellaneous() {
                 device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW").value();
             auto d_id2 =
                 device_id_t::from_string("XBOWTOU-Y7H6RM6-D7WT3UB-7P2DZ5G-R6GNZG6-T5CCG54-SGVF3U5-LBM7RQB").value();
-            auto d_id3 =
-                device_id_t::from_string("EAMTZPW-Q4QYERN-D57DHFS-AUP2OMG-PAHOR3R-ZWLKGAA-WQC5SVW-UJ5NXQA").value();
 
             db::SomeDevice sd_1;
             sd_1.set_name("x1");
@@ -197,9 +195,6 @@ void test_miscellaneous() {
             db::SomeDevice sd_2;
             sd_2.set_name("x2");
             auto ignored_device = ignored_device_t::create(d_id2, sd_2).value();
-
-            db::SomeDevice sd_3;
-            sd_3.set_name("x3");
 
             auto builder = diff_builder_t(*cluster);
             builder.add_unknown_device(d_id1, sd_1).add_ignored_device(d_id2, sd_2).apply(*sup);
@@ -224,8 +219,6 @@ void test_miscellaneous() {
             sup->send<model::payload::contact_update_t>(sup->get_address(), std::move(diff), nullptr);
             diff = new model::diff::contact::ignored_connected_t(*cluster, d_id2, sd_2);
             sup->send<model::payload::contact_update_t>(sup->get_address(), std::move(diff), nullptr);
-            diff = new model::diff::contact::unknown_connected_t(*cluster, d_id3, sd_3);
-            sup->send<model::payload::contact_update_t>(sup->get_address(), std::move(diff), nullptr);
             sup->do_process();
 
             {
@@ -234,24 +227,17 @@ void test_miscellaneous() {
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-                REQUIRE(cluster_clone->get_unknown_devices().size() == 2);
+                REQUIRE(cluster_clone->get_unknown_devices().size() == 1);
                 REQUIRE(cluster_clone->get_ignored_devices().size() == 1);
-                auto unknown_1 = cluster_clone->get_unknown_devices().by_sha256(d_id1.get_sha256());
-                auto unknown_2 = cluster_clone->get_unknown_devices().by_sha256(d_id3.get_sha256());
+                auto unknown = cluster_clone->get_unknown_devices().by_sha256(d_id1.get_sha256());
                 auto ignored = cluster_clone->get_ignored_devices().by_sha256(d_id2.get_sha256());
-                REQUIRE(unknown_1);
-                REQUIRE(unknown_2);
+                REQUIRE(unknown);
                 REQUIRE(ignored);
-                CHECK(unknown_1->get_name() == "x1_2");
+                CHECK(unknown->get_name() == "x1_2");
                 CHECK(ignored->get_name() == "x2_2");
-                CHECK(unknown_2->get_name() == "x3");
             }
 
-            auto unknown_2 = cluster->get_unknown_devices().by_sha256(d_id3.get_sha256());
-            builder.remove_unknown_device(*unknown_device)
-                .remove_unknown_device(*unknown_2)
-                .remove_ignored_device(*ignored_device)
-                .apply(*sup);
+            builder.remove_unknown_device(*unknown_device).remove_ignored_device(*ignored_device).apply(*sup);
             REQUIRE(cluster->get_unknown_devices().size() == 0);
             REQUIRE(cluster->get_ignored_devices().size() == 0);
 

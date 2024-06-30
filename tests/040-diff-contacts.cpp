@@ -25,23 +25,18 @@ TEST_CASE("unknown device connected", "[model]") {
 
     db::SomeDevice db_device;
     db_device.set_name("a name");
+    auto buider = diff_builder_t(*cluster);
+    REQUIRE(buider.add_unknown_device(peer_id, db_device).apply());
+
+    db_device.set_name("a name-2");
     auto diff = model::diff::contact_diff_ptr_t{};
-    auto diff_raw = new model::diff::contact::unknown_connected_t(*cluster, peer_id, db_device);
-    CHECK(diff_raw->inner);
-    diff = diff_raw;
+    diff = new model::diff::contact::unknown_connected_t(*cluster, peer_id, db_device);
     REQUIRE(diff->apply(*cluster));
 
     REQUIRE(cluster->get_unknown_devices().size() == 1);
     auto unknown = cluster->get_unknown_devices().by_sha256(peer_id.get_sha256());
     REQUIRE(unknown);
-
-    diff_raw = new model::diff::contact::unknown_connected_t(*cluster, peer_id, db_device);
-    CHECK(!diff_raw->inner);
-    diff = diff_raw;
-    REQUIRE(diff->apply(*cluster));
-
-    unknown = cluster->get_unknown_devices().by_sha256(peer_id.get_sha256());
-    REQUIRE(unknown);
+    CHECK(unknown->get_name() == "a name-2");
 }
 
 TEST_CASE("ignored device connected", "[model]") {
