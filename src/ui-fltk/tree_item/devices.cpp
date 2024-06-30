@@ -21,8 +21,7 @@ namespace {
 struct devices_widget_t : Fl_Scroll {
     using parent_t = Fl_Scroll;
 
-    devices_widget_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
-        : parent_t(x, y, w, h), supervisor{supervisor_} {
+    devices_widget_t(devices_t &owner_, int x, int y, int w, int h) : parent_t(x, y, w, h), owner{owner_} {
         box(FL_FLAT_BOX);
         auto padding_top = 40;
         auto padding = 10;
@@ -45,31 +44,9 @@ struct devices_widget_t : Fl_Scroll {
         // resizable(nullptr);
     }
 
-    void on_add_device() {
-        auto device_opt = model::device_id_t::from_string(input_id->value());
-        auto &log = supervisor.get_logger();
-        if (!device_opt) {
-            log->error("incorrect device_id");
-            return;
-        }
+    void on_add_device() { owner.add_new_device(input_id->value(), input_label->value()); }
 
-        auto &peer = *device_opt;
-        auto &cluster = *supervisor.get_cluster();
-        auto &devices = cluster.get_devices();
-        auto found = devices.by_sha256(peer.get_sha256());
-        if (found) {
-            log->error("device {} is already added", peer);
-            return;
-        }
-
-        db::Device db_dev;
-        db_dev.set_name(input_label->value());
-
-        auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(db_dev), peer, cluster));
-        supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
-    }
-
-    app_supervisor_t &supervisor;
+    devices_t &owner;
     Fl_Input *input_id;
     Fl_Input *input_label;
 };
@@ -84,7 +61,7 @@ devices_t::devices_t(app_supervisor_t &supervisor, Fl_Tree *tree)
 
 bool devices_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-        auto widget = new devices_widget_t(supervisor, prev->x(), prev->y(), prev->w(), prev->h());
+        auto widget = new devices_widget_t(*this, prev->x(), prev->y(), prev->w(), prev->h());
         content = widget;
         return widget;
     });
@@ -98,6 +75,24 @@ void devices_t::operator()(model::message::model_update_t &update) {
 }
 
 auto devices_t::operator()(const diff::modify::update_peer_t &diff, void *) noexcept -> outcome::result<void> {
+    auto peer = supervisor.get_cluster()->get_devices().by_sha256(diff.peer_id);
+    bool new_peer = true;
+    for (int i = 1; i < children(); ++i) {
+        auto node = dynamic_cast<peer_device_t *>(child(i));
+        if (node) {
+            if (node->peer == peer) {
+                new_peer = true;
+                break;
+            }
+        }
+    }
+    if (new_peer) {
+        auto tree_item = add_device(peer);
+        if (tree_item) {
+            tree()->select(tree_item, 1);
+            tree()->deselect(this, 1);
+        }
+    }
     return outcome::success();
 }
 
@@ -142,12 +137,12 @@ void devices_t::update_label() {
 
 tree_item_t *devices_t::get_self_device() { return static_cast<tree_item_t *>(child(0)); }
 
-void devices_t::add_device(const model::device_ptr_t &device) {
+auto devices_t::add_device(const model::device_ptr_t &device) -> tree_item_t * {
     for (int i = 1; i < children(); ++i) {
         auto node = dynamic_cast<peer_device_t *>(child(i));
         if (node) {
             if (node->peer == device) {
-                return;
+                return nullptr;
             }
         }
     }
@@ -155,4 +150,29 @@ void devices_t::add_device(const model::device_ptr_t &device) {
     auto device_node = new peer_device_t(device, supervisor, tree());
     add(prefs(), device_node->label(), device_node);
     tree()->close(device_node, 0);
+    return device_node;
+}
+
+void devices_t::add_new_device(std::string_view device_id, std::string_view label) {
+    auto device_opt = model::device_id_t::from_string(device_id);
+    auto &log = supervisor.get_logger();
+    if (!device_opt) {
+        log->error("incorrect device_id");
+        return;
+    }
+
+    auto &peer = *device_opt;
+    auto &cluster = *supervisor.get_cluster();
+    auto &devices = cluster.get_devices();
+    auto found = devices.by_sha256(peer.get_sha256());
+    if (found) {
+        log->error("device {} is already added", peer);
+        return;
+    }
+
+    db::Device db_dev;
+    db_dev.set_name(std::string(label));
+
+    auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(db_dev), peer, cluster));
+    supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
 }
