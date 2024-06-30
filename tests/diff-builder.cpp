@@ -145,14 +145,14 @@ diff_builder_t &diff_builder_t::create_folder(std::string_view id, std::string_v
     return *this;
 }
 
-diff_builder_t &diff_builder_t::update_peer(std::string_view sha256, std::string_view name, std::string_view cert_name,
-                                            bool auto_accept) noexcept {
+diff_builder_t &diff_builder_t::update_peer(const model::device_id_t &device, std::string_view name,
+                                            std::string_view cert_name, bool auto_accept) noexcept {
     db::Device db_device;
     db_device.set_name(std::string(name));
     db_device.set_cert_name(std::string(cert_name));
     db_device.set_auto_accept(auto_accept);
 
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::update_peer_t(db_device, sha256));
+    auto diff = diff::cluster_diff_ptr_t(new diff::modify::update_peer_t(db_device, device, cluster));
     diffs.emplace_back(std::move(diff));
     return *this;
 }

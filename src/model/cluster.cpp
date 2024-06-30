@@ -32,6 +32,8 @@ const devices_map_t &cluster_t::get_devices() const noexcept { return devices; }
 
 ignored_devices_map_t &cluster_t::get_ignored_devices() noexcept { return ignored_devices; }
 
+const ignored_devices_map_t &cluster_t::get_ignored_devices() const noexcept { return ignored_devices; }
+
 ignored_folders_map_t &cluster_t::get_ignored_folders() noexcept { return ignored_folders; }
 
 block_infos_map_t &cluster_t::get_blocks() noexcept { return blocks; }
@@ -41,6 +43,8 @@ const block_infos_map_t &cluster_t::get_blocks() const noexcept { return blocks;
 folders_map_t &cluster_t::get_folders() noexcept { return folders; }
 
 auto cluster_t::get_unknown_devices() noexcept -> unknown_devices_map_t & { return unknown_devices; }
+
+auto cluster_t::get_unknown_devices() const noexcept -> const unknown_devices_map_t & { return unknown_devices; }
 
 auto cluster_t::get_unknown_folders() noexcept -> unknown_folders_t & { return unknown_folders; }
 

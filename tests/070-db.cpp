@@ -258,11 +258,11 @@ void test_miscellaneous() {
 void test_peer_updating() {
     struct F : fixture_t {
         void main() noexcept override {
-            auto sha256 = peer_device->device_id().get_sha256();
 
             auto builder = diff_builder_t(*cluster);
-            builder.update_peer(sha256, "some_name", "some-cn", true).apply(*sup);
+            builder.update_peer(peer_device->device_id(), "some_name", "some-cn", true).apply(*sup);
 
+            auto sha256 = peer_device->device_id().get_sha256();
             auto device = cluster->get_devices().by_sha256(sha256);
             REQUIRE(device);
             CHECK(device->get_name() == "some_name");
@@ -292,7 +292,7 @@ void test_folder_sharing() {
             auto sha256 = peer_device->device_id().get_sha256();
             auto folder_id = "1234-5678";
             auto builder = diff_builder_t(*cluster);
-            builder.update_peer(sha256)
+            builder.update_peer(peer_device->device_id())
                 .apply(*sup)
                 .create_folder(folder_id, "/my/path")
                 .configure_cluster(sha256)
@@ -341,7 +341,7 @@ void test_cluster_update_and_remove() {
             b->set_hash(utils::sha256_digest("12345").value());
 
             auto builder = diff_builder_t(*cluster);
-            builder.update_peer(sha256)
+            builder.update_peer(peer_device->device_id())
                 .apply(*sup)
                 .create_folder(folder_id, "/my/path")
                 .configure_cluster(sha256)
@@ -438,7 +438,7 @@ void test_unsharing_folder() {
             b->set_hash(utils::sha256_digest("12345").value());
 
             auto builder = diff_builder_t(*cluster);
-            builder.update_peer(sha256)
+            builder.update_peer(peer_device->device_id())
                 .apply(*sup)
                 .create_folder(folder_id, "/my/path")
                 .configure_cluster(sha256)
@@ -501,7 +501,7 @@ void test_clone_file() {
             counter->set_value(peer_device->as_uint());
 
             auto builder = diff_builder_t(*cluster);
-            builder.update_peer(sha256)
+            builder.update_peer(peer_device->device_id())
                 .apply(*sup)
                 .create_folder(folder_id, "/my/path")
                 .configure_cluster(sha256)
@@ -678,11 +678,10 @@ void test_local_update() {
 void test_peer_going_offline() {
     struct F : fixture_t {
         void main() noexcept override {
-            auto sha256 = peer_device->device_id().get_sha256();
-
             auto builder = diff_builder_t(*cluster);
-            builder.update_peer(sha256).apply(*sup);
+            builder.update_peer(peer_device->device_id()).apply(*sup);
 
+            auto sha256 = peer_device->device_id().get_sha256();
             db::Device db_peer;
             auto peer = cluster->get_devices().by_sha256(sha256);
             REQUIRE(db_peer.last_seen() == 0);
@@ -723,7 +722,7 @@ void test_remove_peer() {
             b->set_hash(utils::sha256_digest("12345").value());
 
             auto builder = diff_builder_t(*cluster);
-            builder.update_peer(sha256)
+            builder.update_peer(peer_device->device_id())
                 .apply(*sup)
                 .create_folder(folder_id, "/my/path")
                 .configure_cluster(sha256)

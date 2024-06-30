@@ -73,7 +73,7 @@ struct fixture_t {
         auto builder = diff_builder_t(*cluster);
         builder.create_folder(folder_id, root_path.string(), "my-label")
             .apply(*sup)
-            .update_peer(sha256, "some_name", "some-cn", true)
+            .update_peer(peer_device->device_id(), "some_name", "some-cn", true)
             .apply(*sup)
             .share_folder(sha256, folder_id)
             .apply(*sup);

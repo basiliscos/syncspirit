@@ -31,10 +31,12 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     const block_infos_map_t &get_blocks() const noexcept;
     devices_map_t &get_devices() noexcept;
     const devices_map_t &get_devices() const noexcept;
+    const ignored_devices_map_t &get_ignored_devices() const noexcept;
     ignored_devices_map_t &get_ignored_devices() noexcept;
     ignored_folders_map_t &get_ignored_folders() noexcept;
     folders_map_t &get_folders() noexcept;
     unknown_devices_map_t &get_unknown_devices() noexcept;
+    const unknown_devices_map_t &get_unknown_devices() const noexcept;
     unknown_folders_t &get_unknown_folders() noexcept;
 
     const folders_map_t &get_folders() const noexcept;

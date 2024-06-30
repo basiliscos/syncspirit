@@ -61,7 +61,7 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
 
     struct SYNCSPIRIT_API map_t : public generic_map_t<ptr_t, 1> {
         using parent_t = generic_map_t<ptr_t, 1>;
-        ptr_t by_sha256(std::string_view value) noexcept { return this->template get<0>(value); }
+        ptr_t by_sha256(std::string_view value) const noexcept { return this->template get<0>(value); }
     };
 
     void assign(const db::SomeDevice &db) noexcept {
