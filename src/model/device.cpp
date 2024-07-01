@@ -3,8 +3,9 @@
 
 #include "device.h"
 #include "structs.pb.h"
-#include "../db/prefix.h"
+#include "db/prefix.h"
 #include "misc/error_code.h"
+#include "utils/time.h"
 
 namespace syncspirit::model {
 
@@ -77,11 +78,7 @@ std::string device_t::serialize(db::Device &r) const noexcept {
     r.set_skip_introduction_removals(skip_introduction_removals);
     r.set_auto_accept(auto_accept);
     r.set_paused(paused);
-
-    pt::ptime epoch(boost::gregorian::date(1970, 1, 1));
-    auto time_diff = last_seen - epoch;
-    auto last_seen_time = time_diff.ticks() / time_diff.ticks_per_second();
-    r.set_last_seen(last_seen_time);
+    r.set_last_seen(utils::as_seconds(last_seen));
 
     for (auto &address : static_uris) {
         *r.add_addresses() = address->buffer();

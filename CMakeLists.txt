@@ -187,6 +187,7 @@ add_library(syncspirit_lib
     src/utils/log.cpp
     src/utils/network_interface.cpp
     src/utils/platform.cpp
+    src/utils/time.cpp
     src/utils/tls.cpp
     src/utils/uri.cpp
 )

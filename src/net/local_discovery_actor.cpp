@@ -6,9 +6,14 @@
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
+#include "utils/time.h"
 #include "model/diff/contact/update_contact.h"
+#include "model/diff/contact/ignored_connected.h"
+#include "model/diff/contact/unknown_connected.h"
+#include "model/diff/modify/add_unknown_device.h"
 #include "model/messages.h"
 
+using namespace syncspirit;
 using namespace syncspirit::net;
 
 static const constexpr std::size_t BUFF_SZ = 1500;
@@ -157,28 +162,25 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
         auto &sha = msg->id();
         auto device_id = model::device_id_t::from_sha256(sha);
         if (device_id) {
-            if (device_id != cluster->get_device()->device_id()) { // skip "self" discovery via network
-                utils::uri_container_t uris;
-                for (int i = 0; i < msg->addresses_size(); ++i) {
-                    auto uri = utils::parse(msg->addresses(i).c_str());
-                    if (uri && uri->has_port()) {
-                        uris.emplace_back(std::move(uri));
-                    }
+            utils::uri_container_t uris;
+            for (int i = 0; i < msg->addresses_size(); ++i) {
+                auto uri = utils::parse(msg->addresses(i).c_str());
+                if (uri && uri->has_port()) {
+                    uris.emplace_back(std::move(uri));
                 }
-                if (!uris.empty()) {
-                    LOG_TRACE(log, "on_read, local peer = {} ", device_id.value().get_value());
-                    for (auto &uri : uris) {
-                        LOG_TRACE(log, "on_read, peer is available via {}", uri);
-                    }
-                    pt::ptime now(pt::microsec_clock::local_time());
+            }
+            if (!uris.empty()) {
+                LOG_TRACE(log, "on_read, local peer = {} ", device_id.value().get_value());
+                for (auto &uri : uris) {
+                    LOG_TRACE(log, "on_read, peer is available via {}", uri);
+                }
 
-                    using namespace model::diff;
-                    auto diff = model::diff::contact_diff_ptr_t{};
-                    diff = new contact::update_contact_t(*cluster, device_id.value(), uris);
-                    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
-                } else {
-                    LOG_WARN(log, "on_read, no valid uris from: {}", peer_endpoint);
-                }
+                using namespace model::diff;
+                auto diff = model::diff::contact_diff_ptr_t{};
+                diff = new contact::update_contact_t(*cluster, device_id.value(), uris);
+                send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+            } else {
+                LOG_WARN(log, "on_read, no valid uris from: {}", peer_endpoint);
             }
         } else {
             LOG_WARN(log, "on_read, wrong device id, coming from: {}", peer_endpoint);
@@ -202,5 +204,55 @@ void local_discovery_actor_t::on_write_error(const sys::error_code &ec) noexcept
     if (ec != asio::error::operation_aborted) {
         LOG_ERROR(log, "on_write_error, error = {}", ec.message());
         do_shutdown(make_error(ec));
+    }
+}
+
+struct filler_t {
+    template <typename T> static auto fill(T &peer, const std::string &uris_str) -> db::SomeDevice {
+        db::SomeDevice db;
+        peer->serialize(db);
+        db.set_address(uris_str);
+        db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
+        return db;
+    }
+};
+
+void local_discovery_actor_t::handle(const model::device_id_t &device_id, utils::uri_container_t &uris) noexcept {
+    if (device_id == cluster->get_device()->device_id()) { // skip "self" discovery via network
+        LOG_TRACE(log, "skipping self discovery (?)");
+        return;
+    }
+    if (uris.empty()) {
+        LOG_TRACE(log, "no valid urls found for {}", device_id);
+        return;
+    }
+
+    using namespace model::diff;
+    auto diff = model::diff::contact_diff_ptr_t{};
+    auto uris_str = fmt::format("{}", fmt::join(uris, ", "));
+    LOG_TRACE(log, "on_read, peer is available via {}", uris_str);
+
+    if (auto peer = cluster->get_devices().by_sha256(device_id.get_sha256()); peer) {
+        LOG_DEBUG(log, "device '{}' contacted", device_id);
+        diff = new contact::update_contact_t(*cluster, device_id, uris);
+    } else if (auto peer = cluster->get_ignored_devices().by_sha256(device_id.get_sha256()); peer) {
+        LOG_DEBUG(log, "ignored device '{}' contacted", device_id);
+        auto db = filler_t::fill(peer, uris_str);
+        diff = new contact::ignored_connected_t(*cluster, device_id, std::move(db));
+    } else if (auto peer = cluster->get_unknown_devices().by_sha256(device_id.get_sha256()); peer) {
+        auto db = filler_t::fill(peer, uris_str);
+        diff = new contact::unknown_connected_t(*cluster, device_id, std::move(db));
+    } else {
+        db::SomeDevice db;
+        db.set_name(std::string(device_id.get_short()));
+        db.set_address(uris_str);
+        db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
+        auto cluster_diff = cluster_diff_ptr_t{};
+        cluster_diff = new model::diff::modify::add_unknown_device_t(device_id, db);
+        send<model::payload::model_update_t>(coordinator, std::move(cluster_diff));
+        diff = new contact::unknown_connected_t(*cluster, device_id, std::move(db));
+    }
+    if (diff) {
+        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
     }
 }

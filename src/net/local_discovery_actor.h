@@ -61,6 +61,8 @@ struct SYNCSPIRIT_API local_discovery_actor_t final : public r::actor_base_t {
     void on_write_error(const sys::error_code &ec) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
 
+    void handle(const model::device_id_t &device_id, utils::uri_container_t &uris) noexcept;
+
     utils::logger_t log;
     r::pt::time_duration frequency;
     asio::io_context::strand &strand;

@@ -7,6 +7,7 @@
 #include "utils/tls.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
+#include "utils/time.h"
 #include "proto/bep_support.h"
 #include "model/messages.h"
 #include "model/diff/contact/peer_state.h"
@@ -378,17 +379,11 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
     auto db = db::SomeDevice();
     auto fill_db_and_shutdown = [&]() {
         auto address = fmt::format("{}://{}", peer_proto, peer_endpoint);
-
         db.set_name(device_name);
         db.set_client_name(client_name);
         db.set_client_version(client_version);
         db.set_address(std::move(address));
-
-        pt::ptime epoch(boost::gregorian::date(1970, 1, 1));
-        auto now = pt::microsec_clock::local_time();
-        auto time_diff = now - epoch;
-        auto time_value = time_diff.ticks() / time_diff.ticks_per_second();
-        db.set_last_seen(time_value);
+        db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
         LOG_INFO(log, "device {} is unknown/ignored, shutting down", device_name);
         do_shutdown();
     };

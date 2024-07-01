@@ -10,6 +10,7 @@
 #include "device_id.h"
 #include "syncspirit-export.h"
 #include "structs.pb.h"
+#include "utils/time.h"
 
 #include <boost/outcome.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -38,15 +39,11 @@ template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<so
     }
 
     void serialize(db::SomeDevice &db) const noexcept {
-        pt::ptime epoch(boost::gregorian::date(1970, 1, 1));
-        auto time_diff = last_seen - epoch;
-        auto last_seen_time = time_diff.ticks() / time_diff.ticks_per_second();
-
         db.set_name(name);
         db.set_client_name(client_name);
         db.set_client_version(client_version);
         db.set_address(address);
-        db.set_last_seen(last_seen_time);
+        db.set_last_seen(utils::as_seconds(last_seen));
     }
 
     std::string_view get_name() const noexcept { return name; }
