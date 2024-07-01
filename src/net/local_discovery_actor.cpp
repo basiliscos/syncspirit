@@ -121,7 +121,7 @@ void local_discovery_actor_t::announce() noexcept {
         resources->acquire(resource::send);
         LOG_TRACE(log, "announce has been sent");
     } else {
-        LOG_TRACE(log, " announce() skipping");
+        LOG_TRACE(log, "announce() skipping");
     }
 
     timer_request = start_timer(frequency, *this, &local_discovery_actor_t::on_timer);

@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "config/utils.h"
-#include "utils/error_code.h"
 #include "net_supervisor.h"
 #include "global_discovery_actor.h"
 #include "local_discovery_actor.h"
@@ -17,7 +16,6 @@
 #include "relay_actor.h"
 #include "names.h"
 #include <boost/filesystem.hpp>
-#include <algorithm>
 #include <ctime>
 
 namespace bfs = boost::filesystem;
@@ -331,7 +329,6 @@ void net_supervisor_t::launch_net() noexcept {
         .relay_config(app_config.relay_config)
         .escalate_failure()
         .finish();
-
     auto dcfg = app_config.dialer_config;
     if (dcfg.enabled) {
         create_actor<dialer_actor_t>().timeout(timeout).dialer_config(dcfg).cluster(cluster).finish();
