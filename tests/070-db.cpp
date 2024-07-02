@@ -180,7 +180,7 @@ void test_folder_creation() {
     F().run();
 }
 
-void test_miscellaneous() {
+void test_unknown_and_ignored_devices_1() {
     struct F : fixture_t {
         void main() noexcept override {
             auto d_id1 =
@@ -249,6 +249,42 @@ void test_miscellaneous() {
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
                 REQUIRE(cluster_clone->get_unknown_devices().size() == 0);
                 REQUIRE(cluster_clone->get_ignored_devices().size() == 0);
+            }
+        }
+    };
+    F().run();
+}
+
+void test_unknown_and_ignored_devices_2() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto d_id =
+                device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW").value();
+
+            db::SomeDevice sd;
+            sd.set_name("x1");
+            auto builder = diff_builder_t(*cluster);
+
+            builder.add_unknown_device(d_id, sd).apply(*sup);
+            {
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                auto cluster_clone = make_cluster();
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                CHECK(cluster_clone->get_unknown_devices().by_sha256(d_id.get_sha256()));
+                CHECK(!cluster_clone->get_ignored_devices().by_sha256(d_id.get_sha256()));
+            }
+
+            builder.add_ignored_device(d_id, sd).apply(*sup);
+            {
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                auto cluster_clone = make_cluster();
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                CHECK(!cluster_clone->get_unknown_devices().by_sha256(d_id.get_sha256()));
+                CHECK(cluster_clone->get_ignored_devices().by_sha256(d_id.get_sha256()));
             }
         }
     };
@@ -810,7 +846,8 @@ void test_update_peer() {
 
 int _init() {
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
-    REGISTER_TEST_CASE(test_miscellaneous, "test_miscellaneous", "[db]");
+    REGISTER_TEST_CASE(test_unknown_and_ignored_devices_1, "test_unknown_and_ignored_devices_1", "[db]");
+    REGISTER_TEST_CASE(test_unknown_and_ignored_devices_2, "test_unknown_and_ignored_devices_2", "[db]");
     REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
     REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
     REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");

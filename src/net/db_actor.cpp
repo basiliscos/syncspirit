@@ -438,7 +438,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_unknown_folders_t &di
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -448,12 +448,17 @@ auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &dif
         return txn_opt.assume_error();
     }
     auto &txn = *txn_opt.assume_value();
-    auto device = cluster->get_ignored_devices().by_sha256(diff.device_id.get_sha256());
 
+    auto r = diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
+    if (r.has_error()) {
+        return r.assume_error();
+    }
+
+    auto device = cluster->get_ignored_devices().by_sha256(diff.device_id.get_sha256());
     auto key = device->get_key();
     auto data = device->serialize();
 
-    auto r = db::save({key, data}, txn);
+    r = db::save({key, data}, txn);
     if (!r) {
         return r.assume_error();
     }

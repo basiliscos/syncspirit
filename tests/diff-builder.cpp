@@ -235,7 +235,7 @@ diff_builder_t &diff_builder_t::ack_block(const model::diff::modify::block_trans
 
 diff_builder_t &diff_builder_t::add_ignored_device(const model::device_id_t &device,
                                                    db::SomeDevice db_device) noexcept {
-    diffs.emplace_back(new diff::modify::add_ignored_device_t(device, db_device));
+    diffs.emplace_back(new diff::modify::add_ignored_device_t(cluster, device, db_device));
     return *this;
 }
 

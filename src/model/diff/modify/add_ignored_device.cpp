@@ -4,13 +4,26 @@
 #include "add_ignored_device.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/modify/remove_unknown_device.h"
 
 using namespace syncspirit::model::diff::modify;
 
-add_ignored_device_t::add_ignored_device_t(const device_id_t &id_, db::SomeDevice db_device_) noexcept
-    : device_id{id_}, db_device{db_device_} {}
+add_ignored_device_t::add_ignored_device_t(const cluster_t &cluster, const device_id_t &id_,
+                                           db::SomeDevice db_device_) noexcept
+    : device_id{id_}, db_device{db_device_} {
+    auto peer = cluster.get_unknown_devices().by_sha256(device_id.get_sha256());
+    if (peer) {
+        auto diff = cluster_diff_ptr_t{};
+        diff = new remove_unknown_device_t(*peer);
+        diffs.emplace_back(std::move(diff));
+    }
+}
 
 auto add_ignored_device_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    auto r = parent_t::apply_impl(cluster);
+    if (!r) {
+        return r;
+    }
     auto opt = ignored_device_t::create(device_id, db_device);
     if (!opt) {
         return opt.assume_error();
