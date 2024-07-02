@@ -4,6 +4,7 @@
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/contact/unknown_connected.h"
 #include "model/diff/modify/update_peer.h"
+#include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/remove_unknown_device.h"
 
 using namespace syncspirit;
@@ -91,6 +92,11 @@ auto unknown_devices_t::operator()(const diff::modify::remove_unknown_device_t &
 }
 
 auto unknown_devices_t::operator()(const diff::modify::update_peer_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
+}
+
+auto unknown_devices_t::operator()(const diff::modify::add_ignored_device_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
 }

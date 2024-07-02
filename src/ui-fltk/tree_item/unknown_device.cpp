@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
 #include "unknown_device.h"
+#include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/remove_unknown_device.h"
 #include "model/diff/modify/update_peer.h"
 #include "../static_table.h"
@@ -133,7 +134,14 @@ void unknown_device_t::on_connect() {
     supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
 }
 
-void unknown_device_t::on_ignore() {}
+void unknown_device_t::on_ignore() {
+    auto diff = cluster_diff_ptr_t{};
+    auto &cluster = *supervisor.get_cluster();
+    db::SomeDevice db;
+    device->serialize(db);
+    diff = new modify::add_ignored_device_t(cluster, device->get_device_id(), std::move(db));
+    supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
+}
 
 void unknown_device_t::on_remove() {
     auto diff = cluster_diff_ptr_t{};

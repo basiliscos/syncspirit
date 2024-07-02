@@ -17,6 +17,7 @@ struct unknown_devices_t : tree_item_t,
     void operator()(model::message::contact_update_t &) override;
     outcome::result<void> operator()(const diff::load::load_cluster_t &, void *) noexcept override;
     outcome::result<void> operator()(const diff::load::unknown_devices_t &, void *) noexcept override;
+    outcome::result<void> operator()(const diff::modify::add_ignored_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const diff::modify::remove_unknown_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const diff::modify::update_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const diff::contact::unknown_connected_t &, void *) noexcept override;
