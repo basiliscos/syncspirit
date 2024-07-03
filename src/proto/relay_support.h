@@ -3,15 +3,18 @@
 
 #pragma once
 
+#include "model/misc/arc.hpp"
+#include "model/device_id.h"
+#include "utils/uri.h"
+#include "syncspirit-export.h"
+
 #include <string>
 #include <cstdint>
 #include <variant>
 #include <vector>
 #include <optional>
-#include <model/misc/arc.hpp>
-#include <model/device_id.h>
-#include "utils/uri.h"
-#include "syncspirit-export.h"
+
+#include <boost/asio/ip/address_v4.hpp>
 #include <boost/outcome.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
@@ -19,6 +22,8 @@ namespace syncspirit::proto::relay {
 
 namespace outcome = boost::outcome_v2;
 namespace pt = boost::posix_time;
+
+using ipv4_option_t = std::optional<boost::asio::ip::address_v4>;
 
 struct ping_t {};
 
@@ -42,7 +47,7 @@ struct connect_request_t {
 struct session_invitation_t {
     std::string from;
     std::string key;
-    std::string address;
+    ipv4_option_t address;
     std::uint32_t port;
     bool server_socket;
 };

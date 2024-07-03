@@ -708,8 +708,9 @@ struct active_relay_fixture_t : fixture_t {
     }
 
     virtual void relay_reply() noexcept {
-        write(relay_trans, proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()),
-                                                              session_key, "", listening_ep.port(), false});
+        write(relay_trans,
+              proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()), session_key,
+                                                 asio::ip::address_v4(0), listening_ep.port(), false});
     }
 
     virtual void session_reply() noexcept { write(peer_trans, proto::relay::response_t{0, "ok"}); }
@@ -809,7 +810,7 @@ void test_relay_wrong_device() {
 
         void relay_reply() noexcept override {
             write(relay_trans, proto::relay::session_invitation_t{std::string(relay_device.get_sha256()), session_key,
-                                                                  "", listening_ep.port(), false});
+                                                                  asio::ip::address_v4(0), listening_ep.port(), false});
         }
         void on_write(size_t) override {}
 
@@ -832,30 +833,9 @@ void test_relay_non_connectable() {
     struct F : active_relay_fixture_t {
 
         void relay_reply() noexcept override {
-            write(relay_trans, proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()),
-                                                                  session_key, "", 0, false});
-        }
-
-        void main() noexcept override {
-            auto act = create_actor();
-            io_ctx.run();
-            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(!connected_message);
-            sup->do_shutdown();
-            sup->do_process();
-            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 2);
-        }
-    };
-    F().run();
-}
-
-void test_relay_malformed_address() {
-    struct F : active_relay_fixture_t {
-
-        void relay_reply() noexcept override {
-            write(relay_trans, proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()),
-                                                                  session_key, "8.8.8.8z", listening_ep.port(), false});
+            write(relay_trans,
+                  proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()), session_key,
+                                                     boost::asio::ip::address_v4(0), 0, false});
         }
 
         void main() noexcept override {
@@ -942,7 +922,6 @@ int _init() {
     REGISTER_TEST_CASE(test_relay_active_not_enabled, "test_relay_active_not_enabled", "[initiator]");
     REGISTER_TEST_CASE(test_relay_wrong_device, "test_relay_wrong_device", "[initiator]");
     REGISTER_TEST_CASE(test_relay_non_connectable, "test_relay_non_connectable", "[initiator]");
-    REGISTER_TEST_CASE(test_relay_malformed_address, "test_relay_malformed_address", "[initiator]");
     REGISTER_TEST_CASE(test_relay_garbage_reply, "test_relay_garbage_reply", "[initiator]");
     REGISTER_TEST_CASE(test_relay_non_invitation_reply, "test_relay_non_invitation_reply", "[initiator]");
 

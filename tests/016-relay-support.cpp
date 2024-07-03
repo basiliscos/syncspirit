@@ -84,7 +84,8 @@ TEST_CASE("relay proto", "[relay]") {
         }
 
         SECTION("session_invitation") {
-            auto source = session_invitation_t{"lorem", "impsum", "dolor", 1234, true};
+            auto ip = boost::asio::ip::address_v4::from_string("127.0.0.1");
+            auto source = session_invitation_t{"lorem", "impsum", ip, 1234, true};
             auto sz = serialize(source, buff);
             REQUIRE(sz);
             auto r = parse(buff);
@@ -95,13 +96,13 @@ TEST_CASE("relay proto", "[relay]") {
             REQUIRE(target);
             CHECK(target->from == source.from);
             CHECK(target->key == source.key);
-            CHECK(target->address == source.address);
+            CHECK(target->address.value() == ip);
             CHECK(target->server_socket == source.server_socket);
         }
 
         SECTION("session_invitation (host of zeroes)") {
-            auto zeros = std::string("\0\0\0\0", 4);
-            auto source = session_invitation_t{"lorem", "impsum", zeros, 1234, true};
+            auto ip = boost::asio::ip::address_v4(0);
+            auto source = session_invitation_t{"lorem", "impsum", ip, 1234, true};
             auto sz = serialize(source, buff);
             REQUIRE(sz);
             auto r = parse(buff);
@@ -112,7 +113,7 @@ TEST_CASE("relay proto", "[relay]") {
             REQUIRE(target);
             CHECK(target->from == source.from);
             CHECK(target->key == source.key);
-            CHECK(target->address.empty());
+            CHECK(!target->address.has_value());
             CHECK(target->server_socket == source.server_socket);
         }
 
@@ -166,7 +167,7 @@ TEST_CASE("relay proto", "[relay]") {
             REQUIRE(target);
             CHECK(target->from.size() == 32);
             CHECK(target->key == "lorem-imspum-dolor");
-            CHECK(target->address == "");
+            CHECK(!target->address.has_value());
             CHECK(target->port == 12345);
             CHECK(target->server_socket);
         }

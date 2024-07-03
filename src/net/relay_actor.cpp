@@ -369,15 +369,9 @@ bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
     }
 
     asio::ip::tcp::endpoint relay_ep;
-    if (!msg.address.empty()) {
+    if (msg.address.has_value()) {
         sys::error_code ec;
-        auto ip = asio::ip::make_address(msg.address, ec);
-        if (ec) {
-            LOG_ERROR(log, "invalid ip address: {}", spdlog::to_hex(msg.address.begin(), msg.address.end()));
-            do_shutdown(make_error(ec));
-            return false;
-        }
-        relay_ep = asio::ip::tcp::endpoint{ip, (uint16_t)msg.port};
+        relay_ep = asio::ip::tcp::endpoint{msg.address.value(), (uint16_t)msg.port};
     } else {
         relay_ep = asio::ip::tcp::endpoint{master_endpoint.address(), (uint16_t)msg.port};
     }

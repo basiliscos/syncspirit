@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <spdlog/fmt/bin_to_hex.h>
 #include <fmt/core.h>
+#include <ares.h>
 
 using namespace syncspirit::net;
 
@@ -445,8 +446,20 @@ void initiator_actor_t::on_read_relay_active(size_t bytes) noexcept {
         return initiate_active();
     }
     auto &addr = inv->address;
+    char addr_buff[INET_ADDRSTRLEN + 1] = {0};
+    using string_t = decltype(active_uri->host());
+    auto host = string_t{};
+    auto ip = std::string_view();
+    if (addr.has_value()) {
+        auto raw_value = addr.value().to_uint();
+        ares_inet_ntop(AF_INET, &raw_value, addr_buff, INET_ADDRSTRLEN);
+        ip = addr_buff;
+    } else {
+        host = active_uri->host();
+        ip = host;
+    }
+
     relay_key = inv->key;
-    auto ip = !addr.empty() ? addr : active_uri->host();
     auto uri_str = fmt::format("tcp://{}:{}", ip, inv->port);
     LOG_DEBUG(log, "going to connect to {}, using key: {}", uri_str,
               spdlog::to_hex(relay_key.begin(), relay_key.end()));

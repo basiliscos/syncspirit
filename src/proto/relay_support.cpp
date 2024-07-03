@@ -6,6 +6,8 @@
 #include <nlohmann/json.hpp>
 #include <boost/endian/arithmetic.hpp>
 #include <boost/endian/conversion.hpp>
+#include <ares.h>
+#include <cstring>
 
 namespace be = boost::endian;
 using json = nlohmann::json;
@@ -82,6 +84,17 @@ static void serialize_header(char *ptr, type_t type, size_t payload_sz) noexcept
     std::copy(in, in + header_sz, ptr);
 }
 
+static inline void write32_be(void *ptr, std::uint32_t value) {
+    auto v = be::native_to_big(value);
+    std::memcpy(ptr, &v, sizeof(value));
+}
+
+static inline std::uint32_t read32_be(const void *ptr) {
+    std::uint32_t value;
+    std::memcpy(&value, ptr, sizeof(value));
+    return be::big_to_native(value);
+}
+
 size_t serialize(const message_t &msg, std::string &out) noexcept {
     return std::visit(
         [&](auto &it) -> size_t {
@@ -139,32 +152,36 @@ size_t serialize(const message_t &msg, std::string &out) noexcept {
             } else if constexpr (std::is_same_v<T, session_invitation_t>) {
                 auto &from = it.from;
                 auto &key = it.key;
-                auto &address = it.address;
+                auto address_raw = std::uint32_t{0};
+                if (it.address.has_value()) {
+                    address_raw = be::native_to_big(it.address->to_uint());
+                }
+                auto address = std::string_view(reinterpret_cast<char *>(&address_raw), 4);
                 auto payload_sz = sizeof(uint32_t) * 6 + from.size() + key.size() + address.size();
                 auto sz = header_sz + payload_sz;
                 out.resize(sz);
                 auto ptr = out.data();
                 serialize_header(ptr, type_t::session_invitation, payload_sz);
                 ptr += header_sz;
-                *(reinterpret_cast<uint32_t *>(ptr)) = be::native_to_big((uint32_t)from.size());
+                write32_be(ptr, (uint32_t)from.size());
                 ptr += sizeof(uint32_t);
                 std::copy(from.begin(), from.end(), ptr);
                 ptr += from.size();
 
-                *(reinterpret_cast<uint32_t *>(ptr)) = be::native_to_big((uint32_t)key.size());
+                write32_be(ptr, (uint32_t)key.size());
                 ptr += sizeof(uint32_t);
                 std::copy(key.begin(), key.end(), ptr);
                 ptr += key.size();
 
-                *(reinterpret_cast<uint32_t *>(ptr)) = be::native_to_big((uint32_t)address.size());
+                write32_be(ptr, (uint32_t)address.size());
                 ptr += sizeof(uint32_t);
                 std::copy(address.begin(), address.end(), ptr);
                 ptr += address.size();
 
-                *(reinterpret_cast<uint32_t *>(ptr)) = be::native_to_big((uint32_t)it.port);
+                write32_be(ptr, (uint32_t)it.port);
                 ptr += sizeof(uint32_t);
 
-                *(reinterpret_cast<uint32_t *>(ptr)) = be::native_to_big((uint32_t)it.server_socket);
+                write32_be(ptr, (uint32_t)it.server_socket);
                 return sz;
             } else {
                 static_assert(always_false_v<T>, "non-exhaustive visitor!");
@@ -228,7 +245,7 @@ static parse_result_t parse_session_invitation(std::string_view data) noexcept {
     }
     auto orig = data;
 
-    auto from_sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
+    auto from_sz = read32_be(data.data());
     data = data.substr(sizeof(uint32_t));
     if (data.size() < from_sz) {
         return protocol_error_t{};
@@ -239,7 +256,7 @@ static parse_result_t parse_session_invitation(std::string_view data) noexcept {
     if (data.size() < sizeof(uint32_t)) {
         return protocol_error_t{};
     }
-    auto key_sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
+    auto key_sz = read32_be(data.data());
     data = data.substr(sizeof(uint32_t));
     if (data.size() < key_sz) {
         return protocol_error_t{};
@@ -250,33 +267,39 @@ static parse_result_t parse_session_invitation(std::string_view data) noexcept {
     if (data.size() < sizeof(uint32_t)) {
         return protocol_error_t{};
     }
-    auto addr_sz = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
+    auto addr_sz = read32_be(data.data());
     data = data.substr(sizeof(uint32_t));
     if (data.size() < addr_sz) {
         return protocol_error_t{};
     }
     auto addr = data.substr(0, addr_sz);
     data = data.substr(addr_sz);
-
+    auto ip = ipv4_option_t{};
+    if (addr_sz == 4) {
+        auto number = std::uint32_t{0};
+        std::memcpy(&number, addr.data(), addr_sz);
+        if (number) {
+            ip = boost::asio::ip::address_v4(be::big_to_native(number));
+        }
+    }
     if (data.size() < sizeof(uint32_t)) {
         return protocol_error_t{};
     }
-    auto port = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
+    auto port = read32_be(data.data());
     data = data.substr(sizeof(uint32_t));
 
     if (data.size() < sizeof(uint32_t)) {
         return protocol_error_t{};
     }
-    auto server_socket = be::big_to_native(*reinterpret_cast<const uint32_t *>(data.data()));
+    auto server_socket = read32_be(data.data());
     data = data.substr(sizeof(uint32_t));
 
     if (!addr.empty() && !addr[0]) {
         addr = "";
     };
 
-    return wrapped_message_t{
-        header_sz + orig.size(),
-        session_invitation_t{std::string(from), std::string(key), std::string(addr), port, (bool)server_socket}};
+    return wrapped_message_t{header_sz + orig.size(),
+                             session_invitation_t{std::string(from), std::string(key), ip, port, (bool)server_socket}};
 }
 
 parse_result_t parse(std::string_view data) noexcept {
