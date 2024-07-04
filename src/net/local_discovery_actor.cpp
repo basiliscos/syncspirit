@@ -62,7 +62,7 @@ void local_discovery_actor_t::init() noexcept {
         return do_shutdown(make_error(ec));
     }
 
-    auto listen_endpoint = udp::endpoint{asio::ip::address_v4::loopback(), port};
+    auto listen_endpoint = udp::endpoint{asio::ip::address_v4::any(), port};
     sock.open(listen_endpoint.protocol(), ec);
     if (ec) {
         LOG_WARN(log, "init, can't open socket :: {}", ec.message());
@@ -170,17 +170,9 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
                 }
             }
             if (!uris.empty()) {
-                LOG_TRACE(log, "on_read, local peer = {} ", device_id.value().get_value());
-                for (auto &uri : uris) {
-                    LOG_TRACE(log, "on_read, peer is available via {}", uri);
-                }
-
-                using namespace model::diff;
-                auto diff = model::diff::contact_diff_ptr_t{};
-                diff = new contact::update_contact_t(*cluster, device_id.value(), uris);
-                send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+                handle(*device_id, uris);
             } else {
-                LOG_WARN(log, "on_read, no valid uris from: {}", peer_endpoint);
+                LOG_WARN(log, "on_read, no valid uris from: {} / {}", peer_endpoint, *device_id);
             }
         } else {
             LOG_WARN(log, "on_read, wrong device id, coming from: {}", peer_endpoint);
