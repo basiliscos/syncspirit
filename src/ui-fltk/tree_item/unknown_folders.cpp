@@ -13,7 +13,8 @@ unknown_folders_t::unknown_folders_t(model::device_t &peer_, app_supervisor_t &s
     : parent_t(supervisor, tree), peer{peer_} {
     label("unknown folders");
 
-    for (auto &it : supervisor.get_cluster()->get_unknown_folders()) {
+    auto &folders = supervisor.get_cluster()->get_unknown_folders();
+    for (auto &it : folders) {
         auto &uf = *it.item;
         if (uf.device_id() == peer.device_id()) {
             uf.set_augmentation(add_unknown_folder(uf));

@@ -16,7 +16,6 @@ void unknown_devices_t::update_label() {
     auto count = cluster ? cluster->get_unknown_devices().size() : 0;
     auto l = fmt::format("unknown devices ({})", count);
     label(l.data());
-    tree()->redraw();
 }
 
 auto unknown_devices_t::add_device(model::unknown_device_t &device) -> augmentation_ptr_t {

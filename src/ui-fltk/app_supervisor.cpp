@@ -169,14 +169,14 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_folders
     auto &unknown_folders = cluster->get_unknown_folders();
     for (auto &item : diff.container) {
         auto peer = devices.by_sha256(item.peer_id);
-        auto unknown_folder = *unknown_folders.by_id(item.db.folder().id());
-        if (unknown_folder.get_augmentation()) {
+        auto unknown_folder = unknown_folders.by_id(item.db.folder().id());
+        if (unknown_folder->get_augmentation()) {
             continue;
         }
         auto augmentation = static_cast<augmentation_t *>(peer->get_augmentation().get());
         auto peer_node = static_cast<tree_item::peer_device_t *>(augmentation->get_owner());
         auto unknown_node = static_cast<tree_item::unknown_folders_t *>(peer_node->get_unknown_folders());
-        unknown_folder.set_augmentation(unknown_node->add_unknown_folder(unknown_folder));
+        unknown_folder->set_augmentation(unknown_node->add_unknown_folder(*unknown_folder));
     }
     return outcome::success();
 }

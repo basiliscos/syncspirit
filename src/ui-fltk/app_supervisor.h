@@ -107,7 +107,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_unknown_folders_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::add_unknown_device_t &, void *) noexcept;
+    outcome::result<void> operator()(const model::diff::modify::add_unknown_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
 
     time_point_t started_at;
