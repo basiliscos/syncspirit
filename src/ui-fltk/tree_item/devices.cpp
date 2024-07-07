@@ -190,11 +190,7 @@ auto devices_t::set_self(model::device_t &self) -> augmentation_ptr_t {
 augmentation_ptr_t devices_t::add_peer(model::device_t &peer) {
     ++devices_count;
     update_label();
-    return within_tree([&]() {
-        auto device_node = new peer_device_t(peer, supervisor, tree());
-        add(prefs(), device_node->label(), device_node);
-        return device_node->get_proxy();
-    });
+    return within_tree([&]() { return insert_by_label(new peer_device_t(peer, supervisor, tree()), 1)->get_proxy(); });
 }
 
 void devices_t::remove_peer(tree_item_t *item) {
