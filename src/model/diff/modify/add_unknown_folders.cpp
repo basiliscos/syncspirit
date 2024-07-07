@@ -19,7 +19,7 @@ auto add_unknown_folders_t::apply_impl(cluster_t &cluster) const noexcept -> out
         if (!opt) {
             return opt.assume_error();
         }
-        unknown.emplace_front(std::move(opt.value()));
+        unknown.put(std::move(opt.value()));
     }
     return outcome::success();
 }

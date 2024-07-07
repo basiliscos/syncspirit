@@ -21,7 +21,6 @@
 namespace syncspirit::model {
 
 struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
-    using unknown_folders_t = std::forward_list<unknown_folder_ptr_t>;
 
     cluster_t(device_ptr_t device_, size_t seed, int32_t write_requests) noexcept;
 
@@ -37,10 +36,10 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     folders_map_t &get_folders() noexcept;
     unknown_devices_map_t &get_unknown_devices() noexcept;
     const unknown_devices_map_t &get_unknown_devices() const noexcept;
-    unknown_folders_t &get_unknown_folders() noexcept;
+    unknown_folder_map_t &get_unknown_folders() noexcept;
 
     const folders_map_t &get_folders() const noexcept;
-    const unknown_folders_t &get_unknown_folders() const noexcept;
+    const unknown_folder_map_t &get_unknown_folders() const noexcept;
     uuid_t next_uuid() noexcept;
     uint64_t next_uint64() noexcept;
     inline bool is_tainted() const noexcept { return tainted; }
@@ -66,7 +65,7 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     devices_map_t devices;
     ignored_devices_map_t ignored_devices;
     ignored_folders_map_t ignored_folders;
-    unknown_folders_t unknown_folders;
+    unknown_folder_map_t unknown_folders;
     unknown_devices_map_t unknown_devices;
     bool tainted = false;
     int32_t write_requests;

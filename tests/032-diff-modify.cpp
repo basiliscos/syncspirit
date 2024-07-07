@@ -80,7 +80,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             db_fi->set_max_sequence(12);
 
             auto uf = unknown_folder_t::create(cluster->next_uuid(), db_uf, peer_device->device_id()).value();
-            cluster->get_unknown_folders().emplace_front(uf);
+            cluster->get_unknown_folders().put(uf);
 
             auto diff_share =
                 diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id()));
@@ -94,7 +94,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             CHECK(fi_peer->get_device() == peer_device);
             CHECK(fi_peer->get_max_sequence() == 12);
             CHECK(fi_peer->get_index() == 2345);
-            CHECK(cluster->get_unknown_folders().empty());
+            CHECK(cluster->get_unknown_folders().size() == 0);
 
             auto pr_file_1 = proto::FileInfo();
             pr_file_1.set_name("a.txt");

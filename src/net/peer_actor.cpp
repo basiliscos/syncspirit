@@ -395,7 +395,7 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
         }
         auto state = model::device_state_t::online;
         diff = new contact::peer_state_t(*cluster, sha_s256, get_address(), state, cert_name, peer_endpoint,
-                                         msg->client_name());
+                                         client_name, client_version);
     } else if (auto peer = cluster->get_ignored_devices().by_sha256(sha_s256)) {
         fill_db_and_shutdown();
         diff = new model::diff::contact::ignored_connected_t(*cluster, peer_device_id, std::move(db));

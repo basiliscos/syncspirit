@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "misc/arc.hpp"
+#include "misc/augmentation.hpp"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
 #include "device_id.h"
@@ -14,6 +14,7 @@
 #include "structs.pb.h"
 #include <boost/outcome.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/asio/ip/tcp.hpp>
 
 namespace syncspirit::model {
 
@@ -25,9 +26,10 @@ using device_ptr_t = intrusive_ptr_t<device_t>;
 
 enum class device_state_t { offline, discovering, connecting, online };
 
-struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
+struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     using uris_t = utils::uri_container_t;
     using name_option_t = std::optional<std::string>;
+    using tcp = boost::asio::ip::tcp;
 
     static outcome::result<device_ptr_t> create(std::string_view key, const db::Device &data) noexcept;
     static outcome::result<device_ptr_t> create(const device_id_t &device_id, std::string_view name,
@@ -42,11 +44,16 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     std::string serialize() const noexcept;
     inline bool is_dynamic() const noexcept { return static_uris.empty(); }
     inline device_state_t get_state() const noexcept { return state; }
-    void update_state(device_state_t new_state);
+    void update_state(device_state_t new_state) noexcept;
+    void update_contact(const tcp::endpoint &endpoint, std::string_view client_name,
+                        std::string_view client_version) noexcept;
     inline device_id_t &device_id() noexcept { return id; }
     inline const device_id_t &device_id() const noexcept { return id; }
     inline std::string_view get_name() const noexcept { return name; }
     inline const name_option_t get_cert_name() const noexcept { return cert_name; }
+    inline const tcp::endpoint &get_endpoint() const noexcept { return endpoint; }
+    inline std::string_view get_client_name() const noexcept { return client_name; }
+    inline std::string_view get_client_version() const noexcept { return client_version; }
     inline proto::Compression get_compression() const noexcept { return compression; }
     inline bool is_introducer() const noexcept { return introducer; }
     inline bool has_auto_accept() const noexcept { return auto_accept; }
@@ -79,6 +86,10 @@ struct SYNCSPIRIT_API device_t : arc_base_t<device_t> {
     bool paused;
     bool skip_introduction_removals;
     device_state_t state = device_state_t::offline;
+    tcp::endpoint endpoint;
+    std::string client_name;
+    std::string client_version;
+
     remote_folder_infos_map_t remote_folder_infos;
     pt::ptime last_seen;
 };

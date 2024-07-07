@@ -163,7 +163,7 @@ TEST_CASE("remove peer", "[model]") {
 
         auto uf = unknown_folder_t::create(cluster->next_uuid(), db_uf, peer_device->device_id()).value();
         auto &unknown_folders = cluster->get_unknown_folders();
-        unknown_folders.emplace_front(uf);
+        unknown_folders.put(uf);
         REQUIRE(builder.remove_peer(*peer_device).apply());
         CHECK(devices.size() == 1);
     }

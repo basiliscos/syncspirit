@@ -58,6 +58,7 @@ auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
         devices.put(peer);
     } else {
         peer->update(item);
+        peer->notify_update();
     }
     LOG_TRACE(log, "applyging update_peer_t, device {}", peer->device_id());
 

@@ -422,7 +422,7 @@ void test_cluster_update_and_remove() {
                 REQUIRE(peer_folder_info);
                 REQUIRE(peer_folder_info->get_file_infos().size() == 1);
                 REQUIRE(peer_folder_info->get_file_infos().by_name("a.txt"));
-                REQUIRE(!cluster_clone->get_unknown_folders().empty());
+                REQUIRE(cluster_clone->get_unknown_folders().size() == 1);
             }
 
             auto pr_msg = proto::ClusterConfig();
@@ -451,7 +451,7 @@ void test_cluster_update_and_remove() {
                 auto folder_info = fis.by_device(*peer_device);
                 REQUIRE(folder_info);
                 REQUIRE(fis.by_device(*cluster->get_device()));
-                REQUIRE(cluster_clone->get_unknown_folders().empty());
+                REQUIRE(cluster_clone->get_unknown_folders().size() == 0);
             }
         }
     };
@@ -772,7 +772,7 @@ void test_remove_peer() {
                 .finish()
                 .apply(*sup);
 
-            REQUIRE(!cluster->get_unknown_folders().empty());
+            CHECK(cluster->get_unknown_folders().size() == 1);
 
             REQUIRE(cluster->get_blocks().size() == 1);
             auto block = cluster->get_blocks().get(b->hash());
@@ -797,7 +797,7 @@ void test_remove_peer() {
             auto cluster_clone = make_cluster();
             {
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-                CHECK(cluster_clone->get_unknown_folders().empty());
+                CHECK(cluster_clone->get_unknown_folders().size() == 0);
                 CHECK(cluster_clone->get_devices().size() == 1);
                 REQUIRE(cluster_clone->get_blocks().size() == 0);
             }

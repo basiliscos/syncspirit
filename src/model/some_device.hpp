@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "misc/arc.hpp"
+#include "misc/augmentation.hpp"
 #include "misc/map.hpp"
 #include "misc/error_code.h"
 
@@ -20,7 +20,7 @@ namespace syncspirit::model {
 namespace outcome = boost::outcome_v2;
 namespace pt = boost::posix_time;
 
-template <char prefix> struct SYNCSPIRIT_API some_device_t final : arc_base_t<some_device_t<prefix>> {
+template <char prefix> struct SYNCSPIRIT_API some_device_t final : augmentable_t<some_device_t<prefix>> {
 
     using ptr_t = intrusive_ptr_t<some_device_t>;
 
