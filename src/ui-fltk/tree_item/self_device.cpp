@@ -40,19 +40,13 @@ struct my_table_t : static_table_t {
 
 } // namespace
 
-self_device_t::self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree), model_sub(supervisor.add(this)) {
+self_device_t::self_device_t(model::device_t &self_, app_supervisor_t &supervisor, Fl_Tree *tree)
+    : parent_t(supervisor, tree) {
 
     auto settings = new settings_t(supervisor, tree);
     add(prefs(), "settings", settings);
 
     update_label();
-    Fl::awake(
-        [](void *data) {
-            auto self = reinterpret_cast<self_device_t *>(data);
-            self->tree()->select(self);
-        },
-        this);
 }
 
 void self_device_t::update_label() {
@@ -60,12 +54,6 @@ void self_device_t::update_label() {
     auto device_id = self->device_id().get_short();
     auto label = fmt::format("(self) {}, {}", supervisor.get_app_config().device_name, device_id);
     this->label(label.data());
-}
-
-void self_device_t::operator()(model::message::model_response_t &) {
-    update_label();
-    recalc_tree();
-    tree()->redraw();
 }
 
 bool self_device_t::on_select() {

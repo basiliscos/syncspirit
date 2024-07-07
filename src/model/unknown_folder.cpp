@@ -56,6 +56,7 @@ void unknown_folder_t::assign_fields(const db::UnknownFolder &data) noexcept {
     auto &fi = data.folder_info();
     index = fi.index_id();
     max_sequence = fi.max_sequence();
+    id = data.folder().id();
 }
 
 std::string unknown_folder_t::serialize() const noexcept {
@@ -75,12 +76,8 @@ template <> SYNCSPIRIT_API std::string_view get_index<1>(const unknown_folder_pt
     return item->get_id();
 }
 
-unknown_folder_ptr_t unknown_folder_map_t::by_key(std::string_view key) const noexcept {
-    return get<0>(key);
-}
+unknown_folder_ptr_t unknown_folder_map_t::by_key(std::string_view key) const noexcept { return get<0>(key); }
 
-unknown_folder_ptr_t unknown_folder_map_t::by_id(std::string_view id) const noexcept {
-    return get<0>(id);
-}
+unknown_folder_ptr_t unknown_folder_map_t::by_id(std::string_view id) const noexcept { return get<1>(id); }
 
-}
+} // namespace syncspirit::model

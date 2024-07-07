@@ -95,7 +95,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                 auto &d = f.devices(i);
                 if (d.id() == source.device_id().get_sha256()) {
                     for (auto &it : known_unknowns) {
-                        auto& uf = it.item;
+                        auto &uf = it.item;
                         auto match = uf->device_id() == source.device_id() && uf->get_id() == f.id();
                         if (match) {
                             confirmed_unknown_folders.emplace(std::string(uf->get_key()));
@@ -172,7 +172,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     }
 
     for (auto &it : known_unknowns) {
-        auto& uf = it.item;
+        auto &uf = it.item;
         if (uf->device_id() != source.device_id()) {
             continue;
         }

@@ -326,7 +326,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
     auto &unknown = cluster->get_unknown_folders();
     if (unknown.size()) {
         for (auto &it : unknown) {
-            auto& uf = it.item;
+            auto &uf = it.item;
             auto key = uf->get_key();
             auto data = uf->serialize();
 

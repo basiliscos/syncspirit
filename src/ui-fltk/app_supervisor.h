@@ -5,6 +5,7 @@
 #include "model/messages.h"
 #include "model/diff/block_visitor.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/load/load_cluster.h"
 
 #include <set>
 #include <chrono>
@@ -18,24 +19,10 @@ namespace syncspirit::fltk {
 namespace r = rotor;
 namespace rf = r::fltk;
 namespace bfs = boost::filesystem;
+namespace outcome = boost::outcome_v2;
 
 struct app_supervisor_t;
-
-struct model_listener_t {
-    virtual ~model_listener_t() = default;
-    virtual void operator()(model::message::model_response_t &);
-    virtual void operator()(model::message::model_update_t &);
-    virtual void operator()(model::message::contact_update_t &);
-};
-
-struct model_subscription_t {
-    model_subscription_t(model_listener_t *listener, app_supervisor_t *owner);
-    model_subscription_t(model_subscription_t &&) = default;
-    ~model_subscription_t();
-
-    app_supervisor_t *owner;
-    model_listener_t *listener;
-};
+struct tree_item_t;
 
 struct app_supervisor_config_t : rf::supervisor_config_fltk_t {
     using parent_t = rf::supervisor_config_fltk_t;
@@ -69,6 +56,7 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
 
 struct app_supervisor_t : rf::supervisor_fltk_t,
                           private model::diff::cluster_visitor_t,
+                          private model::diff::contact_visitor_t,
                           private model::diff::block_visitor_t {
     using parent_t = rf::supervisor_fltk_t;
     using config_t = app_supervisor_config_t;
@@ -81,8 +69,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     const config::main_t &get_app_config();
     model::cluster_ptr_t &get_cluster();
 
-    model_subscription_t add(model_listener_t *listener) noexcept;
-    void remove(model_listener_t *listener) noexcept;
     std::string get_uptime() noexcept;
     utils::logger_t &get_logger() noexcept;
 
@@ -107,14 +93,22 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
         send<Payload>(coordinator, std::forward<Args>(args)...);
     }
 
+    void set_devices(tree_item_t *devices);
+    void set_unknown_devices(tree_item_t *devices);
+
   private:
-    using load_listeners_t = std::set<model_listener_t *>;
     using clock_t = std::chrono::high_resolution_clock;
     using time_point_t = typename clock_t::time_point;
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_contact_update(model::message::contact_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
+
+    outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::add_unknown_folders_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::add_unknown_device_t &, void *) noexcept;
+    outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
 
     time_point_t started_at;
     r::address_ptr_t coordinator;
@@ -123,8 +117,9 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     bfs::path config_path;
     config::main_t app_config;
     model::cluster_ptr_t cluster;
-    load_listeners_t model_listeners;
     Fl_Widget *content;
+    tree_item_t *devices;
+    tree_item_t *unkwnown_devices;
 };
 
 } // namespace syncspirit::fltk

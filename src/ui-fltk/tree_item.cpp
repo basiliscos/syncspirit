@@ -3,11 +3,19 @@
 using namespace syncspirit::fltk;
 
 tree_item_t::tree_item_t(app_supervisor_t &supervisor_, Fl_Tree *tree)
-    : parent_t(tree), supervisor{supervisor_}, content{nullptr} {}
+    : parent_t(tree), supervisor{supervisor_}, content{nullptr} {
+    augmentation = new augmentation_t(this);
+}
+
+tree_item_t::~tree_item_t() { augmentation->release_onwer(); }
 
 bool tree_item_t::on_select() { return false; }
 
 void tree_item_t::on_desect() { content = nullptr; }
+
+void tree_item_t::on_update() {}
+
+void tree_item_t::on_delete() {}
 
 void tree_item_t::select_other() {
     auto t = tree();
@@ -30,3 +38,5 @@ void tree_item_t::select_other() {
     }
     t->remove(this);
 }
+
+auto tree_item_t::get_proxy() -> augmentation_ptr_t { return augmentation; }

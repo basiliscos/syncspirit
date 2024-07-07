@@ -51,5 +51,4 @@ struct SYNCSPIRIT_API unknown_folder_map_t : generic_map_t<unknown_folder_ptr_t,
     unknown_folder_ptr_t by_id(std::string_view id) const noexcept;
 };
 
-
 } // namespace syncspirit::model
