@@ -23,11 +23,7 @@ unknown_folders_t::unknown_folders_t(model::device_t &peer_, app_supervisor_t &s
 }
 
 augmentation_ptr_t unknown_folders_t::add_unknown_folder(model::unknown_folder_t &uf) {
-    return within_tree([&]() {
-        auto node = new unknown_folder_t(uf, supervisor, tree());
-        add(prefs(), node->label(), node);
-        return node->get_proxy();
-    });
+    return within_tree([&]() { return insert_by_label(new unknown_folder_t(uf, supervisor, tree()))->get_proxy(); });
 }
 
 void unknown_folders_t::remove_folder(tree_item_t *item) {

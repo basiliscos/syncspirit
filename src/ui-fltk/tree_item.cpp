@@ -1,4 +1,5 @@
 #include "tree_item.h"
+#include <algorithm>
 
 using namespace syncspirit::fltk;
 
@@ -40,3 +41,20 @@ void tree_item_t::select_other() {
 }
 
 auto tree_item_t::get_proxy() -> augmentation_ptr_t { return augmentation; }
+
+auto tree_item_t::insert_by_label(tree_item_t *child_node, int start_index, int end_index) -> tree_item_t * {
+    auto new_label = std::string_view(child_node->label());
+    auto end = std::max(end_index, children());
+    int pos = start_index;
+    for (int i = start_index; i < end_index; ++i) {
+        auto label = std::string_view(child(i)->label());
+        if (label >= new_label) {
+            break;
+        }
+        ++pos;
+    }
+
+    auto tmp_node = insert(prefs(), "", pos);
+    replace_child(tmp_node, child_node);
+    return child_node;
+}

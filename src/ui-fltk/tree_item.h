@@ -33,6 +33,8 @@ struct tree_item_t : Fl_Tree_Item {
         return std::move(r);
     }
 
+    auto insert_by_label(tree_item_t *child, int start_index = 0, int end_index = -1) -> tree_item_t *;
+
     app_supervisor_t &supervisor;
     Fl_Widget *content;
     augmentation_ptr_t augmentation;
