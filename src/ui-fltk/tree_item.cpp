@@ -3,12 +3,18 @@
 
 using namespace syncspirit::fltk;
 
-tree_item_t::tree_item_t(app_supervisor_t &supervisor_, Fl_Tree *tree)
+tree_item_t::tree_item_t(app_supervisor_t &supervisor_, Fl_Tree *tree, bool has_augmentation)
     : parent_t(tree), supervisor{supervisor_}, content{nullptr} {
-    augmentation = new augmentation_t(this);
+    if (has_augmentation) {
+        augmentation = new augmentation_t(this);
+    }
 }
 
-tree_item_t::~tree_item_t() { augmentation->release_onwer(); }
+tree_item_t::~tree_item_t() {
+    if (augmentation) {
+        augmentation->release_onwer();
+    }
+}
 
 bool tree_item_t::on_select() { return false; }
 
@@ -25,7 +31,9 @@ void tree_item_t::on_update() {
 
 void tree_item_t::on_delete() {
     select_other();
-    augmentation->release_onwer();
+    if (augmentation) {
+        augmentation->release_onwer();
+    }
     auto upper = static_cast<tree_item_t *>(parent());
     if (upper) {
         upper->remove_child(this);

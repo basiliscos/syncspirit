@@ -6,7 +6,7 @@ using namespace syncspirit::model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-ignored_devices_t::ignored_devices_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree) {
+ignored_devices_t::ignored_devices_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree, false) {
     supervisor.set_ignored_devices(this);
     update_label();
     tree->close(this, 0);

@@ -6,7 +6,7 @@ using namespace syncspirit::model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-unknown_devices_t::unknown_devices_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree) {
+unknown_devices_t::unknown_devices_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree, false) {
     supervisor.set_unknown_devices(this);
     update_label();
 }

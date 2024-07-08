@@ -13,7 +13,7 @@ namespace diff = model::diff;
 
 struct tree_item_t : Fl_Tree_Item {
     using parent_t = Fl_Tree_Item;
-    tree_item_t(app_supervisor_t &supervisor, Fl_Tree *tree);
+    tree_item_t(app_supervisor_t &supervisor, Fl_Tree *tree, bool has_augmentation = true);
     ~tree_item_t();
 
     virtual void update_label();

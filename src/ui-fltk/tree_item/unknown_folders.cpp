@@ -10,7 +10,7 @@ using namespace fltk;
 using namespace fltk::tree_item;
 
 unknown_folders_t::unknown_folders_t(model::device_t &peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree), peer{peer_} {
+    : parent_t(supervisor, tree, false), peer{peer_} {
     label("unknown folders");
 
     auto &folders = supervisor.get_cluster()->get_unknown_folders();

@@ -52,7 +52,8 @@ struct devices_widget_t : Fl_Scroll {
 
 } // namespace
 
-devices_t::devices_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree), devices_count{0} {
+devices_t::devices_t(app_supervisor_t &supervisor, Fl_Tree *tree)
+    : parent_t(supervisor, tree, false), devices_count{0} {
     supervisor.set_devices(this);
     update_label();
 }

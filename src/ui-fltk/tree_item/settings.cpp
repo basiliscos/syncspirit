@@ -4,7 +4,7 @@
 
 using namespace syncspirit::fltk::tree_item;
 
-settings_t::settings_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree) {
+settings_t::settings_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree, false) {
     update_label(false);
 }
 
