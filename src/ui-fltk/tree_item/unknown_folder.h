@@ -14,7 +14,6 @@ struct unknown_folder_t : tree_item_t {
     unknown_folder_t(model::unknown_folder_t &folder, app_supervisor_t &supervisor, Fl_Tree *tree);
 
     bool on_select() override;
-    void on_delete() override;
 
     model::unknown_folder_t &folder;
 };

@@ -12,12 +12,10 @@ struct unknown_device_t : tree_item_t {
     using parent_t = tree_item_t;
 
     unknown_device_t(model::unknown_device_t &device, app_supervisor_t &supervisor, Fl_Tree *tree);
-    void update_label();
-    void refresh();
+    void update_label() override;
+    void refresh_content() override;
 
     bool on_select() override;
-    void on_delete() override;
-    void on_update() override;
 
     void on_connect();
     void on_ignore();

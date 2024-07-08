@@ -14,9 +14,23 @@ bool tree_item_t::on_select() { return false; }
 
 void tree_item_t::on_desect() { content = nullptr; }
 
-void tree_item_t::on_update() {}
+void tree_item_t::update_label() {}
 
-void tree_item_t::on_delete() {}
+void tree_item_t::refresh_content() {}
+
+void tree_item_t::on_update() {
+    update_label();
+    refresh_content();
+}
+
+void tree_item_t::on_delete() {
+    select_other();
+    augmentation->release_onwer();
+    auto upper = static_cast<tree_item_t *>(parent());
+    if (upper) {
+        upper->remove_child(this);
+    }
+}
 
 void tree_item_t::select_other() {
     auto t = tree();
@@ -55,4 +69,10 @@ auto tree_item_t::insert_by_label(tree_item_t *child_node, int start_index, int 
     auto tmp_node = insert(prefs(), "", pos);
     replace_child(tmp_node, child_node);
     return child_node;
+}
+
+void tree_item_t::remove_child(tree_item_t *child) {
+    parent_t::remove_child(child);
+    update_label();
+    tree()->redraw();
 }

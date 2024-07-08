@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
 #include "ignored_device.h"
-#include "ignored_devices.h"
 #include "model/diff/modify/remove_ignored_device.h"
 #include "model/diff/modify/update_peer.h"
 #include "../static_table.h"
@@ -99,7 +98,7 @@ bool ignored_device_t::on_select() {
     return true;
 }
 
-void ignored_device_t::refresh() {
+void ignored_device_t::refresh_content() {
     update_label();
     if (content) {
         auto &table = *static_cast<static_table_t *>(content);
@@ -136,15 +135,4 @@ void ignored_device_t::on_remove() {
     auto diff = cluster_diff_ptr_t{};
     diff = new modify::remove_ignored_device_t(device);
     supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
-}
-
-void ignored_device_t::on_delete() {
-    select_other();
-    augmentation->release_onwer();
-    static_cast<ignored_devices_t *>(parent())->remove_device(this);
-}
-
-void ignored_device_t::on_update() {
-    update_label();
-    refresh();
 }

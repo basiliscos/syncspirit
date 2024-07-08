@@ -10,7 +10,7 @@ struct self_device_t final : tree_item_t {
     self_device_t(model::device_t &self, app_supervisor_t &supervisor, Fl_Tree *tree);
 
     bool on_select() override;
-    void update_label();
+    void update_label() override;
 };
 
 } // namespace syncspirit::fltk::tree_item

@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
 #include "unknown_folder.h"
-#include "unknown_folders.h"
 #include "../static_table.h"
 
 #include <FL/Fl_Check_Button.H>
@@ -72,10 +71,4 @@ bool unknown_folder_t::on_select() {
         return content;
     });
     return true;
-}
-
-void unknown_folder_t::on_delete() {
-    select_other();
-    augmentation->release_onwer();
-    static_cast<unknown_folders_t *>(parent())->remove_folder(this);
 }

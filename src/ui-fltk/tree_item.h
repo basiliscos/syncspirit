@@ -16,6 +16,10 @@ struct tree_item_t : Fl_Tree_Item {
     tree_item_t(app_supervisor_t &supervisor, Fl_Tree *tree);
     ~tree_item_t();
 
+    virtual void update_label();
+    virtual void refresh_content();
+    virtual void remove_child(tree_item_t *child);
+
     virtual bool on_select();
     virtual void on_desect();
     virtual void on_update();

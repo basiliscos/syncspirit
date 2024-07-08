@@ -14,7 +14,7 @@ struct devices_t : tree_item_t {
     void remove_peer(tree_item_t *item);
 
     bool on_select() override;
-    void update_label();
+    void update_label() override;
     void add_new_device(std::string_view device_id, std::string_view label);
 
     size_t devices_count;

@@ -1,5 +1,4 @@
 #include "peer_device.h"
-#include "devices.h"
 #include "unknown_folders.h"
 #include "../qr_button.h"
 #include "model/diff/modify/remove_peer.h"
@@ -39,7 +38,8 @@ struct checkbox_widget_t : peer_device_t::peer_widget_t {
         auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
 
         input = new Fl_Check_Button(x + padding, yy, ww, hh);
-        input->callback([](auto, void *data) { reinterpret_cast<peer_device_t *>(data)->on_change(); }, &container);
+        input->callback([](auto, void *data) { reinterpret_cast<peer_device_t *>(data)->refresh_content(); },
+                        &container);
 
         group->end();
         widget = group;
@@ -97,7 +97,8 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
 
             input = new Fl_Input(x + padding, yy, ww, hh);
             input->when(input->when() | FL_WHEN_CHANGED);
-            input->callback([](auto, void *data) { reinterpret_cast<peer_device_t *>(data)->on_change(); }, &container);
+            input->callback([](auto, void *data) { reinterpret_cast<peer_device_t *>(data)->refresh_content(); },
+                            &container);
 
             group->end();
             group->resizable(nullptr);
@@ -183,7 +184,8 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
             input->add("never");
             input->add("always");
             input->value(0);
-            input->callback([](auto, void *data) { reinterpret_cast<peer_device_t *>(data)->on_change(); }, &container);
+            input->callback([](auto, void *data) { reinterpret_cast<peer_device_t *>(data)->refresh_content(); },
+                            &container);
 
             group->end();
             group->resizable(nullptr);
@@ -313,7 +315,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
                     menu->add("static", 0, 0, 0, FL_MENU_INACTIVE);
                 }
             }
-            container.on_change();
+            container.refresh_content();
         }
 
         mutable Fl_Input_Choice *input;
@@ -409,7 +411,7 @@ std::string peer_device_t::get_state() {
     }
 }
 
-void peer_device_t::on_change() {
+void peer_device_t::refresh_content() {
     if (!content) {
         return;
     }
@@ -471,7 +473,7 @@ void peer_device_t::on_reset() {
     for (auto &w : widgets) {
         w->reset();
     }
-    on_change();
+    refresh_content();
 }
 
 void peer_device_t::on_remove() {
@@ -482,17 +484,6 @@ void peer_device_t::on_remove() {
     auto &cluster = *supervisor.get_cluster();
     auto diff = cluster_diff_ptr_t(new modify::remove_peer_t(cluster, peer));
     supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
-}
-
-void peer_device_t::on_delete() {
-    select_other();
-    augmentation->release_onwer();
-    static_cast<devices_t *>(parent())->remove_peer(this);
-}
-
-void peer_device_t::on_update() {
-    on_change();
-    update_label();
 }
 
 tree_item_t *peer_device_t::get_unknown_folders() { return static_cast<tree_item_t *>(child(0)); }

@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
 #include "unknown_device.h"
-#include "unknown_devices.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/remove_unknown_device.h"
 #include "model/diff/modify/update_peer.h"
@@ -102,18 +101,7 @@ bool unknown_device_t::on_select() {
     return true;
 }
 
-void unknown_device_t::on_delete() {
-    select_other();
-    augmentation->release_onwer();
-    static_cast<unknown_devices_t *>(parent())->remove_device(this);
-}
-
-void unknown_device_t::on_update() {
-    update_label();
-    refresh();
-}
-
-void unknown_device_t::refresh() {
+void unknown_device_t::refresh_content() {
     update_label();
     if (content) {
         auto &table = *static_cast<static_table_t *>(content);

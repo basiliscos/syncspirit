@@ -34,13 +34,11 @@ struct peer_device_t : tree_item_t {
     const model::device_t &get_device() const;
     widgetable_ptr_t record(peer_widget_ptr_t);
     std::string get_state();
-    void update_label();
+    void update_label() override;
+    void refresh_content() override;
 
     bool on_select() override;
-    void on_delete() override;
-    void on_update() override;
 
-    void on_change();
     void on_remove();
     void on_apply();
     void on_reset();
