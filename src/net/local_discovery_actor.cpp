@@ -210,8 +210,8 @@ struct filler_t {
 };
 
 void local_discovery_actor_t::handle(const model::device_id_t &device_id, utils::uri_container_t &uris) noexcept {
-    if (device_id == cluster->get_device()->device_id()) { // skip "self" discovery via network
-        LOG_TRACE(log, "skipping self discovery (?)");
+    if (device_id == cluster->get_device()->device_id()) {
+        LOG_TRACE(log, "skipping self discovery");
         return;
     }
     if (uris.empty()) {
