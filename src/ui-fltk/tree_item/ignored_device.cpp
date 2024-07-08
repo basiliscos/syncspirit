@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
-#include "unknown_device.h"
-#include "unknown_devices.h"
-#include "model/diff/modify/add_ignored_device.h"
-#include "model/diff/modify/remove_unknown_device.h"
+#include "ignored_device.h"
+#include "ignored_devices.h"
+#include "model/diff/modify/remove_ignored_device.h"
 #include "model/diff/modify/update_peer.h"
 #include "../static_table.h"
 #include "../qr_button.h"
@@ -20,10 +19,10 @@ using namespace fltk::tree_item;
 
 static constexpr int padding = 2;
 
-static widgetable_ptr_t make_actions(unknown_device_t &container) {
+static widgetable_ptr_t make_actions(ignored_device_t &container) {
     struct widget_t final : widgetable_t {
         using parent_t = widgetable_t;
-        widget_t(unknown_device_t &container_) : widget{nullptr}, container{container_} {}
+        widget_t(ignored_device_t &container_) : widget{nullptr}, container{container_} {}
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto group = new Fl_Group(x, y, w, h);
@@ -31,15 +30,13 @@ static widgetable_ptr_t make_actions(unknown_device_t &container) {
             group->box(FL_FLAT_BOX);
             auto yy = y + padding, ww = 100, hh = h - padding * 2;
             auto connect = new Fl_Button(x + padding, yy, ww, hh, "connect");
-            auto ignore = new Fl_Button(connect->x() + ww + padding * 2, yy, ww, hh, "ignore");
-            auto remove = new Fl_Button(ignore->x() + ww + padding * 2, yy, ww, hh, "remove");
+            auto remove = new Fl_Button(connect->x() + ww + padding * 2, yy, ww, hh, "remove");
             remove->color(FL_RED);
             group->end();
 
-            connect->callback([](auto, void *data) { static_cast<unknown_device_t *>(data)->on_connect(); },
+            connect->callback([](auto, void *data) { static_cast<ignored_device_t *>(data)->on_connect(); },
                               &container);
-            ignore->callback([](auto, void *data) { static_cast<unknown_device_t *>(data)->on_ignore(); }, &container);
-            remove->callback([](auto, void *data) { static_cast<unknown_device_t *>(data)->on_remove(); }, &container);
+            remove->callback([](auto, void *data) { static_cast<ignored_device_t *>(data)->on_remove(); }, &container);
 
             widget = group;
             return widget;
@@ -47,18 +44,18 @@ static widgetable_ptr_t make_actions(unknown_device_t &container) {
         Fl_Widget *get_widget() override { return widget; };
 
         Fl_Widget *widget;
-        unknown_device_t &container;
+        ignored_device_t &container;
     };
 
     return new widget_t(container);
 }
 
-unknown_device_t::unknown_device_t(model::unknown_device_t &device_, app_supervisor_t &supervisor, Fl_Tree *tree)
+ignored_device_t::ignored_device_t(model::ignored_device_t &device_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), device{device_} {
     update_label();
 }
 
-void unknown_device_t::update_label() {
+void ignored_device_t::update_label() {
     auto name = device.get_name();
     auto id = device.get_device_id().get_short();
     auto value = fmt::format("{}, {}", name, id);
@@ -66,7 +63,7 @@ void unknown_device_t::update_label() {
     tree()->redraw();
 }
 
-bool unknown_device_t::on_select() {
+bool ignored_device_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
         auto &device_id = device.get_device_id();
 
@@ -102,18 +99,7 @@ bool unknown_device_t::on_select() {
     return true;
 }
 
-void unknown_device_t::on_delete() {
-    select_other();
-    augmentation->release_onwer();
-    static_cast<unknown_devices_t *>(parent())->remove_device(this);
-}
-
-void unknown_device_t::on_update() {
-    update_label();
-    refresh();
-}
-
-void unknown_device_t::refresh() {
+void ignored_device_t::refresh() {
     update_label();
     if (content) {
         auto &table = *static_cast<static_table_t *>(content);
@@ -136,7 +122,7 @@ void unknown_device_t::refresh() {
     }
 }
 
-void unknown_device_t::on_connect() {
+void ignored_device_t::on_connect() {
     db::Device db_dev;
     db_dev.set_name(std::string(device.get_name()));
 
@@ -146,17 +132,19 @@ void unknown_device_t::on_connect() {
     supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
 }
 
-void unknown_device_t::on_ignore() {
+void ignored_device_t::on_remove() {
     auto diff = cluster_diff_ptr_t{};
-    auto &cluster = *supervisor.get_cluster();
-    db::SomeDevice db;
-    device.serialize(db);
-    diff = new modify::add_ignored_device_t(cluster, device.get_device_id(), std::move(db));
+    diff = new modify::remove_ignored_device_t(device);
     supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
 }
 
-void unknown_device_t::on_remove() {
-    auto diff = cluster_diff_ptr_t{};
-    diff = new modify::remove_unknown_device_t(device);
-    supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
+void ignored_device_t::on_delete() {
+    select_other();
+    augmentation->release_onwer();
+    static_cast<ignored_devices_t *>(parent())->remove_device(this);
+}
+
+void ignored_device_t::on_update() {
+    update_label();
+    refresh();
 }

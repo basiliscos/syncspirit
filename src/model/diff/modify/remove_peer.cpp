@@ -39,9 +39,10 @@ remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noe
     }
 
     auto removed_unknown_folders = remove_unknown_folders_t::unique_keys_t{};
-    for (auto &uf : cluster.get_unknown_folders()) {
-        if (uf->device_id() == peer.device_id()) {
-            removed_unknown_folders.emplace(uf->get_key());
+    for (auto &it : cluster.get_unknown_folders()) {
+        auto &uf = *it.item;
+        if (uf.device_id() == peer.device_id()) {
+            removed_unknown_folders.emplace(uf.get_key());
         }
     }
     if (removed_unknown_folders.size()) {

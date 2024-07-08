@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
-#include "misc/arc.hpp"
+#include "misc/augmentation.hpp"
+#include "misc/map.hpp"
 #include "misc/uuid.h"
 #include "device_id.h"
 #include "folder_data.h"
@@ -19,7 +20,7 @@ struct unknown_folder_t;
 
 using unknown_folder_ptr_t = intrusive_ptr_t<unknown_folder_t>;
 
-struct SYNCSPIRIT_API unknown_folder_t final : arc_base_t<unknown_folder_t>, folder_data_t {
+struct SYNCSPIRIT_API unknown_folder_t final : augmentable_t<unknown_folder_t>, folder_data_t {
 
     static outcome::result<unknown_folder_ptr_t> create(std::string_view key, const db::UnknownFolder &data) noexcept;
     static outcome::result<unknown_folder_ptr_t> create(const uuid_t &uuid, const db::UnknownFolder &data,
@@ -43,6 +44,11 @@ struct SYNCSPIRIT_API unknown_folder_t final : arc_base_t<unknown_folder_t>, fol
 
     static const constexpr auto data_length = uuid_length + device_id_t::digest_length + 1;
     char key[data_length];
+};
+
+struct SYNCSPIRIT_API unknown_folder_map_t : generic_map_t<unknown_folder_ptr_t, 2> {
+    unknown_folder_ptr_t by_key(std::string_view id) const noexcept;
+    unknown_folder_ptr_t by_id(std::string_view id) const noexcept;
 };
 
 } // namespace syncspirit::model

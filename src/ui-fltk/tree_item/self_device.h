@@ -5,15 +5,12 @@
 
 namespace syncspirit::fltk::tree_item {
 
-struct self_device_t : tree_item_t, private model_listener_t {
+struct self_device_t final : tree_item_t {
     using parent_t = tree_item_t;
-    self_device_t(app_supervisor_t &supervisor, Fl_Tree *tree);
+    self_device_t(model::device_t &self, app_supervisor_t &supervisor, Fl_Tree *tree);
 
-    void operator()(model::message::model_response_t &) override;
     bool on_select() override;
     void update_label();
-
-    model_subscription_t model_sub;
 };
 
 } // namespace syncspirit::fltk::tree_item

@@ -85,9 +85,9 @@ TEST_CASE("cluster update, new folder", "[model]") {
         auto visitor = my_cluster_update_visitor_t([&](auto &diff) { return outcome::success(); });
         auto r_v = diff->visit(visitor, nullptr);
         REQUIRE(r_v);
-        REQUIRE(!cluster->get_unknown_folders().empty());
+        REQUIRE(cluster->get_unknown_folders().size());
         REQUIRE(visitor.add_unknown_folders == 1);
-        auto uf = cluster->get_unknown_folders().front();
+        auto uf = cluster->get_unknown_folders().begin()->item;
         CHECK(uf->device_id() == peer_device->device_id());
         CHECK(uf->get_id() == "some-id");
         CHECK(uf->get_max_sequence() == 10);
@@ -106,7 +106,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         diff = diff_opt.value();
         r_a = diff->apply(*cluster);
         CHECK(r_a);
-        REQUIRE(!cluster->get_unknown_folders().empty());
+        REQUIRE(cluster->get_unknown_folders().size() == 1);
         std::ignore = diff->visit(visitor, nullptr);
         REQUIRE(visitor.add_unknown_folders == 1);
 
@@ -119,8 +119,8 @@ TEST_CASE("cluster update, new folder", "[model]") {
         CHECK(r_a);
         (void)diff->visit(visitor, nullptr);
         REQUIRE(visitor.add_unknown_folders == 2);
-        REQUIRE(!cluster->get_unknown_folders().empty());
-        uf = cluster->get_unknown_folders().front();
+        REQUIRE(cluster->get_unknown_folders().size() == 1);
+        uf = cluster->get_unknown_folders().begin()->item;
         CHECK(uf->device_id() == peer_device->device_id());
         CHECK(uf->get_id() == "some-id");
         CHECK(uf->get_max_sequence() == 15);
@@ -319,7 +319,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     db_u_folder.mutable_folder()->set_label("unknown");
     auto u_folder = unknown_folder_t::create(cluster->next_uuid(), db_u_folder, peer_device->device_id()).value();
     auto &unknown_folders = cluster->get_unknown_folders();
-    unknown_folders.push_front(u_folder);
+    unknown_folders.put(u_folder);
 
     auto folder_info_my = folder_info_ptr_t();
     auto folder_info_peer = folder_info_ptr_t();

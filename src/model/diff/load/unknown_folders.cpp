@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "unknown_folders.h"
 #include "../../cluster.h"
@@ -22,7 +22,7 @@ auto unknown_folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
             return option.assume_error();
         }
         auto &folder = option.value();
-        items.emplace_front(folder);
+        items.put(std::move(folder));
     }
     return outcome::success();
 }

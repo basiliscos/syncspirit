@@ -7,6 +7,7 @@
 #include <optional>
 #include <boost/filesystem.hpp>
 #include <boost/outcome.hpp>
+#include "misc/augmentation.hpp"
 #include "device.h"
 #include "folder_info.h"
 #include "misc/local_file.h"
@@ -27,7 +28,7 @@ struct folder_t;
 
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
-struct SYNCSPIRIT_API folder_t final : arc_base_t<folder_t>, folder_data_t {
+struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
 
     static outcome::result<folder_ptr_t> create(std::string_view key, const db::Folder &folder) noexcept;
     static outcome::result<folder_ptr_t> create(const uuid_t &uuid, const db::Folder &folder) noexcept;

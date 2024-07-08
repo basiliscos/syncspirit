@@ -8,11 +8,10 @@
 #include <optional>
 #include <boost/filesystem.hpp>
 #include <boost/outcome.hpp>
-#include "misc/arc.hpp"
+#include "misc/augmentation.hpp"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
 #include "block_info.h"
-#include "device.h"
 #include "structs.pb.h"
 #include "syncspirit-export.h"
 
@@ -30,7 +29,7 @@ struct blocks_iterator_t;
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
-struct SYNCSPIRIT_API file_info_t final : arc_base_t<file_info_t> {
+struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
 
     // clang-format off
     enum flags_t {

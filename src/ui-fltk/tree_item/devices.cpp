@@ -8,7 +8,6 @@
 
 #include "model/device_id.h"
 #include "model/diff/modify/update_peer.h"
-#include "model/diff/load/load_cluster.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit;
@@ -53,9 +52,8 @@ struct devices_widget_t : Fl_Scroll {
 
 } // namespace
 
-devices_t::devices_t(app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree), model_sub(supervisor.add(this)), devices_count{0} {
-    build_tree();
+devices_t::devices_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree), devices_count{0} {
+    supervisor.set_devices(this);
     update_label();
 }
 
@@ -68,89 +66,9 @@ bool devices_t::on_select() {
     return true;
 }
 
-void devices_t::operator()(model::message::model_update_t &update) {
-    std::ignore = update.payload.diff->visit(*this, nullptr);
-    build_tree();
-    update_label();
-}
-
-auto devices_t::operator()(const diff::modify::update_peer_t &diff, void *) noexcept -> outcome::result<void> {
-    auto peer = supervisor.get_cluster()->get_devices().by_sha256(diff.peer_id);
-    bool new_peer = true;
-    for (int i = 1; i < children(); ++i) {
-        auto node = dynamic_cast<peer_device_t *>(child(i));
-        if (node) {
-            if (node->peer == peer) {
-                new_peer = true;
-                break;
-            }
-        }
-    }
-    if (new_peer) {
-        auto tree_item = add_device(peer);
-        if (tree_item) {
-            tree()->select(tree_item, 1);
-            tree()->deselect(this, 1);
-        }
-    }
-    return outcome::success();
-}
-
-auto devices_t::operator()(const diff::load::load_cluster_t &diff, void *data) noexcept -> outcome::result<void> {
-    return diff.diff::cluster_aggregate_diff_t::visit(*this, data);
-}
-
-auto devices_t::operator()(const diff::load::devices_t &diff, void *) noexcept -> outcome::result<void> {
-    build_tree();
-    update_label();
-    return outcome::success();
-}
-
-void devices_t::build_tree() {
-    auto &cluster = supervisor.get_cluster();
-    if (!cluster) {
-        return;
-    }
-    auto &devices = cluster->get_devices();
-
-    tree()->begin();
-    if (children() == 0) {
-        auto self_node = new tree_item::self_device_t(supervisor, tree());
-        add(prefs(), "self", self_node);
-        tree()->close(self_node, 0);
-    }
-
-    for (auto it : devices) {
-        if (it.item == cluster->get_device()) {
-            continue;
-        }
-        add_device(it.item);
-    }
-    devices_count = devices.size();
-    tree()->end();
-}
-
 void devices_t::update_label() {
     auto l = fmt::format("devices ({})", devices_count);
     this->label(l.data());
-}
-
-tree_item_t *devices_t::get_self_device() { return static_cast<tree_item_t *>(child(0)); }
-
-auto devices_t::add_device(const model::device_ptr_t &device) -> tree_item_t * {
-    for (int i = 1; i < children(); ++i) {
-        auto node = dynamic_cast<peer_device_t *>(child(i));
-        if (node) {
-            if (node->peer == device) {
-                return nullptr;
-            }
-        }
-    }
-
-    auto device_node = new peer_device_t(device, supervisor, tree());
-    add(prefs(), device_node->label(), device_node);
-    tree()->close(device_node, 0);
-    return device_node;
 }
 
 void devices_t::add_new_device(std::string_view device_id, std::string_view label) {
@@ -175,4 +93,26 @@ void devices_t::add_new_device(std::string_view device_id, std::string_view labe
 
     auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(db_dev), peer, cluster));
     supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
+}
+
+auto devices_t::set_self(model::device_t &self) -> augmentation_ptr_t {
+    return within_tree([&]() {
+        auto self_node = new tree_item::self_device_t(self, supervisor, tree());
+        add(prefs(), "self", self_node);
+        tree()->close(self_node, 0);
+        return self_node->get_proxy();
+    });
+}
+
+augmentation_ptr_t devices_t::add_peer(model::device_t &peer) {
+    ++devices_count;
+    update_label();
+    return within_tree([&]() { return insert_by_label(new peer_device_t(peer, supervisor, tree()), 1)->get_proxy(); });
+}
+
+void devices_t::remove_peer(tree_item_t *item) {
+    --devices_count;
+    update_label();
+    remove_child(item);
+    tree()->redraw();
 }

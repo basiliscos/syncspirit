@@ -46,9 +46,9 @@ auto cluster_t::get_unknown_devices() noexcept -> unknown_devices_map_t & { retu
 
 auto cluster_t::get_unknown_devices() const noexcept -> const unknown_devices_map_t & { return unknown_devices; }
 
-auto cluster_t::get_unknown_folders() noexcept -> unknown_folders_t & { return unknown_folders; }
+auto cluster_t::get_unknown_folders() noexcept -> unknown_folder_map_t & { return unknown_folders; }
 
-auto cluster_t::get_unknown_folders() const noexcept -> const unknown_folders_t & { return unknown_folders; }
+auto cluster_t::get_unknown_folders() const noexcept -> const unknown_folder_map_t & { return unknown_folders; }
 
 const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
 

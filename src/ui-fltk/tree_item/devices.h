@@ -1,27 +1,22 @@
 #pragma once
 
-#pragma once
-
+#include "model/device.h"
 #include "../tree_item.h"
 
 namespace syncspirit::fltk::tree_item {
 
-struct devices_t : tree_item_t, private model_listener_t, private model::diff::cluster_visitor_t {
+struct devices_t : tree_item_t {
     using parent_t = tree_item_t;
     devices_t(app_supervisor_t &supervisor, Fl_Tree *tree);
 
-    void build_tree();
-    void update_label();
+    augmentation_ptr_t set_self(model::device_t &self);
+    augmentation_ptr_t add_peer(model::device_t &peer);
+    void remove_peer(tree_item_t *item);
+
     bool on_select() override;
-    void operator()(model::message::model_update_t &) override;
-    outcome::result<void> operator()(const diff::load::load_cluster_t &, void *custom) noexcept override;
-    outcome::result<void> operator()(const diff::load::devices_t &, void *custom) noexcept override;
-    outcome::result<void> operator()(const diff::modify::update_peer_t &, void *custom) noexcept override;
-    tree_item_t *get_self_device();
-    tree_item_t *add_device(const model::device_ptr_t &device);
+    void update_label();
     void add_new_device(std::string_view device_id, std::string_view label);
 
-    model_subscription_t model_sub;
     size_t devices_count;
 };
 

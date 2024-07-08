@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "share_folder.h"
 #include "../cluster_visitor.h"
-#include "../../cluster.h"
-#include "../../misc/error_code.h"
-#include "../../../utils/format.hpp"
+#include "model/cluster.h"
+#include "model/misc/error_code.h"
+#include "utils/format.hpp"
 #include "structs.pb.h"
 
 using namespace syncspirit::model::diff::modify;
@@ -26,14 +26,14 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     }
     auto index = uint64_t{0};
     auto max_sequence = int64_t{0};
-    auto unknown_it = unknown.end();
+    auto unknown_folder = model::unknown_folder_ptr_t{};
 
-    for (auto it = unknown.begin(), prev = unknown.before_begin(); it != unknown.end(); prev = it, ++it) {
-        auto &uf = **it;
+    for (auto it = unknown.begin(); it != unknown.end(); ++it) {
+        auto &uf = *it->item;
         if (uf.device_id() == peer->device_id() && uf.get_id() == folder_id) {
             index = uf.get_index();
             max_sequence = uf.get_max_sequence();
-            unknown_it = prev;
+            unknown_folder = it->item;
             break;
         }
     }
@@ -56,7 +56,7 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     auto &fi = fi_opt.value();
     folder->add(fi);
     if (index) {
-        unknown.erase_after(unknown_it);
+        unknown.remove(unknown_folder);
     }
 
     return outcome::success();

@@ -4,6 +4,7 @@ find_package(libqrencode REQUIRED)
 
 add_executable(syncspirit-fltk WIN32
     app_supervisor.cpp
+    augmentation.cpp
     log_colors.cpp
     log_panel.cpp
     log_sink.cpp

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
 #include <cstdint>
 #include <optional>
+#include "misc/augmentation.hpp"
 #include "device.h"
 #include "file_info.h"
-#include "misc/local_file.h"
 #include "structs.pb.h"
 #include "syncspirit-export.h"
 #include <boost/outcome.hpp>
@@ -22,7 +22,7 @@ using folder_ptr_t = intrusive_ptr_t<folder_t>;
 struct folder_info_t;
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
-struct SYNCSPIRIT_API folder_info_t final : arc_base_t<folder_info_t> {
+struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
 
     struct decomposed_key_t {
         std::string_view device_id;

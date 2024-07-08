@@ -92,11 +92,18 @@ std::string device_t::serialize() const noexcept {
     return serialize(r);
 }
 
-void device_t::update_state(device_state_t new_state) {
+void device_t::update_state(device_state_t new_state) noexcept {
     if (state == device_state_t::online | new_state == device_state_t::online) {
         last_seen = pt::microsec_clock::local_time();
     }
     state = new_state;
+}
+
+void device_t::update_contact(const tcp::endpoint &endpoint_, std::string_view client_name_,
+                              std::string_view client_version_) noexcept {
+    endpoint = endpoint_;
+    client_name = client_name_;
+    client_version = client_version_;
 }
 
 std::string_view device_t::get_key() const noexcept { return id.get_key(); }

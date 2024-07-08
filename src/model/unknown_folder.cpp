@@ -6,7 +6,7 @@
 #undef uuid_t
 #endif
 
-using namespace syncspirit::model;
+namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(syncspirit::db::prefix::unknown_folder);
 
@@ -56,6 +56,7 @@ void unknown_folder_t::assign_fields(const db::UnknownFolder &data) noexcept {
     auto &fi = data.folder_info();
     index = fi.index_id();
     max_sequence = fi.max_sequence();
+    id = data.folder().id();
 }
 
 std::string unknown_folder_t::serialize() const noexcept {
@@ -66,3 +67,17 @@ std::string unknown_folder_t::serialize() const noexcept {
     fi.set_max_sequence(max_sequence);
     return r.SerializePartialAsString();
 }
+
+template <> SYNCSPIRIT_API std::string_view get_index<0>(const unknown_folder_ptr_t &item) noexcept {
+    return item->get_key();
+}
+
+template <> SYNCSPIRIT_API std::string_view get_index<1>(const unknown_folder_ptr_t &item) noexcept {
+    return item->get_id();
+}
+
+unknown_folder_ptr_t unknown_folder_map_t::by_key(std::string_view key) const noexcept { return get<0>(key); }
+
+unknown_folder_ptr_t unknown_folder_map_t::by_id(std::string_view id) const noexcept { return get<1>(id); }
+
+} // namespace syncspirit::model

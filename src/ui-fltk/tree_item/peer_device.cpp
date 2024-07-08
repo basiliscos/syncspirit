@@ -1,11 +1,9 @@
 #include "peer_device.h"
-
-#include "../qr_button.h"
+#include "devices.h"
 #include "unknown_folders.h"
-
+#include "../qr_button.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/update_peer.h"
-#include "model/diff/contact/peer_state.h"
 #include "utils/format.hpp"
 
 #include <FL/Fl_Tile.H>
@@ -15,7 +13,6 @@
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Input_Choice.H>
 #include "FL/fl_ask.H"
-#include <tuple>
 
 using namespace syncspirit;
 using namespace model::diff;
@@ -110,7 +107,7 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
             return widget;
         }
 
-        void reset() override { input->value(container.peer->get_name().data()); }
+        void reset() override { input->value(container.peer.get_name().data()); }
 
         bool store(db::Device &device) override {
             device.set_name(input->value());
@@ -128,7 +125,7 @@ static peer_device_t::peer_widget_ptr_t make_introducer(peer_device_t &container
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
-        void reset() override { input->value(container.peer->is_introducer()); }
+        void reset() override { input->value(container.peer.is_introducer()); }
 
         bool store(db::Device &device) override {
             device.set_introducer(input->value());
@@ -144,7 +141,7 @@ static peer_device_t::peer_widget_ptr_t make_auto_accept(peer_device_t &containe
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
-        void reset() override { input->value(container.peer->has_auto_accept()); }
+        void reset() override { input->value(container.peer.has_auto_accept()); }
         bool store(db::Device &device) override {
             device.set_auto_accept(input->value());
             return true;
@@ -159,7 +156,7 @@ static peer_device_t::peer_widget_ptr_t make_paused(peer_device_t &container) {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
-        void reset() override { input->value(container.peer->is_paused()); }
+        void reset() override { input->value(container.peer.is_paused()); }
         bool store(db::Device &device) override {
             device.set_paused(input->value());
             return true;
@@ -198,7 +195,7 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
 
         void reset() override {
             using C = proto::Compression;
-            auto c = container.peer->get_compression();
+            auto c = container.peer.get_compression();
             if (c == C::METADATA) {
                 input->value(0);
             } else if (c == C::NEVER) {
@@ -243,7 +240,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
         }
 
         void reset() override {
-            auto &uris = container.peer->get_static_uris();
+            auto &uris = container.peer.get_static_uris();
             auto menu = input->menubutton();
             input->clear();
             menu->add("dynamic", 0, 0, 0, (uris.empty() ? FL_MENU_INACTIVE : 0));
@@ -306,7 +303,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
                     menu->add("static", 0, 0, 0, 0);
                     input->input()->deactivate();
                 } else {
-                    auto &uris = container.peer->get_static_uris();
+                    auto &uris = container.peer.get_static_uris();
                     auto value = format_urls(uris);
                     input->value(value.data());
                     input->input()->activate();
@@ -325,56 +322,21 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
     return new widget_t(container);
 }
 
-peer_device_t::peer_device_t(model::device_ptr_t peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree), model_sub(supervisor.add(this)), peer{std::move(peer_)} {
-    update_label();
+peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
+    : parent_t(supervisor, tree), peer{peer_} {
 
     auto unknown_folders = new unknown_folders_t(peer, supervisor, tree);
     add(prefs(), unknown_folders->label(), unknown_folders);
+
+    update_label();
 }
 
 void peer_device_t::update_label() {
-    auto name = peer->get_name();
-    auto id = peer->device_id().get_short();
+    auto name = peer.get_name();
+    auto id = peer.device_id().get_short();
     auto value = fmt::format("{}, {} [{}]", name, id, get_state());
     label(value.data());
     tree()->redraw();
-}
-
-void peer_device_t::operator()(model::message::model_update_t &update) {
-    std::ignore = update.payload.diff->visit(*this, nullptr);
-}
-
-void peer_device_t::operator()(model::message::contact_update_t &update) {
-    std::ignore = update.payload.diff->visit(*this, nullptr);
-}
-
-auto peer_device_t::operator()(const diff::contact::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
-    if (diff.peer_id == peer->device_id().get_sha256()) {
-        if (diff.state == model::device_state_t::online) {
-            peer_endpoint = diff.endpoint;
-        } else {
-            peer_endpoint.reset();
-        }
-        on_change();
-        update_label();
-    }
-    return outcome::success();
-}
-
-auto peer_device_t::operator()(const diff::modify::update_peer_t &diff, void *) noexcept -> outcome::result<void> {
-    if (diff.peer_id == peer->device_id().get_sha256()) {
-        on_change();
-        update_label();
-    }
-    return outcome::success();
-}
-
-auto peer_device_t::operator()(const diff::modify::remove_peer_t &diff, void *) noexcept -> outcome::result<void> {
-    if (diff.get_peer_sha256() == peer->device_id().get_sha256()) {
-        select_other();
-    }
-    return outcome::success();
 }
 
 bool peer_device_t::on_select() {
@@ -391,12 +353,13 @@ bool peer_device_t::on_select() {
 
         auto top = [&]() -> Fl_Widget * {
             auto data = table_rows_t();
+            auto &ep = peer.get_endpoint();
 
-            auto device_id = peer->device_id().get_value();
-            auto device_id_short = peer->device_id().get_short();
-            auto cert_name = peer->get_cert_name();
-            auto endpoint = peer_endpoint ? fmt::format("{}", peer_endpoint.value()) : "";
-            auto last_seen = peer_endpoint ? "now" : model::pt::to_simple_string(peer->get_last_seen());
+            auto device_id = peer.device_id().get_value();
+            auto device_id_short = peer.device_id().get_short();
+            auto cert_name = peer.get_cert_name();
+            auto endpoint = ep.port() ? fmt::format("{}", ep) : "";
+            auto last_seen = ep.port() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
 
             data.push_back({"name", record(make_name(*this))});
             data.push_back({"last_seen", last_seen});
@@ -404,6 +367,8 @@ bool peer_device_t::on_select() {
             data.push_back({"endpoint", endpoint});
             data.push_back({"state", get_state()});
             data.push_back({"cert name", cert_name.value_or("")});
+            data.push_back({"client name", std::string(peer.get_client_name())});
+            data.push_back({"client version", std::string(peer.get_client_version())});
             data.push_back({"device id (short)", std::string(device_id_short)});
             data.push_back({"device id", device_id});
             data.push_back({"introducer", record(make_introducer(*this))});
@@ -416,7 +381,7 @@ bool peer_device_t::on_select() {
             return content;
         }();
         auto bot = [&]() -> Fl_Widget * {
-            return new qr_button_t(peer->device_id(), supervisor, x, y + top->h(), w, bot_h);
+            return new qr_button_t(peer.device_id(), supervisor, x, y + top->h(), w, bot_h);
         }();
         group->add(top);
         group->add(bot);
@@ -432,7 +397,7 @@ widgetable_ptr_t peer_device_t::record(peer_widget_ptr_t widget) {
 }
 
 std::string peer_device_t::get_state() {
-    switch (peer->get_state()) {
+    switch (peer.get_state()) {
     case model::device_state_t::online:
         return "online";
     case model::device_state_t::discovering:
@@ -448,7 +413,7 @@ void peer_device_t::on_change() {
     if (!content) {
         return;
     }
-    auto initial_data = peer->serialize();
+    auto initial_data = peer.serialize();
     auto current = db::Device();
     auto ok = current.ParseFromArray(initial_data.data(), initial_data.size());
     assert(ok);
@@ -472,17 +437,21 @@ void peer_device_t::on_change() {
         if (rows[i].label == "state") {
             table.update_value(i, get_state());
         } else if (rows[i].label == "last_seen") {
-            auto last_seen = peer_endpoint ? "now" : model::pt::to_simple_string(peer->get_last_seen());
+            auto last_seen = peer.get_endpoint().port() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
             table.update_value(i, last_seen);
         } else if (rows[i].label == "endpoint") {
-            auto endpoint = peer_endpoint ? fmt::format("{}", *peer_endpoint) : "";
+            auto endpoint = peer.get_endpoint().port() ? fmt::format("{}", peer.get_endpoint()) : "";
             table.update_value(i, endpoint);
+        } else if (rows[i].label == "client name") {
+            table.update_value(i, std::string(peer.get_client_name()));
+        } else if (rows[i].label == "client version") {
+            table.update_value(i, std::string(peer.get_client_version()));
         }
     }
 }
 
 void peer_device_t::on_apply() {
-    auto data = peer->serialize();
+    auto data = peer.serialize();
     auto device = db::Device();
     auto ok = device.ParseFromArray(data.data(), data.size());
     assert(ok);
@@ -491,7 +460,7 @@ void peer_device_t::on_apply() {
         valid = valid && w->store(device);
     }
     if (valid) {
-        auto &device_id = peer->device_id();
+        auto &device_id = peer.device_id();
         auto &cluster = *supervisor.get_cluster();
         auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(device), device_id, cluster));
         supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
@@ -511,6 +480,19 @@ void peer_device_t::on_remove() {
         return;
     }
     auto &cluster = *supervisor.get_cluster();
-    auto diff = cluster_diff_ptr_t(new modify::remove_peer_t(cluster, *peer));
+    auto diff = cluster_diff_ptr_t(new modify::remove_peer_t(cluster, peer));
     supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
 }
+
+void peer_device_t::on_delete() {
+    select_other();
+    augmentation->release_onwer();
+    static_cast<devices_t *>(parent())->remove_peer(this);
+}
+
+void peer_device_t::on_update() {
+    on_change();
+    update_label();
+}
+
+tree_item_t *peer_device_t::get_unknown_folders() { return static_cast<tree_item_t *>(child(0)); }
