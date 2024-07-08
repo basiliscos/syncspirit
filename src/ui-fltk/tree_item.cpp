@@ -31,13 +31,11 @@ void tree_item_t::select_other() {
                 if (item->on_select()) {
                     t->select(prev, 0);
                     t->redraw();
-                    t->remove(this);
                     break;
                 }
             }
         }
     }
-    t->remove(this);
 }
 
 auto tree_item_t::get_proxy() -> augmentation_ptr_t { return augmentation; }
