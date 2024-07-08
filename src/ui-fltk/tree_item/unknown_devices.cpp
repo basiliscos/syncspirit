@@ -27,7 +27,7 @@ auto unknown_devices_t::add_device(model::unknown_device_t &device) -> augmentat
 }
 
 void unknown_devices_t::remove_device(tree_item_t *item) {
-    update_label();
     remove_child(item);
+    update_label();
     tree()->redraw();
 }

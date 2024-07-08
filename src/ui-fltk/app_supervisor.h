@@ -95,6 +95,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
 
     void set_devices(tree_item_t *devices);
     void set_unknown_devices(tree_item_t *devices);
+    void set_ignored_devices(tree_item_t *devices);
 
   private:
     using clock_t = std::chrono::high_resolution_clock;
@@ -108,6 +109,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_unknown_folders_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_unknown_device_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
 
     time_point_t started_at;
@@ -120,6 +122,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     Fl_Widget *content;
     tree_item_t *devices;
     tree_item_t *unkwnown_devices;
+    tree_item_t *ignored_devices;
 };
 
 } // namespace syncspirit::fltk

@@ -1,10 +1,12 @@
 #include "app_supervisor.h"
 #include "tree_item/devices.h"
+#include "tree_item/ignored_devices.h"
 #include "tree_item/peer_device.h"
 #include "tree_item/unknown_devices.h"
 #include "tree_item/unknown_folders.h"
 #include "net/names.h"
 #include "model/diff/peer/cluster_update.h"
+#include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_unknown_device.h"
 #include "model/diff/modify/add_unknown_folders.h"
 #include "model/diff/modify/update_peer.h"
@@ -22,7 +24,8 @@ r::plugin::resource_id_t model = 0;
 
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
-      app_config(std::move(config.app_config)), content{nullptr}, devices{nullptr}, unkwnown_devices{nullptr} {
+      app_config(std::move(config.app_config)), content{nullptr}, devices{nullptr}, unkwnown_devices{nullptr},
+      ignored_devices{nullptr} {
     started_at = clock_t::now();
 }
 
@@ -119,8 +122,8 @@ std::string app_supervisor_t::get_uptime() noexcept {
 auto app_supervisor_t::get_logger() noexcept -> utils::logger_t & { return log; }
 
 void app_supervisor_t::set_devices(tree_item_t *devices_) { devices = devices_; }
-
 void app_supervisor_t::set_unknown_devices(tree_item_t *devices_) { unkwnown_devices = devices_; }
+void app_supervisor_t::set_ignored_devices(tree_item_t *devices_) { ignored_devices = devices_; }
 
 auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &, void *) noexcept -> outcome::result<void> {
     auto devices_node = static_cast<tree_item::devices_t *>(devices);
@@ -142,6 +145,12 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &, voi
     for (auto &it : cluster->get_unknown_devices()) {
         auto &device = *it.item;
         device.set_augmentation(unknown_devices_node->add_device(device));
+    }
+
+    auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
+    for (auto &it : cluster->get_ignored_devices()) {
+        auto &device = *it.item;
+        device.set_augmentation(ignored_devices_node->add_device(device));
     }
 
     return outcome::success();
@@ -186,5 +195,13 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_device_
     auto &device = *cluster->get_unknown_devices().by_sha256(diff.device_id.get_sha256());
     auto unknown_devices_node = static_cast<tree_item::unknown_devices_t *>(unkwnown_devices);
     device.set_augmentation(unknown_devices_node->add_device(device));
+    return outcome::success();
+}
+
+auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_t &diff, void *) noexcept
+    -> outcome::result<void> {
+    auto &device = *cluster->get_ignored_devices().by_sha256(diff.device_id.get_sha256());
+    auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
+    device.set_augmentation(ignored_devices_node->add_device(device));
     return outcome::success();
 }

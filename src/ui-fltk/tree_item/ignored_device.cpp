@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
 #include "ignored_device.h"
+#include "ignored_devices.h"
 #include "model/diff/modify/remove_ignored_device.h"
 #include "model/diff/modify/update_peer.h"
 #include "../static_table.h"
@@ -49,14 +50,14 @@ static widgetable_ptr_t make_actions(ignored_device_t &container) {
     return new widget_t(container);
 }
 
-ignored_device_t::ignored_device_t(model::ignored_device_ptr_t device_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree), device{std::move(device_)} {
+ignored_device_t::ignored_device_t(model::ignored_device_t &device_, app_supervisor_t &supervisor, Fl_Tree *tree)
+    : parent_t(supervisor, tree), device{device_} {
     update_label();
 }
 
 void ignored_device_t::update_label() {
-    auto name = device->get_name();
-    auto id = device->get_device_id().get_short();
+    auto name = device.get_name();
+    auto id = device.get_device_id().get_short();
     auto value = fmt::format("{}, {}", name, id);
     label(value.data());
     tree()->redraw();
@@ -64,7 +65,7 @@ void ignored_device_t::update_label() {
 
 bool ignored_device_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-        auto &device_id = device->get_device_id();
+        auto &device_id = device.get_device_id();
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         int bot_h = 100;
@@ -76,13 +77,13 @@ bool ignored_device_t::on_select() {
         group->begin();
         auto top = [&]() -> Fl_Widget * {
             auto data = table_rows_t();
-            auto last_seen = model::pt::to_simple_string(device->get_last_seen());
-            data.push_back({"name", std::string(device->get_name())});
+            auto last_seen = model::pt::to_simple_string(device.get_last_seen());
+            data.push_back({"name", std::string(device.get_name())});
             data.push_back({"device id (short)", std::string(device_id.get_short())});
             data.push_back({"device id", std::string(device_id.get_value())});
-            data.push_back({"client", std::string(device->get_client_name())});
-            data.push_back({"client version", std::string(device->get_client_version())});
-            data.push_back({"address", std::string(device->get_address())});
+            data.push_back({"client", std::string(device.get_client_name())});
+            data.push_back({"client version", std::string(device.get_client_version())});
+            data.push_back({"address", std::string(device.get_address())});
             data.push_back({"last_seen", last_seen});
             data.push_back({"actions", make_actions(*this)});
             int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
@@ -105,15 +106,15 @@ void ignored_device_t::refresh() {
         auto &rows = table.get_rows();
         for (size_t i = 0; i < rows.size(); ++i) {
             if (rows[i].label == "name") {
-                table.update_value(i, std::string(device->get_name()));
+                table.update_value(i, std::string(device.get_name()));
             } else if (rows[i].label == "client") {
-                table.update_value(i, std::string(device->get_client_name()));
+                table.update_value(i, std::string(device.get_client_name()));
             } else if (rows[i].label == "client version") {
-                table.update_value(i, std::string(device->get_client_version()));
+                table.update_value(i, std::string(device.get_client_version()));
             } else if (rows[i].label == "address") {
-                table.update_value(i, std::string(device->get_address()));
+                table.update_value(i, std::string(device.get_address()));
             } else if (rows[i].label == "last_seen") {
-                auto last_seen = model::pt::to_simple_string(device->get_last_seen());
+                auto last_seen = model::pt::to_simple_string(device.get_last_seen());
                 table.update_value(i, last_seen);
             }
         }
@@ -123,16 +124,27 @@ void ignored_device_t::refresh() {
 
 void ignored_device_t::on_connect() {
     db::Device db_dev;
-    db_dev.set_name(std::string(device->get_name()));
+    db_dev.set_name(std::string(device.get_name()));
 
     auto diff = cluster_diff_ptr_t();
     auto &cluster = *supervisor.get_cluster();
-    diff = new modify::update_peer_t(std::move(db_dev), device->get_device_id(), cluster);
+    diff = new modify::update_peer_t(std::move(db_dev), device.get_device_id(), cluster);
     supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
 }
 
 void ignored_device_t::on_remove() {
     auto diff = cluster_diff_ptr_t{};
-    diff = new modify::remove_ignored_device_t(*device);
+    diff = new modify::remove_ignored_device_t(device);
     supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
+}
+
+void ignored_device_t::on_delete() {
+    select_other();
+    augmentation->release_onwer();
+    static_cast<ignored_devices_t *>(parent())->remove_device(this);
+}
+
+void ignored_device_t::on_update() {
+    update_label();
+    refresh();
 }

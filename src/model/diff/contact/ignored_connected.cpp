@@ -19,6 +19,7 @@ auto ignored_connected_t::apply_impl(cluster_t &cluster) const noexcept -> outco
         return make_error_code(error_code_t::no_such_device);
     }
     prev->assign(db_device);
+    prev->notify_update();
     return outcome::success();
 }
 
