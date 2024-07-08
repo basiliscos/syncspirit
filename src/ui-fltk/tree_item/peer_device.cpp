@@ -1,9 +1,7 @@
 #include "peer_device.h"
 #include "devices.h"
-
-#include "../qr_button.h"
 #include "unknown_folders.h"
-
+#include "../qr_button.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/update_peer.h"
 #include "utils/format.hpp"
