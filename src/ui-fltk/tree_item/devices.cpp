@@ -111,9 +111,8 @@ augmentation_ptr_t devices_t::add_peer(model::device_t &peer) {
     return within_tree([&]() { return insert_by_label(new peer_device_t(peer, supervisor, tree()), 1)->get_proxy(); });
 }
 
-void devices_t::remove_peer(tree_item_t *item) {
+void devices_t::remove_child(tree_item_t *child) {
+    parent_t::remove_child(child);
     --devices_count;
     update_label();
-    remove_child(item);
-    tree()->redraw();
 }

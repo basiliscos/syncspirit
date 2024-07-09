@@ -109,9 +109,10 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
         send<Payload>(coordinator, std::forward<Args>(args)...);
     }
 
-    void set_devices(tree_item_t *devices);
-    void set_unknown_devices(tree_item_t *devices);
-    void set_ignored_devices(tree_item_t *devices);
+    void set_devices(tree_item_t *node);
+    void set_folders(tree_item_t *node);
+    void set_unknown_devices(tree_item_t *node);
+    void set_ignored_devices(tree_item_t *node);
 
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
 
@@ -141,6 +142,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     model::cluster_ptr_t cluster;
     Fl_Widget *content;
     tree_item_t *devices;
+    tree_item_t *folders;
     tree_item_t *unkwnown_devices;
     tree_item_t *ignored_devices;
     db_info_viewer_t *db_info_viewer;

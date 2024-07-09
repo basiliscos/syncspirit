@@ -1,5 +1,6 @@
 #include "app_supervisor.h"
 #include "tree_item/devices.h"
+#include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
 #include "tree_item/peer_device.h"
 #include "tree_item/unknown_devices.h"
@@ -39,8 +40,8 @@ db_info_viewer_guard_t::~db_info_viewer_guard_t() {
 
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
-      app_config(std::move(config.app_config)), content{nullptr}, devices{nullptr}, unkwnown_devices{nullptr},
-      ignored_devices{nullptr}, db_info_viewer{nullptr} {
+      app_config(std::move(config.app_config)), content{nullptr}, devices{nullptr}, folders{nullptr},
+      unkwnown_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr} {
     started_at = clock_t::now();
 }
 
@@ -150,9 +151,10 @@ void app_supervisor_t::on_db_info_response(net::message::db_info_response_t &res
 }
 
 auto app_supervisor_t::get_logger() noexcept -> utils::logger_t & { return log; }
-void app_supervisor_t::set_devices(tree_item_t *devices_) { devices = devices_; }
-void app_supervisor_t::set_unknown_devices(tree_item_t *devices_) { unkwnown_devices = devices_; }
-void app_supervisor_t::set_ignored_devices(tree_item_t *devices_) { ignored_devices = devices_; }
+void app_supervisor_t::set_devices(tree_item_t *node) { devices = node; }
+void app_supervisor_t::set_folders(tree_item_t *node) { folders = node; }
+void app_supervisor_t::set_unknown_devices(tree_item_t *node) { unkwnown_devices = node; }
+void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices = node; }
 
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
     request<net::payload::db_info_request_t>(coordinator).send(init_timeout * 5 / 6);
@@ -186,6 +188,13 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &, voi
     for (auto &it : cluster->get_ignored_devices()) {
         auto &device = *it.item;
         device.set_augmentation(ignored_devices_node->add_device(device));
+    }
+
+    auto folders_node = static_cast<tree_item::folders_t *>(folders);
+    for (auto &it : cluster->get_folders()) {
+        auto &folder_infos = it.item->get_folder_infos();
+        auto folder_info = folder_infos.by_device(*self_device);
+        folder_info->set_augmentation(folders_node->add_folder(*folder_info));
     }
 
     return outcome::success();
