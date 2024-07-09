@@ -36,15 +36,19 @@ template <> inline auto &db_actor_t::access<env>() noexcept { return env; }
 namespace {
 
 struct fixture_t {
-    using msg_t = net::message::load_cluster_response_t;
-    using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
+    using load_msg_t = net::message::load_cluster_response_t;
+    using load_msg_ptr_t = r::intrusive_ptr_t<load_msg_t>;
+    using stats_msg_t = net::message::db_info_response_t;
+    using stats_msg_ptr_t = r::intrusive_ptr_t<stats_msg_t>;
 
     fixture_t() noexcept : root_path{bfs::unique_path()}, path_quard{root_path} { utils::set_default("trace"); }
 
     virtual supervisor_t::configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
-            plugin.template with_casted<r::plugin::starter_plugin_t>(
-                [&](auto &p) { p.subscribe_actor(r::lambda<msg_t>([&](msg_t &msg) { reply = &msg; })); });
+            plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+                p.subscribe_actor(r::lambda<load_msg_t>([&](load_msg_t &msg) { reply = &msg; }));
+                p.subscribe_actor(r::lambda<stats_msg_t>([&](stats_msg_t &msg) { stats_reply = &msg; }));
+            });
         };
     }
 
@@ -108,7 +112,8 @@ struct fixture_t {
     bfs::path root_path;
     path_guard_t path_quard;
     r::system_context_t ctx;
-    msg_ptr_t reply;
+    load_msg_ptr_t reply;
+    stats_msg_ptr_t stats_reply;
 };
 
 } // namespace
@@ -143,6 +148,13 @@ void test_loading_empty_db() {
             auto devices = cluster->get_devices();
             REQUIRE(devices.size() == 1);
             REQUIRE(devices.by_sha256(cluster->get_device()->device_id().get_sha256()));
+
+            sup->request<net::payload::db_info_request_t>(sup->get_address()).send(timeout);
+            sup->do_process();
+            REQUIRE(stats_reply);
+            auto &stats = stats_reply->payload.res;
+            CHECK(stats.entries > 0);
+            CHECK(stats.page_size > 0);
         }
     };
 

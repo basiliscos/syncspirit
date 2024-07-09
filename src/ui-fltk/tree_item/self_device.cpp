@@ -17,26 +17,66 @@
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-static void on_timeout(void *data) {
-    auto self = reinterpret_cast<self_device_t *>(data);
-    auto table = static_cast<syncspirit::fltk::static_table_t *>(self->content);
-    if (table) {
-        table->update_value(2, self->supervisor.get_uptime());
-        Fl::repeat_timeout(1.0, on_timeout, data);
-    }
-}
-
 namespace {
 
-struct my_table_t : static_table_t {
+static void on_uptime_timeout(void *data);
+static void on_db_refresh_timeout(void *data);
+
+struct self_table_t final : static_table_t, db_info_viewer_t {
     using parent_t = static_table_t;
-    my_table_t(void *timer_canceller_, table_rows_t &&rows, int x, int y, int w, int h)
-        : parent_t(std::move(rows), x, y, w, h), timer_canceller{timer_canceller_} {}
+    using db_info_t = syncspirit::net::payload::db_info_response_t;
 
-    ~my_table_t() { Fl::remove_timeout(on_timeout, timer_canceller); }
+    self_table_t(self_device_t *owner_, table_rows_t &&rows, int x, int y, int w, int h)
+        : parent_t(std::move(rows), x, y, w, h), owner{owner_}, db_info_guard(nullptr) {
+        update_db_info();
+        Fl::add_timeout(1.0, on_uptime_timeout, owner);
+        Fl::add_timeout(10.0, on_db_refresh_timeout, owner);
+    }
 
-    void *timer_canceller;
+    ~self_table_t() {
+        Fl::remove_timeout(on_uptime_timeout, owner);
+        Fl::remove_timeout(on_db_refresh_timeout, owner);
+    }
+
+    void update_db_info() { db_info_guard = owner->supervisor.request_db_info(this); }
+
+    void view(const db_info_t &info) override {
+        auto &rows = get_rows();
+        auto pages = info.leaf_pages + info.ms_branch_pages + info.overflow_pages;
+        auto size = pages * info.page_size / 1024;
+        for (size_t i = 0; i < rows.size(); ++i) {
+            if (rows[i].label == "mdbx entries") {
+                update_value(i, std::to_string(info.entries));
+            } else if (rows[i].label == "mdbx pages") {
+                update_value(i, std::to_string(pages));
+            } else if (rows[i].label == "mdbx size, Kb") {
+                update_value(i, std::to_string(size));
+            }
+        }
+        redraw();
+    }
+
+    self_device_t *owner;
+    db_info_viewer_guard_t db_info_guard;
 };
+
+static void on_uptime_timeout(void *data) {
+    auto self = reinterpret_cast<self_device_t *>(data);
+    auto table = static_cast<self_table_t *>(self->content);
+    if (table) {
+        table->update_value(2, self->supervisor.get_uptime());
+        table->redraw();
+        Fl::repeat_timeout(1.0, on_uptime_timeout, data);
+    }
+}
+static void on_db_refresh_timeout(void *data) {
+    auto self = reinterpret_cast<self_device_t *>(data);
+    auto table = static_cast<self_table_t *>(self->content);
+    if (table) {
+        table->update_db_info();
+        Fl::repeat_timeout(10.0, on_db_refresh_timeout, data);
+    }
+}
 
 } // namespace
 
@@ -98,6 +138,9 @@ bool self_device_t::on_select() {
             data.push_back({"device id (short)", device_id_short});
             data.push_back({"device id", device_id});
             data.push_back({"uptime", supervisor.get_uptime()});
+            data.push_back({"mdbx entries", ""});
+            data.push_back({"mdbx pages", ""});
+            data.push_back({"mdbx size, Kb", ""});
             data.push_back({"app version", fmt::format("{} {}", constants::client_name, constants::client_version)});
             data.push_back({"mdbx version", mbdx_version});
             data.push_back({"protobuf version", google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION)});
@@ -105,7 +148,7 @@ bool self_device_t::on_select() {
             data.push_back({"openssl version", openssl_version});
             data.push_back({"fltk version", fmt::format("{}", Fl::version())});
 
-            content = new my_table_t(this, std::move(data), x, y, w, h - bot_h);
+            content = new self_table_t(this, std::move(data), x, y, w, h - bot_h);
             return content;
         }();
         auto bot = [&]() -> Fl_Widget * {
@@ -117,6 +160,5 @@ bool self_device_t::on_select() {
         group->end();
         return group;
     });
-    Fl::add_timeout(1.0, on_timeout, this);
     return true;
 }

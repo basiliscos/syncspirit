@@ -160,6 +160,19 @@ struct transfer_pop_t {
     uint32_t bytes;
 };
 
+struct db_info_response_t {
+    uint32_t page_size;
+    uint32_t tree_depth;
+    uint64_t leaf_pages;
+    uint64_t overflow_pages;
+    uint64_t ms_branch_pages;
+    uint64_t entries;
+};
+
+struct db_info_request_t {
+    using response_t = db_info_response_t;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -190,6 +203,9 @@ using block_response_t = r::request_traits_t<payload::block_request_t>::response
 
 using connect_request_t = r::request_traits_t<payload::connect_request_t>::request::message_t;
 using connect_response_t = r::request_traits_t<payload::connect_request_t>::response::message_t;
+
+using db_info_request_t = r::request_traits_t<payload::db_info_request_t>::request::message_t;
+using db_info_response_t = r::request_traits_t<payload::db_info_request_t>::response::message_t;
 
 } // end of namespace message
 

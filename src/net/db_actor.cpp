@@ -98,6 +98,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&db_actor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&db_actor_t::on_contact_update, coordinator);
+                plugin->subscribe_actor(&db_actor_t::on_db_info, coordinator);
             }
         });
     });
@@ -214,6 +215,23 @@ void db_actor_t::shutdown_finish() noexcept {
     }
     env = nullptr;
     r::actor_base_t::shutdown_finish();
+}
+
+void db_actor_t::on_db_info(message::db_info_request_t &request) noexcept {
+    LOG_TRACE(log, "on_db_info");
+    MDBX_stat stat = {0};
+    auto r = mdbx_env_stat_ex(env, nullptr, &stat, sizeof(stat));
+    if (r != MDBX_SUCCESS) {
+        LOG_ERROR(log, "mdbx_env_stat_ex, mbdx error ({}): {}", r, mdbx_strerror(r));
+        auto ec = db::make_error_code(r);
+        return reply_with_error(request, make_error(ec));
+    }
+
+    payload::db_info_response_t info{
+        stat.ms_psize, stat.ms_depth, stat.ms_leaf_pages, stat.ms_overflow_pages, stat.ms_branch_pages, stat.ms_entries,
+    };
+
+    reply_to(request, info);
 }
 
 void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {

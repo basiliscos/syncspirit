@@ -11,6 +11,7 @@
 #include "model/diff/modify/add_unknown_folders.h"
 #include "model/diff/modify/update_peer.h"
 
+#include <utility>
 #include <sstream>
 #include <iomanip>
 
@@ -22,10 +23,24 @@ r::plugin::resource_id_t model = 0;
 }
 } // namespace
 
+db_info_viewer_guard_t::db_info_viewer_guard_t(app_supervisor_t *supervisor_) : supervisor{supervisor_} {}
+db_info_viewer_guard_t::db_info_viewer_guard_t(db_info_viewer_guard_t &&other) { *this = std::move(other); }
+
+db_info_viewer_guard_t &db_info_viewer_guard_t::operator=(db_info_viewer_guard_t &&other) {
+    std::swap(supervisor, other.supervisor);
+    return *this;
+}
+
+db_info_viewer_guard_t::~db_info_viewer_guard_t() {
+    if (supervisor) {
+        supervisor->db_info_viewer = nullptr;
+    }
+}
+
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
       app_config(std::move(config.app_config)), content{nullptr}, devices{nullptr}, unkwnown_devices{nullptr},
-      ignored_devices{nullptr} {
+      ignored_devices{nullptr}, db_info_viewer{nullptr} {
     started_at = clock_t::now();
 }
 
@@ -57,7 +72,11 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
 
     plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) { p.subscribe_actor(&app_supervisor_t::on_model_response); }, r::plugin::config_phase_t::PREINIT);
+        [&](auto &p) {
+            p.subscribe_actor(&app_supervisor_t::on_model_response);
+            p.subscribe_actor(&app_supervisor_t::on_db_info_response);
+        },
+        r::plugin::config_phase_t::PREINIT);
 }
 
 void app_supervisor_t::on_model_response(model::message::model_response_t &res) noexcept {
@@ -119,11 +138,27 @@ std::string app_supervisor_t::get_uptime() noexcept {
     return out.str();
 }
 
-auto app_supervisor_t::get_logger() noexcept -> utils::logger_t & { return log; }
+void app_supervisor_t::on_db_info_response(net::message::db_info_response_t &res) noexcept {
+    if (db_info_viewer) {
+        auto &ee = res.payload.ee;
+        if (ee) {
+            log->warn("error requesting db info: {}", ee->message());
+        } else {
+            db_info_viewer->view(res.payload.res);
+        }
+    }
+}
 
+auto app_supervisor_t::get_logger() noexcept -> utils::logger_t & { return log; }
 void app_supervisor_t::set_devices(tree_item_t *devices_) { devices = devices_; }
 void app_supervisor_t::set_unknown_devices(tree_item_t *devices_) { unkwnown_devices = devices_; }
 void app_supervisor_t::set_ignored_devices(tree_item_t *devices_) { ignored_devices = devices_; }
+
+auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
+    request<net::payload::db_info_request_t>(coordinator).send(init_timeout * 5 / 6);
+    db_info_viewer = viewer;
+    return db_info_viewer_guard_t(this);
+}
 
 auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &, void *) noexcept -> outcome::result<void> {
     auto devices_node = static_cast<tree_item::devices_t *>(devices);

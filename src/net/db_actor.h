@@ -70,6 +70,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t,
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
     void on_contact_update(model::message::contact_update_t &) noexcept;
+    void on_db_info(message::db_info_request_t &) noexcept;
 
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;

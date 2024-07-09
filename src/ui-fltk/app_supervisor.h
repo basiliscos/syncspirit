@@ -2,12 +2,12 @@
 
 #include "config/main.h"
 #include "utils/log.h"
+#include "net/messages.h"
 #include "model/messages.h"
 #include "model/diff/block_visitor.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/load/load_cluster.h"
 
-#include <set>
 #include <chrono>
 #include <rotor/fltk.hpp>
 #include <FL/Fl_Widget.H>
@@ -23,6 +23,22 @@ namespace outcome = boost::outcome_v2;
 
 struct app_supervisor_t;
 struct tree_item_t;
+
+struct db_info_viewer_t {
+    virtual void view(const net::payload::db_info_response_t &) = 0;
+};
+
+struct db_info_viewer_guard_t {
+    db_info_viewer_guard_t(app_supervisor_t *supervisor);
+    db_info_viewer_guard_t(const db_info_viewer_guard_t &) = delete;
+    db_info_viewer_guard_t(db_info_viewer_guard_t &&);
+
+    db_info_viewer_guard_t &operator=(db_info_viewer_guard_t &&);
+    ~db_info_viewer_guard_t();
+
+  private:
+    app_supervisor_t *supervisor;
+};
 
 struct app_supervisor_config_t : rf::supervisor_config_fltk_t {
     using parent_t = rf::supervisor_config_fltk_t;
@@ -97,13 +113,17 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void set_unknown_devices(tree_item_t *devices);
     void set_ignored_devices(tree_item_t *devices);
 
+    db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
+
   private:
     using clock_t = std::chrono::high_resolution_clock;
     using time_point_t = typename clock_t::time_point;
+
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_contact_update(model::message::contact_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
+    void on_db_info_response(net::message::db_info_response_t &res) noexcept;
 
     outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
@@ -123,6 +143,9 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     tree_item_t *devices;
     tree_item_t *unkwnown_devices;
     tree_item_t *ignored_devices;
+    db_info_viewer_t *db_info_viewer;
+
+    friend struct db_info_viewer_guard_t;
 };
 
 } // namespace syncspirit::fltk
