@@ -24,6 +24,7 @@ add_executable(syncspirit-fltk WIN32
     table_widget/base.cpp
     table_widget/checkbox.cpp
     tree_item/devices.cpp
+    tree_item/folder.cpp
     tree_item/folders.cpp
     tree_item/ignored_device.cpp
     tree_item/ignored_devices.cpp

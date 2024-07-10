@@ -1,4 +1,5 @@
 #include "folders.h"
+#include "folder.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model::diff;
@@ -19,10 +20,7 @@ void folders_t::update_label() {
 
 augmentation_ptr_t folders_t::add_folder(model::folder_info_t &folder_info) {
     auto augmentation = within_tree([&]() {
-        auto item = new tree_item_t(supervisor, tree(), true);
-        auto folder = folder_info.get_folder();
-        auto label = fmt::format("{}, {}", folder->get_id(), folder->get_label());
-        item->label(label.data());
+        auto item = new folder_t(folder_info, supervisor, tree());
         return insert_by_label(item)->get_proxy();
     });
     update_label();
