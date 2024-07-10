@@ -21,6 +21,8 @@ add_executable(syncspirit-fltk WIN32
     config/properties.cpp
     config/property.cpp
     config/table.cpp
+    table_widget/base.cpp
+    table_widget/checkbox.cpp
     tree_item/devices.cpp
     tree_item/folders.cpp
     tree_item/ignored_device.cpp

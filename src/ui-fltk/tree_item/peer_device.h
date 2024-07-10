@@ -5,7 +5,7 @@
 
 #include "model/device.h"
 #include "../tree_item.h"
-#include "../static_table.h"
+#include "../table_widget/base.h"
 #include <boost/asio.hpp>
 #include <vector>
 
@@ -13,26 +13,13 @@ namespace syncspirit::fltk::tree_item {
 
 struct peer_device_t : tree_item_t {
     using parent_t = tree_item_t;
+    using widgetable_ptr_t = table_widget::table_widget_ptr_t;
 
-    struct peer_widget_t : widgetable_t {
-        using parent_t = widgetable_t;
-        peer_widget_t(peer_device_t &container);
-
-        Fl_Widget *get_widget() override;
-        virtual void reset();
-        virtual bool store(db::Device &device);
-
-        Fl_Widget *widget = nullptr;
-        peer_device_t &container;
-    };
-
-    using peer_widget_ptr_t = boost::intrusive_ptr<peer_widget_t>;
-
-    using widgets_t = std::vector<peer_widget_ptr_t>;
+    using widgets_t = std::vector<widgetable_ptr_t>;
     peer_device_t(model::device_t &peer, app_supervisor_t &supervisor, Fl_Tree *tree);
 
     const model::device_t &get_device() const;
-    widgetable_ptr_t record(peer_widget_ptr_t);
+    widgetable_ptr_t record(widgetable_ptr_t);
     std::string get_state();
     void update_label() override;
     void refresh_content() override;

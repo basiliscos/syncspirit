@@ -1,6 +1,7 @@
 #include "peer_device.h"
 #include "unknown_folders.h"
 #include "../qr_button.h"
+#include "../table_widget/checkbox.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/update_peer.h"
 #include "utils/format.hpp"
@@ -22,37 +23,21 @@ static constexpr int padding = 2;
 
 static std::string format_urls(const utils::uri_container_t &uris) { return fmt::format("{}", fmt::join(uris, ",")); }
 
-peer_device_t::peer_widget_t::peer_widget_t(peer_device_t &container_) : container{container_} {}
-Fl_Widget *peer_device_t::peer_widget_t::get_widget() { return widget; }
-void peer_device_t::peer_widget_t::reset() {}
-bool peer_device_t::peer_widget_t::store(db::Device &) { return true; }
-
-struct checkbox_widget_t : peer_device_t::peer_widget_t {
-    using parent_t = peer_widget_t;
+struct checkbox_widget_t : table_widget::checkbox_t {
+    using parent_t = table_widget::checkbox_t;
     using parent_t::parent_t;
 
     Fl_Widget *create_widget(int x, int y, int w, int h) override {
-        auto group = new Fl_Group(x, y, w, h);
-        group->begin();
-        group->box(FL_FLAT_BOX);
-        auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
-
-        input = new Fl_Check_Button(x + padding, yy, ww, hh);
+        auto r = parent_t::create_widget(x, y, w, h);
         input->callback([](auto, void *data) { reinterpret_cast<peer_device_t *>(data)->refresh_content(); },
                         &container);
-
-        group->end();
-        widget = group;
-        reset();
-        return widget;
+        return r;
     }
-
-    mutable Fl_Check_Button *input;
 };
 
-static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
-    struct widget_t final : peer_device_t::peer_widget_t {
-        using parent_t = peer_widget_t;
+static peer_device_t::widgetable_ptr_t make_actions(peer_device_t &container) {
+    struct widget_t final : table_widget::base_t {
+        using parent_t = table_widget::base_t;
         using parent_t::parent_t;
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
@@ -74,6 +59,7 @@ static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
             remove->callback([](auto, void *data) { static_cast<peer_device_t *>(data)->on_remove(); }, &container);
 
             this->reset();
+            auto &container = static_cast<peer_device_t &>(this->container);
             container.apply_button = apply;
             container.reset_button = reset;
             return widget;
@@ -83,9 +69,9 @@ static peer_device_t::peer_widget_ptr_t make_actions(peer_device_t &container) {
     return new widget_t(container);
 }
 
-static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
-    struct widget_t final : peer_device_t::peer_widget_t {
-        using parent_t = peer_widget_t;
+static peer_device_t::widgetable_ptr_t make_name(peer_device_t &container) {
+    struct widget_t final : table_widget::base_t {
+        using parent_t = table_widget::base_t;
         using parent_t::parent_t;
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
@@ -108,9 +94,13 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
             return widget;
         }
 
-        void reset() override { input->value(container.peer.get_name().data()); }
+        void reset() override {
+            auto &container = static_cast<peer_device_t &>(this->container);
+            input->value(container.peer.get_name().data());
+        }
 
-        bool store(db::Device &device) override {
+        bool store(void *data) override {
+            auto &device = *reinterpret_cast<db::Device *>(data);
             device.set_name(input->value());
             return true;
         };
@@ -121,14 +111,18 @@ static peer_device_t::peer_widget_ptr_t make_name(peer_device_t &container) {
     return new widget_t(container);
 }
 
-static peer_device_t::peer_widget_ptr_t make_introducer(peer_device_t &container) {
+static peer_device_t::widgetable_ptr_t make_introducer(peer_device_t &container) {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
-        void reset() override { input->value(container.peer.is_introducer()); }
+        void reset() override {
+            auto &container = static_cast<peer_device_t &>(this->container);
+            input->value(container.peer.is_introducer());
+        }
 
-        bool store(db::Device &device) override {
+        bool store(void *data) override {
+            auto &device = *reinterpret_cast<db::Device *>(data);
             device.set_introducer(input->value());
             return true;
         };
@@ -137,13 +131,18 @@ static peer_device_t::peer_widget_ptr_t make_introducer(peer_device_t &container
     return new widget_t(container);
 }
 
-static peer_device_t::peer_widget_ptr_t make_auto_accept(peer_device_t &container) {
+static peer_device_t::widgetable_ptr_t make_auto_accept(peer_device_t &container) {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
-        void reset() override { input->value(container.peer.has_auto_accept()); }
-        bool store(db::Device &device) override {
+        void reset() override {
+            auto &container = static_cast<peer_device_t &>(this->container);
+            input->value(container.peer.has_auto_accept());
+        }
+
+        bool store(void *data) override {
+            auto &device = *reinterpret_cast<db::Device *>(data);
             device.set_auto_accept(input->value());
             return true;
         };
@@ -152,13 +151,18 @@ static peer_device_t::peer_widget_ptr_t make_auto_accept(peer_device_t &containe
     return new widget_t(container);
 }
 
-static peer_device_t::peer_widget_ptr_t make_paused(peer_device_t &container) {
+static peer_device_t::widgetable_ptr_t make_paused(peer_device_t &container) {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
-        void reset() override { input->value(container.peer.is_paused()); }
-        bool store(db::Device &device) override {
+        void reset() override {
+            auto &container = static_cast<peer_device_t &>(this->container);
+            input->value(container.peer.is_paused());
+        }
+
+        bool store(void *data) override {
+            auto &device = *reinterpret_cast<db::Device *>(data);
             device.set_paused(input->value());
             return true;
         };
@@ -167,7 +171,7 @@ static peer_device_t::peer_widget_ptr_t make_paused(peer_device_t &container) {
     return new widget_t(container);
 }
 
-static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &container) {
+static peer_device_t::widgetable_ptr_t make_compressions(peer_device_t &container) {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -196,6 +200,7 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
         }
 
         void reset() override {
+            auto &container = static_cast<peer_device_t &>(this->container);
             using C = proto::Compression;
             auto c = container.peer.get_compression();
             if (c == C::METADATA) {
@@ -207,7 +212,8 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
             }
         }
 
-        bool store(db::Device &device) override {
+        bool store(void *data) override {
+            auto &device = *reinterpret_cast<db::Device *>(data);
             device.set_compression(static_cast<proto::Compression>(input->value()));
             return true;
         };
@@ -218,9 +224,9 @@ static peer_device_t::peer_widget_ptr_t make_compressions(peer_device_t &contain
     return new widget_t(container);
 }
 
-static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container) {
-    struct widget_t final : peer_device_t::peer_widget_t {
-        using parent_t = peer_widget_t;
+static peer_device_t::widgetable_ptr_t make_addresses(peer_device_t &container) {
+    struct widget_t final : table_widget::base_t {
+        using parent_t = table_widget::base_t;
         using parent_t::parent_t;
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
@@ -242,6 +248,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
         }
 
         void reset() override {
+            auto &container = static_cast<peer_device_t &>(this->container);
             auto &uris = container.peer.get_static_uris();
             auto menu = input->menubutton();
             input->clear();
@@ -261,7 +268,8 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
             }
         }
 
-        bool store(db::Device &device) override {
+        bool store(void *data) override {
+            auto &device = *reinterpret_cast<db::Device *>(data);
             device.clear_addresses();
             if (input->input()->active() == 0) {
                 return true;
@@ -297,6 +305,7 @@ static peer_device_t::peer_widget_ptr_t make_addresses(peer_device_t &container)
 
         void on_change() {
             auto menu = input->menubutton();
+            auto &container = static_cast<peer_device_t &>(this->container);
             if (menu->changed()) {
                 if (menu->value() == 0) {
                     input->value("dynamic");
@@ -393,7 +402,7 @@ bool peer_device_t::on_select() {
     return true;
 }
 
-widgetable_ptr_t peer_device_t::record(peer_widget_ptr_t widget) {
+auto peer_device_t::record(widgetable_ptr_t widget) -> widgetable_ptr_t {
     widgets.push_back(widget);
     return widget;
 }
@@ -421,7 +430,7 @@ void peer_device_t::refresh_content() {
     assert(ok);
     bool valid = true;
     for (auto &w : widgets) {
-        valid = valid && w->store(current);
+        valid = valid && w->store(&current);
     }
     auto current_data = current.SerializeAsString();
     if (initial_data != current_data) {
@@ -459,7 +468,7 @@ void peer_device_t::on_apply() {
     assert(ok);
     bool valid = true;
     for (auto &w : widgets) {
-        valid = valid && w->store(device);
+        valid = valid && w->store(&device);
     }
     if (valid) {
         auto &device_id = peer.device_id();
