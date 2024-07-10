@@ -41,6 +41,7 @@ static_table_t::static_table_t(table_rows_t &&rows_, int x, int y, int w, int h)
     set_visible_focus();
     rows(table_rows.size());
     create_widgets();
+    resize(x, y, w, h);
 }
 
 void static_table_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {
@@ -101,7 +102,6 @@ void static_table_t::resize(int x, int y, int w, int h) {
     col_width(0, col_widths.w1);
     col_width(1, col_widths.w2);
     init_sizes();
-    redraw();
 }
 
 auto static_table_t::calc_col_widths() -> col_sizes_t {
@@ -119,7 +119,9 @@ auto static_table_t::calc_col_widths() -> col_sizes_t {
     auto w = tiw;
     auto delta = w - (r.w1 + r.w2);
     if (r.w1 + r.w2 < w) {
-        r.w1 += delta * (double(r.w1_min) / r.w2_min);
+        auto tmp_w1_1 = r.w1 + static_cast<int>(delta * (double(r.w1_min) / r.w2_min));
+        auto tmp_w1_2 = r.w1_min * 3 / 2;
+        r.w1 = std::min(tmp_w1_1, tmp_w1_2);
         r.w2 = w - r.w1;
     }
     r.invalid = r.w1_min == PADDING * 2;

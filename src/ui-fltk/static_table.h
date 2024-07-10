@@ -9,8 +9,6 @@
 #include <vector>
 #include <utility>
 #include <variant>
-#include <functional>
-#include <memory>
 
 namespace syncspirit::fltk {
 
