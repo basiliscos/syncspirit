@@ -14,6 +14,7 @@ struct folder_t : tree_item_t {
 
     bool on_select() override;
     void update_label() override;
+    void refresh_content() override;
 
     table_widget::table_widget_ptr_t record(table_widget::table_widget_ptr_t);
     void on_remove();

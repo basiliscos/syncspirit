@@ -12,24 +12,25 @@ static constexpr int padding = 2;
 
 namespace {
 
-struct checkbox_widget_t final : table_widget::checkbox_t {
-    using parent_t = table_widget::checkbox_t;
+struct serialiazation_context_t {
+    db::Folder folder;
+    db::FolderInfo folder_info;
+};
 
-    checkbox_widget_t(folder_t &container, bool value_) : parent_t(container), value{value_} {}
+struct checkbox_widget_t : table_widget::checkbox_t {
+    using parent_t = table_widget::checkbox_t;
+    using parent_t::parent_t;
 
     Fl_Widget *create_widget(int x, int y, int w, int h) override {
         auto r = parent_t::create_widget(x, y, w, h);
-        input->deactivate();
-        input->value(value ? 1 : 0);
+        input->callback([](auto, void *data) { reinterpret_cast<folder_t *>(data)->refresh_content(); }, &container);
         return r;
     }
-
-    bool value;
 };
 
 inline auto static make_read_only(folder_t &container) -> table_widget::table_widget_ptr_t {
-    struct widget_t final : table_widget::checkbox_t {
-        using parent_t = table_widget::checkbox_t;
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
         void reset() override {
@@ -41,8 +42,8 @@ inline auto static make_read_only(folder_t &container) -> table_widget::table_wi
 }
 
 inline auto static make_ignore_permissions(folder_t &container) -> table_widget::table_widget_ptr_t {
-    struct widget_t final : table_widget::checkbox_t {
-        using parent_t = table_widget::checkbox_t;
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
         void reset() override {
@@ -54,8 +55,8 @@ inline auto static make_ignore_permissions(folder_t &container) -> table_widget:
 }
 
 inline auto static make_ignore_delete(folder_t &container) -> table_widget::table_widget_ptr_t {
-    struct widget_t final : table_widget::checkbox_t {
-        using parent_t = table_widget::checkbox_t;
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
         void reset() override {
@@ -67,8 +68,8 @@ inline auto static make_ignore_delete(folder_t &container) -> table_widget::tabl
 }
 
 inline auto static make_disable_tmp(folder_t &container) -> table_widget::table_widget_ptr_t {
-    struct widget_t final : table_widget::checkbox_t {
-        using parent_t = table_widget::checkbox_t;
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
         void reset() override {
@@ -80,8 +81,8 @@ inline auto static make_disable_tmp(folder_t &container) -> table_widget::table_
 }
 
 inline auto static make_paused(folder_t &container) -> table_widget::table_widget_ptr_t {
-    struct widget_t final : table_widget::checkbox_t {
-        using parent_t = table_widget::checkbox_t;
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
         void reset() override {
@@ -140,6 +141,37 @@ void folder_t::update_label() {
     tree()->redraw();
 }
 
+void folder_t::refresh_content() {
+    if (!content) {
+        return;
+    }
+
+    serialiazation_context_t ctx;
+    auto folder = folder_info.get_folder();
+    folder->serialize(ctx.folder);
+    folder_info.serialize(ctx.folder_info);
+
+    auto folder_data = ctx.folder.SerializeAsString();
+    auto folder_info_data = ctx.folder_info.SerializeAsString();
+
+    bool valid = true;
+    for (auto &w : widgets) {
+        valid = valid && w->store(&ctx);
+    }
+
+    auto is_same =
+        (folder_data == ctx.folder.SerializeAsString()) && (folder_info_data == ctx.folder_info.SerializeAsString());
+    if (!is_same) {
+        if (valid) {
+            apply_button->activate();
+        }
+        reset_button->activate();
+    } else {
+        apply_button->deactivate();
+        reset_button->deactivate();
+    }
+}
+
 bool folder_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
         auto data = table_rows_t();
@@ -160,9 +192,10 @@ bool folder_t::on_select() {
         data.push_back({"actions", record(make_actions(*this))});
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        auto content = new static_table_t(std::move(data), x, y, w, h);
+        content = new static_table_t(std::move(data), x, y, w, h);
         return content;
     });
+    refresh_content();
     return true;
 }
 

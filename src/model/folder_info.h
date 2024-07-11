@@ -43,6 +43,7 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     bool operator!=(const folder_info_t &other) const noexcept { return !(*this == other); }
 
     void add(const file_info_ptr_t &file_info, bool inc_max_sequence) noexcept;
+    void serialize(db::FolderInfo &storage) noexcept;
     std::string serialize() noexcept;
 
     inline std::uint64_t get_index() const noexcept { return index; }

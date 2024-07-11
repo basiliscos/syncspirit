@@ -36,6 +36,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     void assign_cluster(const cluster_ptr_t &cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
     std::string serialize() noexcept;
+    using folder_data_t::serialize;
 
     bool operator==(const folder_t &other) const noexcept { return get_id() == other.get_id(); }
     bool operator!=(const folder_t &other) const noexcept { return !(*this == other); }
