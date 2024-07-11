@@ -8,6 +8,8 @@ using namespace model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
+static constexpr int padding = 2;
+
 namespace {
 
 struct checkbox_widget_t final : table_widget::checkbox_t {
@@ -25,14 +27,109 @@ struct checkbox_widget_t final : table_widget::checkbox_t {
     bool value;
 };
 
-inline auto static make_checkbox(folder_t &container, bool value) -> widgetable_ptr_t {
-    return new checkbox_widget_t(container, value);
+inline auto static make_read_only(folder_t &container) -> table_widget::table_widget_ptr_t {
+    struct widget_t final : table_widget::checkbox_t {
+        using parent_t = table_widget::checkbox_t;
+        using parent_t::parent_t;
+
+        void reset() override {
+            auto &container = static_cast<folder_t &>(this->container);
+            input->value(container.folder_info.get_folder()->is_read_only());
+        }
+    };
+    return new widget_t(container);
+}
+
+inline auto static make_ignore_permissions(folder_t &container) -> table_widget::table_widget_ptr_t {
+    struct widget_t final : table_widget::checkbox_t {
+        using parent_t = table_widget::checkbox_t;
+        using parent_t::parent_t;
+
+        void reset() override {
+            auto &container = static_cast<folder_t &>(this->container);
+            input->value(container.folder_info.get_folder()->are_permissions_ignored());
+        }
+    };
+    return new widget_t(container);
+}
+
+inline auto static make_ignore_delete(folder_t &container) -> table_widget::table_widget_ptr_t {
+    struct widget_t final : table_widget::checkbox_t {
+        using parent_t = table_widget::checkbox_t;
+        using parent_t::parent_t;
+
+        void reset() override {
+            auto &container = static_cast<folder_t &>(this->container);
+            input->value(container.folder_info.get_folder()->is_deletion_ignored());
+        }
+    };
+    return new widget_t(container);
+}
+
+inline auto static make_disable_tmp(folder_t &container) -> table_widget::table_widget_ptr_t {
+    struct widget_t final : table_widget::checkbox_t {
+        using parent_t = table_widget::checkbox_t;
+        using parent_t::parent_t;
+
+        void reset() override {
+            auto &container = static_cast<folder_t &>(this->container);
+            input->value(container.folder_info.get_folder()->are_temp_indixes_disabled());
+        }
+    };
+    return new widget_t(container);
+}
+
+inline auto static make_paused(folder_t &container) -> table_widget::table_widget_ptr_t {
+    struct widget_t final : table_widget::checkbox_t {
+        using parent_t = table_widget::checkbox_t;
+        using parent_t::parent_t;
+
+        void reset() override {
+            auto &container = static_cast<folder_t &>(this->container);
+            input->value(container.folder_info.get_folder()->is_paused());
+        }
+    };
+    return new widget_t(container);
+}
+
+inline auto static make_actions(folder_t &container) -> table_widget::table_widget_ptr_t {
+    struct widget_t final : table_widget::base_t {
+        using parent_t = table_widget::base_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto group = new Fl_Group(x, y, w, h);
+            group->begin();
+            group->box(FL_FLAT_BOX);
+            auto yy = y + padding, ww = 100, hh = h - padding * 2;
+            auto apply = new Fl_Button(x + padding, yy, ww, hh, "apply");
+            auto reset = new Fl_Button(apply->x() + ww + padding * 2, yy, ww, hh, "reset");
+            auto remove = new Fl_Button(reset->x() + ww + padding * 2, yy, ww, hh, "remove");
+            apply->deactivate();
+            reset->deactivate();
+            remove->color(FL_RED);
+            group->end();
+            widget = group;
+
+            apply->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_apply(); }, &container);
+            reset->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_reset(); }, &container);
+            remove->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_remove(); }, &container);
+
+            this->reset();
+            auto &container = static_cast<folder_t &>(this->container);
+            container.apply_button = apply;
+            container.reset_button = reset;
+            return widget;
+        }
+    };
+
+    return new widget_t(container);
 }
 
 } // namespace
 
 folder_t::folder_t(model::folder_info_t &folder_info_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree, true), folder_info{folder_info_} {
+    : parent_t(supervisor, tree, true), folder_info{folder_info_}, apply_button{nullptr}, reset_button{nullptr} {
     update_label();
 }
 
@@ -48,21 +145,39 @@ bool folder_t::on_select() {
         auto data = table_rows_t();
         auto f = folder_info.get_folder();
         auto entries = folder_info.get_file_infos().size();
+
         data.push_back({"path", f->get_path().string()});
         data.push_back({"id", std::string(f->get_id())});
         data.push_back({"label", std::string(f->get_label())});
         data.push_back({"entries", std::to_string(entries)});
         data.push_back({"index", std::to_string(folder_info.get_index())});
         data.push_back({"max sequence", std::to_string(folder_info.get_max_sequence())});
-        data.push_back({"read only", make_checkbox(*this, f->is_read_only())});
-        data.push_back({"ignore permissions", make_checkbox(*this, f->are_permissions_ignored())});
-        data.push_back({"ignore delete", make_checkbox(*this, f->is_deletion_ignored())});
-        data.push_back({"disable temp indixes", make_checkbox(*this, f->are_temp_indixes_disabled())});
-        data.push_back({"paused", make_checkbox(*this, f->is_paused())});
+        data.push_back({"read only", record(make_read_only(*this))});
+        data.push_back({"ignore permissions", record(make_ignore_permissions(*this))});
+        data.push_back({"ignore delete", record(make_ignore_delete(*this))});
+        data.push_back({"disable temp indixes", record(make_disable_tmp(*this))});
+        data.push_back({"paused", record(make_paused(*this))});
+        data.push_back({"actions", record(make_actions(*this))});
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         auto content = new static_table_t(std::move(data), x, y, w, h);
         return content;
     });
     return true;
+}
+
+auto folder_t::record(table_widget::table_widget_ptr_t widget) -> table_widget::table_widget_ptr_t {
+    widgets.push_back(widget);
+    return widget;
+}
+
+void folder_t::on_remove() {}
+
+void folder_t::on_apply() {}
+
+void folder_t::on_reset() {
+    for (auto &w : widgets) {
+        w->reset();
+    }
+    refresh_content();
 }

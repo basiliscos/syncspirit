@@ -6,7 +6,6 @@
 #include "model/device.h"
 #include "../tree_item.h"
 #include "../table_widget/base.h"
-#include <boost/asio.hpp>
 #include <vector>
 
 namespace syncspirit::fltk::tree_item {

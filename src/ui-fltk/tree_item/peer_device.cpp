@@ -6,6 +6,8 @@
 #include "model/diff/modify/update_peer.h"
 #include "utils/format.hpp"
 
+#include <boost/asio.hpp>
+
 #include <FL/Fl_Tile.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Input.H>
