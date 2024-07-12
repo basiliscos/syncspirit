@@ -7,6 +7,7 @@
 #include "utils/format.hpp"
 
 #include <boost/asio.hpp>
+#include <vector>
 
 #include <FL/Fl_Tile.H>
 #include <FL/Fl_Button.H>
@@ -14,16 +15,22 @@
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Input_Choice.H>
-#include "FL/fl_ask.H"
+#include <FL/fl_ask.H>
 
 using namespace syncspirit;
 using namespace model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
+using widgets_t = std::vector<table_widget::table_widget_ptr_t>;
+
 static constexpr int padding = 2;
 
 static std::string format_urls(const utils::uri_container_t &uris) { return fmt::format("{}", fmt::join(uris, ",")); }
+
+namespace {
+
+using widgetable_ptr_t = table_widget::table_widget_ptr_t;
 
 struct checkbox_widget_t : table_widget::checkbox_t {
     using parent_t = table_widget::checkbox_t;
@@ -37,7 +44,7 @@ struct checkbox_widget_t : table_widget::checkbox_t {
     }
 };
 
-static peer_device_t::widgetable_ptr_t make_actions(peer_device_t &container) {
+static widgetable_ptr_t make_actions(peer_device_t &container) {
     struct widget_t final : table_widget::base_t {
         using parent_t = table_widget::base_t;
         using parent_t::parent_t;
@@ -71,7 +78,7 @@ static peer_device_t::widgetable_ptr_t make_actions(peer_device_t &container) {
     return new widget_t(container);
 }
 
-static peer_device_t::widgetable_ptr_t make_name(peer_device_t &container) {
+static widgetable_ptr_t make_name(peer_device_t &container) {
     struct widget_t final : table_widget::base_t {
         using parent_t = table_widget::base_t;
         using parent_t::parent_t;
@@ -113,7 +120,7 @@ static peer_device_t::widgetable_ptr_t make_name(peer_device_t &container) {
     return new widget_t(container);
 }
 
-static peer_device_t::widgetable_ptr_t make_introducer(peer_device_t &container) {
+static widgetable_ptr_t make_introducer(peer_device_t &container) {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -133,7 +140,7 @@ static peer_device_t::widgetable_ptr_t make_introducer(peer_device_t &container)
     return new widget_t(container);
 }
 
-static peer_device_t::widgetable_ptr_t make_auto_accept(peer_device_t &container) {
+static widgetable_ptr_t make_auto_accept(peer_device_t &container) {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -153,7 +160,7 @@ static peer_device_t::widgetable_ptr_t make_auto_accept(peer_device_t &container
     return new widget_t(container);
 }
 
-static peer_device_t::widgetable_ptr_t make_paused(peer_device_t &container) {
+static widgetable_ptr_t make_paused(peer_device_t &container) {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -173,7 +180,7 @@ static peer_device_t::widgetable_ptr_t make_paused(peer_device_t &container) {
     return new widget_t(container);
 }
 
-static peer_device_t::widgetable_ptr_t make_compressions(peer_device_t &container) {
+static widgetable_ptr_t make_compressions(peer_device_t &container) {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -226,7 +233,7 @@ static peer_device_t::widgetable_ptr_t make_compressions(peer_device_t &containe
     return new widget_t(container);
 }
 
-static peer_device_t::widgetable_ptr_t make_addresses(peer_device_t &container) {
+static widgetable_ptr_t make_addresses(peer_device_t &container) {
     struct widget_t final : table_widget::base_t {
         using parent_t = table_widget::base_t;
         using parent_t::parent_t;
@@ -331,9 +338,36 @@ static peer_device_t::widgetable_ptr_t make_addresses(peer_device_t &container) 
 
         mutable Fl_Input_Choice *input;
     };
-
     return new widget_t(container);
 }
+
+struct my_table_t final : static_table_t {
+    using parent_t = static_table_t;
+    using widgets_t = std::vector<table_widget::table_widget_ptr_t>;
+
+    my_table_t(widgets_t widgets_, table_rows_t &&rows, int x, int y, int w, int h)
+        : parent_t(std::move(rows), x, y, w, h), widgets{std::move(widgets_)} {
+        reset();
+    }
+
+    void reset() {
+        for (auto &w : widgets) {
+            w->reset();
+        }
+    }
+
+    bool store(void *data) {
+        bool valid = true;
+        for (auto &w : widgets) {
+            valid = valid && w->store(data);
+        }
+        return valid;
+    }
+
+    widgets_t widgets;
+};
+
+} // namespace
 
 peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), peer{peer_} {
@@ -354,7 +388,6 @@ void peer_device_t::update_label() {
 
 bool peer_device_t::on_select() {
     supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-        widgets.clear();
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         int bot_h = 100;
 
@@ -374,6 +407,12 @@ bool peer_device_t::on_select() {
             auto endpoint = ep.port() ? fmt::format("{}", ep) : "";
             auto last_seen = ep.port() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
 
+            auto widgets = my_table_t::widgets_t{};
+            auto record = [&](table_widget::table_widget_ptr_t widget) -> table_widget::table_widget_ptr_t {
+                widgets.push_back(widget);
+                return widget;
+            };
+
             data.push_back({"name", record(make_name(*this))});
             data.push_back({"last_seen", last_seen});
             data.push_back({"addresses", record(make_addresses(*this))});
@@ -390,7 +429,7 @@ bool peer_device_t::on_select() {
             data.push_back({"compression", record(make_compressions(*this))});
 
             data.push_back({"actions", record(make_actions(*this))});
-            content = new static_table_t(std::move(data), x, y, w, h - bot_h);
+            content = new my_table_t(std::move(widgets), std::move(data), x, y, w, h - bot_h);
             return content;
         }();
         auto bot = [&]() -> Fl_Widget * {
@@ -402,11 +441,6 @@ bool peer_device_t::on_select() {
         return group;
     });
     return true;
-}
-
-auto peer_device_t::record(widgetable_ptr_t widget) -> widgetable_ptr_t {
-    widgets.push_back(widget);
-    return widget;
 }
 
 std::string peer_device_t::get_state() {
@@ -430,10 +464,8 @@ void peer_device_t::refresh_content() {
     auto current = db::Device();
     auto ok = current.ParseFromArray(initial_data.data(), initial_data.size());
     assert(ok);
-    bool valid = true;
-    for (auto &w : widgets) {
-        valid = valid && w->store(&current);
-    }
+    auto valid = static_cast<my_table_t *>(content)->store(&current);
+
     auto current_data = current.SerializeAsString();
     if (initial_data != current_data) {
         if (valid) {
@@ -468,10 +500,7 @@ void peer_device_t::on_apply() {
     auto device = db::Device();
     auto ok = device.ParseFromArray(data.data(), data.size());
     assert(ok);
-    bool valid = true;
-    for (auto &w : widgets) {
-        valid = valid && w->store(&device);
-    }
+    auto valid = static_cast<my_table_t *>(content)->store(&device);
     if (valid) {
         auto &device_id = peer.device_id();
         auto &cluster = *supervisor.get_cluster();
@@ -481,9 +510,7 @@ void peer_device_t::on_apply() {
 }
 
 void peer_device_t::on_reset() {
-    for (auto &w : widgets) {
-        w->reset();
-    }
+    static_cast<my_table_t *>(content)->reset();
     refresh_content();
 }
 
