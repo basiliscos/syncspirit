@@ -1,6 +1,7 @@
 #include "folder.h"
 
 #include "../table_widget/checkbox.h"
+#include "../table_widget/choice.h"
 #include "../table_widget/input.h"
 #include <spdlog/fmt/fmt.h>
 
@@ -51,6 +52,40 @@ inline auto static make_label(folder_t &container) -> table_widget::table_widget
         bool store(void *data) override {
             auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
             ctx->folder.set_label(input->value());
+            return true;
+        }
+    };
+    return new widget_t(container);
+}
+
+inline auto static make_folder_type(folder_t &container) -> table_widget::table_widget_ptr_t {
+    struct widget_t final : table_widget::choice_t {
+        using parent_t = table_widget::choice_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            input->size(200, r->h());
+            input->callback([](auto, void *data) { reinterpret_cast<folder_t *>(data)->refresh_content(); },
+                            &container);
+            input->when(input->when() | FL_WHEN_CHANGED);
+            input->add("Send and Receive");
+            input->add("Send only");
+            input->add("Receive only");
+            return r;
+        }
+
+        void reset() override {
+            auto &container = static_cast<folder_t &>(this->container);
+            auto value = container.folder_info.get_folder()->get_folder_type();
+            input->value(static_cast<int>(value));
+        }
+
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+            auto value = (db::FolderType)(input->value());
+
+            ctx->folder.set_folder_type(value);
             return true;
         }
     };
@@ -239,6 +274,7 @@ bool folder_t::on_select() {
         data.push_back({"path", f->get_path().string()});
         data.push_back({"id", std::string(f->get_id())});
         data.push_back({"label", record(make_label(*this))});
+        data.push_back({"type", record(make_folder_type(*this))});
         data.push_back({"entries", std::to_string(entries)});
         data.push_back({"index", std::to_string(folder_info.get_index())});
         data.push_back({"max sequence", std::to_string(folder_info.get_max_sequence())});

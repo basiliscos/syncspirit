@@ -10,7 +10,7 @@ void folder_data_t::assign_fields(const db::Folder &item) noexcept {
     id = item.id();
     label = item.label();
     path = item.path();
-    folder_type = (foldet_type_t)item.folder_type();
+    folder_type = (folder_type_t)item.folder_type();
     rescan_interval = item.rescan_interval();
     pull_order = (pull_order_t)item.pull_order();
     watched = item.watched();

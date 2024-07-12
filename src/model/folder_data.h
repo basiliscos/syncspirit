@@ -13,7 +13,7 @@ namespace syncspirit::model {
 namespace bfs = boost::filesystem;
 
 struct SYNCSPIRIT_API folder_data_t {
-    enum class foldet_type_t { send = 0, receive, send_and_receive };
+    enum class folder_type_t { send = 0, receive, send_and_receive };
     enum class pull_order_t { random = 0, alphabetic, largest, oldest, newest };
 
     inline const std::string &get_label() noexcept { return label; }
@@ -23,6 +23,7 @@ struct SYNCSPIRIT_API folder_data_t {
     inline bool are_permissions_ignored() const noexcept { return ignore_permissions; }
     inline bool are_temp_indixes_disabled() const noexcept { return disable_temp_indixes; }
     inline bool is_paused() const noexcept { return paused; }
+    inline folder_type_t get_folder_type() const noexcept { return folder_type; }
 
   protected:
     inline const bfs::path &get_path() noexcept { return path; }
@@ -33,7 +34,7 @@ struct SYNCSPIRIT_API folder_data_t {
     std::string id;
     std::string label;
     bfs::path path;
-    foldet_type_t folder_type;
+    folder_type_t folder_type;
     std::uint32_t rescan_interval;
     pull_order_t pull_order;
     bool watched;
