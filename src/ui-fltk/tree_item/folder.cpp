@@ -37,6 +37,12 @@ inline auto static make_read_only(folder_t &container) -> table_widget::table_wi
             auto &container = static_cast<folder_t &>(this->container);
             input->value(container.folder_info.get_folder()->is_read_only());
         }
+
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+            ctx->folder.set_read_only(input->value());
+            return true;
+        }
     };
     return new widget_t(container);
 }
@@ -49,6 +55,12 @@ inline auto static make_ignore_permissions(folder_t &container) -> table_widget:
         void reset() override {
             auto &container = static_cast<folder_t &>(this->container);
             input->value(container.folder_info.get_folder()->are_permissions_ignored());
+        }
+
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+            ctx->folder.set_ignore_permissions(input->value());
+            return true;
         }
     };
     return new widget_t(container);
@@ -63,6 +75,11 @@ inline auto static make_ignore_delete(folder_t &container) -> table_widget::tabl
             auto &container = static_cast<folder_t &>(this->container);
             input->value(container.folder_info.get_folder()->is_deletion_ignored());
         }
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+            ctx->folder.set_ignore_delete(input->value());
+            return true;
+        }
     };
     return new widget_t(container);
 }
@@ -76,6 +93,11 @@ inline auto static make_disable_tmp(folder_t &container) -> table_widget::table_
             auto &container = static_cast<folder_t &>(this->container);
             input->value(container.folder_info.get_folder()->are_temp_indixes_disabled());
         }
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+            ctx->folder.set_disable_temp_indexes(input->value());
+            return true;
+        }
     };
     return new widget_t(container);
 }
@@ -88,6 +110,11 @@ inline auto static make_paused(folder_t &container) -> table_widget::table_widge
         void reset() override {
             auto &container = static_cast<folder_t &>(this->container);
             input->value(container.folder_info.get_folder()->is_paused());
+        }
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+            ctx->folder.set_paused(input->value());
+            return true;
         }
     };
     return new widget_t(container);
@@ -148,8 +175,8 @@ void folder_t::refresh_content() {
 
     serialiazation_context_t ctx;
     auto folder = folder_info.get_folder();
-    folder->serialize(ctx.folder);
     folder_info.serialize(ctx.folder_info);
+    folder->serialize(ctx.folder);
 
     auto folder_data = ctx.folder.SerializeAsString();
     auto folder_info_data = ctx.folder_info.SerializeAsString();
@@ -193,6 +220,11 @@ bool folder_t::on_select() {
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         content = new static_table_t(std::move(data), x, y, w, h);
+
+        for (auto &w : widgets) {
+            w->reset();
+        }
+
         return content;
     });
     refresh_content();
