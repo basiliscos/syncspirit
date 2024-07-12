@@ -23,6 +23,7 @@ add_executable(syncspirit-fltk WIN32
     config/table.cpp
     table_widget/base.cpp
     table_widget/checkbox.cpp
+    table_widget/input.cpp
     tree_item/devices.cpp
     tree_item/folder.cpp
     tree_item/folders.cpp
