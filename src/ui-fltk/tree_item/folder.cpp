@@ -92,6 +92,43 @@ inline auto static make_folder_type(folder_t &container) -> table_widget::table_
     return new widget_t(container);
 }
 
+inline auto static make_pull_order(folder_t &container) -> table_widget::table_widget_ptr_t {
+    struct widget_t final : table_widget::choice_t {
+        using parent_t = table_widget::choice_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            input->size(200, r->h());
+            input->callback([](auto, void *data) { reinterpret_cast<folder_t *>(data)->refresh_content(); },
+                            &container);
+            input->when(input->when() | FL_WHEN_CHANGED);
+            input->add("random");
+            input->add("alphabetic");
+            input->add("smallest first");
+            input->add("largest first");
+            input->add("oldest first");
+            input->add("newest first");
+            return r;
+        }
+
+        void reset() override {
+            auto &container = static_cast<folder_t &>(this->container);
+            auto value = container.folder_info.get_folder()->get_pull_order();
+            input->value(static_cast<int>(value));
+        }
+
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+            auto value = (db::PullOrder)(input->value());
+
+            ctx->folder.set_pull_order(value);
+            return true;
+        }
+    };
+    return new widget_t(container);
+}
+
 inline auto static make_read_only(folder_t &container) -> table_widget::table_widget_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
@@ -275,6 +312,7 @@ bool folder_t::on_select() {
         data.push_back({"id", std::string(f->get_id())});
         data.push_back({"label", record(make_label(*this))});
         data.push_back({"type", record(make_folder_type(*this))});
+        data.push_back({"pull order", record(make_pull_order(*this))});
         data.push_back({"entries", std::to_string(entries)});
         data.push_back({"index", std::to_string(folder_info.get_index())});
         data.push_back({"max sequence", std::to_string(folder_info.get_max_sequence())});

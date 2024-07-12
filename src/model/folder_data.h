@@ -14,7 +14,7 @@ namespace bfs = boost::filesystem;
 
 struct SYNCSPIRIT_API folder_data_t {
     enum class folder_type_t { send = 0, receive, send_and_receive };
-    enum class pull_order_t { random = 0, alphabetic, largest, oldest, newest };
+    enum class pull_order_t { random = 0, alphabetic, smallest, largest, oldest, newest };
 
     inline const std::string &get_label() noexcept { return label; }
     inline std::string_view get_id() const noexcept { return id; }
@@ -24,6 +24,7 @@ struct SYNCSPIRIT_API folder_data_t {
     inline bool are_temp_indixes_disabled() const noexcept { return disable_temp_indixes; }
     inline bool is_paused() const noexcept { return paused; }
     inline folder_type_t get_folder_type() const noexcept { return folder_type; }
+    inline pull_order_t get_pull_order() const noexcept { return pull_order; }
 
   protected:
     inline const bfs::path &get_path() noexcept { return path; }
