@@ -17,9 +17,11 @@ struct folder_t : tree_item_t {
     void refresh_content() override;
 
     table_widget::table_widget_ptr_t record(table_widget::table_widget_ptr_t);
+
     void on_remove();
     void on_apply();
     void on_reset();
+    void on_rescan();
 
     model::folder_info_t &folder_info;
     widgets_t widgets;

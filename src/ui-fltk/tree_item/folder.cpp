@@ -162,6 +162,7 @@ inline auto static make_actions(folder_t &container) -> table_widget::table_widg
             auto apply = new Fl_Button(x + padding, yy, ww, hh, "apply");
             auto reset = new Fl_Button(apply->x() + ww + padding * 2, yy, ww, hh, "reset");
             auto remove = new Fl_Button(reset->x() + ww + padding * 2, yy, ww, hh, "remove");
+            auto rescan = new Fl_Button(remove->x() + ww + padding * 2, yy, ww, hh, "rescan");
             apply->deactivate();
             reset->deactivate();
             remove->color(FL_RED);
@@ -171,6 +172,7 @@ inline auto static make_actions(folder_t &container) -> table_widget::table_widg
             apply->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_apply(); }, &container);
             reset->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_reset(); }, &container);
             remove->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_remove(); }, &container);
+            rescan->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_rescan(); }, &container);
 
             this->reset();
             auto &container = static_cast<folder_t &>(this->container);
@@ -268,6 +270,8 @@ auto folder_t::record(table_widget::table_widget_ptr_t widget) -> table_widget::
 void folder_t::on_remove() {}
 
 void folder_t::on_apply() {}
+
+void folder_t::on_rescan() {}
 
 void folder_t::on_reset() {
     for (auto &w : widgets) {
