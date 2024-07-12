@@ -3,6 +3,7 @@
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
+#include <vector>
 #include <spdlog/fmt/fmt.h>
 
 using namespace syncspirit;
@@ -257,6 +258,32 @@ inline auto static make_actions(folder_t &container) -> table_widget::table_widg
     return new widget_t(container);
 }
 
+struct my_table_t final : static_table_t {
+    using parent_t = static_table_t;
+    using widgets_t = std::vector<table_widget::table_widget_ptr_t>;
+
+    my_table_t(widgets_t widgets_, table_rows_t &&rows, int x, int y, int w, int h)
+        : parent_t(std::move(rows), x, y, w, h), widgets{std::move(widgets_)} {
+        reset();
+    }
+
+    void reset() {
+        for (auto &w : widgets) {
+            w->reset();
+        }
+    }
+
+    bool store(serialiazation_context_t &ctx) {
+        bool valid = true;
+        for (auto &w : widgets) {
+            valid = valid && w->store(&ctx);
+        }
+        return valid;
+    }
+
+    widgets_t widgets;
+};
+
 } // namespace
 
 folder_t::folder_t(model::folder_info_t &folder_info_, app_supervisor_t &supervisor, Fl_Tree *tree)
@@ -283,11 +310,7 @@ void folder_t::refresh_content() {
 
     auto folder_data = ctx.folder.SerializeAsString();
     auto folder_info_data = ctx.folder_info.SerializeAsString();
-
-    bool valid = true;
-    for (auto &w : widgets) {
-        valid = valid && w->store(&ctx);
-    }
+    auto valid = static_cast<my_table_t *>(content)->store(ctx);
 
     auto is_same =
         (folder_data == ctx.folder.SerializeAsString()) && (folder_info_data == ctx.folder_info.SerializeAsString());
@@ -308,6 +331,12 @@ bool folder_t::on_select() {
         auto f = folder_info.get_folder();
         auto entries = folder_info.get_file_infos().size();
 
+        auto widgets = my_table_t::widgets_t{};
+        auto record = [&](table_widget::table_widget_ptr_t widget) -> table_widget::table_widget_ptr_t {
+            widgets.push_back(widget);
+            return widget;
+        };
+
         data.push_back({"path", f->get_path().string()});
         data.push_back({"id", std::string(f->get_id())});
         data.push_back({"label", record(make_label(*this))});
@@ -324,21 +353,11 @@ bool folder_t::on_select() {
         data.push_back({"actions", record(make_actions(*this))});
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        content = new static_table_t(std::move(data), x, y, w, h);
-
-        for (auto &w : widgets) {
-            w->reset();
-        }
-
+        content = new my_table_t(std::move(widgets), std::move(data), x, y, w, h);
         return content;
     });
     refresh_content();
     return true;
-}
-
-auto folder_t::record(table_widget::table_widget_ptr_t widget) -> table_widget::table_widget_ptr_t {
-    widgets.push_back(widget);
-    return widget;
 }
 
 void folder_t::on_remove() {}
@@ -348,8 +367,6 @@ void folder_t::on_apply() {}
 void folder_t::on_rescan() {}
 
 void folder_t::on_reset() {
-    for (auto &w : widgets) {
-        w->reset();
-    }
+    static_cast<my_table_t *>(content)->reset();
     refresh_content();
 }
