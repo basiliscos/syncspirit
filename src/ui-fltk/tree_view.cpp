@@ -13,10 +13,14 @@ static void tree_view_callback(Fl_Widget *w, void *data) {
     auto item = static_cast<tree_item_t *>(tree->callback_item());
     switch (tree->callback_reason()) {
     case FL_TREE_REASON_SELECTED:
-        item->on_select();
+        if (tree->current != item) {
+            tree->current = item;
+            item->on_select();
+        }
         break;
     case FL_TREE_REASON_DESELECTED:
         item->on_desect();
+        tree->current = nullptr;
         break;
         /*
       case FL_TREE_REASON_RESELECTED: [..]
@@ -27,7 +31,7 @@ static void tree_view_callback(Fl_Widget *w, void *data) {
 }
 
 tree_view_t::tree_view_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), supervisor{supervisor_} {
+    : parent_t(x, y, w, h), supervisor{supervisor_}, current{nullptr} {
 
     showroot(false);
     auto folders_node = new tree_item::folders_t(supervisor, this);

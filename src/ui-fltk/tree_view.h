@@ -10,6 +10,7 @@ struct tree_view_t : Fl_Tree {
     tree_view_t(app_supervisor_t &supervisor, int x, int y, int w, int h);
 
     app_supervisor_t &supervisor;
+    Fl_Tree_Item *current;
 };
 
 } // namespace syncspirit::fltk
