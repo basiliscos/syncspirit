@@ -61,6 +61,7 @@ struct static_table_t : Fl_Table_Row {
     table_rows_t &get_rows();
     virtual void reset();
     virtual bool store(void *);
+    void remove_row(widgetable_t &);
 
   private:
     void create_widgets();

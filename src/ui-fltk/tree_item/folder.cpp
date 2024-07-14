@@ -240,8 +240,20 @@ inline auto static make_shared_with(folder_t &container, model::device_t &device
             auto add = new Fl_Button(input->x() + input->w() + padding * 2, yy, hh, hh, "@+");
             auto remove = new Fl_Button(add->x() + add->w() + padding * 2, yy, hh, hh, "@undo");
 
-            add->callback([](auto, void *data) { reinterpret_cast<folder_t *>(data)->on_add_share(); }, &container);
-            add->callback([](auto, void *data) { reinterpret_cast<folder_t *>(data)->on_add_share(); }, &container);
+            add->callback(
+                [](auto, void *data) {
+                    auto self = reinterpret_cast<widget_t *>(data);
+                    auto &container = static_cast<folder_t &>(self->container);
+                    container.on_add_share(*self);
+                },
+                this);
+            remove->callback(
+                [](auto, void *data) {
+                    auto self = reinterpret_cast<widget_t *>(data);
+                    auto &container = static_cast<folder_t &>(self->container);
+                    container.on_remove_share(*self);
+                },
+                this);
 
             group->end();
             group->resizable(nullptr);
@@ -408,6 +420,9 @@ void folder_t::on_reset() {
     refresh_content();
 }
 
-void folder_t::on_add_share() {}
+void folder_t::on_add_share(widgetable_t &) {}
 
-void folder_t::on_remove_share() {}
+void folder_t::on_remove_share(widgetable_t &item) {
+    static_cast<static_table_t *>(content)->remove_row(item);
+    refresh_content();
+}

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../tree_item.h"
+#include "../static_table.h"
 
 namespace syncspirit::fltk::tree_item {
 
@@ -17,8 +18,9 @@ struct folder_t : tree_item_t {
     void on_apply();
     void on_reset();
     void on_rescan();
-    void on_add_share();
-    void on_remove_share();
+
+    void on_add_share(widgetable_t &);
+    void on_remove_share(widgetable_t &);
 
     model::folder_info_t &folder_info;
     Fl_Widget *apply_button;

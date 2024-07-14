@@ -279,3 +279,30 @@ bool static_table_t::store(void *data) {
     }
     return ok;
 }
+
+void static_table_t::remove_row(widgetable_t &item) {
+    int index = -1;
+    for (int i = 0; i < static_cast<int>(table_rows.size()); ++i) {
+        auto &row = table_rows[i];
+        auto widget = std::get_if<widgetable_ptr_t>(&row.value);
+        if (widget && widget->get() == &item) {
+            index = i;
+            break;
+        }
+    }
+    if (index >= 0) {
+        if (index != static_cast<int>(table_rows.size()) - 1) {
+            for (int j = index + 1; j < static_cast<int>(table_rows.size()); ++j) {
+                table_rows[j - 1] = std::move(table_rows[j]);
+                int xx, yy, ww, hh;
+                find_cell(CONTEXT_TABLE, j - 1, 1, xx, yy, ww, hh);
+                auto &value = table_rows[j - 1].value;
+                std::visit([&](auto &arg) { resize_value(arg, xx, yy, ww, hh); }, value);
+            }
+        }
+        auto it = table_rows.cbegin() + table_rows.size() - 1;
+        table_rows.erase(it);
+        rows(table_rows.size());
+        redraw();
+    }
+}
