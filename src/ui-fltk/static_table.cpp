@@ -280,16 +280,19 @@ bool static_table_t::store(void *data) {
     return ok;
 }
 
-void static_table_t::remove_row(widgetable_t &item) {
-    int index = -1;
+int static_table_t::find_row(const widgetable_t &item) {
     for (int i = 0; i < static_cast<int>(table_rows.size()); ++i) {
         auto &row = table_rows[i];
         auto widget = std::get_if<widgetable_ptr_t>(&row.value);
         if (widget && widget->get() == &item) {
-            index = i;
-            break;
+            return i;
         }
     }
+    return -1;
+}
+
+void static_table_t::remove_row(widgetable_t &item) {
+    int index = find_row(item);
     if (index >= 0) {
         if (index != static_cast<int>(table_rows.size()) - 1) {
             for (int j = index + 1; j < static_cast<int>(table_rows.size()); ++j) {
