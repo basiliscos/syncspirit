@@ -33,13 +33,3 @@ void ignored_devices_t::remove_device(tree_item_t *item) {
     update_label();
     tree()->redraw();
 }
-
-#if 0
-auto ignored_devices_t::operator()(const diff::modify::add_ignored_device_t &diff, void *) noexcept
-    -> outcome::result<void> {
-    auto &ignored_devices = supervisor.get_cluster()->get_ignored_devices();
-    auto peer = ignored_devices.by_sha256(diff.device_id.get_sha256());
-    add_device(peer);
-    return outcome::success();
-}
-#endif

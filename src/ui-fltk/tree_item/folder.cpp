@@ -320,32 +320,6 @@ inline auto static make_actions(folder_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-struct my_table_t final : static_table_t {
-    using parent_t = static_table_t;
-    using widgets_t = std::vector<widgetable_ptr_t>;
-
-    my_table_t(widgets_t widgets_, table_rows_t &&rows, int x, int y, int w, int h)
-        : parent_t(std::move(rows), x, y, w, h), widgets{std::move(widgets_)} {
-        reset();
-    }
-
-    void reset() {
-        for (auto &w : widgets) {
-            w->reset();
-        }
-    }
-
-    bool store(serialiazation_context_t &ctx) {
-        bool valid = true;
-        for (auto &w : widgets) {
-            valid = valid && w->store(&ctx);
-        }
-        return valid;
-    }
-
-    widgets_t widgets;
-};
-
 } // namespace
 
 folder_t::folder_t(model::folder_info_t &folder_info_, app_supervisor_t &supervisor, Fl_Tree *tree)
@@ -372,7 +346,7 @@ void folder_t::refresh_content() {
 
     auto folder_data = ctx.folder.SerializeAsString();
     auto folder_info_data = ctx.folder_info.SerializeAsString();
-    auto valid = static_cast<my_table_t *>(content)->store(ctx);
+    auto valid = static_cast<static_table_t *>(content)->store(&ctx);
 
     auto is_same =
         (folder_data == ctx.folder.SerializeAsString()) && (folder_info_data == ctx.folder_info.SerializeAsString());
@@ -393,36 +367,30 @@ bool folder_t::on_select() {
         auto f = folder_info.get_folder();
         auto entries = folder_info.get_file_infos().size();
 
-        auto widgets = my_table_t::widgets_t{};
-        auto record = [&](widgetable_ptr_t widget) -> widgetable_ptr_t {
-            widgets.push_back(widget);
-            return widget;
-        };
-
         data.push_back({"path", f->get_path().string()});
         data.push_back({"id", std::string(f->get_id())});
-        data.push_back({"label", record(make_label(*this))});
-        data.push_back({"type", record(make_folder_type(*this))});
-        data.push_back({"pull order", record(make_pull_order(*this))});
+        data.push_back({"label", make_label(*this)});
+        data.push_back({"type", make_folder_type(*this)});
+        data.push_back({"pull order", make_pull_order(*this)});
         data.push_back({"entries", std::to_string(entries)});
         data.push_back({"index", std::to_string(folder_info.get_index())});
         data.push_back({"max sequence", std::to_string(folder_info.get_max_sequence())});
-        data.push_back({"read only", record(make_read_only(*this))});
-        data.push_back({"ignore permissions", record(make_ignore_permissions(*this))});
-        data.push_back({"ignore delete", record(make_ignore_delete(*this))});
-        data.push_back({"disable temp indixes", record(make_disable_tmp(*this))});
-        data.push_back({"paused", record(make_paused(*this))});
+        data.push_back({"read only", make_read_only(*this)});
+        data.push_back({"ignore permissions", make_ignore_permissions(*this)});
+        data.push_back({"ignore delete", make_ignore_delete(*this)});
+        data.push_back({"disable temp indixes", make_disable_tmp(*this)});
+        data.push_back({"paused", make_paused(*this)});
 
         auto cluster = supervisor.get_cluster();
         for (auto it : cluster->get_devices()) {
             if (it.item != cluster->get_device()) {
-                data.push_back({"shared_with", record(make_shared_with(*this, *it.item))});
+                data.push_back({"shared_with", make_shared_with(*this, *it.item)});
             }
         }
-        data.push_back({"actions", record(make_actions(*this))});
+        data.push_back({"actions", make_actions(*this)});
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        content = new my_table_t(std::move(widgets), std::move(data), x, y, w, h);
+        content = new static_table_t(std::move(data), x, y, w, h);
         return content;
     });
     refresh_content();
@@ -436,7 +404,7 @@ void folder_t::on_apply() {}
 void folder_t::on_rescan() {}
 
 void folder_t::on_reset() {
-    static_cast<my_table_t *>(content)->reset();
+    static_cast<static_table_t *>(content)->reset();
     refresh_content();
 }
 

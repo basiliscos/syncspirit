@@ -27,6 +27,12 @@ static void resize_value(widgetable_ptr_t &widget, int x, int y, int w, int h) {
     };
 }
 
+static void reset_widget(std::string &) {}
+static void reset_widget(widgetable_ptr_t &widget) { widget->reset(); }
+
+static bool store_widget(std::string &, void *) { return true; }
+static bool store_widget(widgetable_ptr_t &widget, void *data) { return widget->store(data); }
+
 static int handle_value(const std::string &, int) { return 0; }
 static int handle_value(widgetable_ptr_t &widget, int event) {
     auto impl = widget->get_widget();
@@ -49,6 +55,7 @@ static_table_t::static_table_t(table_rows_t &&rows_, int x, int y, int w, int h)
     set_visible_focus();
     rows(table_rows.size());
     create_widgets();
+    reset();
     resize(x, y, w, h);
 }
 
@@ -255,4 +262,20 @@ void static_table_t::make_widget(const widgetable_ptr_t &w, int row) {
     find_cell(CONTEXT_TABLE, row, 1, xx, yy, ww, hh);
     auto backend = w->create_widget(xx, yy, ww, hh);
     add(backend);
+}
+
+void static_table_t::reset() {
+    for (int i = 0; i < static_cast<int>(table_rows.size()); ++i) {
+        auto &row = table_rows[i];
+        std::visit([&](auto &arg) { reset_widget(arg); }, row.value);
+    }
+}
+
+bool static_table_t::store(void *data) {
+    bool ok = true;
+    for (int i = 0; ok && i < static_cast<int>(table_rows.size()); ++i) {
+        auto &row = table_rows[i];
+        ok = std::visit([&](auto &arg) { return store_widget(arg, data); }, row.value);
+    }
+    return ok;
 }

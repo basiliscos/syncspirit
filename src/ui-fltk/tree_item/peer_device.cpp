@@ -341,32 +341,6 @@ static widgetable_ptr_t make_addresses(peer_device_t &container) {
     return new widget_t(container);
 }
 
-struct my_table_t final : static_table_t {
-    using parent_t = static_table_t;
-    using widgets_t = std::vector<widgetable_ptr_t>;
-
-    my_table_t(widgets_t widgets_, table_rows_t &&rows, int x, int y, int w, int h)
-        : parent_t(std::move(rows), x, y, w, h), widgets{std::move(widgets_)} {
-        reset();
-    }
-
-    void reset() {
-        for (auto &w : widgets) {
-            w->reset();
-        }
-    }
-
-    bool store(void *data) {
-        bool valid = true;
-        for (auto &w : widgets) {
-            valid = valid && w->store(data);
-        }
-        return valid;
-    }
-
-    widgets_t widgets;
-};
-
 } // namespace
 
 peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
@@ -407,15 +381,9 @@ bool peer_device_t::on_select() {
             auto endpoint = ep.port() ? fmt::format("{}", ep) : "";
             auto last_seen = ep.port() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
 
-            auto widgets = my_table_t::widgets_t{};
-            auto record = [&](widgetable_ptr_t widget) -> widgetable_ptr_t {
-                widgets.push_back(widget);
-                return widget;
-            };
-
-            data.push_back({"name", record(make_name(*this))});
+            data.push_back({"name", make_name(*this)});
             data.push_back({"last_seen", last_seen});
-            data.push_back({"addresses", record(make_addresses(*this))});
+            data.push_back({"addresses", make_addresses(*this)});
             data.push_back({"endpoint", endpoint});
             data.push_back({"state", get_state()});
             data.push_back({"cert name", cert_name.value_or("")});
@@ -423,13 +391,13 @@ bool peer_device_t::on_select() {
             data.push_back({"client version", std::string(peer.get_client_version())});
             data.push_back({"device id (short)", std::string(device_id_short)});
             data.push_back({"device id", device_id});
-            data.push_back({"introducer", record(make_introducer(*this))});
-            data.push_back({"auto accept", record(make_auto_accept(*this))});
-            data.push_back({"paused", record(make_paused(*this))});
-            data.push_back({"compression", record(make_compressions(*this))});
+            data.push_back({"introducer", make_introducer(*this)});
+            data.push_back({"auto accept", make_auto_accept(*this)});
+            data.push_back({"paused", make_paused(*this)});
+            data.push_back({"compression", make_compressions(*this)});
 
-            data.push_back({"actions", record(make_actions(*this))});
-            content = new my_table_t(std::move(widgets), std::move(data), x, y, w, h - bot_h);
+            data.push_back({"actions", make_actions(*this)});
+            content = new static_table_t(std::move(data), x, y, w, h - bot_h);
             return content;
         }();
         auto bot = [&]() -> Fl_Widget * {
@@ -464,7 +432,7 @@ void peer_device_t::refresh_content() {
     auto current = db::Device();
     auto ok = current.ParseFromArray(initial_data.data(), initial_data.size());
     assert(ok);
-    auto valid = static_cast<my_table_t *>(content)->store(&current);
+    auto valid = static_cast<static_table_t *>(content)->store(&current);
 
     auto current_data = current.SerializeAsString();
     if (initial_data != current_data) {
@@ -500,7 +468,7 @@ void peer_device_t::on_apply() {
     auto device = db::Device();
     auto ok = device.ParseFromArray(data.data(), data.size());
     assert(ok);
-    auto valid = static_cast<my_table_t *>(content)->store(&device);
+    auto valid = static_cast<static_table_t *>(content)->store(&device);
     if (valid) {
         auto &device_id = peer.device_id();
         auto &cluster = *supervisor.get_cluster();
@@ -510,7 +478,7 @@ void peer_device_t::on_apply() {
 }
 
 void peer_device_t::on_reset() {
-    static_cast<my_table_t *>(content)->reset();
+    static_cast<static_table_t *>(content)->reset();
     refresh_content();
 }
 
