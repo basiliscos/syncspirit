@@ -21,7 +21,7 @@ static constexpr int padding = 2;
 static widgetable_ptr_t make_actions(ignored_device_t &container) {
     struct widget_t final : widgetable_t {
         using parent_t = widgetable_t;
-        widget_t(ignored_device_t &container_) : widget{nullptr}, container{container_} {}
+        widget_t(ignored_device_t &container_) : parent_t(container_) {}
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto group = new Fl_Group(x, y, w, h);
@@ -40,10 +40,6 @@ static widgetable_ptr_t make_actions(ignored_device_t &container) {
             widget = group;
             return widget;
         }
-        Fl_Widget *get_widget() override { return widget; };
-
-        Fl_Widget *widget;
-        ignored_device_t &container;
     };
 
     return new widget_t(container);

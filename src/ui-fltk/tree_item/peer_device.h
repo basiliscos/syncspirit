@@ -4,7 +4,7 @@
 #pragma once
 
 #include "model/device.h"
-#include "../table_widget/base.h"
+#include "../tree_item.h"
 
 namespace syncspirit::fltk::tree_item {
 

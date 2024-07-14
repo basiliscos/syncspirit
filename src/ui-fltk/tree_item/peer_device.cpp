@@ -22,7 +22,7 @@ using namespace model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-using widgets_t = std::vector<table_widget::table_widget_ptr_t>;
+using widgets_t = std::vector<widgetable_ptr_t>;
 
 static constexpr int padding = 2;
 
@@ -30,7 +30,7 @@ static std::string format_urls(const utils::uri_container_t &uris) { return fmt:
 
 namespace {
 
-using widgetable_ptr_t = table_widget::table_widget_ptr_t;
+using widgetable_ptr_t = widgetable_ptr_t;
 
 struct checkbox_widget_t : table_widget::checkbox_t {
     using parent_t = table_widget::checkbox_t;
@@ -45,8 +45,8 @@ struct checkbox_widget_t : table_widget::checkbox_t {
 };
 
 static widgetable_ptr_t make_actions(peer_device_t &container) {
-    struct widget_t final : table_widget::base_t {
-        using parent_t = table_widget::base_t;
+    struct widget_t final : widgetable_t {
+        using parent_t = widgetable_t;
         using parent_t::parent_t;
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
@@ -79,8 +79,8 @@ static widgetable_ptr_t make_actions(peer_device_t &container) {
 }
 
 static widgetable_ptr_t make_name(peer_device_t &container) {
-    struct widget_t final : table_widget::base_t {
-        using parent_t = table_widget::base_t;
+    struct widget_t final : widgetable_t {
+        using parent_t = widgetable_t;
         using parent_t::parent_t;
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
@@ -234,8 +234,8 @@ static widgetable_ptr_t make_compressions(peer_device_t &container) {
 }
 
 static widgetable_ptr_t make_addresses(peer_device_t &container) {
-    struct widget_t final : table_widget::base_t {
-        using parent_t = table_widget::base_t;
+    struct widget_t final : widgetable_t {
+        using parent_t = widgetable_t;
         using parent_t::parent_t;
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
@@ -343,7 +343,7 @@ static widgetable_ptr_t make_addresses(peer_device_t &container) {
 
 struct my_table_t final : static_table_t {
     using parent_t = static_table_t;
-    using widgets_t = std::vector<table_widget::table_widget_ptr_t>;
+    using widgets_t = std::vector<widgetable_ptr_t>;
 
     my_table_t(widgets_t widgets_, table_rows_t &&rows, int x, int y, int w, int h)
         : parent_t(std::move(rows), x, y, w, h), widgets{std::move(widgets_)} {
@@ -408,7 +408,7 @@ bool peer_device_t::on_select() {
             auto last_seen = ep.port() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
 
             auto widgets = my_table_t::widgets_t{};
-            auto record = [&](table_widget::table_widget_ptr_t widget) -> table_widget::table_widget_ptr_t {
+            auto record = [&](widgetable_ptr_t widget) -> widgetable_ptr_t {
                 widgets.push_back(widget);
                 return widget;
             };

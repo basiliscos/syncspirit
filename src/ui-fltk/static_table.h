@@ -12,11 +12,19 @@
 
 namespace syncspirit::fltk {
 
+struct tree_item_t;
+
 struct widgetable_t : boost::intrusive_ref_counter<widgetable_t, boost::thread_unsafe_counter> {
-    widgetable_t() = default;
+    widgetable_t(tree_item_t &container);
     virtual ~widgetable_t() = default;
+
     virtual Fl_Widget *create_widget(int x, int y, int w, int h) = 0;
-    virtual Fl_Widget *get_widget() = 0;
+    Fl_Widget *get_widget();
+    virtual void reset();
+    virtual bool store(void *);
+
+    tree_item_t &container;
+    Fl_Widget *widget = nullptr;
 };
 
 using widgetable_ptr_t = boost::intrusive_ptr<widgetable_t>;

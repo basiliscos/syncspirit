@@ -31,7 +31,7 @@ struct checkbox_widget_t : table_widget::checkbox_t {
     }
 };
 
-inline auto static make_label(folder_t &container) -> table_widget::table_widget_ptr_t {
+inline auto static make_label(folder_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::input_t {
         using parent_t = table_widget::input_t;
         using parent_t::parent_t;
@@ -59,7 +59,7 @@ inline auto static make_label(folder_t &container) -> table_widget::table_widget
     return new widget_t(container);
 }
 
-inline auto static make_folder_type(folder_t &container) -> table_widget::table_widget_ptr_t {
+inline auto static make_folder_type(folder_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::choice_t {
         using parent_t = table_widget::choice_t;
         using parent_t::parent_t;
@@ -93,7 +93,7 @@ inline auto static make_folder_type(folder_t &container) -> table_widget::table_
     return new widget_t(container);
 }
 
-inline auto static make_pull_order(folder_t &container) -> table_widget::table_widget_ptr_t {
+inline auto static make_pull_order(folder_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::choice_t {
         using parent_t = table_widget::choice_t;
         using parent_t::parent_t;
@@ -130,7 +130,7 @@ inline auto static make_pull_order(folder_t &container) -> table_widget::table_w
     return new widget_t(container);
 }
 
-inline auto static make_read_only(folder_t &container) -> table_widget::table_widget_ptr_t {
+inline auto static make_read_only(folder_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -149,7 +149,7 @@ inline auto static make_read_only(folder_t &container) -> table_widget::table_wi
     return new widget_t(container);
 }
 
-inline auto static make_ignore_permissions(folder_t &container) -> table_widget::table_widget_ptr_t {
+inline auto static make_ignore_permissions(folder_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -168,7 +168,7 @@ inline auto static make_ignore_permissions(folder_t &container) -> table_widget:
     return new widget_t(container);
 }
 
-inline auto static make_ignore_delete(folder_t &container) -> table_widget::table_widget_ptr_t {
+inline auto static make_ignore_delete(folder_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -186,7 +186,7 @@ inline auto static make_ignore_delete(folder_t &container) -> table_widget::tabl
     return new widget_t(container);
 }
 
-inline auto static make_disable_tmp(folder_t &container) -> table_widget::table_widget_ptr_t {
+inline auto static make_disable_tmp(folder_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -204,7 +204,7 @@ inline auto static make_disable_tmp(folder_t &container) -> table_widget::table_
     return new widget_t(container);
 }
 
-inline auto static make_paused(folder_t &container) -> table_widget::table_widget_ptr_t {
+inline auto static make_paused(folder_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -222,9 +222,9 @@ inline auto static make_paused(folder_t &container) -> table_widget::table_widge
     return new widget_t(container);
 }
 
-inline auto static make_shared_with(folder_t &container, model::device_t &device) -> table_widget::table_widget_ptr_t {
-    struct widget_t final : table_widget::base_t {
-        using parent_t = table_widget::base_t;
+inline auto static make_shared_with(folder_t &container, model::device_t &device) -> widgetable_ptr_t {
+    struct widget_t final : widgetable_t {
+        using parent_t = widgetable_t;
 
         widget_t(tree_item_t &container, model::device_t &device_)
             : parent_t(container), device{device_}, input{nullptr} {}
@@ -239,6 +239,9 @@ inline auto static make_shared_with(folder_t &container, model::device_t &device
             input = new Fl_Choice(x + padding, yy, ww, hh);
             auto add = new Fl_Button(input->x() + input->w() + padding * 2, yy, hh, hh, "@+");
             auto remove = new Fl_Button(add->x() + add->w() + padding * 2, yy, hh, hh, "@undo");
+
+            add->callback([](auto, void *data) { reinterpret_cast<folder_t *>(data)->on_add_share(); }, &container);
+            add->callback([](auto, void *data) { reinterpret_cast<folder_t *>(data)->on_add_share(); }, &container);
 
             group->end();
             group->resizable(nullptr);
@@ -281,9 +284,9 @@ inline auto static make_shared_with(folder_t &container, model::device_t &device
     return new widget_t(container, device);
 }
 
-inline auto static make_actions(folder_t &container) -> table_widget::table_widget_ptr_t {
-    struct widget_t final : table_widget::base_t {
-        using parent_t = table_widget::base_t;
+inline auto static make_actions(folder_t &container) -> widgetable_ptr_t {
+    struct widget_t final : widgetable_t {
+        using parent_t = widgetable_t;
         using parent_t::parent_t;
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
@@ -319,7 +322,7 @@ inline auto static make_actions(folder_t &container) -> table_widget::table_widg
 
 struct my_table_t final : static_table_t {
     using parent_t = static_table_t;
-    using widgets_t = std::vector<table_widget::table_widget_ptr_t>;
+    using widgets_t = std::vector<widgetable_ptr_t>;
 
     my_table_t(widgets_t widgets_, table_rows_t &&rows, int x, int y, int w, int h)
         : parent_t(std::move(rows), x, y, w, h), widgets{std::move(widgets_)} {
@@ -391,7 +394,7 @@ bool folder_t::on_select() {
         auto entries = folder_info.get_file_infos().size();
 
         auto widgets = my_table_t::widgets_t{};
-        auto record = [&](table_widget::table_widget_ptr_t widget) -> table_widget::table_widget_ptr_t {
+        auto record = [&](widgetable_ptr_t widget) -> widgetable_ptr_t {
             widgets.push_back(widget);
             return widget;
         };
@@ -436,3 +439,7 @@ void folder_t::on_reset() {
     static_cast<my_table_t *>(content)->reset();
     refresh_content();
 }
+
+void folder_t::on_add_share() {}
+
+void folder_t::on_remove_share() {}

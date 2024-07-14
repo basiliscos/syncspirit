@@ -17,6 +17,8 @@ struct folder_t : tree_item_t {
     void on_apply();
     void on_reset();
     void on_rescan();
+    void on_add_share();
+    void on_remove_share();
 
     model::folder_info_t &folder_info;
     Fl_Widget *apply_button;

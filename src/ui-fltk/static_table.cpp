@@ -10,6 +10,14 @@ using namespace syncspirit::fltk;
 
 static constexpr int PADDING = 5;
 
+widgetable_t::widgetable_t(tree_item_t &container_) : container{container_}, widget{nullptr} {}
+
+Fl_Widget *widgetable_t::get_widget() { return widget; }
+
+void widgetable_t::reset() {}
+
+bool widgetable_t::store(void *) { return true; }
+
 static void resize_value(const std::string &, int, int, int, int) {}
 static void resize_value(widgetable_ptr_t &widget, int x, int y, int w, int h) {
     auto impl = widget->get_widget();
