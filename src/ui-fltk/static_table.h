@@ -76,6 +76,7 @@ struct static_table_t : Fl_Table_Row {
     void draw_text(const std::string &, bool selected, int x, int y, int w, int h);
     void make_widget(const std::string &, int row);
     void make_widget(const widgetable_ptr_t &, int row);
+    void resize_widgets();
 
     std::string gather_selected();
     col_sizes_t calc_col_widths();

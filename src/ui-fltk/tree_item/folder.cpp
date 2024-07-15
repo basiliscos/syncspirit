@@ -20,6 +20,30 @@ struct serialiazation_context_t {
     db::FolderInfo folder_info;
 };
 
+struct my_table_t : static_table_t {
+    using parent_t = static_table_t;
+
+    my_table_t(folder_t &container_, unsigned shared_count_, table_rows_t &&rows, int x, int y, int w, int h)
+        : parent_t(std::move(rows), x, y, w, h), container{container_}, shared_count{shared_count_} {}
+
+    bool on_remove_share(widgetable_t &item) {
+        bool removed = false;
+        if (shared_count > 1) {
+            --shared_count;
+            parent_t::remove_row(item);
+            container.refresh_content();
+            removed = true;
+        }
+        redraw();
+        return removed;
+    }
+
+    void on_add_share(widgetable_t &) {}
+
+    unsigned shared_count;
+    folder_t &container;
+};
+
 struct checkbox_widget_t : table_widget::checkbox_t {
     using parent_t = table_widget::checkbox_t;
     using parent_t::parent_t;
@@ -244,14 +268,21 @@ inline auto static make_shared_with(folder_t &container, model::device_t &device
                 [](auto, void *data) {
                     auto self = reinterpret_cast<widget_t *>(data);
                     auto &container = static_cast<folder_t &>(self->container);
-                    container.on_add_share(*self);
+                    auto table = static_cast<my_table_t *>(container.content);
+                    table->on_add_share(*self);
                 },
                 this);
             remove->callback(
                 [](auto, void *data) {
                     auto self = reinterpret_cast<widget_t *>(data);
-                    auto &container = static_cast<folder_t &>(self->container);
-                    container.on_remove_share(*self);
+                    if (self->input->value()) {
+                        auto &container = static_cast<folder_t &>(self->container);
+                        auto table = static_cast<my_table_t *>(container.content);
+                        bool ok = table->on_remove_share(*self);
+                        if (!ok) {
+                            self->input->value(0);
+                        }
+                    }
                 },
                 this);
 
@@ -266,8 +297,9 @@ inline auto static make_shared_with(folder_t &container, model::device_t &device
             auto &container = static_cast<folder_t &>(this->container);
             auto cluster = container.supervisor.get_cluster();
 
-            int index = 0;
-            int i = 0;
+            input->add("(empty)");
+            int i = 1;
+            int index = i;
             for (auto &it : cluster->get_devices()) {
                 auto device = it.item.get();
                 if (device == cluster->get_device().get()) {
@@ -394,15 +426,17 @@ bool folder_t::on_select() {
         data.push_back({"paused", make_paused(*this)});
 
         auto cluster = supervisor.get_cluster();
+        unsigned shared_count = 0;
         for (auto it : cluster->get_devices()) {
             if (it.item != cluster->get_device()) {
+                ++shared_count;
                 data.push_back({"shared_with", make_shared_with(*this, *it.item)});
             }
         }
         data.push_back({"actions", make_actions(*this)});
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        content = new static_table_t(std::move(data), x, y, w, h);
+        content = new my_table_t(*this, shared_count, std::move(data), x, y, w, h);
         return content;
     });
     refresh_content();
@@ -417,12 +451,5 @@ void folder_t::on_rescan() {}
 
 void folder_t::on_reset() {
     static_cast<static_table_t *>(content)->reset();
-    refresh_content();
-}
-
-void folder_t::on_add_share(widgetable_t &) {}
-
-void folder_t::on_remove_share(widgetable_t &item) {
-    static_cast<static_table_t *>(content)->remove_row(item);
     refresh_content();
 }

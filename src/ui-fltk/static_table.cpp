@@ -23,6 +23,9 @@ static void resize_value(widgetable_ptr_t &widget, int x, int y, int w, int h) {
     auto impl = widget->get_widget();
     if (impl) {
         impl->resize(x, y, w, h);
+        if (auto group = dynamic_cast<Fl_Group *>(impl); group) {
+            group->init_sizes();
+        }
         impl->redraw();
     };
 }
@@ -94,17 +97,7 @@ void static_table_t::draw_cell(TableContext context, int row, int col, int x, in
         if (last_sz >= col_min_size) {
             col_width(1, last_sz);
         }
-        for (int i = 0; i < rows(); ++i) {
-            auto &row = table_rows.at(static_cast<size_t>(i));
-            std::visit(
-                [&](auto &&arg) {
-                    int xx, yy, ww, hh;
-                    find_cell(CONTEXT_TABLE, i, 1, xx, yy, ww, hh);
-                    resize_value(arg, xx, yy, ww, hh);
-                },
-                row.value);
-        }
-        init_sizes();
+        resize_widgets();
         return;
     }
     default:
@@ -291,21 +284,32 @@ int static_table_t::find_row(const widgetable_t &item) {
     return -1;
 }
 
+void static_table_t::resize_widgets() {
+    for (int i = 0; i < rows(); ++i) {
+        auto &row = table_rows.at(static_cast<size_t>(i));
+        std::visit(
+            [&](auto &&arg) {
+                int xx, yy, ww, hh;
+                find_cell(CONTEXT_TABLE, i, 1, xx, yy, ww, hh);
+                resize_value(arg, xx, yy, ww, hh);
+            },
+            row.value);
+    }
+    init_sizes();
+}
+
 void static_table_t::remove_row(widgetable_t &item) {
     int index = find_row(item);
     if (index >= 0) {
         if (index != static_cast<int>(table_rows.size()) - 1) {
+            table_rows[index].value = {};
             for (int j = index + 1; j < static_cast<int>(table_rows.size()); ++j) {
                 table_rows[j - 1] = std::move(table_rows[j]);
-                int xx, yy, ww, hh;
-                find_cell(CONTEXT_TABLE, j - 1, 1, xx, yy, ww, hh);
-                auto &value = table_rows[j - 1].value;
-                std::visit([&](auto &arg) { resize_value(arg, xx, yy, ww, hh); }, value);
             }
         }
         auto it = table_rows.cbegin() + table_rows.size() - 1;
         table_rows.erase(it);
         rows(table_rows.size());
-        redraw();
+        resize_widgets();
     }
 }

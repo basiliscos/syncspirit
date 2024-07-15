@@ -19,9 +19,6 @@ struct folder_t : tree_item_t {
     void on_reset();
     void on_rescan();
 
-    void on_add_share(widgetable_t &);
-    void on_remove_share(widgetable_t &);
-
     model::folder_info_t &folder_info;
     Fl_Widget *apply_button;
     Fl_Widget *reset_button;
