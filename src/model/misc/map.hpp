@@ -117,9 +117,9 @@ template <typename Item, size_t N> struct generic_map_t {
         auto &other_keys = other.key2item.template get<0>();
         if (keys.size() == other.size()) {
             for (auto &it : *this) {
-                auto key = get_index<0>(it.item);
+                auto &key = it.keys[0];
                 auto other_it = other_keys.find(key);
-                if (other_it == other_keys.end() || (other_it->keys != it.keys)) {
+                if (other_it == other_keys.end()) {
                     return false;
                 }
             }

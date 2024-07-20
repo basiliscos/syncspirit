@@ -3,8 +3,8 @@
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
+#include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
-#include <set>
 #include <vector>
 
 using namespace syncspirit;
@@ -16,37 +16,52 @@ static constexpr int padding = 2;
 
 namespace {
 
-using shared_devices_t = std::set<model::device_id_t>;
+using shared_devices_t = boost::local_shared_ptr<model::devices_map_t>;
 
 struct serialiazation_context_t {
     db::Folder folder;
     db::FolderInfo folder_info;
-    shared_devices_t shared_with;
+    model::devices_map_t shared_with;
 };
 
 struct my_table_t : static_table_t {
     using parent_t = static_table_t;
 
-    my_table_t(folder_t &container_, shared_devices_t shared_with_, table_rows_t &&rows, int x, int y, int w, int h)
-        : parent_t(std::move(rows), x, y, w, h), container{container_}, initially_shared_with{shared_with_},
-          shared_with{shared_with_} {}
+    my_table_t(folder_t &container_, shared_devices_t shared_with_, shared_devices_t non_shared_with_,
+               table_rows_t &&rows, int x, int y, int w, int h)
+        : parent_t(std::move(rows), x, y, w, h), container{container_}, shared_with{shared_with_},
+          non_shared_with{std::move(non_shared_with_)} {
+        initially_shared_with = *shared_with;
+        initially_non_shared_with = *non_shared_with;
+    }
 
-    bool on_remove_share(widgetable_t &item, const model::device_id_t &device) {
+    bool on_remove_share(widgetable_t &item, model::device_ptr_t device) {
         bool removed = false;
-        if (shared_with.size() > 1) {
+        if (shared_with->size() > 1) {
             parent_t::remove_row(item);
             container.refresh_content();
             removed = true;
+        } else {
+            redraw();
         }
-        shared_with.erase(device);
-        redraw();
+
+        shared_with->remove(device);
+        non_shared_with->put(device);
         return removed;
+    }
+
+    void on_select(model::device_ptr_t device) {
+        shared_with->put(device);
+        non_shared_with->remove(device);
+        container.refresh_content();
     }
 
     void on_add_share(widgetable_t &) {}
 
-    shared_devices_t initially_shared_with;
+    model::devices_map_t initially_shared_with;
+    model::devices_map_t initially_non_shared_with;
     shared_devices_t shared_with;
+    shared_devices_t non_shared_with;
     folder_t &container;
 };
 
@@ -252,12 +267,14 @@ inline auto static make_paused(folder_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-inline auto static make_shared_with(folder_t &container, model::device_t &device) -> widgetable_ptr_t {
+inline auto static make_shared_with(folder_t &container, model::device_ptr_t device, shared_devices_t shared_with,
+                                    shared_devices_t non_shared_with) -> widgetable_ptr_t {
     struct widget_t final : widgetable_t {
         using parent_t = widgetable_t;
 
-        widget_t(tree_item_t &container, model::device_t &device_)
-            : parent_t(container), device{device_}, input{nullptr} {}
+        widget_t(tree_item_t &container, model::device_ptr_t device_, shared_devices_t shared_with_,
+                 shared_devices_t non_shared_with_)
+            : parent_t(container), initial_device{device_}, device{device_}, input{nullptr} {}
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto group = new Fl_Group(x, y, w, h);
@@ -284,10 +301,33 @@ inline auto static make_shared_with(folder_t &container, model::device_t &device
                     if (self->input->value()) {
                         auto &container = static_cast<folder_t &>(self->container);
                         auto table = static_cast<my_table_t *>(container.content);
-                        auto &device_id = self->device.device_id();
-                        bool ok = table->on_remove_share(*self, device_id);
+                        bool ok = table->on_remove_share(*self, self->initial_device);
                         if (!ok) {
                             self->input->value(0);
+                        }
+                    }
+                },
+                this);
+            input->callback(
+                [](auto, void *data) {
+                    auto self = reinterpret_cast<widget_t *>(data);
+                    if (self->input->value()) {
+                        auto &container = static_cast<folder_t &>(self->container);
+                        auto table = static_cast<my_table_t *>(container.content);
+                        auto cluster = table->container.supervisor.get_cluster();
+                        for (auto &it : cluster->get_devices()) {
+                            auto device = it.item.get();
+                            if (device == cluster->get_device().get()) {
+                                continue;
+                            }
+                            auto short_id = device->device_id().get_short();
+                            auto label = fmt::format("{}, {}", device->get_name(), short_id);
+                            if (label == self->input->text()) {
+                                auto table = static_cast<my_table_t *>(container.content);
+                                self->device = it.item;
+                                table->on_select(it.item);
+                                break;
+                            }
                         }
                     }
                 },
@@ -315,7 +355,7 @@ inline auto static make_shared_with(folder_t &container, model::device_t &device
                 auto short_id = device->device_id().get_short();
                 auto label = fmt::format("{}, {}", device->get_name(), short_id);
                 input->add(label.data());
-                if (device == &this->device) {
+                if (device == this->initial_device) {
                     index = i;
                 }
                 ++i;
@@ -325,14 +365,17 @@ inline auto static make_shared_with(folder_t &container, model::device_t &device
 
         bool store(void *data) override {
             auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
-            ctx->shared_with.emplace(device.device_id());
+            ctx->shared_with.put(device);
             return true;
         }
 
-        model::device_t &device;
+        model::device_ptr_t initial_device;
+        model::device_ptr_t device;
+        shared_devices_t shared_with;
+        shared_devices_t non_shared_with;
         Fl_Choice *input;
     };
-    return new widget_t(container, device);
+    return new widget_t(container, device, shared_with, non_shared_with);
 }
 
 inline auto static make_actions(folder_t &container) -> widgetable_ptr_t {
@@ -437,17 +480,24 @@ bool folder_t::on_select() {
         data.push_back({"paused", make_paused(*this)});
 
         auto cluster = supervisor.get_cluster();
-        shared_devices_t shared_with;
+        auto shared_devices = shared_devices_t(new model::devices_map_t());
+        auto non_shared_devices = shared_devices_t(new model::devices_map_t());
         for (auto it : cluster->get_devices()) {
-            if (it.item != cluster->get_device()) {
-                shared_with.emplace(it.item->device_id());
-                data.push_back({"shared_with", make_shared_with(*this, *it.item)});
+            auto &device = it.item;
+            if (device != cluster->get_device()) {
+                if (f->is_shared_with(*device)) {
+                    shared_devices->put(device);
+                    auto widget = make_shared_with(*this, device, shared_devices, non_shared_devices);
+                    data.push_back({"shared_with", widget});
+                } else {
+                    non_shared_devices->put(device);
+                }
             }
         }
         data.push_back({"actions", make_actions(*this)});
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        content = new my_table_t(*this, shared_with, std::move(data), x, y, w, h);
+        content = new my_table_t(*this, shared_devices, non_shared_devices, std::move(data), x, y, w, h);
         return content;
     });
     refresh_content();
