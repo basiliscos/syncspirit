@@ -3,8 +3,9 @@
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
-#include <vector>
 #include <spdlog/fmt/fmt.h>
+#include <set>
+#include <vector>
 
 using namespace syncspirit;
 using namespace model::diff;
@@ -15,32 +16,37 @@ static constexpr int padding = 2;
 
 namespace {
 
+using shared_devices_t = std::set<model::device_id_t>;
+
 struct serialiazation_context_t {
     db::Folder folder;
     db::FolderInfo folder_info;
+    shared_devices_t shared_with;
 };
 
 struct my_table_t : static_table_t {
     using parent_t = static_table_t;
 
-    my_table_t(folder_t &container_, unsigned shared_count_, table_rows_t &&rows, int x, int y, int w, int h)
-        : parent_t(std::move(rows), x, y, w, h), container{container_}, shared_count{shared_count_} {}
+    my_table_t(folder_t &container_, shared_devices_t shared_with_, table_rows_t &&rows, int x, int y, int w, int h)
+        : parent_t(std::move(rows), x, y, w, h), container{container_}, initially_shared_with{shared_with_},
+          shared_with{shared_with_} {}
 
-    bool on_remove_share(widgetable_t &item) {
+    bool on_remove_share(widgetable_t &item, const model::device_id_t &device) {
         bool removed = false;
-        if (shared_count > 1) {
-            --shared_count;
+        if (shared_with.size() > 1) {
             parent_t::remove_row(item);
             container.refresh_content();
             removed = true;
         }
+        shared_with.erase(device);
         redraw();
         return removed;
     }
 
     void on_add_share(widgetable_t &) {}
 
-    unsigned shared_count;
+    shared_devices_t initially_shared_with;
+    shared_devices_t shared_with;
     folder_t &container;
 };
 
@@ -278,7 +284,8 @@ inline auto static make_shared_with(folder_t &container, model::device_t &device
                     if (self->input->value()) {
                         auto &container = static_cast<folder_t &>(self->container);
                         auto table = static_cast<my_table_t *>(container.content);
-                        bool ok = table->on_remove_share(*self);
+                        auto &device_id = self->device.device_id();
+                        bool ok = table->on_remove_share(*self, device_id);
                         if (!ok) {
                             self->input->value(0);
                         }
@@ -317,8 +324,8 @@ inline auto static make_shared_with(folder_t &container, model::device_t &device
         }
 
         bool store(void *data) override {
-            // auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
-            // ctx->folder.set_paused(input->value());
+            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+            ctx->shared_with.emplace(device.device_id());
             return true;
         }
 
@@ -388,12 +395,16 @@ void folder_t::refresh_content() {
     folder_info.serialize(ctx.folder_info);
     folder->serialize(ctx.folder);
 
+    auto table = static_cast<my_table_t *>(content);
     auto folder_data = ctx.folder.SerializeAsString();
     auto folder_info_data = ctx.folder_info.SerializeAsString();
-    auto valid = static_cast<static_table_t *>(content)->store(&ctx);
+    auto valid = table->store(&ctx);
 
-    auto is_same =
-        (folder_data == ctx.folder.SerializeAsString()) && (folder_info_data == ctx.folder_info.SerializeAsString());
+    // clang-format off
+    auto is_same = (folder_data == ctx.folder.SerializeAsString())
+                && (folder_info_data == ctx.folder_info.SerializeAsString())
+                && (table->initially_shared_with == ctx.shared_with);
+    // clang-format on
     if (!is_same) {
         if (valid) {
             apply_button->activate();
@@ -426,17 +437,17 @@ bool folder_t::on_select() {
         data.push_back({"paused", make_paused(*this)});
 
         auto cluster = supervisor.get_cluster();
-        unsigned shared_count = 0;
+        shared_devices_t shared_with;
         for (auto it : cluster->get_devices()) {
             if (it.item != cluster->get_device()) {
-                ++shared_count;
+                shared_with.emplace(it.item->device_id());
                 data.push_back({"shared_with", make_shared_with(*this, *it.item)});
             }
         }
         data.push_back({"actions", make_actions(*this)});
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        content = new my_table_t(*this, shared_count, std::move(data), x, y, w, h);
+        content = new my_table_t(*this, shared_with, std::move(data), x, y, w, h);
         return content;
     });
     refresh_content();
