@@ -12,6 +12,12 @@ static constexpr int PADDING = 5;
 
 widgetable_t::widgetable_t(tree_item_t &container_) : container{container_}, widget{nullptr} {}
 
+widgetable_t::~widgetable_t() {
+    if (widget) {
+        delete widget;
+    }
+}
+
 Fl_Widget *widgetable_t::get_widget() { return widget; }
 
 void widgetable_t::reset() {}
@@ -307,20 +313,22 @@ void static_table_t::remove_row(widgetable_t &item) {
                 table_rows[j - 1] = std::move(table_rows[j]);
             }
         }
+        table_rows.resize(table_rows.size() - 1);
         auto it = table_rows.cbegin() + table_rows.size() - 1;
-        table_rows.erase(it);
         rows(table_rows.size());
         resize_widgets();
     }
 }
 
-void static_table_t::insert_row(std::string_view label, widgetable_t &w, size_t index) {
+void static_table_t::insert_row(std::string_view label, widgetable_ptr_t &w, size_t index) {
     assert(index <= table_rows.size());
     table_rows.resize(table_rows.size() + 1);
-    for (size_t j = table_rows.size() - 1; j > index; ++j) {
+    for (size_t j = table_rows.size() - 1; j > index; --j) {
         table_rows[j] = std::move(table_rows[j - 1]);
     }
-    table_rows[index] = table_row_t{label, &w};
+    table_rows[index] = table_row_t{label, w};
     rows(table_rows.size());
+    make_widget(w, static_cast<int>(index));
     resize_widgets();
+    redraw();
 }

@@ -16,7 +16,7 @@ struct tree_item_t;
 
 struct widgetable_t : boost::intrusive_ref_counter<widgetable_t, boost::thread_unsafe_counter> {
     widgetable_t(tree_item_t &container);
-    virtual ~widgetable_t() = default;
+    virtual ~widgetable_t();
 
     virtual Fl_Widget *create_widget(int x, int y, int w, int h) = 0;
     Fl_Widget *get_widget();
@@ -65,7 +65,7 @@ struct static_table_t : Fl_Table_Row {
     virtual bool store(void *);
     void remove_row(widgetable_t &);
     int find_row(const widgetable_t &);
-    void insert_row(std::string_view label, widgetable_t &, size_t index);
+    void insert_row(std::string_view label, widgetable_ptr_t &, size_t index);
 
   private:
     void create_widgets();
