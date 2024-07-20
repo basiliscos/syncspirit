@@ -118,8 +118,8 @@ template <typename Item, size_t N> struct generic_map_t {
         if (keys.size() == other.size()) {
             for (auto &it : *this) {
                 auto key = get_index<0>(it.item);
-                auto other_item = other.get(key);
-                if (it.item != other_item) {
+                auto other_it = other_keys.find(key);
+                if (other_it == other_keys.end() || (other_it->keys != it.keys)) {
                     return false;
                 }
             }
