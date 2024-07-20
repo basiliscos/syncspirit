@@ -47,12 +47,19 @@ struct my_table_t : static_table_t {
 
         shared_with->remove(device);
         non_shared_with->put(device);
+        container.refresh_content();
         return removed;
     }
 
-    void on_select(model::device_ptr_t device) {
-        shared_with->put(device);
-        non_shared_with->remove(device);
+    void on_select(model::device_ptr_t device, model::device_ptr_t previous) {
+        if (previous) {
+            shared_with->remove(previous);
+            non_shared_with->put(previous);
+        }
+        if (device) {
+            shared_with->put(device);
+            non_shared_with->remove(device);
+        }
         container.refresh_content();
     }
 
@@ -301,6 +308,7 @@ inline auto static make_shared_with(folder_t &container, model::device_ptr_t dev
                     if (self->input->value()) {
                         auto &container = static_cast<folder_t &>(self->container);
                         auto table = static_cast<my_table_t *>(container.content);
+                        self->device = {};
                         bool ok = table->on_remove_share(*self, self->initial_device);
                         if (!ok) {
                             self->input->value(0);
@@ -311,9 +319,10 @@ inline auto static make_shared_with(folder_t &container, model::device_ptr_t dev
             input->callback(
                 [](auto, void *data) {
                     auto self = reinterpret_cast<widget_t *>(data);
+                    auto &container = static_cast<folder_t &>(self->container);
+                    auto table = static_cast<my_table_t *>(container.content);
+                    auto previous = self->device;
                     if (self->input->value()) {
-                        auto &container = static_cast<folder_t &>(self->container);
-                        auto table = static_cast<my_table_t *>(container.content);
                         auto cluster = table->container.supervisor.get_cluster();
                         for (auto &it : cluster->get_devices()) {
                             auto device = it.item.get();
@@ -325,11 +334,13 @@ inline auto static make_shared_with(folder_t &container, model::device_ptr_t dev
                             if (label == self->input->text()) {
                                 auto table = static_cast<my_table_t *>(container.content);
                                 self->device = it.item;
-                                table->on_select(it.item);
                                 break;
                             }
                         }
+                    } else {
+                        self->device = {};
                     }
+                    table->on_select(self->device, previous);
                 },
                 this);
 
@@ -348,14 +359,15 @@ inline auto static make_shared_with(folder_t &container, model::device_ptr_t dev
             int i = 1;
             int index = i;
             for (auto &it : cluster->get_devices()) {
-                auto device = it.item.get();
-                if (device == cluster->get_device().get()) {
+                auto &device = it.item;
+                if (device == cluster->get_device()) {
                     continue;
                 }
                 auto short_id = device->device_id().get_short();
                 auto label = fmt::format("{}, {}", device->get_name(), short_id);
                 input->add(label.data());
                 if (device == this->initial_device) {
+                    this->device = device;
                     index = i;
                 }
                 ++i;
@@ -364,8 +376,10 @@ inline auto static make_shared_with(folder_t &container, model::device_ptr_t dev
         }
 
         bool store(void *data) override {
-            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
-            ctx->shared_with.put(device);
+            if (device) {
+                auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+                ctx->shared_with.put(device);
+            }
             return true;
         }
 
