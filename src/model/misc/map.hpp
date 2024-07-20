@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
 
 #pragma once
+
 #include <string>
 #include <string_view>
 #include <array>
+#include <algorithm>
 #include <boost/multi_index/global_fun.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/mem_fun.hpp>
@@ -109,6 +111,22 @@ template <typename Item, size_t N> struct generic_map_t {
     const_iterator_t begin() const noexcept { return key2item.template get<0>().cbegin(); }
 
     const_iterator_t end() const noexcept { return key2item.template get<0>().cend(); }
+
+    bool operator==(const generic_map_t &other) const noexcept {
+        auto &keys = key2item.template get<0>();
+        auto &other_keys = other.key2item.template get<0>();
+        if (keys.size() == other.size()) {
+            for (auto &it : *this) {
+                auto key = get_index<0>(it.item);
+                auto other_item = other.get(key);
+                if (it.item != other_item) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
 
     void clear() noexcept { key2item.clear(); }
 

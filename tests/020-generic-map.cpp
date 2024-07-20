@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -24,6 +24,7 @@ TEST_CASE("generic map", "[model]") {
     map.remove(my_device);
     REQUIRE(!map.by_sha256(my_id.get_sha256()));
     REQUIRE(!map.get(my_device->get_key()));
+    REQUIRE(map == map);
 }
 
 namespace syncspirit::model::details {
