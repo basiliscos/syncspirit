@@ -35,6 +35,8 @@ struct table_row_t {
     std::string label;
     value_provider_t value;
 
+    table_row_t() = default;
+
     template <typename L, typename V>
     table_row_t(L &&label_, V &&value_) : label{std::forward<L>(label_)}, value{std::forward<V>(value_)} {}
 };
@@ -63,7 +65,7 @@ struct static_table_t : Fl_Table_Row {
     virtual bool store(void *);
     void remove_row(widgetable_t &);
     int find_row(const widgetable_t &);
-    void insert_row(std::string_view label, widgetable_t &);
+    void insert_row(std::string_view label, widgetable_t &, size_t index);
 
   private:
     void create_widgets();

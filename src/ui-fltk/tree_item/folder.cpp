@@ -63,13 +63,140 @@ struct my_table_t : static_table_t {
         container.refresh_content();
     }
 
-    void on_add_share(widgetable_t &) {}
+    void on_add_share(widgetable_t &widget) {
+        auto &rows = get_rows();
+        auto from_index = int{-1};
+        for (int i = 0; i < rows.size(); ++i) {
+            auto item = std::get_if<widgetable_ptr_t>(&rows[i].value);
+            if (!item) {
+                continue;
+            }
+            if (item->get() == &widget) {
+                from_index = i;
+            }
+        }
+        assert(from_index);
+    }
 
     model::devices_map_t initially_shared_with;
     model::devices_map_t initially_non_shared_with;
     shared_devices_t shared_with;
     shared_devices_t non_shared_with;
     folder_t &container;
+};
+
+struct device_share_widget_t final : widgetable_t {
+    using parent_t = widgetable_t;
+
+    device_share_widget_t(tree_item_t &container, model::device_ptr_t device_, shared_devices_t shared_with_,
+                          shared_devices_t non_shared_with_)
+        : parent_t(container), initial_device{device_}, device{device_}, input{nullptr} {}
+
+    Fl_Widget *create_widget(int x, int y, int w, int h) override {
+        auto group = new Fl_Group(x, y, w, h);
+        group->begin();
+        group->box(FL_FLAT_BOX);
+        auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
+        ww = std::min(300, ww);
+
+        input = new Fl_Choice(x + padding, yy, ww, hh);
+        auto add = new Fl_Button(input->x() + input->w() + padding * 2, yy, hh, hh, "@+");
+        auto remove = new Fl_Button(add->x() + add->w() + padding * 2, yy, hh, hh, "@undo");
+
+        add->callback(
+            [](auto, void *data) {
+                auto self = reinterpret_cast<device_share_widget_t *>(data);
+                auto &container = static_cast<folder_t &>(self->container);
+                auto table = static_cast<my_table_t *>(container.content);
+                table->on_add_share(*self);
+            },
+            this);
+        remove->callback(
+            [](auto, void *data) {
+                auto self = reinterpret_cast<device_share_widget_t *>(data);
+                if (self->input->value()) {
+                    auto &container = static_cast<folder_t &>(self->container);
+                    auto table = static_cast<my_table_t *>(container.content);
+                    self->device = {};
+                    bool ok = table->on_remove_share(*self, self->initial_device);
+                    if (!ok) {
+                        self->input->value(0);
+                    }
+                }
+            },
+            this);
+        input->callback(
+            [](auto, void *data) {
+                auto self = reinterpret_cast<device_share_widget_t *>(data);
+                auto &container = static_cast<folder_t &>(self->container);
+                auto table = static_cast<my_table_t *>(container.content);
+                auto previous = self->device;
+                if (self->input->value()) {
+                    auto cluster = table->container.supervisor.get_cluster();
+                    for (auto &it : cluster->get_devices()) {
+                        auto device = it.item.get();
+                        if (device == cluster->get_device().get()) {
+                            continue;
+                        }
+                        auto short_id = device->device_id().get_short();
+                        auto label = fmt::format("{}, {}", device->get_name(), short_id);
+                        if (label == self->input->text()) {
+                            auto table = static_cast<my_table_t *>(container.content);
+                            self->device = it.item;
+                            break;
+                        }
+                    }
+                } else {
+                    self->device = {};
+                }
+                table->on_select(self->device, previous);
+            },
+            this);
+
+        group->end();
+        group->resizable(nullptr);
+        widget = group;
+        reset();
+        return widget;
+    }
+
+    void reset() override {
+        auto &container = static_cast<folder_t &>(this->container);
+        auto cluster = container.supervisor.get_cluster();
+
+        input->add("(empty)");
+        int i = 1;
+        int index = i;
+        for (auto &it : cluster->get_devices()) {
+            auto &device = it.item;
+            if (device == cluster->get_device()) {
+                continue;
+            }
+            auto short_id = device->device_id().get_short();
+            auto label = fmt::format("{}, {}", device->get_name(), short_id);
+            input->add(label.data());
+            if (device == this->initial_device) {
+                this->device = device;
+                index = i;
+            }
+            ++i;
+        }
+        input->value(index);
+    }
+
+    bool store(void *data) override {
+        if (device) {
+            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+            ctx->shared_with.put(device);
+        }
+        return true;
+    }
+
+    model::device_ptr_t initial_device;
+    model::device_ptr_t device;
+    shared_devices_t shared_with;
+    shared_devices_t non_shared_with;
+    Fl_Choice *input;
 };
 
 struct checkbox_widget_t : table_widget::checkbox_t {
@@ -276,120 +403,7 @@ inline auto static make_paused(folder_t &container) -> widgetable_ptr_t {
 
 inline auto static make_shared_with(folder_t &container, model::device_ptr_t device, shared_devices_t shared_with,
                                     shared_devices_t non_shared_with) -> widgetable_ptr_t {
-    struct widget_t final : widgetable_t {
-        using parent_t = widgetable_t;
-
-        widget_t(tree_item_t &container, model::device_ptr_t device_, shared_devices_t shared_with_,
-                 shared_devices_t non_shared_with_)
-            : parent_t(container), initial_device{device_}, device{device_}, input{nullptr} {}
-
-        Fl_Widget *create_widget(int x, int y, int w, int h) override {
-            auto group = new Fl_Group(x, y, w, h);
-            group->begin();
-            group->box(FL_FLAT_BOX);
-            auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
-            ww = std::min(300, ww);
-
-            input = new Fl_Choice(x + padding, yy, ww, hh);
-            auto add = new Fl_Button(input->x() + input->w() + padding * 2, yy, hh, hh, "@+");
-            auto remove = new Fl_Button(add->x() + add->w() + padding * 2, yy, hh, hh, "@undo");
-
-            add->callback(
-                [](auto, void *data) {
-                    auto self = reinterpret_cast<widget_t *>(data);
-                    auto &container = static_cast<folder_t &>(self->container);
-                    auto table = static_cast<my_table_t *>(container.content);
-                    table->on_add_share(*self);
-                },
-                this);
-            remove->callback(
-                [](auto, void *data) {
-                    auto self = reinterpret_cast<widget_t *>(data);
-                    if (self->input->value()) {
-                        auto &container = static_cast<folder_t &>(self->container);
-                        auto table = static_cast<my_table_t *>(container.content);
-                        self->device = {};
-                        bool ok = table->on_remove_share(*self, self->initial_device);
-                        if (!ok) {
-                            self->input->value(0);
-                        }
-                    }
-                },
-                this);
-            input->callback(
-                [](auto, void *data) {
-                    auto self = reinterpret_cast<widget_t *>(data);
-                    auto &container = static_cast<folder_t &>(self->container);
-                    auto table = static_cast<my_table_t *>(container.content);
-                    auto previous = self->device;
-                    if (self->input->value()) {
-                        auto cluster = table->container.supervisor.get_cluster();
-                        for (auto &it : cluster->get_devices()) {
-                            auto device = it.item.get();
-                            if (device == cluster->get_device().get()) {
-                                continue;
-                            }
-                            auto short_id = device->device_id().get_short();
-                            auto label = fmt::format("{}, {}", device->get_name(), short_id);
-                            if (label == self->input->text()) {
-                                auto table = static_cast<my_table_t *>(container.content);
-                                self->device = it.item;
-                                break;
-                            }
-                        }
-                    } else {
-                        self->device = {};
-                    }
-                    table->on_select(self->device, previous);
-                },
-                this);
-
-            group->end();
-            group->resizable(nullptr);
-            widget = group;
-            reset();
-            return widget;
-        }
-
-        void reset() override {
-            auto &container = static_cast<folder_t &>(this->container);
-            auto cluster = container.supervisor.get_cluster();
-
-            input->add("(empty)");
-            int i = 1;
-            int index = i;
-            for (auto &it : cluster->get_devices()) {
-                auto &device = it.item;
-                if (device == cluster->get_device()) {
-                    continue;
-                }
-                auto short_id = device->device_id().get_short();
-                auto label = fmt::format("{}, {}", device->get_name(), short_id);
-                input->add(label.data());
-                if (device == this->initial_device) {
-                    this->device = device;
-                    index = i;
-                }
-                ++i;
-            }
-            input->value(index);
-        }
-
-        bool store(void *data) override {
-            if (device) {
-                auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
-                ctx->shared_with.put(device);
-            }
-            return true;
-        }
-
-        model::device_ptr_t initial_device;
-        model::device_ptr_t device;
-        shared_devices_t shared_with;
-        shared_devices_t non_shared_with;
-        Fl_Choice *input;
-    };
-    return new widget_t(container, device, shared_with, non_shared_with);
+    return new device_share_widget_t(container, device, shared_with, non_shared_with);
 }
 
 inline auto static make_actions(folder_t &container) -> widgetable_ptr_t {

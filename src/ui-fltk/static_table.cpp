@@ -313,3 +313,14 @@ void static_table_t::remove_row(widgetable_t &item) {
         resize_widgets();
     }
 }
+
+void static_table_t::insert_row(std::string_view label, widgetable_t &w, size_t index) {
+    assert(index <= table_rows.size());
+    table_rows.resize(table_rows.size() + 1);
+    for (size_t j = table_rows.size() - 1; j > index; ++j) {
+        table_rows[j] = std::move(table_rows[j - 1]);
+    }
+    table_rows[index] = table_row_t{label, &w};
+    rows(table_rows.size());
+    resize_widgets();
+}
