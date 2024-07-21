@@ -50,10 +50,10 @@ struct my_table_t : static_table_t {
         initially_non_shared_with = *non_shared_with;
     }
 
-    bool on_remove_share(widgetable_t &widget, model::device_ptr_t device) {
+    bool on_remove_share(widgetable_t &widget, model::device_ptr_t device, model::device_ptr_t initial) {
         bool removed = false;
         auto [_, count] = scan(widget);
-        if (count > 1) {
+        if (count > 1 && !initial) {
             parent_t::remove_row(widget);
             removed = (bool)device;
         } else {
@@ -145,7 +145,7 @@ Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
             auto &container = static_cast<folder_t &>(self->container);
             auto table = static_cast<my_table_t *>(container.content);
             self->device = {};
-            bool ok = table->on_remove_share(*self, self->device);
+            bool ok = table->on_remove_share(*self, self->device, self->initial_device);
             if (!ok) {
                 self->input->value(0);
             }
