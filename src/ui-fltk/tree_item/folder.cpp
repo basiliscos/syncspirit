@@ -492,6 +492,7 @@ void folder_t::refresh_content() {
     auto folder_info_data = ctx.folder_info.SerializeAsString();
     auto valid = table->store(&ctx);
 
+#if 0
     // clang-format off
     auto is_same = (folder_data == ctx.folder.SerializeAsString())
                 && (folder_info_data == ctx.folder_info.SerializeAsString())
@@ -506,6 +507,7 @@ void folder_t::refresh_content() {
         apply_button->deactivate();
         reset_button->deactivate();
     }
+#endif
 }
 
 bool folder_t::on_select() {
@@ -513,6 +515,9 @@ bool folder_t::on_select() {
         auto data = table_rows_t();
         auto f = folder_info.get_folder();
         auto entries = folder_info.get_file_infos().size();
+
+        auto shared_devices = shared_devices_t(new model::devices_map_t());
+        auto non_shared_devices = shared_devices_t(new model::devices_map_t());
 
         data.push_back({"path", f->get_path().string()});
         data.push_back({"id", std::string(f->get_id())});
@@ -529,8 +534,6 @@ bool folder_t::on_select() {
         data.push_back({"paused", make_paused(*this)});
 
         auto cluster = supervisor.get_cluster();
-        auto shared_devices = shared_devices_t(new model::devices_map_t());
-        auto non_shared_devices = shared_devices_t(new model::devices_map_t());
         for (auto it : cluster->get_devices()) {
             auto &device = it.item;
             if (device != cluster->get_device()) {

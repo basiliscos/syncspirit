@@ -49,7 +49,7 @@ static int handle_value(widgetable_ptr_t &widget, int event) {
 }
 
 static_table_t::static_table_t(table_rows_t &&rows_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), table_rows(std::move(rows_)) {
+    : parent_t(x, y, w, h) {
     // box(FL_ENGRAVED_BOX);
     row_header(0);
     row_height_all(20);
@@ -62,10 +62,18 @@ static_table_t::static_table_t(table_rows_t &&rows_, int x, int y, int w, int h)
     resizable(this);
 
     set_visible_focus();
+    resize(x, y, w, h);
+    assign_rows(std::move(rows_));
+}
+
+void static_table_t::assign_rows(table_rows_t rows_) {
+    table_rows = std::move(rows_);
     rows(table_rows.size());
     create_widgets();
     reset();
+    auto x = this->x(), y = this->y(), w = this->w(), h = this->h();
     resize(x, y, w, h);
+    redraw();
 }
 
 void static_table_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {

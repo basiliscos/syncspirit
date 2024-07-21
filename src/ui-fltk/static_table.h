@@ -56,6 +56,7 @@ struct static_table_t : Fl_Table_Row {
 
     static_table_t(table_rows_t &&rows, int x, int y, int w, int h);
 
+    void assign_rows(table_rows_t rows);
     void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
     int handle(int event) override;
     void resize(int x, int y, int w, int h) override;
