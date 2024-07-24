@@ -1,5 +1,6 @@
 #pragma once
 
+#include "content.h"
 #include "config/main.h"
 #include "utils/log.h"
 #include "net/messages.h"
@@ -79,6 +80,8 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     template <typename Actor> using config_builder_t = app_supervisor_config_builder_t<Actor>;
 
     explicit app_supervisor_t(config_t &config);
+    app_supervisor_t(const app_supervisor_t &) = delete;
+
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     utils::dist_sink_t &get_dist_sink();
     const bfs::path &get_config_path();
@@ -88,21 +91,23 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     std::string get_uptime() noexcept;
     utils::logger_t &get_logger() noexcept;
 
-    template <typename Fn> void replace_content(Fn constructor) noexcept {
+    template <typename Fn> auto replace_content(Fn constructor) noexcept -> content_t * {
         if (!content) {
             content = constructor(content);
         } else {
-            auto parent = content->parent();
+            auto parent = content->get_widget()->parent();
             auto prev = content;
-            parent->remove(prev);
+            parent->remove(prev->get_widget());
             parent->begin();
             content = constructor(prev);
-            parent->add(content);
+            content->refresh();
+            parent->add(content->get_widget());
             parent->end();
             delete prev;
             // parent->resizable(content);
             parent->redraw();
         }
+        return content;
     }
 
     template <typename Payload, typename... Args> void send_model(Args &&...args) {
@@ -140,7 +145,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     bfs::path config_path;
     config::main_t app_config;
     model::cluster_ptr_t cluster;
-    Fl_Widget *content;
+    content_t *content;
     tree_item_t *devices;
     tree_item_t *folders;
     tree_item_t *unkwnown_devices;

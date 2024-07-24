@@ -14,10 +14,7 @@ struct devices_t : tree_item_t {
 
     bool on_select() override;
     void update_label() override;
-    void add_new_device(std::string_view device_id, std::string_view label);
     void remove_child(tree_item_t *child) override;
-
-    size_t devices_count;
 };
 
 } // namespace syncspirit::fltk::tree_item

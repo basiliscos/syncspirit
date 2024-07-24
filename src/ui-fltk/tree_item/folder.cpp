@@ -16,6 +16,19 @@ static constexpr int padding = 2;
 
 namespace {
 
+struct my_table_t;
+
+auto static make_label(my_table_t &container) -> widgetable_ptr_t;
+auto static make_folder_type(my_table_t &container) -> widgetable_ptr_t;
+auto static make_pull_order(my_table_t &container) -> widgetable_ptr_t;
+auto static make_read_only(my_table_t &container) -> widgetable_ptr_t;
+auto static make_ignore_permissions(my_table_t &container) -> widgetable_ptr_t;
+auto static make_ignore_delete(my_table_t &container) -> widgetable_ptr_t;
+auto static make_disable_tmp(my_table_t &container) -> widgetable_ptr_t;
+auto static make_paused(my_table_t &container) -> widgetable_ptr_t;
+auto static make_actions(my_table_t &container) -> widgetable_ptr_t;
+auto static make_shared_with(my_table_t &container, model::device_ptr_t device) -> widgetable_ptr_t;
+
 using shared_devices_t = boost::local_shared_ptr<model::devices_map_t>;
 
 struct serialiazation_context_t {
@@ -26,7 +39,7 @@ struct serialiazation_context_t {
 
 struct device_share_widget_t final : widgetable_t {
     using parent_t = widgetable_t;
-    device_share_widget_t(tree_item_t &container, model::device_ptr_t device_);
+    device_share_widget_t(Fl_Widget &container, model::device_ptr_t device_);
 
     Fl_Widget *create_widget(int x, int y, int w, int h) override;
     void reset() override;
@@ -42,12 +55,50 @@ struct device_share_widget_t final : widgetable_t {
 struct my_table_t : static_table_t {
     using parent_t = static_table_t;
 
-    my_table_t(folder_t &container_, shared_devices_t shared_with_, shared_devices_t non_shared_with_,
-               table_rows_t &&rows, int x, int y, int w, int h)
-        : parent_t(std::move(rows), x, y, w, h), container{container_}, shared_with{shared_with_},
-          non_shared_with{std::move(non_shared_with_)} {
+    my_table_t(folder_t &container_, int x, int y, int w, int h)
+        : parent_t(x, y, w, h), container{container_}, folder_info(container_.folder_info),
+          shared_with{new model::devices_map_t()}, non_shared_with{new model::devices_map_t()}, apply_button{nullptr},
+          reset_button{nullptr} {
+
+        auto data = table_rows_t();
+        auto f = folder_info.get_folder();
+        auto entries = folder_info.get_file_infos().size();
+
+        auto shared_devices = shared_devices_t(new model::devices_map_t());
+        auto non_shared_devices = shared_devices_t(new model::devices_map_t());
+
+        data.push_back({"path", f->get_path().string()});
+        data.push_back({"id", std::string(f->get_id())});
+        data.push_back({"label", make_label(*this)});
+        data.push_back({"type", make_folder_type(*this)});
+        data.push_back({"pull order", make_pull_order(*this)});
+        data.push_back({"entries", std::to_string(entries)});
+        data.push_back({"index", std::to_string(folder_info.get_index())});
+        data.push_back({"max sequence", std::to_string(folder_info.get_max_sequence())});
+        data.push_back({"read only", make_read_only(*this)});
+        data.push_back({"ignore permissions", make_ignore_permissions(*this)});
+        data.push_back({"ignore delete", make_ignore_delete(*this)});
+        data.push_back({"disable temp indixes", make_disable_tmp(*this)});
+        data.push_back({"paused", make_paused(*this)});
+
+        auto cluster = container.supervisor.get_cluster();
+        for (auto it : cluster->get_devices()) {
+            auto &device = it.item;
+            if (device != cluster->get_device()) {
+                if (f->is_shared_with(*device)) {
+                    shared_devices->put(device);
+                    auto widget = make_shared_with(*this, device);
+                    data.push_back({"shared_with", widget});
+                } else {
+                    non_shared_devices->put(device);
+                }
+            }
+        }
+        data.push_back({"actions", make_actions(*this)});
+
         initially_shared_with = *shared_with;
         initially_non_shared_with = *non_shared_with;
+        assign_rows(std::move(data));
     }
 
     bool on_remove_share(widgetable_t &widget, model::device_ptr_t device, model::device_ptr_t initial) {
@@ -85,7 +136,7 @@ struct my_table_t : static_table_t {
         if (count < container.supervisor.get_cluster()->get_devices().size() - 1) {
             assert(from_index);
             auto w = widgetable_ptr_t{};
-            w.reset(new device_share_widget_t(container, {}));
+            w.reset(new device_share_widget_t(*this, {}));
             insert_row("shared with", w, from_index + 1);
         }
     }
@@ -110,14 +161,43 @@ struct my_table_t : static_table_t {
         return {from_index, count};
     }
 
+    void refresh() override {
+        serialiazation_context_t ctx;
+        auto folder = folder_info.get_folder();
+        folder_info.serialize(ctx.folder_info);
+        folder->serialize(ctx.folder);
+
+        auto folder_data = ctx.folder.SerializeAsString();
+        auto folder_info_data = ctx.folder_info.SerializeAsString();
+        auto valid = store(&ctx);
+
+        // clang-format off
+        auto is_same = (folder_data == ctx.folder.SerializeAsString())
+                    && (folder_info_data == ctx.folder_info.SerializeAsString())
+                    && (initially_shared_with == ctx.shared_with);
+        // clang-format on
+        if (!is_same) {
+            if (valid) {
+                apply_button->activate();
+            }
+            reset_button->activate();
+        } else {
+            apply_button->deactivate();
+            reset_button->deactivate();
+        }
+    }
+
     model::devices_map_t initially_shared_with;
     model::devices_map_t initially_non_shared_with;
     shared_devices_t shared_with;
     shared_devices_t non_shared_with;
     folder_t &container;
+    model::folder_info_t &folder_info;
+    Fl_Widget *apply_button;
+    Fl_Widget *reset_button;
 };
 
-device_share_widget_t::device_share_widget_t(tree_item_t &container, model::device_ptr_t device_)
+device_share_widget_t::device_share_widget_t(Fl_Widget &container, model::device_ptr_t device_)
     : parent_t(container), initial_device{device_}, device{device_}, input{nullptr} {}
 
 Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
@@ -134,18 +214,16 @@ Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
     add->callback(
         [](auto, void *data) {
             auto self = reinterpret_cast<device_share_widget_t *>(data);
-            auto &container = static_cast<folder_t &>(self->container);
-            auto table = static_cast<my_table_t *>(container.content);
-            table->on_add_share(*self);
+            auto &table = static_cast<my_table_t &>(self->container);
+            table.on_add_share(*self);
         },
         this);
     remove->callback(
         [](auto, void *data) {
             auto self = reinterpret_cast<device_share_widget_t *>(data);
-            auto &container = static_cast<folder_t &>(self->container);
-            auto table = static_cast<my_table_t *>(container.content);
+            auto &table = static_cast<my_table_t &>(self->container);
             self->device = {};
-            bool ok = table->on_remove_share(*self, self->device, self->initial_device);
+            bool ok = table.on_remove_share(*self, self->device, self->initial_device);
             if (!ok) {
                 self->input->value(0);
             }
@@ -154,11 +232,10 @@ Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
     input->callback(
         [](auto, void *data) {
             auto self = reinterpret_cast<device_share_widget_t *>(data);
-            auto &container = static_cast<folder_t &>(self->container);
-            auto table = static_cast<my_table_t *>(container.content);
+            auto &table = static_cast<my_table_t &>(self->container);
             auto previous = self->device;
             if (self->input->value()) {
-                auto cluster = table->container.supervisor.get_cluster();
+                auto cluster = table.container.supervisor.get_cluster();
                 for (auto &it : cluster->get_devices()) {
                     auto device = it.item.get();
                     if (device == cluster->get_device().get()) {
@@ -167,7 +244,6 @@ Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
                     auto short_id = device->device_id().get_short();
                     auto label = fmt::format("{}, {}", device->get_name(), short_id);
                     if (label == self->input->text()) {
-                        auto table = static_cast<my_table_t *>(container.content);
                         self->device = it.item;
                         break;
                     }
@@ -175,7 +251,7 @@ Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
             } else {
                 self->device = {};
             }
-            table->on_select(self->device, previous);
+            table.on_select(self->device, previous);
         },
         this);
 
@@ -187,8 +263,8 @@ Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
 }
 
 void device_share_widget_t::reset() {
-    auto &container = static_cast<folder_t &>(this->container);
-    auto cluster = container.supervisor.get_cluster();
+    auto &container = static_cast<my_table_t &>(this->container);
+    auto cluster = container.container.supervisor.get_cluster();
 
     input->add("(empty)");
     int i = 1;
@@ -227,26 +303,25 @@ struct checkbox_widget_t : table_widget::checkbox_t {
 
     Fl_Widget *create_widget(int x, int y, int w, int h) override {
         auto r = parent_t::create_widget(x, y, w, h);
-        input->callback([](auto, void *data) { reinterpret_cast<folder_t *>(data)->refresh_content(); }, &container);
+        input->callback([](auto, void *data) { reinterpret_cast<my_table_t *>(data)->refresh(); }, &container);
         return r;
     }
 };
 
-inline auto static make_label(folder_t &container) -> widgetable_ptr_t {
+auto static make_label(my_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::input_t {
         using parent_t = table_widget::input_t;
         using parent_t::parent_t;
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
-            input->callback([](auto, void *data) { reinterpret_cast<folder_t *>(data)->refresh_content(); },
-                            &container);
+            input->callback([](auto, void *data) { reinterpret_cast<my_table_t *>(data)->refresh(); }, &container);
             input->when(input->when() | FL_WHEN_CHANGED);
             return r;
         }
 
         void reset() override {
-            auto &container = static_cast<folder_t &>(this->container);
+            auto &container = static_cast<my_table_t &>(this->container);
             auto value = container.folder_info.get_folder()->get_label();
             input->value(value.data());
         }
@@ -260,7 +335,7 @@ inline auto static make_label(folder_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-inline auto static make_folder_type(folder_t &container) -> widgetable_ptr_t {
+auto static make_folder_type(my_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::choice_t {
         using parent_t = table_widget::choice_t;
         using parent_t::parent_t;
@@ -268,8 +343,7 @@ inline auto static make_folder_type(folder_t &container) -> widgetable_ptr_t {
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
             input->size(200, r->h());
-            input->callback([](auto, void *data) { reinterpret_cast<folder_t *>(data)->refresh_content(); },
-                            &container);
+            input->callback([](auto, void *data) { reinterpret_cast<my_table_t *>(data)->refresh(); }, &container);
             input->when(input->when() | FL_WHEN_CHANGED);
             input->add("Send and Receive");
             input->add("Send only");
@@ -278,7 +352,7 @@ inline auto static make_folder_type(folder_t &container) -> widgetable_ptr_t {
         }
 
         void reset() override {
-            auto &container = static_cast<folder_t &>(this->container);
+            auto &container = static_cast<my_table_t &>(this->container);
             auto value = container.folder_info.get_folder()->get_folder_type();
             input->value(static_cast<int>(value));
         }
@@ -294,7 +368,7 @@ inline auto static make_folder_type(folder_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-inline auto static make_pull_order(folder_t &container) -> widgetable_ptr_t {
+auto static make_pull_order(my_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::choice_t {
         using parent_t = table_widget::choice_t;
         using parent_t::parent_t;
@@ -302,8 +376,7 @@ inline auto static make_pull_order(folder_t &container) -> widgetable_ptr_t {
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
             input->size(200, r->h());
-            input->callback([](auto, void *data) { reinterpret_cast<folder_t *>(data)->refresh_content(); },
-                            &container);
+            input->callback([](auto, void *data) { reinterpret_cast<my_table_t *>(data)->refresh(); }, &container);
             input->when(input->when() | FL_WHEN_CHANGED);
             input->add("random");
             input->add("alphabetic");
@@ -315,7 +388,7 @@ inline auto static make_pull_order(folder_t &container) -> widgetable_ptr_t {
         }
 
         void reset() override {
-            auto &container = static_cast<folder_t &>(this->container);
+            auto &container = static_cast<my_table_t &>(this->container);
             auto value = container.folder_info.get_folder()->get_pull_order();
             input->value(static_cast<int>(value));
         }
@@ -331,13 +404,13 @@ inline auto static make_pull_order(folder_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-inline auto static make_read_only(folder_t &container) -> widgetable_ptr_t {
+auto static make_read_only(my_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
         void reset() override {
-            auto &container = static_cast<folder_t &>(this->container);
+            auto &container = static_cast<my_table_t &>(this->container);
             input->value(container.folder_info.get_folder()->is_read_only());
         }
 
@@ -350,13 +423,13 @@ inline auto static make_read_only(folder_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-inline auto static make_ignore_permissions(folder_t &container) -> widgetable_ptr_t {
+auto static make_ignore_permissions(my_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
         void reset() override {
-            auto &container = static_cast<folder_t &>(this->container);
+            auto &container = static_cast<my_table_t &>(this->container);
             input->value(container.folder_info.get_folder()->are_permissions_ignored());
         }
 
@@ -369,13 +442,13 @@ inline auto static make_ignore_permissions(folder_t &container) -> widgetable_pt
     return new widget_t(container);
 }
 
-inline auto static make_ignore_delete(folder_t &container) -> widgetable_ptr_t {
+auto static make_ignore_delete(my_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
         void reset() override {
-            auto &container = static_cast<folder_t &>(this->container);
+            auto &container = static_cast<my_table_t &>(this->container);
             input->value(container.folder_info.get_folder()->is_deletion_ignored());
         }
         bool store(void *data) override {
@@ -387,13 +460,13 @@ inline auto static make_ignore_delete(folder_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-inline auto static make_disable_tmp(folder_t &container) -> widgetable_ptr_t {
+auto static make_disable_tmp(my_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
         void reset() override {
-            auto &container = static_cast<folder_t &>(this->container);
+            auto &container = static_cast<my_table_t &>(this->container);
             input->value(container.folder_info.get_folder()->are_temp_indixes_disabled());
         }
         bool store(void *data) override {
@@ -405,13 +478,13 @@ inline auto static make_disable_tmp(folder_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-inline auto static make_paused(folder_t &container) -> widgetable_ptr_t {
+auto static make_paused(my_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
 
         void reset() override {
-            auto &container = static_cast<folder_t &>(this->container);
+            auto &container = static_cast<my_table_t &>(this->container);
             input->value(container.folder_info.get_folder()->is_paused());
         }
         bool store(void *data) override {
@@ -423,11 +496,11 @@ inline auto static make_paused(folder_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-inline auto static make_shared_with(folder_t &container, model::device_ptr_t device) -> widgetable_ptr_t {
+auto static make_shared_with(my_table_t &container, model::device_ptr_t device) -> widgetable_ptr_t {
     return new device_share_widget_t(container, device);
 }
 
-inline auto static make_actions(folder_t &container) -> widgetable_ptr_t {
+auto static make_actions(my_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : widgetable_t {
         using parent_t = widgetable_t;
         using parent_t::parent_t;
@@ -453,7 +526,7 @@ inline auto static make_actions(folder_t &container) -> widgetable_ptr_t {
             rescan->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_rescan(); }, &container);
 
             this->reset();
-            auto &container = static_cast<folder_t &>(this->container);
+            auto &container = static_cast<my_table_t &>(this->container);
             container.apply_button = apply;
             container.reset_button = reset;
             return widget;
@@ -466,7 +539,7 @@ inline auto static make_actions(folder_t &container) -> widgetable_ptr_t {
 } // namespace
 
 folder_t::folder_t(model::folder_info_t &folder_info_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree, true), folder_info{folder_info_}, apply_button{nullptr}, reset_button{nullptr} {
+    : parent_t(supervisor, tree, true), folder_info{folder_info_} {
     update_label();
 }
 
@@ -477,82 +550,11 @@ void folder_t::update_label() {
     tree()->redraw();
 }
 
-void folder_t::refresh_content() {
-    if (!content) {
-        return;
-    }
-
-    serialiazation_context_t ctx;
-    auto folder = folder_info.get_folder();
-    folder_info.serialize(ctx.folder_info);
-    folder->serialize(ctx.folder);
-
-    auto table = static_cast<my_table_t *>(content);
-    auto folder_data = ctx.folder.SerializeAsString();
-    auto folder_info_data = ctx.folder_info.SerializeAsString();
-    auto valid = table->store(&ctx);
-
-#if 0
-    // clang-format off
-    auto is_same = (folder_data == ctx.folder.SerializeAsString())
-                && (folder_info_data == ctx.folder_info.SerializeAsString())
-                && (table->initially_shared_with == ctx.shared_with);
-    // clang-format on
-    if (!is_same) {
-        if (valid) {
-            apply_button->activate();
-        }
-        reset_button->activate();
-    } else {
-        apply_button->deactivate();
-        reset_button->deactivate();
-    }
-#endif
-}
-
 bool folder_t::on_select() {
-    supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
-        auto data = table_rows_t();
-        auto f = folder_info.get_folder();
-        auto entries = folder_info.get_file_infos().size();
-
-        auto shared_devices = shared_devices_t(new model::devices_map_t());
-        auto non_shared_devices = shared_devices_t(new model::devices_map_t());
-
-        data.push_back({"path", f->get_path().string()});
-        data.push_back({"id", std::string(f->get_id())});
-        data.push_back({"label", make_label(*this)});
-        data.push_back({"type", make_folder_type(*this)});
-        data.push_back({"pull order", make_pull_order(*this)});
-        data.push_back({"entries", std::to_string(entries)});
-        data.push_back({"index", std::to_string(folder_info.get_index())});
-        data.push_back({"max sequence", std::to_string(folder_info.get_max_sequence())});
-        data.push_back({"read only", make_read_only(*this)});
-        data.push_back({"ignore permissions", make_ignore_permissions(*this)});
-        data.push_back({"ignore delete", make_ignore_delete(*this)});
-        data.push_back({"disable temp indixes", make_disable_tmp(*this)});
-        data.push_back({"paused", make_paused(*this)});
-
-        auto cluster = supervisor.get_cluster();
-        for (auto it : cluster->get_devices()) {
-            auto &device = it.item;
-            if (device != cluster->get_device()) {
-                if (f->is_shared_with(*device)) {
-                    shared_devices->put(device);
-                    auto widget = make_shared_with(*this, device);
-                    data.push_back({"shared_with", widget});
-                } else {
-                    non_shared_devices->put(device);
-                }
-            }
-        }
-        data.push_back({"actions", make_actions(*this)});
-
-        int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        content = new my_table_t(*this, shared_devices, non_shared_devices, std::move(data), x, y, w, h);
-        return content;
+    content = supervisor.replace_content([&](content_t *content) -> content_t * {
+        auto prev = content->get_widget();
+        return new my_table_t(*this, prev->x(), prev->y(), prev->w(), prev->h());
     });
-    refresh_content();
     return true;
 }
 

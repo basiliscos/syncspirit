@@ -1,4 +1,6 @@
 #include "tree_item.h"
+
+#include "static_table.h"
 #include <algorithm>
 
 using namespace syncspirit::fltk;
@@ -18,11 +20,15 @@ tree_item_t::~tree_item_t() {
 
 bool tree_item_t::on_select() { return false; }
 
-void tree_item_t::on_desect() { content = nullptr; }
+void tree_item_t::on_deselect() { content = nullptr; }
 
 void tree_item_t::update_label() {}
 
-void tree_item_t::refresh_content() {}
+void tree_item_t::refresh_content() {
+    if (content) {
+        content->refresh();
+    }
+}
 
 void tree_item_t::on_update() {
     update_label();

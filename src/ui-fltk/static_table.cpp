@@ -10,7 +10,7 @@ using namespace syncspirit::fltk;
 
 static constexpr int PADDING = 5;
 
-widgetable_t::widgetable_t(tree_item_t &container_) : container{container_}, widget{nullptr} {}
+widgetable_t::widgetable_t(Fl_Widget &container_) : container{container_}, widget{nullptr} {}
 
 widgetable_t::~widgetable_t() {
     if (widget) {
@@ -48,8 +48,7 @@ static int handle_value(widgetable_ptr_t &widget, int event) {
     return impl ? impl->handle(event) : 0;
 }
 
-static_table_t::static_table_t(table_rows_t &&rows_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h) {
+static_table_t::static_table_t(int x, int y, int w, int h, table_rows_t &&rows_) : parent_t(x, y, w, h) {
     // box(FL_ENGRAVED_BOX);
     row_header(0);
     row_height_all(20);
@@ -68,12 +67,14 @@ static_table_t::static_table_t(table_rows_t &&rows_, int x, int y, int w, int h)
 
 void static_table_t::assign_rows(table_rows_t rows_) {
     table_rows = std::move(rows_);
-    rows(table_rows.size());
-    create_widgets();
-    reset();
-    auto x = this->x(), y = this->y(), w = this->w(), h = this->h();
-    resize(x, y, w, h);
-    redraw();
+    if (table_rows.size()) {
+        rows(table_rows.size());
+        create_widgets();
+        reset();
+        auto x = this->x(), y = this->y(), w = this->w(), h = this->h();
+        resize(x, y, w, h);
+        redraw();
+    }
 }
 
 void static_table_t::draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) {

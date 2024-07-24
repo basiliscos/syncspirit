@@ -189,6 +189,7 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &, voi
         auto &device = *it.item;
         device.set_augmentation(ignored_devices_node->add_device(device));
     }
+#if 0
 
     auto folders_node = static_cast<tree_item::folders_t *>(folders);
     for (auto &it : cluster->get_folders()) {
@@ -196,6 +197,7 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &, voi
         auto folder_info = folder_infos.by_device(*self_device);
         folder_info->set_augmentation(folders_node->add_folder(*folder_info));
     }
+#endif
 
     return outcome::success();
 }

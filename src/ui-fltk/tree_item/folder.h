@@ -12,7 +12,6 @@ struct folder_t : tree_item_t {
 
     bool on_select() override;
     void update_label() override;
-    void refresh_content() override;
 
     void on_remove();
     void on_apply();
@@ -20,8 +19,6 @@ struct folder_t : tree_item_t {
     void on_rescan();
 
     model::folder_info_t &folder_info;
-    Fl_Widget *apply_button;
-    Fl_Widget *reset_button;
 };
 
 } // namespace syncspirit::fltk::tree_item

@@ -11,7 +11,7 @@ namespace syncspirit::fltk::config {
 static constexpr int PADDING = 5;
 
 control_t::control_t(tree_item_t &tree_item_, int x, int y, int w, int h)
-    : Fl_Group(x, y, w, h, "global app settings"), tree_item{tree_item_} {
+    : parent_t(x, y, w, h, "global app settings"), tree_item{tree_item_} {
 
     auto &sup = tree_item_.supervisor;
     auto config_path = sup.get_config_path();

@@ -5,6 +5,7 @@ find_package(libqrencode REQUIRED)
 add_executable(syncspirit-fltk WIN32
     app_supervisor.cpp
     augmentation.cpp
+    content.cpp
     log_colors.cpp
     log_panel.cpp
     log_sink.cpp
@@ -25,6 +26,7 @@ add_executable(syncspirit-fltk WIN32
     table_widget/checkbox.cpp
     table_widget/choice.cpp
     table_widget/input.cpp
+    table_widget/label.cpp
     tree_item/devices.cpp
     tree_item/folder.cpp
     tree_item/folders.cpp

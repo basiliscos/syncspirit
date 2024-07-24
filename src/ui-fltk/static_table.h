@@ -1,5 +1,6 @@
 #pragma once
 
+#include "content.h"
 #include <FL/Fl_Table_Row.H>
 
 #include <boost/intrusive_ptr.hpp>
@@ -12,10 +13,8 @@
 
 namespace syncspirit::fltk {
 
-struct tree_item_t;
-
 struct widgetable_t : boost::intrusive_ref_counter<widgetable_t, boost::thread_unsafe_counter> {
-    widgetable_t(tree_item_t &container);
+    widgetable_t(Fl_Widget &container);
     virtual ~widgetable_t();
 
     virtual Fl_Widget *create_widget(int x, int y, int w, int h) = 0;
@@ -23,7 +22,7 @@ struct widgetable_t : boost::intrusive_ref_counter<widgetable_t, boost::thread_u
     virtual void reset();
     virtual bool store(void *);
 
-    tree_item_t &container;
+    Fl_Widget &container;
     Fl_Widget *widget = nullptr;
 };
 
@@ -43,8 +42,8 @@ struct table_row_t {
 
 using table_rows_t = std::vector<table_row_t>;
 
-struct static_table_t : Fl_Table_Row {
-    using parent_t = Fl_Table_Row;
+struct static_table_t : contentable_t<Fl_Table_Row> {
+    using parent_t = contentable_t<Fl_Table_Row>;
 
     struct col_sizes_t {
         int w1;
@@ -54,7 +53,7 @@ struct static_table_t : Fl_Table_Row {
         bool invalid;
     };
 
-    static_table_t(table_rows_t &&rows, int x, int y, int w, int h);
+    static_table_t(int x, int y, int w, int h, table_rows_t &&rows = {});
 
     void assign_rows(table_rows_t rows);
     void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
@@ -62,11 +61,12 @@ struct static_table_t : Fl_Table_Row {
     void resize(int x, int y, int w, int h) override;
     void update_value(std::size_t row, std::string value);
     table_rows_t &get_rows();
-    virtual void reset();
-    virtual bool store(void *);
     void remove_row(widgetable_t &);
     int find_row(const widgetable_t &);
     void insert_row(std::string_view label, widgetable_ptr_t &, size_t index);
+
+    void reset() override;
+    bool store(void *) override;
 
   private:
     void create_widgets();

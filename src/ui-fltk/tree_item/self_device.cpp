@@ -27,15 +27,15 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
     using db_info_t = syncspirit::net::payload::db_info_response_t;
 
     self_table_t(self_device_t *owner_, table_rows_t &&rows, int x, int y, int w, int h)
-        : parent_t(std::move(rows), x, y, w, h), owner{owner_}, db_info_guard(nullptr) {
+        : parent_t(x, y, w, h, std::move(rows)), owner{owner_}, db_info_guard(nullptr) {
         update_db_info();
-        Fl::add_timeout(1.0, on_uptime_timeout, owner);
-        Fl::add_timeout(10.0, on_db_refresh_timeout, owner);
+        Fl::add_timeout(1.0, on_uptime_timeout, this);
+        Fl::add_timeout(10.0, on_db_refresh_timeout, this);
     }
 
     ~self_table_t() {
-        Fl::remove_timeout(on_uptime_timeout, owner);
-        Fl::remove_timeout(on_db_refresh_timeout, owner);
+        Fl::remove_timeout(on_uptime_timeout, this);
+        Fl::remove_timeout(on_db_refresh_timeout, this);
     }
 
     void update_db_info() { db_info_guard = owner->supervisor.request_db_info(this); }
@@ -61,31 +61,22 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
 };
 
 static void on_uptime_timeout(void *data) {
-    auto self = reinterpret_cast<self_device_t *>(data);
-    auto table = static_cast<self_table_t *>(self->content);
-    if (table) {
-        table->update_value(2, self->supervisor.get_uptime());
-        table->redraw();
-        Fl::repeat_timeout(1.0, on_uptime_timeout, data);
-    }
+    auto self = reinterpret_cast<self_table_t *>(data);
+    self->update_value(2, self->owner->supervisor.get_uptime());
+    self->redraw();
+    Fl::repeat_timeout(1.0, on_uptime_timeout, data);
 }
 static void on_db_refresh_timeout(void *data) {
-    auto self = reinterpret_cast<self_device_t *>(data);
-    auto table = static_cast<self_table_t *>(self->content);
-    if (table) {
-        table->update_db_info();
-        Fl::repeat_timeout(10.0, on_db_refresh_timeout, data);
-    }
+    auto self = reinterpret_cast<self_table_t *>(data);
+    self->update_db_info();
+    Fl::repeat_timeout(10.0, on_db_refresh_timeout, data);
 }
 
 } // namespace
 
 self_device_t::self_device_t(model::device_t &self_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree) {
-
-    auto settings = new settings_t(supervisor, tree);
-    add(prefs(), "settings", settings);
-
+    add(prefs(), "settings", new settings_t(supervisor, tree));
     update_label();
 }
 
@@ -97,17 +88,23 @@ void self_device_t::update_label() {
 }
 
 bool self_device_t::on_select() {
-    supervisor.replace_content([&](Fl_Widget *prev) -> Fl_Widget * {
+    content = supervisor.replace_content([&](content_t *content) -> content_t * {
+        struct tile_t : contentable_t<Fl_Tile> {
+            using parent_t = contentable_t<Fl_Tile>;
+            using parent_t::parent_t;
+        };
+
+        auto prev = content->get_widget();
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         int bot_h = 100;
 
         // auto group = new Fl_Group(x, y, w, h);
-        auto group = new Fl_Tile(x, y, w, h);
+        auto group = new tile_t(x, y, w, h);
         auto resizeable_area = new Fl_Box(x + w * 1. / 6, y + h * 1. / 2, w * 4. / 6, h / 2. - bot_h);
         group->resizable(resizeable_area);
 
         group->begin();
-        auto top = [&]() -> Fl_Widget * {
+        auto top = [&]() -> self_table_t * {
             auto cluster = supervisor.get_cluster();
             auto device_id_short = std::string("XXXXXXX");
             auto device_id = std::string("XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX");
@@ -148,14 +145,13 @@ bool self_device_t::on_select() {
             data.push_back({"openssl version", openssl_version});
             data.push_back({"fltk version", fmt::format("{}", Fl::version())});
 
-            content = new self_table_t(this, std::move(data), x, y, w, h - bot_h);
-            return content;
+            return new self_table_t(this, std::move(data), x, y, w, h - bot_h);
         }();
         auto bot = [&]() -> Fl_Widget * {
             auto &device = supervisor.get_cluster()->get_device()->device_id();
             return new qr_button_t(device, supervisor, x, y + top->h(), w, bot_h);
         }();
-        group->add(top);
+        group->add(top->get_widget());
         group->add(bot);
         group->end();
         return group;

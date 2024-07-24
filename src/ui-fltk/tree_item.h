@@ -2,6 +2,7 @@
 
 #include "app_supervisor.h"
 #include "augmentation.h"
+#include "content.h"
 
 #include <FL/Fl_Tree_Item.H>
 #include <FL/Fl_Tree.H>
@@ -11,17 +12,19 @@ namespace syncspirit::fltk {
 namespace outcome = model::outcome;
 namespace diff = model::diff;
 
+struct static_table_t;
+
 struct tree_item_t : Fl_Tree_Item {
     using parent_t = Fl_Tree_Item;
     tree_item_t(app_supervisor_t &supervisor, Fl_Tree *tree, bool has_augmentation = true);
     ~tree_item_t();
 
     virtual void update_label();
-    virtual void refresh_content();
+    void refresh_content();
     virtual void remove_child(tree_item_t *child);
 
     virtual bool on_select();
-    virtual void on_desect();
+    virtual void on_deselect();
     virtual void on_update();
     virtual void on_delete();
 
@@ -40,7 +43,7 @@ struct tree_item_t : Fl_Tree_Item {
     auto insert_by_label(tree_item_t *child, int start_index = 0, int end_index = -1) -> tree_item_t *;
 
     app_supervisor_t &supervisor;
-    Fl_Widget *content;
+    content_t *content;
     augmentation_ptr_t augmentation;
 };
 
