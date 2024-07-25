@@ -16,13 +16,19 @@ unknown_folders_t::unknown_folders_t(model::device_t &peer_, app_supervisor_t &s
     auto &folders = supervisor.get_cluster()->get_unknown_folders();
     for (auto &it : folders) {
         auto &uf = *it.item;
-        if (uf.device_id() == peer.device_id()) {
+        if (uf.device_id() == peer.device_id() && !uf.get_augmentation()) {
             uf.set_augmentation(add_unknown_folder(uf));
         }
     }
 }
 
 augmentation_ptr_t unknown_folders_t::add_unknown_folder(model::unknown_folder_t &uf) {
+    for (int i = 0; i < children(); ++i) {
+        auto item = static_cast<unknown_folder_t *>(this->child(i));
+        if (&item->folder == &uf) {
+            return {};
+        }
+    }
     return within_tree([&]() { return insert_by_label(new unknown_folder_t(uf, supervisor, tree()))->get_proxy(); });
 }
 
