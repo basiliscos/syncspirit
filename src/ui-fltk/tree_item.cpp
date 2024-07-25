@@ -72,7 +72,7 @@ auto tree_item_t::insert_by_label(tree_item_t *child_node, int start_index, int 
     auto new_label = std::string_view(child_node->label());
     auto end = std::max(end_index, children());
     int pos = start_index;
-    for (int i = start_index; i < end_index; ++i) {
+    for (int i = start_index; i < end; ++i) {
         auto label = std::string_view(child(i)->label());
         if (label >= new_label) {
             break;
