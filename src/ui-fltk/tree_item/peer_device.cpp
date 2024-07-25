@@ -455,9 +455,19 @@ static widgetable_ptr_t make_addresses(my_table_t &container) {
 } // namespace
 
 peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree), peer{peer_} {
-    auto unknown_folders = new unknown_folders_t(peer, supervisor, tree);
-    add(prefs(), unknown_folders->label(), unknown_folders);
+    : parent_t(supervisor, tree), peer{peer_}, unknown_folders{nullptr} {
+    bool has_unknown_folders = false;
+    auto &folders = supervisor.get_cluster()->get_unknown_folders();
+    for (auto &it : folders) {
+        auto &uf = *it.item;
+        if (uf.device_id() == peer.device_id()) {
+            has_unknown_folders = true;
+            break;
+        }
+    }
+    if (has_unknown_folders) {
+        this->get_unknown_folders();
+    }
     update_label();
 }
 
@@ -491,4 +501,11 @@ std::string peer_device_t::get_state() {
     }
 }
 
-tree_item_t *peer_device_t::get_unknown_folders() { return static_cast<tree_item_t *>(child(0)); }
+tree_item_t *peer_device_t::get_unknown_folders() {
+    if (!unknown_folders) {
+        unknown_folders = new unknown_folders_t(peer, supervisor, tree());
+        add(prefs(), unknown_folders->label(), unknown_folders);
+        tree()->redraw();
+    }
+    return unknown_folders;
+}
