@@ -13,11 +13,6 @@ struct folder_t : tree_item_t {
     bool on_select() override;
     void update_label() override;
 
-    void on_remove();
-    void on_apply();
-    void on_reset();
-    void on_rescan();
-
     model::folder_info_t &folder_info;
 };
 

@@ -34,12 +34,12 @@ tree_view_t::tree_view_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     : parent_t(x, y, w, h), supervisor{supervisor_}, current{nullptr} {
 
     showroot(false);
-    // auto folders_node = new tree_item::folders_t(supervisor, this);
+    auto folders_node = new tree_item::folders_t(supervisor, this);
     auto devices_node = new tree_item::devices_t(supervisor, this);
     auto unknown_devices_node = new tree_item::unknown_devices_t(supervisor, this);
     auto ignored_devices_node = new tree_item::ignored_devices_t(supervisor, this);
 
-    // add(folders_node->label(), folders_node);
+    add(folders_node->label(), folders_node);
     add(devices_node->label(), devices_node);
     add(unknown_devices_node->label(), unknown_devices_node);
     add(ignored_devices_node->label(), ignored_devices_node);

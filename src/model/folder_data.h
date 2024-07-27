@@ -25,9 +25,9 @@ struct SYNCSPIRIT_API folder_data_t {
     inline bool is_paused() const noexcept { return paused; }
     inline folder_type_t get_folder_type() const noexcept { return folder_type; }
     inline pull_order_t get_pull_order() const noexcept { return pull_order; }
+    inline const bfs::path &get_path() noexcept { return path; }
 
   protected:
-    inline const bfs::path &get_path() noexcept { return path; }
     void set_path(const bfs::path &value) noexcept { path = value; }
     void assign_fields(const db::Folder &item) noexcept;
     void serialize(db::Folder &dest) const noexcept;

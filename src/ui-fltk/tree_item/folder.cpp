@@ -3,6 +3,7 @@
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
+#include "../content/folder_table.h"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
 #include <vector>
@@ -14,6 +15,7 @@ using namespace syncspirit::fltk::tree_item;
 
 static constexpr int padding = 2;
 
+#if 0
 namespace {
 
 struct my_table_t;
@@ -186,6 +188,12 @@ struct my_table_t : static_table_t {
             reset_button->deactivate();
         }
     }
+
+    void on_remove() {}
+
+    void on_apply() {}
+
+    void on_rescan() {}
 
     model::devices_map_t initially_shared_with;
     model::devices_map_t initially_non_shared_with;
@@ -520,10 +528,10 @@ auto static make_actions(my_table_t &container) -> widgetable_ptr_t {
             group->end();
             widget = group;
 
-            apply->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_apply(); }, &container);
-            reset->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_reset(); }, &container);
-            remove->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_remove(); }, &container);
-            rescan->callback([](auto, void *data) { static_cast<folder_t *>(data)->on_rescan(); }, &container);
+            apply->callback([](auto, void *data) { static_cast<my_table_t *>(data)->on_apply(); }, &container);
+            reset->callback([](auto, void *data) { static_cast<my_table_t *>(data)->on_reset(); }, &container);
+            remove->callback([](auto, void *data) { static_cast<my_table_t *>(data)->on_remove(); }, &container);
+            rescan->callback([](auto, void *data) { static_cast<my_table_t *>(data)->on_rescan(); }, &container);
 
             this->reset();
             auto &container = static_cast<my_table_t &>(this->container);
@@ -537,6 +545,8 @@ auto static make_actions(my_table_t &container) -> widgetable_ptr_t {
 }
 
 } // namespace
+
+#endif
 
 folder_t::folder_t(model::folder_info_t &folder_info_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree, true), folder_info{folder_info_} {
@@ -552,19 +562,34 @@ void folder_t::update_label() {
 
 bool folder_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
+        using devices_ptr_t = content::folder_table_t::shared_devices_t;
+
+        auto f = folder_info.get_folder();
         auto prev = content->get_widget();
-        return new my_table_t(*this, prev->x(), prev->y(), prev->w(), prev->h());
+        auto shared_with = devices_ptr_t(new model::devices_map_t{});
+        auto non_shared_with = devices_ptr_t(new model::devices_map_t{});
+
+        auto cluster = supervisor.get_cluster();
+        for (auto it : cluster->get_devices()) {
+            auto &device = it.item;
+            if (device != cluster->get_device()) {
+                if (f->is_shared_with(*device)) {
+                    shared_with->put(device);
+                } else {
+                    non_shared_with->put(device);
+                }
+            }
+        }
+
+        int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
+        auto folder_descr = content::folder_table_t::folder_description_t{*folder_info.get_folder(),
+                                                                          folder_info.get_file_infos().size(),
+                                                                          folder_info.get_index(),
+                                                                          folder_info.get_max_sequence(),
+                                                                          shared_with,
+                                                                          non_shared_with};
+
+        return new content::folder_table_t(*this, folder_descr, x, y, w, h);
     });
     return true;
-}
-
-void folder_t::on_remove() {}
-
-void folder_t::on_apply() {}
-
-void folder_t::on_rescan() {}
-
-void folder_t::on_reset() {
-    static_cast<static_table_t *>(content)->reset();
-    refresh_content();
 }
