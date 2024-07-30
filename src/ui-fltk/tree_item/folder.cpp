@@ -562,7 +562,8 @@ void folder_t::update_label() {
 
 bool folder_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
-        using devices_ptr_t = content::folder_table_t::shared_devices_t;
+        using table_t = content::folder_table_t;
+        using devices_ptr_t = table_t::shared_devices_t;
 
         auto f = folder_info.get_folder();
         auto prev = content->get_widget();
@@ -582,14 +583,14 @@ bool folder_t::on_select() {
         }
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        auto folder_descr = content::folder_table_t::folder_description_t{*folder_info.get_folder(),
-                                                                          folder_info.get_file_infos().size(),
-                                                                          folder_info.get_index(),
-                                                                          folder_info.get_max_sequence(),
-                                                                          shared_with,
-                                                                          non_shared_with};
+        auto folder_descr = table_t::folder_description_t{*folder_info.get_folder(),
+                                                          folder_info.get_file_infos().size(),
+                                                          folder_info.get_index(),
+                                                          folder_info.get_max_sequence(),
+                                                          shared_with,
+                                                          non_shared_with};
 
-        return new content::folder_table_t(*this, folder_descr, x, y, w, h);
+        return new table_t(*this, folder_descr, table_t::mode_t::edit, x, y, w, h);
     });
     return true;
 }

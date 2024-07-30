@@ -21,8 +21,8 @@ auto static make_ignore_permissions(folder_table_t &container) -> widgetable_ptr
 auto static make_ignore_delete(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_disable_tmp(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_paused(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_actions(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_shared_with(folder_table_t &container, model::device_ptr_t device) -> widgetable_ptr_t;
+auto static make_actions(folder_table_t &container) -> widgetable_ptr_t;
 
 using ctx_t = folder_table_t::serialiazation_context_t;
 
@@ -125,10 +125,10 @@ void device_share_widget_t::reset() {
         }
         ++i;
     }
-    if (index == 1) {
-        index = 0;
-    }
     input->value(index);
+    if (table.mode == folder_table_t::mode_t::share) {
+        widget->deactivate();
+    }
 }
 
 bool device_share_widget_t::store(void *data) {
@@ -348,29 +348,48 @@ auto static make_actions(folder_table_t &container) -> widgetable_ptr_t {
         using parent_t::parent_t;
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            using M = folder_table_t::mode_t;
             auto group = new Fl_Group(x, y, w, h);
             group->begin();
             group->box(FL_FLAT_BOX);
+            auto &container = static_cast<folder_table_t &>(this->container);
+
             auto yy = y + padding, ww = 100, hh = h - padding * 2;
-            auto apply = new Fl_Button(x + padding, yy, ww, hh, "apply");
-            auto reset = new Fl_Button(apply->x() + ww + padding * 2, yy, ww, hh, "reset");
-            auto remove = new Fl_Button(reset->x() + ww + padding * 2, yy, ww, hh, "remove");
-            auto rescan = new Fl_Button(remove->x() + ww + padding * 2, yy, ww, hh, "rescan");
-            apply->deactivate();
+            int xx;
+            if (container.mode == M::share) {
+                auto share = new Fl_Button(x + padding, yy, ww, hh, "share");
+                share->deactivate();
+                share->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_share(); }, &container);
+                xx = share->x() + ww + padding * 2;
+                container.share_button = share;
+            } else if (container.mode == M::edit) {
+                auto apply = new Fl_Button(x + padding, yy, ww, hh, "apply");
+                apply->deactivate();
+                apply->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_apply(); }, &container);
+                container.apply_button = apply;
+                xx = apply->x() + ww + padding * 2;
+            }
+            auto reset = new Fl_Button(xx, yy, ww, hh, "reset");
             reset->deactivate();
-            remove->color(FL_RED);
+            reset->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_reset(); }, &container);
+            container.reset_button = reset;
+
+            if (container.mode == M::edit) {
+                auto rescan = new Fl_Button(reset->x() + ww + padding * 2, yy, ww, hh, "rescan");
+                rescan->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_rescan(); },
+                                 &container);
+                rescan->deactivate();
+
+                auto remove = new Fl_Button(rescan->x() + ww + padding * 2, yy, ww, hh, "remove");
+                remove->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_remove(); },
+                                 &container);
+                remove->color(FL_RED);
+                remove->deactivate();
+            }
             group->end();
             widget = group;
 
-            apply->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_apply(); }, &container);
-            reset->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_reset(); }, &container);
-            remove->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_remove(); }, &container);
-            rescan->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_rescan(); }, &container);
-
             this->reset();
-            auto &container = static_cast<folder_table_t &>(this->container);
-            container.apply_button = apply;
-            container.reset_button = reset;
             return widget;
         }
     };
@@ -380,16 +399,14 @@ auto static make_actions(folder_table_t &container) -> widgetable_ptr_t {
 
 } // namespace
 
-folder_table_t::folder_table_t(tree_item_t &container_, const folder_description_t &folder_descr, int x, int y, int w,
-                               int h)
-    : parent_t(x, y, w, h), container{container_}, folder_data{folder_descr.folder_data}, entries{folder_descr.entries},
-      index{folder_descr.index}, max_sequence{folder_descr.max_sequence}, shared_with{folder_descr.shared_with},
-      non_shared_with{folder_descr.non_shared_with}, apply_button{nullptr}, reset_button{nullptr} {
+folder_table_t::folder_table_t(tree_item_t &container_, const folder_description_t &folder_descr, mode_t mode_, int x,
+                               int y, int w, int h)
+    : parent_t(x, y, w, h), container{container_}, folder_data{folder_descr.folder_data}, mode{mode_},
+      entries{folder_descr.entries}, index{folder_descr.index}, max_sequence{folder_descr.max_sequence},
+      shared_with{folder_descr.shared_with}, non_shared_with{folder_descr.non_shared_with}, apply_button{nullptr},
+      share_button{nullptr}, reset_button{nullptr} {
 
     auto data = table_rows_t();
-
-    auto shared_devices = shared_devices_t(new model::devices_map_t());
-    auto non_shared_devices = shared_devices_t(new model::devices_map_t());
 
     data.push_back({"path", folder_data.get_path().string()});
     data.push_back({"id", std::string(folder_data.get_id())});
@@ -406,21 +423,16 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
     data.push_back({"paused", make_paused(*this)});
 
     auto cluster = container.supervisor.get_cluster();
-    for (auto it : *shared_devices) {
+    for (auto it : *shared_with) {
         auto &device = it.item;
-        if (device != cluster->get_device()) {
-            auto widget = make_shared_with(*this, device);
-            data.push_back({"shared_with", widget});
-        }
+        auto widget = make_shared_with(*this, device);
+        data.push_back({"shared_with", widget});
     }
     data.push_back({"actions", make_actions(*this)});
 
     initially_shared_with = *shared_with;
     initially_non_shared_with = *non_shared_with;
     assign_rows(std::move(data));
-
-    initially_shared_with = *shared_with;
-    initially_non_shared_with = *non_shared_with;
 }
 
 bool folder_table_t::on_remove_share(widgetable_t &widget, model::device_ptr_t device, model::device_ptr_t initial) {
@@ -483,7 +495,8 @@ std::pair<int, int> folder_table_t::scan(widgetable_t &widget) {
     return {from_index, count};
 }
 
-void folder_table_t::on_remove() {}
+void folder_table_t::on_share() {}
 void folder_table_t::on_apply() {}
 void folder_table_t::on_reset() {}
+void folder_table_t::on_remove() {}
 void folder_table_t::on_rescan() {}
