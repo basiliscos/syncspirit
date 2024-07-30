@@ -495,6 +495,36 @@ std::pair<int, int> folder_table_t::scan(widgetable_t &widget) {
     return {from_index, count};
 }
 
+void folder_table_t::refresh() {
+    serialiazation_context_t ctx;
+    folder_data.serialize(ctx.folder);
+
+    auto copy_data = ctx.folder.SerializeAsString();
+    auto valid = store(&ctx);
+
+    // clang-format off
+    auto is_same = (copy_data == ctx.folder.SerializeAsString())
+                && (initially_shared_with == ctx.shared_with);
+    // clang-format on
+    if (!is_same) {
+        if (valid) {
+            if (mode == mode_t::edit) {
+                apply_button->activate();
+            }
+        }
+        reset_button->activate();
+    } else {
+        if (mode == mode_t::edit) {
+            apply_button->deactivate();
+        }
+        reset_button->deactivate();
+    }
+
+    if (mode == mode_t::share) {
+        share_button->activate();
+    }
+}
+
 void folder_table_t::on_share() {}
 void folder_table_t::on_apply() {}
 void folder_table_t::on_reset() {}

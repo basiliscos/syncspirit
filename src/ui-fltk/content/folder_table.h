@@ -15,7 +15,6 @@ struct folder_table_t : static_table_t {
 
     struct serialiazation_context_t {
         db::Folder folder;
-        db::FolderInfo folder_info;
         model::devices_map_t shared_with;
     };
 
@@ -30,6 +29,8 @@ struct folder_table_t : static_table_t {
 
     folder_table_t(tree_item_t &container_, const folder_description_t &description, mode_t mode, int x, int y, int w,
                    int h);
+
+    void refresh() override;
 
     bool on_remove_share(widgetable_t &widget, model::device_ptr_t device, model::device_ptr_t initial);
     void on_select(model::device_ptr_t device, model::device_ptr_t previous);
