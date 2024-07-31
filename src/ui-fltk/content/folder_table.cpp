@@ -159,6 +159,13 @@ auto static make_path(folder_table_t &container) -> widgetable_ptr_t {
         using parent_t = table_widget::path_t;
         using parent_t::parent_t;
 
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            input->when(input->when() | FL_WHEN_CHANGED);
+            input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
+            return r;
+        }
+
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
             auto path = container.folder_data.get_path();
@@ -373,9 +380,8 @@ auto static make_notice(folder_table_t &container) -> widgetable_ptr_t {
         using parent_t::parent_t;
 
         void reset() override {
-            auto label = static_cast<folder_table_t &>(container).error;
-            auto ptr = label.size() ? label.data() : "";
-            input->label(ptr);
+            auto &label = static_cast<folder_table_t &>(container).error;
+            input->label(label.c_str());
         }
     };
     return new widget_t(container);
@@ -472,7 +478,7 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
         auto widget = make_shared_with(*this, device);
         data.push_back({"shared_with", widget});
     }
-    data.push_back({"", make_notice(*this)});
+    data.push_back({"", notice = make_notice(*this)});
     data.push_back({"actions", make_actions(*this)});
 
     initially_shared_with = *shared_with;
@@ -546,6 +552,7 @@ void folder_table_t::refresh() {
 
     auto copy_data = ctx.folder.SerializeAsString();
     auto valid = store(&ctx);
+    error = {};
 
     // clang-format off
     auto is_same = (copy_data == ctx.folder.SerializeAsString())
@@ -566,11 +573,21 @@ void folder_table_t::refresh() {
     }
 
     if (mode == mode_t::share) {
-        share_button->activate();
+        if (ctx.folder.path().empty()) {
+            error = "path cannot be empty";
+        }
+
+        if (error.empty()) {
+            share_button->activate();
+        } else {
+            share_button->deactivate();
+        }
     }
+    notice->reset();
 }
 
 void folder_table_t::on_share() {}
+
 void folder_table_t::on_apply() {}
 
 void folder_table_t::on_reset() { reset(); }

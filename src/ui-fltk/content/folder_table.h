@@ -54,6 +54,7 @@ struct folder_table_t : static_table_t {
     shared_devices_t non_shared_with;
     tree_item_t &container;
     std::string error;
+    widgetable_ptr_t notice;
     Fl_Widget *apply_button;
     Fl_Widget *share_button;
     Fl_Widget *reset_button;
