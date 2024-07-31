@@ -3,6 +3,7 @@
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
+#include "../table_widget/label.h"
 
 using namespace syncspirit;
 using namespace model::diff;
@@ -22,6 +23,7 @@ auto static make_ignore_delete(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_disable_tmp(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_paused(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_shared_with(folder_table_t &container, model::device_ptr_t device) -> widgetable_ptr_t;
+auto static make_notice(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_actions(folder_table_t &container) -> widgetable_ptr_t;
 
 using ctx_t = folder_table_t::serialiazation_context_t;
@@ -342,6 +344,20 @@ auto static make_shared_with(folder_table_t &container, model::device_ptr_t devi
     return new device_share_widget_t(container, device);
 }
 
+auto static make_notice(folder_table_t &container) -> widgetable_ptr_t {
+    struct widget_t final : table_widget::label_t {
+        using parent_t = table_widget::label_t;
+        using parent_t::parent_t;
+
+        void reset() override {
+            auto label = static_cast<folder_table_t &>(container).error;
+            auto ptr = label.size() ? label.data() : "";
+            input->label(ptr);
+        }
+    };
+    return new widget_t(container);
+}
+
 auto static make_actions(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : widgetable_t {
         using parent_t = widgetable_t;
@@ -433,6 +449,7 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
         auto widget = make_shared_with(*this, device);
         data.push_back({"shared_with", widget});
     }
+    data.push_back({"", make_notice(*this)});
     data.push_back({"actions", make_actions(*this)});
 
     initially_shared_with = *shared_with;
