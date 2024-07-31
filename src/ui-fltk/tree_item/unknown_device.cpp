@@ -113,6 +113,11 @@ static widgetable_ptr_t make_actions(my_table_t &container) {
             auto ignore = new Fl_Button(connect->x() + ww + padding * 2, yy, ww, hh, "ignore");
             auto remove = new Fl_Button(ignore->x() + ww + padding * 2, yy, ww, hh, "remove");
             remove->color(FL_RED);
+
+            auto xx = remove->x() + ww + padding * 2;
+            auto invisible = new Fl_Box(xx, yy, w - (xx - group->x() + padding * 2), hh);
+            invisible->hide();
+            group->resizable(invisible);
             group->end();
 
             connect->callback([](auto, void *data) { static_cast<my_table_t *>(data)->on_connect(); }, &container);

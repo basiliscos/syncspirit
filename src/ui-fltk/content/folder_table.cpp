@@ -373,9 +373,10 @@ auto static make_actions(folder_table_t &container) -> widgetable_ptr_t {
             reset->deactivate();
             reset->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_reset(); }, &container);
             container.reset_button = reset;
+            xx = reset->x() + ww + padding * 2;
 
             if (container.mode == M::edit) {
-                auto rescan = new Fl_Button(reset->x() + ww + padding * 2, yy, ww, hh, "rescan");
+                auto rescan = new Fl_Button(xx, yy, ww, hh, "rescan");
                 rescan->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_rescan(); },
                                  &container);
                 rescan->deactivate();
@@ -385,7 +386,11 @@ auto static make_actions(folder_table_t &container) -> widgetable_ptr_t {
                                  &container);
                 remove->color(FL_RED);
                 remove->deactivate();
+                xx = remove->x() + ww + padding * 2;
             }
+            auto invisible = new Fl_Box(xx, yy, w - (xx - group->x() + padding * 2), hh);
+            invisible->hide();
+            group->resizable(invisible);
             group->end();
             widget = group;
 
@@ -527,6 +532,8 @@ void folder_table_t::refresh() {
 
 void folder_table_t::on_share() {}
 void folder_table_t::on_apply() {}
-void folder_table_t::on_reset() {}
+
+void folder_table_t::on_reset() { reset(); }
+
 void folder_table_t::on_remove() {}
 void folder_table_t::on_rescan() {}

@@ -173,6 +173,12 @@ static widgetable_ptr_t make_actions(my_table_t &container) {
             apply->deactivate();
             reset->deactivate();
             remove->color(FL_RED);
+
+            auto xx = remove->x() + ww + padding * 2;
+            auto invisible = new Fl_Box(xx, yy, w - (xx - group->x() + padding * 2), hh);
+            invisible->hide();
+            group->resizable(invisible);
+
             group->end();
             widget = group;
 
