@@ -4,6 +4,7 @@
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
 #include "../table_widget/label.h"
+#include "../table_widget/path.h"
 
 using namespace syncspirit;
 using namespace model::diff;
@@ -14,6 +15,7 @@ static constexpr int padding = 2;
 
 namespace {
 
+auto static make_path(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_label(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_folder_type(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_pull_order(folder_table_t &container) -> widgetable_ptr_t;
@@ -151,6 +153,27 @@ struct checkbox_widget_t : table_widget::checkbox_t {
         return r;
     }
 };
+
+auto static make_path(folder_table_t &container) -> widgetable_ptr_t {
+    struct widget_t final : table_widget::path_t {
+        using parent_t = table_widget::path_t;
+        using parent_t::parent_t;
+
+        void reset() override {
+            auto &container = static_cast<folder_table_t &>(this->container);
+            auto path = container.folder_data.get_path();
+            auto value = path.string();
+            input->value(value.data());
+        }
+
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<ctx_t *>(data);
+            ctx->folder.set_path(input->value());
+            return true;
+        }
+    };
+    return new widget_t(container, "folder directory");
+}
 
 auto static make_label(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::input_t {
@@ -429,7 +452,7 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
 
     auto data = table_rows_t();
 
-    data.push_back({"path", folder_data.get_path().string()});
+    data.push_back({"path", make_path(*this)});
     data.push_back({"id", std::string(folder_data.get_id())});
     data.push_back({"label", make_label(*this)});
     data.push_back({"type", make_folder_type(*this)});
