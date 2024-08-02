@@ -3,6 +3,7 @@
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
+#include "../table_widget/int_input.h"
 #include "../table_widget/label.h"
 #include "../table_widget/path.h"
 
@@ -20,6 +21,7 @@ auto static make_label(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_folder_type(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_pull_order(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_read_only(folder_table_t &container) -> widgetable_ptr_t;
+auto static make_rescan_interval(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_ignore_permissions(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_ignore_delete(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_disable_tmp(folder_table_t &container) -> widgetable_ptr_t;
@@ -297,6 +299,43 @@ auto static make_read_only(folder_table_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
+auto static make_rescan_interval(folder_table_t &container) -> widgetable_ptr_t {
+    struct widget_t final : table_widget::int_input_t {
+        using parent_t = table_widget::int_input_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
+            input->when(input->when() | FL_WHEN_CHANGED);
+            return r;
+        }
+
+        void reset() override {
+            auto &container = static_cast<folder_table_t &>(this->container);
+            auto value = container.folder_data.get_rescan_interval();
+            auto value_str = std::to_string(value);
+            input->value(value_str.data());
+        }
+
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<ctx_t *>(data);
+            auto value_str = std::string_view(input->value());
+            int value = 0;
+            auto result = std::from_chars(value_str.begin(), value_str.end(), value);
+            if (result.ec != std::errc() || value <= 0) {
+                auto &container = static_cast<folder_table_t &>(this->container);
+                container.error = "invalid rescan interval";
+                return false;
+            }
+
+            ctx->folder.set_rescan_interval(static_cast<std::uint32_t>(value));
+            return true;
+        }
+    };
+    return new widget_t(container);
+}
+
 auto static make_ignore_permissions(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
@@ -460,6 +499,7 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
     if (mode == mode_t::share) {
         auto &path = container.supervisor.get_app_config().default_location;
         folder_data.set_path(path);
+        folder_data.set_rescan_interval(3600u);
     }
 
     data.push_back({"path", make_path(*this)});
@@ -471,6 +511,7 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
     data.push_back({"index", std::to_string(index)});
     data.push_back({"max sequence", std::to_string(max_sequence)});
     data.push_back({"read only", make_read_only(*this)});
+    data.push_back({"rescan interval", make_rescan_interval(*this)});
     data.push_back({"ignore permissions", make_ignore_permissions(*this)});
     data.push_back({"ignore delete", make_ignore_delete(*this)});
     data.push_back({"disable temp indixes", make_disable_tmp(*this)});
@@ -555,8 +596,8 @@ void folder_table_t::refresh() {
     folder_data.serialize(ctx.folder);
 
     auto copy_data = ctx.folder.SerializeAsString();
-    auto valid = store(&ctx);
     error = {};
+    auto valid = store(&ctx);
 
     // clang-format off
     auto is_same = (copy_data == ctx.folder.SerializeAsString())
@@ -577,19 +618,21 @@ void folder_table_t::refresh() {
     }
 
     if (mode == mode_t::share) {
-        if (ctx.folder.path().empty()) {
-            error = "path should be defined";
-        } else {
-            auto path = bfs::path(ctx.folder.path());
-            auto ec = sys::error_code{};
-            if (bfs::exists(path, ec)) {
-                if (!bfs::is_empty(path, ec)) {
-                    error = "referred directory should be empty";
+        if (valid) {
+            if (ctx.folder.path().empty()) {
+                error = "path should be defined";
+            } else {
+                auto path = bfs::path(ctx.folder.path());
+                auto ec = sys::error_code{};
+                if (bfs::exists(path, ec)) {
+                    if (!bfs::is_empty(path, ec)) {
+                        error = "referred directory should be empty";
+                    }
                 }
             }
         }
 
-        if (error.empty()) {
+        if (valid && error.empty()) {
             share_button->activate();
         } else {
             share_button->deactivate();

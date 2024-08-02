@@ -26,6 +26,7 @@ add_executable(syncspirit-fltk WIN32
     table_widget/checkbox.cpp
     table_widget/choice.cpp
     table_widget/input.cpp
+    table_widget/int_input.cpp
     table_widget/label.cpp
     table_widget/path.cpp
     tree_item/devices.cpp
