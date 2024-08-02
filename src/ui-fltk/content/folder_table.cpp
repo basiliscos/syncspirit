@@ -136,7 +136,7 @@ void device_share_widget_t::reset() {
         }
         ++i;
     }
-    input->value(index);
+    input->value(this->device ? index : 0);
     if (table.mode == folder_table_t::mode_t::share) {
         widget->deactivate();
     }
@@ -170,6 +170,10 @@ auto static make_path(folder_table_t &container) -> widgetable_ptr_t {
             auto r = parent_t::create_widget(x, y, w, h);
             input->when(input->when() | FL_WHEN_CHANGED);
             input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
+            auto &container = static_cast<folder_table_t &>(this->container);
+            if (container.mode != folder_table_t::mode_t::share) {
+                widget->deactivate();
+            }
             return r;
         }
 
@@ -591,6 +595,7 @@ void folder_table_t::on_add_share(widgetable_t &widget) {
         auto w = widgetable_ptr_t{};
         w.reset(new device_share_widget_t(*this, {}));
         insert_row("shared with", w, from_index + 1);
+        refresh();
     }
 }
 
@@ -687,6 +692,30 @@ void folder_table_t::on_share() {
 void folder_table_t::on_apply() {}
 
 void folder_table_t::on_reset() {
+    auto &rows = get_rows();
+    for (int i = 0; i < static_cast<int>(rows.size()); ++i) {
+        auto &row = rows[i];
+        auto widget = std::get_if<widgetable_ptr_t>(&row.value);
+        if (!widget) {
+            continue;
+        }
+        auto share = dynamic_cast<device_share_widget_t *>(widget->get());
+        if (!share) {
+            continue;
+        }
+        bool remove = false;
+        auto &device = share->initial_device;
+        if (!device) {
+            remove = true;
+        } else {
+            auto device_id = device->device_id().get_sha256();
+            remove = !initially_shared_with.by_sha256(device_id);
+        }
+        if (remove) {
+            remove_row(**widget);
+            --i;
+        }
+    }
     reset();
     refresh();
 }
