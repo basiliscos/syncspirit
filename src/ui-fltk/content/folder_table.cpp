@@ -457,6 +457,10 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
       share_button{nullptr}, reset_button{nullptr} {
 
     auto data = table_rows_t();
+    if (mode == mode_t::share) {
+        auto &path = container.supervisor.get_app_config().default_location;
+        folder_data.set_path(path);
+    }
 
     data.push_back({"path", make_path(*this)});
     data.push_back({"id", std::string(folder_data.get_id())});
@@ -574,7 +578,15 @@ void folder_table_t::refresh() {
 
     if (mode == mode_t::share) {
         if (ctx.folder.path().empty()) {
-            error = "path cannot be empty";
+            error = "path should be defined";
+        } else {
+            auto path = bfs::path(ctx.folder.path());
+            auto ec = sys::error_code{};
+            if (bfs::exists(path, ec)) {
+                if (!bfs::is_empty(path, ec)) {
+                    error = "referred directory should be empty";
+                }
+            }
         }
 
         if (error.empty()) {
@@ -590,7 +602,10 @@ void folder_table_t::on_share() {}
 
 void folder_table_t::on_apply() {}
 
-void folder_table_t::on_reset() { reset(); }
+void folder_table_t::on_reset() {
+    reset();
+    refresh();
+}
 
 void folder_table_t::on_remove() {}
 void folder_table_t::on_rescan() {}

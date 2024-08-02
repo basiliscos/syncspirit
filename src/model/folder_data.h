@@ -26,10 +26,10 @@ struct SYNCSPIRIT_API folder_data_t {
     inline folder_type_t get_folder_type() const noexcept { return folder_type; }
     inline pull_order_t get_pull_order() const noexcept { return pull_order; }
     inline const bfs::path &get_path() noexcept { return path; }
+    void set_path(const bfs::path &value) noexcept { path = value; }
     void serialize(db::Folder &dest) const noexcept;
 
   protected:
-    void set_path(const bfs::path &value) noexcept { path = value; }
     void assign_fields(const db::Folder &item) noexcept;
 
     std::string id;
