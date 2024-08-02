@@ -1,5 +1,9 @@
 #include "folder_table.h"
 
+#include "model/diff/modify/create_folder.h"
+#include "model/diff/modify/share_folder.h"
+#include "model/diff/aggregate_diff.hpp"
+
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
@@ -17,6 +21,7 @@ static constexpr int padding = 2;
 namespace {
 
 auto static make_path(folder_table_t &container) -> widgetable_ptr_t;
+auto static make_id(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_label(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_folder_type(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_pull_order(folder_table_t &container) -> widgetable_ptr_t;
@@ -182,6 +187,24 @@ auto static make_path(folder_table_t &container) -> widgetable_ptr_t {
         }
     };
     return new widget_t(container, "folder directory");
+}
+
+auto static make_id(folder_table_t &container) -> widgetable_ptr_t {
+    struct widget_t final : table_widget::label_t {
+        using parent_t = table_widget::label_t;
+        using parent_t::parent_t;
+
+        void reset() override {
+            auto id = static_cast<folder_table_t &>(container).folder_data.get_id();
+            input->label(id.data());
+        }
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<ctx_t *>(data);
+            ctx->folder.set_id(input->label());
+            return true;
+        }
+    };
+    return new widget_t(container);
 }
 
 auto static make_label(folder_table_t &container) -> widgetable_ptr_t {
@@ -503,7 +526,7 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
     }
 
     data.push_back({"path", make_path(*this)});
-    data.push_back({"id", std::string(folder_data.get_id())});
+    data.push_back({"id", make_id(*this)});
     data.push_back({"label", make_label(*this)});
     data.push_back({"type", make_folder_type(*this)});
     data.push_back({"pull order", make_pull_order(*this)});
@@ -641,7 +664,25 @@ void folder_table_t::refresh() {
     notice->reset();
 }
 
-void folder_table_t::on_share() {}
+void folder_table_t::on_share() {
+    serialiazation_context_t ctx;
+    auto valid = store(&ctx);
+    if (!valid) {
+        return;
+    }
+
+    auto &folder = ctx.folder;
+    auto &sup = container.supervisor;
+    auto log = sup.get_logger();
+    auto &peer = ctx.shared_with.begin()->item;
+    log->info("going to create folder {}({}) & share it with {}", folder.label(), folder.id(), peer->get_name());
+    auto peer_id = peer->device_id().get_sha256();
+    auto diffs_vector = diff::cluster_aggregate_diff_t::diffs_t{};
+    diffs_vector.emplace_back(cluster_diff_ptr_t(new modify::create_folder_t(folder)));
+    diffs_vector.emplace_back(cluster_diff_ptr_t(new modify::share_folder_t(peer_id, folder.id())));
+    auto diff = diff::cluster_diff_ptr_t(new diff::cluster_aggregate_diff_t(std::move(diffs_vector)));
+    sup.send_model<model::payload::model_update_t>(std::move(diff), this);
+}
 
 void folder_table_t::on_apply() {}
 
