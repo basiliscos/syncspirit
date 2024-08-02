@@ -11,6 +11,8 @@
 #include "../table_widget/label.h"
 #include "../table_widget/path.h"
 
+#include <FL/fl_ask.H>
+
 using namespace syncspirit;
 using namespace model::diff;
 using namespace syncspirit::fltk;
@@ -496,7 +498,6 @@ auto static make_actions(folder_table_t &container) -> widgetable_ptr_t {
                 remove->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_remove(); },
                                  &container);
                 remove->color(FL_RED);
-                remove->deactivate();
                 xx = remove->x() + ww + padding * 2;
             }
             auto invisible = new Fl_Box(xx, yy, w - (xx - group->x() + padding * 2), hh);
@@ -720,5 +721,13 @@ void folder_table_t::on_reset() {
     refresh();
 }
 
-void folder_table_t::on_remove() {}
+void folder_table_t::on_remove() {
+    auto r = fl_choice("Are you sure? (no files on disk are touched)", "Yes", "No", nullptr);
+    if (r != 0) {
+        return;
+    }
+    auto &supervisor = container.supervisor;
+    auto &cluster = *supervisor.get_cluster();
+}
+
 void folder_table_t::on_rescan() {}
