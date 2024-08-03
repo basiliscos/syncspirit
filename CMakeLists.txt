@@ -138,6 +138,7 @@ add_library(syncspirit_lib
     src/model/misc/error_code.cpp
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
+    src/model/misc/orphaned_blocks.cpp
     src/model/misc/updates_streamer.cpp
     src/model/misc/uuid.cpp
     src/model/misc/version_utils.cpp

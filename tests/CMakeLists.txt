@@ -86,6 +86,10 @@ add_executable(020-generic-map 020-generic-map.cpp $<$<PLATFORM_ID:Windows>:win3
 target_link_libraries(020-generic-map syncspirit_test_lib)
 add_test(020-generic-map "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/020-generic-map")
 
+add_executable(021-orphaned-blocks 021-orphaned-blocks.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(021-orphaned-blocks syncspirit_test_lib)
+add_test(021-orphaned-blocks "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/021-orphaned-blocks")
+
 add_executable(025-device_id 025-device_id.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(025-device_id syncspirit_test_lib)
 add_test(025-device_id "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/025-device_id")
