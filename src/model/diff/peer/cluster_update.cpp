@@ -10,8 +10,9 @@
 #include "model/diff/modify/remove_unknown_folders.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/update_folder_info.h"
-#include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/cluster.h"
+#include "model/misc/orphaned_blocks.h"
 #include "utils/format.hpp"
 #include "utils/string_comparator.hpp"
 #include <spdlog/fmt/bin_to_hex.h>
@@ -34,28 +35,10 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     keys_t removed_unknown_folders;
     keys_t confirmed_unknown_folders;
     keys_t confirmed_folders;
-    keys_t removed_blocks;
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
     keys_t reshared_folders;
-
-    auto remove_blocks = [&](const model::file_info_ptr_t &fi) noexcept {
-        auto &blocks = fi->get_blocks();
-        for (auto &block : blocks) {
-            auto predicate = [&](const model::file_block_t fb) -> bool {
-                auto &same_blocks = fb.block()->get_file_blocks();
-                auto is_deleted = [&](const model::file_block_t &b) -> bool {
-                    return (bool)removed_files.get(b.file()->get_name());
-                };
-                return std::none_of(begin(same_blocks), end(same_blocks), is_deleted);
-            };
-            auto &file_blocks = block->get_file_blocks();
-            bool remove = std::all_of(file_blocks.begin(), file_blocks.end(), predicate);
-            if (remove) {
-                removed_blocks.emplace(std::string(block->get_key()));
-            }
-        }
-    };
+    auto orphaned_blocks = orphaned_blocks_t{};
 
     auto remove_folder = [&](const model::folder_info_t &folder_info) noexcept {
         removed_folders.emplace(folder_info.get_key());
@@ -63,7 +46,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         for (auto &it_f : files) {
             auto &file = it_f.item;
             removed_files.put(file);
-            remove_blocks(file);
+            orphaned_blocks.record(*file);
         }
     };
 
@@ -203,6 +186,7 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
     if (removed_folders.size()) {
         diffs.emplace_back(new modify::remove_folder_infos_t(std::move(removed_folders)));
     }
+    auto removed_blocks = orphaned_blocks.deduce();
     if (!removed_blocks.empty()) {
         diffs.emplace_back(new modify::remove_blocks_t(std::move(removed_blocks)));
     }
