@@ -123,6 +123,7 @@ add_library(syncspirit_lib
     src/model/diff/modify/mark_reachable.cpp
     src/model/diff/modify/remove_blocks.cpp
     src/model/diff/modify/remove_files.cpp
+    src/model/diff/modify/remove_folder.cpp
     src/model/diff/modify/remove_folder_infos.cpp
     src/model/diff/modify/remove_peer.cpp
     src/model/diff/modify/remove_ignored_device.cpp

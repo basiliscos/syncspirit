@@ -12,7 +12,7 @@ namespace syncspirit::model::diff::modify {
 struct SYNCSPIRIT_API unshare_folder_t final : cluster_aggregate_diff_t {
     using parent_t = cluster_aggregate_diff_t;
 
-    unshare_folder_t(const model::cluster_t &cluster, const model::folder_info_t &folder,
+    unshare_folder_t(const model::cluster_t &cluster, model::folder_info_t &folder,
                      orphaned_blocks_t *orphaned_blocks = nullptr) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
