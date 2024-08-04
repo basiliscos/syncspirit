@@ -5,6 +5,7 @@
 
 #include "../cluster_diff.h"
 #include "model/device.h"
+#include "model/misc/orphaned_blocks.h"
 
 namespace syncspirit::model::diff::modify {
 

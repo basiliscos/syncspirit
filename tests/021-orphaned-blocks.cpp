@@ -50,8 +50,8 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
         auto bi2 = model::block_info_t::create(*b2).value();
 
         REQUIRE(builder.local_update("fid", pr_file).apply());
-        auto& folder_infos =  cluster->get_folders().by_id("fid")->get_folder_infos();
-        auto& file_infos = folder_infos.by_device(*my_device)->get_file_infos();
+        auto &folder_infos = cluster->get_folders().by_id("fid")->get_folder_infos();
+        auto &file_infos = folder_infos.by_device(*my_device)->get_file_infos();
         auto file = file_infos.by_name("a.txt");
         REQUIRE(file);
 
@@ -82,8 +82,8 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
         auto bi = model::block_info_t::create(*b1).value();
 
         REQUIRE(builder.local_update("fid", pr_file).apply());
-        auto& folder_infos =  cluster->get_folders().by_id("fid")->get_folder_infos();
-        auto& file_infos = folder_infos.by_device(*my_device)->get_file_infos();
+        auto &folder_infos = cluster->get_folders().by_id("fid")->get_folder_infos();
+        auto &file_infos = folder_infos.by_device(*my_device)->get_file_infos();
         auto file = file_infos.by_name("a.txt");
         REQUIRE(file);
 

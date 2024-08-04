@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "unshare_folder.h"
+#include "remove_blocks.h"
 #include "remove_files.h"
 #include "remove_folder_infos.h"
 #include "model/diff/cluster_visitor.h"
@@ -10,7 +11,7 @@
 using namespace syncspirit::model::diff::modify;
 
 unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model::folder_info_t &folder_info,
-                                   blocks_t *blocks_for_removal) noexcept
+                                   orphaned_blocks_t *orphaned_blocks_) noexcept
     : parent_t() {
 
     auto &peer = *folder_info.get_device();
@@ -19,30 +20,21 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, const model:
 
     auto &file_infos = folder_info.get_file_infos();
     auto removed_files = file_infos_map_t();
-    auto local_removed_blocks = remove_blocks_t::unique_keys_t();
-    auto &removed_blocks = blocks_for_removal ? *blocks_for_removal : local_removed_blocks;
+    auto local_orphaned_blocks = orphaned_blocks_t();
+    auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
     for (auto &fi : file_infos) {
         removed_files.put(fi.item);
-        auto &file_info = *fi.item;
-        for (auto &b : file_info.get_blocks()) {
-            bool remove_block = true;
-            for (auto &fb : b->get_file_blocks()) {
-                if (*fb.file()->get_folder_info()->get_device() != peer) {
-                    remove_block = false;
-                    break;
-                }
-            }
-            if (remove_block) {
-                removed_blocks.emplace(std::string(b->get_key()));
-            }
-        }
+        orphaned_blocks.record(*fi.item);
     }
 
     if (removed_files.size()) {
         diffs.emplace_back(new modify::remove_files_t(peer, removed_files));
     }
-    if (local_removed_blocks.size()) {
-        diffs.emplace_back(cluster_diff_ptr_t(new remove_blocks_t(std::move(local_removed_blocks))));
+    if (!orphaned_blocks_) {
+        auto block_keys = local_orphaned_blocks.deduce();
+        if (block_keys.size()) {
+            diffs.emplace_back(cluster_diff_ptr_t(new remove_blocks_t(std::move(block_keys))));
+        }
     }
     auto removed_folders = remove_folder_infos_t::unique_keys_t();
     removed_folders.emplace(folder_info.get_key());

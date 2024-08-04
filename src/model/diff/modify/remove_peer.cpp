@@ -15,14 +15,14 @@ using namespace syncspirit::model::diff::modify;
 
 using blocks_t = remove_blocks_t::unique_keys_t;
 
-static auto make_unshare(const cluster_t &cluster, const device_t &peer, blocks_t &removed_blocks)
+static auto make_unshare(const cluster_t &cluster, const device_t &peer, orphaned_blocks_t &orphaned_blocks)
     -> cluster_aggregate_diff_t::diffs_t {
     cluster_aggregate_diff_t::diffs_t r;
     auto &folders = cluster.get_folders();
     for (auto it : folders) {
         auto &f = it.item;
         if (auto fi = f->is_shared_with(peer); fi) {
-            r.emplace_back(new unshare_folder_t(cluster, *fi, &removed_blocks));
+            r.emplace_back(new unshare_folder_t(cluster, *fi, &orphaned_blocks));
         }
     }
     return r;
@@ -31,9 +31,10 @@ static auto make_unshare(const cluster_t &cluster, const device_t &peer, blocks_
 remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept
     : parent_t(), peer_key{peer.get_key()} {
 
-    auto removed_blocks = blocks_t{};
+    orphaned_blocks_t orphaned_blocks;
 
-    diffs = make_unshare(cluster, peer, removed_blocks);
+    diffs = make_unshare(cluster, peer, orphaned_blocks);
+    auto removed_blocks = orphaned_blocks.deduce();
     if (removed_blocks.size()) {
         diffs.emplace_back(cluster_diff_ptr_t(new remove_blocks_t(std::move(removed_blocks))));
     }
