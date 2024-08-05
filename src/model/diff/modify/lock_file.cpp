@@ -29,7 +29,7 @@ auto lock_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resu
         file->unlock();
     }
 
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 auto lock_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

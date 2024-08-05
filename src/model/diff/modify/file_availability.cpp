@@ -26,7 +26,7 @@ auto file_availability_t::apply_impl(cluster_t &cluster) const noexcept -> outco
             }
         }
     }
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 auto file_availability_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

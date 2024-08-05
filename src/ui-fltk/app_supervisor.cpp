@@ -213,7 +213,8 @@ auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff
 
 auto app_supervisor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
+    std::abort();
+    // return diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
 }
 
 auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *) noexcept

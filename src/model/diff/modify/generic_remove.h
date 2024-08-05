@@ -10,7 +10,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API generic_remove_t : cluster_aggregate_diff_t {
+struct SYNCSPIRIT_API generic_remove_t : cluster_diff_t {
     using unique_keys_t = std::set<std::string, utils::string_comparator_t>;
     using keys_t = std::vector<std::string>;
 

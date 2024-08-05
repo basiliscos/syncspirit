@@ -8,6 +8,8 @@
 
 namespace syncspirit::model::diff {
 
+struct cluster_diff_t;
+
 namespace load {
 struct devices_t;
 struct ignored_devices_t;
@@ -80,6 +82,9 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const modify::remove_ignored_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_unknown_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_unknown_folders_t &, void *custom) noexcept;
+
+    outcome::result<void> next(const model::diff::cluster_diff_t &, void *custom,
+                               const outcome::result<void> &prev = outcome::success()) noexcept;
 };
 
 using cluster_visitor_t = generic_visitor_t<tag::cluster>;

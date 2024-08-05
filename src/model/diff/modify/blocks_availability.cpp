@@ -25,7 +25,7 @@ auto blocks_availability_t::apply_impl(cluster_t &cluster) const noexcept -> out
             file->mark_local_available(i);
         }
     }
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 auto blocks_availability_t::visit(block_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

@@ -9,8 +9,8 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API update_peer_t final : cluster_aggregate_diff_t {
-    using parent_t = cluster_aggregate_diff_t;
+struct SYNCSPIRIT_API update_peer_t final : cluster_diff_t {
+    using parent_t = cluster_diff_t;
 
     update_peer_t(db::Device db, const model::device_id_t &device_id, const model::cluster_t &) noexcept;
 

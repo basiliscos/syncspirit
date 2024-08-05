@@ -51,6 +51,7 @@
 #include <alloca.h>
 #endif
 
+#if 0
 namespace syncspirit::net {
 
 namespace {
@@ -952,3 +953,4 @@ auto db_actor_t::operator()(const model::diff::contact::unknown_connected_t &dif
 }
 
 } // namespace syncspirit::net
+#endif

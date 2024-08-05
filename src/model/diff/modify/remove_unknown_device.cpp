@@ -17,7 +17,7 @@ auto remove_unknown_device_t::apply_impl(cluster_t &cluster) const noexcept -> o
         return make_error_code(error_code_t::no_such_device);
     }
     unknown_devices.remove(unknown_device);
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 std::string_view remove_unknown_device_t::get_device_sha256() const noexcept {

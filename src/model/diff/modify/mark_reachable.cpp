@@ -20,8 +20,7 @@ auto mark_reachable_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
 
     LOG_TRACE(log, "applyging reachable ({}) for '{}'", reachable, file->get_full_name());
     file->mark_unreachable(!reachable);
-
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 auto mark_reachable_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

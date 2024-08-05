@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "cluster_visitor.h"
+#include "cluster_diff.h"
 
 using namespace syncspirit::model::diff;
 
@@ -118,5 +119,16 @@ auto cluster_visitor_t::operator()(const modify::lock_file_t &, void *) noexcept
 }
 
 auto cluster_visitor_t::operator()(const modify::mark_reachable_t &, void *) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
+auto cluster_visitor_t::next(const model::diff::cluster_diff_t &diff, void *custom,
+                             const outcome::result<void> &prev) noexcept -> outcome::result<void> {
+    if (!prev) {
+        return prev;
+    }
+    if (diff.next) {
+        return diff.next->visit(*this, custom);
+    }
     return outcome::success();
 }

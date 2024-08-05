@@ -9,3 +9,7 @@ using namespace syncspirit::model::diff::load;
 auto load_cluster_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     return visitor(*this, custom);
 }
+
+auto load_cluster_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    return next ? next->apply(cluster) : outcome::success();
+}

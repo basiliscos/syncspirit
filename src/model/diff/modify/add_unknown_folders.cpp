@@ -21,7 +21,7 @@ auto add_unknown_folders_t::apply_impl(cluster_t &cluster) const noexcept -> out
         }
         unknown.put(std::move(opt.value()));
     }
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 auto add_unknown_folders_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

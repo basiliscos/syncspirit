@@ -21,7 +21,7 @@ auto unknown_connected_t::apply_impl(cluster_t &cluster) const noexcept -> outco
     }
     prev->assign(db_device);
     prev->notify_update();
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 auto unknown_connected_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

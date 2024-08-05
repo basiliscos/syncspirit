@@ -25,5 +25,5 @@ auto folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result
         map.put(folder);
         folder->assign_cluster(&cluster);
     }
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }

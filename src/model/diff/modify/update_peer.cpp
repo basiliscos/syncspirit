@@ -20,30 +20,27 @@ update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
     if (!peer) {
         auto &ignored_devices = cluster.get_ignored_devices();
         auto &unknown_devices = cluster.get_unknown_devices();
+        auto current = (cluster_diff_t *){this};
         if (auto unknown_device = unknown_devices.by_sha256(peer_id); unknown_device) {
-            auto diff = cluster_diff_ptr_t{};
-            diff = new remove_unknown_device_t(*unknown_device);
-            this->diffs.emplace_back(std::move(diff));
+            current = current->assign(new remove_unknown_device_t(*unknown_device));
         }
         if (auto ignored_device = ignored_devices.by_sha256(peer_id); ignored_device) {
-            auto diff = cluster_diff_ptr_t{};
-            diff = new remove_ignored_device_t(*ignored_device);
-            this->diffs.emplace_back(std::move(diff));
+            current = current->assign(new remove_ignored_device_t(*ignored_device));
         }
     }
 }
 
 auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    if (next) {
+        LOG_TRACE(log, "update_peer_t, removing unknown/ignored device");
+        auto r = next->apply(cluster);
+        if (!r) {
+            return r;
+        }
+    }
     auto &devices = cluster.get_devices();
     auto peer = devices.by_sha256(peer_id);
     if (!peer) {
-        if (!diffs.empty()) {
-            LOG_TRACE(log, "update_peer_t, removing unknown/ignored device");
-            auto r = parent_t::apply_impl(cluster);
-            if (!r) {
-                return r;
-            }
-        }
         auto prefix = (char)db::prefix::device;
         auto device_id_opt = device_id_t::from_sha256(peer_id);
         if (!device_id_opt) {
@@ -61,7 +58,6 @@ auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
         peer->notify_update();
     }
     LOG_TRACE(log, "applyging update_peer_t, device {}", peer->device_id());
-
     return outcome::success();
 }
 

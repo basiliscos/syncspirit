@@ -81,13 +81,15 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &remove_unknown_device(const model::unknown_device_t &device) noexcept;
 
   private:
-    using bdiffs_t = std::deque<model::diff::block_diff_ptr_t>;
-    using diffs_t = std::deque<model::diff::cluster_diff_ptr_t>;
-    using cdiff_t = std::deque<model::diff::contact_diff_ptr_t>;
+    diff_builder_t &assign(model::diff::cluster_diff_t *) noexcept;
+    diff_builder_t &assign(model::diff::block_diff_t *) noexcept;
+    diff_builder_t &assign(model::diff::contact_diff_t *) noexcept;
+
     model::cluster_t &cluster;
-    diffs_t diffs;
-    bdiffs_t bdiffs;
-    cdiff_t cdiffs;
+    model::diff::cluster_diff_ptr_t cluster_diff;
+    model::diff::contact_diff_ptr_t contact_diff;
+    model::diff::block_diff_ptr_t block_diff;
+
     friend struct cluster_configurer_t;
     friend struct index_maker_t;
 };

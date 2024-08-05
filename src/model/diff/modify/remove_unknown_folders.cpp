@@ -17,7 +17,7 @@ auto remove_unknown_folders_t::apply_impl(cluster_t &cluster) const noexcept -> 
             map.remove(folder);
         }
     }
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 auto remove_unknown_folders_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

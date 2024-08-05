@@ -16,5 +16,5 @@ auto ignored_folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
         auto &folder = option.value();
         map.put(folder);
     }
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }

@@ -354,13 +354,13 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     db_folder2.set_label("my-label-2");
     db_folder2.set_path("/my/path");
 
-    auto diffs = diff::cluster_aggregate_diff_t::diffs_t{};
-    diffs.push_back(new diff::modify::create_folder_t(db_folder1));
-    diffs.push_back(new diff::modify::create_folder_t(db_folder2));
-    diffs.push_back(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder1.id()));
-    diffs.push_back(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder2.id()));
+    auto diff = diff::cluster_diff_ptr_t{};
+    diff = new diff::modify::create_folder_t(db_folder1);
 
-    auto diff = diff::cluster_diff_ptr_t(new diff::cluster_aggregate_diff_t(std::move(diffs)));
+    auto current = diff->assign(new diff::modify::create_folder_t(db_folder2));
+    current = current->assign(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder1.id()));
+    current = current->assign(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder2.id()));
+
     REQUIRE(diff->apply(*cluster));
     auto folder1 = folders.by_id(db_folder1.id());
     auto folder2 = folders.by_id(db_folder2.id());

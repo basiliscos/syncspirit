@@ -62,7 +62,7 @@ auto update_contact_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
         auto device = devices.by_sha256(this->device.get_sha256());
         device->assign_uris(uris);
     }
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 auto update_contact_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

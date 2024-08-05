@@ -30,7 +30,7 @@ auto add_remote_folder_infos_t::apply_impl(cluster_t &cluster) const noexcept ->
         }
         remote_folders.put(opt.assume_value());
     }
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 auto add_remote_folder_infos_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept

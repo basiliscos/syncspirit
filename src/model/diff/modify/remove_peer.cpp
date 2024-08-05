@@ -17,29 +17,26 @@ using blocks_t = remove_blocks_t::unique_keys_t;
 
 remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept
     : parent_t(), peer_key{peer.get_key()} {
-
     orphaned_blocks_t orphaned_blocks;
-
+    auto current = (cluster_diff_t *)this;
     auto &folders = cluster.get_folders();
     for (auto it : folders) {
         auto &f = it.item;
         if (auto fi = f->is_shared_with(peer); fi) {
-            diffs.emplace_back(new unshare_folder_t(cluster, *fi, &orphaned_blocks));
+            current = current->assign(new unshare_folder_t(cluster, *fi, &orphaned_blocks));
         }
     }
 
     auto removed_blocks = orphaned_blocks.deduce();
     if (removed_blocks.size()) {
-        diffs.emplace_back(cluster_diff_ptr_t(new remove_blocks_t(std::move(removed_blocks))));
+        current = current->assign(new remove_blocks_t(std::move(removed_blocks)));
     }
 
     auto removed_unknown_folders = remove_unknown_folders_t::unique_keys_t{};
     for (auto &it : cluster.get_unknown_folders()) {
         auto &uf = *it.item;
         if (uf.device_id() == peer.device_id()) {
-            auto diff = cluster_diff_ptr_t{};
-            diff.reset(new remove_unknown_folders_t(std::move(removed_unknown_folders)));
-            diffs.emplace_back(diff);
+            current = current->assign(new remove_unknown_folders_t(std::move(removed_unknown_folders)));
         }
     }
 }
@@ -63,7 +60,7 @@ auto remove_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
     }
 
     cluster.get_devices().remove(peer);
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 std::string_view remove_peer_t::get_peer_sha256() const noexcept { return std::string_view(peer_key).substr(1); }

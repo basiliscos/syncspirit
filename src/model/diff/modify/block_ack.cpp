@@ -16,7 +16,7 @@ auto block_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resu
     auto file = folder_info->get_file_infos().by_name(file_name);
     LOG_TRACE(log, "block_ack_t, '{}' block # {}", file->get_full_name(), block_index);
     file->mark_local_available(block_index);
-    return outcome::success();
+    return next ? next->apply(cluster) : outcome::success();
 }
 
 auto block_ack_t::visit(block_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
