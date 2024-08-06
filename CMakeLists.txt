@@ -80,9 +80,7 @@ add_library(syncspirit_lib
     src/model/diff/base_diff.cpp
     src/model/diff/block_diff.cpp
     src/model/diff/block_visitor.cpp
-    src/model/diff/contact_diff.cpp
     src/model/diff/contact_visitor.cpp
-    src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_visitor.cpp
     src/model/diff/contact/connect_request.cpp
     src/model/diff/contact/dial_request.cpp

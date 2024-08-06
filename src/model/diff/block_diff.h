@@ -19,12 +19,6 @@ struct SYNCSPIRIT_API block_diff_t : generic_diff_t<tag::block, block_diff_t> {
     block_diff_t(const block_diff_t &) noexcept;
     block_diff_t(const file_info_t &file, size_t block_index = 0) noexcept;
 
-#if 0
-    virtual outcome::result<void> visit(visitor_t &, void *custom) const noexcept override;
-    block_diff_t *assign_sibling(block_diff_t *sibling) noexcept;
-    void assign_child(block_diff_ptr_t child) noexcept;
-#endif
-
     std::string file_name;
     std::string folder_id;
     std::string device_id;

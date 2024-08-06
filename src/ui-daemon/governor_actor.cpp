@@ -5,6 +5,11 @@
 #include "net/names.h"
 #include "utils/format.hpp"
 #include "utils/error_code.h"
+#include "model/diff/modify/append_block.h"
+#include "model/diff/modify/clone_block.h"
+#include "model/diff/modify/clone_file.h"
+#include "model/diff/peer/cluster_update.h"
+#include "model/diff/peer/update_folder.h"
 
 using namespace syncspirit::daemon;
 
@@ -181,31 +186,31 @@ void governor_actor_t::add_callback(const void *pointer, command_callback_t &&ca
     callbacks_map.emplace(pointer, callback);
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &, void *) noexcept -> outcome::result<void> {
+auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept -> outcome::result<void> {
     refresh_deadline();
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto governor_actor_t::operator()(const model::diff::peer::cluster_update_t &, void *) noexcept
+auto governor_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     refresh_deadline();
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto governor_actor_t::operator()(const model::diff::peer::update_folder_t &, void *) noexcept
+auto governor_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     refresh_deadline();
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::append_block_t &, void *) noexcept
+auto governor_actor_t::operator()(const model::diff::modify::append_block_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     refresh_deadline();
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::clone_block_t &, void *) noexcept
+auto governor_actor_t::operator()(const model::diff::modify::clone_block_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     refresh_deadline();
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }

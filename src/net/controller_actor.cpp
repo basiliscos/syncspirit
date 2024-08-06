@@ -17,6 +17,7 @@
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/unshare_folder.h"
+#include "model/diff/peer/cluster_update.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
@@ -309,10 +310,10 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
     pull_ready();
     push_pending();
 }
-auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &, void *custom) noexcept
+auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (custom != this) {
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
 
     for (auto it : cluster->get_folders()) {
@@ -332,13 +333,13 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &,
     }
     updates_streamer = model::updates_streamer_t(*cluster, *peer);
 
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (custom != this) {
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
 
     auto folder_id = diff.folder_id;
@@ -349,7 +350,7 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
     file->locally_unlock();
     auto it = locally_locked_files.find(file);
     locally_locked_files.erase(it);
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, void *custom) noexcept
@@ -359,13 +360,13 @@ auto controller_actor_t::operator()(const model::diff::modify::finish_file_ack_t
     auto file = folder_info->get_file_infos().by_name(diff.file_name);
     assert(file);
     updates_streamer.on_update(*file);
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (custom != this) {
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
 
     auto &folder_id = diff.folder_id;
@@ -381,23 +382,23 @@ auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff
         assert(it != locked_files.end());
         locked_files.erase(it);
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (diff.peer_id != peer->device_id().get_sha256()) {
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
 
     send_cluster_config();
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (diff.peer_id != peer->device_id().get_sha256()) {
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
 
     send_cluster_config();
@@ -405,10 +406,10 @@ auto controller_actor_t::operator()(const model::diff::modify::unshare_folder_t 
         updates_streamer = model::updates_streamer_t(*cluster, *peer);
     }
 
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::local_update_t &diff, void *) noexcept
+auto controller_actor_t::operator()(const model::diff::modify::local_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
 
     auto &folder_id = diff.folder_id;
@@ -418,7 +419,7 @@ auto controller_actor_t::operator()(const model::diff::modify::local_update_t &d
     auto file = folder_info->get_file_infos().by_name(file_name);
     updates_streamer.on_update(*file);
     push_pending();
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t &diff, void *custom) noexcept
@@ -437,7 +438,7 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
     push_pending();
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff, void *custom) noexcept
@@ -460,16 +461,16 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
     process_block_write();
     pull_ready();
 
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::block_rej_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     LOG_ERROR(log, "on block rej, not implemented");
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void *) noexcept
+auto controller_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (diff.get_peer_sha256() == peer->device_id().get_sha256()) {
         LOG_DEBUG(log, "on remove_peer_t, initiating self destruction");
@@ -477,7 +478,7 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_peer_t &di
         auto reason = make_error(ec);
         do_shutdown(reason);
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 void controller_actor_t::on_block_update(model::message::block_update_t &message) noexcept {

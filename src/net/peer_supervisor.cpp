@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "peer_supervisor.h"
 #include "peer_actor.h"
@@ -122,7 +122,7 @@ void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
         .finish();
 }
 
-auto peer_supervisor_t::operator()(const model::diff::contact::connect_request_t &diff, void *) noexcept
+auto peer_supervisor_t::operator()(const model::diff::contact::connect_request_t &diff, void *custom) noexcept
     -> outcome::result<void> {
 
     auto lock = std::unique_lock(diff.mutex);
@@ -139,10 +139,10 @@ auto peer_supervisor_t::operator()(const model::diff::contact::connect_request_t
         .alpn(constants::protocol_name)
         .timeout(timeout)
         .finish();
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto peer_supervisor_t::operator()(const model::diff::contact::relay_connect_request_t &diff, void *) noexcept
+auto peer_supervisor_t::operator()(const model::diff::contact::relay_connect_request_t &diff, void *custom) noexcept
     -> outcome::result<void> {
 
     auto peer = cluster->get_devices().by_sha256(diff.peer.get_sha256());
@@ -164,10 +164,10 @@ auto peer_supervisor_t::operator()(const model::diff::contact::relay_connect_req
     } else {
         LOG_DEBUG(log, "peer '{}' is not offline, dropping relay connection request", peer->device_id());
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto peer_supervisor_t::operator()(const model::diff::contact::dial_request_t &diff, void *) noexcept
+auto peer_supervisor_t::operator()(const model::diff::contact::dial_request_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &devices = cluster->get_devices();
     auto peer = devices.by_sha256(diff.peer_id);
@@ -188,5 +188,5 @@ auto peer_supervisor_t::operator()(const model::diff::contact::dial_request_t &d
             .shutdown_timeout(connect_timeout)
             .finish();
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }

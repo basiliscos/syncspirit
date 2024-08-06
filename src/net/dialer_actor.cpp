@@ -195,7 +195,7 @@ void dialer_actor_t::on_contact_update(model::message::contact_update_t &msg) no
     }
 }
 
-auto dialer_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept
+auto dialer_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &devices = cluster->get_devices();
     auto peer = devices.by_sha256(diff.peer_id);
@@ -214,15 +214,15 @@ auto dialer_actor_t::operator()(const model::diff::contact::peer_state_t &diff, 
         }
     }
 
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto dialer_actor_t::operator()(const model::diff::contact::update_contact_t &diff, void *) noexcept
+auto dialer_actor_t::operator()(const model::diff::contact::update_contact_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &devices = cluster->get_devices();
     auto peer = devices.by_sha256(diff.device.get_sha256());
     if (!peer || peer == cluster->get_device()) {
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
 
     using state_t = model::device_state_t;
@@ -239,10 +239,10 @@ auto dialer_actor_t::operator()(const model::diff::contact::update_contact_t &di
         }
     }
 
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto dialer_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void *) noexcept
+auto dialer_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void * custom) noexcept
     -> outcome::result<void> {
     for (auto it = redial_map.begin(); it != redial_map.end(); ++it) {
         if (it->first->device_id().get_sha256() == diff.get_peer_sha256()) {
@@ -254,7 +254,7 @@ auto dialer_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, 
             break;
         }
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 } // namespace syncspirit::net
