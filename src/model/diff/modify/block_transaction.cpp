@@ -11,5 +11,5 @@ block_transaction_t::block_transaction_t(const file_info_t &file, size_t block_i
 block_transaction_t::~block_transaction_t() { callback(*this); }
 
 auto block_transaction_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }

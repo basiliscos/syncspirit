@@ -8,6 +8,7 @@
 #include "utils/format.hpp"
 #include "model/cluster.h"
 #include "model/messages.h"
+#include "model/diff/contact_visitor.h"
 #include "model/diff/contact/relay_connect_request.h"
 #include "net/names.h"
 #include "net/messages.h"

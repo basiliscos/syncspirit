@@ -15,6 +15,7 @@
 #include "db_actor.h"
 #include "relay_actor.h"
 #include "names.h"
+#include "model/diff/load/load_cluster.h"
 #include <boost/filesystem.hpp>
 #include <ctime>
 
@@ -194,7 +195,8 @@ void net_supervisor_t::on_contact_update(model::message::contact_update_t &messa
     }
 }
 
-auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &, void *) noexcept -> outcome::result<void> {
+auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     if (!cluster->is_tainted()) {
 
         auto &ignored_devices = cluster->get_ignored_devices();
@@ -229,7 +231,7 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &, voi
                           .finish();
         launch_net();
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 void net_supervisor_t::launch_net() noexcept {

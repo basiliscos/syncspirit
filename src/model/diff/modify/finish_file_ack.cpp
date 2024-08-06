@@ -27,7 +27,7 @@ auto finish_file_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
     assert(source->is_locally_available());
 
     uuid_t uuid;
-    assign(uuid, file->get_uuid());
+    model::assign(uuid, file->get_uuid());
     auto data = source->as_proto(false);
     auto seq = folder_info->get_max_sequence() + 1;
     data.set_sequence(seq);
@@ -47,7 +47,7 @@ auto finish_file_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
     }
     folder_info->add(new_file, true);
 
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto finish_file_ack_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

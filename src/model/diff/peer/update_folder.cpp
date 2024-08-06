@@ -36,7 +36,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         uuid_t file_uuid;
         auto prev_file = fm.by_name(f.name());
         if (prev_file) {
-            assign(file_uuid, prev_file->get_uuid());
+            model::assign(file_uuid, prev_file->get_uuid());
         } else {
             file_uuid = cluster.next_uuid();
         }
@@ -74,8 +74,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         folder_info->add(it.item, true);
     }
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
-
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto update_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

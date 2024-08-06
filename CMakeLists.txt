@@ -80,9 +80,7 @@ add_library(syncspirit_lib
     src/model/diff/base_diff.cpp
     src/model/diff/block_diff.cpp
     src/model/diff/block_visitor.cpp
-    src/model/diff/contact_diff.cpp
     src/model/diff/contact_visitor.cpp
-    src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_visitor.cpp
     src/model/diff/contact/connect_request.cpp
     src/model/diff/contact/dial_request.cpp
@@ -123,6 +121,7 @@ add_library(syncspirit_lib
     src/model/diff/modify/mark_reachable.cpp
     src/model/diff/modify/remove_blocks.cpp
     src/model/diff/modify/remove_files.cpp
+    src/model/diff/modify/remove_folder.cpp
     src/model/diff/modify/remove_folder_infos.cpp
     src/model/diff/modify/remove_peer.cpp
     src/model/diff/modify/remove_ignored_device.cpp
@@ -138,6 +137,7 @@ add_library(syncspirit_lib
     src/model/misc/error_code.cpp
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
+    src/model/misc/orphaned_blocks.cpp
     src/model/misc/updates_streamer.cpp
     src/model/misc/uuid.cpp
     src/model/misc/version_utils.cpp

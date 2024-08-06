@@ -10,12 +10,13 @@
 #include "model/messages.h"
 #include "model/messages.h"
 #include "model/diff/modify/block_transaction.h"
+#include "model/diff/block_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "hasher/messages.h"
 #include "utils/log.h"
 #include "fs/messages.h"
 
 #include <unordered_set>
-#include <optional>
 #include <deque>
 
 namespace syncspirit {

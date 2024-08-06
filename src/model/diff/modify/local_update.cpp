@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "local_update.h"
 #include "../cluster_visitor.h"
@@ -60,7 +60,7 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
 
     auto uuid = uuid_t{};
     if (prev_file) {
-        assign(uuid, prev_file->get_uuid());
+        model::assign(uuid, prev_file->get_uuid());
         *version_ptr = prev_file->get_version();
     } else {
         uuid = cluster.next_uuid();
@@ -100,7 +100,7 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
         prev_file->remove_blocks();
     }
     folder_info->add(file_info, true);
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto local_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

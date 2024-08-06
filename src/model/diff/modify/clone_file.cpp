@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "clone_file.h"
 #include "../cluster_visitor.h"
@@ -57,7 +57,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
         file_uuid = cluster.next_uuid();
     } else {
         prev_file = files.by_name(file.name());
-        assign(file_uuid, prev_file->get_uuid());
+        model::assign(file_uuid, prev_file->get_uuid());
     }
 
     auto peer_file = folder_peer->get_file_infos().by_name(file.name());
@@ -114,7 +114,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
                   blocks.size());
     }
 
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto clone_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

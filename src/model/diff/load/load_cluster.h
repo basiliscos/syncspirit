@@ -6,11 +6,12 @@
 
 namespace syncspirit::model::diff::load {
 
-struct SYNCSPIRIT_API load_cluster_t final : cluster_aggregate_diff_t {
-    using parent_t = cluster_aggregate_diff_t;
-    template <typename T> load_cluster_t(T &&diffs_) noexcept : parent_t(std::forward<T>(diffs_)) {}
+struct SYNCSPIRIT_API load_cluster_t final : cluster_diff_t {
+    using parent_t = cluster_diff_t;
+    using parent_t::parent_t;
 
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
 };
 
 } // namespace syncspirit::model::diff::load

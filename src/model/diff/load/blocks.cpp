@@ -22,5 +22,5 @@ auto blocks_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<
         }
         blocks_map.put(std::move(block.value()));
     }
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }

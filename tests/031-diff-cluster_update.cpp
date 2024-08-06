@@ -6,6 +6,13 @@
 #include "model/cluster.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/cluster_diff.h"
+#include "model/diff/modify/remove_blocks.h"
+#include "model/diff/modify/remove_files.h"
+#include "model/diff/modify/remove_folder_infos.h"
+#include "model/diff/modify/remove_unknown_folders.h"
+#include "model/diff/modify/update_folder_info.h"
+#include "model/diff/modify/add_unknown_folders.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -24,32 +31,34 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     my_cluster_update_visitor_t(F &&fn_) : fn{std::forward<F>(fn_)} {}
 
     outcome::result<void> operator()(const diff::peer::cluster_update_t &diff, void *custom) noexcept override {
-        std::ignore = diff.diff::cluster_aggregate_diff_t::visit(*this, custom);
-        return fn(diff);
+        fn(diff);
+        return diff.visit_next(*this, custom);
     }
-    outcome::result<void> operator()(const diff::modify::remove_blocks_t &, void *) noexcept override {
+
+    outcome::result<void> operator()(const diff::modify::remove_blocks_t &diff, void *custom) noexcept override {
         ++remove_blocks;
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
-    outcome::result<void> operator()(const diff::modify::remove_files_t &, void *) noexcept override {
+    outcome::result<void> operator()(const diff::modify::remove_files_t &diff, void *custom) noexcept override {
         ++remove_files;
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
-    outcome::result<void> operator()(const diff::modify::remove_folder_infos_t &, void *) noexcept override {
+    outcome::result<void> operator()(const diff::modify::remove_folder_infos_t &diff, void *custom) noexcept override {
         ++remove_folders;
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
-    outcome::result<void> operator()(const diff::modify::remove_unknown_folders_t &, void *) noexcept override {
+    outcome::result<void> operator()(const diff::modify::remove_unknown_folders_t &diff,
+                                     void *custom) noexcept override {
         ++remove_unknown_folders;
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
-    outcome::result<void> operator()(const diff::modify::update_folder_info_t &, void *) noexcept override {
+    outcome::result<void> operator()(const diff::modify::update_folder_info_t &diff, void *custom) noexcept override {
         ++updated_folders;
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
-    outcome::result<void> operator()(const diff::modify::add_unknown_folders_t &, void *) noexcept override {
+    outcome::result<void> operator()(const diff::modify::add_unknown_folders_t &diff, void *custom) noexcept override {
         ++add_unknown_folders;
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
 };
 
@@ -82,7 +91,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         auto r_a = diff->apply(*cluster);
         CHECK(r_a);
 
-        auto visitor = my_cluster_update_visitor_t([&](auto &diff) { return outcome::success(); });
+        auto visitor = my_cluster_update_visitor_t([&](auto &diff) {});
         auto r_v = diff->visit(visitor, nullptr);
         REQUIRE(r_v);
         REQUIRE(cluster->get_unknown_folders().size());
@@ -200,10 +209,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             CHECK(folder_info_peer->is_actual());
 
             bool visited = false;
-            auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
-                visited = true;
-                return outcome::success();
-            });
+            auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
             auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
@@ -224,10 +230,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             CHECK(r_a);
 
             bool visited = false;
-            auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
-                visited = true;
-                return outcome::success();
-            });
+            auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
             auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
@@ -285,10 +288,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             REQUIRE(fi->get_max_sequence() == 123456u);
 
             bool visited = false;
-            auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
-                visited = true;
-                return outcome::success();
-            });
+            auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
             auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
@@ -418,10 +418,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     CHECK(blocks_map.get(b1->get_hash()));
 
     bool visited = false;
-    auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
-        visited = true;
-        return outcome::success();
-    });
+    auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
     auto r_v = diff->visit(visitor, nullptr);
     REQUIRE(r_v);
     REQUIRE(visited);

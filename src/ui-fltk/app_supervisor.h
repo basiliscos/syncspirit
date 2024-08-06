@@ -6,6 +6,7 @@
 #include "net/messages.h"
 #include "model/messages.h"
 #include "model/diff/block_visitor.h"
+#include "model/diff/contact_visitor.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/load/load_cluster.h"
 

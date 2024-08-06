@@ -48,7 +48,7 @@ diff_builder_t &cluster_configurer_t::finish() noexcept {
     auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
     auto diff = diff::peer::cluster_update_t::create(cluster, *peer, cc);
     assert(diff.has_value());
-    builder.diffs.emplace_back(std::move(diff.value()));
+    builder.assign(diff.value().get());
     return builder;
 }
 
@@ -67,36 +67,32 @@ diff_builder_t &index_maker_t::finish() noexcept {
     auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
     auto diff = diff::peer::update_folder_t::create(cluster, *peer, index);
     assert(diff.has_value());
-    builder.diffs.emplace_back(std::move(diff.value()));
+    builder.assign(diff.value().get());
     return builder;
 }
 
 diff_builder_t::diff_builder_t(model::cluster_t &cluster_) noexcept : cluster{cluster_} {}
 
 diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
-    auto has_diffs = [&]() -> bool { return !diffs.empty() || !bdiffs.empty() || !cdiffs.empty(); };
+    auto has_diffs = [&]() -> bool { return cluster_diff || contact_diff || block_diff; };
     assert(has_diffs());
 
     auto &addr = sup.get_address();
-    while (has_diffs()) {
-        if (!diffs.empty()) {
-            auto diffs_vector = diff::cluster_aggregate_diff_t::diffs_t{};
-            std::move(diffs.begin(), diffs.end(), std::back_insert_iterator(diffs_vector));
-            auto diff = diff::cluster_diff_ptr_t(new diff::cluster_aggregate_diff_t(std::move(diffs_vector)));
-            sup.send<model::payload::model_update_t>(addr, std::move(diff), nullptr);
-            diffs.clear();
+    bool do_try = true;
+    while (do_try) {
+        do_try = false;
+        if (cluster_diff) {
+            sup.send<model::payload::model_update_t>(addr, std::move(cluster_diff), nullptr);
+            do_try = true;
         }
-
-        for (auto &diff : cdiffs) {
-            sup.send<model::payload::contact_update_t>(addr, std::move(diff), nullptr);
+        if (contact_diff) {
+            sup.send<model::payload::contact_update_t>(addr, std::move(contact_diff), nullptr);
+            do_try = true;
         }
-        cdiffs.clear();
-
-        for (auto &diff : bdiffs) {
-            sup.send<model::payload::block_update_t>(addr, std::move(diff), nullptr);
+        if (block_diff) {
+            sup.send<model::payload::block_update_t>(addr, std::move(block_diff), nullptr);
+            do_try = true;
         }
-        bdiffs.clear();
-
         sup.do_process();
     }
 
@@ -105,33 +101,25 @@ diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
 
 auto diff_builder_t::apply() noexcept -> outcome::result<void> {
     auto r = outcome::result<void>(outcome::success());
-    while (!diffs.empty()) {
-        auto &d = diffs.front();
-        r = d->apply(cluster);
-        if (!r) {
-            return r;
+    bool do_try = true;
+    while (do_try) {
+        do_try = false;
+        if (r && cluster_diff) {
+            r = cluster_diff->apply(cluster);
+            cluster_diff.reset();
+            do_try = true;
         }
-        diffs.pop_front();
-    }
-
-    while (!cdiffs.empty()) {
-        auto &d = cdiffs.front();
-        r = d->apply(cluster);
-        if (!r) {
-            return r;
+        if (r && contact_diff) {
+            r = contact_diff->apply(cluster);
+            contact_diff.reset();
+            do_try = true;
         }
-        cdiffs.pop_front();
-    }
-
-    while (!bdiffs.empty()) {
-        auto &d = bdiffs.front();
-        r = d->apply(cluster);
-        if (!r) {
-            return r;
+        if (r && block_diff) {
+            r = block_diff->apply(cluster);
+            block_diff.reset();
+            do_try = true;
         }
-        bdiffs.pop_front();
     }
-
     return r;
 }
 
@@ -141,8 +129,7 @@ diff_builder_t &diff_builder_t::create_folder(std::string_view id, std::string_v
     db_folder.set_id(std::string(id));
     db_folder.set_label(std::string(label));
     db_folder.set_path(std::string(path));
-    diffs.emplace_back(new diff::modify::create_folder_t(db_folder));
-    return *this;
+    return assign(new diff::modify::create_folder_t(db_folder));
 }
 
 diff_builder_t &diff_builder_t::update_peer(const model::device_id_t &device, std::string_view name,
@@ -152,9 +139,7 @@ diff_builder_t &diff_builder_t::update_peer(const model::device_id_t &device, st
     db_device.set_cert_name(std::string(cert_name));
     db_device.set_auto_accept(auto_accept);
 
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::update_peer_t(db_device, device, cluster));
-    diffs.emplace_back(std::move(diff));
-    return *this;
+    return assign(new diff::modify::update_peer_t(db_device, device, cluster));
 }
 
 cluster_configurer_t diff_builder_t::configure_cluster(std::string_view sha256) noexcept {
@@ -166,91 +151,100 @@ index_maker_t diff_builder_t::make_index(std::string_view sha256, std::string_vi
 }
 
 diff_builder_t &diff_builder_t::share_folder(std::string_view sha256, std::string_view folder_id) noexcept {
-    diffs.emplace_back(new diff::modify::share_folder_t(sha256, folder_id));
-    return *this;
+    return assign(new diff::modify::share_folder_t(sha256, folder_id));
 }
 
 diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcept {
-    diffs.emplace_back(new diff::modify::unshare_folder_t(cluster, fi));
-    return *this;
+    return assign(new diff::modify::unshare_folder_t(cluster, fi));
 }
 
 diff_builder_t &diff_builder_t::clone_file(const model::file_info_t &source) noexcept {
-    diffs.emplace_back(new diff::modify::clone_file_t(source));
-    return *this;
+    return assign(new diff::modify::clone_file_t(source));
 }
 
 diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &source) noexcept {
-    diffs.emplace_back(new diff::modify::finish_file_t(source));
-    return *this;
+    return assign(new diff::modify::finish_file_t(source));
 }
 
 diff_builder_t &diff_builder_t::finish_file_ack(const model::file_info_t &source) noexcept {
-    diffs.emplace_back(new diff::modify::finish_file_ack_t(source));
-    return *this;
+    return assign(new diff::modify::finish_file_ack_t(source));
 }
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
-    diffs.emplace_back(new diff::modify::local_update_t(cluster, folder_id, file_));
-    return *this;
+    return assign(new diff::modify::local_update_t(cluster, folder_id, file_));
 }
 
 diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcept {
-    diffs.emplace_back(new diff::modify::remove_peer_t(cluster, peer));
+    return assign(new diff::modify::remove_peer_t(cluster, peer));
     return *this;
 }
 
 diff_builder_t &diff_builder_t::update_state(const model::device_t &peer, const r::address_ptr_t &peer_addr,
                                              model::device_state_t state) noexcept {
-    model::diff::contact_diff_ptr_t diff;
-    diff.reset(new model::diff::contact::peer_state_t(cluster, peer.device_id().get_sha256(), peer_addr, state));
-    cdiffs.emplace_back(std::move(diff));
-    return *this;
+    return assign(new model::diff::contact::peer_state_t(cluster, peer.device_id().get_sha256(), peer_addr, state));
 }
 
 diff_builder_t &diff_builder_t::update_contact(const model::device_id_t &device,
                                                const utils::uri_container_t &uris) noexcept {
-    model::diff::contact_diff_ptr_t diff;
-    diff.reset(new model::diff::contact::update_contact_t(cluster, device, uris));
-    cdiffs.emplace_back(std::move(diff));
-    return *this;
+    return assign(new model::diff::contact::update_contact_t(cluster, device, uris));
 }
 
 diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target, size_t block_index, std::string data,
                                              dispose_callback_t callback) noexcept {
-    bdiffs.emplace_back(new diff::modify::append_block_t(target, block_index, std::move(data), std::move(callback)));
-    return *this;
+    return assign(new diff::modify::append_block_t(target, block_index, std::move(data), std::move(callback)));
 }
 
 diff_builder_t &diff_builder_t::clone_block(const model::file_block_t &file_block,
                                             dispose_callback_t callback) noexcept {
-    bdiffs.emplace_back(new diff::modify::clone_block_t(file_block, std::move(callback)));
-    return *this;
+    return assign(new diff::modify::clone_block_t(file_block, std::move(callback)));
 }
 
 diff_builder_t &diff_builder_t::ack_block(const model::diff::modify::block_transaction_t &diff) noexcept {
-    bdiffs.emplace_back(new diff::modify::block_ack_t(diff));
+    return assign(new diff::modify::block_ack_t(diff));
     return *this;
 }
 
 diff_builder_t &diff_builder_t::add_ignored_device(const model::device_id_t &device,
                                                    db::SomeDevice db_device) noexcept {
-    diffs.emplace_back(new diff::modify::add_ignored_device_t(cluster, device, db_device));
-    return *this;
+    return assign(new diff::modify::add_ignored_device_t(cluster, device, db_device));
 }
 
 diff_builder_t &diff_builder_t::add_unknown_device(const model::device_id_t &device,
                                                    db::SomeDevice db_device) noexcept {
-    diffs.emplace_back(new diff::modify::add_unknown_device_t(device, db_device));
-    return *this;
+    return assign(new diff::modify::add_unknown_device_t(device, db_device));
 }
 
 diff_builder_t &diff_builder_t::remove_ignored_device(const model::ignored_device_t &device) noexcept {
-    diffs.emplace_back(new diff::modify::remove_ignored_device_t(device));
-    return *this;
+    return assign(new diff::modify::remove_ignored_device_t(device));
 }
 
 diff_builder_t &diff_builder_t::remove_unknown_device(const model::unknown_device_t &device) noexcept {
-    diffs.emplace_back(new diff::modify::remove_unknown_device_t(device));
+    return assign(new diff::modify::remove_unknown_device_t(device));
+}
+
+template <typename Holder, typename Diff> static void generic_assign(Holder *holder, Diff *diff) noexcept {
+    if (!(*holder)) {
+        holder->reset(diff);
+    } else {
+        auto h = *holder;
+        while (h && h->sibling) {
+            h = h->sibling;
+        }
+        h->assign_sibling(diff);
+    }
+}
+
+diff_builder_t &diff_builder_t::assign(model::diff::cluster_diff_t *diff) noexcept {
+    generic_assign(&cluster_diff, diff);
+    return *this;
+}
+
+diff_builder_t &diff_builder_t::assign(model::diff::contact_diff_t *diff) noexcept {
+    generic_assign(&contact_diff, diff);
+    return *this;
+}
+
+diff_builder_t &diff_builder_t::assign(model::diff::block_diff_t *diff) noexcept {
+    generic_assign(&block_diff, diff);
     return *this;
 }

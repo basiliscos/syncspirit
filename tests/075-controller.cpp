@@ -228,6 +228,7 @@ struct fixture_t {
         if (auto_share) {
             builder.share_folder(peer_id.get_sha256(), folder_id_1);
         }
+        REQUIRE(builder.apply());
 
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
@@ -258,8 +259,6 @@ struct fixture_t {
             .finish();
 
         peer_actor = sup->create_actor<sample_peer_t>().timeout(timeout).finish();
-
-        builder.apply(*sup);
 
         auto &folders = cluster->get_folders();
         folder_1 = folders.by_id(folder_id_1);
@@ -341,7 +340,7 @@ void test_startup() {
             CHECK(peer_actor->messages.empty());
         }
     };
-    F(false, 10).run();
+    F(false, 10, false).run();
 }
 
 void test_index_receiving() {

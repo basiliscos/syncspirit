@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
 #include "rotor/supervisor.h"
 #include "model/messages.h"
+#include "model/diff/cluster_visitor.h"
 #include "utils/log.h"
 #include "syncspirit-test-export.h"
 

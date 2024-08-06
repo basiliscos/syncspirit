@@ -5,13 +5,13 @@
 #include "model/diff/modify/add_remote_folder_infos.h"
 #include "model/diff/modify/add_unknown_folders.h"
 #include "model/diff/modify/remove_blocks.h"
-#include "model/diff/modify/remove_files.h"
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/remove_unknown_folders.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/update_folder_info.h"
-#include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/cluster.h"
+#include "model/misc/orphaned_blocks.h"
 #include "utils/format.hpp"
 #include "utils/string_comparator.hpp"
 #include <spdlog/fmt/bin_to_hex.h>
@@ -23,49 +23,26 @@ using keys_t = std::set<std::string, syncspirit::utils::string_comparator_t>;
 
 auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, const message_t &message) noexcept
     -> outcome::result<cluster_diff_ptr_t> {
+    return cluster_diff_ptr_t{new cluster_update_t(cluster, source, message)};
+};
+
+cluster_update_t::cluster_update_t(const cluster_t &cluster, const device_t &source, const message_t &message) noexcept
+    : peer_id(source.device_id().get_sha256()) {
     auto log = get_log();
 
-    auto update_diffs = cluster_aggregate_diff_t::diffs_t();
     auto &known_unknowns = cluster.get_unknown_folders();
     auto new_unknown_folders = diff::modify::add_unknown_folders_t::container_t{};
     auto remote_folders = diff::modify::add_remote_folder_infos_t::container_t{};
-    file_infos_map_t removed_files;
-    keys_t removed_folders;
+    folder_infos_map_t removed_folders;
     keys_t removed_unknown_folders;
     keys_t confirmed_unknown_folders;
     keys_t confirmed_folders;
-    keys_t removed_blocks;
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
     keys_t reshared_folders;
-
-    auto remove_blocks = [&](const model::file_info_ptr_t &fi) noexcept {
-        auto &blocks = fi->get_blocks();
-        for (auto &block : blocks) {
-            auto predicate = [&](const model::file_block_t fb) -> bool {
-                auto &same_blocks = fb.block()->get_file_blocks();
-                auto is_deleted = [&](const model::file_block_t &b) -> bool {
-                    return (bool)removed_files.get(b.file()->get_name());
-                };
-                return std::none_of(begin(same_blocks), end(same_blocks), is_deleted);
-            };
-            auto &file_blocks = block->get_file_blocks();
-            bool remove = std::all_of(file_blocks.begin(), file_blocks.end(), predicate);
-            if (remove) {
-                removed_blocks.emplace(std::string(block->get_key()));
-            }
-        }
-    };
-
-    auto remove_folder = [&](const model::folder_info_t &folder_info) noexcept {
-        removed_folders.emplace(folder_info.get_key());
-        auto &files = folder_info.get_file_infos();
-        for (auto &it_f : files) {
-            auto &file = it_f.item;
-            removed_files.put(file);
-            remove_blocks(file);
-        }
-    };
+    auto orphaned_blocks = orphaned_blocks_t{};
+    auto folder_update_diff = diff::cluster_diff_ptr_t{};
+    auto folder_update = (diff::cluster_diff_t *){nullptr};
 
     auto add_unknown = [&](const proto::Folder &f, const proto::Device &d) noexcept {
         using item_t = decltype(new_unknown_folders)::value_type;
@@ -154,9 +131,8 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
             if (d.index_id() != folder_info->get_index()) {
                 LOG_TRACE(log, "cluster_update_t, reseting folder: {}, new index = {:#x}, max_seq = {}", f.label(),
                           d.index_id(), d.max_sequence());
-                remove_folder(*folder_info);
+                removed_folders.put(folder_info);
                 do_update = true;
-
             } else if (d.max_sequence() > folder_info->get_max_sequence()) {
                 LOG_TRACE(log, "cluster_update_t, updating folder = {}, index = {:#x}, max seq = {} -> {}",
                           folder->get_label(), folder_info->get_index(), folder_info->get_max_sequence(),
@@ -164,8 +140,13 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
                 do_update = true;
             }
             if (do_update) {
-                auto diff = cluster_diff_ptr_t(new modify::update_folder_info_t(std::move(db), source, *folder));
-                update_diffs.emplace_back(std::move(diff));
+                auto ptr = cluster_diff_ptr_t{new modify::update_folder_info_t(std::move(db), source, *folder)};
+                if (folder_update) {
+                    folder_update = folder_update->assign_sibling(ptr.get());
+                } else {
+                    folder_update_diff = ptr;
+                    folder_update = ptr.get();
+                }
             }
             confirmed_folders.emplace(folder_info->get_key());
         }
@@ -184,66 +165,70 @@ auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, 
         }
     }
 
-    auto diffs = cluster_aggregate_diff_t::diffs_t();
-
     for (auto it_f : folders) {
         auto &folder = it_f.item;
         auto folder_info = folder->get_folder_infos().by_device(source);
         if (folder_info) {
             if (!confirmed_folders.contains(folder_info->get_key())) {
-                remove_folder(*folder_info);
+                removed_folders.put(folder_info);
                 reshared_folders.emplace(folder->get_id());
             }
         }
     }
 
-    if (removed_files.size()) {
-        diffs.emplace_back(new modify::remove_files_t(source, removed_files));
-    }
+    auto current = (cluster_diff_t *){nullptr};
     if (removed_folders.size()) {
-        diffs.emplace_back(new modify::remove_folder_infos_t(std::move(removed_folders)));
+        auto diff = cluster_diff_ptr_t{};
+        diff = new modify::remove_folder_infos_t(std::move(removed_folders), &orphaned_blocks);
+        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }
+    if (folder_update_diff) { // must be applied folders removal
+        auto &diff = folder_update_diff;
+        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
+    }
+    auto removed_blocks = orphaned_blocks.deduce();
     if (!removed_blocks.empty()) {
-        diffs.emplace_back(new modify::remove_blocks_t(std::move(removed_blocks)));
+        auto diff = cluster_diff_ptr_t{};
+        diff = new modify::remove_blocks_t(std::move(removed_blocks));
+        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }
     if (!removed_unknown_folders.empty()) {
-        diffs.emplace_back(new modify::remove_unknown_folders_t(std::move(removed_unknown_folders)));
+        auto diff = cluster_diff_ptr_t{};
+        diff = new modify::remove_unknown_folders_t(std::move(removed_unknown_folders));
+        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }
     if (reshared_folders.size()) {
         for (auto &it : reshared_folders) {
-            diffs.emplace_back(new modify::share_folder_t(source.device_id().get_sha256(), it));
+            auto diff = cluster_diff_ptr_t{};
+            diff = new modify::share_folder_t(source.device_id().get_sha256(), it);
+            current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
         }
     }
     if (!new_unknown_folders.empty()) {
-        auto diff = cluster_diff_ptr_t(new modify::add_unknown_folders_t(std::move(new_unknown_folders)));
-        update_diffs.emplace_back(std::move(diff));
+        auto diff = cluster_diff_ptr_t{};
+        diff = new modify::add_unknown_folders_t(std::move(new_unknown_folders));
+        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }
     if (!remote_folders.empty()) {
-        auto diff = cluster_diff_ptr_t(new modify::add_remote_folder_infos_t(source, std::move(remote_folders)));
-        update_diffs.emplace_back(std::move(diff));
+        auto diff = cluster_diff_ptr_t{};
+        diff = new modify::add_remote_folder_infos_t(source, std::move(remote_folders));
+        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }
-    std::move(update_diffs.begin(), update_diffs.end(), std::back_insert_iterator(diffs));
-
-    auto ptr = cluster_diff_ptr_t();
-    ptr = new cluster_update_t(source, std::move(diffs));
-    return outcome::success(std::move(ptr));
 }
 
-cluster_update_t::cluster_update_t(const model::device_t &source, cluster_aggregate_diff_t::diffs_t diffs_) noexcept
-    : cluster_aggregate_diff_t{std::move(diffs_)}, peer_id(source.device_id().get_sha256()) {}
-
 auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "applying cluster_update_t");
+    LOG_TRACE(log, "applying cluster_update_t (self)");
     auto &folders = cluster.get_folders();
     auto peer = cluster.get_devices().by_sha256(peer_id);
     peer->get_remote_folder_infos().clear();
 
-    auto r = cluster_aggregate_diff_t::apply_impl(cluster);
-    if (r.has_error()) {
+    LOG_TRACE(log, "applying cluster_update_t (children)");
+    auto r = applicator_t::apply_child(cluster);
+    if (!r) {
         return r;
     }
 
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto cluster_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

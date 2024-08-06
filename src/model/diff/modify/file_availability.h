@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
 #include "model/cluster.h"
 #include "../cluster_diff.h"
+#include "../cluster_visitor.h"
 
 namespace syncspirit::model::diff::modify {
 

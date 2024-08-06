@@ -5,11 +5,12 @@
 
 #include "../cluster_diff.h"
 #include "model/device.h"
+#include "model/misc/orphaned_blocks.h"
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API remove_peer_t final : cluster_aggregate_diff_t {
-    using parent_t = cluster_aggregate_diff_t;
+struct SYNCSPIRIT_API remove_peer_t final : cluster_diff_t {
+    using parent_t = cluster_diff_t;
 
     remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept;
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;

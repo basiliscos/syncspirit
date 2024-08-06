@@ -28,8 +28,7 @@ auto lock_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resu
         assert(file->is_locked());
         file->unlock();
     }
-
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto lock_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

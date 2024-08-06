@@ -6,6 +6,7 @@
 #include "tree_item/unknown_devices.h"
 #include "tree_item/unknown_folders.h"
 #include "net/names.h"
+#include "model/diff/load/load_cluster.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_unknown_device.h"
@@ -162,7 +163,8 @@ auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_view
     return db_info_viewer_guard_t(this);
 }
 
-auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &, void *) noexcept -> outcome::result<void> {
+auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     auto devices_node = static_cast<tree_item::devices_t *>(devices);
 
     auto &self_device = cluster->get_device();
@@ -197,7 +199,7 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &, voi
         folder_info->set_augmentation(folders_node->add_folder(*folder_info));
     }
 
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff, void *) noexcept
@@ -213,10 +215,11 @@ auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff
 
 auto app_supervisor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
+    std::abort();
+    // return diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *) noexcept
+auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &devices = cluster->get_devices();
     auto &unknown_folders = cluster->get_unknown_folders();
@@ -231,21 +234,21 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_folders
         }
         unknown_folder->set_augmentation(unknown_node->add_unknown_folder(*unknown_folder));
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_device_t &diff, void *) noexcept
+auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_device_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &device = *cluster->get_unknown_devices().by_sha256(diff.device_id.get_sha256());
     auto unknown_devices_node = static_cast<tree_item::unknown_devices_t *>(unkwnown_devices);
     device.set_augmentation(unknown_devices_node->add_device(device));
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_t &diff, void *) noexcept
+auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &device = *cluster->get_ignored_devices().by_sha256(diff.device_id.get_sha256());
     auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
     device.set_augmentation(ignored_devices_node->add_device(device));
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }

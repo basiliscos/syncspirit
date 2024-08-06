@@ -59,7 +59,7 @@ auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
         unknown.remove(unknown_folder);
     }
 
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto share_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

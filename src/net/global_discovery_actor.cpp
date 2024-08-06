@@ -228,7 +228,7 @@ void global_discovery_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
-auto global_discovery_actor_t::operator()(const model::diff::contact::update_contact_t &diff, void *) noexcept
+auto global_discovery_actor_t::operator()(const model::diff::contact::update_contact_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (diff.self && state == r::state_t::OPERATIONAL) {
         if (resources->has(resource::timer)) {
@@ -236,20 +236,20 @@ auto global_discovery_actor_t::operator()(const model::diff::contact::update_con
         }
         announce();
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto global_discovery_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if ((state != r::state_t::OPERATIONAL) || (diff.state != model::device_state_t::discovering)) {
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
 
     auto sha256 = diff.peer_id;
     if (discovering_devices.count(sha256)) {
         auto device_id = model::device_id_t::from_sha256(sha256).value();
         LOG_TRACE(log, "device '{}' is already discovering, skip", device_id.get_short());
-        return outcome::success();
+        return diff.visit_next(*this, custom);
     }
 
     auto peer = cluster->get_devices().by_sha256(sha256);
@@ -267,5 +267,5 @@ auto global_discovery_actor_t::operator()(const model::diff::contact::peer_state
         auto msg = reinterpret_cast<model::message::contact_update_t *>(custom);
         make_request(addr_discovery, r.value(), std::move(tx_buff), msg);
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }

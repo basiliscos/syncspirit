@@ -202,14 +202,16 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome
     return outcome::success();
 }
 
-auto file_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *) noexcept -> outcome::result<void> {
+auto file_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = file_info->get_file_infos().by_name(diff.file.name());
-    return reflect(file);
+    auto r = reflect(file);
+    return r ? diff.visit_next(*this, custom) : r;
 }
 
-auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *) noexcept
+auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
@@ -243,10 +245,10 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     auto ack = model::diff::cluster_diff_ptr_t{};
     ack = new model::diff::modify::finish_file_ack_t(*file);
     send<model::payload::model_update_t>(coordinator, std::move(ack), this);
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
-auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, void *) noexcept
+auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto ack = write_ack_t(diff);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
@@ -264,7 +266,8 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, v
     auto block_index = diff.block_index;
     auto offset = file->get_block_offset(block_index);
     auto &backend = file_opt.value();
-    return ack(backend->write(offset, diff.data));
+    auto r = ack(backend->write(offset, diff.data));
+    return r ? diff.visit_next(*this, custom) : r;
 }
 
 auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const file_ptr_t &target_backend) noexcept
@@ -291,7 +294,7 @@ auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const 
     return open_file_ro(source_path, false);
 }
 
-auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, void *) noexcept
+auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto ack = write_ack_t(diff);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
@@ -319,7 +322,8 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     auto &block = source->get_blocks().at(diff.source_block_index);
     auto target_offset = target->get_block_offset(diff.block_index);
     auto source_offset = source->get_block_offset(diff.source_block_index);
-    return ack(target_backend->copy(target_offset, *source_backend, source_offset, block->get_size()));
+    auto r = ack(target_backend->copy(target_offset, *source_backend, source_offset, block->get_size()));
+    return r ? diff.visit_next(*this, custom) : r;
 }
 
 auto file_actor_t::open_file_rw(const boost::filesystem::path &path, model::file_info_ptr_t info) noexcept

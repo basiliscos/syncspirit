@@ -24,7 +24,7 @@ auto peer_state_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
         peer->update_contact(endpoint, client_name, client_version);
     }
     peer->notify_update();
-    return outcome::success();
+    return applicator_t::apply_impl(cluster);
 }
 
 auto peer_state_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

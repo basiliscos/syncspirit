@@ -36,7 +36,7 @@ auto update_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outc
         LOG_TRACE(log, "applyging update_folder_info_t (new/reset), device {}, folder = {}", device->device_id(),
                   folder->get_label());
     }
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto update_folder_info_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

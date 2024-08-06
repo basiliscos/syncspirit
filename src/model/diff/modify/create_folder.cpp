@@ -38,7 +38,7 @@ auto create_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     folders.put(folder);
     folder->assign_cluster(&cluster);
 
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto create_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
