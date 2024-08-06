@@ -54,7 +54,9 @@ remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noe
 
 auto remove_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto r = applicator_t::apply_child(cluster);
-    if (!r) { return r; }
+    if (!r) {
+        return r;
+    }
     auto sha256 = get_peer_sha256();
     assert(sha256.size() == device_id_t::digest_length);
     auto peer = cluster.get_devices().by_sha256(sha256);

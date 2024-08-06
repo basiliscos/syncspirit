@@ -242,7 +242,7 @@ auto dialer_actor_t::operator()(const model::diff::contact::update_contact_t &di
     return diff.visit_next(*this, custom);
 }
 
-auto dialer_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void * custom) noexcept
+auto dialer_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     for (auto it = redial_map.begin(); it != redial_map.end(); ++it) {
         if (it->first->device_id().get_sha256() == diff.get_peer_sha256()) {

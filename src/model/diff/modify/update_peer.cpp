@@ -36,7 +36,9 @@ update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
 
 auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto r = applicator_t::apply_child(cluster);
-    if (!r) { return r; }
+    if (!r) {
+        return r;
+    }
     auto &devices = cluster.get_devices();
     auto peer = devices.by_sha256(peer_id);
     if (!peer) {

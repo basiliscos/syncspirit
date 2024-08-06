@@ -183,7 +183,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, const device_t &sou
         current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }
     if (folder_update_diff) { // must be applied folders removal
-        auto& diff = folder_update_diff;
+        auto &diff = folder_update_diff;
         current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }
     auto removed_blocks = orphaned_blocks.deduce();
@@ -224,7 +224,9 @@ auto cluster_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
 
     LOG_TRACE(log, "applying cluster_update_t (children)");
     auto r = applicator_t::apply_child(cluster);
-    if (!r) { return r; }
+    if (!r) {
+        return r;
+    }
 
     return applicator_t::apply_sibling(cluster);
 }

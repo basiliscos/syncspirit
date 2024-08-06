@@ -35,7 +35,9 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, model::folde
 
 auto unshare_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto r = applicator_t::apply_child(cluster);
-    if (!r) { return r; }
+    if (!r) {
+        return r;
+    }
     LOG_TRACE(log, "applyging unshare_folder_t");
     return applicator_t::apply_sibling(cluster);
 }

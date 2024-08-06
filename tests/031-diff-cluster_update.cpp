@@ -91,7 +91,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         auto r_a = diff->apply(*cluster);
         CHECK(r_a);
 
-        auto visitor = my_cluster_update_visitor_t([&](auto &diff) { });
+        auto visitor = my_cluster_update_visitor_t([&](auto &diff) {});
         auto r_v = diff->visit(visitor, nullptr);
         REQUIRE(r_v);
         REQUIRE(cluster->get_unknown_folders().size());
@@ -209,9 +209,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             CHECK(folder_info_peer->is_actual());
 
             bool visited = false;
-            auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
-                visited = true;
-            });
+            auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
             auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
@@ -232,9 +230,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             CHECK(r_a);
 
             bool visited = false;
-            auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
-                visited = true;
-            });
+            auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
             auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
@@ -292,9 +288,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             REQUIRE(fi->get_max_sequence() == 123456u);
 
             bool visited = false;
-            auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
-                visited = true;
-            });
+            auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
             auto r_v = diff->visit(visitor, nullptr);
             REQUIRE(r_v);
             REQUIRE(visited);
@@ -424,9 +418,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     CHECK(blocks_map.get(b1->get_hash()));
 
     bool visited = false;
-    auto visitor = my_cluster_update_visitor_t([&](auto &diff) {
-        visited = true;
-    });
+    auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
     auto r_v = diff->visit(visitor, nullptr);
     REQUIRE(r_v);
     REQUIRE(visited);

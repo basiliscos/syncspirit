@@ -32,7 +32,9 @@ remove_files_t::remove_files_t(const device_t &device, const file_infos_map_t &f
 
 auto remove_files_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto r = applicator_t::apply_child(cluster);
-    if (!r) { return r; }
+    if (!r) {
+        return r;
+    }
     auto &folders = cluster.get_folders();
     for (size_t i = 0; i < folder_ids.size(); ++i) {
         auto folder = cluster.get_folders().by_id(folder_ids[i]);

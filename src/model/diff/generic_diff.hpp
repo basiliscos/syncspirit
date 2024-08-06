@@ -80,7 +80,7 @@ template <typename Tag, typename T> struct generic_diff_t : base_diff_t {
         return n;
     }
 
-    T* assign_child(ptr_t child_) noexcept {
+    T *assign_child(ptr_t child_) noexcept {
         assert(!child);
         child = std::move(child_);
         return child.get();

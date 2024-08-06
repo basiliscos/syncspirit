@@ -13,19 +13,23 @@
 
 using namespace syncspirit::model::diff;
 
-auto contact_visitor_t::operator()(const contact::connect_request_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto contact_visitor_t::operator()(const contact::connect_request_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
-auto contact_visitor_t::operator()(const contact::dial_request_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto contact_visitor_t::operator()(const contact::dial_request_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
-auto contact_visitor_t::operator()(const contact::ignored_connected_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto contact_visitor_t::operator()(const contact::ignored_connected_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
-auto contact_visitor_t::operator()(const contact::relay_connect_request_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto contact_visitor_t::operator()(const contact::relay_connect_request_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
@@ -33,10 +37,12 @@ auto contact_visitor_t::operator()(const contact::peer_state_t &diff, void *cust
     return diff.visit_next(*this, custom);
 }
 
-auto contact_visitor_t::operator()(const contact::unknown_connected_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto contact_visitor_t::operator()(const contact::unknown_connected_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
-auto contact_visitor_t::operator()(const contact::update_contact_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto contact_visitor_t::operator()(const contact::update_contact_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }

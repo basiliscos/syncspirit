@@ -95,7 +95,7 @@ diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
 auto diff_builder_t::apply() noexcept -> outcome::result<void> {
     auto r = outcome::result<void>(outcome::success());
     bool do_try = true;
-    while(do_try) {
+    while (do_try) {
         do_try = false;
         if (r && cluster_diff) {
             r = cluster_diff->apply(cluster);
@@ -218,8 +218,7 @@ diff_builder_t &diff_builder_t::remove_unknown_device(const model::unknown_devic
 template <typename Holder, typename Diff> static void generic_assign(Holder *holder, Diff *diff) noexcept {
     if (!(*holder)) {
         holder->reset(diff);
-    }
-    else {
+    } else {
         auto h = *holder;
         while (h && h->sibling) {
             h = h->sibling;

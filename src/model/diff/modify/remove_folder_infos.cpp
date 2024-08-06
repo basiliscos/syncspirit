@@ -40,7 +40,9 @@ remove_folder_infos_t::remove_folder_infos_t(const folder_infos_map_t &map, orph
 
 auto remove_folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto r = applicator_t::apply_child(cluster);
-    if (!r) { return r; }
+    if (!r) {
+        return r;
+    }
     for (auto &key : keys) {
         auto decomposed = folder_info_t::decompose_key(key);
         char folder_key_data[folder_t::data_length];

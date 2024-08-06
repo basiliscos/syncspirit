@@ -14,7 +14,8 @@ auto block_visitor_t::operator()(const modify::append_block_t &diff, void *custo
     return diff.visit_next(*this, custom);
 }
 
-auto block_visitor_t::operator()(const modify::blocks_availability_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto block_visitor_t::operator()(const modify::blocks_availability_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

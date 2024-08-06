@@ -195,7 +195,8 @@ void net_supervisor_t::on_contact_update(model::message::contact_update_t &messa
     }
 }
 
-auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     if (!cluster->is_tainted()) {
 
         auto &ignored_devices = cluster->get_ignored_devices();

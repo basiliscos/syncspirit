@@ -163,7 +163,8 @@ auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_view
     return db_info_viewer_guard_t(this);
 }
 
-auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     auto devices_node = static_cast<tree_item::devices_t *>(devices);
 
     auto &self_device = cluster->get_device();

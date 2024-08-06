@@ -400,7 +400,8 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff, vo
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -727,7 +728,8 @@ auto db_actor_t::operator()(const model::diff::modify::update_folder_info_t &dif
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -766,7 +768,6 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void 
     if (!r) {
         return r.assume_error();
     }
-
 
     return commit(false);
 }
@@ -814,7 +815,8 @@ auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, 
     return commit(false);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::local_update_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::local_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -877,7 +879,8 @@ auto db_actor_t::operator()(const model::diff::modify::local_update_t &diff, voi
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -929,7 +932,8 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }

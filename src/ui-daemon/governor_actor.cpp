@@ -186,7 +186,8 @@ void governor_actor_t::add_callback(const void *pointer, command_callback_t &&ca
     callbacks_map.emplace(pointer, callback);
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     refresh_deadline();
     return diff.visit_next(*this, custom);
 }
