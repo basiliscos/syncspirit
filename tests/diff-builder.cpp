@@ -78,16 +78,23 @@ diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
     assert(has_diffs());
 
     auto &addr = sup.get_address();
-    if (cluster_diff) {
-        sup.send<model::payload::model_update_t>(addr, std::move(cluster_diff), nullptr);
+    bool do_try = true;
+    while (do_try) {
+        do_try = false;
+        if (cluster_diff) {
+            sup.send<model::payload::model_update_t>(addr, std::move(cluster_diff), nullptr);
+            do_try = true;
+        }
+        if (contact_diff) {
+            sup.send<model::payload::contact_update_t>(addr, std::move(contact_diff), nullptr);
+            do_try = true;
+        }
+        if (block_diff) {
+            sup.send<model::payload::block_update_t>(addr, std::move(block_diff), nullptr);
+            do_try = true;
+        }
+        sup.do_process();
     }
-    if (contact_diff) {
-        sup.send<model::payload::contact_update_t>(addr, std::move(contact_diff), nullptr);
-    }
-    if (block_diff) {
-        sup.send<model::payload::block_update_t>(addr, std::move(block_diff), nullptr);
-    }
-    sup.do_process();
 
     return *this;
 }
