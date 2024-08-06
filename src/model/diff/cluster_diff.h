@@ -4,7 +4,6 @@
 #pragma once
 
 #include "generic_diff.hpp"
-// #include "cluster_visitor.h"
 #include "syncspirit-export.h"
 
 namespace syncspirit::model::diff {
