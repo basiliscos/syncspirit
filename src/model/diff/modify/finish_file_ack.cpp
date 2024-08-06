@@ -47,7 +47,7 @@ auto finish_file_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
     }
     folder_info->add(new_file, true);
 
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto finish_file_ack_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

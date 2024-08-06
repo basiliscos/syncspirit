@@ -25,12 +25,14 @@ remove_files_t::remove_files_t(const device_t &device, const file_infos_map_t &f
     if (!orphaned_blocks_) {
         auto block_keys = local_orphaned_blocks.deduce();
         if (block_keys.size()) {
-            assign(new remove_blocks_t(std::move(block_keys)));
+            assign_child(new remove_blocks_t(std::move(block_keys)));
         }
     }
 }
 
 auto remove_files_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(cluster);
+    if (!r) { return r; }
     auto &folders = cluster.get_folders();
     for (size_t i = 0; i < folder_ids.size(); ++i) {
         auto folder = cluster.get_folders().by_id(folder_ids[i]);
@@ -41,7 +43,7 @@ auto remove_files_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
         auto file = file_infos.get(decomposed.file_id);
         file_infos.remove(file);
     }
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto remove_files_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

@@ -100,7 +100,7 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
         prev_file->remove_blocks();
     }
     folder_info->add(file_info, true);
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto local_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

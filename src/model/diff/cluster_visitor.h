@@ -49,9 +49,7 @@ struct remove_unknown_device_t;
 struct remove_unknown_folders_t;
 } // namespace modify
 
-template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
-    virtual ~generic_visitor_t() = default;
-
+template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t> {
     virtual outcome::result<void> operator()(const load::devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::ignored_devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::unknown_devices_t &, void *custom) noexcept;
@@ -82,11 +80,8 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster> {
     virtual outcome::result<void> operator()(const modify::remove_ignored_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_unknown_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_unknown_folders_t &, void *custom) noexcept;
-
-    outcome::result<void> next(const model::diff::cluster_diff_t &, void *custom,
-                               const outcome::result<void> &prev = outcome::success()) noexcept;
 };
 
-using cluster_visitor_t = generic_visitor_t<tag::cluster>;
+using cluster_visitor_t = generic_visitor_t<tag::cluster, cluster_diff_t>;
 
 } // namespace syncspirit::model::diff

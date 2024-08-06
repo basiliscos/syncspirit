@@ -51,7 +51,6 @@
 #include <alloca.h>
 #endif
 
-#if 0
 namespace syncspirit::net {
 
 namespace {
@@ -238,7 +237,6 @@ void db_actor_t::on_db_info(message::db_info_request_t &request) noexcept {
 void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {
     LOG_TRACE(log, "on_cluster_load");
     using namespace model::diff;
-    using container_t = cluster_aggregate_diff_t::diffs_t;
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn_opt) {
@@ -291,21 +289,21 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         return reply_with_error(request, make_error(unknown_folders_opt.error()));
     }
 
-    container_t container;
-    container.emplace_back(new load::devices_t(std::move(devices_opt.value())));
-    container.emplace_back(new load::blocks_t(std::move(blocks_opt.value())));
-    container.emplace_back(new load::ignored_devices_t(std::move(ignored_devices_opt.value())));
-    container.emplace_back(new load::ignored_folders_t(std::move(ignored_folders_opt.value())));
-    container.emplace_back(new load::folders_t(std::move(folders_opt.value())));
-    container.emplace_back(new load::folder_infos_t(std::move(folder_infos_opt.value())));
-    container.emplace_back(new load::file_infos_t(std::move(file_infos_opt.value())));
-    container.emplace_back(new load::unknown_devices_t(std::move(unknown_devices_opt.value())));
-    container.emplace_back(new load::unknown_folders_t(std::move(unknown_folders_opt.value())));
-    container.emplace_back(new load::close_transaction_t(std::move(txn)));
+    auto diff = model::diff::cluster_diff_ptr_t{};
+    diff.reset(new load::load_cluster_t());
 
-    cluster_diff_ptr_t r = cluster_diff_ptr_t(new load::load_cluster_t(std::move(container)));
+    diff->assign_child(new load::devices_t(std::move(devices_opt.value())))
+        ->assign_sibling(new load::blocks_t(std::move(blocks_opt.value())))
+        ->assign_sibling(new load::ignored_devices_t(std::move(ignored_devices_opt.value())))
+        ->assign_sibling(new load::ignored_folders_t(std::move(ignored_folders_opt.value())))
+        ->assign_sibling(new load::folders_t(std::move(folders_opt.value())))
+        ->assign_sibling(new load::folder_infos_t(std::move(folder_infos_opt.value())))
+        ->assign_sibling(new load::file_infos_t(std::move(file_infos_opt.value())))
+        ->assign_sibling(new load::unknown_devices_t(std::move(unknown_devices_opt.value())))
+        ->assign_sibling(new load::unknown_folders_t(std::move(unknown_folders_opt.value())))
+        ->assign_sibling(new load::close_transaction_t(std::move(txn)));
 
-    reply_to(request, r);
+    reply_to(request, diff);
 }
 
 void db_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
@@ -356,7 +354,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
         }
     }
 
-    auto r = diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
+    auto r = diff.visit_next(*this, custom);
     if (r.has_error()) {
         return r.assume_error();
     }
@@ -364,7 +362,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -394,10 +392,15 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff, vo
         return r.assume_error();
     }
 
+    r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -423,10 +426,15 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, voi
         return r.assume_error();
     }
 
+    r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -454,6 +462,11 @@ auto db_actor_t::operator()(const model::diff::modify::add_unknown_folders_t &di
         }
     }
 
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return commit(true);
 }
 
@@ -468,8 +481,8 @@ auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &dif
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto r = diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
-    if (r.has_error()) {
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
         return r.assume_error();
     }
 
@@ -485,7 +498,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &dif
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::add_unknown_device_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::modify::add_unknown_device_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -505,6 +518,10 @@ auto db_actor_t::operator()(const model::diff::modify::add_unknown_device_t &dif
         return r.assume_error();
     }
 
+    r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
     return commit(true);
 }
 
@@ -524,6 +541,11 @@ auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) n
         if (!r) {
             return r.assume_error();
         }
+    }
+
+    auto r = diff.visit_next(*this, nullptr);
+    if (!r) {
+        return r.assume_error();
     }
 
     return commit(false);
@@ -559,8 +581,8 @@ auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, v
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto r = diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
-    if (r.has_error()) {
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
         return r.assume_error();
     }
 
@@ -579,8 +601,8 @@ auto db_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto r = diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
-    if (r.has_error()) {
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
         return r.assume_error();
     }
     r = db::remove(diff.peer_key, txn);
@@ -608,6 +630,11 @@ auto db_actor_t::operator()(const model::diff::modify::remove_ignored_device_t &
         return r.assume_error();
     }
 
+    r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return commit(true);
 }
 
@@ -624,6 +651,11 @@ auto db_actor_t::operator()(const model::diff::modify::remove_unknown_device_t &
     auto &txn = *txn_opt.assume_value();
 
     auto r = db::remove(diff.device_key, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    r = diff.visit_next(*this, custom);
     if (!r) {
         return r.assume_error();
     }
@@ -655,15 +687,15 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void
         return r.assume_error();
     }
 
-    r = diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
-    if (r.has_error()) {
+    r = diff.visit_next(*this, custom);
+    if (!r) {
         return r.assume_error();
     }
 
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::update_folder_info_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::modify::update_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -687,10 +719,15 @@ auto db_actor_t::operator()(const model::diff::modify::update_folder_info_t &dif
         return r.assume_error();
     }
 
+    r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -725,10 +762,16 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void 
         }
     }
 
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
+
     return commit(false);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -763,10 +806,15 @@ auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, 
         }
     }
 
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return commit(false);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::local_update_t &diff, void *) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::local_update_t &diff, void *custom) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -820,10 +868,16 @@ auto db_actor_t::operator()(const model::diff::modify::local_update_t &diff, voi
             return r.assume_error();
         }
     }
+
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -867,10 +921,15 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
         }
     }
 
+    r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -897,10 +956,15 @@ auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void
         return r.assume_error();
     }
 
+    r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::contact::ignored_connected_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::contact::ignored_connected_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -923,10 +987,15 @@ auto db_actor_t::operator()(const model::diff::contact::ignored_connected_t &dif
         return r.assume_error();
     }
 
+    r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::contact::unknown_connected_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::contact::unknown_connected_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -949,8 +1018,12 @@ auto db_actor_t::operator()(const model::diff::contact::unknown_connected_t &dif
         return r.assume_error();
     }
 
+    r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
     return commit(true);
 }
 
 } // namespace syncspirit::net
-#endif

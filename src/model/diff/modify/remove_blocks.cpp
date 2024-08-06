@@ -18,7 +18,7 @@ auto remove_blocks_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
             blocks.remove(b);
         }
     }
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto remove_blocks_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

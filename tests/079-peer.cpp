@@ -9,6 +9,7 @@
 #include "proto/bep_support.h"
 #include "model/cluster.h"
 #include "model/messages.h"
+#include "model/diff/contact_visitor.h"
 #include "net/names.h"
 #include "net/messages.h"
 #include "net/peer_actor.h"

@@ -9,7 +9,7 @@ using namespace syncspirit::model::diff::contact;
 dial_request_t::dial_request_t(model::device_t &peer) noexcept : peer_id{peer.device_id().get_sha256()} {}
 
 auto dial_request_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto dial_request_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

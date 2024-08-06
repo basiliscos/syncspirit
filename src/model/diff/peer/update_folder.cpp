@@ -74,8 +74,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         folder_info->add(it.item, true);
     }
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
-
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto update_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

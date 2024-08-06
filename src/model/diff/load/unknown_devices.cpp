@@ -12,7 +12,7 @@ auto unknown_devices_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
     using device_t = model::unknown_device_t;
     auto &map = cluster.get_unknown_devices();
     auto r = some_devices_t::apply<device_t>(devices, map);
-    return r && next ? next->apply(cluster) : r;
+    return r ? applicator_t::apply_sibling(cluster) : r;
 }
 
 auto unknown_devices_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

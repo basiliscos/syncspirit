@@ -51,5 +51,5 @@ auto folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
         auto &fi = option.assume_value();
         map.put(fi);
     }
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }

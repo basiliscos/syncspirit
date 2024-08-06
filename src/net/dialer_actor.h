@@ -8,6 +8,7 @@
 #include "utils/log.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/contact_visitor.h"
 #include "messages.h"
 #include <optional>
 #include <unordered_map>

@@ -31,7 +31,7 @@ auto devices_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result
         device_map.put(device);
     }
     assert(device_map.by_sha256(local_device->device_id().get_sha256()));
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto devices_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

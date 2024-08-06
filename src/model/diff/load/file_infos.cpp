@@ -50,5 +50,5 @@ auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
             fi->lock();
         }
     }
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }

@@ -18,7 +18,7 @@ finish_file_t::finish_file_t(const model::file_info_t &file) noexcept {
 }
 
 auto finish_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto finish_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

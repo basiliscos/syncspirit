@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "ignored_folders.h"
 #include "../../cluster.h"
@@ -16,5 +16,5 @@ auto ignored_folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
         auto &folder = option.value();
         map.put(folder);
     }
-    return next ? next->apply(cluster) : outcome::success();
-}
+    return applicator_t::apply_sibling(cluster);
+};

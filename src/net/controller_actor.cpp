@@ -104,7 +104,7 @@ void controller_actor_t::shutdown_finish() noexcept {
                 diff = new_diff;
                 current = new_diff;
             } else {
-                current = current->assign(new_diff);
+                current = current->assign_sibling(new_diff);
             }
             ++diff_counter;
         };
@@ -452,7 +452,7 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
         source_file->set_unlocking(true);
         auto diff = model::diff::cluster_diff_ptr_t{};
         diff = new model::diff::modify::lock_file_t(*source_file, false);
-        diff->assign(new model::diff::modify::finish_file_t(*my_file));
+        diff->assign_sibling(new model::diff::modify::finish_file_t(*my_file));
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
 

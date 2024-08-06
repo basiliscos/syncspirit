@@ -20,7 +20,7 @@ auto ignored_connected_t::apply_impl(cluster_t &cluster) const noexcept -> outco
     }
     prev->assign(db_device);
     prev->notify_update();
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto ignored_connected_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

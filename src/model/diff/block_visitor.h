@@ -8,6 +8,8 @@
 
 namespace syncspirit::model::diff {
 
+struct block_diff_t;
+
 namespace modify {
 struct append_block_t;
 struct block_ack_t;
@@ -17,9 +19,7 @@ struct blocks_availability_t;
 struct clone_block_t;
 } // namespace modify
 
-template <> struct SYNCSPIRIT_API generic_visitor_t<tag::block> {
-    virtual ~generic_visitor_t() = default;
-
+template <> struct SYNCSPIRIT_API generic_visitor_t<tag::block, block_diff_t> {
     virtual outcome::result<void> operator()(const modify::append_block_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::block_ack_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::block_rej_t &, void *custom) noexcept;
@@ -27,6 +27,6 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::block> {
     virtual outcome::result<void> operator()(const modify::clone_block_t &, void *custom) noexcept;
 };
 
-using block_visitor_t = generic_visitor_t<tag::block>;
+using block_visitor_t = generic_visitor_t<tag::block, block_diff_t>;
 
 } // namespace syncspirit::model::diff

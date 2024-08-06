@@ -94,17 +94,24 @@ diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
 
 auto diff_builder_t::apply() noexcept -> outcome::result<void> {
     auto r = outcome::result<void>(outcome::success());
-    if (r && cluster_diff) {
-        r = cluster_diff->apply(cluster);
-        cluster_diff.reset();
-    }
-    if (r && contact_diff) {
-        r = contact_diff->apply(cluster);
-        contact_diff.reset();
-    }
-    if (r && block_diff) {
-        r = block_diff->apply(cluster);
-        block_diff.reset();
+    bool do_try = true;
+    while(do_try) {
+        do_try = false;
+        if (r && cluster_diff) {
+            r = cluster_diff->apply(cluster);
+            cluster_diff.reset();
+            do_try = true;
+        }
+        if (r && contact_diff) {
+            r = contact_diff->apply(cluster);
+            contact_diff.reset();
+            do_try = true;
+        }
+        if (r && block_diff) {
+            r = block_diff->apply(cluster);
+            block_diff.reset();
+            do_try = true;
+        }
     }
     return r;
 }
@@ -209,10 +216,16 @@ diff_builder_t &diff_builder_t::remove_unknown_device(const model::unknown_devic
 }
 
 template <typename Holder, typename Diff> static void generic_assign(Holder *holder, Diff *diff) noexcept {
-    while ((*holder)) {
-        holder = &(*holder)->next;
+    if (!(*holder)) {
+        holder->reset(diff);
     }
-    holder->reset(diff);
+    else {
+        auto h = *holder;
+        while (h && h->sibling) {
+            h = h->sibling;
+        }
+        h->assign_sibling(diff);
+    }
 }
 
 diff_builder_t &diff_builder_t::assign(model::diff::cluster_diff_t *diff) noexcept {

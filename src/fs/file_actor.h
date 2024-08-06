@@ -8,6 +8,7 @@
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "model/diff/block_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "model/misc/lru_cache.hpp"
 #include "config/main.h"
 #include "utils/log.h"

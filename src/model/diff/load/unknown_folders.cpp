@@ -24,5 +24,5 @@ auto unknown_folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
         auto &folder = option.value();
         items.put(std::move(folder));
     }
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }

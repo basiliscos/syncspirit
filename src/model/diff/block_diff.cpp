@@ -17,12 +17,24 @@ block_diff_t::block_diff_t(const file_info_t &file, size_t block_index_) noexcep
     device_id = fi->get_device()->device_id().get_sha256();
 }
 
+#if 0
 auto block_diff_t::visit(block_visitor_t &, void *) const noexcept -> outcome::result<void> {
     return outcome::success();
 }
 
-block_diff_t *block_diff_t::assign(block_diff_t *next_) noexcept {
-    assert(!next);
-    next = next_;
-    return next_;
+block_diff_t *block_diff_t::assign_sibling(block_diff_t *sibling_) noexcept {
+    assert(!sibling);
+    sibling = sibling_;
+
+    auto n = sibling_;
+    while (n->sibling) {
+        n = n->sibling.get();
+    }
+    return n;
 }
+
+void block_diff_t::assign_child(block_diff_ptr_t child_) noexcept {
+    assert(!child);
+    child = std::move(child_);
+}
+#endif

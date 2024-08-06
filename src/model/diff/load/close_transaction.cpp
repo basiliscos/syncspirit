@@ -9,7 +9,7 @@ using namespace syncspirit::model::diff::load;
 close_transaction_t::close_transaction_t(db::transaction_t txn_) noexcept : txn{std::move(txn_)} {}
 
 auto close_transaction_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 close_transaction_t::~close_transaction_t() noexcept {

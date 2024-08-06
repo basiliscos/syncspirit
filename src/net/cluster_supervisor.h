@@ -7,7 +7,7 @@
 #include "model/cluster.h"
 #include "model/folder.h"
 #include "model/messages.h"
-#include "model/diff/cluster_visitor.h"
+#include "model/diff/contact_visitor.h"
 #include "utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>

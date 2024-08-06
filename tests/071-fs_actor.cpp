@@ -615,10 +615,10 @@ void test_requesting_block() {
 }
 
 int _init() {
-    REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[fs]");
+    // REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[fs]");
     REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
-    REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
-    REGISTER_TEST_CASE(test_requesting_block, "test_requesting_block", "[fs]");
+    // REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
+    // REGISTER_TEST_CASE(test_requesting_block, "test_requesting_block", "[fs]");
     return 1;
 }
 

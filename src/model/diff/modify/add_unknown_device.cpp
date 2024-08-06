@@ -17,7 +17,7 @@ auto add_unknown_device_t::apply_impl(cluster_t &cluster) const noexcept -> outc
     }
     auto &unknown_device = opt.assume_value();
     cluster.get_unknown_devices().put(std::move(unknown_device));
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto add_unknown_device_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

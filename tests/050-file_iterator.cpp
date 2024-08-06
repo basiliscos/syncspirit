@@ -357,9 +357,9 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     auto diff = diff::cluster_diff_ptr_t{};
     diff = new diff::modify::create_folder_t(db_folder1);
 
-    auto current = diff->assign(new diff::modify::create_folder_t(db_folder2));
-    current = current->assign(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder1.id()));
-    current = current->assign(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder2.id()));
+    auto current = diff->assign_sibling(new diff::modify::create_folder_t(db_folder2));
+    current = current->assign_sibling(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder1.id()));
+    current = current->assign_sibling(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder2.id()));
 
     REQUIRE(diff->apply(*cluster));
     auto folder1 = folders.by_id(db_folder1.id());

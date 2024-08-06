@@ -20,24 +20,23 @@ update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
     if (!peer) {
         auto &ignored_devices = cluster.get_ignored_devices();
         auto &unknown_devices = cluster.get_unknown_devices();
-        auto current = (cluster_diff_t *){this};
+        auto current = (cluster_diff_t *){nullptr};
         if (auto unknown_device = unknown_devices.by_sha256(peer_id); unknown_device) {
-            current = current->assign(new remove_unknown_device_t(*unknown_device));
+            auto diff = cluster_diff_ptr_t{};
+            diff = new remove_unknown_device_t(*unknown_device);
+            current = assign_child(diff);
         }
         if (auto ignored_device = ignored_devices.by_sha256(peer_id); ignored_device) {
-            current = current->assign(new remove_ignored_device_t(*ignored_device));
+            auto diff = cluster_diff_ptr_t{};
+            diff = new remove_ignored_device_t(*ignored_device);
+            current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
         }
     }
 }
 
 auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    if (next) {
-        LOG_TRACE(log, "update_peer_t, removing unknown/ignored device");
-        auto r = next->apply(cluster);
-        if (!r) {
-            return r;
-        }
-    }
+    auto r = applicator_t::apply_child(cluster);
+    if (!r) { return r; }
     auto &devices = cluster.get_devices();
     auto peer = devices.by_sha256(peer_id);
     if (!peer) {
@@ -58,7 +57,7 @@ auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
         peer->notify_update();
     }
     LOG_TRACE(log, "applyging update_peer_t, device {}", peer->device_id());
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto update_peer_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

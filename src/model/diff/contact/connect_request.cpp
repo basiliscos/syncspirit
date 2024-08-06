@@ -10,7 +10,7 @@ connect_request_t::connect_request_t(tcp::socket sock_, const tcp::endpoint &rem
     : sock{new tcp::socket(std::move(sock_))}, remote{remote_} {}
 
 auto connect_request_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    return next ? next->apply(cluster) : outcome::success();
+    return applicator_t::apply_sibling(cluster);
 }
 
 auto connect_request_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

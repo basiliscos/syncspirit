@@ -7,6 +7,7 @@
 #include "config/db.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/contact_visitor.h"
 #include "mdbx.h"
 #include "utils/log.h"
 #include "db/transaction.h"
