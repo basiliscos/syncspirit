@@ -25,9 +25,17 @@ using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
 
     struct decomposed_key_t {
-        std::string_view device_id;
+        decomposed_key_t(std::string_view reduced_key, std::string_view folder_uuid, std::string_view folder_info_id);
+        decomposed_key_t(const decomposed_key_t &) = default;
+        decomposed_key_t(decomposed_key_t &&) = default;
+
+        inline std::string_view const device_key() {
+            return std::string_view(device_key_raw, device_id_t::data_length);
+        }
+
         std::string_view folder_uuid;
         std::string_view folder_info_id;
+        char device_key_raw[device_id_t::data_length];
     };
 
     static decomposed_key_t decompose_key(std::string_view key);
@@ -76,9 +84,10 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
-struct SYNCSPIRIT_API folder_infos_map_t : public generic_map_t<folder_info_ptr_t, 2> {
+struct SYNCSPIRIT_API folder_infos_map_t : public generic_map_t<folder_info_ptr_t, 3> {
     folder_info_ptr_t by_device(const device_t &device) const noexcept;
     folder_info_ptr_t by_device_id(std::string_view device_id) const noexcept;
+    folder_info_ptr_t by_device_key(std::string_view device_id) const noexcept;
 };
 
 }; // namespace syncspirit::model

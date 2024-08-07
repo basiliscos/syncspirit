@@ -5,6 +5,11 @@ log:
 
 - conflict handling is not available
 
+core:
+  - remove folder for controller test
+  - remove folder for fs-scanner test
+
+
 ===========
 5. разобраться с лог-левелами?
 

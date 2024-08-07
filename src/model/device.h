@@ -94,7 +94,7 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     pt::ptime last_seen;
 };
 
-struct local_device_t final : device_t {
+struct SYNCSPIRIT_API local_device_t final : device_t {
   public:
     local_device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept;
     std::string_view get_key() const noexcept override;

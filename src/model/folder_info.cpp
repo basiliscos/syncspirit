@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "folder_info.h"
 #include "folder.h"
@@ -8,6 +8,7 @@
 #include "../db/prefix.h"
 #include "misc/error_code.h"
 #include <spdlog/spdlog.h>
+#include <algorithm>
 
 #ifdef uuid_t
 #undef uuid_t
@@ -17,12 +18,20 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder_info);
 
+folder_info_t::decomposed_key_t::decomposed_key_t(std::string_view reduced_key, std::string_view folder_uuid_,
+                                                  std::string_view folder_info_id_)
+    : folder_uuid{folder_uuid_}, folder_info_id{folder_info_id_} {
+    assert(reduced_key.size() == device_id_t::digest_length);
+    device_key_raw[0] = (char)(db::prefix::device);
+    std::copy(begin(reduced_key), end(reduced_key), device_key_raw + 1);
+}
+
 auto folder_info_t::decompose_key(std::string_view key) -> decomposed_key_t {
     assert(key.size() == folder_info_t::data_length);
-    auto device_id = key.substr(1, device_id_t::digest_length);
-    auto folder_id = key.substr(1 + device_id.size(), uuid_length);
-    auto folder_info_id = key.substr(1 + device_id.size() + folder_id.size(), uuid_length);
-    return decomposed_key_t{device_id, folder_id, folder_info_id};
+    auto device_key = key.substr(1, device_id_t::digest_length);
+    auto folder_id = key.substr(1 + device_key.size(), uuid_length);
+    auto folder_info_id = key.substr(1 + device_key.size() + folder_id.size(), uuid_length);
+    return decomposed_key_t(device_key, folder_id, folder_info_id);
 }
 
 outcome::result<folder_info_ptr_t> folder_info_t::create(std::string_view key, const db::FolderInfo &data,
@@ -144,11 +153,20 @@ folder_info_ptr_t folder_infos_map_t::by_device_id(std::string_view device_id) c
     return get<1>(device_id);
 }
 
+folder_info_ptr_t folder_infos_map_t::by_device_key(std::string_view device_key) const noexcept {
+    return get<2>(device_key);
+}
+
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_info_ptr_t &item) noexcept {
     return item->get_uuid();
 }
+
 template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_info_ptr_t &item) noexcept {
     return item->get_device()->device_id().get_sha256();
+}
+
+template <> SYNCSPIRIT_API std::string_view get_index<2>(const folder_info_ptr_t &item) noexcept {
+    return item->get_device()->get_key();
 }
 
 } // namespace syncspirit::model

@@ -51,7 +51,8 @@ auto remove_folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> out
         auto folder_key = std::string_view(folder_key_data, folder_t::data_length);
         auto folder = cluster.get_folders().get(folder_key);
         auto &folder_infos = folder->get_folder_infos();
-        auto folder_info = folder_infos.by_device_id(decomposed.device_id);
+        auto device_key = decomposed.device_key();
+        auto folder_info = folder_infos.by_device_key(device_key);
         folder_infos.remove(folder_info);
     }
     return applicator_t::apply_sibling(cluster);

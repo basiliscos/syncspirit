@@ -2,6 +2,7 @@
 
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/remove_folder.h"
 
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
@@ -728,8 +729,12 @@ void folder_table_t::on_remove() {
     if (r != 0) {
         return;
     }
-    auto &supervisor = container.supervisor;
-    auto &cluster = *supervisor.get_cluster();
+    auto &sup = container.supervisor;
+    auto &cluster = *sup.get_cluster();
+    auto &folder = *cluster.get_folders().by_id(folder_data.get_id());
+    auto diff = model::diff::cluster_diff_ptr_t{};
+    diff = new model::diff::modify::remove_folder_t(cluster, folder);
+    sup.send_model<model::payload::model_update_t>(std::move(diff), this);
 }
 
 void folder_table_t::on_rescan() {}
