@@ -686,7 +686,8 @@ void folder_table_t::on_share() {
     auto diff = diff::cluster_diff_ptr_t();
     diff = cluster_diff_ptr_t(new modify::create_folder_t(folder));
     diff->assign_sibling(new modify::share_folder_t(peer_id, folder.id()));
-    sup.send_model<model::payload::model_update_t>(std::move(diff), this);
+    auto cb = sup.call_select_folder(folder.id());
+    sup.send_model<model::payload::model_update_t>(std::move(diff), cb.get());
 }
 
 void folder_table_t::on_apply() {}

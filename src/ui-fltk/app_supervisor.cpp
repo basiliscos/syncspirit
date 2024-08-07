@@ -17,6 +17,7 @@
 #include <utility>
 #include <sstream>
 #include <iomanip>
+#include <functional>
 
 using namespace syncspirit::fltk;
 
@@ -39,6 +40,16 @@ db_info_viewer_guard_t::~db_info_viewer_guard_t() {
         supervisor->db_info_viewer = nullptr;
     }
 }
+
+using callback_fn_t = std::function<void()>;
+
+struct callback_impl_t final : callback_t {
+    callback_impl_t(callback_fn_t fn_) : fn{std::move(fn_)} {}
+
+    void eval() override { fn(); }
+
+    callback_fn_t fn;
+};
 
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
@@ -105,6 +116,17 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     if (!r) {
         LOG_ERROR(log, "error visiting cluster diff: {}", r.assume_error().message());
     }
+    auto custom = message.payload.custom;
+    if (custom) {
+        for (auto it = begin(callbacks); it != end(callbacks); ++it) {
+            if (it->get() == custom) {
+                auto cb = *it;
+                callbacks.erase(it);
+                cb->eval();
+                break;
+            }
+        }
+    }
 }
 
 void app_supervisor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
@@ -162,6 +184,17 @@ auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_view
     request<net::payload::db_info_request_t>(coordinator).send(init_timeout * 5 / 6);
     db_info_viewer = viewer;
     return db_info_viewer_guard_t(this);
+}
+
+callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) {
+    auto id = std::string(folder_id);
+    auto fn = callback_fn_t([this, id = std::move(id)]() {
+        auto folders_node = static_cast<tree_item::folders_t *>(folders);
+        folders_node->select_folder(id);
+    });
+    auto cb = callback_ptr_t(new callback_impl_t(std::move(fn)));
+    callbacks.push_back(cb);
+    return cb;
 }
 
 auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept

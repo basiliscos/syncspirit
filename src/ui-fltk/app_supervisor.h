@@ -73,6 +73,12 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
     }
 };
 
+struct callback_t : model::arc_base_t<callback_t> {
+    virtual ~callback_t() = default;
+    virtual void eval() = 0;
+};
+using callback_ptr_t = model::intrusive_ptr_t<callback_t>;
+
 struct app_supervisor_t : rf::supervisor_fltk_t,
                           private model::diff::cluster_visitor_t,
                           private model::diff::contact_visitor_t,
@@ -121,11 +127,13 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void set_unknown_devices(tree_item_t *node);
     void set_ignored_devices(tree_item_t *node);
 
+    callback_ptr_t call_select_folder(std::string_view folder_id);
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
 
   private:
     using clock_t = std::chrono::high_resolution_clock;
     using time_point_t = typename clock_t::time_point;
+    using callbacks_t = std::list<callback_ptr_t>;
 
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
@@ -154,6 +162,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     tree_item_t *unkwnown_devices;
     tree_item_t *ignored_devices;
     db_info_viewer_t *db_info_viewer;
+    callbacks_t callbacks;
 
     friend struct db_info_viewer_guard_t;
 };
