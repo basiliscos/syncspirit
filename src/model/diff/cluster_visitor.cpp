@@ -21,6 +21,7 @@
 #include "modify/mark_reachable.h"
 #include "modify/remove_blocks.h"
 #include "modify/remove_files.h"
+#include "modify/remove_folder.h"
 #include "modify/remove_folder_infos.h"
 #include "modify/remove_ignored_device.h"
 #include "modify/remove_peer.h"
@@ -120,6 +121,11 @@ auto cluster_visitor_t::operator()(const modify::remove_blocks_t &diff, void *cu
 auto cluster_visitor_t::operator()(const modify::remove_files_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
+auto cluster_visitor_t::operator()(const modify::remove_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
 auto cluster_visitor_t::operator()(const modify::remove_folder_infos_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);

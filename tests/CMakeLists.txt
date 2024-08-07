@@ -138,6 +138,10 @@ add_executable(040-diff-contacts 040-diff-contacts.cpp $<$<PLATFORM_ID:Windows>:
 target_link_libraries(040-diff-contacts syncspirit_test_lib)
 add_test(040-diff-contacts "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/040-diff-contacts")
 
+add_executable(041-diff-remove-folder 041-diff-remove-folder.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(041-diff-remove-folder syncspirit_test_lib)
+add_test(041-diff-remove-folder "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/041-diff-remove-folder")
+
 add_executable(050-file_iterator 050-file_iterator.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(050-file_iterator syncspirit_test_lib)
 add_test(050-file_iterator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/050-file_iterator")

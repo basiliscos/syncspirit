@@ -31,6 +31,7 @@
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_files.h"
+#include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/remove_ignored_device.h"
 #include "model/diff/modify/remove_peer.h"
@@ -583,6 +584,27 @@ auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, v
     auto &txn = *txn_opt.assume_value();
 
     auto r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
+auto db_actor_t::operator()(const model::diff::modify::remove_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto r = db::remove(diff.folder_key, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    r = diff.visit_next(*this, custom);
     if (!r) {
         return r.assume_error();
     }

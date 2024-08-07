@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <vector>
 #include <optional>
+#include <unordered_set>
 #include <boost/filesystem.hpp>
 #include <boost/outcome.hpp>
 #include "misc/augmentation.hpp"
@@ -178,6 +179,8 @@ struct SYNCSPIRIT_API file_infos_map_t : public generic_map_t<file_info_ptr_t, 2
     using parent_t = generic_map_t<file_info_ptr_t, 2>;
     file_info_ptr_t by_name(std::string_view name) noexcept;
 };
+
+using file_infos_set_t = std::unordered_set<file_info_ptr_t>;
 
 }; // namespace syncspirit::model
 

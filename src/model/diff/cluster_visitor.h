@@ -43,6 +43,7 @@ struct generic_remove_t;
 struct remove_peer_t;
 struct remove_blocks_t;
 struct remove_files_t;
+struct remove_folder_t;
 struct remove_folder_infos_t;
 struct remove_ignored_device_t;
 struct remove_unknown_device_t;
@@ -76,6 +77,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const modify::remove_peer_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_blocks_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_files_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::remove_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_folder_infos_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_ignored_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_unknown_device_t &, void *custom) noexcept;

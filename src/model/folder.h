@@ -45,6 +45,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
 
     std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
     inline auto &get_folder_infos() noexcept { return folder_infos; }
+    inline auto &get_folder_infos() const noexcept { return folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
 
     using folder_data_t::get_path;

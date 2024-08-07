@@ -470,7 +470,7 @@ void test_cluster_update_and_remove() {
     F().run();
 }
 
-void test_unsharing_folder() {
+void test_unshare_and_remove_folder() {
     struct F : fixture_t {
         void main() noexcept override {
             auto sha256 = peer_device->device_id().get_sha256();
@@ -512,21 +512,39 @@ void test_unsharing_folder() {
             auto peer_file = peer_folder_info->get_file_infos().by_name("a.txt");
             REQUIRE(peer_file);
 
-            builder.unshare_folder(*peer_folder_info).apply(*sup);
+            SECTION("unshare") {
+                builder.unshare_folder(*peer_folder_info).apply(*sup);
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
-            sup->do_process();
-            REQUIRE(reply);
-            REQUIRE(!reply->payload.ee);
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                REQUIRE(!reply->payload.ee);
 
-            auto cluster_clone = make_cluster();
-            {
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-                auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
-                REQUIRE(fis.size() == 1);
-                REQUIRE(!fis.by_device(*peer_device));
-                REQUIRE(fis.by_device(*cluster->get_device()));
-                REQUIRE(cluster_clone->get_blocks().size() == 0);
+                auto cluster_clone = make_cluster();
+                {
+                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                    auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
+                    REQUIRE(fis.size() == 1);
+                    REQUIRE(!fis.by_device(*peer_device));
+                    REQUIRE(fis.by_device(*cluster->get_device()));
+                    REQUIRE(cluster_clone->get_blocks().size() == 0);
+                }
+            }
+
+            SECTION("remove") {
+                builder.remove_folder(*folder).apply(*sup);
+
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                REQUIRE(!reply->payload.ee);
+
+                auto cluster_clone = make_cluster();
+                {
+                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                    REQUIRE(cluster_clone->get_folders().size() == 0);
+                    REQUIRE(cluster_clone->get_blocks().size() == 0);
+                }
             }
         }
     };
@@ -864,7 +882,7 @@ int _init() {
     REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
     REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
     REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
-    REGISTER_TEST_CASE(test_unsharing_folder, "test_unsharing_folder", "[db]");
+    REGISTER_TEST_CASE(test_unshare_and_remove_folder, "test_unshare_and_remove_folder", "[db]");
     REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
     REGISTER_TEST_CASE(test_local_update, "test_local_update", "[db]");
     REGISTER_TEST_CASE(test_peer_going_offline, "test_peer_going_offline", "[db]");

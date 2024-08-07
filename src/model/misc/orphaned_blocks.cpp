@@ -6,14 +6,13 @@
 
 using namespace syncspirit::model;
 
-void orphaned_blocks_t::record(file_info_t &file) { file_for_removal.put(&file); }
+void orphaned_blocks_t::record(file_info_t &file) { file_for_removal.emplace(&file); }
 
 auto orphaned_blocks_t::deduce() const -> set_t {
     set_t processed;
     set_t r;
-    for (auto &it : file_for_removal) {
-        auto &file = *it.item;
-        auto &blocks = file.get_blocks();
+    for (auto &file : file_for_removal) {
+        auto &blocks = file->get_blocks();
         for (auto &b : blocks) {
             auto key = b->get_key();
             if (processed.contains(b->get_key())) {
@@ -23,7 +22,9 @@ auto orphaned_blocks_t::deduce() const -> set_t {
             auto usages = file_blocks.size();
             for (auto &fb : file_blocks) {
                 auto uuid = fb.file()->get_uuid();
-                if (auto removed = file_for_removal.get(uuid); removed) {
+                auto target_file = file_info_ptr_t(fb.file());
+                auto it = file_for_removal.find(target_file);
+                if (it != file_for_removal.end()) {
                     --usages;
                 }
             }
