@@ -8,12 +8,12 @@ namespace syncspirit::fltk::tree_item {
 struct folder_t : tree_item_t {
     using parent_t = tree_item_t;
 
-    folder_t(model::folder_info_t &folder_info, app_supervisor_t &supervisor, Fl_Tree *tree);
+    folder_t(model::folder_t &folder, app_supervisor_t &supervisor, Fl_Tree *tree);
 
     bool on_select() override;
     void update_label() override;
 
-    model::folder_info_t &folder_info;
+    model::folder_t &folder;
 };
 
 } // namespace syncspirit::fltk::tree_item

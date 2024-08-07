@@ -11,15 +11,13 @@ using namespace syncspirit;
 using namespace model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
-
-folder_t::folder_t(model::folder_info_t &folder_info_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree, true), folder_info{folder_info_} {
+folder_t::folder_t(model::folder_t &folder_, app_supervisor_t &supervisor, Fl_Tree *tree)
+    : parent_t(supervisor, tree, true), folder{folder_} {
     update_label();
 }
 
 void folder_t::update_label() {
-    auto f = folder_info.get_folder();
-    auto value = fmt::format("{}, {}", f->get_label(), f->get_id());
+    auto value = fmt::format("{}, {}", folder.get_label(), folder.get_id());
     label(value.data());
     tree()->redraw();
 }
@@ -29,16 +27,17 @@ bool folder_t::on_select() {
         using table_t = content::folder_table_t;
         using devices_ptr_t = table_t::shared_devices_t;
 
-        auto f = folder_info.get_folder();
         auto prev = content->get_widget();
         auto shared_with = devices_ptr_t(new model::devices_map_t{});
         auto non_shared_with = devices_ptr_t(new model::devices_map_t{});
 
         auto cluster = supervisor.get_cluster();
+        auto &folder_infos = folder.get_folder_infos();
+        auto folder_info = *folder_infos.by_device(*cluster->get_device());
         for (auto it : cluster->get_devices()) {
             auto &device = it.item;
             if (device != cluster->get_device()) {
-                if (f->is_shared_with(*device)) {
+                if (folder.is_shared_with(*device)) {
                     shared_with->put(device);
                 } else {
                     non_shared_with->put(device);
@@ -47,7 +46,7 @@ bool folder_t::on_select() {
         }
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        auto folder_descr = table_t::folder_description_t{*folder_info.get_folder(),
+        auto folder_descr = table_t::folder_description_t{folder,
                                                           folder_info.get_file_infos().size(),
                                                           folder_info.get_index(),
                                                           folder_info.get_max_sequence(),

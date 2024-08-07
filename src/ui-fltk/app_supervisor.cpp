@@ -194,9 +194,8 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
 
     auto folders_node = static_cast<tree_item::folders_t *>(folders);
     for (auto &it : cluster->get_folders()) {
-        auto &folder_infos = it.item->get_folder_infos();
-        auto folder_info = folder_infos.by_device(*self_device);
-        folder_info->set_augmentation(folders_node->add_folder(*folder_info));
+        auto &folder = it.item;
+        folder->set_augmentation(folders_node->add_folder(*folder));
     }
 
     return diff.visit_next(*this, custom);

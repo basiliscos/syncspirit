@@ -18,7 +18,7 @@ void folders_t::update_label() {
     this->label(l.data());
 }
 
-augmentation_ptr_t folders_t::add_folder(model::folder_info_t &folder_info) {
+augmentation_ptr_t folders_t::add_folder(model::folder_t &folder_info) {
     auto augmentation = within_tree([&]() {
         auto item = new folder_t(folder_info, supervisor, tree());
         return insert_by_label(item)->get_proxy();
