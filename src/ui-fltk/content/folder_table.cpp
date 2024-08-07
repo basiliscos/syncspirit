@@ -683,14 +683,10 @@ void folder_table_t::on_share() {
     auto &peer = ctx.shared_with.begin()->item;
     log->info("going to create folder {}({}) & share it with {}", folder.label(), folder.id(), peer->get_name());
     auto peer_id = peer->device_id().get_sha256();
-#if 0
-    auto diffs_vector = diff::cluster_aggregate_diff_t::diffs_t{};
-    diffs_vector.emplace_back(cluster_diff_ptr_t(new modify::create_folder_t(folder)));
-    diffs_vector.emplace_back(cluster_diff_ptr_t(new modify::share_folder_t(peer_id, folder.id())));
-    auto diff = diff::cluster_diff_ptr_t(new diff::cluster_aggregate_diff_t(std::move(diffs_vector)));
+    auto diff = diff::cluster_diff_ptr_t();
+    diff = cluster_diff_ptr_t(new modify::create_folder_t(folder));
+    diff->assign_sibling(new modify::share_folder_t(peer_id, folder.id()));
     sup.send_model<model::payload::model_update_t>(std::move(diff), this);
-#endif
-    std::abort();
 }
 
 void folder_table_t::on_apply() {}

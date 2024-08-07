@@ -26,3 +26,8 @@ augmentation_ptr_t folders_t::add_folder(model::folder_info_t &folder_info) {
     update_label();
     return augmentation;
 }
+
+void folders_t::remove_child(tree_item_t *child) {
+    parent_t::remove_child(child);
+    update_label();
+}

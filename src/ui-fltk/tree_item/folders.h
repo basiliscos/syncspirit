@@ -12,6 +12,7 @@ struct folders_t final : tree_item_t {
 
     // bool on_select() override;
     void update_label() override;
+    void remove_child(tree_item_t *child) override;
 };
 
 } // namespace syncspirit::fltk::tree_item
