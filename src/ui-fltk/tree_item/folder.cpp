@@ -11,6 +11,7 @@ using namespace syncspirit;
 using namespace model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
+
 folder_t::folder_t(model::folder_t &folder_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree, true), folder{folder_} {
     update_label();

@@ -11,6 +11,7 @@
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_unknown_device.h"
 #include "model/diff/modify/add_unknown_folders.h"
+#include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/update_peer.h"
 
 #include <utility>
@@ -249,5 +250,13 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
     auto &device = *cluster->get_ignored_devices().by_sha256(diff.device_id.get_sha256());
     auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
     device.set_augmentation(ignored_devices_node->add_device(device));
+    return diff.visit_next(*this, custom);
+}
+
+auto app_supervisor_t::operator()(const model::diff::modify::create_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto &folder = *cluster->get_folders().by_id(diff.item.id());
+    auto folders_node = static_cast<tree_item::folders_t *>(folders);
+    folder.set_augmentation(folders_node->add_folder(folder));
     return diff.visit_next(*this, custom);
 }
