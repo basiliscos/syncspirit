@@ -288,8 +288,11 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
 
 auto app_supervisor_t::operator()(const model::diff::modify::create_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+#if 0
     auto &folder = *cluster->get_folders().by_id(diff.item.id());
     auto folders_node = static_cast<tree_item::folders_t *>(folders);
     folder.set_augmentation(folders_node->add_folder(folder));
     return diff.visit_next(*this, custom);
+#endif
+    std::abort();
 }

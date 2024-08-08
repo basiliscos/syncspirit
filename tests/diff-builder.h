@@ -17,6 +17,7 @@
 #include "model/diff/contact_diff.h"
 #include "model/diff/block_diff.h"
 #include "model/diff/modify/block_transaction.h"
+#include "model/misc/sequencer.h"
 
 namespace syncspirit::test {
 
@@ -33,6 +34,7 @@ struct SYNCSPIRIT_TEST_API cluster_configurer_t {
 
   private:
     proto::ClusterConfig cc;
+    proto::Folder *folder;
     diff_builder_t &builder;
     std::string_view peer_sha256;
 };
@@ -41,6 +43,7 @@ struct SYNCSPIRIT_TEST_API index_maker_t {
     index_maker_t(diff_builder_t &builder, std::string_view peer_sha256, std::string_view folder_id) noexcept;
     index_maker_t &&add(const proto::FileInfo &) noexcept;
     diff_builder_t &finish() noexcept;
+    std::error_code fail() noexcept;
 
   private:
     proto::Index index;
@@ -53,14 +56,15 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     using dispose_callback_t = model::diff::modify::block_transaction_t::dispose_callback_t;
 
     diff_builder_t(model::cluster_t &) noexcept;
+    cluster_configurer_t configure_cluster(std::string_view sha256) noexcept;
     diff_builder_t &apply(r::supervisor_t &sup) noexcept;
     outcome::result<void> apply() noexcept;
+    index_maker_t make_index(std::string_view sha256, std::string_view folder_id) noexcept;
 
     diff_builder_t &create_folder(std::string_view id, std::string_view path, std::string_view label = "") noexcept;
     diff_builder_t &update_peer(const model::device_id_t &device, std::string_view name = "",
                                 std::string_view cert_name = "", bool auto_accept = true) noexcept;
-    cluster_configurer_t configure_cluster(std::string_view sha256) noexcept;
-    index_maker_t make_index(std::string_view sha256, std::string_view folder_id) noexcept;
+    // diff_builder_t &update_folder(const model::device_id_t &device, proto::Index index) noexcept;
     diff_builder_t &share_folder(std::string_view sha256, std::string_view folder_id) noexcept;
     diff_builder_t &unshare_folder(model::folder_info_t &fi) noexcept;
     diff_builder_t &clone_file(const model::file_info_t &source) noexcept;
@@ -81,11 +85,14 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &remove_ignored_device(const model::ignored_device_t &device) noexcept;
     diff_builder_t &remove_unknown_device(const model::unknown_device_t &device) noexcept;
 
+    model::sequencer_t &get_sequencer() noexcept;
+
   private:
     diff_builder_t &assign(model::diff::cluster_diff_t *) noexcept;
     diff_builder_t &assign(model::diff::block_diff_t *) noexcept;
     diff_builder_t &assign(model::diff::contact_diff_t *) noexcept;
 
+    model::sequencer_ptr_t sequencer;
     model::cluster_t &cluster;
     model::diff::cluster_diff_ptr_t cluster_diff;
     model::diff::contact_diff_ptr_t contact_diff;

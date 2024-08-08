@@ -5,9 +5,9 @@
 #include "remove_ignored_device.h"
 #include "remove_unknown_device.h"
 #include "db/prefix.h"
-#include "../cluster_visitor.h"
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
+#include "model/diff/cluster_visitor.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;

@@ -1,42 +1,54 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "create_folder.h"
 #include "../cluster_visitor.h"
 #include "../../cluster.h"
 #include "../../misc/error_code.h"
+#include "upsert_folder_info.h"
 
 using namespace syncspirit::model::diff::modify;
 
-auto create_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "applyging create_folder_t, folder_id: {}", item.id());
+auto create_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, db::Folder db) noexcept
+    -> outcome::result<cluster_diff_ptr_t> {
     auto &folders = cluster.get_folders();
-    auto prev_folder = folders.by_id(item.id());
+    auto prev_folder = folders.by_id(db.id());
     if (prev_folder) {
         return make_error_code(error_code_t::folder_already_exists);
     }
 
-    auto uuid = cluster.next_uuid();
-    auto folder_opt = folder_t::create(uuid, item);
+    auto diff = cluster_diff_ptr_t{};
+    diff = new create_folder_t(sequencer, std::move(db), *cluster.get_device());
+    return outcome::success(diff);
+}
+
+create_folder_t::create_folder_t(sequencer_t &sequencer, db::Folder db_, const model::device_t &device) noexcept
+    : db{std::move(db_)} {
+
+    uuid = sequencer.next_uuid();
+    auto fi_uuid = sequencer.next_uuid();
+    auto fi_index = sequencer.next_uint64();
+    auto diff = cluster_diff_ptr_t{};
+
+    diff = new upsert_folder_info_t(fi_uuid, device.device_id().get_sha256(), db.id(), fi_index, 0);
+    assign_child(diff);
+}
+
+auto create_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    LOG_TRACE(log, "applying create_folder_t, folder_id: {}", db.id());
+    auto folder_opt = folder_t::create(uuid, db);
     if (!folder_opt) {
         return folder_opt.assume_error();
     }
+    auto &folders = cluster.get_folders();
     auto &folder = folder_opt.value();
-
-    auto &my_device = cluster.get_device();
-    db::FolderInfo db_fi_my;
-    db_fi_my.set_index_id(cluster.next_uint64());
-
-    auto fi_my_opt = folder_info_t::create(cluster.next_uuid(), db_fi_my, my_device, folder);
-    if (!fi_my_opt) {
-        return fi_my_opt.assume_error();
-    }
-    auto &fi_my = fi_my_opt.value();
-
-    auto &folder_infos = folder->get_folder_infos();
-    folder_infos.put(fi_my);
-    folders.put(folder);
     folder->assign_cluster(&cluster);
+    folders.put(folder);
+
+    auto r = applicator_t::apply_child(cluster);
+    if (!r) {
+        return r;
+    }
 
     return applicator_t::apply_sibling(cluster);
 }

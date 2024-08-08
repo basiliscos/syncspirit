@@ -48,6 +48,7 @@ struct remove_folder_infos_t;
 struct remove_ignored_device_t;
 struct remove_unknown_device_t;
 struct remove_unknown_folders_t;
+struct upsert_folder_info_t;
 } // namespace modify
 
 template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t> {
@@ -82,6 +83,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const modify::remove_ignored_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_unknown_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_unknown_folders_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::upsert_folder_info_t &, void *custom) noexcept;
 };
 
 using cluster_visitor_t = generic_visitor_t<tag::cluster, cluster_diff_t>;

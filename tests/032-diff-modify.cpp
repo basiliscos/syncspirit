@@ -2,14 +2,9 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
+#include "diff-builder.h"
 #include "model/cluster.h"
-#include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/share_folder.h"
-#include "model/diff/modify/unshare_folder.h"
-#include "model/diff/modify/update_peer.h"
 #include "model/diff/cluster_visitor.h"
-#include "model/misc/error_code.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -34,19 +29,18 @@ TEST_CASE("cluster modifications from ui", "[model]") {
     cluster->get_devices().put(peer_device);
 
     auto &folders = cluster->get_folders();
-    db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    db_folder.set_path("/my/path");
+    auto id = std::string("1234-5678");
+    auto label = std::string("my-label");
+    auto path = std::string("/my/path");
+    auto builder = diff_builder_t(*cluster);
 
     SECTION("folder creation") {
-        auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-        REQUIRE(diff->apply(*cluster));
-        auto folder = folders.by_id(db_folder.id());
+        REQUIRE(builder.create_folder(id, path, label).apply());
+        auto folder = folders.by_id(id);
         REQUIRE(folder);
-        CHECK(folder->get_id() == db_folder.id());
-        CHECK(folder->get_label() == db_folder.label());
-        CHECK(folder->get_path() == db_folder.path());
+        CHECK(folder->get_id() == id);
+        CHECK(folder->get_label() == label);
+        CHECK(folder->get_path() == path);
         CHECK(folder->get_cluster() == cluster);
 
         auto fi = folder->get_folder_infos().by_device(*my_device);
@@ -56,15 +50,11 @@ TEST_CASE("cluster modifications from ui", "[model]") {
     }
 
     SECTION("share folder (w/o unknown folder)") {
-        auto diff_create = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-        REQUIRE(diff_create->apply(*cluster));
+        REQUIRE(builder.create_folder(id, path, label).apply());
 
         SECTION("w/o unknown folder") {
-            auto diff_share =
-                diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id()));
-            REQUIRE(diff_share->apply(*cluster));
-
-            auto folder = folders.by_id(db_folder.id());
+            REQUIRE(builder.share_folder(peer_id.get_sha256(), id).apply());
+            auto folder = folders.by_id(id);
             REQUIRE(folder);
             auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
             REQUIRE(fi_peer);
@@ -73,6 +63,11 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         }
 
         SECTION("with unknown folder, then unshare") {
+            db::Folder db_folder;
+            db_folder.set_id(id);
+            db_folder.set_label(label);
+            db_folder.set_path(path);
+
             auto db_uf = db::UnknownFolder();
             *db_uf.mutable_folder() = db_folder;
             auto db_fi = db_uf.mutable_folder_info();
@@ -82,9 +77,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             auto uf = unknown_folder_t::create(cluster->next_uuid(), db_uf, peer_device->device_id()).value();
             cluster->get_unknown_folders().put(uf);
 
-            auto diff_share =
-                diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id()));
-            REQUIRE(diff_share->apply(*cluster));
+            REQUIRE(builder.share_folder(peer_id.get_sha256(), id).apply());
 
             auto folder = folders.by_id(db_folder.id());
             REQUIRE(folder);
@@ -125,22 +118,14 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             fi_my->set_max_sequence(file_my->get_sequence());
             file_my->assign_block(bi_2, 1);
 
-            auto diff_unshare = diff::cluster_diff_ptr_t();
-            auto raw_diff = new diff::modify::unshare_folder_t(*cluster, *fi_peer);
-            REQUIRE(cluster->get_blocks().size() == 2);
-            diff_unshare = raw_diff;
-            REQUIRE(diff_unshare->apply(*cluster));
+            REQUIRE(builder.unshare_folder(*fi_peer).apply());
             REQUIRE(!folder->get_folder_infos().by_device(*peer_device));
             REQUIRE(cluster->get_blocks().size() == 1);
         }
     }
 
     SECTION("update peer") {
-        db::Device db;
-        db.set_name("myyy-devices");
-        db.set_cert_name("cn2");
-        auto diff = diff::cluster_diff_ptr_t(new diff::modify::update_peer_t(db, my_id, *cluster));
-        REQUIRE(diff->apply(*cluster));
+        REQUIRE(builder.update_peer(my_id, "myyy-devices", "cn2").apply());
         CHECK(my_device->get_name() == "myyy-devices");
         CHECK(my_device->get_cert_name() == "cn2");
     }

@@ -671,6 +671,7 @@ void folder_table_t::refresh() {
 }
 
 void folder_table_t::on_share() {
+#if 0
     serialiazation_context_t ctx;
     auto valid = store(&ctx);
     if (!valid) {
@@ -688,6 +689,8 @@ void folder_table_t::on_share() {
     diff->assign_sibling(new modify::share_folder_t(peer_id, folder.id()));
     auto cb = sup.call_select_folder(folder.id());
     sup.send_model<model::payload::model_update_t>(std::move(diff), cb.get());
+#endif
+    std::abort();
 }
 
 void folder_table_t::on_apply() {}

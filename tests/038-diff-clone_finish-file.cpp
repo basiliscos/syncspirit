@@ -1,14 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
+#include "diff-builder.h"
 #include "model/cluster.h"
-#include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/share_folder.h"
-#include "model/diff/modify/clone_file.h"
-#include "model/diff/modify/finish_file.h"
-#include "model/diff/modify/finish_file_ack.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -25,17 +20,12 @@ TEST_CASE("new file diff", "[model]") {
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
-    db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-    REQUIRE(diff->apply(*cluster));
-
-    diff = new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id());
-    REQUIRE(diff->apply(*cluster));
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.create_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
     auto &blocks_map = cluster->get_blocks();
-    auto folder = cluster->get_folders().by_id(db_folder.id());
+    auto folder = cluster->get_folders().by_id("1234-5678");
     auto folder_my = folder->get_folder_infos().by_device(*my_device);
     auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
 
@@ -50,8 +40,7 @@ TEST_CASE("new file diff", "[model]") {
         SECTION("no file on my side, clone blockless file") {
             auto file_peer = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
             folder_peer->add(file_peer, false);
-            diff = new diff::modify::clone_file_t(*file_peer);
-            REQUIRE(diff->apply(*cluster));
+            REQUIRE(builder.clone_file(*file_peer).apply());
             auto file_my = folder_my->get_file_infos().by_name(file_info.name());
             REQUIRE(file_my);
             CHECK(file_my->is_locally_available());
@@ -79,8 +68,7 @@ TEST_CASE("new file diff", "[model]") {
             auto file_peer = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
             folder_peer->add(file_peer, false);
             file_peer->assign_block(bi, 0);
-            diff = new diff::modify::clone_file_t(*file_peer);
-            REQUIRE(diff->apply(*cluster));
+            REQUIRE(builder.clone_file(*file_peer).apply());
 
             file_my = folder_my->get_file_infos().by_name(file_info.name());
             REQUIRE(file_my);
@@ -92,7 +80,6 @@ TEST_CASE("new file diff", "[model]") {
             CHECK(folder_my->get_max_sequence() == 1);
         }
     }
-
     SECTION("non-trivial cases") {
         file_info.set_size(5);
         file_info.set_block_size(5);
@@ -110,8 +97,7 @@ TEST_CASE("new file diff", "[model]") {
             file_peer = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
             file_peer->assign_block(bi, 0);
             folder_peer->add(file_peer, false);
-            diff = new diff::modify::clone_file_t(*file_peer);
-            REQUIRE(diff->apply(*cluster));
+            REQUIRE(builder.clone_file(*file_peer).apply());
 
             file_my = folder_my->get_file_infos().by_name(file_info.name());
             REQUIRE(file_my);
@@ -140,8 +126,7 @@ TEST_CASE("new file diff", "[model]") {
 
             file_peer->assign_block(bi2, 0);
             folder_peer->add(file_peer, false);
-            diff = new diff::modify::clone_file_t(*file_peer);
-            REQUIRE(diff->apply(*cluster));
+            REQUIRE(builder.clone_file(*file_peer).apply());
 
             file_my = folder_my->get_file_infos().by_name(file_info.name());
             REQUIRE(file_my);
@@ -155,8 +140,7 @@ TEST_CASE("new file diff", "[model]") {
         }
 
         file_peer->mark_local_available(0);
-        diff = new diff::modify::finish_file_ack_t(*file_my);
-        REQUIRE(diff->apply(*cluster));
+        REQUIRE(builder.finish_file_ack(*file_my).apply());
 
         file_my = folder_my->get_file_infos().by_name(file_info.name());
         CHECK(file_my->is_locally_available());

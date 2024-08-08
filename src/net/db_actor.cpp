@@ -368,6 +368,7 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff, vo
     if (cluster->is_tainted()) {
         return outcome::success();
     }
+#if 0
     auto &folder_id = diff.item.id();
     auto folder = cluster->get_folders().by_id(folder_id);
     assert(folder);
@@ -399,6 +400,8 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff, vo
     }
 
     return commit(true);
+#endif
+    std::abort();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept

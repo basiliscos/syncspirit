@@ -31,6 +31,7 @@
 #include "modify/unshare_folder.h"
 #include "modify/update_folder_info.h"
 #include "modify/update_peer.h"
+#include "modify/upsert_folder_info.h"
 #include "peer/cluster_update.h"
 #include "peer/update_folder.h"
 
@@ -169,6 +170,11 @@ auto cluster_visitor_t::operator()(const modify::lock_file_t &diff, void *custom
 }
 
 auto cluster_visitor_t::operator()(const modify::mark_reachable_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const modify::upsert_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }

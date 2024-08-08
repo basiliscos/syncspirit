@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <memory>
 #include "../cluster_diff.h"
 #include "model/cluster.h"
 #include "bep.pb.h"

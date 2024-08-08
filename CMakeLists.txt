@@ -131,6 +131,7 @@ add_library(syncspirit_lib
     src/model/diff/modify/unshare_folder.cpp
     src/model/diff/modify/update_folder_info.cpp
     src/model/diff/modify/update_peer.cpp
+    src/model/diff/modify/upsert_folder_info.cpp
     src/model/diff/peer/cluster_update.cpp
     src/model/diff/peer/update_folder.cpp
     src/model/misc/block_iterator.cpp
@@ -138,6 +139,7 @@ add_library(syncspirit_lib
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/orphaned_blocks.cpp
+    src/model/misc/sequencer.cpp
     src/model/misc/updates_streamer.cpp
     src/model/misc/uuid.cpp
     src/model/misc/version_utils.cpp

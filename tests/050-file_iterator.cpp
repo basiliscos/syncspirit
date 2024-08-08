@@ -4,11 +4,7 @@
 #include "test-utils.h"
 #include "model/cluster.h"
 #include "model/misc/file_iterator.h"
-#include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/clone_file.h"
-#include "model/diff/modify/share_folder.h"
-#include "model/diff/peer/cluster_update.h"
-#include "model/diff/peer/update_folder.h"
+#include "diff-builder.h"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -35,36 +31,23 @@ TEST_CASE("file iterator", "[model]") {
         return {};
     };
 
+    auto builder = diff_builder_t(*cluster);
+
     auto &folders = cluster->get_folders();
-    db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    db_folder.set_path("/my/path");
-
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-    REQUIRE(diff->apply(*cluster));
-    auto folder = folders.by_id(db_folder.id());
-
-    diff = diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id()));
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(builder.create_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+    auto folder = folders.by_id("1234-5678");
+    auto &folder_infos = cluster->get_folders().by_id(folder->get_id())->get_folder_infos();
 
     SECTION("check when no files") {
         CHECK(!next());
         CHECK(!next(true));
     }
 
-    auto cc = std::make_unique<proto::ClusterConfig>();
-    auto p_folder = cc->add_folders();
-    p_folder->set_id(std::string(folder->get_id()));
-    p_folder->set_label(std::string(folder->get_label()));
-    auto p_peer = p_folder->add_devices();
-    p_peer->set_id(std::string(peer_id.get_sha256()));
-    p_peer->set_name(std::string(peer_device->get_name()));
-    p_peer->set_max_sequence(10u);
-    p_peer->set_index_id(123u);
-
-    diff = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc).value();
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(builder.configure_cluster(peer_id.get_sha256())
+                .add(folder->get_id(), peer_id.get_sha256(), 123, 10u)
+                .finish()
+                .apply());
 
     auto b = proto::BlockInfo();
     b.set_hash(utils::sha256_digest("12345").value());
@@ -74,17 +57,13 @@ TEST_CASE("file iterator", "[model]") {
     auto &blocks_map = cluster->get_blocks();
     blocks_map.put(bi);
 
-    proto::Index idx;
-    idx.set_folder(db_folder.id());
-
     SECTION("file locking && marking unreacheable") {
-        auto file = idx.add_files();
-        file->set_name("a.txt");
-        file->set_sequence(10ul);
-        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
+        auto file = proto::FileInfo();
+        file.set_name("a.txt");
+        file.set_sequence(10ul);
+        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file).finish().apply());
 
-        diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
-        REQUIRE(diff->apply(*cluster));
+        auto peer_folder = folder_infos.by_device(*peer_device);
         auto peer_file = peer_folder->get_file_infos().by_name("a.txt");
 
         SECTION("locking") {
@@ -105,29 +84,28 @@ TEST_CASE("file iterator", "[model]") {
     }
 
     SECTION("file locking && marking unreacheable") {
-        auto file = idx.add_files();
-        file->set_name("a.txt");
-        file->set_sequence(10ul);
-        file->set_invalid(true);
-        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
+        auto file = proto::FileInfo();
+        file.set_name("a.txt");
+        file.set_sequence(10ul);
+        file.set_invalid(true);
+        auto peer_folder = folder_infos.by_device(*peer_device);
 
-        diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
-        REQUIRE(diff->apply(*cluster));
+        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file).finish().apply());
         REQUIRE(!next(true));
     }
 
     SECTION("2 files at peer") {
-        auto file_1 = idx.add_files();
-        file_1->set_name("a.txt");
-        file_1->set_sequence(10ul);
+        auto file_1 = proto::FileInfo();
+        file_1.set_name("a.txt");
+        file_1.set_sequence(10ul);
 
         SECTION("simple_cases") {
-            auto file_2 = idx.add_files();
-            file_2->set_name("b.txt");
-            file_2->set_sequence(9ul);
+            auto file_2 = proto::FileInfo();
+            file_2.set_name("b.txt");
+            file_2.set_sequence(9ul);
 
-            diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
-            REQUIRE(diff->apply(*cluster));
+            REQUIRE(
+                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).add(file_2).finish().apply());
 
             SECTION("files are missing at my side") {
                 auto f1 = next(true);
@@ -155,7 +133,6 @@ TEST_CASE("file iterator", "[model]") {
             }
 
             SECTION("one file is already exists on my side") {
-                auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
                 auto my_folder = folder_infos.by_device(*my_device);
                 auto pr_file = proto::FileInfo();
                 pr_file.set_name("a.txt");
@@ -174,15 +151,13 @@ TEST_CASE("file iterator", "[model]") {
         }
 
         SECTION("a file on peer side is newer then on my") {
-            auto oth_version = file_1->mutable_version();
+            auto oth_version = file_1.mutable_version();
             auto counter = oth_version->add_counters();
             counter->set_id(12345ul);
             counter->set_value(1233ul);
 
-            diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
-            REQUIRE(diff->apply(*cluster));
+            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).finish().apply());
 
-            auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
             proto::Vector my_version;
             auto my_folder = folder_infos.by_device(*my_device);
             auto pr_file = proto::FileInfo();
@@ -196,19 +171,17 @@ TEST_CASE("file iterator", "[model]") {
         }
 
         SECTION("a file on peer side is incomplete") {
-            file_1->set_size(5ul);
-            file_1->set_block_size(5ul);
-            auto b = file_1->add_blocks();
+            file_1.set_size(5ul);
+            file_1.set_block_size(5ul);
+            auto b = file_1.add_blocks();
             b->set_hash("123");
             b->set_size(5ul);
 
-            diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
-            REQUIRE(diff->apply(*cluster));
+            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).finish().apply());
 
-            auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
             auto my_folder = folder_infos.by_device(*my_device);
-            my_folder->set_max_sequence(file_1->sequence());
-            my_folder->add(file_info_t::create(cluster->next_uuid(), *file_1, my_folder).value(), false);
+            my_folder->set_max_sequence(file_1.sequence());
+            my_folder->add(file_info_t::create(cluster->next_uuid(), file_1, my_folder).value(), false);
 
             auto f = next(true);
             REQUIRE(f);
@@ -217,18 +190,16 @@ TEST_CASE("file iterator", "[model]") {
         }
 
         SECTION("folder info is non-actual") {
-            file_1->set_size(5ul);
-            file_1->set_block_size(5ul);
-            auto b = file_1->add_blocks();
+            file_1.set_size(5ul);
+            file_1.set_block_size(5ul);
+            auto b = file_1.add_blocks();
             b->set_hash("123");
             b->set_size(5ul);
 
-            diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
-            REQUIRE(diff->apply(*cluster));
+            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).finish().apply());
 
-            auto &folder_infos = cluster->get_folders().by_id(db_folder.id())->get_folder_infos();
             auto peer_folder = folder_infos.by_device(*peer_device);
-            auto file = file_info_t::create(cluster->next_uuid(), *file_1, peer_folder).value();
+            auto file = file_info_t::create(cluster->next_uuid(), file_1, peer_folder).value();
             peer_folder->add(file, true);
             peer_folder->set_max_sequence(peer_folder->get_max_sequence() + 20);
             REQUIRE(!peer_folder->is_actual());
@@ -237,53 +208,46 @@ TEST_CASE("file iterator", "[model]") {
     }
 
     SECTION("file priorities") {
-        auto file_1 = idx.add_files();
-        file_1->set_name("a.txt");
-        file_1->set_sequence(10ul);
-        file_1->set_size(10ul);
-        file_1->set_block_size(5ul);
-        *file_1->add_blocks() = b;
-        *file_1->add_blocks() = b;
-        auto version_1 = file_1->mutable_version();
+        auto file_1 = proto::FileInfo();
+        file_1.set_name("a.txt");
+        file_1.set_sequence(10ul);
+        file_1.set_size(10ul);
+        file_1.set_block_size(5ul);
+        *file_1.add_blocks() = b;
+        *file_1.add_blocks() = b;
+        auto version_1 = file_1.mutable_version();
         auto counter_1 = version_1->add_counters();
         counter_1->set_id(14ul);
         counter_1->set_value(1ul);
 
-        auto file_2 = idx.add_files();
-        file_2->set_name("b.txt");
-        file_2->set_sequence(9ul);
-        file_2->set_size(10ul);
-        file_2->set_block_size(5ul);
-        *file_2->add_blocks() = b;
-        *file_2->add_blocks() = b;
-        auto version_2 = file_2->mutable_version();
+        auto file_2 = proto::FileInfo();
+        file_2.set_name("b.txt");
+        file_2.set_sequence(9ul);
+        file_2.set_size(10ul);
+        file_2.set_block_size(5ul);
+        *file_2.add_blocks() = b;
+        *file_2.add_blocks() = b;
+        auto version_2 = file_2.mutable_version();
         auto counter_2 = version_2->add_counters();
         counter_2->set_id(15ul);
         counter_2->set_value(1ul);
 
-        diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
-        REQUIRE(diff->apply(*cluster));
+        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).add(file_2).finish().apply());
 
-        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
+        auto peer_folder = folder_infos.by_device(*peer_device);
         auto &peer_files = peer_folder->get_file_infos();
-        auto f1 = peer_files.by_name(file_1->name());
-        auto f2 = peer_files.by_name(file_2->name());
+        auto f1 = peer_files.by_name(file_1.name());
+        auto f2 = peer_files.by_name(file_2.name());
 
         SECTION("non-downloaded file takes priority over non-existing") {
-            diff = new diff::modify::clone_file_t(*f2);
-            REQUIRE(diff->apply(*cluster));
+            REQUIRE(builder.clone_file(*f2).apply());
             REQUIRE(next(true) == f2);
             REQUIRE(next(false) == f1);
             REQUIRE(!next(false));
         }
 
         SECTION("partly-downloaded file takes priority over non-downloaded") {
-            diff = new diff::modify::clone_file_t(*f2);
-            REQUIRE(diff->apply(*cluster));
-
-            diff = new diff::modify::clone_file_t(*f1);
-            REQUIRE(diff->apply(*cluster));
-
+            REQUIRE(builder.clone_file(*f1).clone_file(*f2).apply());
             auto f2_local = f2->local_file();
             REQUIRE(f2_local);
 
@@ -296,17 +260,16 @@ TEST_CASE("file iterator", "[model]") {
     }
 
     SECTION("file actualization") {
-        auto file_a = idx.add_files();
-        file_a->set_name("a.txt");
-        file_a->set_sequence(10ul);
+        auto file_a = proto::FileInfo();
+        file_a.set_name("a.txt");
+        file_a.set_sequence(10ul);
 
-        auto file_b = idx.add_files();
-        file_b->set_name("b.txt");
-        file_b->set_sequence(9ul);
+        auto file_b = proto::FileInfo();
+        file_b.set_name("b.txt");
+        file_b.set_sequence(9ul);
         auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
 
-        diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx).value();
-        REQUIRE(diff->apply(*cluster));
+        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_a).add(file_b).finish().apply());
         auto orig_file = peer_folder->get_file_infos().by_name("b.txt");
 
         auto f_1 = next(true);
@@ -343,71 +306,31 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
         return {};
     };
 
+    auto builder = diff_builder_t(*cluster);
     auto &folders = cluster->get_folders();
-    db::Folder db_folder1;
-    db_folder1.set_id("1234");
-    db_folder1.set_label("my-label-1");
-    db_folder1.set_path("/my/path");
+    auto sha256 = peer_id.get_sha256();
 
-    db::Folder db_folder2;
-    db_folder2.set_id("5678");
-    db_folder2.set_label("my-label-2");
-    db_folder2.set_path("/my/path");
+    REQUIRE(builder.create_folder("1234", "/", "my-label-1").create_folder("5678", "/", "my-label-2").apply());
+    REQUIRE(builder.share_folder(sha256, "1234").share_folder(peer_id.get_sha256(), "5678").apply());
+    auto folder1 = folders.by_id("1234");
+    auto folder2 = folders.by_id("5678");
 
-    auto diff = diff::cluster_diff_ptr_t{};
-    diff = new diff::modify::create_folder_t(db_folder1);
+    REQUIRE(builder.configure_cluster(sha256)
+                .add(sha256, "1234", 123, 10u)
+                .add(sha256, "5678", 1234u, 11)
+                .finish()
+                .apply());
 
-    auto current = diff->assign_sibling(new diff::modify::create_folder_t(db_folder2));
-    current = current->assign_sibling(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder1.id()));
-    current = current->assign_sibling(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder2.id()));
+    auto file1 = proto::FileInfo();
+    file1.set_name("a.txt");
+    file1.set_sequence(10ul);
 
-    REQUIRE(diff->apply(*cluster));
-    auto folder1 = folders.by_id(db_folder1.id());
-    auto folder2 = folders.by_id(db_folder2.id());
+    auto file2 = proto::FileInfo();
+    file2.set_name("b.txt");
+    file2.set_sequence(11ul);
 
-    auto cc = std::make_unique<proto::ClusterConfig>();
-    auto p_folder1 = cc->add_folders();
-    p_folder1->set_id(std::string(folder1->get_id()));
-    p_folder1->set_label(std::string(folder1->get_label()));
-
-    auto p_peer1 = p_folder1->add_devices();
-    p_peer1->set_id(std::string(peer_id.get_sha256()));
-    p_peer1->set_name(std::string(peer_device->get_name()));
-    p_peer1->set_max_sequence(10u);
-    p_peer1->set_index_id(123u);
-
-    auto p_folder2 = cc->add_folders();
-    p_folder2->set_id(std::string(folder2->get_id()));
-    p_folder2->set_label(std::string(folder2->get_label()));
-
-    auto p_peer2 = p_folder2->add_devices();
-    p_peer2->set_id(std::string(peer_id.get_sha256()));
-    p_peer2->set_name(std::string(peer_device->get_name()));
-    p_peer2->set_max_sequence(11u);
-    p_peer2->set_index_id(1234u);
-
-    diff = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc).value();
-    REQUIRE(diff->apply(*cluster));
-
-    proto::Index idx1;
-    idx1.set_folder(db_folder1.id());
-
-    auto file1 = idx1.add_files();
-    file1->set_name("a.txt");
-    file1->set_sequence(10ul);
-
-    diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx1).value();
-    REQUIRE(diff->apply(*cluster));
-
-    proto::Index idx2;
-    idx2.set_folder(db_folder2.id());
-
-    auto file2 = idx2.add_files();
-    file2->set_name("b.txt");
-    file2->set_sequence(11ul);
-
-    diff = diff::peer::update_folder_t::create(*cluster, *peer_device, idx2).value();
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(builder.make_index(sha256, "1234").add(file1).finish().apply());
+    REQUIRE(builder.make_index(sha256, "5678").add(file2).finish().apply());
 
     auto files = std::unordered_set<std::string>{};
     auto f = next(true);
