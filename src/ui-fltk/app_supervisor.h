@@ -9,6 +9,7 @@
 #include "model/diff/contact_visitor.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/load/load_cluster.h"
+#include "model/misc/sequencer.h"
 
 #include <chrono>
 #include <rotor/fltk.hpp>
@@ -95,6 +96,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     const bfs::path &get_config_path();
     const config::main_t &get_app_config();
     model::cluster_ptr_t &get_cluster();
+    model::sequencer_t &get_sequencer();
 
     std::string get_uptime() noexcept;
     utils::logger_t &get_logger() noexcept;
@@ -128,6 +130,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void set_ignored_devices(tree_item_t *node);
 
     callback_ptr_t call_select_folder(std::string_view folder_id);
+    callback_ptr_t call_share_folder(std::string_view folder_id, std::string_view device_id);
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
 
   private:
@@ -149,6 +152,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     outcome::result<void> operator()(const model::diff::modify::create_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
 
+    model::sequencer_ptr_t sequencer;
     time_point_t started_at;
     r::address_ptr_t coordinator;
     utils::logger_t log;

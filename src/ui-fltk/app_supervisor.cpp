@@ -13,6 +13,8 @@
 #include "model/diff/modify/add_unknown_folders.h"
 #include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/update_peer.h"
+#include "model/diff/modify/share_folder.h"
+#include "utils/format.hpp"
 
 #include <utility>
 #include <sstream>
@@ -56,14 +58,15 @@ app_supervisor_t::app_supervisor_t(config_t &config)
       app_config(std::move(config.app_config)), content{nullptr}, devices{nullptr}, folders{nullptr},
       unkwnown_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr} {
     started_at = clock_t::now();
+    sequencer = model::make_sequecner(started_at.time_since_epoch().count());
 }
 
 auto app_supervisor_t::get_dist_sink() -> utils::dist_sink_t & { return dist_sink; }
 
 auto app_supervisor_t::get_config_path() -> const bfs::path & { return config_path; }
 auto app_supervisor_t::get_app_config() -> const config::main_t & { return app_config; }
-
 auto app_supervisor_t::get_cluster() -> model::cluster_ptr_t & { return cluster; }
+auto app_supervisor_t::get_sequencer() -> model::sequencer_t & { return *sequencer; }
 
 void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
@@ -197,6 +200,35 @@ callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) 
     return cb;
 }
 
+callback_ptr_t app_supervisor_t::call_share_folder(std::string_view folder_id, std::string_view device_id) {
+    auto id = std::string(folder_id);
+    auto sha256 = std::string(device_id);
+    auto fn = callback_fn_t([this, id = std::move(id), sha256 = std::move(sha256)]() {
+        auto device = cluster->get_devices().by_sha256(sha256);
+        if (!device) {
+            log->error("cannot share folder {}: target device is missing", id);
+            return;
+        }
+        auto folder = cluster->get_folders().by_id(id);
+        if (!folder) {
+            log->error("cannot share folder {}: not such a folder", id);
+            return;
+        }
+        using diff_t = model::diff::modify::share_folder_t;
+        auto opt = diff_t::create(*cluster, *sequencer, *device, *folder);
+        if (!opt) {
+            auto message = opt.assume_error().message();
+            log->error("cannot share folder {} with {} : {}", id, device->device_id(), message);
+            return;
+        }
+        auto cb = call_select_folder(id);
+        send_model<model::payload::model_update_t>(opt.assume_value(), cb.get());
+    });
+    auto cb = callback_ptr_t(new callback_impl_t(std::move(fn)));
+    callbacks.push_back(cb);
+    return cb;
+}
+
 auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto devices_node = static_cast<tree_item::devices_t *>(devices);
@@ -288,11 +320,8 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
 
 auto app_supervisor_t::operator()(const model::diff::modify::create_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-#if 0
-    auto &folder = *cluster->get_folders().by_id(diff.item.id());
+    auto &folder = *cluster->get_folders().by_id(diff.db.id());
     auto folders_node = static_cast<tree_item::folders_t *>(folders);
     folder.set_augmentation(folders_node->add_folder(folder));
     return diff.visit_next(*this, custom);
-#endif
-    std::abort();
 }

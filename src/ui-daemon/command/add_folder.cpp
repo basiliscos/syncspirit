@@ -74,8 +74,9 @@ outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noex
 bool add_folder_t::execute(governor_actor_t &actor) noexcept {
     using namespace model::diff;
     log = actor.log;
+    auto &cluster = actor.cluster;
 
-    for (auto it : actor.cluster->get_folders()) {
+    for (auto it : cluster->get_folders()) {
         auto f = it.item;
         if ((f->get_id() == folder.id())) {
             log->warn("{}, folder with id = {} is already present is the cluster", actor.get_identity(), f->get_id());
@@ -93,19 +94,23 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
         }
     }
 
+    auto opt = modify::create_folder_t::create(*cluster, *actor.sequencer, folder);
+    if (opt.has_error()) {
+        auto message = opt.assume_error().message();
+        log->warn("{}, cannot create folder '{}' on '{}': {}", actor.get_identity(), folder.label(), folder.path(),
+                  message);
+        return false;
+    }
+
     log->debug("{}, going to add folder '{}' on '{}'", actor.get_identity(), folder.label(), folder.path());
 
-#if 0
-    auto diff = cluster_diff_ptr_t(new modify::create_folder_t(folder));
-    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(diff), this);
+    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(opt.value()), this);
     actor.add_callback(this, [&actor, folder_id = folder.id()]() -> bool {
         actor.rescan_folder(folder_id);
         actor.process();
         return true;
     });
-#endif
-    std::abort();
-    return true;
+    return false;
 }
 
 } // namespace syncspirit::daemon::command

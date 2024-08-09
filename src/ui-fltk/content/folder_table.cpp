@@ -671,7 +671,6 @@ void folder_table_t::refresh() {
 }
 
 void folder_table_t::on_share() {
-#if 0
     serialiazation_context_t ctx;
     auto valid = store(&ctx);
     if (!valid) {
@@ -684,13 +683,14 @@ void folder_table_t::on_share() {
     auto &peer = ctx.shared_with.begin()->item;
     log->info("going to create folder {}({}) & share it with {}", folder.label(), folder.id(), peer->get_name());
     auto peer_id = peer->device_id().get_sha256();
-    auto diff = diff::cluster_diff_ptr_t();
-    diff = cluster_diff_ptr_t(new modify::create_folder_t(folder));
-    diff->assign_sibling(new modify::share_folder_t(peer_id, folder.id()));
-    auto cb = sup.call_select_folder(folder.id());
-    sup.send_model<model::payload::model_update_t>(std::move(diff), cb.get());
-#endif
-    std::abort();
+    auto opt = modify::create_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder);
+    if (!opt) {
+        log->error("cannot create folder: {}", opt.assume_error().message());
+        return;
+    }
+
+    auto cb = sup.call_share_folder(folder.id(), peer_id);
+    sup.send_model<model::payload::model_update_t>(opt.assume_value(), cb.get());
 }
 
 void folder_table_t::on_apply() {}
