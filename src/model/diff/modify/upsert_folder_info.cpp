@@ -25,21 +25,26 @@ auto upsert_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outc
     if (!folder) {
         return make_error_code(error_code_t::no_such_folder);
     }
-    LOG_TRACE(log, "applying upsert_folder_info_t, folder = {} ({}), device = {}", folder->get_label(), folder_id,
-              device->device_id());
+    auto &folder_infos = folder->get_folder_infos();
+    auto fi = folder_infos.by_device(*device);
+    if (fi && fi->get_index() == index_id) {
+        fi->set_max_sequence(max_sequence);
+        LOG_TRACE(log, "applying upsert_folder_info_t (update), folder = {} ({}), device = {}", folder->get_label(),
+                  folder_id, device->device_id());
+    } else {
+        LOG_TRACE(log, "applying upsert_folder_info_t (create), folder = {} ({}), device = {}", folder->get_label(),
+                  folder_id, device->device_id());
+        db::FolderInfo db;
+        db.set_index_id(index_id);
+        db.set_max_sequence(max_sequence);
 
-    db::FolderInfo db;
-    db.set_index_id(index_id);
-    db.set_max_sequence(max_sequence);
-
-    auto opt = folder_info_t::create(uuid, db, device, folder);
-    if (!opt) {
-        return opt.assume_error();
+        auto opt = folder_info_t::create(uuid, db, device, folder);
+        if (!opt) {
+            return opt.assume_error();
+        }
+        auto &fi = opt.value();
+        folder->get_folder_infos().put(fi);
     }
-
-    auto &fi = opt.value();
-    folder->get_folder_infos().put(fi);
-
     return applicator_t::apply_sibling(cluster);
 }
 

@@ -54,8 +54,6 @@ const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
 
 uuid_t cluster_t::next_uuid() noexcept { return uuid_generator(); }
 
-uint64_t cluster_t::next_uint64() noexcept { return uint64_generator(rng_engine); }
-
 auto cluster_t::process(proto::ClusterConfig &msg, const device_t &peer) const noexcept
     -> outcome::result<diff::cluster_diff_ptr_t> {
     return diff::peer::cluster_update_t::create(*this, peer, msg);

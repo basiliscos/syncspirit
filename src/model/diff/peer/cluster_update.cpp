@@ -7,8 +7,6 @@
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/remove_unknown_folders.h"
-#include "model/diff/modify/share_folder.h"
-#include "model/diff/modify/update_folder_info.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
@@ -128,9 +126,6 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, const device_t &sou
                 continue;
             }
 
-            db::FolderInfo db;
-            db.set_index_id(d.index_id());
-            db.set_max_sequence(d.max_sequence());
             bool do_update = false;
             if (d.index_id() != folder_info->get_index()) {
                 LOG_TRACE(log, "cluster_update_t, reseting folder: {}, new index = {:#x}, max_seq = {}", f.label(),
@@ -144,7 +139,10 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, const device_t &sou
                 do_update = true;
             }
             if (do_update) {
-                auto ptr = cluster_diff_ptr_t{new modify::update_folder_info_t(std::move(db), source, *folder)};
+                auto uuid = uuid_t{};
+                assign(uuid, folder_info->get_uuid());
+                auto ptr = cluster_diff_ptr_t{};
+                ptr = new modify::upsert_folder_info_t(uuid, peer_id, f.id(), d.index_id(), d.max_sequence());
                 if (folder_update) {
                     folder_update = folder_update->assign_sibling(ptr.get());
                 } else {
@@ -186,7 +184,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, const device_t &sou
         diff = new modify::remove_folder_infos_t(std::move(removed_folders), &orphaned_blocks);
         current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }
-    if (folder_update_diff) { // must be applied folders removal
+    if (folder_update_diff) { // must be applied after folders removal
         auto &diff = folder_update_diff;
         current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }

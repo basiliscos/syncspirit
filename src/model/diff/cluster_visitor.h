@@ -38,7 +38,6 @@ struct unshare_folder_t;
 struct local_update_t;
 struct share_folder_t;
 struct update_peer_t;
-struct update_folder_info_t;
 struct generic_remove_t;
 struct remove_peer_t;
 struct remove_blocks_t;
@@ -73,7 +72,6 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const modify::local_update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::share_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::unshare_folder_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const modify::update_folder_info_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::update_peer_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_peer_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_blocks_t &, void *custom) noexcept;

@@ -12,7 +12,7 @@
 #include "model/diff/modify/remove_files.h"
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/remove_unknown_folders.h"
-#include "model/diff/modify/update_folder_info.h"
+#include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/modify/add_unknown_folders.h"
 
 using namespace syncspirit;
@@ -53,7 +53,7 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
         ++remove_unknown_folders;
         return diff.visit_next(*this, custom);
     }
-    outcome::result<void> operator()(const diff::modify::update_folder_info_t &diff, void *custom) noexcept override {
+    outcome::result<void> operator()(const diff::modify::upsert_folder_info_t &diff, void *custom) noexcept override {
         ++updated_folders;
         return diff.visit_next(*this, custom);
     }

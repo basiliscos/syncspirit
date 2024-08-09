@@ -38,7 +38,6 @@
 #include "model/diff/modify/remove_unknown_device.h"
 #include "model/diff/modify/remove_unknown_folders.h"
 #include "model/diff/modify/unshare_folder.h"
-#include "model/diff/modify/update_folder_info.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/update_folder.h"
@@ -697,38 +696,6 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void
 }
 
 auto db_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (cluster->is_tainted()) {
-        return outcome::success();
-    }
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
-
-    auto device = cluster->get_devices().by_sha256(diff.device_id);
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*device);
-    assert(folder_info);
-
-    auto fi_key = folder_info->get_key();
-    auto fi_data = folder_info->serialize();
-    auto r = db::save({fi_key, fi_data}, txn);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    r = diff.visit_next(*this, custom);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    return commit(true);
-}
-
-auto db_actor_t::operator()(const model::diff::modify::update_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();

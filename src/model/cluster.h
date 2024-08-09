@@ -40,7 +40,6 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     const folders_map_t &get_folders() const noexcept;
     const unknown_folder_map_t &get_unknown_folders() const noexcept;
     uuid_t next_uuid() noexcept;
-    uint64_t next_uint64() noexcept;
     inline bool is_tainted() const noexcept { return tainted; }
     inline void mark_tainted() noexcept { tainted = true; }
     int32_t get_write_requests() const noexcept;
