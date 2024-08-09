@@ -409,7 +409,8 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, voi
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-
+    std::abort();
+#if 0
     auto peer = cluster->get_devices().by_sha256(diff.peer_id);
     assert(peer);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
@@ -437,6 +438,7 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, voi
     }
 
     return commit(true);
+#endif
 }
 
 auto db_actor_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *custom) noexcept

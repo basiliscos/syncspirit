@@ -28,9 +28,8 @@ TEST_CASE("remove peer", "[model]") {
 
     auto &blocks_map = cluster->get_blocks();
     auto builder = diff_builder_t(*cluster);
-    builder.create_folder("1234-5678", "some/path", "my-label");
-    builder.share_folder(peer_id.get_sha256(), "1234-5678");
-    REQUIRE(builder.apply());
+    REQUIRE(builder.create_folder("1234-5678", "some/path", "my-label").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
     SECTION("1 file, 1 folder, 1 block") {
         auto bi = proto::BlockInfo();
@@ -68,9 +67,8 @@ TEST_CASE("remove peer", "[model]") {
     }
 
     SECTION("3 files, 2 shared files, 2 shared folders, 3 block, 2 shared blocks") {
-        builder.create_folder("1234", "some-2/path-2", "my-label-2");
-        builder.share_folder(peer_id.get_sha256(), "1234");
-        REQUIRE(builder.apply());
+        REQUIRE(builder.create_folder("1234", "some-2/path-2", "my-label-2").apply());
+        REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234").apply());
 
         auto b1 = [&]() {
             auto bi = proto::BlockInfo();

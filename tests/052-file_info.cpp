@@ -87,8 +87,8 @@ TEST_CASE("file_info_t::need_download", "[model]") {
 
     auto &folders = cluster->get_folders();
     auto builder = diff_builder_t(*cluster);
-    builder.create_folder("1234-5678", "some/path", "my-label").share_folder(peer_id.get_sha256(), "1234-5678");
-    REQUIRE(builder.apply());
+    REQUIRE(builder.create_folder("1234-5678", "some/path", "my-label").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
     auto folder = folders.by_id("1234-5678");
     auto &folder_infos = folder->get_folder_infos();
@@ -174,8 +174,8 @@ TEST_CASE("file_info_t::local_file", "[model]") {
 
     auto &folders = cluster->get_folders();
     auto builder = diff_builder_t(*cluster);
-    builder.create_folder("1234-5678", "some/path", "my-label").share_folder(peer_id.get_sha256(), "1234-5678");
-    REQUIRE(builder.apply());
+    REQUIRE(builder.create_folder("1234-5678", "some/path", "my-label").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
     auto folder = folders.by_id("1234-5678");
     auto &folder_infos = folder->get_folder_infos();
@@ -231,8 +231,8 @@ TEST_CASE("source file", "[model]") {
 
     auto &folders = cluster->get_folders();
     auto builder = diff_builder_t(*cluster);
-    builder.create_folder("1234-5678", "some/path", "my-label").share_folder(peer_id.get_sha256(), "1234-5678");
-    REQUIRE(builder.apply());
+    REQUIRE(builder.create_folder("1234-5678", "some/path", "my-label").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
     auto folder = folders.by_id("1234-5678");
     auto &folder_infos = folder->get_folder_infos();

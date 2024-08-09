@@ -83,7 +83,9 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             REQUIRE(folder);
             auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
             auto fi_my = folder->get_folder_infos().by_device(*my_device);
+            REQUIRE(fi_my);
             REQUIRE(fi_peer);
+
             CHECK(fi_peer->get_device() == peer_device);
             CHECK(fi_peer->get_max_sequence() == 12);
             CHECK(fi_peer->get_index() == 2345);
@@ -130,3 +132,10 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         CHECK(my_device->get_cert_name() == "cn2");
     }
 }
+
+int _init() {
+    utils::set_default("trace");
+    return 1;
+}
+
+static int v = _init();

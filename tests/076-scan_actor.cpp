@@ -63,7 +63,9 @@ struct fixture_t {
         sup->start();
         sup->do_process();
         auto builder = diff_builder_t(*cluster);
-        builder.create_folder(folder_id, root_path.string()).share_folder(peer_id.get_sha256(), folder_id).apply(*sup);
+        builder
+            .create_folder(folder_id, root_path.string()).apply(*sup)
+            .share_folder(peer_id.get_sha256(), folder_id).apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
         folder_info = folder->get_folder_infos().by_device(*my_device);

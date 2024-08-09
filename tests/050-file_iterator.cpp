@@ -38,6 +38,7 @@ TEST_CASE("file iterator", "[model]") {
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
     auto folder = folders.by_id("1234-5678");
     auto &folder_infos = cluster->get_folders().by_id(folder->get_id())->get_folder_infos();
+    REQUIRE(folder_infos.size() == 2u);
 
     SECTION("check when no files") {
         CHECK(!next());
@@ -311,7 +312,7 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     auto sha256 = peer_id.get_sha256();
 
     REQUIRE(builder.create_folder("1234", "/", "my-label-1").create_folder("5678", "/", "my-label-2").apply());
-    REQUIRE(builder.share_folder(sha256, "1234").share_folder(peer_id.get_sha256(), "5678").apply());
+    REQUIRE(builder.share_folder(sha256, "1234").share_folder(sha256, "5678").apply());
     auto folder1 = folders.by_id("1234");
     auto folder2 = folders.by_id("5678");
 
@@ -346,3 +347,11 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     CHECK(files.count("my-label-1/a.txt"));
     CHECK(files.count("my-label-2/b.txt"));
 }
+
+
+int _init() {
+    utils::set_default("trace");
+    return 1;
+}
+
+static int v = _init();

@@ -224,11 +224,11 @@ struct fixture_t {
             .configure_cluster(sha256)
             .add(sha256, folder_id_1, 123, max_sequence)
             .finish();
+        REQUIRE(builder.apply());
 
         if (auto_share) {
-            builder.share_folder(peer_id.get_sha256(), folder_id_1);
+            REQUIRE(builder.share_folder(peer_id.get_sha256(), folder_id_1).apply());
         }
-        REQUIRE(builder.apply());
 
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();

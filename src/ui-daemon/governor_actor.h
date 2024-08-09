@@ -8,6 +8,7 @@
 #include "model/messages.h"
 #include "model/diff/block_visitor.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/misc/sequencer.h"
 #include "fs/messages.h"
 #include "utils/log.h"
 
@@ -63,6 +64,7 @@ struct governor_actor_t : public r::actor_base_t,
     model::cluster_ptr_t cluster;
     utils::logger_t log;
     std::uint32_t inactivity_seconds;
+    model::sequencer_ptr_t sequencer;
 
   private:
     using clock_t = r::pt::microsec_clock;
