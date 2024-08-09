@@ -23,7 +23,6 @@ struct SYNCSPIRIT_API create_folder_t final : cluster_diff_t {
 
   private:
     create_folder_t(sequencer_t &sequencer, db::Folder db, const model::device_t &device) noexcept;
-
 };
 
 } // namespace syncspirit::model::diff::modify

@@ -357,7 +357,7 @@ void test_folder_sharing() {
                 .apply(*sup);
             REQUIRE(cluster->get_unknown_folders().size() == 1);
 
-            builder.share_folder(sha256, folder_id) .apply(*sup);
+            builder.share_folder(sha256, folder_id).apply(*sup);
             REQUIRE(cluster->get_unknown_folders().size() == 0);
 
             CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);

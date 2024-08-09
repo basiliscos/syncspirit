@@ -375,7 +375,7 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff, vo
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto& db = diff.db;
+    auto &db = diff.db;
     auto folder = cluster->get_folders().by_id(db.id());
     assert(folder);
     auto f_key = folder->get_key();
@@ -727,7 +727,6 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &dif
 
     return commit(true);
 }
-
 
 auto db_actor_t::operator()(const model::diff::modify::update_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {

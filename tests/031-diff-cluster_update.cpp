@@ -20,7 +20,6 @@ using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
-
 template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor_t {
     F fn;
     int remove_blocks = 0;
@@ -621,7 +620,7 @@ TEST_CASE("non-shared pending folder", "[model]") {
     REQUIRE(builder.configure_cluster(sha256).add(sha256, folder_id, 5, 4).finish().apply());
     REQUIRE(cluster->get_unknown_folders().size() == 1);
 
-    auto& uf = *cluster->get_unknown_folders().begin()->item;
+    auto &uf = *cluster->get_unknown_folders().begin()->item;
     REQUIRE(uf.device_id() == peer_id_1);
     REQUIRE(uf.get_index() == 5);
     REQUIRE(uf.get_max_sequence() == 4);
