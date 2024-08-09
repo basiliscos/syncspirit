@@ -122,7 +122,8 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, const device_t &sou
             auto &folder_infos = folder->get_folder_infos();
             auto folder_info = folder_infos.by_device(*device);
             if (!folder_info) {
-                LOG_WARN(log, "unexpected folder '{}' with a peer '{}'", folder->get_label(), device->device_id());
+                LOG_TRACE(log, "cluster_update_t, adding pending folder {} non-shared with {}", f.label(), device->device_id());
+                add_unknown(f, d);
                 continue;
             }
 

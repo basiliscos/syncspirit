@@ -52,19 +52,25 @@ struct fixture_t {
         };
     }
 
-    cluster_ptr_t make_cluster() noexcept {
-        auto my_id =
-            device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-        my_device = device_t::create(my_id, "my-device").value();
+    cluster_ptr_t make_cluster(bool add_peer = true) noexcept {
+        auto my_id = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";
+        auto my_device_id = device_id_t::from_string(my_id).value();
+        my_device = device_t::create(my_device_id, "my-device").value();
 
-        return cluster_ptr_t(new cluster_t(my_device, 1, 1));
+        auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+        cluster->get_devices().put(my_device);
+
+        auto peer_id = "VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ";
+        auto peer_device_id = device_id_t::from_string(peer_id).value();
+        peer_device = device_t::create(peer_device_id, "peer-device").value();
+
+        if (add_peer) {
+            cluster->get_devices().put(peer_device);
+        }
+        return cluster;
     }
 
     virtual void run() noexcept {
-        auto peer_id =
-            device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-        peer_device = device_t::create(peer_id, "peer-device").value();
-
         cluster = make_cluster();
 
         auto root_path = bfs::unique_path();
@@ -146,8 +152,9 @@ void test_loading_empty_db() {
             REQUIRE(diff->apply(*cluster));
 
             auto devices = cluster->get_devices();
-            REQUIRE(devices.size() == 1);
-            REQUIRE(devices.by_sha256(cluster->get_device()->device_id().get_sha256()));
+            REQUIRE(devices.size() == 2);
+            REQUIRE(devices.by_sha256(my_device->device_id().get_sha256()));
+            REQUIRE(devices.by_sha256(peer_device->device_id().get_sha256()));
 
             sup->request<net::payload::db_info_request_t>(sup->get_address()).send(timeout);
             sup->do_process();
@@ -343,11 +350,15 @@ void test_folder_sharing() {
             builder.update_peer(peer_device->device_id())
                 .apply(*sup)
                 .create_folder(folder_id, "/my/path")
+                .apply(*sup)
                 .configure_cluster(sha256)
                 .add(sha256, folder_id, 5, 4)
                 .finish()
-                .share_folder(sha256, folder_id)
                 .apply(*sup);
+            REQUIRE(cluster->get_unknown_folders().size() == 1);
+
+            builder.share_folder(sha256, folder_id) .apply(*sup);
+            REQUIRE(cluster->get_unknown_folders().size() == 0);
 
             CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
@@ -366,6 +377,7 @@ void test_folder_sharing() {
             REQUIRE(fi);
             CHECK(fi->get_index() == 5);
             CHECK(fi->get_max_sequence() == 4);
+            REQUIRE(cluster_clone->get_unknown_folders().size() == 0);
         }
     };
 
@@ -396,6 +408,7 @@ void test_cluster_update_and_remove() {
                 .add(sha256, folder_id, 5, file.sequence())
                 .add(sha256, unknown_folder_id, 5, 5)
                 .finish()
+                .apply(*sup)
                 .share_folder(sha256, folder_id)
                 .apply(*sup)
                 .make_index(sha256, folder_id)
@@ -489,6 +502,7 @@ void test_unshare_and_remove_folder() {
             builder.update_peer(peer_device->device_id())
                 .apply(*sup)
                 .create_folder(folder_id, "/my/path")
+                .apply(*sup)
                 .configure_cluster(sha256)
                 .add(sha256, folder_id, 5, file.sequence())
                 .finish()
@@ -573,6 +587,7 @@ void test_clone_file() {
                 .configure_cluster(sha256)
                 .add(sha256, folder_id, 5, file.sequence())
                 .finish()
+                .apply(*sup)
                 .share_folder(sha256, folder_id)
                 .apply(*sup);
 
@@ -795,6 +810,7 @@ void test_remove_peer() {
                 .add(sha256, folder_id, 5, file.sequence())
                 .add(sha256, unknown_folder_id, 5, 5)
                 .finish()
+                .apply(*sup)
                 .share_folder(sha256, folder_id)
                 .apply(*sup)
                 .make_index(sha256, folder_id)
@@ -824,7 +840,7 @@ void test_remove_peer() {
             REQUIRE(reply);
             REQUIRE(!reply->payload.ee);
 
-            auto cluster_clone = make_cluster();
+            auto cluster_clone = make_cluster(false);
             {
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
                 CHECK(cluster_clone->get_unknown_folders().size() == 0);

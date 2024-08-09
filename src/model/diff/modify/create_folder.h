@@ -18,11 +18,12 @@ struct SYNCSPIRIT_API create_folder_t final : cluster_diff_t {
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
+    uuid_t uuid;
+    db::Folder db;
+
   private:
     create_folder_t(sequencer_t &sequencer, db::Folder db, const model::device_t &device) noexcept;
 
-    uuid_t uuid;
-    db::Folder db;
 };
 
 } // namespace syncspirit::model::diff::modify

@@ -40,6 +40,7 @@
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_folder_info.h"
 #include "model/diff/modify/update_peer.h"
+#include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/diff/peer/cluster_update.h"
 
@@ -368,28 +369,19 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff, vo
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-#if 0
-    auto &folder_id = diff.item.id();
-    auto folder = cluster->get_folders().by_id(folder_id);
-    assert(folder);
-    auto f_key = folder->get_key();
-    auto f_data = folder->serialize();
-
     auto txn_opt = get_txn();
     if (!txn_opt) {
         return txn_opt.assume_error();
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto r = db::save({f_key, f_data}, txn);
-    if (!r) {
-        return r.assume_error();
-    }
+    auto& db = diff.db;
+    auto folder = cluster->get_folders().by_id(db.id());
+    assert(folder);
+    auto f_key = folder->get_key();
+    auto f_data = folder->serialize();
 
-    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto fi_key = folder_info->get_key();
-    auto fi_data = folder_info->serialize();
-    r = db::save({fi_key, fi_data}, txn);
+    auto r = db::save({f_key, f_data}, txn);
     if (!r) {
         return r.assume_error();
     }
@@ -400,8 +392,6 @@ auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff, vo
     }
 
     return commit(true);
-#endif
-    std::abort();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
@@ -409,12 +399,6 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, voi
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-    std::abort();
-#if 0
-    auto peer = cluster->get_devices().by_sha256(diff.peer_id);
-    assert(peer);
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    assert(folder);
 
     auto txn_opt = get_txn();
     if (!txn_opt) {
@@ -422,23 +406,12 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, voi
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto folder_info = folder->get_folder_infos().by_device(*peer);
-    assert(folder_info);
-
-    auto fi_key = folder_info->get_key();
-    auto fi_data = folder_info->serialize();
-    auto r = db::save({fi_key, fi_data}, txn);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    r = diff.visit_next(*this, custom);
+    auto r = diff.visit_next(*this, custom);
     if (!r) {
         return r.assume_error();
     }
 
     return commit(true);
-#endif
 }
 
 auto db_actor_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *custom) noexcept
@@ -722,6 +695,39 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void
 
     return commit(true);
 }
+
+auto db_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto device = cluster->get_devices().by_sha256(diff.device_id);
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_info = folder->get_folder_infos().by_device(*device);
+    assert(folder_info);
+
+    auto fi_key = folder_info->get_key();
+    auto fi_data = folder_info->serialize();
+    auto r = db::save({fi_key, fi_data}, txn);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
 
 auto db_actor_t::operator()(const model::diff::modify::update_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {
