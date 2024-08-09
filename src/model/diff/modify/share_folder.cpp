@@ -12,9 +12,8 @@
 
 using namespace syncspirit::model::diff::modify;
 
-auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const model::device_t& peer, const model::folder_t& folder) noexcept
--> outcome::result<cluster_diff_ptr_t>
-{
+auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const model::device_t &peer,
+                            const model::folder_t &folder) noexcept -> outcome::result<cluster_diff_ptr_t> {
     auto folder_info = folder.get_folder_infos().by_device(peer);
     if (folder_info) {
         return make_error_code(error_code_t::folder_is_already_shared);
@@ -39,12 +38,14 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
         index = sequencer.next_uint64();
     }
 
-    return new share_folder_t(sequencer.next_uuid(), peer.device_id().get_sha256(), folder.get_id(), index, max_sequence, unknown_folder);
+    return new share_folder_t(sequencer.next_uuid(), peer.device_id().get_sha256(), folder.get_id(), index,
+                              max_sequence, unknown_folder);
 }
 
 share_folder_t::share_folder_t(const uuid_t &uuid, std::string_view device_id, std::string_view folder_id,
-                               std::uint64_t index_id, std::int64_t max_sequence, model::unknown_folder_ptr_t uf) noexcept:
-    peer_id(device_id) {
+                               std::uint64_t index_id, std::int64_t max_sequence,
+                               model::unknown_folder_ptr_t uf) noexcept
+    : peer_id(device_id) {
     auto current = assign_child(new upsert_folder_info_t(uuid, device_id, folder_id, index_id, max_sequence));
     if (uf) {
         auto keys = remove_unknown_folders_t::keys_t{};
@@ -52,7 +53,6 @@ share_folder_t::share_folder_t(const uuid_t &uuid, std::string_view device_id, s
         auto diff = cluster_diff_ptr_t{};
         current->assign_sibling(new remove_unknown_folders_t(std::move(keys)));
     }
-
 }
 
 auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {

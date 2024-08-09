@@ -68,7 +68,8 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, const device_t &sou
         auto &f = message.folders(i);
         auto folder = folders.by_id(f.id());
         auto &device_id = f.id();
-        LOG_TRACE(log, "cluster_update_t, folder = '{}', device = {}", f.label(),  spdlog::to_hex(device_id.begin(), device_id.end()));
+        LOG_TRACE(log, "cluster_update_t, folder = '{}', device = {}", f.label(),
+                  spdlog::to_hex(device_id.begin(), device_id.end()));
         if (!folder) {
             for (int i = 0; i < f.devices_size(); ++i) {
                 auto &d = f.devices(i);
@@ -200,7 +201,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, const device_t &sou
     }
     if (reshared_folders.size()) {
         for (auto &it : reshared_folders) {
-            auto& f = *it.item;
+            auto &f = *it.item;
             auto uuid = uuid_t{};
             assign(uuid, f.get_uuid());
             auto diff = cluster_diff_ptr_t{};

@@ -348,7 +348,6 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     CHECK(files.count("my-label-2/b.txt"));
 }
 
-
 int _init() {
     utils::set_default("trace");
     return 1;

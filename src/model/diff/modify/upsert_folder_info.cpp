@@ -25,7 +25,8 @@ auto upsert_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outc
     if (!folder) {
         return make_error_code(error_code_t::no_such_folder);
     }
-    LOG_TRACE(log, "applying upsert_folder_info_t, folder = {} ({}), device = {}", folder->get_label(), folder_id, device->device_id());
+    LOG_TRACE(log, "applying upsert_folder_info_t, folder = {} ({}), device = {}", folder->get_label(), folder_id,
+              device->device_id());
 
     db::FolderInfo db;
     db.set_index_id(index_id);
