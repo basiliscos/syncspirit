@@ -101,6 +101,7 @@ int main(int argc, char **argv) {
 #if defined(__linux__)
         pthread_setname_np(pthread_self(), "ss/main");
 #endif
+        assert(0 && "TODO: create sequencer");
         // clang-format off
         /* parse command-line & config options */
         po::options_description cmdline_descr("Allowed options");

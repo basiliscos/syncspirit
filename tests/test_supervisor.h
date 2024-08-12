@@ -6,6 +6,7 @@
 #include "rotor/supervisor.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/misc/sequencer.h"
 #include "utils/log.h"
 #include "syncspirit-test-export.h"
 
@@ -61,6 +62,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t, private model::diff::
 
     utils::logger_t log;
     model::cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
     configure_callback_t configure_callback;
     timers_t timers;
     bool auto_finish;

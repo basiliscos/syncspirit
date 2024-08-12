@@ -152,6 +152,7 @@ int main(int argc, char **argv) {
             }
         }
 
+        assert(0 && "TODO: create sequencer");
         config_file_path.append("syncspirit.toml");
         bool populate = !bfs::exists(config_file_path);
         if (populate) {

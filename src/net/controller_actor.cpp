@@ -36,10 +36,13 @@ r::plugin::resource_id_t hash = 1;
 } // namespace
 
 controller_actor_t::controller_actor_t(config_t &config)
-    : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer}, peer_addr{config.peer_addr},
+    : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer}, peer_addr{config.peer_addr},
       request_timeout{config.request_timeout}, rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer{0},
       outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
-      blocks_max_requested{config.blocks_max_requested} {}
+      blocks_max_requested{config.blocks_max_requested} {
+    assert(cluster);
+    assert(sequencer);
+}
 
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -507,7 +510,7 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
     auto &msg = *message;
     LOG_DEBUG(log, "on_message (Index)");
-    auto diff_opt = cluster->process(msg, *peer);
+    auto diff_opt = cluster->process(*sequencer, msg, *peer);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
@@ -521,7 +524,7 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
 void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
     LOG_TRACE(log, "on_message (IndexUpdate)");
     auto &msg = *message;
-    auto diff_opt = cluster->process(msg, *peer);
+    auto diff_opt = cluster->process(*sequencer, msg, *peer);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());

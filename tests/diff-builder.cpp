@@ -64,14 +64,14 @@ index_maker_t &&index_maker_t::add(const proto::FileInfo &file) noexcept {
 std::error_code index_maker_t::fail() noexcept {
     auto &cluster = builder.cluster;
     auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
-    auto opt = diff::peer::update_folder_t::create(cluster, *peer, index);
+    auto opt = diff::peer::update_folder_t::create(cluster, *builder.sequencer, *peer, index);
     return opt.error();
 }
 
 diff_builder_t &index_maker_t::finish() noexcept {
     auto &cluster = builder.cluster;
     auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
-    auto diff = diff::peer::update_folder_t::create(cluster, *peer, index);
+    auto diff = diff::peer::update_folder_t::create(cluster, *builder.sequencer, *peer, index);
     assert(diff.has_value());
     builder.assign(diff.value().get());
     return builder;

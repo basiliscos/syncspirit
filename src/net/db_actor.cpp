@@ -901,8 +901,8 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
     }
 
     auto &blocks_map = cluster->get_blocks();
-    for (const auto &b : diff.blocks) {
-        auto block = blocks_map.get(b.hash());
+    for (const auto it : diff.blocks) {
+        auto block = blocks_map.get(it.hash());
         auto key = block->get_key();
         auto data = block->serialize();
         auto r = db::save({key, data}, txn);

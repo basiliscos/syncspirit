@@ -59,14 +59,14 @@ auto cluster_t::process(proto::ClusterConfig &msg, const device_t &peer) const n
     return diff::peer::cluster_update_t::create(*this, peer, msg);
 }
 
-auto cluster_t::process(proto::Index &msg, const device_t &peer) const noexcept
+auto cluster_t::process(sequencer_t& sequencer, proto::Index &msg, const device_t &peer) const noexcept
     -> outcome::result<diff::cluster_diff_ptr_t> {
-    return diff::peer::update_folder_t::create(*this, peer, msg);
+    return diff::peer::update_folder_t::create(*this, sequencer, peer, msg);
 }
 
-auto cluster_t::process(proto::IndexUpdate &msg, const device_t &peer) const noexcept
+auto cluster_t::process(sequencer_t& sequencer, proto::IndexUpdate &msg, const device_t &peer) const noexcept
     -> outcome::result<diff::cluster_diff_ptr_t> {
-    return diff::peer::update_folder_t::create(*this, peer, msg);
+    return diff::peer::update_folder_t::create(*this, sequencer, peer, msg);
 }
 
 int32_t cluster_t::get_write_requests() const noexcept { return write_requests; }

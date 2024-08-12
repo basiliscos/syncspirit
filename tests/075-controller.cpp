@@ -272,6 +272,7 @@ struct fixture_t {
                      .request_pool(1024)
                      .outgoing_buffer_max(1024'000)
                      .cluster(cluster)
+                     .sequencer(sup->sequencer)
                      .timeout(timeout)
                      .request_timeout(timeout)
                      .finish();

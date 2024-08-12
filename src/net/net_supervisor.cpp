@@ -23,7 +23,7 @@ namespace bfs = boost::filesystem;
 using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
-    : parent_t{cfg}, app_config{cfg.app_config}, cluster_copies{cfg.cluster_copies} {
+    : parent_t{cfg}, app_config{cfg.app_config}, cluster_copies{cfg.cluster_copies}, sequencer{cfg.sequencer} {
     seed = (size_t)std::time(nullptr);
     auto log = utils::get_logger(names::coordinator);
     auto &files_cfg = app_config.global_announce_config;
@@ -225,6 +225,7 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
                           .timeout(shutdown_timeout * 9 / 10)
                           .strand(strand)
                           .cluster(cluster)
+                          .sequencer(sequencer)
                           .bep_config(app_config.bep_config)
                           .hasher_threads(app_config.hasher_threads)
                           .escalate_failure()

@@ -4,14 +4,15 @@
 #pragma once
 
 #include "messages.h"
-#include "model/misc/file_iterator.h"
-#include "model/misc/block_iterator.h"
-#include "model/misc/updates_streamer.h"
 #include "model/messages.h"
 #include "model/messages.h"
 #include "model/diff/modify/block_transaction.h"
 #include "model/diff/block_visitor.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/misc/file_iterator.h"
+#include "model/misc/block_iterator.h"
+#include "model/misc/updates_streamer.h"
+#include "model/misc/sequencer.h"
 #include "hasher/messages.h"
 #include "utils/log.h"
 #include "fs/messages.h"
@@ -38,11 +39,13 @@ using pull_signal_t = r::message_t<payload::pull_signal_t>;
 struct controller_actor_config_t : r::actor_config_t {
     int64_t request_pool;
     model::cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
     model::device_ptr_t peer;
     r::address_ptr_t peer_addr;
     pt::time_duration request_timeout;
     uint32_t blocks_max_requested = 8;
     uint32_t outgoing_buffer_max = 0;
+
 };
 
 template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -87,6 +90,11 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
 
     builder_t &&outgoing_buffer_max(uint32_t value) && noexcept {
         parent_t::config.outgoing_buffer_max = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
+        parent_t::config.sequencer = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -155,6 +163,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     outcome::result<void> operator()(const model::diff::modify::block_rej_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
 
+    model::sequencer_ptr_t sequencer;
     model::cluster_ptr_t cluster;
     model::device_ptr_t peer;
     model::folder_ptr_t folder;
