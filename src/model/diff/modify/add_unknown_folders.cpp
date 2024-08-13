@@ -15,7 +15,7 @@ auto add_unknown_folders_t::apply_impl(cluster_t &cluster) const noexcept -> out
     for (auto &item : container) {
         auto peer = devices.by_sha256(item.peer_id);
         auto &db = item.db;
-        auto opt = unknown_folder_t::create(cluster.next_uuid(), db, peer->device_id());
+        auto opt = unknown_folder_t::create(item.uuid, db, peer->device_id());
         if (!opt) {
             return opt.assume_error();
         }

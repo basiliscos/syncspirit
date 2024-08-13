@@ -5,7 +5,7 @@
 
 #include "../cluster_diff.h"
 #include "model/device.h"
-#include <forward_list>
+#include <vector>
 #include "structs.pb.h"
 
 namespace syncspirit::model::diff::modify {
@@ -14,8 +14,9 @@ struct SYNCSPIRIT_API add_unknown_folders_t final : cluster_diff_t {
     struct item_t {
         db::UnknownFolder db;
         std::string peer_id;
+        uuid_t uuid;
     };
-    using container_t = std::forward_list<item_t>;
+    using container_t = std::vector<item_t>;
 
     add_unknown_folders_t(container_t items) noexcept;
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;

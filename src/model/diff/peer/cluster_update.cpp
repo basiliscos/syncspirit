@@ -20,12 +20,13 @@ using namespace syncspirit::model::diff::peer;
 
 using keys_t = std::set<std::string, syncspirit::utils::string_comparator_t>;
 
-auto cluster_update_t::create(const cluster_t &cluster, const device_t &source, const message_t &message) noexcept
-    -> outcome::result<cluster_diff_ptr_t> {
-    return cluster_diff_ptr_t{new cluster_update_t(cluster, source, message)};
+auto cluster_update_t::create(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
+                              const message_t &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
+    return cluster_diff_ptr_t{new cluster_update_t(cluster, sequencer, source, message)};
 };
 
-cluster_update_t::cluster_update_t(const cluster_t &cluster, const device_t &source, const message_t &message) noexcept
+cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
+                                   const message_t &message) noexcept
     : peer_id(source.device_id().get_sha256()) {
     auto log = get_log();
 
@@ -59,7 +60,8 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, const device_t &sou
         db_f->set_disable_temp_indexes(f.disable_temp_indexes());
         db_f->set_paused(f.paused());
 
-        new_unknown_folders.emplace_front(item_t{std::move(db), std::string(source.device_id().get_sha256())});
+        auto id = std::string(source.device_id().get_sha256());
+        new_unknown_folders.push_back(item_t{std::move(db), std::move(id), sequencer.next_uuid()});
     };
 
     for (int i = 0; i < message.folders_size(); ++i) {

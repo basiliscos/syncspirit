@@ -457,7 +457,7 @@ void test_cluster_update_and_remove() {
             pr_device->set_id(std::string(peer_device->device_id().get_sha256()));
             pr_device->set_max_sequence(1);
             pr_device->set_index_id(peer_folder_info->get_index() + 1);
-            auto diff = diff::peer::cluster_update_t::create(*cluster, *peer_device, pr_msg).value();
+            auto diff = diff::peer::cluster_update_t::create(*cluster, *sup->sequencer, *peer_device, pr_msg).value();
 
             sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
             sup->do_process();

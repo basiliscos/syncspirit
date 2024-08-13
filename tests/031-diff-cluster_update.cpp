@@ -4,6 +4,7 @@
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
+#include "model/misc/sequencer.h"
 #include "diff-builder.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/cluster_visitor.h"
@@ -70,6 +71,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto sequencer = model::make_sequecner(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -85,7 +87,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         d_peer->set_index_id(22ul);
 
         auto folder = *folder_ptr;
-        auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+        auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
 
         auto &diff = diff_opt.value();
@@ -111,7 +113,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         mfi->set_max_sequence(d_peer->max_sequence());
         mfi->set_index_id(d_peer->index_id());
 
-        diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+        diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
         diff = diff_opt.value();
         r_a = diff->apply(*cluster);
@@ -122,7 +124,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
 
         // max-id changed
         d_peer->set_max_sequence(15);
-        diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+        diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
         diff = diff_opt.value();
         r_a = diff->apply(*cluster);
@@ -148,7 +150,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         d_peer->set_max_sequence(10);
         d_peer->set_index_id(22ul);
 
-        diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+        diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
 
         r_a = diff_opt.value()->apply(*cluster);
@@ -196,7 +198,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             p_peer->set_max_sequence(folder_info_peer->get_max_sequence());
             p_peer->set_index_id(folder_info_peer->get_index());
 
-            auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+            auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
             REQUIRE(diff_opt);
 
             auto &diff = diff_opt.value();
@@ -222,7 +224,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             p_peer->set_max_sequence(max_seq);
             p_peer->set_index_id(folder_info_peer->get_index());
 
-            auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+            auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
             REQUIRE(diff_opt);
 
             auto &diff = diff_opt.value();
@@ -278,7 +280,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             p_peer->set_max_sequence(123456u);
             p_peer->set_index_id(7ul);
 
-            auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+            auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
             REQUIRE(diff_opt);
 
             auto &diff = diff_opt.value();
@@ -305,6 +307,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto sequencer = model::make_sequecner(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -397,7 +400,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     p_peer->set_max_sequence(123456u);
     p_peer->set_index_id(7ul);
 
-    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
 
     auto &diff = diff_opt.value();
@@ -437,6 +440,7 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto sequencer = model::make_sequecner(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -468,7 +472,7 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     p_peer->set_max_sequence(123456u);
     p_peer->set_index_id(7ul);
 
-    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
     auto &diff = diff_opt.value();
     REQUIRE(diff->apply(*cluster));
@@ -484,6 +488,7 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
 
     auto peer_device = device_t::create(peer_id_1, "peer-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto sequencer = model::make_sequecner(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -530,7 +535,7 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
     p_peer_2->set_max_sequence(123456u);
     p_peer_2->set_index_id(7ul);
 
-    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
 }
 
@@ -544,6 +549,7 @@ TEST_CASE("cluster update nothing shared", "[model]") {
 
     auto peer_device = device_t::create(peer_id_1, "peer-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto sequencer = model::make_sequecner(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
     auto &blocks_map = cluster->get_blocks();
@@ -590,7 +596,7 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     }
 
     auto cc = std::make_unique<proto::ClusterConfig>();
-    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
     auto opt = diff_opt.value()->apply(*cluster);
     REQUIRE(opt);
@@ -609,6 +615,7 @@ TEST_CASE("non-shared pending folder", "[model]") {
 
     auto peer_device = device_t::create(peer_id_1, "peer-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto sequencer = model::make_sequecner(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -634,6 +641,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
 
     auto peer_device = device_t::create(peer_id_1, "peer-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto sequencer = model::make_sequecner(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -680,7 +688,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
     p_peer_my->set_max_sequence(3);
     p_peer_my->set_index_id(5ul);
 
-    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
 
     auto opt = diff_opt.value()->apply(*cluster);
@@ -693,7 +701,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
 
     SECTION("unshare by peer") {
         auto cc = std::make_unique<proto::ClusterConfig>();
-        diff_opt = diff::peer::cluster_update_t::create(*cluster, *peer_device, *cc);
+        diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
 
         auto &diff = diff_opt.value();

@@ -46,9 +46,12 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     int32_t get_write_requests() const noexcept;
     void modify_write_requests(int32_t delta) noexcept;
 
-    outcome::result<diff::cluster_diff_ptr_t> process(proto::ClusterConfig &msg, const device_t &peer) const noexcept;
-    outcome::result<diff::cluster_diff_ptr_t> process(sequencer_t& sequencer, proto::Index &msg, const device_t &peer) const noexcept;
-    outcome::result<diff::cluster_diff_ptr_t> process(sequencer_t& sequencer, proto::IndexUpdate &msg, const device_t &peer) const noexcept;
+    outcome::result<diff::cluster_diff_ptr_t> process(sequencer_t &sequencer, proto::ClusterConfig &msg,
+                                                      const device_t &peer) const noexcept;
+    outcome::result<diff::cluster_diff_ptr_t> process(sequencer_t &sequencer, proto::Index &msg,
+                                                      const device_t &peer) const noexcept;
+    outcome::result<diff::cluster_diff_ptr_t> process(sequencer_t &sequencer, proto::IndexUpdate &msg,
+                                                      const device_t &peer) const noexcept;
 
   private:
     using rng_engine_t = std::mt19937;

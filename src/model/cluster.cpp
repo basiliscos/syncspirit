@@ -54,17 +54,17 @@ const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
 
 uuid_t cluster_t::next_uuid() noexcept { return uuid_generator(); }
 
-auto cluster_t::process(proto::ClusterConfig &msg, const device_t &peer) const noexcept
+auto cluster_t::process(sequencer_t &sequencer, proto::ClusterConfig &msg, const device_t &peer) const noexcept
     -> outcome::result<diff::cluster_diff_ptr_t> {
-    return diff::peer::cluster_update_t::create(*this, peer, msg);
+    return diff::peer::cluster_update_t::create(*this, sequencer, peer, msg);
 }
 
-auto cluster_t::process(sequencer_t& sequencer, proto::Index &msg, const device_t &peer) const noexcept
+auto cluster_t::process(sequencer_t &sequencer, proto::Index &msg, const device_t &peer) const noexcept
     -> outcome::result<diff::cluster_diff_ptr_t> {
     return diff::peer::update_folder_t::create(*this, sequencer, peer, msg);
 }
 
-auto cluster_t::process(sequencer_t& sequencer, proto::IndexUpdate &msg, const device_t &peer) const noexcept
+auto cluster_t::process(sequencer_t &sequencer, proto::IndexUpdate &msg, const device_t &peer) const noexcept
     -> outcome::result<diff::cluster_diff_ptr_t> {
     return diff::peer::update_folder_t::create(*this, sequencer, peer, msg);
 }

@@ -36,10 +36,10 @@ r::plugin::resource_id_t hash = 1;
 } // namespace
 
 controller_actor_t::controller_actor_t(config_t &config)
-    : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer}, peer_addr{config.peer_addr},
-      request_timeout{config.request_timeout}, rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer{0},
-      outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
-      blocks_max_requested{config.blocks_max_requested} {
+    : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
+      peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, rx_blocks_requested{0},
+      tx_blocks_requested{0}, outgoing_buffer{0}, outgoing_buffer_max{config.outgoing_buffer_max},
+      request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested} {
     assert(cluster);
     assert(sequencer);
 }
@@ -498,7 +498,7 @@ void controller_actor_t::on_block_update(model::message::block_update_t &message
 
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
     LOG_DEBUG(log, "on_message (ClusterConfig)");
-    auto diff_opt = cluster->process(*message, *peer);
+    auto diff_opt = cluster->process(*sequencer, *message, *peer);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());

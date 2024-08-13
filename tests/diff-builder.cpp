@@ -45,7 +45,7 @@ cluster_configurer_t &&cluster_configurer_t::add(std::string_view sha256, std::s
 diff_builder_t &cluster_configurer_t::finish() noexcept {
     auto &cluster = builder.cluster;
     auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
-    auto diff = diff::peer::cluster_update_t::create(cluster, *peer, cc);
+    auto diff = diff::peer::cluster_update_t::create(cluster, *builder.sequencer, *peer, cc);
     assert(diff.has_value());
     builder.assign(diff.value().get());
     return builder;

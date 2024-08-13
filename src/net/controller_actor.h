@@ -45,7 +45,6 @@ struct controller_actor_config_t : r::actor_config_t {
     pt::time_duration request_timeout;
     uint32_t blocks_max_requested = 8;
     uint32_t outgoing_buffer_max = 0;
-
 };
 
 template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {
