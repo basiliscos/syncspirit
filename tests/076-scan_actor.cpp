@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -7,8 +7,6 @@
 #include "diff-builder.h"
 
 #include "model/cluster.h"
-#include "model/diff/cluster_diff.h"
-#include "model/diff/modify/clone_file.h"
 #include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
 #include "fs/scan_actor.h"
@@ -129,6 +127,7 @@ void test_meta_changes() {
     struct F : fixture_t {
         void main() noexcept override {
             sys::error_code ec;
+            auto builder = diff_builder_t(*cluster);
 
             SECTION("trivial") {
                 SECTION("no files") {
@@ -181,14 +180,11 @@ void test_meta_changes() {
             bi.set_offset(0);
 
             auto b = block_info_t::create(bi).value();
-
             SECTION("a file does not physically exist") {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 folder_info_peer->add(file_peer, false);
-
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
-                REQUIRE(diff->apply(*cluster));
+                REQUIRE(builder.clone_file(*file_peer).apply());
                 auto file = files->by_name(pr_fi.name());
 
                 sup->do_process();
@@ -196,13 +192,13 @@ void test_meta_changes() {
                 CHECK(!file->is_locally_available());
                 REQUIRE(scan_completions == 1);
             }
+
             SECTION("complete file exists") {
                 auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 folder_info_peer->add(file_peer, false);
 
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
-                REQUIRE(diff->apply(*cluster));
+                REQUIRE(builder.clone_file(*file_peer).apply());
                 auto file = files->by_name(pr_fi.name());
                 file->set_source(nullptr);
                 auto path = file->get_path();
@@ -214,7 +210,6 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     CHECK(file->is_locally_available());
                 }
-
                 SECTION("meta is changed (modification)") {
                     write_file(path, "12345");
                     sup->do_process();
@@ -256,7 +251,6 @@ void test_meta_changes() {
                 }
                 REQUIRE(scan_completions == 1);
             }
-
             SECTION("incomplete file exists") {
                 pr_fi.set_size(10ul);
                 pr_fi.set_block_size(5ul);
@@ -273,8 +267,7 @@ void test_meta_changes() {
                 file_peer->assign_block(b2, 1);
                 folder_info_peer->add(file_peer, false);
 
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
-                REQUIRE(diff->apply(*cluster));
+                REQUIRE(builder.clone_file(*file_peer).apply());
                 auto file = files->by_name(pr_fi.name());
                 auto path = file->get_path().string() + ".syncspirit-tmp";
                 file->lock(); // should be locked on db, as there is a source
@@ -374,8 +367,7 @@ void test_meta_changes() {
                 file_peer->assign_block(b3, 2);
                 folder_info_peer->add(file_peer, false);
 
-                auto diff = diff::cluster_diff_ptr_t(new diff::modify::clone_file_t(*file_peer));
-                REQUIRE(diff->apply(*cluster));
+                REQUIRE(builder.clone_file(*file_peer).apply());
                 auto file = files->by_name(pr_fi.name());
                 auto path_my = file->get_path().string();
                 auto path_peer = file->get_path().string() + ".syncspirit-tmp";

@@ -263,7 +263,7 @@ void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
                 file->locally_lock();
                 locally_locked_files.emplace(file);
                 auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::clone_file_t(*file);
+                diff = new model::diff::modify::clone_file_t(*file, *sequencer);
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             } else {
                 pull_ready();

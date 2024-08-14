@@ -175,7 +175,7 @@ diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcep
 }
 
 diff_builder_t &diff_builder_t::clone_file(const model::file_info_t &source) noexcept {
-    return assign(new diff::modify::clone_file_t(source));
+    return assign(new diff::modify::clone_file_t(source, *sequencer));
 }
 
 diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &source) noexcept {
