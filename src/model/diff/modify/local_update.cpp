@@ -10,7 +10,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-local_update_t::local_update_t(const model::cluster_t &cluster, std::string_view folder_id_,
+local_update_t::local_update_t(const model::cluster_t &cluster, sequencer_t &sequencer, std::string_view folder_id_,
                                proto::FileInfo file_) noexcept
     : folder_id{folder_id_}, file{std::move(file_)}, already_exists{false} {
     auto &blocks_map = cluster.get_blocks();
@@ -41,6 +41,9 @@ local_update_t::local_update_t(const model::cluster_t &cluster, std::string_view
                 removed_blocks.insert(std::string(hash));
             }
         }
+        assign(uuid, prev_file->get_uuid());
+    } else {
+        uuid = sequencer.next_uuid();
     }
 }
 
@@ -58,12 +61,8 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     file.set_sequence(seq);
     auto version_ptr = file.mutable_version();
 
-    auto uuid = uuid_t{};
     if (prev_file) {
-        model::assign(uuid, prev_file->get_uuid());
         *version_ptr = prev_file->get_version();
-    } else {
-        uuid = cluster.next_uuid();
     }
     record_update(*version_ptr, device);
 

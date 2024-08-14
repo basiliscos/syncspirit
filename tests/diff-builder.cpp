@@ -187,7 +187,7 @@ diff_builder_t &diff_builder_t::finish_file_ack(const model::file_info_t &source
 }
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
-    return assign(new diff::modify::local_update_t(cluster, folder_id, file_));
+    return assign(new diff::modify::local_update_t(cluster, *sequencer, folder_id, file_));
 }
 
 diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcept {
