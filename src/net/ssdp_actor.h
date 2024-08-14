@@ -4,6 +4,7 @@
 #pragma once
 
 #include "messages.h"
+#include "model/cluster.h"
 #include "config/upnp.h"
 #include "utils/log.h"
 #include <boost/asio.hpp>

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "resolver_actor.h"
+#include "model/cluster.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "names.h"

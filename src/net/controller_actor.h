@@ -5,7 +5,7 @@
 
 #include "messages.h"
 #include "model/messages.h"
-#include "model/messages.h"
+#include "model/cluster.h"
 #include "model/diff/modify/block_transaction.h"
 #include "model/diff/block_visitor.h"
 #include "model/diff/cluster_visitor.h"

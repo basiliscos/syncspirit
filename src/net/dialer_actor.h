@@ -6,6 +6,7 @@
 #include "config/dialer.h"
 #include "config/bep.h"
 #include "utils/log.h"
+#include "model/cluster.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/contact_visitor.h"

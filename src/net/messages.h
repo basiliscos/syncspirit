@@ -14,8 +14,8 @@
 #include <optional>
 
 #include <fmt/core.h>
-#include "model/misc/upnp.h"
-#include "model/cluster.h"
+#include "model/diff/cluster_diff.h"
+#include "model/file_info.h"
 #include "transport/base.h"
 #include "proto/bep_support.h"
 #include "utils/dns.h"

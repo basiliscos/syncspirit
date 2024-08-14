@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "cluster.h"
-#include "diff/peer/cluster_update.h"
-#include "diff/peer/update_folder.h"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit;
@@ -53,21 +51,6 @@ auto cluster_t::get_unknown_folders() const noexcept -> const unknown_folder_map
 const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
 
 uuid_t cluster_t::next_uuid() noexcept { return uuid_generator(); }
-
-auto cluster_t::process(sequencer_t &sequencer, proto::ClusterConfig &msg, const device_t &peer) const noexcept
-    -> outcome::result<diff::cluster_diff_ptr_t> {
-    return diff::peer::cluster_update_t::create(*this, sequencer, peer, msg);
-}
-
-auto cluster_t::process(sequencer_t &sequencer, proto::Index &msg, const device_t &peer) const noexcept
-    -> outcome::result<diff::cluster_diff_ptr_t> {
-    return diff::peer::update_folder_t::create(*this, sequencer, peer, msg);
-}
-
-auto cluster_t::process(sequencer_t &sequencer, proto::IndexUpdate &msg, const device_t &peer) const noexcept
-    -> outcome::result<diff::cluster_diff_ptr_t> {
-    return diff::peer::update_folder_t::create(*this, sequencer, peer, msg);
-}
 
 int32_t cluster_t::get_write_requests() const noexcept { return write_requests; }
 

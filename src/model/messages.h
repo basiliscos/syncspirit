@@ -7,6 +7,7 @@
 #include "cluster.h"
 #include "diff/block_diff.h"
 #include "diff/contact_diff.h"
+#include "diff/cluster_diff.h"
 
 namespace syncspirit::model {
 

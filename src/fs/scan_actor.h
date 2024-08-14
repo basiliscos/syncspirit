@@ -5,6 +5,7 @@
 
 #include "model/cluster.h"
 #include "model/messages.h"
+#include "model/misc/sequencer.h"
 #include "utils/log.h"
 #include "hasher/messages.h"
 #include "messages.h"

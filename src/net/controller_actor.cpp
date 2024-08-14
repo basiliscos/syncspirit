@@ -18,6 +18,7 @@
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/peer/cluster_update.h"
+#include "model/diff/peer/update_folder.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
@@ -498,7 +499,7 @@ void controller_actor_t::on_block_update(model::message::block_update_t &message
 
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
     LOG_DEBUG(log, "on_message (ClusterConfig)");
-    auto diff_opt = cluster->process(*sequencer, *message, *peer);
+    auto diff_opt = model::diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer, *message);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
@@ -510,7 +511,7 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
     auto &msg = *message;
     LOG_DEBUG(log, "on_message (Index)");
-    auto diff_opt = cluster->process(*sequencer, msg, *peer);
+    auto diff_opt = model::diff::peer::update_folder_t::create(*cluster, *sequencer, *peer, *message);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
@@ -524,7 +525,7 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
 void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
     LOG_TRACE(log, "on_message (IndexUpdate)");
     auto &msg = *message;
-    auto diff_opt = cluster->process(*sequencer, msg, *peer);
+    auto diff_opt = model::diff::peer::update_folder_t::create(*cluster, *sequencer, *peer, *message);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());

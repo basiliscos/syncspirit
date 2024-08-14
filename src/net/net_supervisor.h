@@ -4,7 +4,7 @@
 #pragma once
 
 #include "model/messages.h"
-#include "model/device.h"
+#include "model/cluster.h"
 #include "model/misc/sequencer.h"
 #include "model/diff/cluster_visitor.h"
 #include "utils/log.h"
