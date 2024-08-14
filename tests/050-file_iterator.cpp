@@ -4,6 +4,7 @@
 #include "test-utils.h"
 #include "model/cluster.h"
 #include "model/misc/file_iterator.h"
+#include "model/misc/sequencer.h"
 #include "diff-builder.h"
 
 using namespace syncspirit;
@@ -16,7 +17,8 @@ TEST_CASE("file iterator", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -137,7 +139,7 @@ TEST_CASE("file iterator", "[model]") {
                 auto my_folder = folder_infos.by_device(*my_device);
                 auto pr_file = proto::FileInfo();
                 pr_file.set_name("a.txt");
-                auto my_file = file_info_t::create(cluster->next_uuid(), pr_file, my_folder).value();
+                auto my_file = file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value();
                 my_folder->add(my_file, false);
 
                 auto peer_folder = folder_infos.by_device(*peer_device);
@@ -163,7 +165,7 @@ TEST_CASE("file iterator", "[model]") {
             auto my_folder = folder_infos.by_device(*my_device);
             auto pr_file = proto::FileInfo();
             pr_file.set_name("a.txt");
-            my_folder->add(file_info_t::create(cluster->next_uuid(), pr_file, my_folder).value(), false);
+            my_folder->add(file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value(), false);
 
             auto f = next(true);
             REQUIRE(f);
@@ -182,7 +184,7 @@ TEST_CASE("file iterator", "[model]") {
 
             auto my_folder = folder_infos.by_device(*my_device);
             my_folder->set_max_sequence(file_1.sequence());
-            my_folder->add(file_info_t::create(cluster->next_uuid(), file_1, my_folder).value(), false);
+            my_folder->add(file_info_t::create(sequencer->next_uuid(), file_1, my_folder).value(), false);
 
             auto f = next(true);
             REQUIRE(f);
@@ -200,7 +202,7 @@ TEST_CASE("file iterator", "[model]") {
             REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).finish().apply());
 
             auto peer_folder = folder_infos.by_device(*peer_device);
-            auto file = file_info_t::create(cluster->next_uuid(), file_1, peer_folder).value();
+            auto file = file_info_t::create(sequencer->next_uuid(), file_1, peer_folder).value();
             peer_folder->add(file, true);
             peer_folder->set_max_sequence(peer_folder->get_max_sequence() + 20);
             REQUIRE(!peer_folder->is_actual());
@@ -292,7 +294,7 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 

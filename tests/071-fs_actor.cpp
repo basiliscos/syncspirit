@@ -31,6 +31,7 @@ struct fixture_t {
     fixture_t() noexcept : root_path{bfs::unique_path()}, path_guard{root_path} {
         utils::set_default("trace");
         bfs::create_directory(root_path);
+        sequencer = make_sequencer(67);
     }
 
     virtual supervisor_t::configure_callback_t configure() noexcept {
@@ -47,7 +48,7 @@ struct fixture_t {
             device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
         my_device = device_t::create(my_id, "my-device").value();
 
-        cluster = new cluster_t(my_device, 1, 1);
+        cluster = new cluster_t(my_device, 1);
         auto peer_id =
             device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
         peer_device = device_t::create(peer_id, "peer-device").value();
@@ -96,6 +97,7 @@ struct fixture_t {
     r::address_ptr_t file_addr;
     r::pt::time_duration timeout = r::pt::millisec{10};
     cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
     model::device_ptr_t peer_device;
     model::device_ptr_t my_device;
     model::folder_ptr_t folder;
@@ -125,7 +127,7 @@ void test_clone_file() {
             counter->set_value(peer_device->as_uint());
 
             auto make_file = [&]() {
-                auto file = file_info_t::create(cluster->next_uuid(), pr_fi, folder_peer).value();
+                auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
                 folder_peer->add(file, false);
                 return file;
             };
@@ -260,7 +262,7 @@ void test_append_block() {
             auto blocks = std::vector<block_info_ptr_t>{b, b2};
 
             auto make_file = [&](size_t count) {
-                auto file = file_info_t::create(cluster->next_uuid(), pr_source, folder_peer).value();
+                auto file = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
                 for (size_t i = 0; i < count; ++i) {
                     file->assign_block(blocks[i], i);
                 }
@@ -373,7 +375,7 @@ void test_clone_block() {
             counter->set_value(peer_device->as_uint());
 
             auto make_file = [&](const proto::FileInfo &fi, size_t count) {
-                auto file = file_info_t::create(cluster->next_uuid(), fi, folder_peer).value();
+                auto file = file_info_t::create(sequencer->next_uuid(), fi, folder_peer).value();
                 for (size_t i = 0; i < count; ++i) {
                     file->assign_block(blocks[i], i);
                 }
@@ -464,7 +466,7 @@ void test_clone_block() {
                     pr_target.set_size(10ul);
                     auto target = make_file(pr_target, 2);
 
-                    auto source = file_info_t::create(cluster->next_uuid(), pr_source, folder_peer).value();
+                    auto source = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
                     source->assign_block(blocks[1], 0);
                     folder_peer->add(source, false);
 
@@ -493,7 +495,7 @@ void test_clone_block() {
             SECTION("source & target are is the same file") {
                 pr_source.set_size(10ul);
 
-                auto source = file_info_t::create(cluster->next_uuid(), pr_source, folder_peer).value();
+                auto source = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
                 source->assign_block(blocks[0], 0);
                 source->assign_block(blocks[0], 1);
                 folder_peer->add(source, false);
@@ -556,7 +558,7 @@ void test_requesting_block() {
             *pr_source.add_blocks() = bi;
             *pr_source.add_blocks() = bi2;
 
-            auto file = file_info_t::create(cluster->next_uuid(), pr_source, folder_my).value();
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_source, folder_my).value();
             file->assign_block(b, 0);
             file->assign_block(b2, 1);
             folder_my->add(file, false);

@@ -134,7 +134,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
         log->debug("public relays json: {}", public_relays);
         initiate_accept();
 
-        cluster = new cluster_t(my_device, 1, 1);
+        cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);

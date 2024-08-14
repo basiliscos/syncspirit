@@ -24,7 +24,6 @@ using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     : parent_t{cfg}, app_config{cfg.app_config}, cluster_copies{cfg.cluster_copies}, sequencer{cfg.sequencer} {
-    seed = (size_t)std::time(nullptr);
     auto log = utils::get_logger(names::coordinator);
     auto &files_cfg = app_config.global_announce_config;
     auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
@@ -56,7 +55,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     auto device = model::device_ptr_t();
     device = new model::local_device_t(device_id, app_config.device_name, cn.value());
     auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
-    cluster = new model::cluster_t(device, seed, static_cast<int32_t>(simultaneous_writes));
+    cluster = new model::cluster_t(device, static_cast<int32_t>(simultaneous_writes));
 
     auto &gcfg = app_config.global_announce_config;
     if (gcfg.enabled) {
@@ -152,7 +151,7 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
     auto device = model::device_ptr_t();
     device = new model::local_device_t(my_device->device_id(), app_config.device_name, "");
     auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
-    auto cluster_copy = new model::cluster_t(device, seed, static_cast<int32_t>(simultaneous_writes));
+    auto cluster_copy = new model::cluster_t(device, static_cast<int32_t>(simultaneous_writes));
     reply_to(message, std::move(cluster_copy));
     if (cluster_copies == 0 && load_diff) {
         seed_model();

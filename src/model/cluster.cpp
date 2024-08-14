@@ -7,10 +7,8 @@
 using namespace syncspirit;
 using namespace syncspirit::model;
 
-cluster_t::cluster_t(device_ptr_t device_, size_t seed_, int32_t write_requests_) noexcept
-    : device(device_), uuid_generator(rng_engine), tainted{false}, write_requests{write_requests_} {
-    rng_engine.seed(seed_);
-}
+cluster_t::cluster_t(device_ptr_t device_, int32_t write_requests_) noexcept
+    : device(device_), tainted{false}, write_requests{write_requests_} {}
 
 proto::ClusterConfig cluster_t::generate(const device_t &target) const noexcept {
     proto::ClusterConfig r;
@@ -49,8 +47,6 @@ auto cluster_t::get_unknown_folders() noexcept -> unknown_folder_map_t & { retur
 auto cluster_t::get_unknown_folders() const noexcept -> const unknown_folder_map_t & { return unknown_folders; }
 
 const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
-
-uuid_t cluster_t::next_uuid() noexcept { return uuid_generator(); }
 
 int32_t cluster_t::get_write_requests() const noexcept { return write_requests; }
 

@@ -4,6 +4,7 @@
 #include "test-utils.h"
 #include "diff-builder.h"
 #include "model/cluster.h"
+#include "model/misc/sequencer.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -16,7 +17,8 @@ TEST_CASE("new file diff", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -38,7 +40,7 @@ TEST_CASE("new file diff", "[model]") {
 
     SECTION("trivial cases") {
         SECTION("no file on my side, clone blockless file") {
-            auto file_peer = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
+            auto file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
             folder_peer->add(file_peer, false);
             REQUIRE(builder.clone_file(*file_peer).apply());
             auto file_my = folder_my->get_file_infos().by_name(file_info.name());
@@ -59,13 +61,13 @@ TEST_CASE("new file diff", "[model]") {
             auto bi = model::block_info_t::create(*b).value();
             blocks_map.put(bi);
 
-            auto file_my = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
+            auto file_my = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
             file_my->assign_block(bi, 0);
             file_my->mark_local_available(0);
             folder_my->add(file_my, false);
 
             file_info.set_modified_s(123);
-            auto file_peer = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
+            auto file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
             folder_peer->add(file_peer, false);
             file_peer->assign_block(bi, 0);
             REQUIRE(builder.clone_file(*file_peer).apply());
@@ -94,7 +96,7 @@ TEST_CASE("new file diff", "[model]") {
 
         SECTION("new file with blocks") {
             file_info.set_modified_s(123);
-            file_peer = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
+            file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
             file_peer->assign_block(bi, 0);
             folder_peer->add(file_peer, false);
             REQUIRE(builder.clone_file(*file_peer).apply());
@@ -110,13 +112,13 @@ TEST_CASE("new file diff", "[model]") {
         }
 
         SECTION("existing file with blocks") {
-            file_my = file_info_t::create(cluster->next_uuid(), file_info, folder_my).value();
+            file_my = file_info_t::create(sequencer->next_uuid(), file_info, folder_my).value();
             file_my->assign_block(bi, 0);
             file_my->mark_local_available(0);
             folder_my->add(file_my, false);
 
             file_info.set_modified_s(123);
-            file_peer = file_info_t::create(cluster->next_uuid(), file_info, folder_peer).value();
+            file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
 
             auto b2 = proto::BlockInfo{};
             b2.set_hash(utils::sha256_digest("67890").value());

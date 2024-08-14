@@ -70,8 +70,8 @@ TEST_CASE("cluster update, new folder", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
-    auto sequencer = model::make_sequecner(5);
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -164,7 +164,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         db_folder.set_id("1234-5678");
         db_folder.set_label("my-label");
         db_folder.set_path("/my/path");
-        auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+        auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
         cluster->get_folders().put(folder);
 
@@ -174,14 +174,14 @@ TEST_CASE("cluster update, new folder", "[model]") {
             db::FolderInfo db_fi;
             db_fi.set_index_id(5ul);
             db_fi.set_max_sequence(10l);
-            folder_info_my = folder_info_t::create(cluster->next_uuid(), db_fi, my_device, folder).value();
+            folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
             folder->get_folder_infos().put(folder_info_my);
         }
         {
             db::FolderInfo db_fi;
             db_fi.set_index_id(6ul);
             db_fi.set_max_sequence(10l);
-            folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi, peer_device, folder).value();
+            folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
             folder->get_folder_infos().put(folder_info_peer);
         }
 
@@ -207,7 +207,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             CHECK(!folder_info_peer->is_actual());
             auto pr_file = proto::FileInfo();
             pr_file.set_sequence(folder_info_peer->get_max_sequence());
-            auto peer_file = file_info_t::create(cluster->next_uuid(), pr_file, folder_info_peer).value();
+            auto peer_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_info_peer).value();
             folder_info_peer->add(peer_file, false);
             CHECK(folder_info_peer->is_actual());
 
@@ -247,7 +247,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         db_folder.set_id("1234-5678");
         db_folder.set_label("my-label");
         db_folder.set_path("/my/path");
-        auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+        auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
         cluster->get_folders().put(folder);
 
@@ -257,14 +257,14 @@ TEST_CASE("cluster update, new folder", "[model]") {
             db::FolderInfo db_fi;
             db_fi.set_index_id(5ul);
             db_fi.set_max_sequence(10l);
-            folder_info_my = folder_info_t::create(cluster->next_uuid(), db_fi, my_device, folder).value();
+            folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
             folder->get_folder_infos().put(folder_info_my);
         }
         {
             db::FolderInfo db_fi;
             db_fi.set_index_id(6ul);
             db_fi.set_max_sequence(10l);
-            folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi, peer_device, folder).value();
+            folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
             folder->get_folder_infos().put(folder_info_peer);
         }
 
@@ -306,8 +306,8 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
-    auto sequencer = model::make_sequecner(5);
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -315,13 +315,13 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     db_folder.set_id("1234-5678");
     db_folder.set_label("my-label");
     db_folder.set_path("/my/path");
-    auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+    auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
     db::UnknownFolder db_u_folder;
     db_u_folder.mutable_folder()->set_id("1111-2222");
     db_u_folder.mutable_folder()->set_label("unknown");
-    auto u_folder = unknown_folder_t::create(cluster->next_uuid(), db_u_folder, peer_device->device_id()).value();
+    auto u_folder = unknown_folder_t::create(sequencer->next_uuid(), db_u_folder, peer_device->device_id()).value();
     auto &unknown_folders = cluster->get_unknown_folders();
     unknown_folders.put(u_folder);
 
@@ -331,13 +331,13 @@ TEST_CASE("cluster update, reset folder", "[model]") {
         db::FolderInfo db_fi;
         db_fi.set_index_id(5ul);
         db_fi.set_max_sequence(10l);
-        folder_info_my = folder_info_t::create(cluster->next_uuid(), db_fi, my_device, folder).value();
+        folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
     }
     {
         db::FolderInfo db_fi;
         db_fi.set_index_id(6ul);
         db_fi.set_max_sequence(0l);
-        folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi, peer_device, folder).value();
+        folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
     }
     folder->get_folder_infos().put(folder_info_my);
     folder->get_folder_infos().put(folder_info_peer);
@@ -366,14 +366,14 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     pr_fi_my.set_name("a/b.txt");
     pr_fi_my.set_size(5ul);
     pr_fi_my.set_block_size(5ul);
-    auto fi_my = file_info_t::create(cluster->next_uuid(), pr_fi_my, folder_info_my).value();
+    auto fi_my = file_info_t::create(sequencer->next_uuid(), pr_fi_my, folder_info_my).value();
     folder_info_my->add(fi_my, false);
 
     proto::FileInfo pr_fi_peer1;
     pr_fi_peer1.set_name("a/c.txt");
     pr_fi_peer1.set_size(5ul);
     pr_fi_peer1.set_block_size(5ul);
-    auto fi_peer1 = file_info_t::create(cluster->next_uuid(), pr_fi_peer1, folder_info_peer).value();
+    auto fi_peer1 = file_info_t::create(sequencer->next_uuid(), pr_fi_peer1, folder_info_peer).value();
     folder_info_peer->add(fi_peer1, false);
     REQUIRE(folder_info_peer->get_file_infos().size() == 1);
 
@@ -381,7 +381,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     pr_fi_peer2.set_name("a/d.txt");
     pr_fi_peer2.set_size(10ul);
     pr_fi_peer2.set_block_size(5ul);
-    auto fi_peer2 = file_info_t::create(cluster->next_uuid(), pr_fi_peer2, folder_info_peer).value();
+    auto fi_peer2 = file_info_t::create(sequencer->next_uuid(), pr_fi_peer2, folder_info_peer).value();
     folder_info_peer->add(fi_peer2, false);
     REQUIRE(folder_info_peer->get_file_infos().size() == 2);
 
@@ -439,8 +439,8 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
-    auto sequencer = model::make_sequecner(5);
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -448,7 +448,7 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     db_folder.set_id("1234-5678");
     db_folder.set_label("my-label");
     db_folder.set_path("/my/path");
-    auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+    auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
 
@@ -458,7 +458,7 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
         db::FolderInfo db_fi;
         db_fi.set_index_id(5ul);
         db_fi.set_max_sequence(10l);
-        folder_info_my = folder_info_t::create(cluster->next_uuid(), db_fi, my_device, folder).value();
+        folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
 
@@ -487,8 +487,8 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
         device_id_t::from_string("EAMTZPW-Q4QYERN-D57DHFS-AUP2OMG-PAHOR3R-ZWLKGAA-WQC5SVW-UJ5NXQA").value();
 
     auto peer_device = device_t::create(peer_id_1, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
-    auto sequencer = model::make_sequecner(5);
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -496,7 +496,7 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
     db_folder.set_id("1234-5678");
     db_folder.set_label("my-label");
     db_folder.set_path("/my/path");
-    auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+    auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
 
@@ -506,14 +506,14 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
         db::FolderInfo db_fi;
         db_fi.set_index_id(5ul);
         db_fi.set_max_sequence(10l);
-        folder_info_my = folder_info_t::create(cluster->next_uuid(), db_fi, my_device, folder).value();
+        folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
     {
         db::FolderInfo db_fi;
         db_fi.set_index_id(6ul);
         db_fi.set_max_sequence(0l);
-        folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi, peer_device, folder).value();
+        folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
     folder->get_folder_infos().put(folder_info_my);
@@ -548,8 +548,8 @@ TEST_CASE("cluster update nothing shared", "[model]") {
         device_id_t::from_string("EAMTZPW-Q4QYERN-D57DHFS-AUP2OMG-PAHOR3R-ZWLKGAA-WQC5SVW-UJ5NXQA").value();
 
     auto peer_device = device_t::create(peer_id_1, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
-    auto sequencer = model::make_sequecner(5);
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
     auto &blocks_map = cluster->get_blocks();
@@ -564,7 +564,7 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     db_folder.set_id("1234-5678");
     db_folder.set_label("my-label");
     db_folder.set_path("/my/path");
-    auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+    auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
 
@@ -574,21 +574,21 @@ TEST_CASE("cluster update nothing shared", "[model]") {
         db::FolderInfo db_fi;
         db_fi.set_index_id(5ul);
         db_fi.set_max_sequence(10l);
-        folder_info_my = folder_info_t::create(cluster->next_uuid(), db_fi, my_device, folder).value();
+        folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
     {
         db::FolderInfo db_fi;
         db_fi.set_index_id(6ul);
         db_fi.set_max_sequence(0l);
-        folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi, peer_device, folder).value();
+        folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
         folder->get_folder_infos().put(folder_info_peer);
 
         proto::FileInfo pr_fi_peer;
         pr_fi_peer.set_name("a/c.txt");
         pr_fi_peer.set_size(5ul);
         pr_fi_peer.set_block_size(5ul);
-        auto fi_peer = file_info_t::create(cluster->next_uuid(), pr_fi_peer, folder_info_peer).value();
+        auto fi_peer = file_info_t::create(sequencer->next_uuid(), pr_fi_peer, folder_info_peer).value();
         folder_info_peer->add(fi_peer, false);
         fi_peer->assign_block(b1, 0);
 
@@ -614,8 +614,8 @@ TEST_CASE("non-shared pending folder", "[model]") {
         device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id_1, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
-    auto sequencer = model::make_sequecner(5);
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -640,8 +640,8 @@ TEST_CASE("cluster update with remote folders", "[model]") {
         device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id_1, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
-    auto sequencer = model::make_sequecner(5);
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -649,7 +649,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
     db_folder.set_id("1234-5678");
     db_folder.set_label("my-label");
     db_folder.set_path("/my/path");
-    auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+    auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
 
@@ -659,14 +659,14 @@ TEST_CASE("cluster update with remote folders", "[model]") {
         db::FolderInfo db_fi;
         db_fi.set_index_id(5ul);
         db_fi.set_max_sequence(10l);
-        folder_info_my = folder_info_t::create(cluster->next_uuid(), db_fi, my_device, folder).value();
+        folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
     {
         db::FolderInfo db_fi;
         db_fi.set_index_id(6ul);
         db_fi.set_max_sequence(0l);
-        folder_info_peer = folder_info_t::create(cluster->next_uuid(), db_fi, peer_device, folder).value();
+        folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
     folder->get_folder_infos().put(folder_info_my);

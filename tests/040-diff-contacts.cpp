@@ -19,7 +19,7 @@ TEST_CASE("unknown device connected", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 
@@ -44,7 +44,7 @@ TEST_CASE("unknown device is removed when connecting to it ", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 
@@ -66,7 +66,7 @@ TEST_CASE("ignored device connected", "[model]") {
 
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 
@@ -87,7 +87,7 @@ TEST_CASE("ignored device is removed when connecting to it ", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 
@@ -108,7 +108,7 @@ TEST_CASE("unknown device is removed adding the same ignored device", "[model]")
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 

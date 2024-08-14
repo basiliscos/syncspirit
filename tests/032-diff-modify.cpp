@@ -4,6 +4,7 @@
 #include "test-utils.h"
 #include "diff-builder.h"
 #include "model/cluster.h"
+#include "model/misc/sequencer.h"
 #include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit;
@@ -24,7 +25,8 @@ TEST_CASE("cluster modifications from ui", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -74,7 +76,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             db_fi->set_index_id(2345);
             db_fi->set_max_sequence(12);
 
-            auto uf = unknown_folder_t::create(cluster->next_uuid(), db_uf, peer_device->device_id()).value();
+            auto uf = unknown_folder_t::create(sequencer->next_uuid(), db_uf, peer_device->device_id()).value();
             cluster->get_unknown_folders().put(uf);
 
             REQUIRE(builder.share_folder(peer_id.get_sha256(), id).apply());
@@ -109,13 +111,13 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             blocks.put(bi_1);
             blocks.put(bi_2);
 
-            auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file_1, fi_peer).value();
+            auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file_1, fi_peer).value();
             fi_peer->get_file_infos().put(file_peer);
             fi_peer->set_max_sequence(file_peer->get_sequence());
             file_peer->assign_block(bi_1, 0);
             file_peer->assign_block(bi_2, 1);
 
-            auto file_my = file_info_t::create(cluster->next_uuid(), pr_file_1, fi_my).value();
+            auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file_1, fi_my).value();
             fi_my->get_file_infos().put(file_my);
             fi_my->set_max_sequence(file_my->get_sequence());
             file_my->assign_block(bi_2, 1);

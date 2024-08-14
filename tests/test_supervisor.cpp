@@ -28,7 +28,7 @@ using namespace syncspirit::test;
 
 supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) {
     auto_finish = cfg.auto_finish;
-    sequencer = model::make_sequecner(1234);
+    sequencer = model::make_sequencer(1234);
 }
 
 void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {

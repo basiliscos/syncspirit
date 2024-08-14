@@ -22,7 +22,8 @@ TEST_CASE("remove folder", "[model]") {
     my_device = new model::local_device_t(my_id, "my-device", "my-device");
     auto peer_device = device_t::create(peer_id, "peer-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
     auto &devices = cluster->get_devices();
     devices.put(my_device);
     devices.put(peer_device);
@@ -76,7 +77,7 @@ TEST_CASE("remove folder", "[model]") {
         b->set_offset(0);
         b->set_size(5);
 
-        auto fi = file_info_t::create(cluster->next_uuid(), pr_fi, fi_1_peer).value();
+        auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1_peer).value();
         fi->assign_block(b1, 0);
         fi_1_peer->get_file_infos().put(fi);
         return fi;
@@ -93,7 +94,7 @@ TEST_CASE("remove folder", "[model]") {
         b->set_offset(0);
         b->set_size(5);
 
-        auto fi = file_info_t::create(cluster->next_uuid(), pr_fi, fi_1_mine).value();
+        auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1_mine).value();
         fi->assign_block(b2, 0);
         fi_1_mine->get_file_infos().put(fi);
         return fi;
@@ -110,7 +111,7 @@ TEST_CASE("remove folder", "[model]") {
         b->set_offset(0);
         b->set_size(5);
 
-        auto fi = file_info_t::create(cluster->next_uuid(), pr_fi, fi_2_mine).value();
+        auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_2_mine).value();
         fi->assign_block(b3, 0);
         fi_2_mine->get_file_infos().put(fi);
         return fi;

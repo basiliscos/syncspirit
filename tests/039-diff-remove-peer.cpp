@@ -4,7 +4,7 @@
 #include "test-utils.h"
 #include "access.h"
 #include "diff-builder.h"
-
+#include "model/misc/sequencer.h"
 #include "model/cluster.h"
 
 using namespace syncspirit;
@@ -21,7 +21,8 @@ TEST_CASE("remove peer", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
     auto &devices = cluster->get_devices();
     devices.put(my_device);
     devices.put(peer_device);
@@ -52,7 +53,7 @@ TEST_CASE("remove peer", "[model]") {
         b1->set_offset(0);
         b1->set_size(5);
 
-        auto fi = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info).value();
+        auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
         fi->assign_block(block, 0);
         folder_info->get_file_infos().put(fi);
 
@@ -114,7 +115,7 @@ TEST_CASE("remove peer", "[model]") {
             b->set_offset(0);
             b->set_size(5);
 
-            auto fi = file_info_t::create(cluster->next_uuid(), pr_fi, fi_1).value();
+            auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1).value();
             fi->assign_block(b1, 0);
             fi_1->get_file_infos().put(fi);
             return fi;
@@ -135,7 +136,7 @@ TEST_CASE("remove peer", "[model]") {
             pr_b_2->set_offset(0);
             pr_b_1->set_size(5);
 
-            auto fi = file_info_t::create(cluster->next_uuid(), pr_fi, fi_2).value();
+            auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_2).value();
             fi->assign_block(b2, 0);
             fi->assign_block(b1, 1);
             fi_2->get_file_infos().put(fi);
@@ -161,7 +162,7 @@ TEST_CASE("remove peer", "[model]") {
         mfi->set_max_sequence(5);
         mfi->set_index_id(10);
 
-        auto uf = unknown_folder_t::create(cluster->next_uuid(), db_uf, peer_device->device_id()).value();
+        auto uf = unknown_folder_t::create(sequencer->next_uuid(), db_uf, peer_device->device_id()).value();
         auto &unknown_folders = cluster->get_unknown_folders();
         unknown_folders.put(uf);
         REQUIRE(builder.remove_peer(*peer_device).apply());

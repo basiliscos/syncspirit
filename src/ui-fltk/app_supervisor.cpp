@@ -58,7 +58,7 @@ app_supervisor_t::app_supervisor_t(config_t &config)
       app_config(std::move(config.app_config)), content{nullptr}, devices{nullptr}, folders{nullptr},
       unkwnown_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr} {
     started_at = clock_t::now();
-    sequencer = model::make_sequecner(started_at.time_since_epoch().count());
+    sequencer = model::make_sequencer(started_at.time_since_epoch().count());
 }
 
 auto app_supervisor_t::get_dist_sink() -> utils::dist_sink_t & { return dist_sink; }

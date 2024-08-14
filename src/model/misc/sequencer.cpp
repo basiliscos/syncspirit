@@ -17,6 +17,6 @@ uint64_t sequencer_t::next_uint64() noexcept {
     return uint64_generator(rng_engine);
 }
 
-auto make_sequecner(size_t seed) -> sequencer_ptr_t { return new sequencer_t(seed); }
+auto make_sequencer(size_t seed) -> sequencer_ptr_t { return new sequencer_t(seed); }
 
 } // namespace syncspirit::model

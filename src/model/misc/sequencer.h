@@ -35,6 +35,6 @@ struct SYNCSPIRIT_API sequencer_t : arc_base_t<sequencer_t> {
 
 using sequencer_ptr_t = intrusive_ptr_t<sequencer_t>;
 
-auto SYNCSPIRIT_API make_sequecner(size_t seed) -> sequencer_ptr_t;
+auto SYNCSPIRIT_API make_sequencer(size_t seed) -> sequencer_ptr_t;
 
 } // namespace syncspirit::model

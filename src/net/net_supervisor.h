@@ -79,7 +79,6 @@ struct SYNCSPIRIT_API net_supervisor_t : public ra::supervisor_asio_t, private m
     model::sequencer_ptr_t sequencer;
     utils::logger_t log;
     config::main_t app_config;
-    size_t seed;
     size_t cluster_copies;
     model::diff::cluster_diff_ptr_t load_diff;
     model::device_id_t global_device;

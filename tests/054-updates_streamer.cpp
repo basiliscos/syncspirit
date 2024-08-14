@@ -18,7 +18,8 @@ TEST_CASE("updates_streamer", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
     auto builder = diff_builder_t(*cluster);
@@ -55,7 +56,7 @@ TEST_CASE("updates_streamer", "[model]") {
         auto pr_file = proto::FileInfo();
         pr_file.set_name(name);
         pr_file.set_sequence(seq++);
-        auto f = file_info_t::create(cluster->next_uuid(), pr_file, my_folder).value();
+        auto f = file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value();
         my_files.put(f);
         my_folder->set_max_sequence(f->get_sequence());
         return f;

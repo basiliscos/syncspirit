@@ -57,7 +57,7 @@ struct fixture_t {
         auto my_device_id = device_id_t::from_string(my_id).value();
         my_device = device_t::create(my_device_id, "my-device").value();
 
-        auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+        auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
         cluster->get_devices().put(my_device);
 
         auto peer_id = "VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ";

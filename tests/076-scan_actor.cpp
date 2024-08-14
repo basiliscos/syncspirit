@@ -40,7 +40,7 @@ struct fixture_t {
             device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
         peer_device = device_t::create(peer_id, "peer-device").value();
 
-        cluster = new cluster_t(my_device, 1, 1);
+        cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
@@ -89,7 +89,7 @@ struct fixture_t {
         target = sup->create_actor<fs::scan_actor_t>()
                      .timeout(timeout)
                      .cluster(cluster)
-                     .sequencer(make_sequecner(77))
+                     .sequencer(make_sequencer(77))
                      .fs_config(fs_config)
                      .requested_hashes_limit(2ul)
                      .finish();
@@ -182,7 +182,8 @@ void test_meta_changes() {
 
             auto b = block_info_t::create(bi).value();
             SECTION("a file does not physically exist") {
-                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
+                auto uuid = sup->sequencer->next_uuid();
+                auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 folder_info_peer->add(file_peer, false);
                 REQUIRE(builder.clone_file(*file_peer).apply());
@@ -195,7 +196,8 @@ void test_meta_changes() {
             }
 
             SECTION("complete file exists") {
-                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
+                auto uuid = sup->sequencer->next_uuid();
+                auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 folder_info_peer->add(file_peer, false);
 
@@ -263,7 +265,8 @@ void test_meta_changes() {
                 bi_2.set_offset(5);
                 auto b2 = block_info_t::create(bi_2).value();
 
-                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
+                auto uuid = sup->sequencer->next_uuid();
+                auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 file_peer->assign_block(b2, 1);
                 folder_info_peer->add(file_peer, false);
@@ -354,7 +357,8 @@ void test_meta_changes() {
                 auto b3 = block_info_t::create(bi_3).value();
 
                 pr_fi.set_size(5ul);
-                auto file_my = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info).value();
+                auto uuid_1 = sup->sequencer->next_uuid();
+                auto file_my = file_info_t::create(uuid_1, pr_fi, folder_info).value();
                 file_my->assign_block(b, 0);
                 file_my->lock();
                 folder_info->add(file_my, false);
@@ -362,7 +366,8 @@ void test_meta_changes() {
                 pr_fi.set_size(15ul);
                 counter->set_id(2);
 
-                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_fi, folder_info_peer).value();
+                auto uuid_2 = sup->sequencer->next_uuid();
+                auto file_peer = file_info_t::create(uuid_2, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 file_peer->assign_block(b2, 1);
                 file_peer->assign_block(b3, 2);

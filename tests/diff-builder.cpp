@@ -78,7 +78,7 @@ diff_builder_t &index_maker_t::finish() noexcept {
 }
 
 diff_builder_t::diff_builder_t(model::cluster_t &cluster_) noexcept : cluster{cluster_} {
-    sequencer = model::make_sequecner(0);
+    sequencer = model::make_sequencer(0);
 }
 
 diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
