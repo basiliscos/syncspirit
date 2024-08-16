@@ -8,7 +8,7 @@
 
 namespace syncspirit::model {
 
-using unknown_device_t = some_device_t<(char)db::prefix::unknown_device>;
+using unknown_device_t = some_device_t<(char)db::prefix::pending_device>;
 using unknown_devices_map_t = typename unknown_device_t::map_t;
 using unknown_device_ptr_t = typename unknown_device_t::ptr_t;
 

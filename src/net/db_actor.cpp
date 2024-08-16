@@ -280,14 +280,14 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         return reply_with_error(request, make_error(file_infos_opt.error()));
     }
 
-    auto unknown_devices_opt = db::load(db::prefix::unknown_device, txn);
-    if (!unknown_devices_opt) {
-        return reply_with_error(request, make_error(unknown_devices_opt.error()));
+    auto pending_devices_opt = db::load(db::prefix::pending_device, txn);
+    if (!pending_devices_opt) {
+        return reply_with_error(request, make_error(pending_devices_opt.error()));
     }
 
-    auto unknown_folders_opt = db::load(db::prefix::unknown_folder, txn);
-    if (!unknown_folders_opt) {
-        return reply_with_error(request, make_error(unknown_folders_opt.error()));
+    auto pending_folders_opt = db::load(db::prefix::pending_folder, txn);
+    if (!pending_folders_opt) {
+        return reply_with_error(request, make_error(pending_folders_opt.error()));
     }
 
     auto diff = model::diff::cluster_diff_ptr_t{};
@@ -300,8 +300,8 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         ->assign_sibling(new load::folders_t(std::move(folders_opt.value())))
         ->assign_sibling(new load::folder_infos_t(std::move(folder_infos_opt.value())))
         ->assign_sibling(new load::file_infos_t(std::move(file_infos_opt.value())))
-        ->assign_sibling(new load::unknown_devices_t(std::move(unknown_devices_opt.value())))
-        ->assign_sibling(new load::unknown_folders_t(std::move(unknown_folders_opt.value())))
+        ->assign_sibling(new load::unknown_devices_t(std::move(pending_devices_opt.value())))
+        ->assign_sibling(new load::unknown_folders_t(std::move(pending_folders_opt.value())))
         ->assign_sibling(new load::close_transaction_t(std::move(txn)));
 
     reply_to(request, diff);
