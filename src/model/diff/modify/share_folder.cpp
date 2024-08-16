@@ -21,7 +21,7 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
     auto index = uint64_t{0};
     auto max_sequence = int64_t{0};
 
-    auto unknown_folder = model::unknown_folder_ptr_t{};
+    auto unknown_folder = model::pending_folder_ptr_t{};
     for (auto it = unknown.begin(); it != unknown.end(); ++it) {
         auto &uf = *it->item;
         if (uf.device_id() == peer.device_id() && uf.get_id() == folder.get_id()) {
@@ -42,7 +42,7 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
 
 share_folder_t::share_folder_t(const uuid_t &uuid, std::string_view device_id, std::string_view folder_id,
                                std::uint64_t index_id, std::int64_t max_sequence,
-                               model::unknown_folder_ptr_t uf) noexcept
+                               model::pending_folder_ptr_t uf) noexcept
     : peer_id(device_id) {
     auto current = assign_child(new upsert_folder_info_t(uuid, device_id, folder_id, index_id, max_sequence));
     if (uf) {

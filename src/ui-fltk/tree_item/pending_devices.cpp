@@ -13,7 +13,7 @@ unknown_devices_t::unknown_devices_t(app_supervisor_t &supervisor, Fl_Tree *tree
 
 void unknown_devices_t::update_label() {
     auto cluster = supervisor.get_cluster();
-    auto count = cluster ? cluster->get_unknown_devices().size() : 0;
+    auto count = cluster ? cluster->get_pending_devices().size() : 0;
     auto l = fmt::format("unknown devices ({})", count);
     label(l.data());
 }

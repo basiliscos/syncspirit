@@ -156,7 +156,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             devices.emplace_back(diff::load::pair_t{key, data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::unknown_devices_t(devices));
             REQUIRE(diff->apply(*cluster));
-            auto &map = cluster->get_unknown_devices();
+            auto &map = cluster->get_pending_devices();
             REQUIRE(map.size() == 1);
 
             auto target = map.get(device_id.get_sha256());

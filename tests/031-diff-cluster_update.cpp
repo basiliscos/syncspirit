@@ -321,7 +321,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     db::PendingFolder db_p_folder;
     db_p_folder.mutable_folder()->set_id("1111-2222");
     db_p_folder.mutable_folder()->set_label("unknown");
-    auto u_folder = unknown_folder_t::create(sequencer->next_uuid(), db_p_folder, peer_device->device_id()).value();
+    auto u_folder = pending_folder_t::create(sequencer->next_uuid(), db_p_folder, peer_device->device_id()).value();
     auto &unknown_folders = cluster->get_unknown_folders();
     unknown_folders.put(u_folder);
 

@@ -280,7 +280,7 @@ void test_hello_from_unknown() {
 
         void on_hello(proto::message::Hello msg) noexcept override {
             CHECK(cluster->get_devices().size() == 1);
-            auto &unknown_devices = cluster->get_unknown_devices();
+            auto &unknown_devices = cluster->get_pending_devices();
             CHECK(unknown_devices.size() == 1);
             auto peer = unknown_devices.by_sha256(peer_device->device_id().get_sha256());
             REQUIRE(peer);
@@ -300,14 +300,14 @@ void test_hello_from_known_unknown() {
     struct F : fixture_t {
         void main() noexcept override {
             diff_builder_t(*cluster).add_unknown_device(peer_device->device_id(), {}).apply(*sup);
-            REQUIRE(cluster->get_unknown_devices().size() == 1);
+            REQUIRE(cluster->get_pending_devices().size() == 1);
             create_actor();
             send_hello();
         }
 
         void on_hello(proto::message::Hello msg) noexcept override {
             CHECK(cluster->get_devices().size() == 1);
-            auto &unknown_devices = cluster->get_unknown_devices();
+            auto &unknown_devices = cluster->get_pending_devices();
             CHECK(unknown_devices.size() == 1);
             auto peer = unknown_devices.by_sha256(peer_device->device_id().get_sha256());
             REQUIRE(peer);
@@ -345,7 +345,7 @@ void test_hello_from_ignored() {
 
             auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
             CHECK(delta.seconds() <= 2);
-            REQUIRE(cluster->get_unknown_devices().size() == 0);
+            REQUIRE(cluster->get_pending_devices().size() == 0);
         }
     };
     F().run(false);

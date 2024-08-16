@@ -17,7 +17,7 @@ auto unknown_folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
             return make_error_code(error_code_t::unknown_folder_deserialization_failure);
         }
 
-        auto option = unknown_folder_t::create(pair.key, db);
+        auto option = pending_folder_t::create(pair.key, db);
         if (!option) {
             return option.assume_error();
         }

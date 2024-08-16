@@ -201,7 +201,7 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
         auto &ignored_devices = cluster->get_ignored_devices();
         auto &ignored_folders = cluster->get_ignored_folders();
         auto &unknown_folders = cluster->get_unknown_folders();
-        auto &unknown_devices = cluster->get_unknown_devices();
+        auto &unknown_devices = cluster->get_pending_devices();
         auto &devices = cluster->get_devices();
         auto &folders = cluster->get_folders();
         size_t files = 0;

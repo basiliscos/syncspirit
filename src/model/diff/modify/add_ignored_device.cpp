@@ -11,7 +11,7 @@ using namespace syncspirit::model::diff::modify;
 add_ignored_device_t::add_ignored_device_t(const cluster_t &cluster, const device_id_t &id_,
                                            db::SomeDevice db_device_) noexcept
     : device_id{id_}, db_device{db_device_} {
-    auto peer = cluster.get_unknown_devices().by_sha256(device_id.get_sha256());
+    auto peer = cluster.get_pending_devices().by_sha256(device_id.get_sha256());
     if (peer) {
         assign_child(new remove_pending_device_t(*peer));
     }

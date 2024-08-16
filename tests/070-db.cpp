@@ -218,7 +218,7 @@ void test_unknown_and_ignored_devices_1() {
             auto builder = diff_builder_t(*cluster);
             builder.add_unknown_device(d_id1, sd_1).add_ignored_device(d_id2, sd_2).apply(*sup);
 
-            REQUIRE(cluster->get_unknown_devices().size() == 1);
+            REQUIRE(cluster->get_pending_devices().size() == 1);
             REQUIRE(cluster->get_ignored_devices().size() == 1);
 
             {
@@ -227,7 +227,7 @@ void test_unknown_and_ignored_devices_1() {
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-                CHECK(cluster_clone->get_unknown_devices().by_sha256(d_id1.get_sha256()));
+                CHECK(cluster_clone->get_pending_devices().by_sha256(d_id1.get_sha256()));
                 CHECK(cluster_clone->get_ignored_devices().by_sha256(d_id2.get_sha256()));
             }
 
@@ -246,9 +246,9 @@ void test_unknown_and_ignored_devices_1() {
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-                REQUIRE(cluster_clone->get_unknown_devices().size() == 1);
+                REQUIRE(cluster_clone->get_pending_devices().size() == 1);
                 REQUIRE(cluster_clone->get_ignored_devices().size() == 1);
-                auto unknown = cluster_clone->get_unknown_devices().by_sha256(d_id1.get_sha256());
+                auto unknown = cluster_clone->get_pending_devices().by_sha256(d_id1.get_sha256());
                 auto ignored = cluster_clone->get_ignored_devices().by_sha256(d_id2.get_sha256());
                 REQUIRE(unknown);
                 REQUIRE(ignored);
@@ -257,7 +257,7 @@ void test_unknown_and_ignored_devices_1() {
             }
 
             builder.remove_unknown_device(*unknown_device).remove_ignored_device(*ignored_device).apply(*sup);
-            REQUIRE(cluster->get_unknown_devices().size() == 0);
+            REQUIRE(cluster->get_pending_devices().size() == 0);
             REQUIRE(cluster->get_ignored_devices().size() == 0);
 
             {
@@ -266,7 +266,7 @@ void test_unknown_and_ignored_devices_1() {
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-                REQUIRE(cluster_clone->get_unknown_devices().size() == 0);
+                REQUIRE(cluster_clone->get_pending_devices().size() == 0);
                 REQUIRE(cluster_clone->get_ignored_devices().size() == 0);
             }
         }
@@ -291,7 +291,7 @@ void test_unknown_and_ignored_devices_2() {
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-                CHECK(cluster_clone->get_unknown_devices().by_sha256(d_id.get_sha256()));
+                CHECK(cluster_clone->get_pending_devices().by_sha256(d_id.get_sha256()));
                 CHECK(!cluster_clone->get_ignored_devices().by_sha256(d_id.get_sha256()));
             }
 
@@ -302,7 +302,7 @@ void test_unknown_and_ignored_devices_2() {
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-                CHECK(!cluster_clone->get_unknown_devices().by_sha256(d_id.get_sha256()));
+                CHECK(!cluster_clone->get_pending_devices().by_sha256(d_id.get_sha256()));
                 CHECK(cluster_clone->get_ignored_devices().by_sha256(d_id.get_sha256()));
             }
         }
@@ -881,7 +881,7 @@ void test_update_peer() {
                 REQUIRE(!reply->payload.ee);
                 auto cluster_clone = make_cluster();
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-                CHECK(cluster_clone->get_unknown_devices().size() == 0);
+                CHECK(cluster_clone->get_pending_devices().size() == 0);
                 CHECK(cluster_clone->get_ignored_devices().size() == 0);
                 CHECK(cluster_clone->get_devices().size() == 2);
             }

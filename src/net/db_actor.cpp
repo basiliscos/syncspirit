@@ -487,7 +487,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_device_t &dif
         return txn_opt.assume_error();
     }
     auto &txn = *txn_opt.assume_value();
-    auto device = cluster->get_unknown_devices().by_sha256(diff.device_id.get_sha256());
+    auto device = cluster->get_pending_devices().by_sha256(diff.device_id.get_sha256());
 
     auto key = device->get_key();
     auto data = device->serialize();
@@ -1004,7 +1004,7 @@ auto db_actor_t::operator()(const model::diff::contact::unknown_connected_t &dif
         return outcome::success();
     }
 
-    auto device = cluster->get_unknown_devices().by_sha256(diff.device_id.get_sha256());
+    auto device = cluster->get_pending_devices().by_sha256(diff.device_id.get_sha256());
     assert(device);
 
     auto key = device->get_key();

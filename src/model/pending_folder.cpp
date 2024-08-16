@@ -10,7 +10,7 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(syncspirit::db::prefix::pending_folder);
 
-outcome::result<unknown_folder_ptr_t> unknown_folder_t::create(std::string_view key,
+outcome::result<pending_folder_ptr_t> pending_folder_t::create(std::string_view key,
                                                                const db::PendingFolder &data) noexcept {
     if (key.size() != data_length) {
         return make_error_code(error_code_t::invalid_unknown_folder_length);
@@ -26,32 +26,32 @@ outcome::result<unknown_folder_ptr_t> unknown_folder_t::create(std::string_view 
         return make_error_code(error_code_t::malformed_deviceid);
     }
 
-    auto ptr = unknown_folder_ptr_t();
-    ptr = new unknown_folder_t(key, device.value());
+    auto ptr = pending_folder_ptr_t();
+    ptr = new pending_folder_t(key, device.value());
     ptr->assign_fields(data);
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<unknown_folder_ptr_t> unknown_folder_t::create(const uuid_t &uuid, const db::PendingFolder &data,
+outcome::result<pending_folder_ptr_t> pending_folder_t::create(const uuid_t &uuid, const db::PendingFolder &data,
                                                                const device_id_t &device_) noexcept {
-    auto ptr = unknown_folder_ptr_t();
-    ptr = new unknown_folder_t(uuid, device_);
+    auto ptr = pending_folder_ptr_t();
+    ptr = new pending_folder_t(uuid, device_);
     ptr->assign_fields(data);
     return outcome::success(std::move(ptr));
 }
 
-unknown_folder_t::unknown_folder_t(const uuid_t &uuid, const device_id_t &device_) noexcept : device{device_} {
+pending_folder_t::pending_folder_t(const uuid_t &uuid, const device_id_t &device_) noexcept : device{device_} {
     key[0] = prefix;
     std::copy(uuid.begin(), uuid.end(), key + 1);
     auto sha256 = device.get_sha256();
     std::copy(sha256.begin(), sha256.end(), key + 1 + uuid_length);
 }
 
-unknown_folder_t::unknown_folder_t(std::string_view key_, const device_id_t &device_) noexcept : device{device_} {
+pending_folder_t::pending_folder_t(std::string_view key_, const device_id_t &device_) noexcept : device{device_} {
     std::copy(key_.begin(), key_.end(), key);
 }
 
-void unknown_folder_t::assign_fields(const db::PendingFolder &data) noexcept {
+void pending_folder_t::assign_fields(const db::PendingFolder &data) noexcept {
     folder_data_t::assign_fields(data.folder());
     auto &fi = data.folder_info();
     index = fi.index_id();
@@ -59,7 +59,7 @@ void unknown_folder_t::assign_fields(const db::PendingFolder &data) noexcept {
     id = data.folder().id();
 }
 
-std::string unknown_folder_t::serialize() const noexcept {
+std::string pending_folder_t::serialize() const noexcept {
     db::PendingFolder r;
     folder_data_t::serialize(*r.mutable_folder());
     auto &fi = *r.mutable_folder_info();
@@ -68,16 +68,16 @@ std::string unknown_folder_t::serialize() const noexcept {
     return r.SerializePartialAsString();
 }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const unknown_folder_ptr_t &item) noexcept {
+template <> SYNCSPIRIT_API std::string_view get_index<0>(const pending_folder_ptr_t &item) noexcept {
     return item->get_key();
 }
 
-template <> SYNCSPIRIT_API std::string_view get_index<1>(const unknown_folder_ptr_t &item) noexcept {
+template <> SYNCSPIRIT_API std::string_view get_index<1>(const pending_folder_ptr_t &item) noexcept {
     return item->get_id();
 }
 
-unknown_folder_ptr_t unknown_folder_map_t::by_key(std::string_view key) const noexcept { return get<0>(key); }
+pending_folder_ptr_t pending_folder_map_t::by_key(std::string_view key) const noexcept { return get<0>(key); }
 
-unknown_folder_ptr_t unknown_folder_map_t::by_id(std::string_view id) const noexcept { return get<1>(id); }
+pending_folder_ptr_t pending_folder_map_t::by_id(std::string_view id) const noexcept { return get<1>(id); }
 
 } // namespace syncspirit::model

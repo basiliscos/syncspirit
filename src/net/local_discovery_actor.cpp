@@ -231,7 +231,7 @@ void local_discovery_actor_t::handle(const model::device_id_t &device_id, utils:
         LOG_DEBUG(log, "ignored device '{}' contacted", device_id);
         auto db = filler_t::fill(peer, uris_str);
         diff = new contact::ignored_connected_t(*cluster, device_id, std::move(db));
-    } else if (auto peer = cluster->get_unknown_devices().by_sha256(device_id.get_sha256()); peer) {
+    } else if (auto peer = cluster->get_pending_devices().by_sha256(device_id.get_sha256()); peer) {
         auto db = filler_t::fill(peer, uris_str);
         diff = new contact::unknown_connected_t(*cluster, device_id, std::move(db));
     } else {
