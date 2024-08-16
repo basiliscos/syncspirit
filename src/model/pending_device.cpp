@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
-#include "unknown_device.h"
+#include "pending_device.h"
 
 namespace syncspirit::model {
 

@@ -7,7 +7,7 @@
 #include "model/misc/sequencer.h"
 #include "model/device.h"
 #include "model/folder.h"
-#include "model/unknown_folder.h"
+#include "model/pending_folder.h"
 
 namespace syncspirit::model::diff::modify {
 

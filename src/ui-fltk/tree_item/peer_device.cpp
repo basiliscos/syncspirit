@@ -1,5 +1,5 @@
 #include "peer_device.h"
-#include "unknown_folders.h"
+#include "pending_folders.h"
 #include "../qr_button.h"
 #include "../table_widget/checkbox.h"
 #include "model/diff/modify/remove_peer.h"

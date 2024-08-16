@@ -4,7 +4,7 @@
 #include "remove_peer.h"
 #include "unshare_folder.h"
 #include "remove_blocks.h"
-#include "remove_unknown_folders.h"
+#include "remove_pending_folders.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"

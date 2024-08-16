@@ -1,6 +1,6 @@
-#include "unknown_devices.h"
+#include "pending_devices.h"
+#include "pending_device.h"
 
-#include "unknown_device.h"
 using namespace syncspirit;
 using namespace syncspirit::model::diff;
 using namespace syncspirit::fltk;

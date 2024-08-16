@@ -4,7 +4,7 @@
 #pragma once
 
 #include "../contact_diff.h"
-#include "model/unknown_device.h"
+#include "model/pending_device.h"
 
 namespace syncspirit::model::diff::contact {
 

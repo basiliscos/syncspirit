@@ -5,7 +5,7 @@
 #include "model/cluster.h"
 #include "../contact_visitor.h"
 #include "model/misc/error_code.h"
-#include "model/diff/modify/add_unknown_device.h"
+#include "model/diff/modify/add_pending_device.h"
 
 using namespace syncspirit::model::diff::contact;
 

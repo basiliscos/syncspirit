@@ -98,12 +98,12 @@ add_library(syncspirit_lib
     src/model/diff/load/ignored_devices.cpp
     src/model/diff/load/ignored_folders.cpp
     src/model/diff/load/load_cluster.cpp
-    src/model/diff/load/unknown_devices.cpp
-    src/model/diff/load/unknown_folders.cpp
+    src/model/diff/load/pending_devices.cpp
+    src/model/diff/load/pending_folders.cpp
     src/model/diff/modify/add_remote_folder_infos.cpp
     src/model/diff/modify/add_ignored_device.cpp
-    src/model/diff/modify/add_unknown_device.cpp
-    src/model/diff/modify/add_unknown_folders.cpp
+    src/model/diff/modify/add_pending_device.cpp
+    src/model/diff/modify/add_pending_folders.cpp
     src/model/diff/modify/append_block.cpp
     src/model/diff/modify/block_ack.cpp
     src/model/diff/modify/block_rej.cpp
@@ -125,8 +125,8 @@ add_library(syncspirit_lib
     src/model/diff/modify/remove_folder_infos.cpp
     src/model/diff/modify/remove_peer.cpp
     src/model/diff/modify/remove_ignored_device.cpp
-    src/model/diff/modify/remove_unknown_device.cpp
-    src/model/diff/modify/remove_unknown_folders.cpp
+    src/model/diff/modify/remove_pending_device.cpp
+    src/model/diff/modify/remove_pending_folders.cpp
     src/model/diff/modify/share_folder.cpp
     src/model/diff/modify/unshare_folder.cpp
     src/model/diff/modify/update_peer.cpp
@@ -152,9 +152,9 @@ add_library(syncspirit_lib
     src/model/folder_info.cpp
     src/model/ignored_device.cpp
     src/model/ignored_folder.cpp
+    src/model/pending_device.cpp
+    src/model/pending_folder.cpp
     src/model/remote_folder_info.cpp
-    src/model/unknown_device.cpp
-    src/model/unknown_folder.cpp
     src/net/acceptor_actor.cpp
     src/net/cluster_supervisor.cpp
     src/net/controller_actor.cpp

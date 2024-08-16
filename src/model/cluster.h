@@ -8,8 +8,8 @@
 #include "ignored_device.h"
 #include "ignored_folder.h"
 #include "folder.h"
-#include "unknown_device.h"
-#include "unknown_folder.h"
+#include "pending_device.h"
+#include "pending_folder.h"
 #include "block_info.h"
 
 namespace syncspirit::model {

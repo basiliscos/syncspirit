@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "model/unknown_folder.h"
+#include "model/pending_folder.h"
 #include "../tree_item.h"
 
 namespace syncspirit::fltk::tree_item {

@@ -6,7 +6,7 @@
 #include "model/misc/error_code.h"
 #include "model/diff/cluster_visitor.h"
 #include "upsert_folder_info.h"
-#include "remove_unknown_folders.h"
+#include "remove_pending_folders.h"
 
 using namespace syncspirit::model::diff::modify;
 

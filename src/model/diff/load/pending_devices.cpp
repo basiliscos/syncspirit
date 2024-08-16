@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "model/cluster.h"
-#include "unknown_devices.h"
+#include "pending_devices.h"
 #include "some_devices.hpp"
 #include "model/diff/cluster_visitor.h"
 

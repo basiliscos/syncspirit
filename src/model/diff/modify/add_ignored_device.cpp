@@ -4,7 +4,7 @@
 #include "add_ignored_device.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
-#include "model/diff/modify/remove_unknown_device.h"
+#include "model/diff/modify/remove_pending_device.h"
 
 using namespace syncspirit::model::diff::modify;
 

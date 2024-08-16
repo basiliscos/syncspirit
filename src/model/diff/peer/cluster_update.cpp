@@ -3,10 +3,10 @@
 
 #include "cluster_update.h"
 #include "model/diff/modify/add_remote_folder_infos.h"
-#include "model/diff/modify/add_unknown_folders.h"
+#include "model/diff/modify/add_pending_folders.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_folder_infos.h"
-#include "model/diff/modify/remove_unknown_folders.h"
+#include "model/diff/modify/remove_pending_folders.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"

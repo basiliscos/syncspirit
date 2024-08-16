@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
-#include "add_unknown_folders.h"
+#include "add_pending_folders.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 

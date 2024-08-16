@@ -12,7 +12,7 @@
 #include "model/diff/load/file_infos.h"
 #include "model/diff/load/folder_infos.h"
 #include "model/diff/load/folders.h"
-#include "model/diff/load/unknown_devices.h"
+#include "model/diff/load/pending_devices.h"
 #include "db/prefix.h"
 
 using namespace syncspirit;

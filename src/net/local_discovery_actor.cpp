@@ -10,7 +10,7 @@
 #include "model/diff/contact/update_contact.h"
 #include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/unknown_connected.h"
-#include "model/diff/modify/add_unknown_device.h"
+#include "model/diff/modify/add_pending_device.h"
 #include "model/messages.h"
 
 using namespace syncspirit;

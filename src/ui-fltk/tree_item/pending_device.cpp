@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
-#include "unknown_device.h"
+#include "pending_device.h"
 #include "model/diff/modify/add_ignored_device.h"
-#include "model/diff/modify/remove_unknown_device.h"
+#include "model/diff/modify/remove_pending_device.h"
 #include "model/diff/modify/update_peer.h"
 #include "../static_table.h"
 #include "../qr_button.h"

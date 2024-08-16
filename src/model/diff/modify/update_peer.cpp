@@ -3,7 +3,7 @@
 
 #include "update_peer.h"
 #include "remove_ignored_device.h"
-#include "remove_unknown_device.h"
+#include "remove_pending_device.h"
 #include "db/prefix.h"
 #include "model/cluster.h"
 #include "model/misc/error_code.h"

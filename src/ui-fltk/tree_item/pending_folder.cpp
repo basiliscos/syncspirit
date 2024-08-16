@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
-#include "unknown_folder.h"
-#include "unknown_folders.h"
+#include "pending_folder.h"
+#include "pending_folders.h"
 #include "../table_widget/checkbox.h"
 #include "../static_table.h"
 #include "../content/folder_table.h"

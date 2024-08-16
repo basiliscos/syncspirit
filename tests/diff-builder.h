@@ -11,7 +11,7 @@
 #include "syncspirit-test-export.h"
 #include "model/device.h"
 #include "model/ignored_device.h"
-#include "model/unknown_device.h"
+#include "model/pending_device.h"
 #include "model/file_info.h"
 #include "model/diff/cluster_diff.h"
 #include "model/diff/contact_diff.h"

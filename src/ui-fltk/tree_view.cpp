@@ -2,7 +2,7 @@
 #include "tree_item/devices.h"
 #include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
-#include "tree_item/unknown_devices.h"
+#include "tree_item/pending_devices.h"
 
 #include <FL/Fl.H>
 
