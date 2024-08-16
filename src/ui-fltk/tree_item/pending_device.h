@@ -3,19 +3,20 @@
 
 #pragma once
 
-#include "model/unknown_folder.h"
+#include "model/pending_device.h"
 #include "../tree_item.h"
 
 namespace syncspirit::fltk::tree_item {
 
-struct unknown_folder_t : tree_item_t {
+struct pending_device_t : tree_item_t {
     using parent_t = tree_item_t;
 
-    unknown_folder_t(model::unknown_folder_t &folder, app_supervisor_t &supervisor, Fl_Tree *tree);
+    pending_device_t(model::pending_device_t &device, app_supervisor_t &supervisor, Fl_Tree *tree);
+    void update_label() override;
 
     bool on_select() override;
 
-    model::unknown_folder_t &folder;
+    model::pending_device_t &device;
 };
 
 }; // namespace syncspirit::fltk::tree_item

@@ -7,7 +7,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-clone_file_t::clone_file_t(const model::file_info_t &source) noexcept
+clone_file_t::clone_file_t(const model::file_info_t &source, sequencer_t &sequencer) noexcept
     : file{source.as_proto(false)}, has_blocks{!source.get_blocks().empty()} {
 
     auto peer_folder_info = source.get_folder_info();
@@ -41,6 +41,11 @@ clone_file_t::clone_file_t(const model::file_info_t &source) noexcept
             }
         }
     }
+    if (create_new_file) {
+        uuid = sequencer.next_uuid();
+    } else {
+        assign(uuid, source.get_uuid());
+    }
 }
 
 auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
@@ -51,13 +56,9 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     auto &files = folder_my->get_file_infos();
     auto prev_file = file_info_ptr_t{};
     auto new_file = file_info_ptr_t{};
-    uuid_t file_uuid;
 
-    if (create_new_file) {
-        file_uuid = cluster.next_uuid();
-    } else {
+    if (!create_new_file) {
         prev_file = files.by_name(file.name());
-        model::assign(file_uuid, prev_file->get_uuid());
     }
 
     auto peer_file = folder_peer->get_file_infos().by_name(file.name());
@@ -72,7 +73,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
         } else {
             file_info.set_sequence(0);
         }
-        return file_info_t::create(file_uuid, file_info, folder_my);
+        return file_info_t::create(uuid, file_info, folder_my);
     };
 
     if (!has_blocks) {

@@ -4,7 +4,7 @@
 #include "diff-builder.h"
 #include "model/messages.h"
 #include "model/diff/modify/add_ignored_device.h"
-#include "model/diff/modify/add_unknown_device.h"
+#include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/clone_block.h"
@@ -19,23 +19,21 @@
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/remove_ignored_device.h"
-#include "model/diff/modify/remove_unknown_device.h"
+#include "model/diff/modify/remove_pending_device.h"
 #include "model/diff/contact/update_contact.h"
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 
-#include <algorithm>
-
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 
 cluster_configurer_t::cluster_configurer_t(diff_builder_t &builder_, std::string_view peer_sha256_) noexcept
-    : builder{builder_}, peer_sha256{peer_sha256_} {}
+    : builder{builder_}, peer_sha256{peer_sha256_}, folder{nullptr} {}
 
 cluster_configurer_t &&cluster_configurer_t::add(std::string_view sha256, std::string_view folder_id, uint64_t index,
                                                  int64_t max_sequence) noexcept {
-    auto folder = cc.add_folders();
+    folder = cc.add_folders();
     folder->set_id(std::string(folder_id));
     auto device = folder->add_devices();
     device->set_id(std::string(sha256));
@@ -47,7 +45,7 @@ cluster_configurer_t &&cluster_configurer_t::add(std::string_view sha256, std::s
 diff_builder_t &cluster_configurer_t::finish() noexcept {
     auto &cluster = builder.cluster;
     auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
-    auto diff = diff::peer::cluster_update_t::create(cluster, *peer, cc);
+    auto diff = diff::peer::cluster_update_t::create(cluster, *builder.sequencer, *peer, cc);
     assert(diff.has_value());
     builder.assign(diff.value().get());
     return builder;
@@ -63,16 +61,25 @@ index_maker_t &&index_maker_t::add(const proto::FileInfo &file) noexcept {
     return std::move(*this);
 }
 
+std::error_code index_maker_t::fail() noexcept {
+    auto &cluster = builder.cluster;
+    auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
+    auto opt = diff::peer::update_folder_t::create(cluster, *builder.sequencer, *peer, index);
+    return opt.error();
+}
+
 diff_builder_t &index_maker_t::finish() noexcept {
     auto &cluster = builder.cluster;
     auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
-    auto diff = diff::peer::update_folder_t::create(cluster, *peer, index);
+    auto diff = diff::peer::update_folder_t::create(cluster, *builder.sequencer, *peer, index);
     assert(diff.has_value());
     builder.assign(diff.value().get());
     return builder;
 }
 
-diff_builder_t::diff_builder_t(model::cluster_t &cluster_) noexcept : cluster{cluster_} {}
+diff_builder_t::diff_builder_t(model::cluster_t &cluster_) noexcept : cluster{cluster_} {
+    sequencer = model::make_sequencer(0);
+}
 
 diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
     auto has_diffs = [&]() -> bool { return cluster_diff || contact_diff || block_diff; };
@@ -130,7 +137,8 @@ diff_builder_t &diff_builder_t::create_folder(std::string_view id, std::string_v
     db_folder.set_id(std::string(id));
     db_folder.set_label(std::string(label));
     db_folder.set_path(std::string(path));
-    return assign(new diff::modify::create_folder_t(db_folder));
+    auto opt = diff::modify::create_folder_t::create(cluster, *sequencer, db_folder);
+    return assign(opt.value().get());
 }
 
 diff_builder_t &diff_builder_t::update_peer(const model::device_id_t &device, std::string_view name,
@@ -152,7 +160,14 @@ index_maker_t diff_builder_t::make_index(std::string_view sha256, std::string_vi
 }
 
 diff_builder_t &diff_builder_t::share_folder(std::string_view sha256, std::string_view folder_id) noexcept {
-    return assign(new diff::modify::share_folder_t(sha256, folder_id));
+    auto device = cluster.get_devices().by_sha256(sha256);
+    auto folder = cluster.get_folders().by_id(folder_id);
+    auto opt = diff::modify::share_folder_t::create(cluster, *sequencer, *device, *folder);
+    if (!opt) {
+        spdlog::error("cannot share: {}", opt.assume_error().message());
+        return *this;
+    }
+    return assign(opt.assume_value().get());
 }
 
 diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcept {
@@ -160,7 +175,7 @@ diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcep
 }
 
 diff_builder_t &diff_builder_t::clone_file(const model::file_info_t &source) noexcept {
-    return assign(new diff::modify::clone_file_t(source));
+    return assign(new diff::modify::clone_file_t(source, *sequencer));
 }
 
 diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &source) noexcept {
@@ -172,7 +187,7 @@ diff_builder_t &diff_builder_t::finish_file_ack(const model::file_info_t &source
 }
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
-    return assign(new diff::modify::local_update_t(cluster, folder_id, file_));
+    return assign(new diff::modify::local_update_t(cluster, *sequencer, folder_id, file_));
 }
 
 diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcept {
@@ -217,15 +232,15 @@ diff_builder_t &diff_builder_t::add_ignored_device(const model::device_id_t &dev
 
 diff_builder_t &diff_builder_t::add_unknown_device(const model::device_id_t &device,
                                                    db::SomeDevice db_device) noexcept {
-    return assign(new diff::modify::add_unknown_device_t(device, db_device));
+    return assign(new diff::modify::add_pending_device_t(device, db_device));
 }
 
 diff_builder_t &diff_builder_t::remove_ignored_device(const model::ignored_device_t &device) noexcept {
     return assign(new diff::modify::remove_ignored_device_t(device));
 }
 
-diff_builder_t &diff_builder_t::remove_unknown_device(const model::unknown_device_t &device) noexcept {
-    return assign(new diff::modify::remove_unknown_device_t(device));
+diff_builder_t &diff_builder_t::remove_unknown_device(const model::pending_device_t &device) noexcept {
+    return assign(new diff::modify::remove_pending_device_t(device));
 }
 
 template <typename Holder, typename Diff> static void generic_assign(Holder *holder, Diff *diff) noexcept {
@@ -254,3 +269,5 @@ diff_builder_t &diff_builder_t::assign(model::diff::block_diff_t *diff) noexcept
     generic_assign(&block_diff, diff);
     return *this;
 }
+
+auto diff_builder_t::get_sequencer() noexcept -> model::sequencer_t & { return *sequencer; }

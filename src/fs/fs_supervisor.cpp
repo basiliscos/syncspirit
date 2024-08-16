@@ -16,7 +16,7 @@ r::plugin::resource_id_t model = 0;
 } // namespace
 
 fs_supervisor_t::fs_supervisor_t(config_t &cfg)
-    : parent_t(cfg), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {}
+    : parent_t(cfg), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads}, sequencer(cfg.sequencer) {}
 
 void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
@@ -62,6 +62,7 @@ void fs_supervisor_t::launch() noexcept {
     scan_actor = create_actor<scan_actor_t>()
                      .fs_config(fs_config)
                      .cluster(cluster)
+                     .sequencer(sequencer)
                      .requested_hashes_limit(hasher_threads * 2)
                      .timeout(timeout)
                      .finish();

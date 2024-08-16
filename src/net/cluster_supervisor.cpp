@@ -13,7 +13,7 @@ using namespace syncspirit::net;
 
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
     : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, hasher_threads{config.hasher_threads},
-      cluster{config.cluster} {}
+      cluster{config.cluster}, sequencer{config.sequencer} {}
 
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     ra::supervisor_asio_t::configure(plugin);
@@ -76,6 +76,7 @@ auto cluster_supervisor_t::operator()(const model::diff::contact::peer_state_t &
                 .peer_addr(diff.peer_addr)
                 .request_timeout(pt::milliseconds(bep_config.request_timeout))
                 .cluster(cluster)
+                .sequencer(sequencer)
                 .finish();
         }
     }

@@ -54,19 +54,12 @@ template <typename Tag, typename T> struct generic_diff_t : base_diff_t {
     }
 
     outcome::result<void> apply_child(cluster_t &cluster) const noexcept {
-        auto r = outcome::result<void>{outcome::success()};
-        if (this->child) {
-            r = this->child->apply(cluster);
-        }
-        return r;
+        return child ? child->apply(cluster) : outcome::success();
     }
 
     outcome::result<void> apply_sibling(cluster_t &cluster) const noexcept {
         auto r = outcome::result<void>{outcome::success()};
-        if (this->sibling) {
-            r = this->sibling->apply(cluster);
-        }
-        return r;
+        return sibling ? sibling->apply(cluster) : outcome::success();
     }
 
     T *assign_sibling(T *sibling_) noexcept {

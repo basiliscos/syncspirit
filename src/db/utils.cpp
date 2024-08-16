@@ -54,7 +54,7 @@ static outcome::result<void> migrate0(model::device_ptr_t &device, transaction_t
     // make anchors
     prefixes_t prefixes{prefix::device,         prefix::folder,         prefix::folder_info,
                         prefix::file_info,      prefix::ignored_device, prefix::ignored_folder,
-                        prefix::unknown_folder, prefix::block_info,     prefix::unknown_device};
+                        prefix::pending_folder, prefix::block_info,     prefix::pending_device};
     for (auto &prefix : prefixes) {
         MDBX_val key, value;
         key.iov_base = &prefix;

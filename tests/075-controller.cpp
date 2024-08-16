@@ -210,7 +210,7 @@ struct fixture_t {
         auto my_id =
             device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
         my_device = device_t::create(my_id, "my-device").value();
-        cluster = new cluster_t(my_device, 1, 1);
+        cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
@@ -224,11 +224,11 @@ struct fixture_t {
             .configure_cluster(sha256)
             .add(sha256, folder_id_1, 123, max_sequence)
             .finish();
+        REQUIRE(builder.apply());
 
         if (auto_share) {
-            builder.share_folder(peer_id.get_sha256(), folder_id_1);
+            REQUIRE(builder.share_folder(peer_id.get_sha256(), folder_id_1).apply());
         }
-        REQUIRE(builder.apply());
 
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
@@ -272,6 +272,7 @@ struct fixture_t {
                      .request_pool(1024)
                      .outgoing_buffer_max(1024'000)
                      .cluster(cluster)
+                     .sequencer(sup->sequencer)
                      .timeout(timeout)
                      .request_timeout(timeout)
                      .finish();
@@ -367,7 +368,7 @@ void test_index_receiving() {
                 folder->set_id(std::string(folder_1->get_id()));
                 auto d_peer = folder->add_devices();
                 d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-                REQUIRE(cluster->get_unknown_folders().size() == 0);
+                REQUIRE(cluster->get_pending_folders().size() == 0);
                 d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
                 d_peer->set_index_id(folder_1_peer->get_index());
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
@@ -614,7 +615,8 @@ void test_downloading() {
                 b1->set_size(5);
                 auto b = model::block_info_t::create(*b1).value();
 
-                auto file_info = model::file_info_t::create(cluster->next_uuid(), pr_fi, folder_peer).value();
+                auto uuid = sup->sequencer->next_uuid();
+                auto file_info = model::file_info_t::create(uuid, pr_fi, folder_peer).value();
                 file_info->assign_block(b, 0);
                 folder_peer->add(file_info, true);
 
@@ -649,7 +651,8 @@ void test_downloading() {
                 b1->set_size(5);
                 auto b = model::block_info_t::create(*b1).value();
 
-                auto file_info = model::file_info_t::create(cluster->next_uuid(), pr_fi, folder_peer).value();
+                auto uuid = sup->sequencer->next_uuid();
+                auto file_info = model::file_info_t::create(uuid, pr_fi, folder_peer).value();
                 file_info->assign_block(b, 0);
                 folder_peer->add(file_info, true);
 
@@ -822,7 +825,8 @@ void test_downloading() {
                 pr_my.set_block_size(5);
                 pr_my.set_size(5);
 
-                auto file_my = model::file_info_t::create(cluster->next_uuid(), pr_my, folder_my).value();
+                auto uuid = sup->sequencer->next_uuid();
+                auto file_my = model::file_info_t::create(uuid, pr_my, folder_my).value();
                 file_my->assign_block(bi_1, 0);
                 file_my->mark_local_available(0);
                 folder_my->add(file_my, true);
@@ -1049,7 +1053,8 @@ void test_uploading() {
             b1->set_size(5);
             auto b = model::block_info_t::create(*b1).value();
 
-            auto file_info = model::file_info_t::create(cluster->next_uuid(), pr_fi, folder_my).value();
+            auto uuid = sup->sequencer->next_uuid();
+            auto file_info = model::file_info_t::create(uuid, pr_fi, folder_my).value();
             file_info->assign_block(b, 0);
             folder_my->add(file_info, true);
 

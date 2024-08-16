@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
-#include "unknown_folder.h"
-#include "unknown_folders.h"
+#include "pending_folder.h"
+#include "pending_folders.h"
 #include "../table_widget/checkbox.h"
 #include "../static_table.h"
 #include "../content/folder_table.h"
@@ -25,7 +25,7 @@ auto static make_checkbox(my_table_t &container, bool value) -> widgetable_ptr_t
 struct my_table_t : static_table_t {
     using parent_t = static_table_t;
 
-    my_table_t(unknown_folder_t &container_, int x, int y, int w, int h) : parent_t(x, y, w, h), container{container_} {
+    my_table_t(pending_folder_t &container_, int x, int y, int w, int h) : parent_t(x, y, w, h), container{container_} {
         auto &folder = container.folder;
         auto data = table_rows_t();
         data.push_back({"id", std::string(folder.get_id())});
@@ -40,7 +40,7 @@ struct my_table_t : static_table_t {
         assign_rows(std::move(data));
     }
 
-    unknown_folder_t &container;
+    pending_folder_t &container;
 };
 
 struct checkbox_widget_t final : table_widget::checkbox_t {
@@ -65,14 +65,14 @@ inline auto static make_checkbox(my_table_t &container, bool value) -> widgetabl
 } // namespace
 #endif
 
-unknown_folder_t::unknown_folder_t(model::unknown_folder_t &folder_, app_supervisor_t &supervisor, Fl_Tree *tree)
+pending_folder_t::pending_folder_t(model::pending_folder_t &folder_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), folder{folder_} {
 
     auto l = fmt::format("{} ({})", folder.get_label(), folder.get_id());
     label(l.c_str());
 }
 
-bool unknown_folder_t::on_select() {
+bool pending_folder_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
         using table_t = content::folder_table_t;
         auto prev = content->get_widget();
@@ -83,7 +83,7 @@ bool unknown_folder_t::on_select() {
         auto cluster = supervisor.get_cluster();
         auto &devices = cluster->get_devices();
         auto &self = *cluster->get_device();
-        auto &peer = static_cast<unknown_folders_t *>(parent())->peer;
+        auto &peer = static_cast<pending_folders_t *>(parent())->peer;
         for (auto &it : devices) {
             auto &device = *it.item;
             if ((&device != &self) && (&device != &peer)) {

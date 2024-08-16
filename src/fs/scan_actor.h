@@ -5,13 +5,12 @@
 
 #include "model/cluster.h"
 #include "model/messages.h"
-#include "config/main.h"
+#include "model/misc/sequencer.h"
 #include "utils/log.h"
 #include "hasher/messages.h"
 #include "messages.h"
 #include "scan_task.h"
 #include <rotor.hpp>
-#include <deque>
 
 namespace syncspirit {
 namespace fs {
@@ -22,6 +21,7 @@ namespace outcome = boost::outcome_v2;
 struct SYNCSPIRIT_API scan_actor_config_t : r::actor_config_t {
     config::fs_config_t fs_config;
     model::cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
     uint32_t requested_hashes_limit;
 };
 
@@ -42,6 +42,11 @@ template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_b
 
     builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
+        parent_t::config.sequencer = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -76,6 +81,7 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
     template <typename Message> void hash_next(Message &m, const r::address_ptr_t &reply_addr) noexcept;
 
     model::cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
     config::fs_config_t fs_config;
     r::address_ptr_t hasher_proxy;
     r::address_ptr_t new_files; /* for routing */

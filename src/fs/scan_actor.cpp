@@ -7,10 +7,7 @@
 #include "model/diff/modify/blocks_availability.h"
 #include "model/diff/modify/local_update.h"
 #include "net/names.h"
-#include "utils/error_code.h"
-#include "utils/tls.h"
 #include "utils.h"
-#include <fstream>
 #include <algorithm>
 
 namespace sys = boost::system;
@@ -19,8 +16,10 @@ using namespace syncspirit::fs;
 template <class> inline constexpr bool always_false_v = false;
 
 scan_actor_t::scan_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, cluster{cfg.cluster}, fs_config{cfg.fs_config},
-      requested_hashes_limit{cfg.requested_hashes_limit} {}
+    : r::actor_base_t{cfg}, cluster{cfg.cluster}, sequencer{cfg.sequencer}, fs_config{cfg.fs_config},
+      requested_hashes_limit{cfg.requested_hashes_limit} {
+    assert(sequencer);
+}
 
 void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -297,7 +296,7 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     }
 
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::modify::local_update_t(*cluster, std::move(folder_id), std::move(file));
+    diff = new model::diff::modify::local_update_t(*cluster, *sequencer, std::move(folder_id), std::move(file));
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 }
 
@@ -336,6 +335,6 @@ void scan_actor_t::on_remove(const model::file_info_t &file) noexcept {
     auto fi = file.as_proto(false);
     fi.set_deleted(true);
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::modify::local_update_t(*cluster, std::move(folder_id), std::move(fi));
+    diff = new model::diff::modify::local_update_t(*cluster, *sequencer, std::move(folder_id), std::move(fi));
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 }

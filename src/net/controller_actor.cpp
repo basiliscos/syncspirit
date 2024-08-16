@@ -18,6 +18,7 @@
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/peer/cluster_update.h"
+#include "model/diff/peer/update_folder.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
@@ -36,10 +37,13 @@ r::plugin::resource_id_t hash = 1;
 } // namespace
 
 controller_actor_t::controller_actor_t(config_t &config)
-    : r::actor_base_t{config}, cluster{config.cluster}, peer{config.peer}, peer_addr{config.peer_addr},
-      request_timeout{config.request_timeout}, rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer{0},
-      outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
-      blocks_max_requested{config.blocks_max_requested} {}
+    : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
+      peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, rx_blocks_requested{0},
+      tx_blocks_requested{0}, outgoing_buffer{0}, outgoing_buffer_max{config.outgoing_buffer_max},
+      request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested} {
+    assert(cluster);
+    assert(sequencer);
+}
 
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -260,7 +264,7 @@ void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
                 file->locally_lock();
                 locally_locked_files.emplace(file);
                 auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::clone_file_t(*file);
+                diff = new model::diff::modify::clone_file_t(*file, *sequencer);
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             } else {
                 pull_ready();
@@ -495,7 +499,7 @@ void controller_actor_t::on_block_update(model::message::block_update_t &message
 
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
     LOG_DEBUG(log, "on_message (ClusterConfig)");
-    auto diff_opt = cluster->process(*message, *peer);
+    auto diff_opt = model::diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer, *message);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
@@ -507,7 +511,7 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
     auto &msg = *message;
     LOG_DEBUG(log, "on_message (Index)");
-    auto diff_opt = cluster->process(msg, *peer);
+    auto diff_opt = model::diff::peer::update_folder_t::create(*cluster, *sequencer, *peer, *message);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
@@ -521,7 +525,7 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
 void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
     LOG_TRACE(log, "on_message (IndexUpdate)");
     auto &msg = *message;
-    auto diff_opt = cluster->process(msg, *peer);
+    auto diff_opt = model::diff::peer::update_folder_t::create(*cluster, *sequencer, *peer, *message);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());

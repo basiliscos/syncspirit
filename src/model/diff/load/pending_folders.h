@@ -7,8 +7,8 @@
 
 namespace syncspirit::model::diff::load {
 
-struct SYNCSPIRIT_API unknown_folders_t final : cluster_diff_t {
-    template <typename T> unknown_folders_t(T &&folders_) noexcept : folders{std::forward<T>(folders_)} {}
+struct SYNCSPIRIT_API pending_folders_t final : cluster_diff_t {
+    template <typename T> pending_folders_t(T &&folders_) noexcept : folders{std::forward<T>(folders_)} {}
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
 

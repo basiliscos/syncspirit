@@ -23,8 +23,7 @@ namespace bfs = boost::filesystem;
 using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
-    : parent_t{cfg}, app_config{cfg.app_config}, cluster_copies{cfg.cluster_copies} {
-    seed = (size_t)std::time(nullptr);
+    : parent_t{cfg}, app_config{cfg.app_config}, cluster_copies{cfg.cluster_copies}, sequencer{cfg.sequencer} {
     auto log = utils::get_logger(names::coordinator);
     auto &files_cfg = app_config.global_announce_config;
     auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
@@ -56,7 +55,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     auto device = model::device_ptr_t();
     device = new model::local_device_t(device_id, app_config.device_name, cn.value());
     auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
-    cluster = new model::cluster_t(device, seed, static_cast<int32_t>(simultaneous_writes));
+    cluster = new model::cluster_t(device, static_cast<int32_t>(simultaneous_writes));
 
     auto &gcfg = app_config.global_announce_config;
     if (gcfg.enabled) {
@@ -152,7 +151,7 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
     auto device = model::device_ptr_t();
     device = new model::local_device_t(my_device->device_id(), app_config.device_name, "");
     auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
-    auto cluster_copy = new model::cluster_t(device, seed, static_cast<int32_t>(simultaneous_writes));
+    auto cluster_copy = new model::cluster_t(device, static_cast<int32_t>(simultaneous_writes));
     reply_to(message, std::move(cluster_copy));
     if (cluster_copies == 0 && load_diff) {
         seed_model();
@@ -201,8 +200,8 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
 
         auto &ignored_devices = cluster->get_ignored_devices();
         auto &ignored_folders = cluster->get_ignored_folders();
-        auto &unknown_folders = cluster->get_unknown_folders();
-        auto &unknown_devices = cluster->get_unknown_devices();
+        auto &pending_folders = cluster->get_pending_folders();
+        auto &pending_devices = cluster->get_pending_devices();
         auto &devices = cluster->get_devices();
         auto &folders = cluster->get_folders();
         size_t files = 0;
@@ -214,17 +213,18 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
             auto fi = folder_info->get_folder_infos().by_device(*cluster->get_device());
             files += fi->get_file_infos().size();
         }
-        auto unknown_folders_sz = std::distance(unknown_folders.begin(), unknown_folders.end());
+        auto pending_folders_sz = std::distance(pending_folders.begin(), pending_folders.end());
         LOG_DEBUG(log,
                   "load cluster, devices = {}, folders = {}, local files = {}, blocks = {}, ignored devices = {}, "
-                  "ignored folders = {}, unknown folders = {}, unknown devices = {}",
+                  "ignored folders = {}, pending folders = {}, pending devices = {}",
                   devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
-                  ignored_folders.size(), unknown_folders_sz, unknown_devices.size());
+                  ignored_folders.size(), pending_folders_sz, pending_devices.size());
 
         cluster_sup = create_actor<cluster_supervisor_t>()
                           .timeout(shutdown_timeout * 9 / 10)
                           .strand(strand)
                           .cluster(cluster)
+                          .sequencer(sequencer)
                           .bep_config(app_config.bep_config)
                           .hasher_threads(app_config.hasher_threads)
                           .escalate_failure()

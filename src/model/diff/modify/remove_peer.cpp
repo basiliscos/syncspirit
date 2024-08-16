@@ -4,7 +4,7 @@
 #include "remove_peer.h"
 #include "unshare_folder.h"
 #include "remove_blocks.h"
-#include "remove_unknown_folders.h"
+#include "remove_pending_folders.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
@@ -19,18 +19,18 @@ remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noe
     : parent_t(), peer_key{peer.get_key()} {
     orphaned_blocks_t orphaned_blocks;
 
-    auto removed_unknown_folders = remove_unknown_folders_t::unique_keys_t{};
-    for (auto &it : cluster.get_unknown_folders()) {
+    auto removed_pending_folders = remove_pending_folders_t::unique_keys_t{};
+    for (auto &it : cluster.get_pending_folders()) {
         auto &uf = *it.item;
         if (uf.device_id() == peer.device_id()) {
-            removed_unknown_folders.emplace(uf.get_key());
+            removed_pending_folders.emplace(uf.get_key());
         }
     }
 
     auto current = (cluster_diff_t *){nullptr};
-    if (removed_unknown_folders.size()) {
+    if (removed_pending_folders.size()) {
         auto diff = cluster_diff_ptr_t{};
-        diff = new remove_unknown_folders_t(std::move(removed_unknown_folders));
+        diff = new remove_pending_folders_t(std::move(removed_pending_folders));
         current = assign_child(diff);
     }
 

@@ -6,11 +6,11 @@
 #include "load/devices.h"
 #include "load/ignored_devices.h"
 #include "load/load_cluster.h"
-#include "load/unknown_devices.h"
+#include "load/pending_devices.h"
 #include "modify/add_ignored_device.h"
 #include "modify/add_remote_folder_infos.h"
-#include "modify/add_unknown_device.h"
-#include "modify/add_unknown_folders.h"
+#include "modify/add_pending_device.h"
+#include "modify/add_pending_folders.h"
 #include "modify/clone_file.h"
 #include "modify/create_folder.h"
 #include "modify/file_availability.h"
@@ -25,12 +25,12 @@
 #include "modify/remove_folder_infos.h"
 #include "modify/remove_ignored_device.h"
 #include "modify/remove_peer.h"
-#include "modify/remove_unknown_device.h"
-#include "modify/remove_unknown_folders.h"
+#include "modify/remove_pending_device.h"
+#include "modify/remove_pending_folders.h"
 #include "modify/share_folder.h"
 #include "modify/unshare_folder.h"
-#include "modify/update_folder_info.h"
 #include "modify/update_peer.h"
+#include "modify/upsert_folder_info.h"
 #include "peer/cluster_update.h"
 #include "peer/update_folder.h"
 
@@ -45,7 +45,7 @@ auto cluster_visitor_t::operator()(const load::ignored_devices_t &diff, void *cu
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const load::unknown_devices_t &diff, void *custom) noexcept
+auto cluster_visitor_t::operator()(const load::pending_devices_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
@@ -81,12 +81,12 @@ auto cluster_visitor_t::operator()(const modify::add_ignored_device_t &diff, voi
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const modify::add_unknown_device_t &diff, void *custom) noexcept
+auto cluster_visitor_t::operator()(const modify::add_pending_device_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const modify::add_unknown_folders_t &diff, void *custom) noexcept
+auto cluster_visitor_t::operator()(const modify::add_pending_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
@@ -96,11 +96,6 @@ auto cluster_visitor_t::operator()(const modify::share_folder_t &diff, void *cus
 }
 
 auto cluster_visitor_t::operator()(const modify::unshare_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const modify::update_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
@@ -136,12 +131,12 @@ auto cluster_visitor_t::operator()(const modify::remove_ignored_device_t &diff, 
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const modify::remove_unknown_device_t &diff, void *custom) noexcept
+auto cluster_visitor_t::operator()(const modify::remove_pending_device_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const modify::remove_unknown_folders_t &diff, void *custom) noexcept
+auto cluster_visitor_t::operator()(const modify::remove_pending_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
@@ -169,6 +164,11 @@ auto cluster_visitor_t::operator()(const modify::lock_file_t &diff, void *custom
 }
 
 auto cluster_visitor_t::operator()(const modify::mark_reachable_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const modify::upsert_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }

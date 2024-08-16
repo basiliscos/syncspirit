@@ -197,6 +197,8 @@ int main(int argc, char **argv) {
         auto strand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
         auto cluster_copies = 2ul;
+        auto seed = (size_t)std::time(nullptr);
+        auto sequencer = model::make_sequencer(seed);
 
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                            .app_config(cfg)
@@ -204,6 +206,7 @@ int main(int argc, char **argv) {
                            .timeout(timeout)
                            .create_registry()
                            .guard_context(true)
+                           .sequencer(sequencer)
                            .cluster_copies(cluster_copies)
                            .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                            .finish();
@@ -242,6 +245,7 @@ int main(int argc, char **argv) {
                           .registry_address(sup_net->get_registry_address())
                           .fs_config(cfg.fs_config)
                           .hasher_threads(cfg.hasher_threads)
+                          .sequencer(sequencer)
                           .finish();
         fs_sup->do_process();
 

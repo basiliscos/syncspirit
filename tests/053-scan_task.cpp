@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "fs/scan_task.h"
+#include "model/misc/sequencer.h"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -23,7 +24,8 @@ TEST_CASE("scan_task", "[fs]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
@@ -31,14 +33,14 @@ TEST_CASE("scan_task", "[fs]") {
     db_folder.set_id("some-id");
     db_folder.set_label("zzz");
     db_folder.set_path(root_path.string());
-    auto folder = folder_t::create(cluster->next_uuid(), db_folder).value();
+    auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
     cluster->get_folders().put(folder);
 
     db::FolderInfo db_folder_info;
     db_folder_info.set_index_id(1234);
     db_folder_info.set_max_sequence(3);
-    auto folder_my = folder_info_t::create(cluster->next_uuid(), db_folder_info, my_device, folder).value();
-    auto folder_peer = folder_info_t::create(cluster->next_uuid(), db_folder_info, peer_device, folder).value();
+    auto folder_my = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
+    auto folder_peer = folder_info_t::create(sequencer->next_uuid(), db_folder_info, peer_device, folder).value();
     folder->get_folder_infos().put(folder_my);
     folder->get_folder_infos().put(folder_peer);
 
@@ -48,7 +50,7 @@ TEST_CASE("scan_task", "[fs]") {
         SECTION("no permissions to read dir => err") {
             bfs::permissions(root_path, bfs::perms::no_perms);
 
-            auto folder_info = folder_info_t::create(cluster->next_uuid(), db_folder_info, my_device, folder).value();
+            auto folder_info = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
             folder->get_folder_infos().put(folder_info);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
@@ -152,7 +154,7 @@ TEST_CASE("scan_task", "[fs]") {
             write_file(path, "12345");
             bfs::last_write_time(path, modified);
 
-            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             folder_my->add(file, false);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
@@ -175,7 +177,7 @@ TEST_CASE("scan_task", "[fs]") {
             pr_file.set_size(5);
             pr_file.set_modified_s(modified);
 
-            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             folder_my->add(file, false);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
@@ -196,7 +198,7 @@ TEST_CASE("scan_task", "[fs]") {
         SECTION("removed file does not exist => unchanged meta") {
             pr_file.set_deleted(true);
 
-            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             folder_my->add(file, false);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
@@ -218,7 +220,7 @@ TEST_CASE("scan_task", "[fs]") {
             pr_file.set_deleted(true);
             folder->set_path(root_path / "zzz");
 
-            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             folder_my->add(file, false);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
@@ -249,7 +251,7 @@ TEST_CASE("scan_task", "[fs]") {
                 write_file(path, "12345");
                 bfs::last_write_time(path, modified);
 
-                file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+                file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 folder_my->add(file, false);
             }
 
@@ -262,7 +264,7 @@ TEST_CASE("scan_task", "[fs]") {
                 write_file(path, "12345");
                 bfs::last_write_time(path, modified);
 
-                file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+                file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 folder_my->add(file, false);
             }
             task = new scan_task_t(cluster, folder->get_id(), config);
@@ -290,8 +292,8 @@ TEST_CASE("scan_task", "[fs]") {
             SECTION("size match -> ok, will recalc") {
                 write_file(path, "12345");
 
-                auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
-                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
+                auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+                auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
                 folder_my->add(file_my, false);
                 folder_peer->add(file_peer, false);
                 file_my->set_source(file_peer);
@@ -315,7 +317,7 @@ TEST_CASE("scan_task", "[fs]") {
             SECTION("source is missing") {
                 write_file(path, "12345");
 
-                auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+                auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 folder_my->add(file_my, false);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
@@ -335,8 +337,8 @@ TEST_CASE("scan_task", "[fs]") {
             SECTION("size mismatch -> remove & ignore") {
                 write_file(path, "123456");
 
-                auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
-                auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
+                auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+                auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
                 folder_my->add(file_my, false);
                 folder_peer->add(file_peer, false);
                 file_my->set_source(file_peer);
@@ -362,9 +364,9 @@ TEST_CASE("scan_task", "[fs]") {
             pr_file.set_size(5);
             pr_file.set_modified_s(modified);
 
-            auto file_my = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             counter->set_id(10);
-            auto file_peer = file_info_t::create(cluster->next_uuid(), pr_file, folder_peer).value();
+            auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
             folder_my->add(file_my, false);
             folder_peer->add(file_peer, false);
             file_my->set_source(file_peer);
@@ -410,7 +412,7 @@ TEST_CASE("scan_task", "[fs]") {
             auto path = root_path / "a.txt";
             write_file(path, "12345");
 
-            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             folder_my->add(file, false);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
@@ -439,7 +441,7 @@ TEST_CASE("scan_task", "[fs]") {
             bfs::permissions(parent, bfs::perms::no_perms, ec);
             bfs::permissions(path, bfs::perms::owner_read, ec);
             if (ec) {
-                auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+                auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 folder_my->add(file, false);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
@@ -482,7 +484,7 @@ TEST_CASE("scan_task", "[fs]") {
             auto target = bfs::path("b.txt");
             bfs::create_symlink(target, path);
 
-            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             folder_my->add(file, false);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
@@ -507,7 +509,7 @@ TEST_CASE("scan_task", "[fs]") {
             auto target = bfs::path("c.txt");
             bfs::create_symlink(target, path);
 
-            auto file = file_info_t::create(cluster->next_uuid(), pr_file, folder_my).value();
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             folder_my->add(file, false);
 
             auto task = scan_task_t(cluster, folder->get_id(), config);

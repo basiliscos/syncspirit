@@ -7,6 +7,7 @@
 #include "transport/stream.h"
 #include "proto/bep_support.h"
 #include "utils/log.h"
+#include "model/cluster.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor/asio/supervisor_asio.h>

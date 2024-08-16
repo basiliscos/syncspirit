@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "utils/platform.h"
 #include "mdbx.h"
 #include <cstddef>
 #include <string>
@@ -23,9 +22,9 @@ static const constexpr discr_t folder_info    {0x12};
 static const constexpr discr_t file_info      {0x13};
 static const constexpr discr_t ignored_device {0x14};
 static const constexpr discr_t ignored_folder {0x15};
-static const constexpr discr_t unknown_folder {0x16};
+static const constexpr discr_t pending_folder {0x16};
 static const constexpr discr_t block_info     {0x17};
-static const constexpr discr_t unknown_device {0x18};
+static const constexpr discr_t pending_device {0x18};
 // clang-format on
 } // namespace prefix
 

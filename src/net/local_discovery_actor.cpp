@@ -10,7 +10,7 @@
 #include "model/diff/contact/update_contact.h"
 #include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/unknown_connected.h"
-#include "model/diff/modify/add_unknown_device.h"
+#include "model/diff/modify/add_pending_device.h"
 #include "model/messages.h"
 
 using namespace syncspirit;
@@ -231,7 +231,7 @@ void local_discovery_actor_t::handle(const model::device_id_t &device_id, utils:
         LOG_DEBUG(log, "ignored device '{}' contacted", device_id);
         auto db = filler_t::fill(peer, uris_str);
         diff = new contact::ignored_connected_t(*cluster, device_id, std::move(db));
-    } else if (auto peer = cluster->get_unknown_devices().by_sha256(device_id.get_sha256()); peer) {
+    } else if (auto peer = cluster->get_pending_devices().by_sha256(device_id.get_sha256()); peer) {
         auto db = filler_t::fill(peer, uris_str);
         diff = new contact::unknown_connected_t(*cluster, device_id, std::move(db));
     } else {
@@ -240,7 +240,7 @@ void local_discovery_actor_t::handle(const model::device_id_t &device_id, utils:
         db.set_address(uris_str);
         db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
         auto cluster_diff = cluster_diff_ptr_t{};
-        cluster_diff = new model::diff::modify::add_unknown_device_t(device_id, db);
+        cluster_diff = new model::diff::modify::add_pending_device_t(device_id, db);
         send<model::payload::model_update_t>(coordinator, std::move(cluster_diff));
         diff = new contact::unknown_connected_t(*cluster, device_id, std::move(db));
     }

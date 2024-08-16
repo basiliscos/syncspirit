@@ -3,11 +3,11 @@
 
 #include "update_peer.h"
 #include "remove_ignored_device.h"
-#include "remove_unknown_device.h"
+#include "remove_pending_device.h"
 #include "db/prefix.h"
-#include "../cluster_visitor.h"
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
+#include "model/diff/cluster_visitor.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
@@ -17,20 +17,19 @@ update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
     : item{std::move(db)}, peer_id{device_id.get_sha256()} {
     auto &devices = cluster.get_devices();
     auto peer = devices.by_sha256(peer_id);
-    if (!peer) {
-        auto &ignored_devices = cluster.get_ignored_devices();
-        auto &unknown_devices = cluster.get_unknown_devices();
-        auto current = (cluster_diff_t *){nullptr};
-        if (auto unknown_device = unknown_devices.by_sha256(peer_id); unknown_device) {
-            auto diff = cluster_diff_ptr_t{};
-            diff = new remove_unknown_device_t(*unknown_device);
-            current = assign_child(diff);
-        }
-        if (auto ignored_device = ignored_devices.by_sha256(peer_id); ignored_device) {
-            auto diff = cluster_diff_ptr_t{};
-            diff = new remove_ignored_device_t(*ignored_device);
-            current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
-        }
+
+    auto &ignored_devices = cluster.get_ignored_devices();
+    auto &pending_devices = cluster.get_pending_devices();
+    auto current = (cluster_diff_t *){nullptr};
+    if (auto pending_device = pending_devices.by_sha256(peer_id); pending_device) {
+        auto diff = cluster_diff_ptr_t{};
+        diff = new remove_pending_device_t(*pending_device);
+        current = assign_child(diff);
+    }
+    if (auto ignored_device = ignored_devices.by_sha256(peer_id); ignored_device) {
+        auto diff = cluster_diff_ptr_t{};
+        diff = new remove_ignored_device_t(*ignored_device);
+        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }
 }
 

@@ -19,7 +19,7 @@ TEST_CASE("unknown device connected", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 
@@ -33,8 +33,8 @@ TEST_CASE("unknown device connected", "[model]") {
     diff = new model::diff::contact::unknown_connected_t(*cluster, peer_id, db_device);
     REQUIRE(diff->apply(*cluster));
 
-    REQUIRE(cluster->get_unknown_devices().size() == 1);
-    auto unknown = cluster->get_unknown_devices().by_sha256(peer_id.get_sha256());
+    REQUIRE(cluster->get_pending_devices().size() == 1);
+    auto unknown = cluster->get_pending_devices().by_sha256(peer_id.get_sha256());
     REQUIRE(unknown);
     CHECK(unknown->get_name() == "a name-2");
 }
@@ -44,7 +44,7 @@ TEST_CASE("unknown device is removed when connecting to it ", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 
@@ -52,11 +52,11 @@ TEST_CASE("unknown device is removed when connecting to it ", "[model]") {
     db_device.set_name("a name");
     auto buider = diff_builder_t(*cluster);
     REQUIRE(buider.add_unknown_device(peer_id, db_device).apply());
-    REQUIRE(cluster->get_unknown_devices().size() == 1);
+    REQUIRE(cluster->get_pending_devices().size() == 1);
     REQUIRE(cluster->get_devices().size() == 1);
 
     REQUIRE(buider.update_peer(peer_id).apply());
-    CHECK(cluster->get_unknown_devices().size() == 0);
+    CHECK(cluster->get_pending_devices().size() == 0);
     CHECK(cluster->get_devices().size() == 2);
 }
 
@@ -66,7 +66,7 @@ TEST_CASE("ignored device connected", "[model]") {
 
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 
@@ -87,7 +87,7 @@ TEST_CASE("ignored device is removed when connecting to it ", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 
@@ -108,7 +108,7 @@ TEST_CASE("unknown device is removed adding the same ignored device", "[model]")
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto my_device = device_t::create(my_id, "my-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 
@@ -116,12 +116,12 @@ TEST_CASE("unknown device is removed adding the same ignored device", "[model]")
     db_device.set_name("a name");
     auto buider = diff_builder_t(*cluster);
     REQUIRE(buider.add_unknown_device(peer_id, db_device).apply());
-    REQUIRE(cluster->get_unknown_devices().size() == 1);
+    REQUIRE(cluster->get_pending_devices().size() == 1);
     REQUIRE(cluster->get_ignored_devices().size() == 0);
     REQUIRE(cluster->get_devices().size() == 1);
 
     REQUIRE(buider.add_ignored_device(peer_id, db_device).apply());
-    REQUIRE(cluster->get_unknown_devices().size() == 0);
+    REQUIRE(cluster->get_pending_devices().size() == 0);
     REQUIRE(cluster->get_ignored_devices().size() == 1);
     REQUIRE(cluster->get_devices().size() == 1);
 }

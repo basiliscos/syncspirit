@@ -4,18 +4,25 @@
 #pragma once
 
 #include "../cluster_diff.h"
-#include "model/unknown_device.h"
+#include "model/device.h"
+#include <vector>
+#include "structs.pb.h"
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API remove_unknown_device_t final : cluster_diff_t {
-    remove_unknown_device_t(const unknown_device_t &device) noexcept;
+struct SYNCSPIRIT_API add_pending_folders_t final : cluster_diff_t {
+    struct item_t {
+        db::PendingFolder db;
+        std::string peer_id;
+        uuid_t uuid;
+    };
+    using container_t = std::vector<item_t>;
+
+    add_pending_folders_t(container_t items) noexcept;
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
-    std::string_view get_device_sha256() const noexcept;
-
-    std::string device_key;
+    container_t container;
 };
 
 } // namespace syncspirit::model::diff::modify

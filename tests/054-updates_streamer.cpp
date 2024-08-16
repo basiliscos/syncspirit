@@ -2,9 +2,8 @@
 // SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
 
 #include "test-utils.h"
+#include "diff-builder.h"
 #include "model/misc/updates_streamer.h"
-#include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/share_folder.h"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -19,22 +18,16 @@ TEST_CASE("updates_streamer", "[model]") {
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
+    auto builder = diff_builder_t(*cluster);
 
     auto &folders = cluster->get_folders();
-    db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    db_folder.set_path("/my/path");
-
-    auto diff = diff::cluster_diff_ptr_t(new diff::modify::create_folder_t(db_folder));
-    REQUIRE(diff->apply(*cluster));
-    auto folder = folders.by_id(db_folder.id());
-
-    diff = diff::cluster_diff_ptr_t(new diff::modify::share_folder_t(peer_id.get_sha256(), db_folder.id()));
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(builder.create_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+    auto folder = folders.by_id("1234-5678");
 
     auto add_remote = [&](std::uint64_t index, std::int64_t sequence) {
         auto remote_folder = remote_folder_info_t::create(index, sequence, *peer_device, *folder).value();
@@ -63,7 +56,7 @@ TEST_CASE("updates_streamer", "[model]") {
         auto pr_file = proto::FileInfo();
         pr_file.set_name(name);
         pr_file.set_sequence(seq++);
-        auto f = file_info_t::create(cluster->next_uuid(), pr_file, my_folder).value();
+        auto f = file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value();
         my_files.put(f);
         my_folder->set_max_sequence(f->get_sequence());
         return f;

@@ -3,14 +3,18 @@
 
 #pragma once
 
-#include "generic_remove.h"
+#include "../cluster_diff.h"
+#include "model/pending_device.h"
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API remove_unknown_folders_t final : generic_remove_t {
-    using generic_remove_t::generic_remove_t;
+struct SYNCSPIRIT_API add_pending_device_t final : cluster_diff_t {
+    add_pending_device_t(const device_id_t &id, db::SomeDevice db_device) noexcept;
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
+
+    device_id_t device_id;
+    db::SomeDevice db_device;
 };
 
 } // namespace syncspirit::model::diff::modify

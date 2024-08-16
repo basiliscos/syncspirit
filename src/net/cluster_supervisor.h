@@ -8,6 +8,7 @@
 #include "model/folder.h"
 #include "model/messages.h"
 #include "model/diff/contact_visitor.h"
+#include "model/misc/sequencer.h"
 #include "utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
@@ -24,6 +25,7 @@ struct cluster_supervisor_config_t : ra::supervisor_config_asio_t {
     config::bep_config_t bep_config;
     std::uint32_t hasher_threads;
     model::cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
 };
 
 template <typename Supervisor>
@@ -44,6 +46,11 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
 
     builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
+        parent_t::config.sequencer = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -69,6 +76,7 @@ struct SYNCSPIRIT_API cluster_supervisor_t : public ra::supervisor_asio_t, priva
     config::bep_config_t bep_config;
     std::uint32_t hasher_threads;
     model::cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
 };
 
 } // namespace net

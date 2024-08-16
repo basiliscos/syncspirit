@@ -6,6 +6,7 @@
 #include "cluster.h"
 #include "misc/error_code.h"
 #include "misc/version_utils.h"
+#include "utils/log.h"
 #include "db/prefix.h"
 #include "fs/utils.h"
 #include <zlib.h>

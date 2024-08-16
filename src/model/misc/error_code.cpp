@@ -51,14 +51,14 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::invalid_folder_prefix:
         r = "invalid folder prefix";
         break;
-    case error_code_t::invalid_unknown_folder_length:
-        r = "invalid unknown folder prefix";
+    case error_code_t::invalid_pending_folder_length:
+        r = "invalid pending folder prefix";
         break;
     case error_code_t::folder_deserialization_failure:
         r = "folder deserialization failure";
         break;
-    case error_code_t::unknown_folder_deserialization_failure:
-        r = "unknown folder deserialization failure";
+    case error_code_t::pending_folder_deserialization_failure:
+        r = "pending folder deserialization failure";
         break;
     case error_code_t::file_info_deserialization_failure:
         r = "file info deserialization failure";

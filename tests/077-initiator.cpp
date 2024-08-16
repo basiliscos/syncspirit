@@ -118,7 +118,7 @@ struct fixture_t {
         log->debug("listening on {}", peer_uri);
         initiate_accept();
 
-        cluster = new cluster_t(my_device, 1, 1);
+        cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);

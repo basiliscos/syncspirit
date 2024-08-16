@@ -26,7 +26,10 @@ inline auto rotor::actor_base_t::access<to::on_timer_trigger, request_id_t, bool
 using namespace syncspirit::net;
 using namespace syncspirit::test;
 
-supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) { auto_finish = cfg.auto_finish; }
+supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) {
+    auto_finish = cfg.auto_finish;
+    sequencer = model::make_sequencer(1234);
+}
 
 void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
-#include "unknown_device.h"
+#include "pending_device.h"
 #include "model/diff/modify/add_ignored_device.h"
-#include "model/diff/modify/remove_unknown_device.h"
+#include "model/diff/modify/remove_pending_device.h"
 #include "model/diff/modify/update_peer.h"
 #include "../static_table.h"
 #include "../qr_button.h"
@@ -28,7 +28,7 @@ static widgetable_ptr_t make_actions(my_table_t &container);
 struct my_table_t : static_table_t {
     using parent_t = static_table_t;
 
-    my_table_t(unknown_device_t &container_, int x, int y, int w, int h) : parent_t(x, y, w, h), container{container_} {
+    my_table_t(pending_device_t &container_, int x, int y, int w, int h) : parent_t(x, y, w, h), container{container_} {
         auto &device = container.device;
         auto &device_id = device.get_device_id();
         auto data = table_rows_t();
@@ -92,11 +92,11 @@ struct my_table_t : static_table_t {
         auto &device = container.device;
         auto &supervisor = container.supervisor;
         auto diff = cluster_diff_ptr_t{};
-        diff = new modify::remove_unknown_device_t(device);
+        diff = new modify::remove_pending_device_t(device);
         supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);
     }
 
-    unknown_device_t &container;
+    pending_device_t &container;
 };
 
 static widgetable_ptr_t make_actions(my_table_t &container) {
@@ -134,12 +134,12 @@ static widgetable_ptr_t make_actions(my_table_t &container) {
 
 } // namespace
 
-unknown_device_t::unknown_device_t(model::unknown_device_t &device_, app_supervisor_t &supervisor, Fl_Tree *tree)
+pending_device_t::pending_device_t(model::pending_device_t &device_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), device{device_} {
     update_label();
 }
 
-void unknown_device_t::update_label() {
+void pending_device_t::update_label() {
     auto name = device.get_name();
     auto id = device.get_device_id().get_short();
     auto value = fmt::format("{}, {}", name, id);
@@ -147,7 +147,7 @@ void unknown_device_t::update_label() {
     tree()->redraw();
 }
 
-bool unknown_device_t::on_select() {
+bool pending_device_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
         struct tile_t : contentable_t<Fl_Tile> {
             using parent_t = contentable_t<Fl_Tile>;

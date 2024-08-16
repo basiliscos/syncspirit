@@ -9,6 +9,7 @@
 #include "model/messages.h"
 #include "model/diff/contact/update_contact.h"
 #include "model/diff/contact/relay_connect_request.h"
+#include "transport/stream.h"
 #include <spdlog/fmt/bin_to_hex.h>
 #include "messages.h"
 #include <cstdlib>
