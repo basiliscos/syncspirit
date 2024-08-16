@@ -9,7 +9,7 @@
 using namespace syncspirit::model::diff::load;
 
 auto unknown_devices_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    using device_t = model::unknown_device_t;
+    using device_t = model::pending_device_t;
     auto &map = cluster.get_unknown_devices();
     auto r = some_devices_t::apply<device_t>(devices, map);
     return r ? applicator_t::apply_sibling(cluster) : r;

@@ -147,7 +147,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
         auto device_id =
             device_id_t::from_string("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7").value();
 
-        auto id = unknown_device_t::create(device_id, db_device).value();
+        auto id = pending_device_t::create(device_id, db_device).value();
         auto key = id->get_key();
         auto data = id->serialize();
 

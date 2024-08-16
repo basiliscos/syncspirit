@@ -477,7 +477,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &dif
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::add_unknown_device_t &diff, void *custom) noexcept
+auto db_actor_t::operator()(const model::diff::modify::add_pending_device_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -638,7 +638,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_ignored_device_t &
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::remove_unknown_device_t &diff, void *custom) noexcept
+auto db_actor_t::operator()(const model::diff::modify::remove_pending_device_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();

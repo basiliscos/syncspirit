@@ -232,15 +232,15 @@ diff_builder_t &diff_builder_t::add_ignored_device(const model::device_id_t &dev
 
 diff_builder_t &diff_builder_t::add_unknown_device(const model::device_id_t &device,
                                                    db::SomeDevice db_device) noexcept {
-    return assign(new diff::modify::add_unknown_device_t(device, db_device));
+    return assign(new diff::modify::add_pending_device_t(device, db_device));
 }
 
 diff_builder_t &diff_builder_t::remove_ignored_device(const model::ignored_device_t &device) noexcept {
     return assign(new diff::modify::remove_ignored_device_t(device));
 }
 
-diff_builder_t &diff_builder_t::remove_unknown_device(const model::unknown_device_t &device) noexcept {
-    return assign(new diff::modify::remove_unknown_device_t(device));
+diff_builder_t &diff_builder_t::remove_unknown_device(const model::pending_device_t &device) noexcept {
+    return assign(new diff::modify::remove_pending_device_t(device));
 }
 
 template <typename Holder, typename Diff> static void generic_assign(Holder *holder, Diff *diff) noexcept {

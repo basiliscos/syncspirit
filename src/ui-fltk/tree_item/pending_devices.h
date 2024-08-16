@@ -10,7 +10,7 @@ struct unknown_devices_t : tree_item_t {
 
     void update_label() override;
 
-    augmentation_ptr_t add_device(model::unknown_device_t &device);
+    augmentation_ptr_t add_device(model::pending_device_t &device);
     void remove_device(tree_item_t *item);
 };
 

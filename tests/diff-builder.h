@@ -82,7 +82,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &add_ignored_device(const model::device_id_t &device, db::SomeDevice db_device) noexcept;
     diff_builder_t &add_unknown_device(const model::device_id_t &device, db::SomeDevice db_device) noexcept;
     diff_builder_t &remove_ignored_device(const model::ignored_device_t &device) noexcept;
-    diff_builder_t &remove_unknown_device(const model::unknown_device_t &device) noexcept;
+    diff_builder_t &remove_unknown_device(const model::pending_device_t &device) noexcept;
 
     model::sequencer_t &get_sequencer() noexcept;
 

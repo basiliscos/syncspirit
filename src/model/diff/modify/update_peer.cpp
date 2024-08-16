@@ -23,7 +23,7 @@ update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
     auto current = (cluster_diff_t *){nullptr};
     if (auto unknown_device = unknown_devices.by_sha256(peer_id); unknown_device) {
         auto diff = cluster_diff_ptr_t{};
-        diff = new remove_unknown_device_t(*unknown_device);
+        diff = new remove_pending_device_t(*unknown_device);
         current = assign_child(diff);
     }
     if (auto ignored_device = ignored_devices.by_sha256(peer_id); ignored_device) {

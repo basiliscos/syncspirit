@@ -13,7 +13,7 @@ add_ignored_device_t::add_ignored_device_t(const cluster_t &cluster, const devic
     : device_id{id_}, db_device{db_device_} {
     auto peer = cluster.get_unknown_devices().by_sha256(device_id.get_sha256());
     if (peer) {
-        assign_child(new remove_unknown_device_t(*peer));
+        assign_child(new remove_pending_device_t(*peer));
     }
 }
 

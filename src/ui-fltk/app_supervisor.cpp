@@ -302,7 +302,7 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_folders
     return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_device_t &diff, void *custom) noexcept
+auto app_supervisor_t::operator()(const model::diff::modify::add_pending_device_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &device = *cluster->get_unknown_devices().by_sha256(diff.device_id.get_sha256());
     auto unknown_devices_node = static_cast<tree_item::unknown_devices_t *>(unkwnown_devices);

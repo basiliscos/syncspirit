@@ -403,7 +403,7 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
         fill_db_and_shutdown();
         if (auto peer = cluster->get_unknown_devices().by_sha256(sha_s256); !peer) {
             auto cluster_diff = cluster_diff_ptr_t{};
-            cluster_diff = new model::diff::modify::add_unknown_device_t(peer_device_id, db);
+            cluster_diff = new model::diff::modify::add_pending_device_t(peer_device_id, db);
             send<model::payload::model_update_t>(coordinator, std::move(cluster_diff));
         }
         // send add unknown device diff

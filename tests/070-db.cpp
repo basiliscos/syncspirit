@@ -209,7 +209,7 @@ void test_unknown_and_ignored_devices_1() {
 
             db::SomeDevice sd_1;
             sd_1.set_name("x1");
-            auto unknown_device = unknown_device_t::create(d_id1, sd_1).value();
+            auto unknown_device = pending_device_t::create(d_id1, sd_1).value();
 
             db::SomeDevice sd_2;
             sd_2.set_name("x2");

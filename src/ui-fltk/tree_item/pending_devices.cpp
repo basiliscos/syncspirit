@@ -18,9 +18,9 @@ void unknown_devices_t::update_label() {
     label(l.data());
 }
 
-auto unknown_devices_t::add_device(model::unknown_device_t &device) -> augmentation_ptr_t {
+auto unknown_devices_t::add_device(model::pending_device_t &device) -> augmentation_ptr_t {
     return within_tree([&]() {
-        auto node = insert_by_label(new unknown_device_t(device, supervisor, tree()));
+        auto node = insert_by_label(new pending_device_t(device, supervisor, tree()));
         update_label();
         return node->get_proxy();
     });
