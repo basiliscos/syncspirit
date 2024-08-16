@@ -5,7 +5,7 @@
 
 namespace syncspirit::model {
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const unknown_device_ptr_t &item) noexcept {
+template <> SYNCSPIRIT_API std::string_view get_index<0>(const pending_device_ptr_t &item) noexcept {
     return item->get_device_id().get_sha256();
 }
 

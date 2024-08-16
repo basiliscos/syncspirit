@@ -38,9 +38,9 @@ const block_infos_map_t &cluster_t::get_blocks() const noexcept { return blocks;
 
 folders_map_t &cluster_t::get_folders() noexcept { return folders; }
 
-auto cluster_t::get_unknown_devices() noexcept -> unknown_devices_map_t & { return unknown_devices; }
+auto cluster_t::get_unknown_devices() noexcept -> pending_devices_map_t & { return unknown_devices; }
 
-auto cluster_t::get_unknown_devices() const noexcept -> const unknown_devices_map_t & { return unknown_devices; }
+auto cluster_t::get_unknown_devices() const noexcept -> const pending_devices_map_t & { return unknown_devices; }
 
 auto cluster_t::get_unknown_folders() noexcept -> unknown_folder_map_t & { return unknown_folders; }
 
