@@ -30,7 +30,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     : peer_id(source.device_id().get_sha256()) {
     auto log = get_log();
 
-    auto &known_unknowns = cluster.get_unknown_folders();
+    auto &known_unknowns = cluster.get_pending_folders();
     auto new_unknown_folders = diff::modify::add_unknown_folders_t::container_t{};
     auto remote_folders = diff::modify::add_remote_folder_infos_t::container_t{};
     folder_infos_map_t removed_folders;

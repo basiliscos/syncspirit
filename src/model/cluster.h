@@ -30,10 +30,10 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     folders_map_t &get_folders() noexcept;
     pending_devices_map_t &get_pending_devices() noexcept;
     const pending_devices_map_t &get_pending_devices() const noexcept;
-    pending_folder_map_t &get_unknown_folders() noexcept;
+    pending_folder_map_t &get_pending_folders() noexcept;
 
     const folders_map_t &get_folders() const noexcept;
-    const pending_folder_map_t &get_unknown_folders() const noexcept;
+    const pending_folder_map_t &get_pending_folders() const noexcept;
     inline bool is_tainted() const noexcept { return tainted; }
     inline void mark_tainted() noexcept { tainted = true; }
     int32_t get_write_requests() const noexcept;
@@ -46,7 +46,7 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     devices_map_t devices;
     ignored_devices_map_t ignored_devices;
     ignored_folders_map_t ignored_folders;
-    pending_folder_map_t unknown_folders;
+    pending_folder_map_t pending_folders;
     pending_devices_map_t pending_devices;
     bool tainted = false;
     int32_t write_requests;

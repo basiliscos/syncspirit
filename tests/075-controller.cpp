@@ -368,7 +368,7 @@ void test_index_receiving() {
                 folder->set_id(std::string(folder_1->get_id()));
                 auto d_peer = folder->add_devices();
                 d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-                REQUIRE(cluster->get_unknown_folders().size() == 0);
+                REQUIRE(cluster->get_pending_folders().size() == 0);
                 d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
                 d_peer->set_index_id(folder_1_peer->get_index());
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));

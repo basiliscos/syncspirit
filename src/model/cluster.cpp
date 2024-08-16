@@ -42,9 +42,9 @@ auto cluster_t::get_pending_devices() noexcept -> pending_devices_map_t & { retu
 
 auto cluster_t::get_pending_devices() const noexcept -> const pending_devices_map_t & { return pending_devices; }
 
-auto cluster_t::get_unknown_folders() noexcept -> pending_folder_map_t & { return unknown_folders; }
+auto cluster_t::get_pending_folders() noexcept -> pending_folder_map_t & { return pending_folders; }
 
-auto cluster_t::get_unknown_folders() const noexcept -> const pending_folder_map_t & { return unknown_folders; }
+auto cluster_t::get_pending_folders() const noexcept -> const pending_folder_map_t & { return pending_folders; }
 
 const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
 

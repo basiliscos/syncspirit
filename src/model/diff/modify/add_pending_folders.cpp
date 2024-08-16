@@ -10,7 +10,7 @@ using namespace syncspirit::model::diff::modify;
 add_unknown_folders_t::add_unknown_folders_t(container_t items) noexcept : container(std::move(items)) {}
 
 auto add_unknown_folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto &unknown = cluster.get_unknown_folders();
+    auto &unknown = cluster.get_pending_folders();
     auto &devices = cluster.get_devices();
     for (auto &item : container) {
         auto peer = devices.by_sha256(item.peer_id);

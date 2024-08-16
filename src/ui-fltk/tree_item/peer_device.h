@@ -19,7 +19,7 @@ struct peer_device_t : tree_item_t {
     void update_label() override;
     bool on_select() override;
 
-    tree_item_t *get_unknown_folders();
+    tree_item_t *get_pending_folders();
 
     model::device_t &peer;
     tree_item_t *unknown_folders;

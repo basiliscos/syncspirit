@@ -97,9 +97,9 @@ TEST_CASE("cluster update, new folder", "[model]") {
         auto visitor = my_cluster_update_visitor_t([&](auto &diff) {});
         auto r_v = diff->visit(visitor, nullptr);
         REQUIRE(r_v);
-        REQUIRE(cluster->get_unknown_folders().size());
+        REQUIRE(cluster->get_pending_folders().size());
         REQUIRE(visitor.add_pending_folders == 1);
-        auto uf = cluster->get_unknown_folders().begin()->item;
+        auto uf = cluster->get_pending_folders().begin()->item;
         CHECK(uf->device_id() == peer_device->device_id());
         CHECK(uf->get_id() == "some-id");
         CHECK(uf->get_max_sequence() == 10);
@@ -118,7 +118,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         diff = diff_opt.value();
         r_a = diff->apply(*cluster);
         CHECK(r_a);
-        REQUIRE(cluster->get_unknown_folders().size() == 1);
+        REQUIRE(cluster->get_pending_folders().size() == 1);
         std::ignore = diff->visit(visitor, nullptr);
         REQUIRE(visitor.add_pending_folders == 1);
 
@@ -131,13 +131,13 @@ TEST_CASE("cluster update, new folder", "[model]") {
         CHECK(r_a);
         (void)diff->visit(visitor, nullptr);
         REQUIRE(visitor.add_pending_folders == 2);
-        REQUIRE(cluster->get_unknown_folders().size() == 1);
-        uf = cluster->get_unknown_folders().begin()->item;
+        REQUIRE(cluster->get_pending_folders().size() == 1);
+        uf = cluster->get_pending_folders().begin()->item;
         CHECK(uf->device_id() == peer_device->device_id());
         CHECK(uf->get_id() == "some-id");
         CHECK(uf->get_max_sequence() == 15);
         CHECK(uf->get_index() == 22ul);
-        CHECK(std::distance(cluster->get_unknown_folders().begin(), cluster->get_unknown_folders().end()) == 1);
+        CHECK(std::distance(cluster->get_pending_folders().begin(), cluster->get_pending_folders().end()) == 1);
 
         // change unknown folder
         cc = std::make_unique<proto::ClusterConfig>();
@@ -156,7 +156,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         r_a = diff_opt.value()->apply(*cluster);
         CHECK(r_a);
 
-        CHECK(std::distance(cluster->get_unknown_folders().begin(), cluster->get_unknown_folders().end()) == 1);
+        CHECK(std::distance(cluster->get_pending_folders().begin(), cluster->get_pending_folders().end()) == 1);
     }
 
     SECTION("existing folder") {
@@ -322,7 +322,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     db_p_folder.mutable_folder()->set_id("1111-2222");
     db_p_folder.mutable_folder()->set_label("unknown");
     auto u_folder = pending_folder_t::create(sequencer->next_uuid(), db_p_folder, peer_device->device_id()).value();
-    auto &unknown_folders = cluster->get_unknown_folders();
+    auto &unknown_folders = cluster->get_pending_folders();
     unknown_folders.put(u_folder);
 
     auto folder_info_my = folder_info_ptr_t();
@@ -625,9 +625,9 @@ TEST_CASE("non-shared pending folder", "[model]") {
     auto sha256 = peer_id_1.get_sha256();
     REQUIRE(builder.create_folder(folder_id, "/my/path").apply());
     REQUIRE(builder.configure_cluster(sha256).add(sha256, folder_id, 5, 4).finish().apply());
-    REQUIRE(cluster->get_unknown_folders().size() == 1);
+    REQUIRE(cluster->get_pending_folders().size() == 1);
 
-    auto &uf = *cluster->get_unknown_folders().begin()->item;
+    auto &uf = *cluster->get_pending_folders().begin()->item;
     REQUIRE(uf.device_id() == peer_id_1);
     REQUIRE(uf.get_index() == 5);
     REQUIRE(uf.get_max_sequence() == 4);

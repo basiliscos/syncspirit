@@ -341,7 +341,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto &unknown = cluster->get_unknown_folders();
+    auto &unknown = cluster->get_pending_folders();
     if (unknown.size()) {
         for (auto &it : unknown) {
             auto &uf = it.item;
@@ -424,7 +424,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_unknown_folders_t &di
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto &unknown = cluster->get_unknown_folders();
+    auto &unknown = cluster->get_pending_folders();
     for (auto &item : diff.container) {
         auto uf = unknown.by_id(item.db.folder().id());
         if (uf && uf->device_id().get_sha256() == item.peer_id) {

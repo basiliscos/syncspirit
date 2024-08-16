@@ -287,12 +287,12 @@ auto app_supervisor_t::operator()(const model::diff::peer::cluster_update_t &dif
 auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &devices = cluster->get_devices();
-    auto &unknown_folders = cluster->get_unknown_folders();
+    auto &unknown_folders = cluster->get_pending_folders();
     for (auto &item : diff.container) {
         auto peer = devices.by_sha256(item.peer_id);
         auto augmentation = static_cast<augmentation_t *>(peer->get_augmentation().get());
         auto peer_node = static_cast<tree_item::peer_device_t *>(augmentation->get_owner());
-        auto unknown_node = static_cast<tree_item::unknown_folders_t *>(peer_node->get_unknown_folders());
+        auto unknown_node = static_cast<tree_item::unknown_folders_t *>(peer_node->get_pending_folders());
         auto unknown_folder = unknown_folders.by_id(item.db.folder().id());
         if (unknown_folder->get_augmentation()) {
             continue;

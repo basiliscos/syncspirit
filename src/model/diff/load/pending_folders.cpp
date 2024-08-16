@@ -8,13 +8,13 @@
 using namespace syncspirit::model::diff::load;
 
 auto unknown_folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto &items = cluster.get_unknown_folders();
+    auto &items = cluster.get_pending_folders();
     for (auto &pair : folders) {
         auto data = pair.value;
         auto db = db::PendingFolder();
         auto ok = db.ParseFromArray(data.data(), data.size());
         if (!ok) {
-            return make_error_code(error_code_t::unknown_folder_deserialization_failure);
+            return make_error_code(error_code_t::pending_folder_deserialization_failure);
         }
 
         auto option = pending_folder_t::create(pair.key, db);

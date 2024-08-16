@@ -77,7 +77,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             db_fi->set_max_sequence(12);
 
             auto uf = pending_folder_t::create(sequencer->next_uuid(), db_pf, peer_device->device_id()).value();
-            cluster->get_unknown_folders().put(uf);
+            cluster->get_pending_folders().put(uf);
 
             REQUIRE(builder.share_folder(peer_id.get_sha256(), id).apply());
 
@@ -91,7 +91,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             CHECK(fi_peer->get_device() == peer_device);
             CHECK(fi_peer->get_max_sequence() == 12);
             CHECK(fi_peer->get_index() == 2345);
-            CHECK(cluster->get_unknown_folders().size() == 0);
+            CHECK(cluster->get_pending_folders().size() == 0);
 
             auto pr_file_1 = proto::FileInfo();
             pr_file_1.set_name("a.txt");

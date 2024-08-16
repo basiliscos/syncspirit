@@ -355,10 +355,10 @@ void test_folder_sharing() {
                 .add(sha256, folder_id, 5, 4)
                 .finish()
                 .apply(*sup);
-            REQUIRE(cluster->get_unknown_folders().size() == 1);
+            REQUIRE(cluster->get_pending_folders().size() == 1);
 
             builder.share_folder(sha256, folder_id).apply(*sup);
-            REQUIRE(cluster->get_unknown_folders().size() == 0);
+            REQUIRE(cluster->get_pending_folders().size() == 0);
 
             CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
@@ -377,7 +377,7 @@ void test_folder_sharing() {
             REQUIRE(fi);
             CHECK(fi->get_index() == 5);
             CHECK(fi->get_max_sequence() == 4);
-            REQUIRE(cluster_clone->get_unknown_folders().size() == 0);
+            REQUIRE(cluster_clone->get_pending_folders().size() == 0);
         }
     };
 
@@ -429,7 +429,7 @@ void test_cluster_update_and_remove() {
             auto peer_file = peer_folder_info->get_file_infos().by_name("a.txt");
             REQUIRE(peer_file);
 
-            auto &unknown_folders = cluster->get_unknown_folders();
+            auto &unknown_folders = cluster->get_pending_folders();
             CHECK(std::distance(unknown_folders.begin(), unknown_folders.end()) == 1);
 
             sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
@@ -447,7 +447,7 @@ void test_cluster_update_and_remove() {
                 REQUIRE(peer_folder_info);
                 REQUIRE(peer_folder_info->get_file_infos().size() == 1);
                 REQUIRE(peer_folder_info->get_file_infos().by_name("a.txt"));
-                REQUIRE(cluster_clone->get_unknown_folders().size() == 1);
+                REQUIRE(cluster_clone->get_pending_folders().size() == 1);
             }
 
             auto pr_msg = proto::ClusterConfig();
@@ -476,7 +476,7 @@ void test_cluster_update_and_remove() {
                 auto folder_info = fis.by_device(*peer_device);
                 REQUIRE(folder_info);
                 REQUIRE(fis.by_device(*cluster->get_device()));
-                REQUIRE(cluster_clone->get_unknown_folders().size() == 0);
+                REQUIRE(cluster_clone->get_pending_folders().size() == 0);
             }
         }
     };
@@ -818,7 +818,7 @@ void test_remove_peer() {
                 .finish()
                 .apply(*sup);
 
-            CHECK(cluster->get_unknown_folders().size() == 1);
+            CHECK(cluster->get_pending_folders().size() == 1);
 
             REQUIRE(cluster->get_blocks().size() == 1);
             auto block = cluster->get_blocks().get(b->hash());
@@ -843,7 +843,7 @@ void test_remove_peer() {
             auto cluster_clone = make_cluster(false);
             {
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
-                CHECK(cluster_clone->get_unknown_folders().size() == 0);
+                CHECK(cluster_clone->get_pending_folders().size() == 0);
                 CHECK(cluster_clone->get_devices().size() == 1);
                 REQUIRE(cluster_clone->get_blocks().size() == 0);
             }

@@ -17,7 +17,7 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
         return make_error_code(error_code_t::folder_is_already_shared);
     }
 
-    auto &unknown = cluster.get_unknown_folders();
+    auto &unknown = cluster.get_pending_folders();
     auto index = uint64_t{0};
     auto max_sequence = int64_t{0};
 

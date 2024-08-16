@@ -13,7 +13,7 @@ static const constexpr char prefix = (char)(syncspirit::db::prefix::pending_fold
 outcome::result<pending_folder_ptr_t> pending_folder_t::create(std::string_view key,
                                                                const db::PendingFolder &data) noexcept {
     if (key.size() != data_length) {
-        return make_error_code(error_code_t::invalid_unknown_folder_length);
+        return make_error_code(error_code_t::invalid_pending_folder_length);
     }
 
     if (key[0] != prefix) {
