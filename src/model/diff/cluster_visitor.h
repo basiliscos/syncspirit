@@ -13,7 +13,7 @@ struct cluster_diff_t;
 namespace load {
 struct devices_t;
 struct ignored_devices_t;
-struct unknown_devices_t;
+struct pending_devices_t;
 struct load_cluster_t;
 } // namespace load
 
@@ -53,7 +53,7 @@ struct upsert_folder_info_t;
 template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t> {
     virtual outcome::result<void> operator()(const load::devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::ignored_devices_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const load::unknown_devices_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const load::pending_devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::load_cluster_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::cluster_update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::update_folder_t &, void *custom) noexcept;

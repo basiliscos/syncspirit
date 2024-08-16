@@ -126,7 +126,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
 
     void set_devices(tree_item_t *node);
     void set_folders(tree_item_t *node);
-    void set_unknown_devices(tree_item_t *node);
+    void set_pending_devices(tree_item_t *node);
     void set_ignored_devices(tree_item_t *node);
 
     callback_ptr_t call_select_folder(std::string_view folder_id);
@@ -163,7 +163,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     content_t *content;
     tree_item_t *devices;
     tree_item_t *folders;
-    tree_item_t *unkwnown_devices;
+    tree_item_t *pending_devices;
     tree_item_t *ignored_devices;
     db_info_viewer_t *db_info_viewer;
     callbacks_t callbacks;

@@ -6,19 +6,19 @@ using namespace syncspirit::model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-unknown_devices_t::unknown_devices_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree, false) {
-    supervisor.set_unknown_devices(this);
+pending_devices_t::pending_devices_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree, false) {
+    supervisor.set_pending_devices(this);
     update_label();
 }
 
-void unknown_devices_t::update_label() {
+void pending_devices_t::update_label() {
     auto cluster = supervisor.get_cluster();
     auto count = cluster ? cluster->get_pending_devices().size() : 0;
-    auto l = fmt::format("unknown devices ({})", count);
+    auto l = fmt::format("pending devices ({})", count);
     label(l.data());
 }
 
-auto unknown_devices_t::add_device(model::pending_device_t &device) -> augmentation_ptr_t {
+auto pending_devices_t::add_device(model::pending_device_t &device) -> augmentation_ptr_t {
     return within_tree([&]() {
         auto node = insert_by_label(new pending_device_t(device, supervisor, tree()));
         update_label();
@@ -26,7 +26,7 @@ auto unknown_devices_t::add_device(model::pending_device_t &device) -> augmentat
     });
 }
 
-void unknown_devices_t::remove_device(tree_item_t *item) {
+void pending_devices_t::remove_device(tree_item_t *item) {
     remove_child(item);
     update_label();
     tree()->redraw();

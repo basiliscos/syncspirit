@@ -56,7 +56,7 @@ struct callback_impl_t final : callback_t {
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
       app_config(std::move(config.app_config)), content{nullptr}, devices{nullptr}, folders{nullptr},
-      unkwnown_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr} {
+      pending_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr} {
     started_at = clock_t::now();
     sequencer = model::make_sequencer(started_at.time_since_epoch().count());
 }
@@ -180,7 +180,7 @@ void app_supervisor_t::on_db_info_response(net::message::db_info_response_t &res
 auto app_supervisor_t::get_logger() noexcept -> utils::logger_t & { return log; }
 void app_supervisor_t::set_devices(tree_item_t *node) { devices = node; }
 void app_supervisor_t::set_folders(tree_item_t *node) { folders = node; }
-void app_supervisor_t::set_unknown_devices(tree_item_t *node) { unkwnown_devices = node; }
+void app_supervisor_t::set_pending_devices(tree_item_t *node) { pending_devices = node; }
 void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices = node; }
 
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
@@ -246,10 +246,10 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
         }
     }
 
-    auto unknown_devices_node = static_cast<tree_item::unknown_devices_t *>(unkwnown_devices);
+    auto pending_devices_node = static_cast<tree_item::pending_devices_t *>(pending_devices);
     for (auto &it : cluster->get_pending_devices()) {
         auto &device = *it.item;
-        device.set_augmentation(unknown_devices_node->add_device(device));
+        device.set_augmentation(pending_devices_node->add_device(device));
     }
 
     auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
@@ -305,8 +305,8 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_folders
 auto app_supervisor_t::operator()(const model::diff::modify::add_pending_device_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &device = *cluster->get_pending_devices().by_sha256(diff.device_id.get_sha256());
-    auto unknown_devices_node = static_cast<tree_item::unknown_devices_t *>(unkwnown_devices);
-    device.set_augmentation(unknown_devices_node->add_device(device));
+    auto pending_devices_node = static_cast<tree_item::pending_devices_t *>(pending_devices);
+    device.set_augmentation(pending_devices_node->add_device(device));
     return diff.visit_next(*this, custom);
 }
 

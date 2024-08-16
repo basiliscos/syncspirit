@@ -300,7 +300,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         ->assign_sibling(new load::folders_t(std::move(folders_opt.value())))
         ->assign_sibling(new load::folder_infos_t(std::move(folder_infos_opt.value())))
         ->assign_sibling(new load::file_infos_t(std::move(file_infos_opt.value())))
-        ->assign_sibling(new load::unknown_devices_t(std::move(pending_devices_opt.value())))
+        ->assign_sibling(new load::pending_devices_t(std::move(pending_devices_opt.value())))
         ->assign_sibling(new load::unknown_folders_t(std::move(pending_folders_opt.value())))
         ->assign_sibling(new load::close_transaction_t(std::move(txn)));
 

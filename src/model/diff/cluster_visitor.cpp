@@ -45,7 +45,7 @@ auto cluster_visitor_t::operator()(const load::ignored_devices_t &diff, void *cu
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const load::unknown_devices_t &diff, void *custom) noexcept
+auto cluster_visitor_t::operator()(const load::pending_devices_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }

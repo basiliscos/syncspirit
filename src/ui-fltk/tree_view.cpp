@@ -36,7 +36,7 @@ tree_view_t::tree_view_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     showroot(false);
     auto folders_node = new tree_item::folders_t(supervisor, this);
     auto devices_node = new tree_item::devices_t(supervisor, this);
-    auto unknown_devices_node = new tree_item::unknown_devices_t(supervisor, this);
+    auto unknown_devices_node = new tree_item::pending_devices_t(supervisor, this);
     auto ignored_devices_node = new tree_item::ignored_devices_t(supervisor, this);
 
     add(folders_node->label(), folders_node);

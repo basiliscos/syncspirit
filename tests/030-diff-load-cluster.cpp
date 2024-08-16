@@ -154,7 +154,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
         SECTION("via diff") {
             diff::load::container_t devices;
             devices.emplace_back(diff::load::pair_t{key, data});
-            auto diff = diff::cluster_diff_ptr_t(new diff::load::unknown_devices_t(devices));
+            auto diff = diff::cluster_diff_ptr_t(new diff::load::pending_devices_t(devices));
             REQUIRE(diff->apply(*cluster));
             auto &map = cluster->get_pending_devices();
             REQUIRE(map.size() == 1);
