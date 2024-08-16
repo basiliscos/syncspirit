@@ -7,6 +7,7 @@
 #include "config/main.h"
 #include "utils/log.h"
 #include "model/messages.h"
+#include "model/misc/sequencer.h"
 #include "syncspirit-export.h"
 #include <rotor/thread.hpp>
 
@@ -19,6 +20,7 @@ namespace rth = rotor::thread;
 struct SYNCSPIRIT_API fs_supervisor_config_t : r::supervisor_config_t {
     config::fs_config_t fs_config;
     uint32_t hasher_threads;
+    model::sequencer_ptr_t sequencer;
 };
 
 template <typename Supervisor> struct fs_supervisor_config_builder_t : r::supervisor_config_builder_t<Supervisor> {
@@ -32,6 +34,10 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
     }
     builder_t &&hasher_threads(uint32_t value) && noexcept {
         parent_t::config.hasher_threads = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
+        parent_t::config.sequencer = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -57,6 +63,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
     void on_block_update(model::message::block_update_t &message) noexcept;
     void launch() noexcept;
 
+    model::sequencer_ptr_t sequencer;
     model::cluster_ptr_t cluster;
     utils::logger_t log;
     config::fs_config_t fs_config;

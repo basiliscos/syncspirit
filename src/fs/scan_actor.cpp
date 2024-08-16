@@ -7,8 +7,6 @@
 #include "model/diff/modify/blocks_availability.h"
 #include "model/diff/modify/local_update.h"
 #include "net/names.h"
-#include "utils/error_code.h"
-#include "utils/tls.h"
 #include "utils.h"
 #include <algorithm>
 
@@ -19,7 +17,9 @@ template <class> inline constexpr bool always_false_v = false;
 
 scan_actor_t::scan_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, cluster{cfg.cluster}, sequencer{cfg.sequencer}, fs_config{cfg.fs_config},
-      requested_hashes_limit{cfg.requested_hashes_limit} {}
+      requested_hashes_limit{cfg.requested_hashes_limit} {
+    assert(sequencer);
+}
 
 void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
