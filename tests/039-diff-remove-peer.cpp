@@ -155,14 +155,14 @@ TEST_CASE("remove peer", "[model]") {
     }
 
     SECTION("unknown folders are removed") {
-        db::UnknownFolder db_uf;
-        auto mf = db_uf.mutable_folder();
+        db::PendingFolder db_pf;
+        auto mf = db_pf.mutable_folder();
         mf->set_id("1234");
-        auto mfi = db_uf.mutable_folder_info();
+        auto mfi = db_pf.mutable_folder_info();
         mfi->set_max_sequence(5);
         mfi->set_index_id(10);
 
-        auto uf = unknown_folder_t::create(sequencer->next_uuid(), db_uf, peer_device->device_id()).value();
+        auto uf = unknown_folder_t::create(sequencer->next_uuid(), db_pf, peer_device->device_id()).value();
         auto &unknown_folders = cluster->get_unknown_folders();
         unknown_folders.put(uf);
         REQUIRE(builder.remove_peer(*peer_device).apply());

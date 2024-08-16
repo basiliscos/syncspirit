@@ -70,13 +70,13 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             db_folder.set_label(label);
             db_folder.set_path(path);
 
-            auto db_uf = db::UnknownFolder();
-            *db_uf.mutable_folder() = db_folder;
-            auto db_fi = db_uf.mutable_folder_info();
+            auto db_pf = db::PendingFolder();
+            *db_pf.mutable_folder() = db_folder;
+            auto db_fi = db_pf.mutable_folder_info();
             db_fi->set_index_id(2345);
             db_fi->set_max_sequence(12);
 
-            auto uf = unknown_folder_t::create(sequencer->next_uuid(), db_uf, peer_device->device_id()).value();
+            auto uf = unknown_folder_t::create(sequencer->next_uuid(), db_pf, peer_device->device_id()).value();
             cluster->get_unknown_folders().put(uf);
 
             REQUIRE(builder.share_folder(peer_id.get_sha256(), id).apply());

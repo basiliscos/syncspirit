@@ -26,8 +26,8 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     int remove_blocks = 0;
     int remove_files = 0;
     int remove_folders = 0;
-    int remove_unknown_folders = 0;
-    int add_unknown_folders = 0;
+    int remove_pending_folders = 0;
+    int add_pending_folders = 0;
     int updated_folders = 0;
 
     my_cluster_update_visitor_t(F &&fn_) : fn{std::forward<F>(fn_)} {}
@@ -51,7 +51,7 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     }
     outcome::result<void> operator()(const diff::modify::remove_unknown_folders_t &diff,
                                      void *custom) noexcept override {
-        ++remove_unknown_folders;
+        ++remove_pending_folders;
         return diff.visit_next(*this, custom);
     }
     outcome::result<void> operator()(const diff::modify::upsert_folder_info_t &diff, void *custom) noexcept override {
@@ -59,7 +59,7 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
         return diff.visit_next(*this, custom);
     }
     outcome::result<void> operator()(const diff::modify::add_unknown_folders_t &diff, void *custom) noexcept override {
-        ++add_unknown_folders;
+        ++add_pending_folders;
         return diff.visit_next(*this, custom);
     }
 };
@@ -98,7 +98,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         auto r_v = diff->visit(visitor, nullptr);
         REQUIRE(r_v);
         REQUIRE(cluster->get_unknown_folders().size());
-        REQUIRE(visitor.add_unknown_folders == 1);
+        REQUIRE(visitor.add_pending_folders == 1);
         auto uf = cluster->get_unknown_folders().begin()->item;
         CHECK(uf->device_id() == peer_device->device_id());
         CHECK(uf->get_id() == "some-id");
@@ -106,10 +106,10 @@ TEST_CASE("cluster update, new folder", "[model]") {
         CHECK(uf->get_index() == 22ul);
 
         // no changes
-        db::UnknownFolder db_uf;
-        auto mf = db_uf.mutable_folder();
+        db::PendingFolder db_pf;
+        auto mf = db_pf.mutable_folder();
         mf->set_id(folder.id());
-        auto mfi = db_uf.mutable_folder_info();
+        auto mfi = db_pf.mutable_folder_info();
         mfi->set_max_sequence(d_peer->max_sequence());
         mfi->set_index_id(d_peer->index_id());
 
@@ -120,7 +120,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         CHECK(r_a);
         REQUIRE(cluster->get_unknown_folders().size() == 1);
         std::ignore = diff->visit(visitor, nullptr);
-        REQUIRE(visitor.add_unknown_folders == 1);
+        REQUIRE(visitor.add_pending_folders == 1);
 
         // max-id changed
         d_peer->set_max_sequence(15);
@@ -130,7 +130,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         r_a = diff->apply(*cluster);
         CHECK(r_a);
         (void)diff->visit(visitor, nullptr);
-        REQUIRE(visitor.add_unknown_folders == 2);
+        REQUIRE(visitor.add_pending_folders == 2);
         REQUIRE(cluster->get_unknown_folders().size() == 1);
         uf = cluster->get_unknown_folders().begin()->item;
         CHECK(uf->device_id() == peer_device->device_id());
@@ -318,10 +318,10 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
-    db::UnknownFolder db_u_folder;
-    db_u_folder.mutable_folder()->set_id("1111-2222");
-    db_u_folder.mutable_folder()->set_label("unknown");
-    auto u_folder = unknown_folder_t::create(sequencer->next_uuid(), db_u_folder, peer_device->device_id()).value();
+    db::PendingFolder db_p_folder;
+    db_p_folder.mutable_folder()->set_id("1111-2222");
+    db_p_folder.mutable_folder()->set_label("unknown");
+    auto u_folder = unknown_folder_t::create(sequencer->next_uuid(), db_p_folder, peer_device->device_id()).value();
     auto &unknown_folders = cluster->get_unknown_folders();
     unknown_folders.put(u_folder);
 
@@ -429,7 +429,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     CHECK(visitor.remove_blocks == 1);
     CHECK(visitor.remove_files == 1);
     CHECK(visitor.remove_folders == 1);
-    CHECK(visitor.remove_unknown_folders == 1);
+    CHECK(visitor.remove_pending_folders == 1);
     CHECK(visitor.updated_folders == 1);
 }
 

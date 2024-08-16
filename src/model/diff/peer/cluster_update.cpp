@@ -47,7 +47,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     auto add_unknown = [&](const proto::Folder &f, const proto::Device &d) noexcept {
         using item_t = decltype(new_unknown_folders)::value_type;
         LOG_TRACE(log, "cluster_update_t, (add/update) unknown folder = {}", f.label());
-        db::UnknownFolder db;
+        db::PendingFolder db;
         auto fi = db.mutable_folder_info();
         auto db_f = db.mutable_folder();
         fi->set_index_id(d.index_id());

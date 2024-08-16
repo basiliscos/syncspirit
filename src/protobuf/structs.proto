@@ -56,7 +56,7 @@ message FolderInfo {
     int64  max_sequence = 2;
 }
 
-message UnknownFolder {
+message PendingFolder {
     Folder folder          = 1;
     FolderInfo folder_info = 2;
 }

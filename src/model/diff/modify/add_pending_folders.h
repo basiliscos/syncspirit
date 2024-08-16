@@ -12,7 +12,7 @@ namespace syncspirit::model::diff::modify {
 
 struct SYNCSPIRIT_API add_unknown_folders_t final : cluster_diff_t {
     struct item_t {
-        db::UnknownFolder db;
+        db::PendingFolder db;
         std::string peer_id;
         uuid_t uuid;
     };

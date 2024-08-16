@@ -22,8 +22,8 @@ using unknown_folder_ptr_t = intrusive_ptr_t<unknown_folder_t>;
 
 struct SYNCSPIRIT_API unknown_folder_t final : augmentable_t<unknown_folder_t>, folder_data_t {
 
-    static outcome::result<unknown_folder_ptr_t> create(std::string_view key, const db::UnknownFolder &data) noexcept;
-    static outcome::result<unknown_folder_ptr_t> create(const uuid_t &uuid, const db::UnknownFolder &data,
+    static outcome::result<unknown_folder_ptr_t> create(std::string_view key, const db::PendingFolder &data) noexcept;
+    static outcome::result<unknown_folder_ptr_t> create(const uuid_t &uuid, const db::PendingFolder &data,
                                                         const device_id_t &device_) noexcept;
 
     inline const device_id_t &device_id() const noexcept { return device; }
@@ -36,7 +36,7 @@ struct SYNCSPIRIT_API unknown_folder_t final : augmentable_t<unknown_folder_t>, 
   private:
     unknown_folder_t(std::string_view key, const device_id_t &device_) noexcept;
     unknown_folder_t(const uuid_t &uuid, const device_id_t &device_) noexcept;
-    void assign_fields(const db::UnknownFolder &data) noexcept;
+    void assign_fields(const db::PendingFolder &data) noexcept;
 
     device_id_t device;
     std::uint64_t index;

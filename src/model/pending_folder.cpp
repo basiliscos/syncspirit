@@ -11,7 +11,7 @@ namespace syncspirit::model {
 static const constexpr char prefix = (char)(syncspirit::db::prefix::unknown_folder);
 
 outcome::result<unknown_folder_ptr_t> unknown_folder_t::create(std::string_view key,
-                                                               const db::UnknownFolder &data) noexcept {
+                                                               const db::PendingFolder &data) noexcept {
     if (key.size() != data_length) {
         return make_error_code(error_code_t::invalid_unknown_folder_length);
     }
@@ -32,7 +32,7 @@ outcome::result<unknown_folder_ptr_t> unknown_folder_t::create(std::string_view 
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<unknown_folder_ptr_t> unknown_folder_t::create(const uuid_t &uuid, const db::UnknownFolder &data,
+outcome::result<unknown_folder_ptr_t> unknown_folder_t::create(const uuid_t &uuid, const db::PendingFolder &data,
                                                                const device_id_t &device_) noexcept {
     auto ptr = unknown_folder_ptr_t();
     ptr = new unknown_folder_t(uuid, device_);
@@ -51,7 +51,7 @@ unknown_folder_t::unknown_folder_t(std::string_view key_, const device_id_t &dev
     std::copy(key_.begin(), key_.end(), key);
 }
 
-void unknown_folder_t::assign_fields(const db::UnknownFolder &data) noexcept {
+void unknown_folder_t::assign_fields(const db::PendingFolder &data) noexcept {
     folder_data_t::assign_fields(data.folder());
     auto &fi = data.folder_info();
     index = fi.index_id();
@@ -60,7 +60,7 @@ void unknown_folder_t::assign_fields(const db::UnknownFolder &data) noexcept {
 }
 
 std::string unknown_folder_t::serialize() const noexcept {
-    db::UnknownFolder r;
+    db::PendingFolder r;
     folder_data_t::serialize(*r.mutable_folder());
     auto &fi = *r.mutable_folder_info();
     fi.set_index_id(index);
