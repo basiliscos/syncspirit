@@ -284,20 +284,20 @@ auto app_supervisor_t::operator()(const model::diff::peer::cluster_update_t &dif
     // return diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *custom) noexcept
+auto app_supervisor_t::operator()(const model::diff::modify::add_pending_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &devices = cluster->get_devices();
-    auto &unknown_folders = cluster->get_pending_folders();
+    auto &pending_folders = cluster->get_pending_folders();
     for (auto &item : diff.container) {
         auto peer = devices.by_sha256(item.peer_id);
         auto augmentation = static_cast<augmentation_t *>(peer->get_augmentation().get());
         auto peer_node = static_cast<tree_item::peer_device_t *>(augmentation->get_owner());
-        auto unknown_node = static_cast<tree_item::unknown_folders_t *>(peer_node->get_pending_folders());
-        auto unknown_folder = unknown_folders.by_id(item.db.folder().id());
-        if (unknown_folder->get_augmentation()) {
+        auto pending_node = static_cast<tree_item::pending_folders_t *>(peer_node->get_pending_folders());
+        auto pending_folder = pending_folders.by_id(item.db.folder().id());
+        if (pending_folder->get_augmentation()) {
             continue;
         }
-        unknown_folder->set_augmentation(unknown_node->add_unknown_folder(*unknown_folder));
+        pending_folder->set_augmentation(pending_node->add_pending_folder(*pending_folder));
     }
     return diff.visit_next(*this, custom);
 }

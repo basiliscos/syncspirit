@@ -83,7 +83,7 @@ bool pending_folder_t::on_select() {
         auto cluster = supervisor.get_cluster();
         auto &devices = cluster->get_devices();
         auto &self = *cluster->get_device();
-        auto &peer = static_cast<unknown_folders_t *>(parent())->peer;
+        auto &peer = static_cast<pending_folders_t *>(parent())->peer;
         for (auto &it : devices) {
             auto &device = *it.item;
             if ((&device != &self) && (&device != &peer)) {

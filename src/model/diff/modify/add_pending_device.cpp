@@ -15,8 +15,8 @@ auto add_pending_device_t::apply_impl(cluster_t &cluster) const noexcept -> outc
     if (!opt) {
         return opt.assume_error();
     }
-    auto &unknown_device = opt.assume_value();
-    cluster.get_pending_devices().put(std::move(unknown_device));
+    auto &pending_device = opt.assume_value();
+    cluster.get_pending_devices().put(std::move(pending_device));
     return applicator_t::apply_sibling(cluster);
 }
 

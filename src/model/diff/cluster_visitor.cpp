@@ -86,7 +86,7 @@ auto cluster_visitor_t::operator()(const modify::add_pending_device_t &diff, voi
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const modify::add_unknown_folders_t &diff, void *custom) noexcept
+auto cluster_visitor_t::operator()(const modify::add_pending_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
@@ -136,7 +136,7 @@ auto cluster_visitor_t::operator()(const modify::remove_pending_device_t &diff, 
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const modify::remove_unknown_folders_t &diff, void *custom) noexcept
+auto cluster_visitor_t::operator()(const modify::remove_pending_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }

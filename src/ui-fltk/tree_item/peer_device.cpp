@@ -461,17 +461,17 @@ static widgetable_ptr_t make_addresses(my_table_t &container) {
 } // namespace
 
 peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree), peer{peer_}, unknown_folders{nullptr} {
-    bool has_unknown_folders = false;
+    : parent_t(supervisor, tree), peer{peer_}, pending_folders{nullptr} {
+    bool has_pending_folders = false;
     auto &folders = supervisor.get_cluster()->get_pending_folders();
     for (auto &it : folders) {
         auto &uf = *it.item;
         if (uf.device_id() == peer.device_id()) {
-            has_unknown_folders = true;
+            has_pending_folders = true;
             break;
         }
     }
-    if (has_unknown_folders) {
+    if (has_pending_folders) {
         this->get_pending_folders();
     }
     update_label();
@@ -508,10 +508,10 @@ std::string peer_device_t::get_state() {
 }
 
 tree_item_t *peer_device_t::get_pending_folders() {
-    if (!unknown_folders) {
-        unknown_folders = new unknown_folders_t(peer, supervisor, tree());
-        add(prefs(), unknown_folders->label(), unknown_folders);
+    if (!pending_folders) {
+        pending_folders = new pending_folders_t(peer, supervisor, tree());
+        add(prefs(), pending_folders->label(), pending_folders);
         tree()->redraw();
     }
-    return unknown_folders;
+    return pending_folders;
 }

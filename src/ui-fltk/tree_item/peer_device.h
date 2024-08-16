@@ -22,7 +22,7 @@ struct peer_device_t : tree_item_t {
     tree_item_t *get_pending_folders();
 
     model::device_t &peer;
-    tree_item_t *unknown_folders;
+    tree_item_t *pending_folders;
 };
 
 } // namespace syncspirit::fltk::tree_item

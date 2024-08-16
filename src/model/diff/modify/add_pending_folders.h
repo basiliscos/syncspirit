@@ -10,7 +10,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API add_unknown_folders_t final : cluster_diff_t {
+struct SYNCSPIRIT_API add_pending_folders_t final : cluster_diff_t {
     struct item_t {
         db::PendingFolder db;
         std::string peer_id;
@@ -18,7 +18,7 @@ struct SYNCSPIRIT_API add_unknown_folders_t final : cluster_diff_t {
     };
     using container_t = std::vector<item_t>;
 
-    add_unknown_folders_t(container_t items) noexcept;
+    add_pending_folders_t(container_t items) noexcept;
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 

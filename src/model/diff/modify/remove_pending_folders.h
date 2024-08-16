@@ -7,7 +7,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API remove_unknown_folders_t final : generic_remove_t {
+struct SYNCSPIRIT_API remove_pending_folders_t final : generic_remove_t {
     using generic_remove_t::generic_remove_t;
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;

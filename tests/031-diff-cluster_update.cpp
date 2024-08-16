@@ -49,7 +49,7 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
         ++remove_folders;
         return diff.visit_next(*this, custom);
     }
-    outcome::result<void> operator()(const diff::modify::remove_unknown_folders_t &diff,
+    outcome::result<void> operator()(const diff::modify::remove_pending_folders_t &diff,
                                      void *custom) noexcept override {
         ++remove_pending_folders;
         return diff.visit_next(*this, custom);
@@ -58,7 +58,7 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
         ++updated_folders;
         return diff.visit_next(*this, custom);
     }
-    outcome::result<void> operator()(const diff::modify::add_unknown_folders_t &diff, void *custom) noexcept override {
+    outcome::result<void> operator()(const diff::modify::add_pending_folders_t &diff, void *custom) noexcept override {
         ++add_pending_folders;
         return diff.visit_next(*this, custom);
     }

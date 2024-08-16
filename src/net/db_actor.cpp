@@ -301,7 +301,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         ->assign_sibling(new load::folder_infos_t(std::move(folder_infos_opt.value())))
         ->assign_sibling(new load::file_infos_t(std::move(file_infos_opt.value())))
         ->assign_sibling(new load::pending_devices_t(std::move(pending_devices_opt.value())))
-        ->assign_sibling(new load::unknown_folders_t(std::move(pending_folders_opt.value())))
+        ->assign_sibling(new load::pending_folders_t(std::move(pending_folders_opt.value())))
         ->assign_sibling(new load::close_transaction_t(std::move(txn)));
 
     reply_to(request, diff);
@@ -341,9 +341,9 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto &unknown = cluster->get_pending_folders();
-    if (unknown.size()) {
-        for (auto &it : unknown) {
+    auto &pending = cluster->get_pending_folders();
+    if (pending.size()) {
+        for (auto &it : pending) {
             auto &uf = it.item;
             auto key = uf->get_key();
             auto data = uf->serialize();
@@ -413,7 +413,7 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, voi
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::add_unknown_folders_t &diff, void *custom) noexcept
+auto db_actor_t::operator()(const model::diff::modify::add_pending_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -424,9 +424,9 @@ auto db_actor_t::operator()(const model::diff::modify::add_unknown_folders_t &di
     }
     auto &txn = *txn_opt.assume_value();
 
-    auto &unknown = cluster->get_pending_folders();
+    auto &pending = cluster->get_pending_folders();
     for (auto &item : diff.container) {
-        auto uf = unknown.by_id(item.db.folder().id());
+        auto uf = pending.by_id(item.db.folder().id());
         if (uf && uf->device_id().get_sha256() == item.peer_id) {
             if (uf->get_id() == item.db.folder().id()) {
                 auto key = uf->get_key();
@@ -543,7 +543,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_folder_infos_t &di
     return (*this)(diff);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::remove_unknown_folders_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::modify::remove_pending_folders_t &diff, void *) noexcept
     -> outcome::result<void> {
     return (*this)(diff);
 }

@@ -7,7 +7,7 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto unknown_folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto pending_folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto &items = cluster.get_pending_folders();
     for (auto &pair : folders) {
         auto data = pair.value;

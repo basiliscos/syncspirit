@@ -26,7 +26,7 @@ namespace modify {
 struct add_ignored_device_t;
 struct add_remote_folder_infos_t;
 struct add_pending_device_t;
-struct add_unknown_folders_t;
+struct add_pending_folders_t;
 struct clone_file_t;
 struct create_folder_t;
 struct file_availability_t;
@@ -46,7 +46,7 @@ struct remove_folder_t;
 struct remove_folder_infos_t;
 struct remove_ignored_device_t;
 struct remove_pending_device_t;
-struct remove_unknown_folders_t;
+struct remove_pending_folders_t;
 struct upsert_folder_info_t;
 } // namespace modify
 
@@ -61,7 +61,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const modify::add_remote_folder_infos_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::add_ignored_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::add_pending_device_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const modify::add_unknown_folders_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::add_pending_folders_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::clone_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::create_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::file_availability_t &, void *custom) noexcept;
@@ -80,7 +80,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const modify::remove_folder_infos_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_ignored_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_pending_device_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const modify::remove_unknown_folders_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::remove_pending_folders_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::upsert_folder_info_t &, void *custom) noexcept;
 };
 

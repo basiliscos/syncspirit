@@ -17,17 +17,17 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
         return make_error_code(error_code_t::folder_is_already_shared);
     }
 
-    auto &unknown = cluster.get_pending_folders();
+    auto &pending = cluster.get_pending_folders();
     auto index = uint64_t{0};
     auto max_sequence = int64_t{0};
 
-    auto unknown_folder = model::pending_folder_ptr_t{};
-    for (auto it = unknown.begin(); it != unknown.end(); ++it) {
+    auto pending_folder = model::pending_folder_ptr_t{};
+    for (auto it = pending.begin(); it != pending.end(); ++it) {
         auto &uf = *it->item;
         if (uf.device_id() == peer.device_id() && uf.get_id() == folder.get_id()) {
             index = uf.get_index();
             max_sequence = uf.get_max_sequence();
-            unknown_folder = it->item;
+            pending_folder = it->item;
             break;
         }
     }
@@ -37,7 +37,7 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
     }
 
     return new share_folder_t(sequencer.next_uuid(), peer.device_id().get_sha256(), folder.get_id(), index,
-                              max_sequence, unknown_folder);
+                              max_sequence, pending_folder);
 }
 
 share_folder_t::share_folder_t(const uuid_t &uuid, std::string_view device_id, std::string_view folder_id,
@@ -46,10 +46,10 @@ share_folder_t::share_folder_t(const uuid_t &uuid, std::string_view device_id, s
     : peer_id(device_id) {
     auto current = assign_child(new upsert_folder_info_t(uuid, device_id, folder_id, index_id, max_sequence));
     if (uf) {
-        auto keys = remove_unknown_folders_t::keys_t{};
+        auto keys = remove_pending_folders_t::keys_t{};
         keys.emplace_back(std::string{uf->get_key()});
         auto diff = cluster_diff_ptr_t{};
-        current->assign_sibling(new remove_unknown_folders_t(std::move(keys)));
+        current->assign_sibling(new remove_pending_folders_t(std::move(keys)));
     }
 }
 
