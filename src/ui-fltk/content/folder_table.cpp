@@ -1,8 +1,10 @@
 #include "folder_table.h"
 
 #include "model/diff/modify/create_folder.h"
-#include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_folder.h"
+#include "model/diff/modify/remove_blocks.h"
+#include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/unshare_folder.h"
 
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
@@ -693,7 +695,70 @@ void folder_table_t::on_share() {
     sup.send_model<model::payload::model_update_t>(opt.assume_value(), cb.get());
 }
 
-void folder_table_t::on_apply() {}
+void folder_table_t::on_apply() {
+    serialiazation_context_t ctx;
+    auto valid = store(&ctx);
+    if (!valid) {
+        return;
+    }
+
+    auto &sup = container.supervisor;
+    auto log = sup.get_logger();
+    auto &cluster = *sup.get_cluster();
+    auto folder = cluster.get_folders().by_id(folder_data.get_id());
+    auto &folder_infos = folder->get_folder_infos();
+    auto diff = model::diff::cluster_diff_ptr_t{};
+    auto current = diff.get();
+    auto orphaned_blocks = model::orphaned_blocks_t{};
+
+    for (auto it : initially_shared_with) {
+        auto &device = it.item;
+        if (!ctx.shared_with.by_sha256(device->device_id().get_sha256())) {
+            auto folder_info = folder_infos.by_device(*device);
+            if (folder_info) {
+                log->info("going to unshare folder '{}' with {}({})", folder->get_label(), device->get_name(),
+                          device->device_id().get_short());
+                auto sub_diff = model::diff::cluster_diff_ptr_t{};
+                sub_diff = new modify::unshare_folder_t(cluster, *folder_info, &orphaned_blocks);
+                if (diff) {
+                    current = current->assign_child(sub_diff);
+                } else {
+                    diff = sub_diff;
+                    current = diff.get();
+                }
+            }
+        }
+    }
+
+    for (auto it : initially_non_shared_with) {
+        auto &device = it.item;
+        if (ctx.shared_with.by_sha256(device->device_id().get_sha256())) {
+            auto opt = modify::share_folder_t::create(cluster, sup.get_sequencer(), *device, *folder);
+            if (!opt) {
+                log->error("folder cannot be sahred: {}", opt.assume_error().message());
+                return;
+            }
+            log->info("going to unshare folder '{}' with {}({})", folder->get_label(), device->get_name(),
+                      device->device_id().get_short());
+            auto ptr = opt.assume_value().get();
+            if (diff) {
+                current = current->assign_child(ptr);
+            } else {
+                diff = ptr;
+            }
+        }
+    }
+
+    if (auto orphaned_set = orphaned_blocks.deduce(); orphaned_set.size()) {
+        log->info("going to remove {} orphaned blocks", orphaned_set.size());
+        auto sub_diff = model::diff::cluster_diff_ptr_t{};
+        sub_diff = new modify::remove_blocks_t(std::move(orphaned_set));
+        current = current->assign_sibling(sub_diff.get());
+    }
+
+    auto cb = sup.call_select_folder(folder->get_id());
+    sup.send_model<model::payload::model_update_t>(diff, cb.get());
+}
 
 void folder_table_t::on_reset() {
     auto &rows = get_rows();
