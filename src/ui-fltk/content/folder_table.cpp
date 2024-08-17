@@ -548,9 +548,15 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
     data.push_back({"paused", make_paused(*this)});
 
     auto cluster = container.supervisor.get_cluster();
+    int shared_count = 0;
     for (auto it : *shared_with) {
         auto &device = it.item;
         auto widget = make_shared_with(*this, device);
+        data.push_back({"shared_with", widget});
+        ++shared_count;
+    }
+    if (!shared_count) {
+        auto widget = make_shared_with(*this, {});
         data.push_back({"shared_with", widget});
     }
     data.push_back({"", notice = make_notice(*this)});
@@ -721,10 +727,9 @@ void folder_table_t::on_apply() {
                 auto sub_diff = model::diff::cluster_diff_ptr_t{};
                 sub_diff = new modify::unshare_folder_t(cluster, *folder_info, &orphaned_blocks);
                 if (diff) {
-                    current = current->assign_child(sub_diff);
+                    current = current->assign_sibling(sub_diff.get());
                 } else {
-                    diff = sub_diff;
-                    current = diff.get();
+                    diff = current = sub_diff.get();
                 }
             }
         }
@@ -738,13 +743,13 @@ void folder_table_t::on_apply() {
                 log->error("folder cannot be sahred: {}", opt.assume_error().message());
                 return;
             }
-            log->info("going to unshare folder '{}' with {}({})", folder->get_label(), device->get_name(),
+            log->info("going to share folder '{}' with {}({})", folder->get_label(), device->get_name(),
                       device->device_id().get_short());
             auto ptr = opt.assume_value().get();
             if (diff) {
-                current = current->assign_child(ptr);
+                current = current->assign_sibling(ptr);
             } else {
-                diff = ptr;
+                diff = current = ptr;
             }
         }
     }
