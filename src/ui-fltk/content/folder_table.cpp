@@ -24,6 +24,7 @@ static constexpr int padding = 2;
 
 namespace {
 
+auto static make_title(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_path(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_id(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_label(folder_table_t &container) -> widgetable_ptr_t;
@@ -165,6 +166,27 @@ struct checkbox_widget_t : table_widget::checkbox_t {
         return r;
     }
 };
+
+auto static make_title(folder_table_t &container) -> widgetable_ptr_t {
+    struct widget_t final : table_widget::label_t {
+        using parent_t = table_widget::label_t;
+        using parent_t::parent_t;
+
+        void reset() override {
+            auto text = std::string_view("");
+            auto &container = static_cast<folder_table_t &>(this->container);
+            if (container.mode == folder_table_t::mode_t::edit) {
+                text = "editing existing folder";
+            } else if (container.mode == folder_table_t::mode_t::create) {
+                text = "creating new folder";
+            } else if (container.mode == folder_table_t::mode_t::share) {
+                text = "accepting pending folder";
+            }
+            input->label(text.data());
+        }
+    };
+    return new widget_t(container);
+}
 
 auto static make_path(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::path_t {
@@ -350,7 +372,7 @@ auto static make_index(folder_table_t &container) -> widgetable_ptr_t {
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
             auto value_str = std::string_view(input->value());
-            int value = 0;
+            std::uint64_t value = 0;
             auto result = std::from_chars(value_str.begin(), value_str.end(), value);
             if (result.ec != std::errc() || value <= 0) {
                 auto &container = static_cast<folder_table_t &>(this->container);
@@ -591,6 +613,7 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
         folder_data.set_rescan_interval(3600u);
     }
 
+    data.push_back({"", make_title(*this)});
     data.push_back({"path", make_path(*this)});
     data.push_back({"id", make_id(*this)});
     data.push_back({"label", make_label(*this)});
