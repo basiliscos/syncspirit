@@ -515,3 +515,10 @@ tree_item_t *peer_device_t::get_pending_folders() {
     }
     return pending_folders;
 }
+
+void peer_device_t::remove_child(tree_item_t *child) {
+    if (child == pending_folders) {
+        pending_folders = nullptr;
+    }
+    parent_t::remove_child(child);
+}

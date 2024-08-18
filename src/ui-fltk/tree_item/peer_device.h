@@ -18,6 +18,7 @@ struct peer_device_t : tree_item_t {
 
     void update_label() override;
     bool on_select() override;
+    void remove_child(tree_item_t *child) override;
 
     tree_item_t *get_pending_folders();
 

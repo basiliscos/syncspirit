@@ -14,7 +14,9 @@ struct pending_folders_t : tree_item_t {
     pending_folders_t(model::device_t &peer, app_supervisor_t &supervisor, Fl_Tree *tree);
 
     augmentation_ptr_t add_pending_folder(model::pending_folder_t &uf);
+
     void remove_folder(tree_item_t *item);
+    void remove_child(tree_item_t *child) override;
 
     model::device_t &peer;
 };
