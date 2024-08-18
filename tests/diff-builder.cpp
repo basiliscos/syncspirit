@@ -9,7 +9,6 @@
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/clone_file.h"
-#include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/finish_file_ack.h"
 #include "model/diff/modify/local_update.h"
@@ -20,6 +19,7 @@
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/remove_ignored_device.h"
 #include "model/diff/modify/remove_pending_device.h"
+#include "model/diff/modify/upsert_folder.h"
 #include "model/diff/contact/update_contact.h"
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/peer/cluster_update.h"
@@ -131,13 +131,18 @@ auto diff_builder_t::apply() noexcept -> outcome::result<void> {
     return r;
 }
 
-diff_builder_t &diff_builder_t::create_folder(std::string_view id, std::string_view path,
+diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, std::string_view path,
                                               std::string_view label) noexcept {
     db::Folder db_folder;
     db_folder.set_id(std::string(id));
     db_folder.set_label(std::string(label));
     db_folder.set_path(std::string(path));
-    auto opt = diff::modify::create_folder_t::create(cluster, *sequencer, db_folder);
+    auto opt = diff::modify::upsert_folder_t::create(cluster, *sequencer, db_folder);
+    return assign(opt.value().get());
+}
+
+diff_builder_t &diff_builder_t::upsert_folder(const db::Folder &data) noexcept {
+    auto opt = diff::modify::upsert_folder_t::create(cluster, *sequencer, data);
     return assign(opt.value().get());
 }
 

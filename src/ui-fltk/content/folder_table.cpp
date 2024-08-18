@@ -1,10 +1,10 @@
 #include "folder_table.h"
 
-#include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
+#include "model/diff/modify/upsert_folder.h"
 
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
@@ -691,7 +691,7 @@ void folder_table_t::on_share() {
     auto &peer = ctx.shared_with.begin()->item;
     log->info("going to create folder {}({}) & share it with {}", folder.label(), folder.id(), peer->get_name());
     auto peer_id = peer->device_id().get_sha256();
-    auto opt = modify::create_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder);
+    auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder);
     if (!opt) {
         log->error("cannot create folder: {}", opt.assume_error().message());
         return;

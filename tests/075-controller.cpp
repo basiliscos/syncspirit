@@ -219,8 +219,8 @@ struct fixture_t {
         auto folder_id_2 = "5555";
         auto builder = diff_builder_t(*cluster);
         auto sha256 = peer_id.get_sha256();
-        builder.create_folder(folder_id_1, "")
-            .create_folder(folder_id_2, "")
+        builder.upsert_folder(folder_id_1, "")
+            .upsert_folder(folder_id_2, "")
             .configure_cluster(sha256)
             .add(sha256, folder_id_1, 123, max_sequence)
             .finish();

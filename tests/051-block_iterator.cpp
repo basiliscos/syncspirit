@@ -34,7 +34,7 @@ TEST_CASE("block iterator", "[model]") {
 
     auto &folders = cluster->get_folders();
     auto builder = diff_builder_t(*cluster);
-    builder.create_folder("1234-5678", "some/path", "my-label");
+    builder.upsert_folder("1234-5678", "some/path", "my-label");
     REQUIRE(builder.apply());
 
     auto folder = folders.by_id("1234-5678");

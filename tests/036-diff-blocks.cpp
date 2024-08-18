@@ -21,7 +21,7 @@ TEST_CASE("various block diffs", "[model]") {
     cluster->get_devices().put(my_device);
 
     auto builder = diff_builder_t(*cluster);
-    builder.create_folder("1234-5678", "some/path", "my-label");
+    builder.upsert_folder("1234-5678", "some/path", "my-label");
     REQUIRE(builder.apply());
 
     auto folder = cluster->get_folders().by_id("1234-5678");

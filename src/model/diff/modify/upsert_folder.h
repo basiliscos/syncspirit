@@ -10,7 +10,7 @@
 
 namespace syncspirit::model::diff::modify {
 
-struct SYNCSPIRIT_API create_folder_t final : cluster_diff_t {
+struct SYNCSPIRIT_API upsert_folder_t final : cluster_diff_t {
 
     static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, sequencer_t &sequencer,
                                                       db::Folder db) noexcept;
@@ -22,7 +22,8 @@ struct SYNCSPIRIT_API create_folder_t final : cluster_diff_t {
     db::Folder db;
 
   private:
-    create_folder_t(sequencer_t &sequencer, db::Folder db, const model::device_t &device) noexcept;
+    upsert_folder_t(sequencer_t &sequencer, uuid_t uuid, db::Folder db, model::folder_info_ptr_t folder_info,
+                    const model::device_t &device) noexcept;
 };
 
 } // namespace syncspirit::model::diff::modify

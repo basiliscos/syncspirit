@@ -5,7 +5,6 @@
 #include "access.h"
 #include "diff-builder.h"
 #include "model/cluster.h"
-#include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/file_availability.h"
 #include "model/diff/contact/update_contact.h"
@@ -44,7 +43,7 @@ TEST_CASE("with file", "[model]") {
     cluster->get_devices().put(my_device);
 
     auto builder = diff_builder_t(*cluster);
-    builder.create_folder("1234-5678", "some/path", "my-label");
+    builder.upsert_folder("1234-5678", "some/path", "my-label");
     REQUIRE(builder.apply());
 
     auto folder = cluster->get_folders().by_id("1234-5678");

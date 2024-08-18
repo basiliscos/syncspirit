@@ -72,7 +72,7 @@ struct fixture_t {
         file_addr = file_actor->get_address();
 
         auto builder = diff_builder_t(*cluster);
-        builder.create_folder(folder_id, root_path.string(), "my-label")
+        builder.upsert_folder(folder_id, root_path.string(), "my-label")
             .apply(*sup)
             .update_peer(peer_device->device_id(), "some_name", "some-cn", true)
             .apply(*sup)

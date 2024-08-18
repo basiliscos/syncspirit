@@ -25,7 +25,7 @@ TEST_CASE("updates_streamer", "[model]") {
     auto builder = diff_builder_t(*cluster);
 
     auto &folders = cluster->get_folders();
-    REQUIRE(builder.create_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
     auto folder = folders.by_id("1234-5678");
 

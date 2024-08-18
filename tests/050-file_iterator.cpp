@@ -36,7 +36,7 @@ TEST_CASE("file iterator", "[model]") {
     auto builder = diff_builder_t(*cluster);
 
     auto &folders = cluster->get_folders();
-    REQUIRE(builder.create_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
     auto folder = folders.by_id("1234-5678");
     auto &folder_infos = cluster->get_folders().by_id(folder->get_id())->get_folder_infos();
@@ -313,7 +313,7 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     auto &folders = cluster->get_folders();
     auto sha256 = peer_id.get_sha256();
 
-    REQUIRE(builder.create_folder("1234", "/", "my-label-1").create_folder("5678", "/", "my-label-2").apply());
+    REQUIRE(builder.upsert_folder("1234", "/", "my-label-1").upsert_folder("5678", "/", "my-label-2").apply());
     REQUIRE(builder.share_folder(sha256, "1234").share_folder(sha256, "5678").apply());
     auto folder1 = folders.by_id("1234");
     auto folder2 = folders.by_id("5678");

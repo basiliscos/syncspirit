@@ -25,7 +25,7 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
     auto builder = diff_builder_t(*cluster);
 
-    REQUIRE(builder.create_folder("fid", "/some/path").apply());
+    REQUIRE(builder.upsert_folder("fid", "/some/path").apply());
 
     auto b1_hash = utils::sha256_digest("12345").value();
     auto b2_hash = utils::sha256_digest("56789").value();

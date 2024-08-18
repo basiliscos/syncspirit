@@ -82,7 +82,6 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t,
     outcome::result<void> operator()(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_folders_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::create_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::finish_file_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::generic_remove_t &) noexcept;
     outcome::result<void> operator()(const model::diff::modify::local_update_t &, void *) noexcept override;
@@ -97,6 +96,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t,
     outcome::result<void> operator()(const model::diff::modify::share_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::unshare_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;

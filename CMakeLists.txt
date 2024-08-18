@@ -111,7 +111,6 @@ add_library(syncspirit_lib
     src/model/diff/modify/blocks_availability.cpp
     src/model/diff/modify/clone_block.cpp
     src/model/diff/modify/clone_file.cpp
-    src/model/diff/modify/create_folder.cpp
     src/model/diff/modify/file_availability.cpp
     src/model/diff/modify/finish_file.cpp
     src/model/diff/modify/finish_file_ack.cpp
@@ -130,6 +129,7 @@ add_library(syncspirit_lib
     src/model/diff/modify/share_folder.cpp
     src/model/diff/modify/unshare_folder.cpp
     src/model/diff/modify/update_peer.cpp
+    src/model/diff/modify/upsert_folder.cpp
     src/model/diff/modify/upsert_folder_info.cpp
     src/model/diff/peer/cluster_update.cpp
     src/model/diff/peer/update_folder.cpp

@@ -36,8 +36,8 @@ TEST_CASE("cluster modifications from ui", "[model]") {
     auto path = std::string("/my/path");
     auto builder = diff_builder_t(*cluster);
 
-    SECTION("folder creation") {
-        REQUIRE(builder.create_folder(id, path, label).apply());
+    SECTION("folder create & update") {
+        REQUIRE(builder.upsert_folder(id, path, label).apply());
         auto folder = folders.by_id(id);
         REQUIRE(folder);
         CHECK(folder->get_id() == id);
@@ -49,10 +49,13 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         REQUIRE(fi);
         CHECK(fi->get_max_sequence() == 0);
         CHECK(fi->get_index() != 0);
+
+        REQUIRE(builder.upsert_folder(id, path, "label-2").apply());
+        CHECK(folder->get_label() == "label-2");
     }
 
     SECTION("share folder (w/o unknown folder)") {
-        REQUIRE(builder.create_folder(id, path, label).apply());
+        REQUIRE(builder.upsert_folder(id, path, label).apply());
 
         SECTION("w/o unknown folder") {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), id).apply());

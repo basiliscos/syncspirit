@@ -24,7 +24,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
     auto &folders = cluster->get_folders();
     auto builder = diff_builder_t(*cluster);
 
-    REQUIRE(builder.create_folder("1234-5678", "/my/path").create_folder("5555-4444", "/p2").apply());
+    REQUIRE(builder.upsert_folder("1234-5678", "/my/path").upsert_folder("5555-4444", "/p2").apply());
     auto folder = folders.by_id("1234-5678");
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 

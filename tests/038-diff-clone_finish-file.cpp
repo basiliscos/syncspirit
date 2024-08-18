@@ -23,7 +23,7 @@ TEST_CASE("new file diff", "[model]") {
     cluster->get_devices().put(peer_device);
 
     auto builder = diff_builder_t(*cluster);
-    REQUIRE(builder.create_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
     auto &blocks_map = cluster->get_blocks();

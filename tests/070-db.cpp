@@ -168,31 +168,47 @@ void test_loading_empty_db() {
     F().run();
 }
 
-void test_folder_creation() {
+void test_folder_upserting() {
     struct F : fixture_t {
         void main() noexcept override {
             auto folder_id = "1234-5678";
 
             auto builder = diff_builder_t(*cluster);
-            builder.create_folder(folder_id, "/my/path", "my-label").apply(*sup);
+            builder.upsert_folder(folder_id, "/my/path", "my-label").apply(*sup);
 
             auto folder = cluster->get_folders().by_id(folder_id);
             REQUIRE(folder);
             REQUIRE(folder->get_folder_infos().by_device(*cluster->get_device()));
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
-            sup->do_process();
-            REQUIRE(reply);
-            auto cluster_clone = make_cluster();
-            REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+            {
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                auto cluster_clone = make_cluster();
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
 
-            auto folder_clone = cluster_clone->get_folders().by_id(folder->get_id());
-            REQUIRE(folder_clone);
-            REQUIRE(folder.get() != folder_clone.get());
-            REQUIRE(folder_clone->get_label() == "my-label");
-            REQUIRE(folder_clone->get_path().string() == "/my/path");
-            REQUIRE(folder_clone->get_folder_infos().size() == 1);
-            REQUIRE(folder_clone->get_folder_infos().by_device(*cluster->get_device()));
+                auto folder_clone = cluster_clone->get_folders().by_id(folder->get_id());
+                REQUIRE(folder_clone);
+                REQUIRE(folder.get() != folder_clone.get());
+                REQUIRE(folder_clone->get_label() == "my-label");
+                REQUIRE(folder_clone->get_path().string() == "/my/path");
+                REQUIRE(folder_clone->get_folder_infos().size() == 1);
+                REQUIRE(folder_clone->get_folder_infos().by_device(*cluster->get_device()));
+            }
+
+            SECTION("upserting") {
+                builder.upsert_folder(folder_id, "/my/path", "my-label-2").apply(*sup);
+                REQUIRE(folder->get_label() == "my-label-2");
+
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+
+                auto cluster_clone = make_cluster();
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                auto folder_clone = cluster_clone->get_folders().by_id(folder->get_id());
+                REQUIRE(folder_clone->get_label() == "my-label-2");
+            }
         }
     };
 
@@ -349,7 +365,7 @@ void test_folder_sharing() {
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(peer_device->device_id())
                 .apply(*sup)
-                .create_folder(folder_id, "/my/path")
+                .upsert_folder(folder_id, "/my/path")
                 .apply(*sup)
                 .configure_cluster(sha256)
                 .add(sha256, folder_id, 5, 4)
@@ -403,7 +419,7 @@ void test_cluster_update_and_remove() {
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(peer_device->device_id())
                 .apply(*sup)
-                .create_folder(folder_id, "/my/path")
+                .upsert_folder(folder_id, "/my/path")
                 .configure_cluster(sha256)
                 .add(sha256, folder_id, 5, file.sequence())
                 .add(sha256, unknown_folder_id, 5, 5)
@@ -501,7 +517,7 @@ void test_unshare_and_remove_folder() {
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(peer_device->device_id())
                 .apply(*sup)
-                .create_folder(folder_id, "/my/path")
+                .upsert_folder(folder_id, "/my/path")
                 .apply(*sup)
                 .configure_cluster(sha256)
                 .add(sha256, folder_id, 5, file.sequence())
@@ -583,7 +599,7 @@ void test_clone_file() {
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(peer_device->device_id())
                 .apply(*sup)
-                .create_folder(folder_id, "/my/path")
+                .upsert_folder(folder_id, "/my/path")
                 .configure_cluster(sha256)
                 .add(sha256, folder_id, 5, file.sequence())
                 .finish()
@@ -712,7 +728,7 @@ void test_local_update() {
             pr_block->set_hash(hash);
 
             auto builder = diff_builder_t(*cluster);
-            builder.create_folder(folder_id, "/my/path").apply(*sup).local_update(folder_id, pr_file).apply(*sup);
+            builder.upsert_folder(folder_id, "/my/path").apply(*sup).local_update(folder_id, pr_file).apply(*sup);
 
             SECTION("check saved file with new blocks") {
                 sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
@@ -805,7 +821,7 @@ void test_remove_peer() {
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(peer_device->device_id())
                 .apply(*sup)
-                .create_folder(folder_id, "/my/path")
+                .upsert_folder(folder_id, "/my/path")
                 .configure_cluster(sha256)
                 .add(sha256, folder_id, 5, file.sequence())
                 .add(sha256, unknown_folder_id, 5, 5)
@@ -894,7 +910,7 @@ int _init() {
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
     REGISTER_TEST_CASE(test_unknown_and_ignored_devices_1, "test_unknown_and_ignored_devices_1", "[db]");
     REGISTER_TEST_CASE(test_unknown_and_ignored_devices_2, "test_unknown_and_ignored_devices_2", "[db]");
-    REGISTER_TEST_CASE(test_folder_creation, "test_folder_creation", "[db]");
+    REGISTER_TEST_CASE(test_folder_upserting, "test_folder_upserting", "[db]");
     REGISTER_TEST_CASE(test_peer_updating, "test_peer_updating", "[db]");
     REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
     REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");

@@ -61,7 +61,7 @@ struct fixture_t {
         sup->start();
         sup->do_process();
         auto builder = diff_builder_t(*cluster);
-        builder.create_folder(folder_id, root_path.string())
+        builder.upsert_folder(folder_id, root_path.string())
             .apply(*sup)
             .share_folder(peer_id.get_sha256(), folder_id)
             .apply(*sup);

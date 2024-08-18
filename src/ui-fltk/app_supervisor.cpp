@@ -11,7 +11,7 @@
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
-#include "model/diff/modify/create_folder.h"
+#include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/share_folder.h"
 #include "utils/format.hpp"
@@ -318,7 +318,7 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
     return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::create_folder_t &diff, void *custom) noexcept
+auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &folder = *cluster->get_folders().by_id(diff.db.id());
     auto folders_node = static_cast<tree_item::folders_t *>(folders);

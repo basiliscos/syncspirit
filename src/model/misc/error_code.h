@@ -37,7 +37,6 @@ enum class error_code_t {
     some_device_deserialization_failure,
     invalid_ignored_folder_prefix,
     ignored_folder_deserialization_failure,
-    folder_already_exists,
     cannot_remove_self,
     source_device_not_exists,
     folder_does_not_exist,

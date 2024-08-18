@@ -6,7 +6,7 @@
 #include "../error_code.h"
 #include "utils/format.hpp"
 #include "utils/base32.h"
-#include "model/diff/modify/create_folder.h"
+#include "model/diff/modify/upsert_folder.h"
 #include "pair_iterator.h"
 #include <random>
 
@@ -94,7 +94,7 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
         }
     }
 
-    auto opt = modify::create_folder_t::create(*cluster, *actor.sequencer, folder);
+    auto opt = modify::upsert_folder_t::create(*cluster, *actor.sequencer, folder);
     if (opt.has_error()) {
         auto message = opt.assume_error().message();
         log->warn("{}, cannot create folder '{}' on '{}': {}", actor.get_identity(), folder.label(), folder.path(),

@@ -623,7 +623,7 @@ TEST_CASE("non-shared pending folder", "[model]") {
     auto folder_id = "1234";
 
     auto sha256 = peer_id_1.get_sha256();
-    REQUIRE(builder.create_folder(folder_id, "/my/path").apply());
+    REQUIRE(builder.upsert_folder(folder_id, "/my/path").apply());
     REQUIRE(builder.configure_cluster(sha256).add(sha256, folder_id, 5, 4).finish().apply());
     REQUIRE(cluster->get_pending_folders().size() == 1);
 

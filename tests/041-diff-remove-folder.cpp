@@ -30,8 +30,8 @@ TEST_CASE("remove folder", "[model]") {
 
     auto &blocks_map = cluster->get_blocks();
     auto builder = diff_builder_t(*cluster);
-    REQUIRE(builder.create_folder("f1", "some/path-1", "my-label-1")
-                .create_folder("f2", "some/path-2", "my-label-2")
+    REQUIRE(builder.upsert_folder("f1", "some/path-1", "my-label-1")
+                .upsert_folder("f2", "some/path-2", "my-label-2")
                 .apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "f1").apply());
 

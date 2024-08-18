@@ -45,6 +45,8 @@ folder_t::folder_t(const uuid_t &uuid) noexcept {
     std::copy(uuid.begin(), uuid.end(), key + 1);
 }
 
+std::string_view folder_t::get_uuid() const noexcept { return std::string_view(key + 1, uuid_length); }
+
 void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
 
 void folder_t::assign_cluster(const cluster_ptr_t &cluster_) noexcept { cluster = cluster_.get(); }

@@ -93,9 +93,6 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::ignored_folder_deserialization_failure:
         r = "ignored folder deserialization failure";
         break;
-    case error_code_t::folder_already_exists:
-        r = "folder already exists";
-        break;
     case error_code_t::cannot_remove_self:
         r = "cannot remove self";
         break;

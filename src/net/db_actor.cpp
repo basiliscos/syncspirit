@@ -24,7 +24,6 @@
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
-#include "model/diff/modify/create_folder.h"
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/finish_file_ack.h"
 #include "model/diff/modify/local_update.h"
@@ -39,6 +38,7 @@
 #include "model/diff/modify/remove_pending_folders.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
+#include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/diff/peer/cluster_update.h"
@@ -363,7 +363,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::create_folder_t &diff, void *custom) noexcept
+auto db_actor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();

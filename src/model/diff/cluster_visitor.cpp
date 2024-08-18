@@ -12,7 +12,6 @@
 #include "modify/add_pending_device.h"
 #include "modify/add_pending_folders.h"
 #include "modify/clone_file.h"
-#include "modify/create_folder.h"
 #include "modify/file_availability.h"
 #include "modify/finish_file.h"
 #include "modify/finish_file_ack.h"
@@ -30,6 +29,7 @@
 #include "modify/share_folder.h"
 #include "modify/unshare_folder.h"
 #include "modify/update_peer.h"
+#include "modify/upsert_folder.h"
 #include "modify/upsert_folder_info.h"
 #include "peer/cluster_update.h"
 #include "peer/update_folder.h"
@@ -62,7 +62,7 @@ auto cluster_visitor_t::operator()(const peer::update_folder_t &diff, void *cust
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const modify::create_folder_t &diff, void *custom) noexcept
+auto cluster_visitor_t::operator()(const modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
