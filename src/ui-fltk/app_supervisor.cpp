@@ -278,12 +278,6 @@ auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff
     return outcome::success();
 }
 
-auto app_supervisor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    std::abort();
-    // return diff.model::diff::cluster_aggregate_diff_t::visit(*this, custom);
-}
-
 auto app_supervisor_t::operator()(const model::diff::modify::add_pending_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &devices = cluster->get_devices();

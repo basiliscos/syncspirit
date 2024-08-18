@@ -150,7 +150,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     outcome::result<void> operator()(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
 
     model::sequencer_ptr_t sequencer;
     time_point_t started_at;
