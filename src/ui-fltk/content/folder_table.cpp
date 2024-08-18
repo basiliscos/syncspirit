@@ -199,17 +199,30 @@ auto static make_path(folder_table_t &container) -> widgetable_ptr_t {
 }
 
 auto static make_id(folder_table_t &container) -> widgetable_ptr_t {
-    struct widget_t final : table_widget::label_t {
-        using parent_t = table_widget::label_t;
+    struct widget_t final : table_widget::input_t {
+        using parent_t = table_widget::input_t;
         using parent_t::parent_t;
 
-        void reset() override {
-            auto id = static_cast<folder_table_t &>(container).folder_data.get_id();
-            input->label(id.data());
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
+            input->when(input->when() | FL_WHEN_CHANGED);
+            auto &container = static_cast<folder_table_t &>(this->container);
+            if (container.mode != folder_table_t::mode_t::create) {
+                widget->deactivate();
+            }
+            return r;
         }
+
+        void reset() override {
+            auto &container = static_cast<folder_table_t &>(this->container);
+            auto value = container.folder_data.get_id();
+            input->value(value.data());
+        }
+
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
-            ctx->folder.set_id(input->label());
+            ctx->folder.set_id(input->value());
             return true;
         }
     };
