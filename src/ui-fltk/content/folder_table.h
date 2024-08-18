@@ -11,10 +11,11 @@ struct folder_table_t : static_table_t {
     using parent_t = static_table_t;
     using shared_devices_t = boost::local_shared_ptr<model::devices_map_t>;
 
-    enum class mode_t { share, edit };
+    enum class mode_t { share, edit, create };
 
     struct serialiazation_context_t {
         db::Folder folder;
+        std::uint64_t index;
         model::devices_map_t shared_with;
     };
 
@@ -39,6 +40,7 @@ struct folder_table_t : static_table_t {
 
     void on_remove();
     void on_apply();
+    void on_create();
     void on_share();
     void on_reset();
     void on_rescan();

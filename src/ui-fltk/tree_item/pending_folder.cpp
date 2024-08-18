@@ -4,7 +4,6 @@
 #include "pending_folder.h"
 #include "pending_folders.h"
 #include "../table_widget/checkbox.h"
-#include "../static_table.h"
 #include "../content/folder_table.h"
 
 #include <FL/Fl_Check_Button.H>

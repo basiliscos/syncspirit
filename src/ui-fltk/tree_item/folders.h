@@ -9,11 +9,10 @@ struct folders_t final : tree_item_t {
     folders_t(app_supervisor_t &supervisor, Fl_Tree *tree);
 
     void select_folder(std::string_view folder_id);
-
     augmentation_ptr_t add_folder(model::folder_t &folder);
-
-    // bool on_select() override;
     void update_label() override;
+
+    bool on_select() override;
     void remove_child(tree_item_t *child) override;
 };
 

@@ -29,6 +29,7 @@ auto static make_id(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_label(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_folder_type(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_pull_order(folder_table_t &container) -> widgetable_ptr_t;
+auto static make_index(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_read_only(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_rescan_interval(folder_table_t &container) -> widgetable_ptr_t;
 auto static make_ignore_permissions(folder_table_t &container) -> widgetable_ptr_t;
@@ -175,7 +176,7 @@ auto static make_path(folder_table_t &container) -> widgetable_ptr_t {
             input->when(input->when() | FL_WHEN_CHANGED);
             input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
             auto &container = static_cast<folder_table_t &>(this->container);
-            if (container.mode != folder_table_t::mode_t::share) {
+            if (container.mode == folder_table_t::mode_t::edit) {
                 widget->deactivate();
             }
             return r;
@@ -305,6 +306,45 @@ auto static make_pull_order(folder_table_t &container) -> widgetable_ptr_t {
             auto value = (db::PullOrder)(input->value());
 
             ctx->folder.set_pull_order(value);
+            return true;
+        }
+    };
+    return new widget_t(container);
+}
+
+auto static make_index(folder_table_t &container) -> widgetable_ptr_t {
+    struct widget_t final : table_widget::int_input_t {
+        using parent_t = table_widget::int_input_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
+            input->when(input->when() | FL_WHEN_CHANGED);
+            auto &container = static_cast<folder_table_t &>(this->container);
+            if (container.mode != folder_table_t::mode_t::create) {
+                widget->deactivate();
+            }
+            return r;
+        }
+
+        void reset() override {
+            auto &container = static_cast<folder_table_t &>(this->container);
+            auto value_str = std::to_string(container.index);
+            input->value(value_str.data());
+        }
+
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<ctx_t *>(data);
+            auto value_str = std::string_view(input->value());
+            int value = 0;
+            auto result = std::from_chars(value_str.begin(), value_str.end(), value);
+            if (result.ec != std::errc() || value <= 0) {
+                auto &container = static_cast<folder_table_t &>(this->container);
+                container.error = "invalid index";
+                return false;
+            }
+            ctx->index = static_cast<std::uint32_t>(value);
             return true;
         }
     };
@@ -483,6 +523,12 @@ auto static make_actions(folder_table_t &container) -> widgetable_ptr_t {
                 apply->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_apply(); }, &container);
                 container.apply_button = apply;
                 xx = apply->x() + ww + padding * 2;
+            } else if (container.mode == M::create) {
+                auto apply = new Fl_Button(x + padding, yy, ww, hh, "create");
+                apply->deactivate();
+                apply->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_create(); }, &container);
+                container.apply_button = apply;
+                xx = apply->x() + ww + padding * 2;
             }
             auto reset = new Fl_Button(xx, yy, ww, hh, "reset");
             reset->deactivate();
@@ -526,7 +572,7 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
       share_button{nullptr}, reset_button{nullptr} {
 
     auto data = table_rows_t();
-    if (mode == mode_t::share) {
+    if (mode != mode_t::edit) {
         auto &path = container.supervisor.get_app_config().default_location;
         folder_data.set_path(path);
         folder_data.set_rescan_interval(3600u);
@@ -538,7 +584,7 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
     data.push_back({"type", make_folder_type(*this)});
     data.push_back({"pull order", make_pull_order(*this)});
     data.push_back({"entries", std::to_string(entries)});
-    data.push_back({"index", std::to_string(index)});
+    data.push_back({"index", make_index(*this)});
     data.push_back({"max sequence", std::to_string(max_sequence)});
     data.push_back({"read only", make_read_only(*this)});
     data.push_back({"rescan interval", make_rescan_interval(*this)});
@@ -764,6 +810,8 @@ void folder_table_t::on_apply() {
     auto cb = sup.call_select_folder(folder->get_id());
     sup.send_model<model::payload::model_update_t>(diff, cb.get());
 }
+
+void folder_table_t::on_create() {}
 
 void folder_table_t::on_reset() {
     auto &rows = get_rows();
