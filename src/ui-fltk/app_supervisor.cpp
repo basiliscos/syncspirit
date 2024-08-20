@@ -315,7 +315,9 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
 auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &folder = *cluster->get_folders().by_id(diff.db.id());
-    auto folders_node = static_cast<tree_item::folders_t *>(folders);
-    folder.set_augmentation(folders_node->add_folder(folder));
+    if (!folder.get_augmentation()) {
+        auto folders_node = static_cast<tree_item::folders_t *>(folders);
+        folder.set_augmentation(folders_node->add_folder(folder));
+    }
     return diff.visit_next(*this, custom);
 }

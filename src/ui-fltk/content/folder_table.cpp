@@ -791,13 +791,20 @@ void folder_table_t::on_apply() {
     }
 
     auto &sup = container.supervisor;
+    auto &folder_db = ctx.folder;
     auto log = sup.get_logger();
     auto &cluster = *sup.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_data.get_id());
     auto &folder_infos = folder->get_folder_infos();
-    auto diff = model::diff::cluster_diff_ptr_t{};
-    auto current = diff.get();
     auto orphaned_blocks = model::orphaned_blocks_t{};
+
+    auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder_db);
+    if (!opt) {
+        log->error("cannot create folder: {}", opt.assume_error().message());
+        return;
+    }
+    auto &diff = opt.value();
+    auto current = diff.get();
 
     for (auto it : initially_shared_with) {
         auto &device = it.item;
@@ -808,11 +815,7 @@ void folder_table_t::on_apply() {
                           device->device_id().get_short());
                 auto sub_diff = model::diff::cluster_diff_ptr_t{};
                 sub_diff = new modify::unshare_folder_t(cluster, *folder_info, &orphaned_blocks);
-                if (diff) {
-                    current = current->assign_sibling(sub_diff.get());
-                } else {
-                    diff = current = sub_diff.get();
-                }
+                current = current->assign_sibling(sub_diff.get());
             }
         }
     }
@@ -828,11 +831,7 @@ void folder_table_t::on_apply() {
             log->info("going to share folder '{}' with {}({})", folder->get_label(), device->get_name(),
                       device->device_id().get_short());
             auto ptr = opt.assume_value().get();
-            if (diff) {
-                current = current->assign_sibling(ptr);
-            } else {
-                diff = current = ptr;
-            }
+            current = current->assign_sibling(ptr);
         }
     }
 
