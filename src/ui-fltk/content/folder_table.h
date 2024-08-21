@@ -40,7 +40,6 @@ struct folder_table_t : static_table_t {
 
     void on_remove();
     void on_apply();
-    void on_create();
     void on_share();
     void on_reset();
     void on_rescan();

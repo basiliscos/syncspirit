@@ -86,6 +86,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
 
             auto folder = folders.by_id(db_folder.id());
             REQUIRE(folder);
+            REQUIRE(folder->is_shared_with(*peer_device));
             auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
             auto fi_my = folder->get_folder_infos().by_device(*my_device);
             REQUIRE(fi_my);
@@ -128,6 +129,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             REQUIRE(builder.unshare_folder(*fi_peer).apply());
             REQUIRE(!folder->get_folder_infos().by_device(*peer_device));
             REQUIRE(cluster->get_blocks().size() == 1);
+            REQUIRE(!folder->is_shared_with(*peer_device));
         }
     }
 

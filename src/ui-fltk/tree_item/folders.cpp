@@ -64,6 +64,11 @@ bool folders_t::on_select() {
         auto &self = *cluster->get_device();
         auto &sequencer = supervisor.get_sequencer();
         auto index = sequencer.next_uint64();
+        for (auto it : devices) {
+            if (it.item != cluster->get_device()) {
+                non_shared_with->put(it.item);
+            }
+        }
 
         auto random_id = sequencer.next_uint64();
         auto random_id_ptr = reinterpret_cast<const char *>(&random_id);

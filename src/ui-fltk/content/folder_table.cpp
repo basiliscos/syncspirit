@@ -2,7 +2,6 @@
 
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/remove_blocks.h"
-#include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/upsert_folder.h"
 
@@ -270,8 +269,15 @@ auto static make_label(folder_table_t &container) -> widgetable_ptr_t {
         }
 
         bool store(void *data) override {
+            auto label = std::string(input->value());
+            if (label.empty()) {
+                auto &container = static_cast<folder_table_t &>(this->container);
+                container.error = "label cannot be empty";
+                return false;
+            }
+
             auto ctx = reinterpret_cast<ctx_t *>(data);
-            ctx->folder.set_label(input->value());
+            ctx->folder.set_label(label);
             return true;
         }
     };
@@ -561,7 +567,7 @@ auto static make_actions(folder_table_t &container) -> widgetable_ptr_t {
             } else if (container.mode == M::create) {
                 auto apply = new Fl_Button(x + padding, yy, ww, hh, "create");
                 apply->deactivate();
-                apply->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_create(); }, &container);
+                apply->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_apply(); }, &container);
                 container.apply_button = apply;
                 xx = apply->x() + ww + padding * 2;
             }
@@ -736,7 +742,7 @@ void folder_table_t::refresh() {
         reset_button->deactivate();
     }
 
-    if (mode == mode_t::share) {
+    if ((mode == mode_t::share) || (mode == mode_t::create)) {
         if (valid) {
             if (ctx.folder.path().empty()) {
                 error = "path should be defined";
@@ -751,10 +757,11 @@ void folder_table_t::refresh() {
             }
         }
 
+        auto target_button = (mode == mode_t::share) ? share_button : apply_button;
         if (valid && error.empty()) {
-            share_button->activate();
+            target_button->activate();
         } else {
-            share_button->deactivate();
+            target_button->deactivate();
         }
     }
     notice->reset();
@@ -779,7 +786,7 @@ void folder_table_t::on_share() {
         return;
     }
 
-    auto cb = sup.call_share_folder(folder.id(), peer_id);
+    auto cb = sup.call_share_folders(folder.id(), {std::string(peer_id)});
     sup.send_model<model::payload::model_update_t>(opt.assume_value(), cb.get());
 }
 
@@ -794,9 +801,6 @@ void folder_table_t::on_apply() {
     auto &folder_db = ctx.folder;
     auto log = sup.get_logger();
     auto &cluster = *sup.get_cluster();
-    auto folder = cluster.get_folders().by_id(folder_data.get_id());
-    auto &folder_infos = folder->get_folder_infos();
-    auto orphaned_blocks = model::orphaned_blocks_t{};
 
     auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder_db);
     if (!opt) {
@@ -806,47 +810,45 @@ void folder_table_t::on_apply() {
     auto &diff = opt.value();
     auto current = diff.get();
 
-    for (auto it : initially_shared_with) {
-        auto &device = it.item;
-        if (!ctx.shared_with.by_sha256(device->device_id().get_sha256())) {
-            auto folder_info = folder_infos.by_device(*device);
-            if (folder_info) {
-                log->info("going to unshare folder '{}' with {}({})", folder->get_label(), device->get_name(),
-                          device->device_id().get_short());
-                auto sub_diff = model::diff::cluster_diff_ptr_t{};
-                sub_diff = new modify::unshare_folder_t(cluster, *folder_info, &orphaned_blocks);
-                current = current->assign_sibling(sub_diff.get());
+    if (initially_shared_with.size()) {
+        auto folder = cluster.get_folders().by_id(folder_data.get_id());
+        auto orphaned_blocks = model::orphaned_blocks_t{};
+        auto &folder_infos = folder->get_folder_infos();
+        for (auto it : initially_shared_with) {
+            auto &device = it.item;
+            if (!ctx.shared_with.by_sha256(device->device_id().get_sha256())) {
+                auto folder_info = folder_infos.by_device(*device);
+                if (folder_info) {
+                    log->info("going to unshare folder '{}' with {}({})", folder->get_label(), device->get_name(),
+                              device->device_id().get_short());
+                    auto sub_diff = model::diff::cluster_diff_ptr_t{};
+                    sub_diff = new modify::unshare_folder_t(cluster, *folder_info, &orphaned_blocks);
+                    current = current->assign_sibling(sub_diff.get());
+                }
             }
+        }
+        if (auto orphaned_set = orphaned_blocks.deduce(); orphaned_set.size()) {
+            log->info("going to remove {} orphaned blocks", orphaned_set.size());
+            auto sub_diff = model::diff::cluster_diff_ptr_t{};
+            sub_diff = new modify::remove_blocks_t(std::move(orphaned_set));
+            current = current->assign_sibling(sub_diff.get());
         }
     }
 
+    auto devices = std::vector<std::string>{};
     for (auto it : initially_non_shared_with) {
         auto &device = it.item;
-        if (ctx.shared_with.by_sha256(device->device_id().get_sha256())) {
-            auto opt = modify::share_folder_t::create(cluster, sup.get_sequencer(), *device, *folder);
-            if (!opt) {
-                log->error("folder cannot be sahred: {}", opt.assume_error().message());
-                return;
-            }
-            log->info("going to share folder '{}' with {}({})", folder->get_label(), device->get_name(),
-                      device->device_id().get_short());
-            auto ptr = opt.assume_value().get();
-            current = current->assign_sibling(ptr);
+        auto sha256 = device->device_id().get_sha256();
+        if (ctx.shared_with.by_sha256(sha256)) {
+            devices.emplace_back(std::string(sha256));
         }
     }
 
-    if (auto orphaned_set = orphaned_blocks.deduce(); orphaned_set.size()) {
-        log->info("going to remove {} orphaned blocks", orphaned_set.size());
-        auto sub_diff = model::diff::cluster_diff_ptr_t{};
-        sub_diff = new modify::remove_blocks_t(std::move(orphaned_set));
-        current = current->assign_sibling(sub_diff.get());
-    }
-
-    auto cb = sup.call_select_folder(folder->get_id());
+    auto &folder_id = folder_db.id();
+    auto cb = devices.empty() ? sup.call_select_folder(std::move(folder_id))
+                              : sup.call_share_folders(std::move(folder_id), std::move(devices));
     sup.send_model<model::payload::model_update_t>(diff, cb.get());
 }
-
-void folder_table_t::on_create() {}
 
 void folder_table_t::on_reset() {
     auto &rows = get_rows();

@@ -130,7 +130,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void set_ignored_devices(tree_item_t *node);
 
     callback_ptr_t call_select_folder(std::string_view folder_id);
-    callback_ptr_t call_share_folder(std::string_view folder_id, std::string_view device_id);
+    callback_ptr_t call_share_folders(std::string folder_id, std::vector<std::string> devices);
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
 
   private:
