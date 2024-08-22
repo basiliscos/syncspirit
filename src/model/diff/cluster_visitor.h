@@ -17,6 +17,11 @@ struct pending_devices_t;
 struct load_cluster_t;
 } // namespace load
 
+namespace local {
+struct scan_finish_t;
+struct scan_start_t;
+} // namespace local
+
 namespace peer {
 struct cluster_update_t;
 struct update_folder_t;
@@ -55,6 +60,10 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const load::ignored_devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::pending_devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::load_cluster_t &, void *custom) noexcept;
+
+    virtual outcome::result<void> operator()(const local::scan_finish_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const local::scan_start_t &, void *custom) noexcept;
+
     virtual outcome::result<void> operator()(const peer::cluster_update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::update_folder_t &, void *custom) noexcept;
 

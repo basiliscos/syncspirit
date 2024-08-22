@@ -100,6 +100,8 @@ add_library(syncspirit_lib
     src/model/diff/load/load_cluster.cpp
     src/model/diff/load/pending_devices.cpp
     src/model/diff/load/pending_folders.cpp
+    src/model/diff/local/scan_finish.cpp
+    src/model/diff/local/scan_start.cpp
     src/model/diff/modify/add_remote_folder_infos.cpp
     src/model/diff/modify/add_ignored_device.cpp
     src/model/diff/modify/add_pending_device.cpp

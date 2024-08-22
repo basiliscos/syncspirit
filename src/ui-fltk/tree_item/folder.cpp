@@ -18,7 +18,7 @@ folder_t::folder_t(model::folder_t &folder_, app_supervisor_t &supervisor, Fl_Tr
 }
 
 void folder_t::update_label() {
-    auto value = fmt::format("{}, {} ({})", folder.get_label(), folder.get_id(), (void *)&folder);
+    auto value = fmt::format("{}, {}", folder.get_label(), folder.get_id());
     label(value.data());
     tree()->redraw();
 }

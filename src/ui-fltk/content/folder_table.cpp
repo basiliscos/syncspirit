@@ -625,9 +625,21 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
     data.push_back({"label", make_label(*this)});
     data.push_back({"type", make_folder_type(*this)});
     data.push_back({"pull order", make_pull_order(*this)});
-    data.push_back({"entries", std::to_string(entries)});
+    if (mode != mode_t::create) {
+        data.push_back({"entries", std::to_string(entries)});
+        data.push_back({"max sequence", std::to_string(max_sequence)});
+    }
     data.push_back({"index", make_index(*this)});
-    data.push_back({"max sequence", std::to_string(max_sequence)});
+    if (mode == mode_t::edit) {
+        auto cluster = container.supervisor.get_cluster();
+        auto folder = cluster->get_folders().by_id(folder_data.get_id());
+        auto &date_start = folder->get_scan_start();
+        auto &date_finish = folder->get_scan_finish();
+        auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
+        auto scan_finish = date_finish.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_finish);
+        data.push_back({"scan start", scan_start});
+        data.push_back({"scan finish", scan_finish});
+    }
     data.push_back({"read only", make_read_only(*this)});
     data.push_back({"rescan interval", make_rescan_interval(*this)});
     data.push_back({"ignore permissions", make_ignore_permissions(*this)});

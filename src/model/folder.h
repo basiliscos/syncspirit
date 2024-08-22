@@ -50,6 +50,10 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     inline auto &get_folder_infos() noexcept { return folder_infos; }
     inline auto &get_folder_infos() const noexcept { return folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
+    const pt::ptime &get_scan_start() const noexcept;
+    void set_scan_start(const pt::ptime &value) noexcept;
+    const pt::ptime &get_scan_finish() noexcept;
+    void set_scan_finish(const pt::ptime &value) noexcept;
 
     using folder_data_t::get_path;
     using folder_data_t::set_path;
@@ -65,6 +69,8 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     folder_t(std::string_view key) noexcept;
     folder_t(const uuid_t &uuid) noexcept;
 
+    pt::ptime scan_start;
+    pt::ptime scan_finish;
     device_ptr_t device;
     folder_infos_map_t folder_infos;
     cluster_t *cluster = nullptr;

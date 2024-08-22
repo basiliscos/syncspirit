@@ -7,6 +7,8 @@
 #include "load/ignored_devices.h"
 #include "load/load_cluster.h"
 #include "load/pending_devices.h"
+#include "local/scan_finish.h"
+#include "local/scan_start.h"
 #include "modify/add_ignored_device.h"
 #include "modify/add_remote_folder_infos.h"
 #include "modify/add_pending_device.h"
@@ -51,6 +53,14 @@ auto cluster_visitor_t::operator()(const load::pending_devices_t &diff, void *cu
 }
 
 auto cluster_visitor_t::operator()(const load::load_cluster_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const local::scan_finish_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const local::scan_start_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
