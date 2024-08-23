@@ -18,8 +18,10 @@ struct load_cluster_t;
 } // namespace load
 
 namespace local {
+struct file_availability_t;
 struct scan_finish_t;
 struct scan_start_t;
+struct update_t;
 } // namespace local
 
 namespace peer {
@@ -34,13 +36,11 @@ struct add_pending_device_t;
 struct add_pending_folders_t;
 struct clone_file_t;
 struct upsert_folder_t;
-struct file_availability_t;
 struct finish_file_t;
 struct finish_file_ack_t;
 struct lock_file_t;
 struct mark_reachable_t;
 struct unshare_folder_t;
-struct local_update_t;
 struct share_folder_t;
 struct update_peer_t;
 struct generic_remove_t;
@@ -61,6 +61,8 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const load::pending_devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::load_cluster_t &, void *custom) noexcept;
 
+    virtual outcome::result<void> operator()(const local::file_availability_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const local::update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_finish_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_start_t &, void *custom) noexcept;
 
@@ -73,12 +75,10 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const modify::add_pending_folders_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::clone_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::upsert_folder_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const modify::file_availability_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::finish_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::finish_file_ack_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::lock_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::mark_reachable_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const modify::local_update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::share_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::unshare_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::update_peer_t &, void *custom) noexcept;

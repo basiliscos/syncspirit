@@ -21,12 +21,12 @@
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/load/pending_devices.h"
 #include "model/diff/load/pending_folders.h"
+#include "model/diff/local/update.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/finish_file_ack.h"
-#include "model/diff/modify/local_update.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_files.h"
@@ -357,6 +357,69 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
 
     auto r = diff.visit_next(*this, custom);
     if (r.has_error()) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
+auto db_actor_t::operator()(const model::diff::local::update_t &diff, void *custom) noexcept -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
+    auto file = folder_info->get_file_infos().by_name(diff.file.name());
+
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    {
+        auto key = folder_info->get_key();
+        auto data = folder_info->serialize();
+
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    {
+        auto key = file->get_key();
+        auto data = file->serialize();
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    auto &blocks_map = cluster->get_blocks();
+    for (const auto &hash : diff.new_blocks) {
+        auto block = blocks_map.get(hash);
+        auto key = block->get_key();
+        auto data = block->serialize();
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+    for (const auto &hash : diff.removed_blocks) {
+        auto data = (char *)alloca(hash.size() + 1);
+        data[0] = (char)(db::prefix::block_info);
+        std::copy(hash.begin(), hash.end(), data + 1);
+        auto key = std::string_view(data, hash.size() + 1);
+        auto r = db::remove(key, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
         return r.assume_error();
     }
 
@@ -812,70 +875,6 @@ auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, 
     }
 
     return commit(false);
-}
-
-auto db_actor_t::operator()(const model::diff::modify::local_update_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (cluster->is_tainted()) {
-        return outcome::success();
-    }
-
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file = folder_info->get_file_infos().by_name(diff.file.name());
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
-
-    {
-        auto key = folder_info->get_key();
-        auto data = folder_info->serialize();
-
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-
-    {
-        auto key = file->get_key();
-        auto data = file->serialize();
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-
-    auto &blocks_map = cluster->get_blocks();
-    for (const auto &hash : diff.new_blocks) {
-        auto block = blocks_map.get(hash);
-        auto key = block->get_key();
-        auto data = block->serialize();
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-    for (const auto &hash : diff.removed_blocks) {
-        auto data = (char *)alloca(hash.size() + 1);
-        data[0] = (char)(db::prefix::block_info);
-        std::copy(hash.begin(), hash.end(), data + 1);
-        auto key = std::string_view(data, hash.size() + 1);
-        auto r = db::remove(key, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-
-    auto r = diff.visit_next(*this, custom);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    return commit(true);
 }
 
 auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept

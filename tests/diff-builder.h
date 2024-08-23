@@ -6,7 +6,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/outcome.hpp>
 #include <rotor/supervisor.h>
-#include <deque>
 
 #include "syncspirit-test-export.h"
 #include "model/device.h"

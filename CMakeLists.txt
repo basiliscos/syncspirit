@@ -100,6 +100,9 @@ add_library(syncspirit_lib
     src/model/diff/load/load_cluster.cpp
     src/model/diff/load/pending_devices.cpp
     src/model/diff/load/pending_folders.cpp
+    src/model/diff/local/blocks_availability.cpp
+    src/model/diff/local/file_availability.cpp
+    src/model/diff/local/update.cpp
     src/model/diff/local/scan_finish.cpp
     src/model/diff/local/scan_start.cpp
     src/model/diff/modify/add_remote_folder_infos.cpp
@@ -110,15 +113,12 @@ add_library(syncspirit_lib
     src/model/diff/modify/block_ack.cpp
     src/model/diff/modify/block_rej.cpp
     src/model/diff/modify/block_transaction.cpp
-    src/model/diff/modify/blocks_availability.cpp
     src/model/diff/modify/clone_block.cpp
     src/model/diff/modify/clone_file.cpp
-    src/model/diff/modify/file_availability.cpp
     src/model/diff/modify/finish_file.cpp
     src/model/diff/modify/finish_file_ack.cpp
     src/model/diff/modify/generic_remove.cpp
     src/model/diff/modify/lock_file.cpp
-    src/model/diff/modify/local_update.cpp
     src/model/diff/modify/mark_reachable.cpp
     src/model/diff/modify/remove_blocks.cpp
     src/model/diff/modify/remove_files.cpp

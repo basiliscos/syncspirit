@@ -6,7 +6,7 @@
 #include "model/cluster.h"
 #include "diff-builder.h"
 
-#include "model/diff/modify/blocks_availability.h"
+#include "model/diff/local/blocks_availability.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -99,7 +99,7 @@ TEST_CASE("various block diffs", "[model]") {
     }
 
     SECTION("availability") {
-        auto bdiff = diff::block_diff_ptr_t(new diff::modify::blocks_availability_t(*file, 1));
+        auto bdiff = diff::block_diff_ptr_t(new diff::local::blocks_availability_t(*file, 1));
         REQUIRE(bdiff->apply(*cluster));
         CHECK(file->is_locally_available());
     }

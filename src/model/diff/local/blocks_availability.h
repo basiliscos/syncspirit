@@ -6,7 +6,7 @@
 #include "../block_diff.h"
 #include "model/file_info.h"
 
-namespace syncspirit::model::diff::modify {
+namespace syncspirit::model::diff::local {
 
 struct SYNCSPIRIT_API blocks_availability_t final : block_diff_t {
 
@@ -18,4 +18,4 @@ struct SYNCSPIRIT_API blocks_availability_t final : block_diff_t {
     proto::Vector version;
 };
 
-} // namespace syncspirit::model::diff::modify
+} // namespace syncspirit::model::diff::local

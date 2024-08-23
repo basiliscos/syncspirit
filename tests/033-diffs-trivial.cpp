@@ -6,7 +6,7 @@
 #include "diff-builder.h"
 #include "model/cluster.h"
 #include "model/diff/modify/lock_file.h"
-#include "model/diff/modify/file_availability.h"
+#include "model/diff/local/file_availability.h"
 #include "model/diff/contact/update_contact.h"
 #include "model/diff/cluster_visitor.h"
 
@@ -82,7 +82,7 @@ TEST_CASE("with file", "[model]") {
         file->remove_blocks();
         file->assign_block(block, 0);
         REQUIRE(!file->is_locally_available());
-        auto diff = diff::cluster_diff_ptr_t(new diff::modify::file_availability_t(file));
+        auto diff = diff::cluster_diff_ptr_t(new diff::local::file_availability_t(file));
         REQUIRE(diff->apply(*cluster));
         REQUIRE(file->is_locally_available());
     }

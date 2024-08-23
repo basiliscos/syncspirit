@@ -7,17 +7,17 @@
 #include "load/ignored_devices.h"
 #include "load/load_cluster.h"
 #include "load/pending_devices.h"
+#include "local/file_availability.h"
 #include "local/scan_finish.h"
 #include "local/scan_start.h"
+#include "local/update.h"
 #include "modify/add_ignored_device.h"
 #include "modify/add_remote_folder_infos.h"
 #include "modify/add_pending_device.h"
 #include "modify/add_pending_folders.h"
 #include "modify/clone_file.h"
-#include "modify/file_availability.h"
 #include "modify/finish_file.h"
 #include "modify/finish_file_ack.h"
-#include "modify/local_update.h"
 #include "modify/lock_file.h"
 #include "modify/mark_reachable.h"
 #include "modify/remove_blocks.h"
@@ -53,6 +53,15 @@ auto cluster_visitor_t::operator()(const load::pending_devices_t &diff, void *cu
 }
 
 auto cluster_visitor_t::operator()(const load::load_cluster_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const local::file_availability_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const local::update_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
@@ -151,21 +160,12 @@ auto cluster_visitor_t::operator()(const modify::remove_pending_folders_t &diff,
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const modify::file_availability_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
 auto cluster_visitor_t::operator()(const modify::finish_file_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
 auto cluster_visitor_t::operator()(const modify::finish_file_ack_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const modify::local_update_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

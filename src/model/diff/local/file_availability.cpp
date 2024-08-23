@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "file_availability.h"
 #include "../cluster_visitor.h"
 #include "model/misc/version_utils.h"
 
-using namespace syncspirit::model::diff::modify;
+using namespace syncspirit::model::diff::local;
 
 file_availability_t::file_availability_t(file_info_ptr_t file_) noexcept : file{file_} {
     folder_id = file_->get_folder_info()->get_folder()->get_id();

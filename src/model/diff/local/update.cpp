@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
-#include "local_update.h"
+#include "update.h"
 #include "../cluster_visitor.h"
 #include "../../cluster.h"
 #include "../../misc/version_utils.h"
 
 #include <cassert>
 
-using namespace syncspirit::model::diff::modify;
+using namespace syncspirit::model::diff::local;
 
-local_update_t::local_update_t(const model::cluster_t &cluster, sequencer_t &sequencer, std::string_view folder_id_,
-                               proto::FileInfo file_) noexcept
+update_t::update_t(const model::cluster_t &cluster, sequencer_t &sequencer, std::string_view folder_id_,
+                   proto::FileInfo file_) noexcept
     : folder_id{folder_id_}, file{std::move(file_)}, already_exists{false} {
     auto &blocks_map = cluster.get_blocks();
     blocks_t kept_blocks;
@@ -47,8 +47,8 @@ local_update_t::local_update_t(const model::cluster_t &cluster, sequencer_t &seq
     }
 }
 
-auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "local_update_t, folder: {}, file: {}", folder_id, file.name());
+auto update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    LOG_TRACE(log, "update_t, folder: {}, file: {}", folder_id, file.name());
 
     auto folder = cluster.get_folders().by_id(folder_id);
     auto &device = *cluster.get_device();
@@ -102,7 +102,7 @@ auto local_update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
     return applicator_t::apply_sibling(cluster);
 }
 
-auto local_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "visiting local_update_t, folder = {}, file = {}", folder_id, file.name());
+auto update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+    LOG_TRACE(log, "visiting update_t, folder = {}, file = {}", folder_id, file.name());
     return visitor(*this, custom);
 }
