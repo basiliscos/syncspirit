@@ -12,7 +12,7 @@ namespace syncspirit::model::diff::local {
 namespace pt = boost::posix_time;
 
 struct SYNCSPIRIT_API scan_start_t final : cluster_diff_t {
-    scan_start_t(std::string folder_id, const pt::ptime &at);
+    scan_start_t(std::string_view folder_id, const pt::ptime &at);
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 

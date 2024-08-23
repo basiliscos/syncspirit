@@ -23,13 +23,11 @@ struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::scan_actor_t>;
     using error_msg_t = model::message::io_error_t;
     using error_msg_ptr_t = r::intrusive_ptr_t<error_msg_t>;
-    using completion_msg_t = fs::message::scan_completed_t;
     using errors_container_t = std::vector<error_msg_ptr_t>;
 
     fixture_t() noexcept : root_path{bfs::unique_path()}, path_guard{root_path} {
         utils::set_default("trace");
         bfs::create_directory(root_path);
-        scan_completions = 0;
     }
 
     void run() noexcept {
@@ -54,7 +52,6 @@ struct fixture_t {
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<error_msg_t>([&](error_msg_t &msg) { errors.push_back(&msg); }));
-                p.subscribe_actor(r::lambda<completion_msg_t>([&](completion_msg_t &) { ++scan_completions; }));
             });
         };
 
@@ -120,7 +117,6 @@ struct fixture_t {
     model::file_infos_map_t *files;
     model::file_infos_map_t *files_peer;
     errors_container_t errors;
-    std::uint32_t scan_completions;
     model::device_ptr_t peer_device;
 };
 
@@ -159,7 +155,7 @@ void test_meta_changes() {
                     }
                 }
 #endif
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             proto::FileInfo pr_fi;
@@ -192,7 +188,7 @@ void test_meta_changes() {
                 sup->do_process();
                 CHECK(files->size() == 1);
                 CHECK(!file->is_locally_available());
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("complete file exists") {
@@ -252,7 +248,7 @@ void test_meta_changes() {
                     REQUIRE(new_file->get_blocks().size() == 1);
                     CHECK(new_file->get_blocks()[0]->get_size() == 5);
                 }
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
             SECTION("incomplete file exists") {
                 pr_fi.set_size(10ul);
@@ -336,7 +332,7 @@ void test_meta_changes() {
                     }
                 }
 #endif
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
             SECTION("local (previous) file exists") {
                 pr_fi.set_size(15ul);
@@ -390,7 +386,7 @@ void test_meta_changes() {
                 CHECK(file_peer->is_locally_available(0));
                 CHECK(file_peer->is_locally_available(1));
                 CHECK(!file_peer->is_locally_available(2));
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
         }
     };
@@ -417,7 +413,7 @@ void test_new_files() {
                 CHECK(file->get_block_size() == 0);
                 CHECK(file->get_size() == 0);
                 CHECK(blocks.size() == 0);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("empty file") {
@@ -434,7 +430,7 @@ void test_new_files() {
                 CHECK(file->get_block_size() == 0);
                 CHECK(file->get_size() == 0);
                 CHECK(blocks.size() == 0);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("non-empty file (1 block)") {
@@ -450,7 +446,7 @@ void test_new_files() {
                 CHECK(file->get_block_size() == 5);
                 CHECK(file->get_size() == 5);
                 CHECK(blocks.size() == 1);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("non-empty file (2 blocks)") {
@@ -468,7 +464,7 @@ void test_new_files() {
                 CHECK(file->get_size() == sz);
                 CHECK(file->get_blocks().size() == 2);
                 CHECK(blocks.size() == 1);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("non-empty file (3 blocks)") {
@@ -486,7 +482,7 @@ void test_new_files() {
                 CHECK(file->get_size() == sz);
                 CHECK(file->get_blocks().size() == 3);
                 CHECK(blocks.size() == 1);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("two files, different content") {
@@ -514,7 +510,7 @@ void test_new_files() {
                 CHECK(file2->get_size() == 5);
 
                 CHECK(blocks.size() == 2);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("two files, same content") {
@@ -542,7 +538,7 @@ void test_new_files() {
                 CHECK(file2->get_size() == 5);
 
                 CHECK(blocks.size() == 1);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
         }
     };
@@ -559,12 +555,13 @@ void test_remove_file() {
                 auto file_path = root_path / "file.ext";
                 write_file(file_path, "12345");
                 sup->do_process();
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
                 auto file = files->by_name("file.ext");
                 REQUIRE(file);
                 REQUIRE(blocks.size() == 1);
 
+                auto prev_finish = folder->get_scan_finish();
                 bfs::remove(file_path);
                 auto &addr = target->get_address();
                 sup->send<fs::payload::scan_folder_t>(addr, std::string(folder->get_id()));
@@ -573,7 +570,8 @@ void test_remove_file() {
                 file = files->by_name("file.ext");
                 CHECK(file->is_deleted() == 1);
                 CHECK(blocks.size() == 0);
-                REQUIRE(scan_completions == 2);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                REQUIRE(folder->get_scan_finish() > prev_finish);
             }
         }
     };

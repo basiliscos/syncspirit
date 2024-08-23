@@ -64,6 +64,7 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
   private:
     using scan_request_t = r::intrusive_ptr_t<message::scan_folder_t>;
     using scan_queue_t = std::list<scan_request_t>;
+    using clock_t = r::pt::microsec_clock;
 
     void initiate_scan(std::string_view folder_id) noexcept;
     model::io_errors_t initiate_hash(scan_task_ptr_t task, const bfs::path &path, proto::FileInfo &metadata) noexcept;

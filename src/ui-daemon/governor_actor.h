@@ -9,7 +9,6 @@
 #include "model/diff/block_visitor.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/sequencer.h"
-#include "fs/messages.h"
 #include "utils/log.h"
 
 #include <unordered_map>
@@ -76,7 +75,6 @@ struct governor_actor_t : public r::actor_base_t,
     void on_io_error(model::message::io_error_t &reply) noexcept;
     void on_inactivity_timer(r::request_id_t, bool cancelled) noexcept;
     void on_rescan_timer(r::request_id_t, bool cancelled) noexcept;
-    void on_scan_completed(fs::message::scan_completed_t &message) noexcept;
 
     void rescan_folders();
     void refresh_deadline() noexcept;
@@ -86,6 +84,7 @@ struct governor_actor_t : public r::actor_base_t,
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::local::scan_finish_t &, void *) noexcept override;
 
     r::pt::ptime deadline;
     r::pt::time_duration dirs_rescan_interval;

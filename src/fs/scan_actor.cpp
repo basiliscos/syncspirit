@@ -6,6 +6,8 @@
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/blocks_availability.h"
 #include "model/diff/modify/local_update.h"
+#include "model/diff/local/scan_finish.h"
+#include "model/diff/local/scan_start.h"
 #include "net/names.h"
 #include "utils.h"
 #include <algorithm>
@@ -58,6 +60,9 @@ void scan_actor_t::initiate_scan(std::string_view folder_id) noexcept {
     LOG_DEBUG(log, "initiating scan of {}", folder_id);
     auto task = scan_task_ptr_t(new scan_task_t(cluster, folder_id, fs_config));
     send<payload::scan_progress_t>(address, std::move(task));
+    auto diff = model::diff::cluster_diff_ptr_t{};
+    diff = new model::diff::local::scan_start_t(folder_id, clock_t::local_time());
+    send<model::payload::model_update_t>(coordinator, std::move(diff));
 }
 
 void scan_actor_t::on_initiate_scan(message::scan_folder_t &message) noexcept {
@@ -147,7 +152,9 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
         send<payload::scan_progress_t>(address, std::move(task));
     } else if (completed) {
         LOG_DEBUG(log, "completed scanning of {}", folder_id);
-        send<payload::scan_completed_t>(coordinator, folder_id);
+        auto diff = model::diff::cluster_diff_ptr_t{};
+        diff = new model::diff::local::scan_finish_t(folder_id, clock_t::local_time());
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
         --progress;
         process_queue();
     }

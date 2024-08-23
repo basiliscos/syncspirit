@@ -3,6 +3,7 @@
 
 #include "governor_actor.h"
 #include "net/names.h"
+#include "fs/messages.h"
 #include "utils/format.hpp"
 #include "utils/error_code.h"
 #include "model/diff/modify/append_block.h"
@@ -10,6 +11,7 @@
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
+#include "model/diff/local/scan_finish.h"
 
 using namespace syncspirit::daemon;
 
@@ -36,7 +38,6 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&governor_actor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&governor_actor_t::on_block_update, coordinator);
                 plugin->subscribe_actor(&governor_actor_t::on_io_error, coordinator);
-                plugin->subscribe_actor(&governor_actor_t::on_scan_completed, coordinator);
             }
         });
         p.discover_name(net::names::fs_scanner, fs_scanner, true).link(true);
@@ -90,13 +91,6 @@ void governor_actor_t::on_io_error(model::message::io_error_t &reply) noexcept {
     for (auto &err : errs) {
         LOG_WARN(log, "on_io_error (ignored) path: {}, problem: {}", err.path, err.ec.message());
     }
-}
-
-void governor_actor_t::on_scan_completed(fs::message::scan_completed_t &message) noexcept {
-    auto &folder_id = message.payload.folder_id;
-    auto folder = scanning_folders.by_id(folder_id);
-    LOG_TRACE(log, "on_scan_completed, folder = {}({})", folder->get_label(), folder->get_id());
-    scanning_folders.remove(folder);
 }
 
 void governor_actor_t::process() noexcept {
@@ -213,5 +207,14 @@ auto governor_actor_t::operator()(const model::diff::modify::append_block_t &dif
 auto governor_actor_t::operator()(const model::diff::modify::clone_block_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     refresh_deadline();
+    return diff.visit_next(*this, custom);
+}
+
+auto governor_actor_t::operator()(const model::diff::local::scan_finish_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto &folder_id = diff.folder_id;
+    auto folder = scanning_folders.by_id(folder_id);
+    LOG_TRACE(log, "on_scan_completed, folder = {}({})", folder->get_label(), folder->get_id());
+    scanning_folders.remove(folder);
     return diff.visit_next(*this, custom);
 }
