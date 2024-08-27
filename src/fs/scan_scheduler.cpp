@@ -116,7 +116,8 @@ void scan_scheduler_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     timer_id = {};
     if (!cancelled) {
         auto &folder_id = schedule_option->folder_id;
-        if (cluster->get_folders().by_id(folder_id)) {
+        if (auto folder = cluster->get_folders().by_id(folder_id); folder) {
+            LOG_DEBUG(log, "sending folder {}({}) scan request", folder->get_label(), folder->get_id());
             send<fs::payload::scan_folder_t>(fs_scanner, std::move(folder_id));
         }
     }

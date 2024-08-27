@@ -5,10 +5,7 @@
 #include "access.h"
 #include "test_supervisor.h"
 #include "diff-builder.h"
-
 #include "model/cluster.h"
-#include "model/diff/local/scan_finish.h"
-#include "model/diff/local/scan_start.h"
 #include "fs/scan_scheduler.h"
 #include "fs/messages.h"
 #include "net/names.h"
@@ -24,9 +21,12 @@ struct fixture_t {
     using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
     using messages_t = std::vector<msg_ptr_t>;
 
-    fixture_t() noexcept { utils::set_default("trace"); }
+    fixture_t() noexcept {
+        utils::set_default("trace");
+        log = utils::get_logger("fixture");
+    }
 
-    void run(bool create_folder) noexcept {
+    void run() noexcept {
         auto my_id =
             device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
         my_device = device_t::create(my_id, "my-device").value();
@@ -51,11 +51,6 @@ struct fixture_t {
 
         folder_id = "1234-5678";
 
-        if (create_folder) {
-            diff_builder_t(*cluster).upsert_folder(folder_id, "/some/path").apply(*sup);
-            folder = cluster->get_folders().by_id(folder_id);
-        }
-
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
         sup->do_process();
 
@@ -75,6 +70,7 @@ struct fixture_t {
 
     virtual void main() noexcept {}
 
+    utils::logger_t log;
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::intrusive_ptr_t<supervisor_t> sup;
     cluster_ptr_t cluster;
@@ -85,7 +81,7 @@ struct fixture_t {
     messages_t messages;
 };
 
-void test_model_update() {
+void test_1_folder() {
     struct F : fixture_t {
         void main() noexcept override {
             REQUIRE(messages.size() == 0);
@@ -109,16 +105,10 @@ void test_model_update() {
 
                 SECTION("scan start/finish") {
                     messages.resize(0);
-                    auto diff = model::diff::cluster_diff_ptr_t{};
-                    diff = new model::diff::local::scan_start_t(folder_id, r::pt::microsec_clock::local_time());
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                    builder.upsert_folder(db_folder).apply(*sup);
+                    builder.scan_start(folder_id).upsert_folder(db_folder).apply(*sup);
                     REQUIRE(messages.size() == 0);
 
-                    diff = new model::diff::local::scan_finish_t(folder_id, r::pt::microsec_clock::local_time());
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
-                    builder.upsert_folder(db_folder).apply(*sup);
-
+                    builder.scan_finish(folder_id).upsert_folder(db_folder).apply(*sup);
                     REQUIRE(sup->timers.size() == 1);
                     sup->do_invoke_timer((*sup->timers.begin())->request_id);
                     sup->do_process();
@@ -129,11 +119,57 @@ void test_model_update() {
             }
         }
     };
-    F().run(false);
+    F().run();
+};
+
+void test_2_folders() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            REQUIRE(messages.size() == 0);
+
+            auto f1_id = "1111";
+            auto f2_id = "2222";
+            auto db_folder_1 = db::Folder();
+            auto db_folder_2 = db::Folder();
+            db_folder_1.set_id(f1_id);
+            db_folder_2.set_id(f2_id);
+
+            db_folder_1.set_rescan_interval(4000);
+            db_folder_2.set_rescan_interval(2000);
+
+            auto builder = diff_builder_t(*cluster);
+            builder.upsert_folder(db_folder_1)
+                .upsert_folder(db_folder_2)
+                .apply(*sup)
+                .scan_start(f1_id)
+                .scan_start(f2_id)
+                .scan_finish(f1_id)
+                .scan_finish(f2_id)
+                .apply(*sup);
+            messages.clear();
+
+            REQUIRE(sup->timers.size() == 1);
+            sup->do_invoke_timer((*sup->timers.begin())->request_id);
+            sup->do_process();
+            REQUIRE(messages.size() == 1);
+            REQUIRE(messages.front()->payload.folder_id == f2_id);
+            auto at = r::pt::microsec_clock::local_time() + r::pt::seconds{db_folder_2.rescan_interval() + 1};
+            log->warn("finish at: {}", r::pt::to_simple_string(at));
+            builder.scan_start(f2_id, at).scan_finish(f2_id, at).apply(*sup);
+
+            REQUIRE(sup->timers.size() == 1);
+            sup->do_invoke_timer((*sup->timers.begin())->request_id);
+            sup->do_process();
+            REQUIRE(messages.size() == 2);
+            REQUIRE(messages.back()->payload.folder_id == f1_id);
+        }
+    };
+    F().run();
 };
 
 int _init() {
-    REGISTER_TEST_CASE(test_model_update, "test_model_update", "[fs]");
+    REGISTER_TEST_CASE(test_1_folder, "test_1_folder", "[fs]");
+    REGISTER_TEST_CASE(test_2_folders, "test_2_folders", "[fs]");
     return 1;
 }
 

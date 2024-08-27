@@ -4,6 +4,8 @@
 #include "diff-builder.h"
 #include "model/messages.h"
 #include "model/diff/local/update.h"
+#include "model/diff/local/scan_finish.h"
+#include "model/diff/local/scan_start.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/append_block.h"
@@ -246,6 +248,16 @@ diff_builder_t &diff_builder_t::remove_ignored_device(const model::ignored_devic
 
 diff_builder_t &diff_builder_t::remove_unknown_device(const model::pending_device_t &device) noexcept {
     return assign(new diff::modify::remove_pending_device_t(device));
+}
+
+diff_builder_t &diff_builder_t::scan_start(std::string_view id, const r::pt::ptime &at) noexcept {
+    auto final_at = at.is_not_a_date_time() ? r::pt::microsec_clock::local_time() : at;
+    return assign(new model::diff::local::scan_start_t(std::string(id), final_at));
+}
+
+diff_builder_t &diff_builder_t::scan_finish(std::string_view id, const r::pt::ptime &at) noexcept {
+    auto final_at = at.is_not_a_date_time() ? r::pt::microsec_clock::local_time() : at;
+    return assign(new model::diff::local::scan_finish_t(std::string(id), final_at));
 }
 
 template <typename Holder, typename Diff> static void generic_assign(Holder *holder, Diff *diff) noexcept {
