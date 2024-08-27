@@ -100,6 +100,16 @@ void folder_t::set_scan_start(const pt::ptime &value) noexcept { scan_start = va
 const pt::ptime &folder_t::get_scan_finish() noexcept { return scan_finish; }
 void folder_t::set_scan_finish(const pt::ptime &value) noexcept { scan_finish = value; }
 
+const bool folder_t::is_scanning() const noexcept {
+    if (scan_start.is_not_a_date_time()) {
+        return false;
+    }
+    if (scan_finish.is_not_a_date_time()) {
+        return true;
+    }
+    return scan_start > scan_finish;
+}
+
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_ptr_t &item) noexcept { return item->get_key(); }
 template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_ptr_t &item) noexcept { return item->get_id(); }
 

@@ -190,10 +190,6 @@ add_executable(075-controller 075-controller.cpp $<$<PLATFORM_ID:Windows>:win32-
 target_link_libraries(075-controller syncspirit_test_lib)
 add_test(075-controller "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/075-controller")
 
-add_executable(076-scan_actor 076-scan_actor.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
-target_link_libraries(076-scan_actor syncspirit_test_lib)
-add_test(076-scan_actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/076-scan_actor")
-
 add_executable(077-initiator 077-initiator.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(077-initiator syncspirit_test_lib)
 add_test(077-initiator "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/077-initiator")
@@ -209,3 +205,12 @@ add_test(079-peer "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/079-peer")
 add_executable(080-resolver 080-resolver.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(080-resolver syncspirit_test_lib)
 add_test(080-resolver "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/080-resolver")
+
+add_executable(085-scan-scheduler 085-scan-scheduler.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(085-scan-scheduler syncspirit_test_lib)
+add_test(085-scan-scheduler "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/085-scan-scheduler")
+
+add_executable(086-scan_actor 086-scan_actor.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(086-scan_actor syncspirit_test_lib)
+add_test(086-scan_actor "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/086-scan_actor")
+

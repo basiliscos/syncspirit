@@ -54,6 +54,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     void set_scan_start(const pt::ptime &value) noexcept;
     const pt::ptime &get_scan_finish() noexcept;
     void set_scan_finish(const pt::ptime &value) noexcept;
+    const bool is_scanning() const noexcept;
 
     using folder_data_t::get_path;
     using folder_data_t::set_path;

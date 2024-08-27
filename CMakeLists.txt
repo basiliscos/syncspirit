@@ -72,6 +72,7 @@ add_library(syncspirit_lib
     src/fs/fs_supervisor.cpp
     src/fs/new_chunk_iterator.cpp
     src/fs/scan_actor.cpp
+    src/fs/scan_scheduler.cpp
     src/fs/scan_task.cpp
     src/fs/utils.cpp
     src/hasher/hasher_actor.cpp
