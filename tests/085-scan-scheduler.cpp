@@ -54,8 +54,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
         sup->do_process();
 
-        target =
-            sup->create_actor<fs::scan_scheduler_t>().timeout(timeout).cluster(cluster).time_scale(0.0001).finish();
+        target = sup->create_actor<fs::scan_scheduler_t>().timeout(timeout).cluster(cluster).finish();
         sup->do_process();
 
         REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);

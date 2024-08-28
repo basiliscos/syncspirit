@@ -9,8 +9,7 @@
 
 using namespace syncspirit::fs;
 
-scan_scheduler_t::scan_scheduler_t(config_t &cfg)
-    : r::actor_base_t(cfg), cluster{std::move(cfg.cluster)}, time_scale{cfg.time_scale} {}
+scan_scheduler_t::scan_scheduler_t(config_t &cfg) : r::actor_base_t(cfg), cluster{std::move(cfg.cluster)} {}
 
 void scan_scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);

@@ -9,6 +9,7 @@
 #include "utils/log.h"
 #include <rotor.hpp>
 #include <optional>
+#include <list>
 
 namespace syncspirit {
 namespace fs {
@@ -18,7 +19,6 @@ namespace outcome = boost::outcome_v2;
 
 struct SYNCSPIRIT_API scan_actor_config_t : r::actor_config_t {
     model::cluster_ptr_t cluster;
-    double time_scale = 1;
 };
 
 template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -28,11 +28,6 @@ template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_b
 
     builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&time_scale(double value) && noexcept {
-        parent_t::config.time_scale = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -53,6 +48,7 @@ struct SYNCSPIRIT_API scan_scheduler_t : public r::actor_base_t, private model::
         std::string folder_id;
     };
     using schedule_option_t = std::optional<next_schedule_t>;
+    using scan_queue_t = std::list<std::string>;
 
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
@@ -64,7 +60,7 @@ struct SYNCSPIRIT_API scan_scheduler_t : public r::actor_base_t, private model::
     outcome::result<void> operator()(const model::diff::local::scan_finish_t &, void *custom) noexcept override;
 
     model::cluster_ptr_t cluster;
-    double time_scale;
+    scan_queue_t scan_queue;
     utils::logger_t log;
     r::address_ptr_t coordinator;
     r::address_ptr_t fs_scanner;
