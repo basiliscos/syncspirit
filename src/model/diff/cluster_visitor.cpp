@@ -9,6 +9,7 @@
 #include "load/pending_devices.h"
 #include "local/file_availability.h"
 #include "local/scan_finish.h"
+#include "local/scan_request.h"
 #include "local/scan_start.h"
 #include "local/update.h"
 #include "modify/add_ignored_device.h"
@@ -66,6 +67,10 @@ auto cluster_visitor_t::operator()(const local::update_t &diff, void *custom) no
 }
 
 auto cluster_visitor_t::operator()(const local::scan_finish_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const local::scan_request_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

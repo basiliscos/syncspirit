@@ -20,6 +20,7 @@ struct load_cluster_t;
 namespace local {
 struct file_availability_t;
 struct scan_finish_t;
+struct scan_request_t;
 struct scan_start_t;
 struct update_t;
 } // namespace local
@@ -64,6 +65,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const local::file_availability_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_finish_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const local::scan_request_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_start_t &, void *custom) noexcept;
 
     virtual outcome::result<void> operator()(const peer::cluster_update_t &, void *custom) noexcept;

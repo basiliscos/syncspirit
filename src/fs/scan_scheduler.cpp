@@ -3,10 +3,10 @@
 
 #include "scan_scheduler.h"
 #include "net/names.h"
-#include "messages.h"
 #include "model/diff/modify/upsert_folder.h"
-#include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
+#include "model/diff/local/scan_request.h"
+#include "model/diff/local/scan_start.h"
 
 using namespace syncspirit::fs;
 
@@ -55,6 +55,15 @@ auto scan_scheduler_t::operator()(const model::diff::modify::upsert_folder_t &di
     return diff.visit_next(*this, custom);
 }
 
+auto scan_scheduler_t::operator()(const model::diff::local::scan_request_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    scan_queue.emplace_back(diff.folder_id);
+    if (!scan_in_progress) {
+        scan_next_or_schedule();
+    }
+    return diff.visit_next(*this, custom);
+}
+
 auto scan_scheduler_t::operator()(const model::diff::local::scan_finish_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     scan_in_progress = false;
@@ -85,6 +94,23 @@ void scan_scheduler_t::scan_next_or_schedule() noexcept {
 }
 
 auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
+    while (!scan_queue.empty()) {
+        auto folder_id = scan_queue.front();
+        scan_queue.pop_front();
+        if (!cluster->get_folders().by_id(folder_id)) {
+            continue;
+        }
+        for (auto it = scan_queue.begin(); it != scan_queue.end(); ) {
+            if (*it == folder_id) {
+                it = scan_queue.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        initiate_scan(folder_id);
+        return {};
+    }
+
     auto folder = model::folder_ptr_t();
     auto deadline = r::pt::ptime{};
     auto now = r::pt::second_clock::local_time();
@@ -95,7 +121,6 @@ auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
         }
         auto interval_s = r::pt::seconds{interval};
         auto prev_scan = it.item->get_scan_finish();
-        LOG_WARN(log, "{}, prev_scan = {}", it.item->get_id(), r::pt::to_simple_string(prev_scan));
         auto it_deadline = prev_scan.is_not_a_date_time() ? now : prev_scan + interval_s;
         auto eq = it_deadline == deadline;
         auto select_it = !folder || it_deadline < deadline ||
@@ -107,8 +132,6 @@ auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
     }
 
     if (folder && deadline <= now) {
-        LOG_WARN(log, "{}, deadline = {}, now = {}", folder->get_id(), r::pt::to_simple_string(deadline),
-                 r::pt::to_simple_string(now));
         initiate_scan(folder->get_id());
         return {};
     }
@@ -130,7 +153,7 @@ void scan_scheduler_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 }
 
 void scan_scheduler_t::initiate_scan(std::string_view folder_id) noexcept {
-    LOG_DEBUG(log, "iniating folder {} scan", folder_id);
+    LOG_DEBUG(log, "iniating folder '{}' scan", folder_id);
     auto diff = model::diff::cluster_diff_ptr_t{};
     auto now = r::pt::microsec_clock::local_time();
     diff = new model::diff::local::scan_start_t(folder_id, now);

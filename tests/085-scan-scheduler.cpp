@@ -141,6 +141,11 @@ void test_2_folders() {
             sup->do_process();
             REQUIRE(f1->is_scanning());
             REQUIRE(!f2->is_scanning());
+
+            f2->set_scan_finish({});
+            builder.scan_finish(f1_id, at).scan_request(f2_id).apply(*sup);
+            REQUIRE(!f1->is_scanning());
+            REQUIRE(f2->is_scanning());
         }
     };
     F().run();

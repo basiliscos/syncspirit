@@ -85,6 +85,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &remove_unknown_device(const model::pending_device_t &device) noexcept;
     diff_builder_t &scan_start(std::string_view id, const r::pt::ptime & = {}) noexcept;
     diff_builder_t &scan_finish(std::string_view id, const r::pt::ptime & = {}) noexcept;
+    diff_builder_t &scan_request(std::string_view id) noexcept;
 
     model::sequencer_t &get_sequencer() noexcept;
 
