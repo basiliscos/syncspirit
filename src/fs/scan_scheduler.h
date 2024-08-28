@@ -55,6 +55,7 @@ struct SYNCSPIRIT_API scan_scheduler_t : public r::actor_base_t, private model::
 
     schedule_option_t scan_next() noexcept;
     void scan_next_or_schedule() noexcept;
+    void initiate_scan(std::string_view folder_id) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::local::scan_finish_t &, void *custom) noexcept override;
@@ -63,9 +64,9 @@ struct SYNCSPIRIT_API scan_scheduler_t : public r::actor_base_t, private model::
     scan_queue_t scan_queue;
     utils::logger_t log;
     r::address_ptr_t coordinator;
-    r::address_ptr_t fs_scanner;
     std::optional<r::request_id_t> timer_id;
     schedule_option_t schedule_option;
+    bool scan_in_progress;
 };
 
 } // namespace fs

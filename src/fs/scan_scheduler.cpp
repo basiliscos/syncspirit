@@ -5,11 +5,13 @@
 #include "net/names.h"
 #include "messages.h"
 #include "model/diff/modify/upsert_folder.h"
+#include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
 
 using namespace syncspirit::fs;
 
-scan_scheduler_t::scan_scheduler_t(config_t &cfg) : r::actor_base_t(cfg), cluster{std::move(cfg.cluster)} {}
+scan_scheduler_t::scan_scheduler_t(config_t &cfg)
+    : r::actor_base_t(cfg), cluster{std::move(cfg.cluster)}, scan_in_progress{false} {}
 
 void scan_scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -26,7 +28,6 @@ void scan_scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&scan_scheduler_t::on_model_update, coordinator);
             }
         });
-        p.discover_name(net::names::fs_scanner, fs_scanner, true).link(true);
     });
 }
 
@@ -48,12 +49,15 @@ void scan_scheduler_t::on_model_update(model::message::model_update_t &message) 
 
 auto scan_scheduler_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    scan_next_or_schedule();
+    if (!scan_in_progress) {
+        scan_next_or_schedule();
+    }
     return diff.visit_next(*this, custom);
 }
 
 auto scan_scheduler_t::operator()(const model::diff::local::scan_finish_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+    scan_in_progress = false;
     scan_next_or_schedule();
     return diff.visit_next(*this, custom);
 }
@@ -90,10 +94,12 @@ auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
             continue;
         }
         auto interval_s = r::pt::seconds{interval};
-        auto prev_scan = it.item->get_scan_start();
+        auto prev_scan = it.item->get_scan_finish();
+        LOG_WARN(log, "{}, prev_scan = {}", it.item->get_id(), r::pt::to_simple_string(prev_scan));
         auto it_deadline = prev_scan.is_not_a_date_time() ? now : prev_scan + interval_s;
+        auto eq = it_deadline == deadline;
         auto select_it = !folder || it_deadline < deadline ||
-                         ((it_deadline == deadline) && (folder->get_rescan_interval() < interval));
+                         ((it_deadline == deadline) && (folder->get_rescan_interval() > interval));
         if (select_it) {
             folder = it.item;
             deadline = it_deadline;
@@ -101,7 +107,9 @@ auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
     }
 
     if (folder && deadline <= now) {
-        send<fs::payload::scan_folder_t>(fs_scanner, std::string(folder->get_id()));
+        LOG_WARN(log, "{}, deadline = {}, now = {}", folder->get_id(), r::pt::to_simple_string(deadline),
+                 r::pt::to_simple_string(now));
+        initiate_scan(folder->get_id());
         return {};
     }
     if (folder) {
@@ -116,8 +124,16 @@ void scan_scheduler_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     if (!cancelled) {
         auto &folder_id = schedule_option->folder_id;
         if (auto folder = cluster->get_folders().by_id(folder_id); folder) {
-            LOG_DEBUG(log, "sending folder {}({}) scan request", folder->get_label(), folder->get_id());
-            send<fs::payload::scan_folder_t>(fs_scanner, std::move(folder_id));
+            initiate_scan(folder->get_id());
         }
     }
+}
+
+void scan_scheduler_t::initiate_scan(std::string_view folder_id) noexcept {
+    LOG_DEBUG(log, "iniating folder {} scan", folder_id);
+    auto diff = model::diff::cluster_diff_ptr_t{};
+    auto now = r::pt::microsec_clock::local_time();
+    diff = new model::diff::local::scan_start_t(folder_id, now);
+    send<model::payload::model_update_t>(coordinator, std::move(diff));
+    scan_in_progress = true;
 }

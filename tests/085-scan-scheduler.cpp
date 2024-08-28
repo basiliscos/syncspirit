@@ -7,19 +7,13 @@
 #include "diff-builder.h"
 #include "model/cluster.h"
 #include "fs/scan_scheduler.h"
-#include "fs/messages.h"
-#include "net/names.h"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
-using namespace syncspirit::net;
 
 struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::scan_scheduler_t>;
-    using msg_t = fs::message::scan_folder_t;
-    using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
-    using messages_t = std::vector<msg_ptr_t>;
 
     fixture_t() noexcept {
         utils::set_default("trace");
@@ -38,14 +32,6 @@ struct fixture_t {
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
         sup->cluster = cluster;
-
-        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
-            plugin.template with_casted<r::plugin::starter_plugin_t>(
-                [&](auto &p) { p.subscribe_actor(r::lambda<msg_t>([&](msg_t &msg) { messages.push_back(&msg); })); });
-            plugin.with_casted<r::plugin::registry_plugin_t>(
-                [&](auto &p) { p.register_name(names::fs_scanner, sup->get_address()); });
-        };
-
         sup->start();
         sup->do_process();
 
@@ -77,14 +63,11 @@ struct fixture_t {
     std::string folder_id;
     target_ptr_t target;
     model::folder_ptr_t folder;
-    messages_t messages;
 };
 
 void test_1_folder() {
     struct F : fixture_t {
         void main() noexcept override {
-            REQUIRE(messages.size() == 0);
-
             auto db_folder = db::Folder();
             db_folder.set_id(folder_id);
 
@@ -92,28 +75,25 @@ void test_1_folder() {
 
             SECTION("zero rescan time => no scan") {
                 builder.upsert_folder(db_folder).apply(*sup);
-                REQUIRE(messages.size() == 0);
+                auto folder = cluster->get_folders().by_id(folder_id);
+                CHECK(!folder->is_scanning());
             }
 
             SECTION("non-zero rescan time") {
                 db_folder.set_rescan_interval(3600);
                 builder.upsert_folder(db_folder).apply(*sup);
 
-                REQUIRE(messages.size() == 1);
-                CHECK(messages.front()->payload.folder_id == folder_id);
+                auto folder = cluster->get_folders().by_id(folder_id);
+                CHECK(folder->is_scanning());
 
                 SECTION("scan start/finish") {
-                    messages.resize(0);
-                    builder.scan_start(folder_id).upsert_folder(db_folder).apply(*sup);
-                    REQUIRE(messages.size() == 0);
-
                     builder.scan_finish(folder_id).upsert_folder(db_folder).apply(*sup);
+                    REQUIRE(!folder->is_scanning());
+
                     REQUIRE(sup->timers.size() == 1);
                     sup->do_invoke_timer((*sup->timers.begin())->request_id);
                     sup->do_process();
-
-                    REQUIRE(messages.size() == 1);
-                    CHECK(messages.front()->payload.folder_id == folder_id);
+                    REQUIRE(folder->is_scanning());
                 }
             }
         }
@@ -124,8 +104,6 @@ void test_1_folder() {
 void test_2_folders() {
     struct F : fixture_t {
         void main() noexcept override {
-            REQUIRE(messages.size() == 0);
-
             auto f1_id = "1111";
             auto f2_id = "2222";
             auto db_folder_1 = db::Folder();
@@ -140,27 +118,29 @@ void test_2_folders() {
             builder.upsert_folder(db_folder_1)
                 .upsert_folder(db_folder_2)
                 .apply(*sup)
-                .scan_start(f1_id)
-                .scan_start(f2_id)
-                .scan_finish(f1_id)
                 .scan_finish(f2_id)
+                .apply(*sup)
+                .scan_finish(f1_id)
                 .apply(*sup);
-            messages.clear();
 
             REQUIRE(sup->timers.size() == 1);
             sup->do_invoke_timer((*sup->timers.begin())->request_id);
             sup->do_process();
-            REQUIRE(messages.size() == 1);
-            REQUIRE(messages.front()->payload.folder_id == f2_id);
+
+            auto f1 = cluster->get_folders().by_id(f1_id);
+            auto f2 = cluster->get_folders().by_id(f2_id);
+
+            REQUIRE(!f1->is_scanning());
+            REQUIRE(f2->is_scanning());
+
             auto at = r::pt::microsec_clock::local_time() + r::pt::seconds{db_folder_2.rescan_interval() + 1};
-            log->warn("finish at: {}", r::pt::to_simple_string(at));
-            builder.scan_start(f2_id, at).scan_finish(f2_id, at).apply(*sup);
+            builder.scan_finish(f2_id, at).apply(*sup);
 
             REQUIRE(sup->timers.size() == 1);
             sup->do_invoke_timer((*sup->timers.begin())->request_id);
             sup->do_process();
-            REQUIRE(messages.size() == 2);
-            REQUIRE(messages.back()->payload.folder_id == f1_id);
+            REQUIRE(f1->is_scanning());
+            REQUIRE(!f2->is_scanning());
         }
     };
     F().run();
