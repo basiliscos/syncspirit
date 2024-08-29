@@ -165,12 +165,32 @@ TEST_CASE("file iterator", "[model]") {
             auto my_folder = folder_infos.by_device(*my_device);
             auto pr_file = proto::FileInfo();
             pr_file.set_name("a.txt");
-            my_folder->add(file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value(), false);
+            auto my_file = file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value();
+            my_file->mark_local();
+            my_folder->add(my_file, false);
 
             auto f = next(true);
             REQUIRE(f);
             CHECK(f->get_name() == "a.txt");
             REQUIRE(!next());
+        }
+
+        SECTION("local file is not scanned yet") {
+            auto oth_version = file_1.mutable_version();
+            auto counter = oth_version->add_counters();
+            counter->set_id(12345ul);
+            counter->set_value(1233ul);
+
+            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).finish().apply());
+
+            proto::Vector my_version;
+            auto my_folder = folder_infos.by_device(*my_device);
+            auto pr_file = proto::FileInfo();
+            pr_file.set_name("a.txt");
+            auto my_file = file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value();
+            my_folder->add(my_file, false);
+
+            REQUIRE(!next(true));
         }
 
         SECTION("a file on peer side is incomplete") {
@@ -184,7 +204,9 @@ TEST_CASE("file iterator", "[model]") {
 
             auto my_folder = folder_infos.by_device(*my_device);
             my_folder->set_max_sequence(file_1.sequence());
-            my_folder->add(file_info_t::create(sequencer->next_uuid(), file_1, my_folder).value(), false);
+            auto my_file = file_info_t::create(sequencer->next_uuid(), file_1, my_folder).value();
+            my_file->mark_local();
+            my_folder->add(my_file, false);
 
             auto f = next(true);
             REQUIRE(f);

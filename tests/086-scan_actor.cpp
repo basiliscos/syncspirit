@@ -566,6 +566,7 @@ void test_remove_file() {
 
             file = files->by_name("file.ext");
             CHECK(file->is_deleted() == 1);
+            CHECK(file->is_local());
             CHECK(blocks.size() == 0);
             REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             REQUIRE(folder->get_scan_finish() > prev_finish);

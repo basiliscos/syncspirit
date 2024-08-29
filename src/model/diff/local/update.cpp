@@ -98,6 +98,7 @@ auto update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<
         }
         prev_file->remove_blocks();
     }
+    file_info->mark_local();
     folder_info->add(file_info, true);
     return applicator_t::apply_sibling(cluster);
 }

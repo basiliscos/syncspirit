@@ -41,6 +41,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
         f_local_locked   = 1 << 4,
         f_unreachable    = 1 << 5,
         f_unlocking      = 1 << 6,
+        f_local          = 1 << 7,
     };
     // clang-format on
 
@@ -91,6 +92,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     inline bool is_deleted() const noexcept { return flags & f_deleted; }
     inline bool is_invalid() const noexcept { return flags & f_invalid; }
     inline bool is_unreachable() const noexcept { return flags & f_unreachable; }
+    inline bool is_local() const noexcept { return flags & f_local; }
 
     std::int64_t get_size() const noexcept;
     inline void set_size(std::int64_t value) noexcept { size = value; }
@@ -100,6 +102,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
 
     void mark_unreachable(bool value) noexcept;
     void mark_local_available(size_t block_index) noexcept;
+    void mark_local() noexcept;
     bool is_locally_available(size_t block_index) const noexcept;
     bool is_locally_available() const noexcept;
     bool is_partly_available() const noexcept;

@@ -145,6 +145,7 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(builder.finish_file_ack(*file_my).apply());
 
         file_my = folder_my->get_file_infos().by_name(file_info.name());
+        CHECK(file_my->is_local());
         CHECK(file_my->is_locally_available());
         CHECK(!file_my->get_source());
         CHECK(file_my->get_sequence() == 1);

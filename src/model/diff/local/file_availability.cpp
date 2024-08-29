@@ -18,6 +18,7 @@ auto file_availability_t::apply_impl(cluster_t &cluster) const noexcept -> outco
         auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
         auto f = folder_info->get_file_infos().by_name(file->get_name());
         if (f && compare(version, f->get_version()) == version_relation_t::identity) {
+            f->mark_local();
             auto &blocks = f->get_blocks();
             for (size_t i = 0; i < blocks.size(); ++i) {
                 if (!f->is_locally_available(i)) {

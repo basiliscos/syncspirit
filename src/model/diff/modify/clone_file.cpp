@@ -110,6 +110,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
                 new_file->mark_local_available(i);
             }
         }
+        new_file->mark_local();
         folder_my->add(new_file, false);
         LOG_TRACE(log, "clone_file_t, new file; folder = {}, name = {}, blocks = {}", folder_id, file.name(),
                   blocks.size());

@@ -45,6 +45,7 @@ auto finish_file_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
         new_file->assign_block(b, i);
         new_file->mark_local_available(i);
     }
+    new_file->mark_local();
     folder_info->add(new_file, true);
 
     return applicator_t::apply_sibling(cluster);

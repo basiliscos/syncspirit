@@ -241,6 +241,8 @@ void file_info_t::mark_unreachable(bool value) noexcept {
     }
 }
 
+void file_info_t::mark_local() noexcept { flags = flags | f_local; }
+
 void file_info_t::mark_local_available(size_t block_index) noexcept {
     assert(block_index < blocks.size());
     assert(!marks[block_index]);

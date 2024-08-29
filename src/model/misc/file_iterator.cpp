@@ -29,6 +29,9 @@ void file_iterator_t::append(file_info_t &file) noexcept {
         }
         return;
     }
+    if (!local_file->is_local()) {
+        return;
+    }
     bool needs_download = local_file->need_download(file);
     if (!needs_download) {
         return;
