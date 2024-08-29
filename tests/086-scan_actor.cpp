@@ -136,7 +136,6 @@ void test_meta_changes() {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(folder_info->get_file_infos().size() == 0);
                 }
-#if 0
 #ifndef SYNCSPIRIT_WIN
                 SECTION("just 1 subdir, which cannot be read") {
                     auto subdir = root_path / "abc";
@@ -145,7 +144,7 @@ void test_meta_changes() {
                     bfs::permissions(subdir, bfs::perms::no_perms);
                     bfs::permissions(subdir, bfs::perms::owner_read, ec);
                     if (!ec) {
-                        sup->do_process();
+                        builder->scan_start(folder->get_id()).apply(*sup);
                         CHECK(folder_info->get_file_infos().size() == 0);
                         bfs::permissions(subdir, bfs::perms::all_all);
                         REQUIRE(errors.size() == 1);
@@ -155,7 +154,6 @@ void test_meta_changes() {
                         REQUIRE(errs.at(0).ec);
                     }
                 }
-#endif
 #endif
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
