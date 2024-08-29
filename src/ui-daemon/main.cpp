@@ -132,7 +132,6 @@ int main(int argc, char **argv) {
                     " the first part is 'XBOWTOU';\n"
                 "  inactivate:${seconds} shut down daemon after ${seconds}"
                     " of inactivity;\n"
-                "  rescan_dirs:${seconds} rescan all folders every ${seconds};\n"
             );
         // clang-format on
 

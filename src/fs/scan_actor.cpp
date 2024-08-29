@@ -2,10 +2,12 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "scan_actor.h"
-#include "model/diff/modify/file_availability.h"
 #include "model/diff/modify/lock_file.h"
-#include "model/diff/modify/blocks_availability.h"
-#include "model/diff/modify/local_update.h"
+#include "model/diff/local/blocks_availability.h"
+#include "model/diff/local/file_availability.h"
+#include "model/diff/local/update.h"
+#include "model/diff/local/scan_finish.h"
+#include "model/diff/local/scan_start.h"
 #include "net/names.h"
 #include "utils.h"
 #include <algorithm>
@@ -24,14 +26,19 @@ scan_actor_t::scan_actor_t(config_t &cfg)
 void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        p.set_identity(net::names::fs_scanner, false);
+        p.set_identity("fs.scanner", false);
         log = utils::get_logger(identity);
         new_files = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(net::names::fs_scanner, address);
         p.discover_name(net::names::hasher_proxy, hasher_proxy, true).link();
-        p.discover_name(net::names::coordinator, coordinator, true).link(false);
+        p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&scan_actor_t::on_model_update, coordinator);
+            }
+        });
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&scan_actor_t::on_scan);
@@ -39,7 +46,6 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&scan_actor_t::on_hash_new, new_files);
         p.subscribe_actor(&scan_actor_t::on_rehash);
         p.subscribe_actor(&scan_actor_t::on_hash_anew);
-        p.subscribe_actor(&scan_actor_t::on_initiate_scan);
     });
 }
 
@@ -54,27 +60,21 @@ void scan_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
-void scan_actor_t::initiate_scan(std::string_view folder_id) noexcept {
-    LOG_DEBUG(log, "initiating scan of {}", folder_id);
-    auto task = scan_task_ptr_t(new scan_task_t(cluster, folder_id, fs_config));
+auto scan_actor_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    LOG_DEBUG(log, "initiating scan of {}", diff.folder_id);
+    auto task = scan_task_ptr_t(new scan_task_t(cluster, diff.folder_id, fs_config));
     send<payload::scan_progress_t>(address, std::move(task));
+    return diff.visit_next(*this, custom);
 }
 
-void scan_actor_t::on_initiate_scan(message::scan_folder_t &message) noexcept {
-    if (!progress) {
-        ++progress;
-        initiate_scan(message.payload.folder_id);
-    } else {
-        queue.emplace_back(&message);
-    }
-}
-
-void scan_actor_t::process_queue() noexcept {
-    if (!queue.empty() && state == r::state_t::OPERATIONAL) {
-        auto &msg = queue.front();
-        auto &p = msg->payload;
-        initiate_scan(p.folder_id);
-        queue.pop_front();
+void scan_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "on_model_update");
+    auto &diff = *message.payload.diff;
+    auto r = diff.visit(*this, nullptr);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
     }
 }
 
@@ -98,7 +98,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                 send<model::payload::io_error_t>(coordinator, std::move(r));
             } else if constexpr (std::is_same_v<T, unchanged_meta_t>) {
                 auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::file_availability_t(r.file);
+                diff = new model::diff::local::file_availability_t(r.file);
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             } else if constexpr (std::is_same_v<T, removed_t>) {
                 on_remove(*r.file);
@@ -147,9 +147,10 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
         send<payload::scan_progress_t>(address, std::move(task));
     } else if (completed) {
         LOG_DEBUG(log, "completed scanning of {}", folder_id);
-        send<payload::scan_completed_t>(coordinator, folder_id);
+        auto diff = model::diff::cluster_diff_ptr_t{};
+        diff = new model::diff::local::scan_finish_t(folder_id, clock_t::local_time());
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
         --progress;
-        process_queue();
     }
 }
 
@@ -248,7 +249,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
                 auto valid_blocks = info.has_valid_blocks();
                 if (valid_blocks >= 0) {
                     auto bdiff = model::diff::block_diff_ptr_t{};
-                    bdiff = new model::diff::modify::blocks_availability_t(*info.get_source(), valid_blocks);
+                    bdiff = new model::diff::local::blocks_availability_t(*info.get_source(), valid_blocks);
                     send<model::payload::block_update_t>(coordinator, std::move(bdiff), this);
                 }
                 auto diff = model::diff::cluster_diff_ptr_t{};
@@ -296,7 +297,7 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     }
 
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::modify::local_update_t(*cluster, *sequencer, std::move(folder_id), std::move(file));
+    diff = new model::diff::local::update_t(*cluster, *sequencer, std::move(folder_id), std::move(file));
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 }
 
@@ -335,6 +336,6 @@ void scan_actor_t::on_remove(const model::file_info_t &file) noexcept {
     auto fi = file.as_proto(false);
     fi.set_deleted(true);
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::modify::local_update_t(*cluster, *sequencer, std::move(folder_id), std::move(fi));
+    diff = new model::diff::local::update_t(*cluster, *sequencer, std::move(folder_id), std::move(fi));
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 }

@@ -16,16 +16,8 @@ namespace r = rotor;
 
 namespace payload {
 
-struct scan_folder_t {
-    std::string folder_id;
-};
-
 struct scan_progress_t {
     scan_task_ptr_t task;
-};
-
-struct scan_completed_t {
-    std::string folder_id;
 };
 
 using rehash_needed_t = chunk_iterator_t;
@@ -46,8 +38,6 @@ struct block_response_t {
 
 namespace message {
 
-using scan_folder_t = r::message_t<payload::scan_folder_t>;
-using scan_completed_t = r::message_t<payload::scan_completed_t>;
 using scan_progress_t = r::message_t<payload::scan_progress_t>;
 using rehash_needed_t = r::message_t<payload::rehash_needed_t>;
 using hash_anew_t = r::message_t<payload::hash_anew_t>;

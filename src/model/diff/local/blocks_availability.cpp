@@ -7,7 +7,7 @@
 #include "../../misc/error_code.h"
 #include "model/misc/version_utils.h"
 
-using namespace syncspirit::model::diff::modify;
+using namespace syncspirit::model::diff::local;
 
 blocks_availability_t::blocks_availability_t(const file_info_t &file, size_t last_block_index) noexcept
     : block_diff_t{file, last_block_index} {

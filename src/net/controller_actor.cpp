@@ -4,12 +4,12 @@
 #include "controller_actor.h"
 #include "names.h"
 #include "constants.h"
+#include "model/diff/local/update.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/block_rej.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/clone_file.h"
-#include "model/diff/modify/local_update.h"
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/finish_file.h"
@@ -413,9 +413,8 @@ auto controller_actor_t::operator()(const model::diff::modify::unshare_folder_t 
     return diff.visit_next(*this, custom);
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::local_update_t &diff, void *custom) noexcept
+auto controller_actor_t::operator()(const model::diff::local::update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-
     auto &folder_id = diff.folder_id;
     auto &file_name = diff.file.name();
     auto folder = cluster->get_folders().by_id(folder_id);

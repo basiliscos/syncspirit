@@ -3,6 +3,10 @@
 
 #include "diff-builder.h"
 #include "model/messages.h"
+#include "model/diff/local/update.h"
+#include "model/diff/local/scan_finish.h"
+#include "model/diff/local/scan_request.h"
+#include "model/diff/local/scan_start.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/append_block.h"
@@ -11,7 +15,6 @@
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/finish_file_ack.h"
-#include "model/diff/modify/local_update.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
@@ -192,7 +195,7 @@ diff_builder_t &diff_builder_t::finish_file_ack(const model::file_info_t &source
 }
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
-    return assign(new diff::modify::local_update_t(cluster, *sequencer, folder_id, file_));
+    return assign(new diff::local::update_t(cluster, *sequencer, folder_id, file_));
 }
 
 diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcept {
@@ -246,6 +249,20 @@ diff_builder_t &diff_builder_t::remove_ignored_device(const model::ignored_devic
 
 diff_builder_t &diff_builder_t::remove_unknown_device(const model::pending_device_t &device) noexcept {
     return assign(new diff::modify::remove_pending_device_t(device));
+}
+
+diff_builder_t &diff_builder_t::scan_start(std::string_view id, const r::pt::ptime &at) noexcept {
+    auto final_at = at.is_not_a_date_time() ? r::pt::microsec_clock::local_time() : at;
+    return assign(new model::diff::local::scan_start_t(std::string(id), final_at));
+}
+
+diff_builder_t &diff_builder_t::scan_finish(std::string_view id, const r::pt::ptime &at) noexcept {
+    auto final_at = at.is_not_a_date_time() ? r::pt::microsec_clock::local_time() : at;
+    return assign(new model::diff::local::scan_finish_t(std::string(id), final_at));
+}
+
+diff_builder_t &diff_builder_t::scan_request(std::string_view id) noexcept {
+    return assign(new model::diff::local::scan_request_t(std::string(id)));
 }
 
 template <typename Holder, typename Diff> static void generic_assign(Holder *holder, Diff *diff) noexcept {

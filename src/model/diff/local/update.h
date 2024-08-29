@@ -11,13 +11,13 @@
 #include "model/misc/sequencer.h"
 #include "utils/string_comparator.hpp"
 
-namespace syncspirit::model::diff::modify {
+namespace syncspirit::model::diff::local {
 
-struct SYNCSPIRIT_API local_update_t final : cluster_diff_t {
+struct SYNCSPIRIT_API update_t final : cluster_diff_t {
     using blocks_t = std::set<std::string, utils::string_comparator_t>;
 
-    local_update_t(const cluster_t &cluster, sequencer_t &sequencer, std::string_view folder_id,
-                   proto::FileInfo file) noexcept;
+    update_t(const cluster_t &cluster, sequencer_t &sequencer, std::string_view folder_id,
+             proto::FileInfo file) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
@@ -30,4 +30,4 @@ struct SYNCSPIRIT_API local_update_t final : cluster_diff_t {
     bool already_exists;
 };
 
-} // namespace syncspirit::model::diff::modify
+} // namespace syncspirit::model::diff::local

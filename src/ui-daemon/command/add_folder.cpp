@@ -106,7 +106,6 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
 
     actor.send<model::payload::model_update_t>(actor.coordinator, std::move(opt.value()), this);
     actor.add_callback(this, [&actor, folder_id = folder.id()]() -> bool {
-        actor.rescan_folder(folder_id);
         actor.process();
         return true;
     });

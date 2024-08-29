@@ -23,13 +23,12 @@ struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::scan_actor_t>;
     using error_msg_t = model::message::io_error_t;
     using error_msg_ptr_t = r::intrusive_ptr_t<error_msg_t>;
-    using completion_msg_t = fs::message::scan_completed_t;
     using errors_container_t = std::vector<error_msg_ptr_t>;
+    using builder_ptr_t = std::unique_ptr<diff_builder_t>;
 
     fixture_t() noexcept : root_path{bfs::unique_path()}, path_guard{root_path} {
         utils::set_default("trace");
         bfs::create_directory(root_path);
-        scan_completions = 0;
     }
 
     void run() noexcept {
@@ -54,14 +53,13 @@ struct fixture_t {
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<error_msg_t>([&](error_msg_t &msg) { errors.push_back(&msg); }));
-                p.subscribe_actor(r::lambda<completion_msg_t>([&](completion_msg_t &) { ++scan_completions; }));
             });
         };
 
         sup->start();
         sup->do_process();
-        auto builder = diff_builder_t(*cluster);
-        builder.upsert_folder(folder_id, root_path.string())
+        builder = std::make_unique<diff_builder_t>(*cluster);
+        builder->upsert_folder(folder_id, root_path.string())
             .apply(*sup)
             .share_folder(peer_id.get_sha256(), folder_id)
             .apply(*sup);
@@ -95,7 +93,6 @@ struct fixture_t {
                      .finish();
         sup->do_process();
 
-        sup->send<fs::payload::scan_folder_t>(target->get_address(), folder_id);
         main();
 
         sup->do_process();
@@ -107,6 +104,7 @@ struct fixture_t {
 
     virtual void main() noexcept {}
 
+    builder_ptr_t builder;
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::intrusive_ptr_t<supervisor_t> sup;
     cluster_ptr_t cluster;
@@ -120,7 +118,6 @@ struct fixture_t {
     model::file_infos_map_t *files;
     model::file_infos_map_t *files_peer;
     errors_container_t errors;
-    std::uint32_t scan_completions;
     model::device_ptr_t peer_device;
 };
 
@@ -128,16 +125,15 @@ void test_meta_changes() {
     struct F : fixture_t {
         void main() noexcept override {
             sys::error_code ec;
-            auto builder = diff_builder_t(*cluster);
 
             SECTION("trivial") {
                 SECTION("no files") {
-                    sup->do_process();
+                    builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(folder_info->get_file_infos().size() == 0);
                 }
                 SECTION("just 1 dir") {
                     CHECK(bfs::create_directories(root_path / "abc"));
-                    sup->do_process();
+                    builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(folder_info->get_file_infos().size() == 0);
                 }
 #ifndef SYNCSPIRIT_WIN
@@ -148,7 +144,7 @@ void test_meta_changes() {
                     bfs::permissions(subdir, bfs::perms::no_perms);
                     bfs::permissions(subdir, bfs::perms::owner_read, ec);
                     if (!ec) {
-                        sup->do_process();
+                        builder->scan_start(folder->get_id()).apply(*sup);
                         CHECK(folder_info->get_file_infos().size() == 0);
                         bfs::permissions(subdir, bfs::perms::all_all);
                         REQUIRE(errors.size() == 1);
@@ -159,7 +155,7 @@ void test_meta_changes() {
                     }
                 }
 #endif
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             proto::FileInfo pr_fi;
@@ -186,22 +182,20 @@ void test_meta_changes() {
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 folder_info_peer->add(file_peer, false);
-                REQUIRE(builder.clone_file(*file_peer).apply());
+                builder->clone_file(*file_peer).scan_start(folder->get_id()).apply(*sup);
+
                 auto file = files->by_name(pr_fi.name());
-
-                sup->do_process();
                 CHECK(files->size() == 1);
-                CHECK(!file->is_locally_available());
-                REQUIRE(scan_completions == 1);
+                CHECK(file->is_deleted());
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
-
             SECTION("complete file exists") {
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 folder_info_peer->add(file_peer, false);
 
-                REQUIRE(builder.clone_file(*file_peer).apply());
+                builder->clone_file(*file_peer).apply(*sup);
                 auto file = files->by_name(pr_fi.name());
                 file->set_source(nullptr);
                 auto path = file->get_path();
@@ -209,13 +203,13 @@ void test_meta_changes() {
                 SECTION("meta is not changed") {
                     write_file(path, "12345");
                     bfs::last_write_time(path, modified);
-                    sup->do_process();
+                    builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(files->size() == 1);
                     CHECK(file->is_locally_available());
                 }
                 SECTION("meta is changed (modification)") {
                     write_file(path, "12345");
-                    sup->do_process();
+                    builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(files->size() == 1);
                     auto new_file = files->by_name(pr_fi.name());
                     REQUIRE(new_file);
@@ -229,7 +223,7 @@ void test_meta_changes() {
                 SECTION("meta is changed (size)") {
                     write_file(path, "123456");
                     bfs::last_write_time(path, modified);
-                    sup->do_process();
+                    builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(files->size() == 1);
                     auto new_file = files->by_name(pr_fi.name());
                     REQUIRE(new_file);
@@ -242,7 +236,7 @@ void test_meta_changes() {
 
                 SECTION("meta is changed (content)") {
                     write_file(path, "67890");
-                    sup->do_process();
+                    builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(files->size() == 1);
                     auto new_file = files->by_name(pr_fi.name());
                     REQUIRE(new_file);
@@ -252,7 +246,7 @@ void test_meta_changes() {
                     REQUIRE(new_file->get_blocks().size() == 1);
                     CHECK(new_file->get_blocks()[0]->get_size() == 5);
                 }
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
             SECTION("incomplete file exists") {
                 pr_fi.set_size(10ul);
@@ -271,7 +265,7 @@ void test_meta_changes() {
                 file_peer->assign_block(b2, 1);
                 folder_info_peer->add(file_peer, false);
 
-                REQUIRE(builder.clone_file(*file_peer).apply());
+                builder->clone_file(*file_peer).apply(*sup);
                 auto file = files->by_name(pr_fi.name());
                 auto path = file->get_path().string() + ".syncspirit-tmp";
                 file->lock(); // should be locked on db, as there is a source
@@ -280,14 +274,14 @@ void test_meta_changes() {
 
                 SECTION("outdated -> just remove") {
                     bfs::last_write_time(path, modified - 24 * 3600);
-                    sup->do_process();
+                    builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available());
                     CHECK(!file->is_locked());
                     CHECK(!bfs::exists(path));
                 }
 
                 SECTION("just 1st block is valid, tmp is kept") {
-                    sup->do_process();
+                    builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available());
                     CHECK(!file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
@@ -301,7 +295,7 @@ void test_meta_changes() {
                 SECTION("source is missing -> tmp is removed") {
                     file->set_source({});
                     file->unlock();
-                    sup->do_process();
+                    builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available());
                     CHECK(!file->is_locked());
                     CHECK(!file_peer->is_locally_available());
@@ -314,7 +308,7 @@ void test_meta_changes() {
                     SECTION("1st block") { write_file(path, "2234567890"); }
                     SECTION("2nd block") { write_file(path, "1234567899"); }
                     SECTION("missing source file") { file->set_source(nullptr); }
-                    sup->do_process();
+                    builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
                     CHECK(!file->is_locked());
@@ -327,7 +321,7 @@ void test_meta_changes() {
                 SECTION("error on reading -> remove") {
                     bfs::permissions(path, bfs::perms::no_perms);
                     if (!ec) {
-                        sup->do_process();
+                        builder->scan_start(folder->get_id()).apply(*sup);
                         CHECK(!file->is_locally_available());
                         CHECK(!file->is_locked());
                         CHECK(!bfs::exists(path));
@@ -336,7 +330,7 @@ void test_meta_changes() {
                     }
                 }
 #endif
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
             SECTION("local (previous) file exists") {
                 pr_fi.set_size(15ul);
@@ -373,7 +367,7 @@ void test_meta_changes() {
                 file_peer->assign_block(b3, 2);
                 folder_info_peer->add(file_peer, false);
 
-                REQUIRE(builder.clone_file(*file_peer).apply());
+                builder->clone_file(*file_peer).apply(*sup);
                 auto file = files->by_name(pr_fi.name());
                 auto path_my = file->get_path().string();
                 auto path_peer = file->get_path().string() + ".syncspirit-tmp";
@@ -382,7 +376,7 @@ void test_meta_changes() {
 
                 auto content = "1234567890\0\0\0\0\0";
                 write_file(path_peer, std::string(content, 15));
-                sup->do_process();
+                builder->scan_start(folder->get_id()).apply(*sup);
 
                 CHECK(file_my->is_locally_available());
                 CHECK(file_my->get_source() == file_peer);
@@ -390,7 +384,7 @@ void test_meta_changes() {
                 CHECK(file_peer->is_locally_available(0));
                 CHECK(file_peer->is_locally_available(1));
                 CHECK(!file_peer->is_locally_available(2));
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
         }
     };
@@ -407,7 +401,7 @@ void test_new_files() {
                 auto file_path = root_path / "symlink";
                 bfs::create_symlink(bfs::path("/some/where"), file_path, ec);
                 REQUIRE(!ec);
-                sup->do_process();
+                builder->scan_start(folder->get_id()).apply(*sup);
 
                 auto file = files->by_name("symlink");
                 REQUIRE(file);
@@ -417,14 +411,14 @@ void test_new_files() {
                 CHECK(file->get_block_size() == 0);
                 CHECK(file->get_size() == 0);
                 CHECK(blocks.size() == 0);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("empty file") {
                 CHECK(bfs::create_directories(root_path / "abc"));
                 auto file_path = root_path / "abc" / "empty.file";
                 write_file(file_path, "");
-                sup->do_process();
+                builder->scan_start(folder->get_id()).apply(*sup);
 
                 auto file = files->by_name("abc/empty.file");
                 REQUIRE(file);
@@ -434,13 +428,13 @@ void test_new_files() {
                 CHECK(file->get_block_size() == 0);
                 CHECK(file->get_size() == 0);
                 CHECK(blocks.size() == 0);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("non-empty file (1 block)") {
                 auto file_path = root_path / "file.ext";
                 write_file(file_path, "12345");
-                sup->do_process();
+                builder->scan_start(folder->get_id()).apply(*sup);
 
                 auto file = files->by_name("file.ext");
                 REQUIRE(file);
@@ -450,7 +444,7 @@ void test_new_files() {
                 CHECK(file->get_block_size() == 5);
                 CHECK(file->get_size() == 5);
                 CHECK(blocks.size() == 1);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("non-empty file (2 blocks)") {
@@ -458,7 +452,7 @@ void test_new_files() {
                 auto sz = size_t{128 * 1024 * 2};
                 std::string data(sz, 'x');
                 write_file(file_path, data);
-                sup->do_process();
+                builder->scan_start(folder->get_id()).apply(*sup);
 
                 auto file = files->by_name("file.ext");
                 REQUIRE(file);
@@ -468,7 +462,7 @@ void test_new_files() {
                 CHECK(file->get_size() == sz);
                 CHECK(file->get_blocks().size() == 2);
                 CHECK(blocks.size() == 1);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("non-empty file (3 blocks)") {
@@ -476,7 +470,7 @@ void test_new_files() {
                 auto sz = size_t{128 * 1024 * 3};
                 std::string data(sz, 'x');
                 write_file(file_path, data);
-                sup->do_process();
+                builder->scan_start(folder->get_id()).apply(*sup);
 
                 auto file = files->by_name("file.ext");
                 REQUIRE(file);
@@ -486,7 +480,7 @@ void test_new_files() {
                 CHECK(file->get_size() == sz);
                 CHECK(file->get_blocks().size() == 3);
                 CHECK(blocks.size() == 1);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("two files, different content") {
@@ -495,7 +489,7 @@ void test_new_files() {
 
                 auto file2_path = root_path / "file2.ext";
                 write_file(file2_path, "67890");
-                sup->do_process();
+                builder->scan_start(folder->get_id()).apply(*sup);
 
                 auto file1 = files->by_name("file1.ext");
                 REQUIRE(file1);
@@ -514,7 +508,7 @@ void test_new_files() {
                 CHECK(file2->get_size() == 5);
 
                 CHECK(blocks.size() == 2);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
             SECTION("two files, same content") {
@@ -523,7 +517,7 @@ void test_new_files() {
 
                 auto file2_path = root_path / "file2.ext";
                 write_file(file2_path, "12345");
-                sup->do_process();
+                builder->scan_start(folder->get_id()).apply(*sup);
 
                 auto file1 = files->by_name("file1.ext");
                 REQUIRE(file1);
@@ -542,7 +536,7 @@ void test_new_files() {
                 CHECK(file2->get_size() == 5);
 
                 CHECK(blocks.size() == 1);
-                REQUIRE(scan_completions == 1);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
         }
     };
@@ -555,26 +549,26 @@ void test_remove_file() {
             sys::error_code ec;
             auto &blocks = cluster->get_blocks();
 
-            SECTION("non-empty file") {
-                auto file_path = root_path / "file.ext";
-                write_file(file_path, "12345");
-                sup->do_process();
-                REQUIRE(scan_completions == 1);
+            auto file_path = root_path / "file.ext";
+            write_file(file_path, "12345");
+            builder->scan_start(folder->get_id()).apply(*sup);
+            REQUIRE(!folder->get_scan_finish().is_not_a_date_time());
+            REQUIRE(!folder->is_scanning());
 
-                auto file = files->by_name("file.ext");
-                REQUIRE(file);
-                REQUIRE(blocks.size() == 1);
+            auto file = files->by_name("file.ext");
+            REQUIRE(file);
+            REQUIRE(blocks.size() == 1);
 
-                bfs::remove(file_path);
-                auto &addr = target->get_address();
-                sup->send<fs::payload::scan_folder_t>(addr, std::string(folder->get_id()));
-                sup->do_process();
+            auto prev_finish = folder->get_scan_finish();
+            bfs::remove(file_path);
 
-                file = files->by_name("file.ext");
-                CHECK(file->is_deleted() == 1);
-                CHECK(blocks.size() == 0);
-                REQUIRE(scan_completions == 2);
-            }
+            builder->scan_start(folder->get_id()).apply(*sup);
+
+            file = files->by_name("file.ext");
+            CHECK(file->is_deleted() == 1);
+            CHECK(blocks.size() == 0);
+            REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+            REQUIRE(folder->get_scan_finish() > prev_finish);
         }
     };
     F().run();
