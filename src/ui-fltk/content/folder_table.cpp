@@ -4,6 +4,7 @@
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/upsert_folder.h"
+#include "model/diff/local/scan_request.h"
 
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
@@ -582,6 +583,7 @@ auto static make_actions(folder_table_t &container) -> widgetable_ptr_t {
                 rescan->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_rescan(); },
                                  &container);
                 rescan->deactivate();
+                container.rescan_button = rescan;
 
                 auto remove = new Fl_Button(rescan->x() + ww + padding * 2, yy, ww, hh, "remove");
                 remove->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_remove(); },
@@ -747,9 +749,17 @@ void folder_table_t::refresh() {
             }
         }
         reset_button->activate();
+        if (mode == mode_t::edit) {
+            rescan_button->deactivate();
+        }
     } else {
         if (mode == mode_t::edit) {
             apply_button->deactivate();
+            auto &folders = container.supervisor.get_cluster()->get_folders();
+            auto folder = folders.by_id(ctx.folder.id());
+            if (!folder->is_scanning()) {
+                rescan_button->activate();
+            }
         }
         reset_button->deactivate();
     }
@@ -776,6 +786,24 @@ void folder_table_t::refresh() {
             target_button->deactivate();
         }
     }
+
+    if (mode == mode_t::edit) {
+        auto cluster = container.supervisor.get_cluster();
+        auto folder = cluster->get_folders().by_id(folder_data.get_id());
+        auto &date_start = folder->get_scan_start();
+        auto &date_finish = folder->get_scan_finish();
+        auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
+        auto scan_finish = date_finish.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_finish);
+        auto &rows = get_rows();
+        for (size_t i = 0; i < rows.size(); ++i) {
+            if (rows[i].label == "scan start") {
+                update_value(i, scan_start);
+            } else if (rows[i].label == "scan finish") {
+                update_value(i, scan_finish);
+            }
+        }
+    }
+
     notice->reset();
 }
 
@@ -904,4 +932,11 @@ void folder_table_t::on_remove() {
     sup.send_model<model::payload::model_update_t>(std::move(diff), this);
 }
 
-void folder_table_t::on_rescan() {}
+void folder_table_t::on_rescan() {
+    auto &sup = container.supervisor;
+    auto &cluster = *sup.get_cluster();
+    auto &folder = *cluster.get_folders().by_id(folder_data.get_id());
+    auto diff = model::diff::cluster_diff_ptr_t{};
+    diff = new model::diff::local::scan_request_t(folder_data.get_id());
+    sup.send_model<model::payload::model_update_t>(std::move(diff), this);
+}

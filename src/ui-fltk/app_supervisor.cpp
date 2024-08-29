@@ -271,7 +271,8 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
     auto folders_node = static_cast<tree_item::folders_t *>(folders);
     for (auto &it : cluster->get_folders()) {
         auto &folder = it.item;
-        folder->set_augmentation(folders_node->add_folder(*folder));
+        auto augmentation = folders_node->add_folder(*folder);
+        folder->set_augmentation(augmentation);
     }
 
     return diff.visit_next(*this, custom);
@@ -327,7 +328,8 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &di
     auto &folder = *cluster->get_folders().by_id(diff.db.id());
     if (!folder.get_augmentation()) {
         auto folders_node = static_cast<tree_item::folders_t *>(folders);
-        folder.set_augmentation(folders_node->add_folder(folder));
+        auto augmentation = folders_node->add_folder(folder);
+        folder.set_augmentation(augmentation);
     }
     return diff.visit_next(*this, custom);
 }

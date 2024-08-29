@@ -59,6 +59,7 @@ struct folder_table_t : static_table_t {
     Fl_Widget *apply_button;
     Fl_Widget *share_button;
     Fl_Widget *reset_button;
+    Fl_Widget *rescan_button;
 };
 
 } // namespace syncspirit::fltk::content
