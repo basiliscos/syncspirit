@@ -3,8 +3,8 @@
 
 #include "fs_supervisor.h"
 #include "net/names.h"
-#include "hasher/hasher_proxy_actor.h"
 #include "scan_actor.h"
+#include "scan_scheduler.h"
 #include "file_actor.h"
 
 using namespace syncspirit::fs;
@@ -59,6 +59,8 @@ void fs_supervisor_t::launch() noexcept {
     spawn(factory).restart_period(r::pt::seconds{1}).restart_policy(r::restart_policy_t::fail_only).spawn();
 
     auto timeout = shutdown_timeout * 9 / 10;
+    create_actor<scan_scheduler_t>().cluster(cluster).timeout(timeout).finish();
+
     scan_actor = create_actor<scan_actor_t>()
                      .fs_config(fs_config)
                      .cluster(cluster)

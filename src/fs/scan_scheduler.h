@@ -17,11 +17,11 @@ namespace fs {
 namespace r = rotor;
 namespace outcome = boost::outcome_v2;
 
-struct SYNCSPIRIT_API scan_actor_config_t : r::actor_config_t {
+struct SYNCSPIRIT_API scan_scheduler_config_t : r::actor_config_t {
     model::cluster_ptr_t cluster;
 };
 
-template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_builder_t<Actor> {
+template <typename Actor> struct scan_scheduler_config_builder_t : r::actor_config_builder_t<Actor> {
     using builder_t = typename Actor::template config_builder_t<Actor>;
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
@@ -33,8 +33,8 @@ template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_b
 };
 
 struct SYNCSPIRIT_API scan_scheduler_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
-    using config_t = scan_actor_config_t;
-    template <typename Actor> using config_builder_t = scan_actor_config_builder_t<Actor>;
+    using config_t = scan_scheduler_config_t;
+    template <typename Actor> using config_builder_t = scan_scheduler_config_builder_t<Actor>;
 
     explicit scan_scheduler_t(config_t &cfg);
 

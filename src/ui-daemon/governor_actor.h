@@ -52,9 +52,7 @@ struct governor_actor_t : public r::actor_base_t,
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
     void track_inactivity() noexcept;
-    void schedule_rescan_dirs(const r::pt::time_duration &interval) noexcept;
     void add_callback(const void *, command_callback_t &&callback) noexcept;
-    void rescan_folder(std::string_view folder_id) noexcept;
     void process() noexcept;
 
     r::address_ptr_t coordinator;
@@ -69,14 +67,11 @@ struct governor_actor_t : public r::actor_base_t,
     using clock_t = r::pt::microsec_clock;
     using callbacks_map_t = std::unordered_map<const void *, command_callback_t>;
 
-    void schedule_rescan_dirs() noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
     void on_io_error(model::message::io_error_t &reply) noexcept;
     void on_inactivity_timer(r::request_id_t, bool cancelled) noexcept;
-    void on_rescan_timer(r::request_id_t, bool cancelled) noexcept;
 
-    void rescan_folders();
     void refresh_deadline() noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
@@ -84,11 +79,8 @@ struct governor_actor_t : public r::actor_base_t,
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::local::scan_finish_t &, void *) noexcept override;
 
     r::pt::ptime deadline;
-    r::pt::time_duration dirs_rescan_interval;
-    model::folders_map_t scanning_folders;
     callbacks_map_t callbacks_map;
 };
 

@@ -100,7 +100,7 @@ auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
         if (!cluster->get_folders().by_id(folder_id)) {
             continue;
         }
-        for (auto it = scan_queue.begin(); it != scan_queue.end(); ) {
+        for (auto it = scan_queue.begin(); it != scan_queue.end();) {
             if (*it == folder_id) {
                 it = scan_queue.erase(it);
             } else {
