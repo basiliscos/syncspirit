@@ -80,7 +80,7 @@ template <> struct fmt::formatter<syncspirit::model::device_t> {
 
     constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
 
-    auto format(const device_t& device, format_context &ctx) -> format_context::iterator {
+    auto format(const device_t &device, format_context &ctx) -> format_context::iterator {
         return fmt::format_to(ctx.out(), "{}", device.device_id());
     }
 };

@@ -25,8 +25,6 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
     for (auto it = pending.begin(); it != pending.end(); ++it) {
         auto &uf = *it->item;
         if (uf.device_id() == peer.device_id() && uf.get_id() == folder.get_id()) {
-            index = uf.get_index();
-            max_sequence = uf.get_max_sequence();
             pending_folder = it->item;
             break;
         }

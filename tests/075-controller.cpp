@@ -369,7 +369,7 @@ void test_index_receiving() {
                 auto d_peer = folder->add_devices();
                 d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
                 REQUIRE(cluster->get_pending_folders().size() == 0);
-                d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
+                d_peer->set_max_sequence(10);
                 d_peer->set_index_id(folder_1_peer->get_index());
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
 
@@ -377,7 +377,7 @@ void test_index_receiving() {
                 auto file = index.add_files();
                 file->set_name("some-dir");
                 file->set_type(proto::FileInfoType::DIRECTORY);
-                file->set_sequence(folder_1_peer->get_max_sequence());
+                file->set_sequence(10);
                 peer_actor->forward(proto::message::Index(new proto::Index(index)));
                 sup->do_process();
 

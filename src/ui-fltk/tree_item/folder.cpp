@@ -37,7 +37,7 @@ bool folder_t::on_select() {
 
         auto cluster = supervisor.get_cluster();
         auto &folder_infos = folder.get_folder_infos();
-        auto folder_info = *folder_infos.by_device(*cluster->get_device());
+        auto &folder_info = *folder_infos.by_device(*cluster->get_device());
         for (auto it : cluster->get_devices()) {
             auto &device = it.item;
             if (device != cluster->get_device()) {
