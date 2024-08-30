@@ -10,6 +10,15 @@
 
 namespace syncspirit::model {
 
+auto block_info_t::make_strict_hash(std::string_view hash) noexcept -> strict_hash_t {
+    assert(hash.size() <= digest_length);
+    auto r = strict_hash_t{};
+    memset(r.data, 0, digest_length);
+    memcpy(r.data, hash.data(), hash.size());
+    r.hash = std::string_view(r.data, digest_length);
+    return r;
+}
+
 static const constexpr char prefix = (char)(db::prefix::block_info);
 
 block_info_t::block_info_t(std::string_view key) noexcept { std::copy(key.begin(), key.end(), hash); }

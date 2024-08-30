@@ -29,6 +29,13 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
     static const constexpr size_t digest_length = 32;
     static const constexpr size_t data_length = digest_length + 1;
 
+    struct strict_hash_t {
+        char data[digest_length];
+        std::string_view hash;
+    };
+
+    static strict_hash_t make_strict_hash(std::string_view hash) noexcept;
+
     static outcome::result<block_info_ptr_t> create(std::string_view key, const db::BlockInfo &data) noexcept;
     static outcome::result<block_info_ptr_t> create(const proto::BlockInfo &block) noexcept;
 

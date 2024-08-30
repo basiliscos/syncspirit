@@ -31,7 +31,6 @@ struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
     std::string peer_id;
     files_t files;
     uuids_t uuids;
-    blocks_t blocks;
 };
 
 } // namespace syncspirit::model::diff::peer

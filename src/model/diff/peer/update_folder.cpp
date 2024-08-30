@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "update_folder.h"
+#include "model/diff/modify/add_blocks.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
 
@@ -9,27 +10,25 @@ using namespace syncspirit::model;
 using namespace syncspirit::model::diff::peer;
 
 update_folder_t::update_folder_t(std::string_view folder_id_, std::string_view peer_id_, files_t files_, uuids_t uuids,
-                                 blocks_t blocks_) noexcept
+                                 blocks_t blocks) noexcept
     : folder_id{std::string(folder_id_)}, peer_id{std::string(peer_id_)}, files{std::move(files_)},
-      uuids{std::move(uuids)}, blocks{std::move(blocks_)} {}
+      uuids{std::move(uuids)} {
+    if (!blocks.empty()) {
+        assign_child(new modify::add_blocks_t(std::move(blocks)));
+    }
+}
 
 auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto folder = cluster.get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device_id(peer_id);
-
-    auto &bm = cluster.get_blocks();
-    auto new_blocks = model::block_infos_map_t();
-    for (const auto &b : blocks) {
-        auto opt = block_info_t::create(b);
-        if (!opt) {
-            return opt.assume_error();
-        }
-        auto block = std::move(opt.assume_value());
-        new_blocks.put(block);
+    auto r = applicator_t::apply_child(cluster);
+    if (!r) {
+        return r;
     }
 
+    auto folder = cluster.get_folders().by_id(folder_id);
+    auto folder_info = folder->get_folder_infos().by_device_id(peer_id);
+    auto &bm = cluster.get_blocks();
+
     auto max_seq = folder_info->get_max_sequence();
-    auto files_map = file_infos_map_t();
     auto &fm = folder_info->get_file_infos();
     for (std::size_t i = 0; i < files.size(); ++i) {
         auto &f = files[i];
@@ -40,36 +39,21 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
             return opt.assume_error();
         }
         file = std::move(opt.assume_value());
-        files_map.put(file);
 
         if (f.size()) {
             for (int i = 0; i < f.blocks_size(); ++i) {
                 auto &b = f.blocks(i);
-                auto block = new_blocks.get(b.hash());
-                if (!block) {
-                    block = bm.get(b.hash());
-                }
-                if (!block) {
-                    auto opt = block_info_t::create(b);
-                    if (!opt) {
-                        return opt.assume_error();
-                    }
-                    block = std::move(opt.value());
-                }
+                auto strict_hash = block_info_t::make_strict_hash(b.hash());
+                auto block = bm.get(strict_hash.hash);
+                assert(block);
                 file->assign_block(block, (size_t)i);
             }
         }
+        folder_info->add(file, true);
     }
 
-    // all ok, commit
-    for (auto &it : new_blocks) {
-        bm.put(it.item);
-    }
-    for (auto &it : files_map) {
-        folder_info->add(it.item, true);
-    }
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
-    auto r = applicator_t::apply_sibling(cluster);
+    r = applicator_t::apply_sibling(cluster);
     if (auto aug = folder_info->get_augmentation(); aug) {
         aug->on_update();
     }

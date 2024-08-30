@@ -31,6 +31,7 @@ struct update_folder_t;
 } // namespace peer
 
 namespace modify {
+struct add_blocks_t;
 struct add_ignored_device_t;
 struct add_remote_folder_infos_t;
 struct add_pending_device_t;
@@ -71,6 +72,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const peer::cluster_update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::update_folder_t &, void *custom) noexcept;
 
+    virtual outcome::result<void> operator()(const modify::add_blocks_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::add_remote_folder_infos_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::add_ignored_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::add_pending_device_t &, void *custom) noexcept;

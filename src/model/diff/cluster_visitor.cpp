@@ -12,6 +12,7 @@
 #include "local/scan_request.h"
 #include "local/scan_start.h"
 #include "local/update.h"
+#include "modify/add_blocks.h"
 #include "modify/add_ignored_device.h"
 #include "modify/add_remote_folder_infos.h"
 #include "modify/add_pending_device.h"
@@ -92,6 +93,10 @@ auto cluster_visitor_t::operator()(const modify::upsert_folder_t &diff, void *cu
 }
 
 auto cluster_visitor_t::operator()(const modify::clone_file_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const modify::add_blocks_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

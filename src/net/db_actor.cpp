@@ -22,6 +22,7 @@
 #include "model/diff/load/pending_devices.h"
 #include "model/diff/load/pending_folders.h"
 #include "model/diff/local/update.h"
+#include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
@@ -476,6 +477,36 @@ auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, voi
     return commit(true);
 }
 
+auto db_actor_t::operator()(const model::diff::modify::add_blocks_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto &blocks_map = cluster->get_blocks();
+    for (const auto it : diff.blocks) {
+        auto block = blocks_map.get(it.hash());
+        auto key = block->get_key();
+        auto data = block->serialize();
+        auto r = db::save({key, data}, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return commit(true);
+}
+
 auto db_actor_t::operator()(const model::diff::modify::add_pending_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
@@ -897,17 +928,6 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
     auto r = db::save({fi_key, fi_data}, txn);
     if (!r) {
         return r.assume_error();
-    }
-
-    auto &blocks_map = cluster->get_blocks();
-    for (const auto it : diff.blocks) {
-        auto block = blocks_map.get(it.hash());
-        auto key = block->get_key();
-        auto data = block->serialize();
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
-        }
     }
 
     auto &files_map = folder_info->get_file_infos();
