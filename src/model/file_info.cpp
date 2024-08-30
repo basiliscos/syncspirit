@@ -189,7 +189,7 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
             *r.add_blocks() = block.as_bep(offset);
             offset += block.get_size();
         }
-        if (blocks.empty() && is_file()) {
+        if (blocks.empty() && is_file() && !is_deleted()) {
             auto emtpy_block = r.add_blocks();
             auto data = std::string();
             auto weak_hash = adler32(0L, Z_NULL, 0);
