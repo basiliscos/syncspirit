@@ -25,8 +25,6 @@ struct SYNCSPIRIT_API update_t final : cluster_diff_t {
     std::string folder_id;
     uuid_t uuid;
     proto::FileInfo file;
-    blocks_t new_blocks;
-    blocks_t removed_blocks;
     bool already_exists;
 };
 

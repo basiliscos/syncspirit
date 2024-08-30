@@ -44,7 +44,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
             for (int i = 0; i < f.blocks_size(); ++i) {
                 auto &b = f.blocks(i);
                 auto strict_hash = block_info_t::make_strict_hash(b.hash());
-                auto block = bm.get(strict_hash.hash);
+                auto block = bm.get(strict_hash.get_hash());
                 assert(block);
                 file->assign_block(block, (size_t)i);
             }

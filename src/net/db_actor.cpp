@@ -398,27 +398,6 @@ auto db_actor_t::operator()(const model::diff::local::update_t &diff, void *cust
         }
     }
 
-    auto &blocks_map = cluster->get_blocks();
-    for (const auto &hash : diff.new_blocks) {
-        auto block = blocks_map.get(hash);
-        auto key = block->get_key();
-        auto data = block->serialize();
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-    for (const auto &hash : diff.removed_blocks) {
-        auto data = (char *)alloca(hash.size() + 1);
-        data[0] = (char)(db::prefix::block_info);
-        std::copy(hash.begin(), hash.end(), data + 1);
-        auto key = std::string_view(data, hash.size() + 1);
-        auto r = db::remove(key, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-
     auto r = diff.visit_next(*this, custom);
     if (!r) {
         return r.assume_error();

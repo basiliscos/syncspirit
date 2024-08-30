@@ -2,9 +2,12 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "update.h"
-#include "../cluster_visitor.h"
-#include "../../cluster.h"
-#include "../../misc/version_utils.h"
+#include "model/diff/cluster_visitor.h"
+#include "model/diff/modify/add_blocks.h"
+#include "model/diff/modify/remove_blocks.h"
+#include "model/cluster.h"
+#include "model/misc/version_utils.h"
+#include "model/misc/orphaned_blocks.h"
 
 #include <cassert>
 
@@ -13,41 +16,61 @@ using namespace syncspirit::model::diff::local;
 update_t::update_t(const model::cluster_t &cluster, sequencer_t &sequencer, std::string_view folder_id_,
                    proto::FileInfo file_) noexcept
     : folder_id{folder_id_}, file{std::move(file_)}, already_exists{false} {
-    auto &blocks_map = cluster.get_blocks();
-    blocks_t kept_blocks;
-    for (int i = 0; i < file.blocks_size(); ++i) {
-        auto &block = file.blocks(i);
-        auto &hash = block.hash();
-        assert(!hash.empty());
-        auto existing_block = blocks_map.get(hash);
-        if (!existing_block) {
-            new_blocks.insert(hash);
-        } else {
-            kept_blocks.insert(hash);
-        }
-    }
 
+    auto orphaned_candidates = orphaned_blocks_t{};
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
     auto prev_file = folder_info->get_file_infos().by_name(file.name());
     already_exists = (bool)prev_file;
 
+    auto orphaned_blocks = orphaned_blocks_t::set_t{};
+
     if (prev_file) {
-        auto &prev_blocks = prev_file->get_blocks();
-        for (auto &b : prev_blocks) {
-            auto hash = b->get_hash();
-            bool remove = !kept_blocks.count(hash) && b->get_file_blocks().size() == 1;
-            if (remove) {
-                removed_blocks.insert(std::string(hash));
-            }
-        }
+        auto orphaned_candidates = orphaned_blocks_t{};
+        orphaned_candidates.record(*prev_file);
+        orphaned_blocks = orphaned_candidates.deduce();
         assign(uuid, prev_file->get_uuid());
     } else {
         uuid = sequencer.next_uuid();
     }
+
+    auto &blocks_map = cluster.get_blocks();
+    auto new_blocks = modify::add_blocks_t::blocks_t{};
+    for (int i = 0; i < file.blocks_size(); ++i) {
+        auto &block = file.blocks(i);
+        auto strict_hash = block_info_t::make_strict_hash(block.hash());
+        auto existing_block = blocks_map.get(strict_hash.get_hash());
+        if (!existing_block) {
+            new_blocks.push_back(block);
+        } else {
+            auto it = orphaned_blocks.find(strict_hash.get_key());
+            if (it != orphaned_blocks.end()) {
+                orphaned_blocks.erase(it);
+            }
+        }
+    }
+
+    auto current = (cluster_diff_t *){};
+    if (!new_blocks.empty()) {
+        current = assign_child(new modify::add_blocks_t(std::move(new_blocks)));
+    }
+
+    if (!orphaned_blocks.empty()) {
+        auto diff = cluster_diff_ptr_t{};
+        diff = new modify::remove_blocks_t(std::move(orphaned_blocks));
+        if (current) {
+            current->assign_sibling(diff.get());
+        } else {
+            assign_child(diff);
+        }
+    }
 }
 
 auto update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(cluster);
+    if (!r) {
+        return r;
+    }
     LOG_TRACE(log, "update_t, folder: {}, file: {}", folder_id, file.name());
 
     auto folder = cluster.get_folders().by_id(folder_id);
@@ -75,28 +98,11 @@ auto update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<
     auto &blocks_map = cluster.get_blocks();
     for (int i = 0; i < file.blocks_size(); ++i) {
         auto &block = file.blocks(i);
-        auto &hash = block.hash();
-        auto block_info = block_info_ptr_t{};
-        if (new_blocks.find(hash) != new_blocks.end()) {
-            auto block_opt = block_info_t::create(block);
-            if (!block_opt) {
-                return block_opt.assume_error();
-            }
-            block_info = std::move(block_opt.assume_value());
-            blocks_map.put(block_info);
-        } else {
-            block_info = blocks_map.get(hash);
-        }
+        auto strict_hash = block_info_t::make_strict_hash(block.hash());
+        auto block_info = blocks_map.get(strict_hash.get_hash());
         assert(block_info);
         file_info->assign_block(block_info, i);
         file_info->mark_local_available(i);
-    }
-    if (prev_file) {
-        for (auto &block_id : removed_blocks) {
-            auto block = blocks_map.get(block_id);
-            blocks_map.remove(block);
-        }
-        prev_file->remove_blocks();
     }
     file_info->mark_local();
     folder_info->add(file_info, true);
