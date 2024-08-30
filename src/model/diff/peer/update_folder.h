@@ -6,6 +6,7 @@
 #include "../cluster_diff.h"
 #include "model/cluster.h"
 #include "model/misc/sequencer.h"
+#include "model/misc/orphaned_blocks.h"
 #include "bep.pb.h"
 
 namespace syncspirit::model::diff::peer {
@@ -26,7 +27,7 @@ struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     update_folder_t(std::string_view folder_id, std::string_view peer_id, files_t files, uuids_t uuids,
-                    blocks_t new_blocks) noexcept;
+                    blocks_t new_blocks, orphaned_blocks_t::set_t removed_blocks) noexcept;
     std::string folder_id;
     std::string peer_id;
     files_t files;

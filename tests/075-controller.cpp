@@ -531,7 +531,6 @@ void test_downloading() {
 
             SECTION("cluster config & index has a new file => download it") {
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
-
                 auto index = proto::Index{};
                 index.set_folder(std::string(folder_1->get_id()));
                 auto file = index.add_files();
@@ -655,6 +654,7 @@ void test_downloading() {
                 auto file_info = model::file_info_t::create(uuid, pr_fi, folder_peer).value();
                 file_info->assign_block(b, 0);
                 folder_peer->add(file_info, true);
+                cluster->get_blocks().put(b);
 
                 d_peer->set_max_sequence(folder_1_peer->get_max_sequence() + 1);
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
@@ -686,7 +686,6 @@ void test_downloading() {
                 CHECK(f->get_sequence() == 1ul);
                 CHECK(peer_actor->blocks_requested == 0);
             }
-
             SECTION("new file via index_update => download it") {
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
 
