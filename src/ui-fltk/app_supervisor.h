@@ -143,6 +143,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void on_contact_update(model::message::contact_update_t &message) noexcept;
     void on_block_update(model::message::block_update_t &message) noexcept;
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
+    void on_io_error(model::message::io_error_t &message) noexcept;
 
     outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
