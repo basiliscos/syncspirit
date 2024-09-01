@@ -62,7 +62,7 @@ using actor_ptr_t = r::intrusive_ptr_t<initiator_actor_t>;
 struct fixture_t {
     using acceptor_t = asio::ip::tcp::acceptor;
     using ready_ptr_t = r::intrusive_ptr_t<net::message::peer_connected_t>;
-    using diff_ptr_t = r::intrusive_ptr_t<model::message::contact_update_t>;
+    using diff_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
     using diff_msgs_t = std::vector<diff_ptr_t>;
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {

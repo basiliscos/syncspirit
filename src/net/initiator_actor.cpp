@@ -107,13 +107,13 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.discover_name(names::resolver, resolver).link(false);
         p.discover_name(names::coordinator, coordinator).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking && role == role_t::active) {
-                auto diff = model::diff::contact_diff_ptr_t();
+                auto diff = model::diff::cluster_diff_ptr_t();
                 auto state = model::device_state_t::connecting;
                 auto sha256 = peer_device_id.get_sha256();
                 auto peer = cluster && cluster->get_devices().by_sha256(sha256);
                 if (peer) {
                     diff = new model::diff::contact::peer_state_t(*cluster, sha256, nullptr, state);
-                    send<model::payload::contact_update_t>(coordinator, std::move(diff));
+                    send<model::payload::model_update_t>(coordinator, std::move(diff));
                 }
             }
         });
@@ -204,9 +204,9 @@ void initiator_actor_t::shutdown_finish() noexcept {
         auto state = model::device_state_t::offline;
         auto sha256 = peer_device_id.get_sha256();
         if (auto peer = cluster->get_devices().by_sha256(sha256); peer) {
-            auto diff = model::diff::contact_diff_ptr_t();
+            auto diff = model::diff::cluster_diff_ptr_t();
             diff = new model::diff::contact::peer_state_t(*cluster, sha256, nullptr, state);
-            send<model::payload::contact_update_t>(coordinator, std::move(diff));
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
         }
     }
     r::actor_base_t::shutdown_finish();

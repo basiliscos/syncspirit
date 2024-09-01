@@ -100,7 +100,7 @@ TEST_CASE("update_contact_t", "[model]") {
 
     {
         auto update_my =
-            diff::contact_diff_ptr_t(new diff::contact::update_contact_t(*cluster, {"127.0.0.1", "127.0.0.1"}));
+            diff::cluster_diff_ptr_t(new diff::contact::update_contact_t(*cluster, {"127.0.0.1", "127.0.0.1"}));
         REQUIRE(update_my->apply(*cluster));
 
         auto got_uris = my_device->get_uris();
@@ -112,7 +112,7 @@ TEST_CASE("update_contact_t", "[model]") {
         auto url_1 = utils::parse("tcp://192.168.100.6:22000");
         auto url_2 = utils::parse("tcp://192.168.100.6:22001");
         auto url_3 = utils::parse("tcp://192.168.100.6:22001");
-        auto update_peer = diff::contact_diff_ptr_t(
+        auto update_peer = diff::cluster_diff_ptr_t(
             new diff::contact::update_contact_t(*cluster, peer_id, utils::uri_container_t{url_1, url_1, url_2, url_3}));
         REQUIRE(update_peer->apply(*cluster));
         auto &uris = peer_device->get_uris();

@@ -62,7 +62,6 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&controller_actor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&controller_actor_t::on_block_update, coordinator);
             }
         });
     });
@@ -282,7 +281,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
     if (file_block.is_locally_available()) {
         LOG_TRACE(log, "cloning locally available block, file = {}, block index = {} / {}", file->get_full_name(),
                   file_block.block_index(), file->get_blocks().size() - 1);
-        auto diff = block_diff_ptr_t(new modify::clone_block_t(file_block, make_callback()));
+        auto diff = cluster_diff_ptr_t(new modify::clone_block_t(file_block, make_callback()));
         push_block_write(std::move(diff));
     } else {
         auto block = file_block.block();
@@ -484,18 +483,6 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_peer_t &di
     return diff.visit_next(*this, custom);
 }
 
-void controller_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
-    if (message.payload.custom == this) {
-        LOG_TRACE(log, "on_block_update");
-        auto &diff = *message.payload.diff;
-        auto r = diff.visit(*this, const_cast<void *>(message.payload.custom));
-        if (!r) {
-            auto ee = make_error(r.assume_error());
-            return do_shutdown(ee);
-        }
-    }
-}
-
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
     LOG_DEBUG(log, "on_message (ClusterConfig)");
     auto diff_opt = model::diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer, *message);
@@ -663,7 +650,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
 
             LOG_TRACE(log, "{}, got block {}, write requests left = {}", file->get_name(), index,
                       cluster->get_write_requests());
-            auto diff = block_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data), make_callback()));
+            auto diff = cluster_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data), make_callback()));
             push_block_write(std::move(diff));
         }
     }
@@ -679,7 +666,7 @@ void controller_actor_t::on_write_ack(model::message::write_ack_t &message) noex
 }
 #endif
 
-void controller_actor_t::push_block_write(model::diff::block_diff_ptr_t diff) noexcept {
+void controller_actor_t::push_block_write(model::diff::cluster_diff_ptr_t diff) noexcept {
     block_write_queue.emplace_back(std::move(diff));
     process_block_write();
 }
@@ -689,7 +676,7 @@ void controller_actor_t::process_block_write() noexcept {
     auto sent = 0;
     while (requests_left > 0 && !block_write_queue.empty()) {
         auto &diff = block_write_queue.front();
-        send<model::payload::block_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
         --requests_left;
         ++sent;
         block_write_queue.pop_front();
@@ -707,13 +694,13 @@ auto controller_actor_t::make_callback() noexcept -> dispose_callback_t {
     return [sup = std::move(sup), address = std::move(address),
             this](model::diff::modify::block_transaction_t &source_diff) {
         bool ok = source_diff.errors.load() == 0;
-        auto diff = model::diff::block_diff_ptr_t{};
+        auto diff = model::diff::cluster_diff_ptr_t{};
         if (ok) {
             diff = new model::diff::modify::block_ack_t(source_diff);
         } else {
             diff = new model::diff::modify::block_rej_t(source_diff);
         }
-        auto msg = r::make_message<model::payload::block_update_t>(coordinator, std::move(diff), this);
+        auto msg = r::make_message<model::payload::model_update_t>(coordinator, std::move(diff), this);
         sup->enqueue(std::move(msg));
     };
 }

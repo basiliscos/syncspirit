@@ -248,9 +248,9 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
             if (info.is_complete()) {
                 auto valid_blocks = info.has_valid_blocks();
                 if (valid_blocks >= 0) {
-                    auto bdiff = model::diff::block_diff_ptr_t{};
-                    bdiff = new model::diff::local::blocks_availability_t(*info.get_source(), valid_blocks);
-                    send<model::payload::block_update_t>(coordinator, std::move(bdiff), this);
+                    auto diff = model::diff::cluster_diff_ptr_t{};
+                    diff = new model::diff::local::blocks_availability_t(*info.get_source(), valid_blocks);
+                    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
                 }
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 diff = new model::diff::modify::lock_file_t(*info.get_file(), false);

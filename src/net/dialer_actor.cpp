@@ -38,7 +38,6 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&dialer_actor_t::on_announce, coordinator);
                 plugin->subscribe_actor(&dialer_actor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&dialer_actor_t::on_contact_update, coordinator);
             }
         });
     });
@@ -118,13 +117,13 @@ void dialer_actor_t::discover_or_dial(const model::device_ptr_t &peer_device) no
     }
 
     if (do_discover) {
-        auto diff = model::diff::contact_diff_ptr_t();
+        auto diff = model::diff::cluster_diff_ptr_t();
         diff = new model::diff::contact::peer_state_t(*cluster, device_id.get_sha256(), nullptr, state_t::discovering);
-        send<model::payload::contact_update_t>(coordinator, std::move(diff));
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
     }
     if (do_dial) {
         auto diff = new model::diff::contact::dial_request_t(*peer_device);
-        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
         LOG_TRACE(log, "discover_or_dial, dialing to {} (dynamic = {}, discover attempts left = {})", device_id,
                   dynamic, info.skip_discovers);
     }
@@ -132,7 +131,7 @@ void dialer_actor_t::discover_or_dial(const model::device_ptr_t &peer_device) no
         // will dial indirectly
         auto &uris = peer_device->get_static_uris();
         auto diff = new model::diff::contact::update_contact_t(*cluster, device_id, uris);
-        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
 }
 
@@ -185,16 +184,6 @@ void dialer_actor_t::on_model_update(model::message::model_update_t &msg) noexce
     }
 }
 
-void dialer_actor_t::on_contact_update(model::message::contact_update_t &msg) noexcept {
-    LOG_TRACE(log, "on_contact_update");
-    auto &diff = *msg.payload.diff;
-    auto r = diff.visit(*this, nullptr);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
-    }
-}
-
 auto dialer_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &devices = cluster->get_devices();
@@ -230,7 +219,7 @@ auto dialer_actor_t::operator()(const model::diff::contact::update_contact_t &di
     if (peer->get_uris().size() && (state == state_t::offline || state == state_t::discovering)) {
         LOG_TRACE(log, "dialing to {}", peer->device_id());
         auto diff = new model::diff::contact::dial_request_t(*peer);
-        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
         if (state == state_t::discovering) {
             auto it = redial_map.find(peer);
             if (it != redial_map.end()) {

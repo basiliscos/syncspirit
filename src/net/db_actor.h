@@ -8,7 +8,6 @@
 #include "model/messages.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
-#include "model/diff/contact_visitor.h"
 #include "mdbx.h"
 #include "utils/log.h"
 #include "db/transaction.h"
@@ -46,9 +45,7 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
     }
 };
 
-struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t,
-                                   private model::diff::cluster_visitor_t,
-                                   private model::diff::contact_visitor_t {
+struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = db_actor_config_t;
     template <typename Actor> using config_builder_t = db_actor_config_builder_t<Actor>;
 
@@ -71,7 +68,6 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t,
 
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
-    void on_contact_update(model::message::contact_update_t &) noexcept;
     void on_db_info(message::db_info_request_t &) noexcept;
 
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;

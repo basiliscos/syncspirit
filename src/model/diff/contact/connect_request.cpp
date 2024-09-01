@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "connect_request.h"
-#include "../contact_visitor.h"
+#include "../cluster_visitor.h"
 
 using namespace syncspirit::model::diff::contact;
 
@@ -13,7 +13,7 @@ auto connect_request_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
     return applicator_t::apply_sibling(cluster);
 }
 
-auto connect_request_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+auto connect_request_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting connect_request_t");
     return visitor(*this, custom);
 }

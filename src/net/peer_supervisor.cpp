@@ -35,7 +35,6 @@ void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&peer_supervisor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&peer_supervisor_t::on_contact_update, coordinator);
                 plugin->subscribe_actor(&peer_supervisor_t::on_peer_ready);
                 plugin->subscribe_actor(&peer_supervisor_t::on_connect);
                 plugin->subscribe_actor(&peer_supervisor_t::on_connected, addr_unknown);
@@ -58,16 +57,6 @@ void peer_supervisor_t::on_start() noexcept {
 
 void peer_supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "on_model_update");
-    auto &diff = *msg.payload.diff;
-    auto r = diff.visit(*this, nullptr);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
-    }
-}
-
-void peer_supervisor_t::on_contact_update(model::message::contact_update_t &msg) noexcept {
-    LOG_TRACE(log, "on_contact_update");
     auto &diff = *msg.payload.diff;
     auto r = diff.visit(*this, nullptr);
     if (!r) {

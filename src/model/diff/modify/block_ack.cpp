@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "block_ack.h"
-#include "../block_visitor.h"
 #include "model/file_info.h"
 #include "model/cluster.h"
+#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -19,7 +19,7 @@ auto block_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resu
     return applicator_t::apply_sibling(cluster);
 }
 
-auto block_ack_t::visit(block_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+auto block_ack_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting block_ack_t");
     return visitor(*this, custom);
 }

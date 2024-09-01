@@ -5,8 +5,6 @@
 #include "utils/log.h"
 #include "net/messages.h"
 #include "model/messages.h"
-#include "model/diff/block_visitor.h"
-#include "model/diff/contact_visitor.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/misc/sequencer.h"
@@ -80,9 +78,7 @@ struct callback_t : model::arc_base_t<callback_t> {
 };
 using callback_ptr_t = model::intrusive_ptr_t<callback_t>;
 
-struct app_supervisor_t : rf::supervisor_fltk_t,
-                          private model::diff::cluster_visitor_t,
-                          private model::diff::contact_visitor_t {
+struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_visitor_t {
     using parent_t = rf::supervisor_fltk_t;
     using config_t = app_supervisor_config_t;
     template <typename Actor> using config_builder_t = app_supervisor_config_builder_t<Actor>;
@@ -139,8 +135,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
 
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
-    void on_contact_update(model::message::contact_update_t &message) noexcept;
-    void on_block_update(model::message::block_update_t &message) noexcept;
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
     void on_io_error(model::message::io_error_t &message) noexcept;
 

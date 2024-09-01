@@ -30,7 +30,6 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&fs_supervisor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&fs_supervisor_t::on_block_update, coordinator);
                 request<model::payload::model_request_t>(coordinator).send(init_timeout);
                 resources->acquire(resource::model);
             }
@@ -110,17 +109,6 @@ void fs_supervisor_t::on_model_update(model::message::model_update_t &message) n
     auto r = diff.apply(*cluster);
     if (!r) {
         LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
-        auto ee = make_error(r.assume_error());
-        return do_shutdown(ee);
-    }
-}
-
-void fs_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
-    auto &diff = *message.payload.diff;
-    LOG_TRACE(log, "on_block_update for {}", diff.file_name);
-    auto r = diff.apply(*cluster);
-    if (!r) {
-        LOG_ERROR(log, "error applying block diff: {}", r.assume_error().message());
         auto ee = make_error(r.assume_error());
         return do_shutdown(ee);
     }

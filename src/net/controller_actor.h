@@ -7,7 +7,6 @@
 #include "model/messages.h"
 #include "model/cluster.h"
 #include "model/diff/modify/block_transaction.h"
-#include "model/diff/block_visitor.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/file_iterator.h"
 #include "model/misc/block_iterator.h"
@@ -98,9 +97,7 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
     }
 };
 
-struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
-                                           private model::diff::cluster_visitor_t,
-                                           private model::diff::block_visitor_t {
+struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = controller_actor_config_t;
     template <typename Actor> using config_builder_t = controller_actor_config_builder_t<Actor>;
 
@@ -118,7 +115,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     using unlink_request_t = r::message::unlink_request_t;
     using unlink_request_ptr_t = r::intrusive_ptr_t<unlink_request_t>;
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
-    using block_write_queue_t = std::deque<model::diff::block_diff_ptr_t>;
+    using block_write_queue_t = std::deque<model::diff::cluster_diff_ptr_t>;
     using dispose_callback_t = model::diff::modify::block_transaction_t::dispose_callback_t;
 
     void on_termination(message::termination_signal_t &message) noexcept;
@@ -128,7 +125,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     void on_validation(hasher::message::validation_response_t &res) noexcept;
     void preprocess_block(model::file_block_t &block) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
-    void on_block_update(model::message::block_update_t &message) noexcept;
     void on_transfer_push(message::transfer_push_t &message) noexcept;
     void on_transfer_pop(message::transfer_pop_t &message) noexcept;
     void on_block_response(fs::message::block_response_t &message) noexcept;
@@ -143,7 +139,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     void pull_ready() noexcept;
     void push_pending() noexcept;
     void send_cluster_config() noexcept;
-    void push_block_write(model::diff::block_diff_ptr_t block) noexcept;
+    void push_block_write(model::diff::cluster_diff_ptr_t block) noexcept;
     void process_block_write() noexcept;
     dispose_callback_t make_callback() noexcept;
 

@@ -3,8 +3,7 @@
 
 #pragma once
 
-#include "generic_diff.hpp"
-#include "syncspirit-export.h"
+#include "cluster_diff.h"
 
 namespace syncspirit::model {
 
@@ -12,10 +11,7 @@ struct file_info_t;
 
 namespace diff {
 
-struct block_diff_t;
-using block_diff_ptr_t = boost::intrusive_ptr<block_diff_t>;
-
-struct SYNCSPIRIT_API block_diff_t : generic_diff_t<tag::block, block_diff_t> {
+struct SYNCSPIRIT_API block_diff_t : cluster_diff_t {
     block_diff_t(const block_diff_t &) noexcept;
     block_diff_t(const file_info_t &file, size_t block_index = 0) noexcept;
 
@@ -24,8 +20,6 @@ struct SYNCSPIRIT_API block_diff_t : generic_diff_t<tag::block, block_diff_t> {
     std::string device_id;
     size_t block_index;
 };
-
-using block_visitor_t = block_diff_t::visitor_t;
 
 } // namespace diff
 } // namespace syncspirit::model

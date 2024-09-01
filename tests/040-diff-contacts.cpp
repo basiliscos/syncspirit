@@ -29,7 +29,7 @@ TEST_CASE("unknown device connected", "[model]") {
     REQUIRE(buider.add_unknown_device(peer_id, db_device).apply());
 
     db_device.set_name("a name-2");
-    auto diff = model::diff::contact_diff_ptr_t{};
+    auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new model::diff::contact::unknown_connected_t(*cluster, peer_id, db_device);
     REQUIRE(diff->apply(*cluster));
 
@@ -77,7 +77,7 @@ TEST_CASE("ignored device connected", "[model]") {
     auto &ignored_devices = cluster->get_ignored_devices();
     auto ignored_device = ignored_devices.by_sha256(peer_id.get_sha256());
 
-    auto diff = model::diff::contact_diff_ptr_t{};
+    auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new model::diff::contact::ignored_connected_t(*cluster, peer_id, db_device);
     REQUIRE(diff->apply(*cluster));
 }

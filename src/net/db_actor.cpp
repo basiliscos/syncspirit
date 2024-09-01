@@ -99,7 +99,6 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&db_actor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&db_actor_t::on_contact_update, coordinator);
                 plugin->subscribe_actor(&db_actor_t::on_db_info, coordinator);
             }
         });
@@ -315,17 +314,6 @@ void db_actor_t::on_model_update(model::message::model_update_t &message) noexce
     if (!r) {
         auto ee = make_error(r.assume_error());
         LOG_ERROR(log, "on_model_update error: {}", r.assume_error().message());
-        do_shutdown(ee);
-    }
-}
-
-void db_actor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
-    LOG_TRACE(log, "on_contact_update", identity);
-    auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this, nullptr);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        LOG_ERROR(log, "on_contact_update error: {}", r.assume_error().message());
         do_shutdown(ee);
     }
 }

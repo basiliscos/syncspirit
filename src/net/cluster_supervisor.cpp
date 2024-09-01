@@ -26,7 +26,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&cluster_supervisor_t::on_contact_update, coordinator);
+                plugin->subscribe_actor(&cluster_supervisor_t::on_model_update, coordinator);
             }
         });
     });
@@ -49,7 +49,7 @@ void cluster_supervisor_t::shutdown_start() noexcept {
     ra::supervisor_asio_t::shutdown_start();
 }
 
-void cluster_supervisor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
+void cluster_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, nullptr);

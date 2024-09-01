@@ -8,7 +8,7 @@
 #include "utils/format.hpp"
 #include "model/cluster.h"
 #include "model/messages.h"
-#include "model/diff/contact_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "model/diff/contact/relay_connect_request.h"
 #include "net/names.h"
 #include "net/messages.h"
@@ -72,7 +72,7 @@ struct supervisor_t : ra::supervisor_asio_t {
 using supervisor_ptr_t = r::intrusive_ptr_t<supervisor_t>;
 using actor_ptr_t = r::intrusive_ptr_t<relay_actor_t>;
 
-struct fixture_t : private model::diff::contact_visitor_t {
+struct fixture_t : private model::diff::cluster_visitor_t {
     using acceptor_t = asio::ip::tcp::acceptor;
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
@@ -87,13 +87,12 @@ struct fixture_t : private model::diff::contact_visitor_t {
     }
 
     void run() noexcept {
-
         auto strand = std::make_shared<asio::io_context::strand>(io_ctx);
         sup = ctx.create_supervisor<supervisor_t>().strand(strand).timeout(timeout).create_registry().finish();
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                using contact_update_t = model::message::contact_update_t;
-                p.subscribe_actor(r::lambda<contact_update_t>([&](contact_update_t &msg) { on(msg); }));
+                using model_update_t = model::message::model_update_t;
+                p.subscribe_actor(r::lambda<model_update_t>([&](model_update_t &msg) { on(msg); }));
                 using http_req_t = net::message::http_request_t;
                 p.subscribe_actor(r::lambda<http_req_t>([&](http_req_t &req) {
                     LOG_INFO(log, "received http request");
@@ -241,7 +240,7 @@ struct fixture_t : private model::diff::contact_visitor_t {
     void on(proto::relay::session_invitation_t &) noexcept {
 
     };
-    virtual void on(model::message::contact_update_t &update) noexcept {
+    virtual void on(model::message::model_update_t &update) noexcept {
         auto &diff = *update.payload.diff;
         auto r = diff.apply(*cluster);
         if (!r) {
@@ -314,7 +313,7 @@ void test_master_connect() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
         }
 
-        void on(model::message::contact_update_t &update) noexcept override {
+        void on(model::message::model_update_t &update) noexcept override {
             LOG_INFO(log, "contact_update_t");
             fixture_t::on(update);
             io_ctx.stop();
@@ -341,7 +340,7 @@ void test_passive() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
         }
 
-        void on(model::message::contact_update_t &update) noexcept override {
+        void on(model::message::model_update_t &update) noexcept override {
             LOG_INFO(log, "contact_update_t");
             fixture_t::on(update);
             if (my_device->get_uris().size() == 1 && !sent) {

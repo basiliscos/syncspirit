@@ -80,8 +80,6 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&app_supervisor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&app_supervisor_t::on_contact_update, coordinator);
-                plugin->subscribe_actor(&app_supervisor_t::on_block_update, coordinator);
                 plugin->subscribe_actor(&app_supervisor_t::on_io_error, coordinator);
                 request<model::payload::model_request_t>(coordinator).send(init_timeout);
                 resources->acquire(resource::model);
@@ -130,30 +128,6 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
                 break;
             }
         }
-    }
-}
-
-void app_supervisor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
-    LOG_TRACE(log, "on_contact_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.apply(*cluster);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        LOG_ERROR(log, "error applying contact diff: {}", r.assume_error().message());
-    }
-    r = diff.visit(*this, nullptr);
-    if (!r) {
-        LOG_ERROR(log, "error visiting contact diff: {}", r.assume_error().message());
-    }
-}
-
-void app_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
-    LOG_TRACE(log, "on_block_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.apply(*cluster);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        LOG_ERROR(log, "error applying block diff: {}", r.assume_error().message());
     }
 }
 

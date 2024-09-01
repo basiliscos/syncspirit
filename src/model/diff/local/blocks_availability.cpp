@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "blocks_availability.h"
-#include "../block_visitor.h"
-#include "../../cluster.h"
-#include "../../misc/error_code.h"
+#include "model/diff/cluster_visitor.h"
+#include "model/cluster.h"
 #include "model/misc/version_utils.h"
 
 using namespace syncspirit::model::diff::local;
@@ -28,7 +27,7 @@ auto blocks_availability_t::apply_impl(cluster_t &cluster) const noexcept -> out
     return applicator_t::apply_sibling(cluster);
 }
 
-auto blocks_availability_t::visit(block_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+auto blocks_availability_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting blocks_availability_t");
     return visitor(*this, custom);
 }

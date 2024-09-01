@@ -99,8 +99,8 @@ TEST_CASE("various block diffs", "[model]") {
     }
 
     SECTION("availability") {
-        auto bdiff = diff::block_diff_ptr_t(new diff::local::blocks_availability_t(*file, 1));
-        REQUIRE(bdiff->apply(*cluster));
+        auto diff = diff::cluster_diff_ptr_t(new diff::local::blocks_availability_t(*file, 1));
+        REQUIRE(diff->apply(*cluster));
         CHECK(file->is_locally_available());
     }
 }

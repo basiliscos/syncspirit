@@ -2,9 +2,8 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "clone_block.h"
-#include "../block_visitor.h"
-#include "../../cluster.h"
-#include "../../misc/error_code.h"
+#include "model/diff/cluster_visitor.h"
+#include "model/cluster.h"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -38,7 +37,7 @@ clone_block_t::clone_block_t(const file_block_t &file_block, dispose_callback_t 
     source_file_name = source_file->get_name();
 }
 
-auto clone_block_t::visit(block_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+auto clone_block_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting clone_block_t");
     return visitor(*this, custom);
 }

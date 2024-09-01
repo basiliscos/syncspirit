@@ -306,9 +306,9 @@ void upnp_actor_t::on_validate(message::http_response_t &msg) noexcept {
     if (ok) {
         resources->acquire(resource::external_port);
         using namespace model::diff;
-        auto diff = model::diff::contact_diff_ptr_t{};
+        auto diff = model::diff::cluster_diff_ptr_t{};
         diff = new contact::update_contact_t(*cluster, {external_addr.to_string(), local_address.to_string()});
-        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
 }
 

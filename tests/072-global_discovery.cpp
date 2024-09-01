@@ -246,9 +246,9 @@ void test_late_announcement() {
     struct F : fixture_t {
         void main() noexcept override {
 
-            auto diff = model::diff::contact_diff_ptr_t{};
+            auto diff = model::diff::cluster_diff_ptr_t{};
             diff = new model::diff::contact::update_contact_t(*cluster, {"127.0.0.3"});
-            sup->send<model::payload::contact_update_t>(sup->get_address(), diff);
+            sup->send<model::payload::model_update_t>(sup->get_address(), diff);
 
             http::response<http::string_body> res;
             res.result(204);

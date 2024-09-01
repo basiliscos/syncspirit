@@ -85,7 +85,7 @@ diff_builder_t::diff_builder_t(model::cluster_t &cluster_) noexcept : cluster{cl
 }
 
 diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
-    auto has_diffs = [&]() -> bool { return cluster_diff || contact_diff || block_diff; };
+    auto has_diffs = [&]() -> bool { return (bool)cluster_diff; };
     assert(has_diffs());
 
     auto &addr = sup.get_address();
@@ -94,14 +94,6 @@ diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
         do_try = false;
         if (cluster_diff) {
             sup.send<model::payload::model_update_t>(addr, std::move(cluster_diff), nullptr);
-            do_try = true;
-        }
-        if (contact_diff) {
-            sup.send<model::payload::contact_update_t>(addr, std::move(contact_diff), nullptr);
-            do_try = true;
-        }
-        if (block_diff) {
-            sup.send<model::payload::block_update_t>(addr, std::move(block_diff), nullptr);
             do_try = true;
         }
         sup.do_process();
@@ -118,16 +110,6 @@ auto diff_builder_t::apply() noexcept -> outcome::result<void> {
         if (r && cluster_diff) {
             r = cluster_diff->apply(cluster);
             cluster_diff.reset();
-            do_try = true;
-        }
-        if (r && contact_diff) {
-            r = contact_diff->apply(cluster);
-            contact_diff.reset();
-            do_try = true;
-        }
-        if (r && block_diff) {
-            r = block_diff->apply(cluster);
-            block_diff.reset();
             do_try = true;
         }
     }
@@ -279,16 +261,6 @@ template <typename Holder, typename Diff> static void generic_assign(Holder *hol
 
 diff_builder_t &diff_builder_t::assign(model::diff::cluster_diff_t *diff) noexcept {
     generic_assign(&cluster_diff, diff);
-    return *this;
-}
-
-diff_builder_t &diff_builder_t::assign(model::diff::contact_diff_t *diff) noexcept {
-    generic_assign(&contact_diff, diff);
-    return *this;
-}
-
-diff_builder_t &diff_builder_t::assign(model::diff::block_diff_t *diff) noexcept {
-    generic_assign(&block_diff, diff);
     return *this;
 }
 

@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "update_contact.h"
-#include "../contact_visitor.h"
-#include "../../cluster.h"
+#include "model/diff/cluster_visitor.h"
+#include "model/cluster.h"
 #include <fmt/core.h>
 #include <set>
 
@@ -65,6 +65,6 @@ auto update_contact_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     return applicator_t::apply_sibling(cluster);
 }
 
-auto update_contact_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+auto update_contact_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     return visitor(*this, custom);
 }

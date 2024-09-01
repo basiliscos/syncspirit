@@ -3,7 +3,7 @@
 
 #include "peer_state.h"
 #include "model/cluster.h"
-#include "model/diff/contact_visitor.h"
+#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit::model::diff::contact;
 
@@ -27,6 +27,6 @@ auto peer_state_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     return applicator_t::apply_impl(cluster);
 }
 
-auto peer_state_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+auto peer_state_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     return visitor(*this, custom);
 }

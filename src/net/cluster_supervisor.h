@@ -7,7 +7,7 @@
 #include "model/cluster.h"
 #include "model/folder.h"
 #include "model/messages.h"
-#include "model/diff/contact_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "model/misc/sequencer.h"
 #include "utils/log.h"
 #include <boost/asio.hpp>
@@ -55,7 +55,7 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
     }
 };
 
-struct SYNCSPIRIT_API cluster_supervisor_t : public ra::supervisor_asio_t, private model::diff::contact_visitor_t {
+struct SYNCSPIRIT_API cluster_supervisor_t : public ra::supervisor_asio_t, private model::diff::cluster_visitor_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = cluster_supervisor_config_t;
     template <typename Actor> using config_builder_t = cluster_supervisor_config_builder_t<Actor>;
@@ -67,7 +67,7 @@ struct SYNCSPIRIT_API cluster_supervisor_t : public ra::supervisor_asio_t, priva
     void shutdown_start() noexcept override;
 
   private:
-    void on_contact_update(model::message::contact_update_t &) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
 
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
 

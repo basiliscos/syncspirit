@@ -42,7 +42,7 @@ void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexc
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&global_discovery_actor_t::on_contact_update, coordinator);
+                plugin->subscribe_actor(&global_discovery_actor_t::on_model_update, coordinator);
             }
         });
     });
@@ -144,7 +144,7 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     resources->release(resource::http);
     http_request.reset();
     auto &custom = message.payload.req->payload.request_payload->custom;
-    auto msg = static_cast<model::message::contact_update_t *>(custom.get());
+    auto msg = static_cast<model::message::model_update_t *>(custom.get());
     auto diff = static_cast<model::diff::contact::peer_state_t *>(msg->payload.diff.get());
     auto sha256 = diff->peer_id;
     auto it = discovering_devices.find(sha256);
@@ -168,9 +168,9 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
                 LOG_DEBUG(log, "on_discovery_response, found some URIs for {}", device_id);
                 found = true;
                 if (cluster->get_devices().by_sha256(sha256)) {
-                    auto diff = model::diff::contact_diff_ptr_t{};
+                    auto diff = model::diff::cluster_diff_ptr_t{};
                     diff = new contact::update_contact_t(*cluster, device_id, uris);
-                    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+                    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
                 } else {
                     LOG_DEBUG(log, "on_discovery_response, device '{}' is no longer exist", device_id);
                 }
@@ -181,14 +181,14 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     }
     if (!found) {
         using state_t = model::device_state_t;
-        auto diff = model::diff::contact_diff_ptr_t();
+        auto diff = model::diff::cluster_diff_ptr_t();
         diff = new model::diff::contact::peer_state_t(*cluster, sha256, nullptr, state_t::offline);
-        send<model::payload::contact_update_t>(coordinator, std::move(diff));
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
     }
 }
 
-void global_discovery_actor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
-    LOG_TRACE(log, "on_contact_update");
+void global_discovery_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, &message);
     if (!r) {
@@ -264,7 +264,7 @@ auto global_discovery_actor_t::operator()(const model::diff::contact::peer_state
         }
 
         discovering_devices.emplace(sha256);
-        auto msg = reinterpret_cast<model::message::contact_update_t *>(custom);
+        auto msg = reinterpret_cast<model::message::model_update_t *>(custom);
         make_request(addr_discovery, r.value(), std::move(tx_buff), msg);
     }
     return diff.visit_next(*this, custom);

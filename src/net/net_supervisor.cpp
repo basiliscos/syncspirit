@@ -78,8 +78,6 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         [&](auto &p) { p.register_name(names::coordinator, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&net_supervisor_t::on_model_update);
-        p.subscribe_actor(&net_supervisor_t::on_block_update);
-        p.subscribe_actor(&net_supervisor_t::on_contact_update);
         p.subscribe_actor(&net_supervisor_t::on_load_cluster);
         p.subscribe_actor(&net_supervisor_t::on_model_request);
         launch_early();
@@ -168,26 +166,6 @@ void net_supervisor_t::on_model_update(model::message::model_update_t &message) 
         do_shutdown(ee);
     }
     r = diff.visit(*this, nullptr);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
-    }
-}
-
-void net_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
-    auto &diff = *message.payload.diff;
-    LOG_TRACE(log, "on_block_update for {}", diff.file_name);
-    auto r = diff.apply(*cluster);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
-    }
-}
-
-void net_supervisor_t::on_contact_update(model::message::contact_update_t &message) noexcept {
-    LOG_TRACE(log, "on_contact_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.apply(*cluster);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);

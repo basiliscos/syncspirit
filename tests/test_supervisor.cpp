@@ -39,11 +39,8 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.register_name(names::coordinator, get_address()); });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&supervisor_t::on_model_update);
-        p.subscribe_actor(&supervisor_t::on_block_update);
-        p.subscribe_actor(&supervisor_t::on_contact_update);
-    });
+    plugin.with_casted<r::plugin::starter_plugin_t>(
+        [&](auto &p) { p.subscribe_actor(&supervisor_t::on_model_update); });
     if (configure_callback) {
         configure_callback(plugin);
     }
@@ -100,26 +97,6 @@ void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept
     r = diff->visit(*this, nullptr);
     if (!r) {
         LOG_ERROR(log, "{}, error visiting model: {}", identity, r.assume_error().message());
-        do_shutdown(make_error(r.assume_error()));
-    }
-}
-
-void supervisor_t::on_block_update(model::message::block_update_t &msg) noexcept {
-    LOG_TRACE(log, "{}, updating block", identity);
-    auto &diff = msg.payload.diff;
-    auto r = diff->apply(*cluster);
-    if (!r) {
-        LOG_ERROR(log, "{}, error updating block: {}", identity, r.assume_error().message());
-        do_shutdown(make_error(r.assume_error()));
-    }
-}
-
-void supervisor_t::on_contact_update(model::message::contact_update_t &msg) noexcept {
-    LOG_TRACE(log, "{}, updating contact", identity);
-    auto &diff = msg.payload.diff;
-    auto r = diff->apply(*cluster);
-    if (!r) {
-        LOG_ERROR(log, "{}, error updating contact: {}", identity, r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
     }
 }

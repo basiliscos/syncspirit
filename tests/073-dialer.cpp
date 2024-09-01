@@ -20,8 +20,8 @@ using state_t = model::device_state_t;
 
 namespace {
 
-struct fixture_t : private model::diff::contact_visitor_t {
-    using msg_t = model::message::contact_update_t;
+struct fixture_t : private model::diff::cluster_visitor_t {
+    using msg_t = model::message::model_update_t;
     using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
     using messages_t = std::vector<msg_ptr_t>;
 
@@ -178,7 +178,7 @@ void test_static_address() {
             SECTION("remove") {
                 builder.remove_peer(*peer_device).apply(*sup);
                 CHECK(sup->timers.size() == 0);
-                REQUIRE(messages.size() == 3);
+                REQUIRE(messages.size() == 4);
             }
 
             SECTION("invoke") {

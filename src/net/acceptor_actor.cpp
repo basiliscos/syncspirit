@@ -8,7 +8,6 @@
 #include "utils/network_interface.h"
 #include "utils/format.hpp"
 #include "model/messages.h"
-#include "model/diff/contact_diff.h"
 #include "model/diff/contact/connect_request.h"
 #include "model/diff/contact/update_contact.h"
 
@@ -71,9 +70,9 @@ void acceptor_actor_t::on_start() noexcept {
         }
     }
 
-    auto diff = model::diff::contact_diff_ptr_t{};
+    auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new contact::update_contact_t(*cluster, cluster->get_device()->device_id(), uris);
-    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     accept_next();
     r::actor_base_t::on_start();
 }
@@ -114,8 +113,8 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
     }
     LOG_TRACE(log, "on_accept, peer = {}", remote);
 
-    auto diff = model::diff::contact_diff_ptr_t{};
+    auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new contact::connect_request_t(std::move(peer), remote);
-    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     accept_next();
 }

@@ -9,7 +9,7 @@
 #include "proto/bep_support.h"
 #include "model/cluster.h"
 #include "model/messages.h"
-#include "model/diff/contact_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "net/names.h"
 #include "net/messages.h"
 #include "net/peer_actor.h"
@@ -74,7 +74,7 @@ struct supervisor_t : ra::supervisor_asio_t {
 using supervisor_ptr_t = r::intrusive_ptr_t<supervisor_t>;
 using actor_ptr_t = r::intrusive_ptr_t<peer_actor_t>;
 
-struct fixture_t : private model::diff::contact_visitor_t {
+struct fixture_t : private model::diff::cluster_visitor_t {
     using acceptor_t = asio::ip::tcp::acceptor;
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
@@ -90,21 +90,9 @@ struct fixture_t : private model::diff::contact_visitor_t {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 using cluster_diff_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
                 using cluster_diff_t = typename cluster_diff_ptr_t::element_type;
-                using contact_diff_ptr_t = r::intrusive_ptr_t<model::message::contact_update_t>;
-                using contact_diff_t = typename contact_diff_ptr_t::element_type;
 
                 p.subscribe_actor(r::lambda<cluster_diff_t>([&](cluster_diff_t &msg) {
                     LOG_INFO(log, "received cluster diff message");
-                    auto &diff = msg.payload.diff;
-                    auto r = diff->apply(*cluster);
-                    if (!r) {
-                        LOG_ERROR(log, "error updating model: {}", r.assume_error().message());
-                        sup->do_shutdown();
-                    }
-                }));
-
-                p.subscribe_actor(r::lambda<contact_diff_t>([&](contact_diff_t &msg) {
-                    LOG_INFO(log, "received contact diff message");
                     auto &diff = msg.payload.diff;
                     auto r = diff->apply(*cluster);
                     if (!r) {

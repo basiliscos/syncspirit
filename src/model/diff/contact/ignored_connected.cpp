@@ -3,7 +3,7 @@
 
 #include "ignored_connected.h"
 #include "model/cluster.h"
-#include "../contact_visitor.h"
+#include "../cluster_visitor.h"
 #include "model/misc/error_code.h"
 
 using namespace syncspirit::model::diff::contact;
@@ -23,7 +23,7 @@ auto ignored_connected_t::apply_impl(cluster_t &cluster) const noexcept -> outco
     return applicator_t::apply_sibling(cluster);
 }
 
-auto ignored_connected_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+auto ignored_connected_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting ignored_connected_t");
     return visitor(*this, custom);
 }

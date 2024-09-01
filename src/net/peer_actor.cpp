@@ -245,10 +245,10 @@ void peer_actor_t::shutdown_finish() noexcept {
     auto sha256 = peer_device_id.get_sha256();
     auto device = cluster->get_devices().by_sha256(sha256);
     if (device && device->get_state() != model::device_state_t::offline) {
-        auto diff = model::diff::contact_diff_ptr_t();
+        auto diff = model::diff::cluster_diff_ptr_t();
         auto state = model::device_state_t::offline;
         diff = new model::diff::contact::peer_state_t(*cluster, sha256, address, state);
-        send<model::payload::contact_update_t>(coordinator, std::move(diff));
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
     }
 }
 
@@ -375,7 +375,7 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
     auto &client_version = msg->client_version();
     auto sha_s256 = peer_device_id.get_sha256();
     LOG_DEBUG(log, "read_hello, from {} ({} {})", device_name, client_name, client_version);
-    auto diff = contact_diff_ptr_t();
+    auto diff = cluster_diff_ptr_t();
     auto db = db::SomeDevice();
     auto fill_db_and_shutdown = [&]() {
         auto address = fmt::format("{}://{}", peer_proto, peer_endpoint);
@@ -410,7 +410,7 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
         diff = new model::diff::contact::unknown_connected_t(*cluster, peer_device_id, std::move(db));
     }
 
-    send<model::payload::contact_update_t>(coordinator, std::move(diff));
+    send<model::payload::model_update_t>(coordinator, std::move(diff));
 }
 
 void peer_actor_t::handle_ping(proto::message::Ping &&) noexcept { log->trace("handle_ping"); }

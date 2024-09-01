@@ -5,7 +5,7 @@
 
 #include "messages.h"
 #include "model/messages.h"
-#include "model/diff/contact_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "utils/log.h"
 #include "utils/string_comparator.hpp"
 #include <boost/asio.hpp>
@@ -69,7 +69,7 @@ template <typename Actor> struct global_discovery_actor_config_builder_t : r::ac
     }
 };
 
-struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private model::diff::contact_visitor_t {
+struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = global_discovery_actor_config_t;
     template <typename Actor> using config_builder_t = global_discovery_actor_config_builder_t<Actor>;
 
@@ -83,12 +83,12 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
     using rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
     using discovering_devices_t = std::set<std::string, utils::string_comparator_t>;
     using uris_t = std::unordered_set<std::string>;
-    using custom_msg_ptr_t = r::intrusive_ptr_t<model::message::contact_update_t>;
+    using custom_msg_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
 
     void announce() noexcept;
     void on_announce_response(message::http_response_t &message) noexcept;
     void on_discovery_response(message::http_response_t &message) noexcept;
-    void on_contact_update(model::message::contact_update_t &message) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, fmt::memory_buffer &&tx_buff,
                       const custom_msg_ptr_t &custom = {}) noexcept;

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "block_rej.h"
-#include "../block_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "model/file_info.h"
 #include "model/cluster.h"
 
@@ -19,7 +19,7 @@ auto block_rej_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::resu
     return applicator_t::apply_sibling(cluster);
 }
 
-auto block_rej_t::visit(block_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+auto block_rej_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting block_rej_t");
     return visitor(*this, custom);
 }

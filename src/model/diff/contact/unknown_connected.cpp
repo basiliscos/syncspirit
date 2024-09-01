@@ -3,9 +3,8 @@
 
 #include "unknown_connected.h"
 #include "model/cluster.h"
-#include "../contact_visitor.h"
+#include "../cluster_visitor.h"
 #include "model/misc/error_code.h"
-#include "model/diff/modify/add_pending_device.h"
 
 using namespace syncspirit::model::diff::contact;
 
@@ -24,7 +23,7 @@ auto unknown_connected_t::apply_impl(cluster_t &cluster) const noexcept -> outco
     return applicator_t::apply_sibling(cluster);
 }
 
-auto unknown_connected_t::visit(contact_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+auto unknown_connected_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting unknown_connected_t");
     return visitor(*this, custom);
 }

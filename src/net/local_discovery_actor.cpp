@@ -220,7 +220,7 @@ void local_discovery_actor_t::handle(const model::device_id_t &device_id, utils:
     }
 
     using namespace model::diff;
-    auto diff = model::diff::contact_diff_ptr_t{};
+    auto diff = model::diff::cluster_diff_ptr_t{};
     auto uris_str = fmt::format("{}", fmt::join(uris, ", "));
     LOG_TRACE(log, "on_read, peer is available via {}", uris_str);
 
@@ -245,6 +245,6 @@ void local_discovery_actor_t::handle(const model::device_id_t &device_id, utils:
         diff = new contact::unknown_connected_t(*cluster, device_id, std::move(db));
     }
     if (diff) {
-        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
 }

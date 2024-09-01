@@ -6,7 +6,6 @@
 #include <rotor.hpp>
 #include "command.h"
 #include "model/messages.h"
-#include "model/diff/block_visitor.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/sequencer.h"
 #include "utils/log.h"
@@ -38,9 +37,7 @@ template <typename Actor> struct governor_actor_config_builder_t : r::actor_conf
     }
 };
 
-struct governor_actor_t : public r::actor_base_t,
-                          private model::diff::cluster_visitor_t,
-                          private model::diff::block_visitor_t {
+struct governor_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = governor_actor_config_t;
     template <typename Actor> using config_builder_t = governor_actor_config_builder_t<Actor>;
 
@@ -68,7 +65,6 @@ struct governor_actor_t : public r::actor_base_t,
     using callbacks_map_t = std::unordered_map<const void *, command_callback_t>;
 
     void on_model_update(model::message::model_update_t &message) noexcept;
-    void on_block_update(model::message::block_update_t &message) noexcept;
     void on_io_error(model::message::io_error_t &reply) noexcept;
     void on_inactivity_timer(r::request_id_t, bool cancelled) noexcept;
 

@@ -13,7 +13,7 @@ struct SYNCSPIRIT_API blocks_availability_t final : block_diff_t {
     blocks_availability_t(const file_info_t &file, size_t last_block_index) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
-    outcome::result<void> visit(block_visitor_t &, void *) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     proto::Vector version;
 };

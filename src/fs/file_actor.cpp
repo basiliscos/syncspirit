@@ -45,7 +45,6 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&file_actor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&file_actor_t::on_block_update, coordinator);
             }
         });
     });
@@ -66,16 +65,6 @@ void file_actor_t::shutdown_start() noexcept {
 
 void file_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this, nullptr);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
-    }
-}
-
-void file_actor_t::on_block_update(model::message::block_update_t &message) noexcept {
-    LOG_TRACE(log, "on_block_update");
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, nullptr);
     if (!r) {

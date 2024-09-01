@@ -75,9 +75,9 @@ void relay_actor_t::shutdown_start() noexcept {
             }
         }
         using namespace model::diff;
-        auto diff = model::diff::contact_diff_ptr_t{};
+        auto diff = model::diff::cluster_diff_ptr_t{};
         diff = new contact::update_contact_t(*cluster, self->device_id(), uris);
-        send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
 }
 
@@ -353,14 +353,14 @@ bool relay_actor_t::on(proto::relay::response_t &res) noexcept {
     auto uris = self->get_uris();
     uris.emplace_back(relays[relay_index]->uri);
     using namespace model::diff;
-    auto diff = model::diff::contact_diff_ptr_t{};
+    auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new contact::update_contact_t(*cluster, self->device_id(), uris);
-    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     return true;
 }
 
 bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
-    auto diff = model::diff::contact_diff_ptr_t{};
+    auto diff = model::diff::cluster_diff_ptr_t{};
     auto device_opt = model::device_id_t::from_sha256(msg.from);
     if (!device_opt) {
         LOG_ERROR(log, "not valid device: {}", spdlog::to_hex(msg.from.begin(), msg.from.end()));
@@ -379,7 +379,7 @@ bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
 
     diff = new model::diff::contact::relay_connect_request_t(std::move(device_opt.value()), std::move(msg.key),
                                                              std::move(relay_ep));
-    send<model::payload::contact_update_t>(coordinator, std::move(diff), this);
+    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     return true;
 }
 

@@ -13,7 +13,6 @@
 #include "model/pending_device.h"
 #include "model/file_info.h"
 #include "model/diff/cluster_diff.h"
-#include "model/diff/contact_diff.h"
 #include "model/diff/block_diff.h"
 #include "model/diff/modify/block_transaction.h"
 #include "model/misc/sequencer.h"
@@ -91,14 +90,10 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
 
   private:
     diff_builder_t &assign(model::diff::cluster_diff_t *) noexcept;
-    diff_builder_t &assign(model::diff::block_diff_t *) noexcept;
-    diff_builder_t &assign(model::diff::contact_diff_t *) noexcept;
 
     model::sequencer_ptr_t sequencer;
     model::cluster_t &cluster;
     model::diff::cluster_diff_ptr_t cluster_diff;
-    model::diff::contact_diff_ptr_t contact_diff;
-    model::diff::block_diff_ptr_t block_diff;
 
     friend struct cluster_configurer_t;
     friend struct index_maker_t;

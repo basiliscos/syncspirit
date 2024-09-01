@@ -3,10 +3,18 @@
 
 #include "cluster_diff.h"
 #include "cluster_visitor.h"
+#include "contact/connect_request.h"
+#include "contact/dial_request.h"
+#include "contact/ignored_connected.h"
+#include "contact/peer_state.h"
+#include "contact/relay_connect_request.h"
+#include "contact/unknown_connected.h"
+#include "contact/update_contact.h"
 #include "load/devices.h"
 #include "load/ignored_devices.h"
 #include "load/load_cluster.h"
 #include "load/pending_devices.h"
+#include "local/blocks_availability.h"
 #include "local/file_availability.h"
 #include "local/scan_finish.h"
 #include "local/scan_request.h"
@@ -14,9 +22,13 @@
 #include "local/update.h"
 #include "modify/add_blocks.h"
 #include "modify/add_ignored_device.h"
-#include "modify/add_remote_folder_infos.h"
 #include "modify/add_pending_device.h"
 #include "modify/add_pending_folders.h"
+#include "modify/add_remote_folder_infos.h"
+#include "modify/append_block.h"
+#include "modify/block_ack.h"
+#include "modify/block_rej.h"
+#include "modify/clone_block.h"
 #include "modify/clone_file.h"
 #include "modify/finish_file.h"
 #include "modify/finish_file_ack.h"
@@ -39,6 +51,40 @@
 #include "peer/update_folder.h"
 
 using namespace syncspirit::model::diff;
+
+auto cluster_visitor_t::operator()(const contact::connect_request_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const contact::dial_request_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const contact::ignored_connected_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const contact::relay_connect_request_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const contact::peer_state_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const contact::unknown_connected_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const contact::update_contact_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
 
 auto cluster_visitor_t::operator()(const load::devices_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
@@ -84,6 +130,27 @@ auto cluster_visitor_t::operator()(const peer::cluster_update_t &diff, void *cus
 }
 
 auto cluster_visitor_t::operator()(const peer::update_folder_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const modify::append_block_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const local::blocks_availability_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const modify::block_ack_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const modify::block_rej_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const modify::clone_block_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

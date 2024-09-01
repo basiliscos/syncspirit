@@ -249,11 +249,11 @@ void test_unknown_and_ignored_devices_1() {
 
             sd_1.set_name("x1_2");
             sd_2.set_name("x2_2");
-            auto diff = model::diff::contact_diff_ptr_t{};
+            auto diff = model::diff::cluster_diff_ptr_t{};
             diff = new model::diff::contact::unknown_connected_t(*cluster, d_id1, sd_1);
-            sup->send<model::payload::contact_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
             diff = new model::diff::contact::ignored_connected_t(*cluster, d_id2, sd_2);
-            sup->send<model::payload::contact_update_t>(sup->get_address(), std::move(diff), nullptr);
+            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
             sup->do_process();
 
             {
