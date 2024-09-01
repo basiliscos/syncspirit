@@ -82,8 +82,7 @@ using callback_ptr_t = model::intrusive_ptr_t<callback_t>;
 
 struct app_supervisor_t : rf::supervisor_fltk_t,
                           private model::diff::cluster_visitor_t,
-                          private model::diff::contact_visitor_t,
-                          private model::diff::block_visitor_t {
+                          private model::diff::contact_visitor_t {
     using parent_t = rf::supervisor_fltk_t;
     using config_t = app_supervisor_config_t;
     template <typename Actor> using config_builder_t = app_supervisor_config_builder_t<Actor>;

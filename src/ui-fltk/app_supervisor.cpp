@@ -147,7 +147,15 @@ void app_supervisor_t::on_contact_update(model::message::contact_update_t &messa
     }
 }
 
-void app_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {}
+void app_supervisor_t::on_block_update(model::message::block_update_t &message) noexcept {
+    LOG_TRACE(log, "on_block_update");
+    auto &diff = *message.payload.diff;
+    auto r = diff.apply(*cluster);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        LOG_ERROR(log, "error applying block diff: {}", r.assume_error().message());
+    }
+}
 
 std::string app_supervisor_t::get_uptime() noexcept {
     using namespace std;
