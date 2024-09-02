@@ -20,6 +20,7 @@ struct SYNCSPIRIT_API share_folder_t final : cluster_diff_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string peer_id;
+    std::string folder_id;
 
   private:
     share_folder_t(const uuid_t &uuid, std::string_view device_id, std::string_view folder_id, std::uint64_t index_id,
