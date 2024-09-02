@@ -7,6 +7,7 @@
 #include "diff-builder.h"
 #include "model/cluster.h"
 #include "fs/scan_scheduler.h"
+#include "net/names.h"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -32,6 +33,11 @@ struct fixture_t {
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
         sup->cluster = cluster;
+        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
+            plugin.template with_casted<r::plugin::registry_plugin_t>(
+                [&](auto &p) { p.register_name(net::names::fs_scanner, sup->get_address()); });
+        };
+
         sup->start();
         sup->do_process();
 

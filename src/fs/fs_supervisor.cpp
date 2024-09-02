@@ -58,8 +58,6 @@ void fs_supervisor_t::launch() noexcept {
     spawn(factory).restart_period(r::pt::seconds{1}).restart_policy(r::restart_policy_t::fail_only).spawn();
 
     auto timeout = shutdown_timeout * 9 / 10;
-    create_actor<scan_scheduler_t>().cluster(cluster).timeout(timeout).finish();
-
     scan_actor = create_actor<scan_actor_t>()
                      .fs_config(fs_config)
                      .cluster(cluster)
@@ -67,6 +65,9 @@ void fs_supervisor_t::launch() noexcept {
                      .requested_hashes_limit(hasher_threads * 2)
                      .timeout(timeout)
                      .finish();
+
+    create_actor<scan_scheduler_t>().cluster(cluster).timeout(timeout).finish();
+
     for (auto &l : launchers) {
         l(cluster);
     }

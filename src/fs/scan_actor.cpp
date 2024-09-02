@@ -26,11 +26,12 @@ scan_actor_t::scan_actor_t(config_t &cfg)
 void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        p.set_identity("fs.scanner", false);
+        p.set_identity(net::names::fs_scanner, false);
         log = utils::get_logger(identity);
         new_files = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.register_name(net::names::fs_scanner, address);
         p.discover_name(net::names::hasher_proxy, hasher_proxy, true).link();
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
