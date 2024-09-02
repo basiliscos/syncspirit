@@ -1,6 +1,5 @@
 #include "devices.h"
 #include "self_device.h"
-#include "peer_device.h"
 #include "../table_widget/input.h"
 #include "../table_widget/label.h"
 #include "../static_table.h"
@@ -247,6 +246,17 @@ auto devices_t::set_self(model::device_t &self) -> augmentation_ptr_t {
 augmentation_ptr_t devices_t::add_peer(model::device_t &peer) {
     update_label();
     return within_tree([&]() { return insert_by_label(new peer_device_t(peer, supervisor, tree()), 1)->get_proxy(); });
+}
+
+peer_device_t *devices_t::get_peer(const model::device_t &peer) {
+    for (int i = 1; i < children(); ++i) {
+        auto node = static_cast<peer_device_t *>(child(i));
+        if (node->peer == peer) {
+            return node;
+        }
+    }
+    supervisor.get_logger()->warn("no node/tree-item for device {}", peer.device_id().get_short());
+    return {};
 }
 
 void devices_t::remove_child(tree_item_t *child) {

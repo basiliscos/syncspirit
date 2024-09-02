@@ -35,6 +35,8 @@ add_executable(syncspirit-fltk WIN32
     tree_item/ignored_device.cpp
     tree_item/ignored_devices.cpp
     tree_item/peer_device.cpp
+    tree_item/peer_folder.cpp
+    tree_item/peer_folders.cpp
     tree_item/pending_device.cpp
     tree_item/pending_devices.cpp
     tree_item/pending_folder.cpp

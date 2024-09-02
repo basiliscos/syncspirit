@@ -1,4 +1,5 @@
 #include "peer_device.h"
+#include "peer_folders.h"
 #include "pending_folders.h"
 #include "../qr_button.h"
 #include "../table_widget/checkbox.h"
@@ -461,10 +462,23 @@ static widgetable_ptr_t make_addresses(my_table_t &container) {
 } // namespace
 
 peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree), peer{peer_}, pending_folders{nullptr} {
-    bool has_pending_folders = false;
-    auto &folders = supervisor.get_cluster()->get_pending_folders();
+    : parent_t(supervisor, tree), peer{peer_}, folders{nullptr}, pending_folders{nullptr} {
+    auto &cluster = *supervisor.get_cluster();
+    bool has_folders = false;
+    auto &folders = cluster.get_folders();
     for (auto &it : folders) {
+        if (it.item->is_shared_with(peer)) {
+            has_folders = true;
+            break;
+        }
+    }
+    if (has_folders) {
+        get_folders();
+    }
+
+    bool has_pending_folders = false;
+    auto &pending_folders = cluster.get_pending_folders();
+    for (auto &it : pending_folders) {
         auto &uf = *it.item;
         if (uf.device_id() == peer.device_id()) {
             has_pending_folders = true;
@@ -472,8 +486,9 @@ peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &superviso
         }
     }
     if (has_pending_folders) {
-        this->get_pending_folders();
+        get_pending_folders();
     }
+
     update_label();
 }
 
@@ -507,6 +522,20 @@ std::string peer_device_t::get_state() {
     }
 }
 
+tree_item_t *peer_device_t::get_folders() {
+    if (!folders) {
+        auto count = children();
+        folders = new peer_folders_t(peer, supervisor, tree());
+        add(prefs(), folders->label(), folders);
+        if (count) {
+            auto pending = child(0);
+            folders->move_above(pending);
+        }
+        tree()->redraw();
+    }
+    return folders;
+}
+
 tree_item_t *peer_device_t::get_pending_folders() {
     if (!pending_folders) {
         pending_folders = new pending_folders_t(peer, supervisor, tree());
@@ -519,6 +548,9 @@ tree_item_t *peer_device_t::get_pending_folders() {
 void peer_device_t::remove_child(tree_item_t *child) {
     if (child == pending_folders) {
         pending_folders = nullptr;
+    }
+    if (child == folders) {
+        folders = nullptr;
     }
     parent_t::remove_child(child);
 }

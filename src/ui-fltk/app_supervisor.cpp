@@ -5,9 +5,9 @@
 #include "tree_item/peer_device.h"
 #include "tree_item/pending_devices.h"
 #include "tree_item/pending_folders.h"
+#include "tree_item/peer_folders.h"
 #include "net/names.h"
 #include "model/diff/load/load_cluster.h"
-#include "model/diff/peer/cluster_update.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
@@ -309,6 +309,18 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
     auto &device = *cluster->get_ignored_devices().by_sha256(diff.device_id.get_sha256());
     auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
     device.set_augmentation(ignored_devices_node->add_device(device));
+    return diff.visit_next(*this, custom);
+}
+
+auto app_supervisor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto &device = *cluster->get_devices().by_sha256(diff.peer_id);
+    auto &folder = *cluster->get_folders().by_id(diff.folder_id);
+    auto folder_info = *folder.is_shared_with(device);
+    auto devices_node = static_cast<tree_item::devices_t *>(devices);
+    auto peer_node = devices_node->get_peer(device);
+    auto folders_node = static_cast<tree_item::peer_folders_t *>(peer_node->get_folders());
+    folders_node->add_folder(folder_info);
     return diff.visit_next(*this, custom);
 }
 

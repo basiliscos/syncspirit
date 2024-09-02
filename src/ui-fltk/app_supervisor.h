@@ -139,10 +139,11 @@ struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_vi
     void on_io_error(model::message::io_error_t &message) noexcept;
 
     outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_folders_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::share_folder_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
 
     model::sequencer_ptr_t sequencer;

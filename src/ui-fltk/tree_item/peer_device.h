@@ -20,9 +20,11 @@ struct peer_device_t : tree_item_t {
     bool on_select() override;
     void remove_child(tree_item_t *child) override;
 
+    tree_item_t *get_folders();
     tree_item_t *get_pending_folders();
 
     model::device_t &peer;
+    tree_item_t *folders;
     tree_item_t *pending_folders;
 };
 
