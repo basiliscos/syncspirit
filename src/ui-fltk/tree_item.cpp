@@ -22,6 +22,10 @@ bool tree_item_t::on_select() { return false; }
 
 void tree_item_t::on_deselect() { content = nullptr; }
 
+void tree_item_t::on_open() {}
+
+void tree_item_t::on_close() {}
+
 void tree_item_t::update_label() {}
 
 void tree_item_t::refresh_content() {

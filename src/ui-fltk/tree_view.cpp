@@ -24,9 +24,13 @@ static void tree_view_callback(Fl_Widget *w, void *data) {
         break;
         /*
       case FL_TREE_REASON_RESELECTED: [..]
-      case FL_TREE_REASON_OPENED: [..]
-      case FL_TREE_REASON_CLOSED: [..]
-*/
+        */
+    case FL_TREE_REASON_OPENED:
+        item->on_open();
+        break;
+    case FL_TREE_REASON_CLOSED:
+        item->on_close();
+        break;
     }
 }
 

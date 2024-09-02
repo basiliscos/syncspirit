@@ -27,6 +27,8 @@ struct tree_item_t : Fl_Tree_Item {
     virtual void on_deselect();
     virtual void on_update();
     virtual void on_delete();
+    virtual void on_open();
+    virtual void on_close();
 
     void select_other();
     augmentation_ptr_t get_proxy();
