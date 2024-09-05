@@ -17,7 +17,7 @@ void peer_dir_base_t::add_file(model::file_info_t &file) {
     within_tree([&]() {
         auto node = new tree_item_t(supervisor, tree(), false);
         node->label(label.c_str());
-        add(prefs(), label.c_str(), node);
+        insert_by_label(node, direct_dirs_count, -1);
         return node;
     });
 }

@@ -74,14 +74,34 @@ auto tree_item_t::get_proxy() -> augmentation_ptr_t { return augmentation; }
 
 auto tree_item_t::insert_by_label(tree_item_t *child_node, int start_index, int end_index) -> tree_item_t * {
     auto new_label = std::string_view(child_node->label());
-    auto end = std::max(end_index, children());
+    auto children_count = children();
+    end_index = std::max(end_index, children_count ? children_count - 1 : 0);
     int pos = start_index;
-    for (int i = start_index; i < end; ++i) {
-        auto label = std::string_view(child(i)->label());
-        if (label >= new_label) {
+    if (children_count) {
+        auto right = std::string_view(child(end_index)->label());
+        if (right < new_label) {
+            pos = start_index = children_count;
+        }
+    }
+    while (start_index < children_count) {
+        auto left = std::string_view(child(start_index)->label());
+        if (left > new_label) {
+            pos = start_index;
             break;
         }
-        ++pos;
+        auto right = std::string_view(child(end_index)->label());
+        if (right < new_label) {
+            pos = end_index;
+            break;
+        }
+
+        auto mid_index = (start_index + end_index) / 2;
+        auto mid = std::string_view(child(mid_index)->label());
+        if (mid < new_label) {
+            end_index = mid_index;
+        } else {
+            start_index = mid_index;
+        }
     }
 
     auto tmp_node = insert(prefs(), "", pos);
