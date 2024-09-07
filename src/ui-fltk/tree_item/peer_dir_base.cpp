@@ -25,10 +25,12 @@ virtual_dir_t *peer_dir_base_t::locate_own_dir(std::string_view name) {
         }
     }
     return within_tree([&]() {
-        auto node = new peer_dir_t(supervisor, tree(), false);
+        auto t = tree();
+        auto node = new peer_dir_t(supervisor, t, false);
         node->label(name.data());
         auto tmp_node = insert(prefs(), "", pos);
         replace_child(tmp_node, node);
+        t->close(node, 0);
         ++direct_dirs_count;
         return node;
     });
@@ -43,7 +45,7 @@ void peer_dir_base_t::add_entry(model::file_info_t &file) {
     within_tree([&]() {
         auto node = new tree_item_t(supervisor, tree(), false);
         node->label(label.c_str());
-        insert_by_label(node, direct_dirs_count, -1);
+        insert_by_label(node, direct_dirs_count);
         return node;
     });
 }

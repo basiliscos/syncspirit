@@ -82,6 +82,8 @@ int tree_item_t::bisect_pos(std::string_view new_label, int start_index, int end
     auto right = std::string_view(child(end_index)->label());
     if (new_label > right) {
         return end_index + 1;
+    } else if (new_label >= right) {
+        return end_index;
     }
     auto left = std::string_view(child(start_index)->label());
     if (left >= new_label) {
@@ -95,13 +97,13 @@ int tree_item_t::bisect_pos(std::string_view new_label, int start_index, int end
             return start_index;
         }
         auto right = std::string_view(child(end_index)->label());
-        if (right < new_label) {
+        if (right <= new_label) {
             return end_index;
         }
 
         auto mid_index = (start_index + end_index) / 2;
         auto mid = std::string_view(child(mid_index)->label());
-        if (mid < new_label) {
+        if (mid > new_label) {
             end_index = mid_index;
         } else {
             start_index = mid_index;
