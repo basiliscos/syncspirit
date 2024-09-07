@@ -11,7 +11,8 @@ struct virtual_dir_t {
     virtual ~virtual_dir_t() = default;
 
     virtual virtual_dir_t *locate_dir(const bfs::path &parent) = 0;
-    virtual void add_file(model::file_info_t &file) = 0;
+    virtual virtual_dir_t *locate_own_dir(std::string_view name) = 0;
+    virtual void add_entry(model::file_info_t &file) = 0;
 };
 
 } // namespace syncspirit::fltk::tree_item

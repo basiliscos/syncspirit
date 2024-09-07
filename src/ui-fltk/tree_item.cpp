@@ -72,27 +72,31 @@ void tree_item_t::select_other() {
 
 auto tree_item_t::get_proxy() -> augmentation_ptr_t { return augmentation; }
 
-auto tree_item_t::insert_by_label(tree_item_t *child_node, int start_index, int end_index) -> tree_item_t * {
-    auto new_label = std::string_view(child_node->label());
+int tree_item_t::bisect_pos(std::string_view new_label, int start_index, int end_index) {
     auto children_count = children();
-    end_index = std::max(end_index, children_count ? children_count - 1 : 0);
-    int pos = start_index;
-    if (children_count) {
-        auto right = std::string_view(child(end_index)->label());
-        if (right < new_label) {
-            pos = start_index = children_count;
-        }
+    end_index = std::min(children_count - 1, end_index);
+    if (end_index < 0) {
+        return 0;
     }
-    while (start_index < children_count) {
+
+    auto right = std::string_view(child(end_index)->label());
+    if (new_label > right) {
+        return end_index + 1;
+    }
+    auto left = std::string_view(child(start_index)->label());
+    if (left >= new_label) {
+        return start_index;
+    }
+
+    // int pos = start_index;
+    while (start_index <= end_index) {
         auto left = std::string_view(child(start_index)->label());
-        if (left > new_label) {
-            pos = start_index;
-            break;
+        if (left >= new_label) {
+            return start_index;
         }
         auto right = std::string_view(child(end_index)->label());
         if (right < new_label) {
-            pos = end_index;
-            break;
+            return end_index;
         }
 
         auto mid_index = (start_index + end_index) / 2;
@@ -103,7 +107,12 @@ auto tree_item_t::insert_by_label(tree_item_t *child_node, int start_index, int 
             start_index = mid_index;
         }
     }
+    return start_index;
+}
 
+auto tree_item_t::insert_by_label(tree_item_t *child_node, int start_index, int end_index) -> tree_item_t * {
+    auto new_label = std::string_view(child_node->label());
+    auto pos = bisect_pos(new_label, start_index, end_index);
     auto tmp_node = insert(prefs(), "", pos);
     replace_child(tmp_node, child_node);
     return child_node;

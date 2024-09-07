@@ -6,6 +6,7 @@
 
 #include <FL/Fl_Tree_Item.H>
 #include <FL/Fl_Tree.H>
+#include <limits>
 
 namespace syncspirit::fltk {
 
@@ -16,6 +17,8 @@ struct static_table_t;
 
 struct tree_item_t : Fl_Tree_Item {
     using parent_t = Fl_Tree_Item;
+    static constexpr auto MAX_INDEX = std::numeric_limits<int>::max();
+
     tree_item_t(app_supervisor_t &supervisor, Fl_Tree *tree, bool has_augmentation = true);
     ~tree_item_t();
 
@@ -42,7 +45,8 @@ struct tree_item_t : Fl_Tree_Item {
         return std::move(r);
     }
 
-    auto insert_by_label(tree_item_t *child, int start_index = 0, int end_index = -1) -> tree_item_t *;
+    int bisect_pos(std::string_view name, int start_index = 0, int end_index = MAX_INDEX);
+    auto insert_by_label(tree_item_t *child, int start_index = 0, int end_index = MAX_INDEX) -> tree_item_t *;
 
     app_supervisor_t &supervisor;
     content_t *content;

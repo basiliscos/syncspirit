@@ -48,7 +48,7 @@ void peer_folder_t::on_open() {
     for (auto &file : files) {
         auto path = bfs::path(file->get_name());
         auto dir = locate_dir(path.parent_path());
-        dir->add_file(*file);
+        dir->add_entry(*file);
     }
     tree()->redraw();
 
