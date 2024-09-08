@@ -22,6 +22,7 @@ struct log_panel_t : Fl_Group {
     ~log_panel_t();
 
     void min_display_level(spdlog::level::level_enum level);
+    void set_display_level(spdlog::level::level_enum level);
     void update();
     void on_filter(std::string_view filter);
 
@@ -34,7 +35,6 @@ struct log_panel_t : Fl_Group {
     log_records_t incoming_records;
     log_records_t records;
     log_records_t displayed_records;
-    spdlog::level::level_enum display_level;
     std::string filter;
 };
 

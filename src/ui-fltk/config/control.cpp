@@ -80,6 +80,7 @@ void control_t::on_save() {
     auto config_path = sup.get_config_path();
     auto cfg = reflect(categories);
     cfg.config_path = config_path;
+    cfg.fltk_config = sup.get_app_config().fltk_config;
 
     auto path = config_path.string();
     std::fstream f_cfg(path, f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);

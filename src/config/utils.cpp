@@ -384,6 +384,24 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         c.uncommitted_threshold = uncommitted_threshold.value();
     }
 
+    // fltk
+    {
+        auto t = root_tbl["fltk"];
+        auto &c = cfg.fltk_config;
+
+        auto level = t["level"].value<std::string>();
+        if (!level) {
+            return "fltk/level is incorrect or missing";
+        }
+        c.level = utils::get_log_level(level.value());
+
+        auto display_deleted = t["display_deleted"].value<bool>();
+        if (!display_deleted) {
+            return "fltk/display_deleted is incorrect or missing";
+        }
+        c.display_deleted = display_deleted.value();
+    }
+
     return cfg;
 }
 
@@ -484,6 +502,10 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                       {"discovery_url", cfg.relay_config.discovery_url->buffer().data()},
                       {"rx_buff_size", cfg.relay_config.rx_buff_size},
                   }}},
+        {"fltk", toml::table{{
+                     {"level", get_level(cfg.fltk_config.level)},
+                     {"display_deleted", cfg.fltk_config.display_deleted},
+                 }}},
     }};
     // clang-format on
     out << tbl;
@@ -587,6 +609,11 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         false,                                                  /* debug */
         utils::parse("https://relays.syncthing.net/endpoint"),  /* discovery url */
         1024 * 1024,                                            /* rx buff size */
+    };
+
+    cfg.fltk_config = fltk_config_t {
+        spdlog::level::level_enum::info,    /* level */
+        false,                              /* display_deleted */
     };
     return cfg;
 }

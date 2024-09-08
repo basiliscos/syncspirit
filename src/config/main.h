@@ -12,6 +12,7 @@
 #include "log.h"
 #include "relay.h"
 #include "upnp.h"
+#include "fltk.h"
 #include <boost/filesystem.hpp>
 
 namespace syncspirit::config {
@@ -19,7 +20,6 @@ namespace syncspirit::config {
 namespace bfs = boost::filesystem;
 
 struct main_t {
-
     bfs::path config_path;
     bfs::path default_location;
 
@@ -32,6 +32,7 @@ struct main_t {
     fs_config_t fs_config;
     db_config_t db_config;
     relay_config_t relay_config;
+    fltk_config_t fltk_config;
 
     std::uint32_t timeout;
     std::string device_name;

@@ -89,7 +89,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_vi
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     utils::dist_sink_t &get_dist_sink();
     const bfs::path &get_config_path();
-    const config::main_t &get_app_config();
+    config::main_t &get_app_config();
     model::cluster_ptr_t &get_cluster();
     model::sequencer_t &get_sequencer();
 

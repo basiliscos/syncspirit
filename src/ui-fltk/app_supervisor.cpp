@@ -64,7 +64,7 @@ app_supervisor_t::app_supervisor_t(config_t &config)
 auto app_supervisor_t::get_dist_sink() -> utils::dist_sink_t & { return dist_sink; }
 
 auto app_supervisor_t::get_config_path() -> const bfs::path & { return config_path; }
-auto app_supervisor_t::get_app_config() -> const config::main_t & { return app_config; }
+auto app_supervisor_t::get_app_config() -> config::main_t & { return app_config; }
 auto app_supervisor_t::get_cluster() -> model::cluster_ptr_t & { return cluster; }
 auto app_supervisor_t::get_sequencer() -> model::sequencer_t & { return *sequencer; }
 

@@ -117,9 +117,7 @@ struct counter_label_t : Fl_Box {
 };
 
 log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
-    : parent_t{x, y, w, h}, supervisor{supervisor_}, display_level{spdlog::level::trace}
-
-{
+    : parent_t{x, y, w, h}, supervisor{supervisor_} {
     int padding = 5;
     bool auto_scroll = true;
 
@@ -191,6 +189,11 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     level_buttons[5] = critical_button;
     button_x += critical_button->w() + padding;
 
+    auto enable_button = static_cast<std::size_t>(supervisor.get_app_config().fltk_config.level);
+    if (enable_button < level_buttons.size()) {
+        level_buttons[enable_button]->value(1);
+    }
+
     auto filter_input = new Fl_Input(button_x, common_y, 200, common_h, "");
     filter_input->callback(on_input_filter, this);
     filter_input->when(FL_WHEN_CHANGED);
@@ -230,6 +233,7 @@ log_panel_t::~log_panel_t() {
 
 void log_panel_t::update() {
     displayed_records.clear();
+    auto display_level = supervisor.get_app_config().fltk_config.level;
     for (auto &r : records) {
         bool display_record = (r->level >= display_level);
         if (display_record && !filter.empty()) {
@@ -248,7 +252,7 @@ void log_panel_t::update() {
 }
 
 void log_panel_t::min_display_level(spdlog::level::level_enum level) {
-    display_level = level;
+    supervisor.get_app_config().fltk_config.level = level;
     update();
 }
 
