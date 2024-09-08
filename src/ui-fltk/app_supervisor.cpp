@@ -230,6 +230,9 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string folder_id, std::
 
 auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+    if (!devices) {
+        return diff.visit_next(*this, custom);
+    }
     auto devices_node = static_cast<tree_item::devices_t *>(devices);
 
     auto &self_device = cluster->get_device();

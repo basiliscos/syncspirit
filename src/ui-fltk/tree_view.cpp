@@ -36,7 +36,7 @@ static void tree_view_callback(Fl_Widget *w, void *data) {
 
 tree_view_t::tree_view_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), supervisor{supervisor_}, current{nullptr} {
-
+    resizable(this);
     showroot(false);
     auto folders_node = new tree_item::folders_t(supervisor, this);
     auto devices_node = new tree_item::devices_t(supervisor, this);
@@ -49,4 +49,9 @@ tree_view_t::tree_view_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     add(ignored_devices_node->label(), ignored_devices_node);
 
     callback(tree_view_callback);
+}
+
+void tree_view_t::resize(int x, int y, int w, int h) {
+    printf("tree_view_t  = %d, %d, %d, %d\n", x, y, w, h);
+    parent_t::resize(x, y, w, h);
 }
