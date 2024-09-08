@@ -45,6 +45,9 @@ void peer_dir_base_t::add_entry(model::file_info_t &file) {
     within_tree([&]() {
         auto node = new tree_item_t(supervisor, tree(), false);
         node->label(label.c_str());
+        if (file.is_deleted()) {
+            node->labelfgcolor(FL_DARK1);
+        }
         insert_by_label(node, direct_dirs_count);
         return node;
     });
