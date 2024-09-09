@@ -249,7 +249,9 @@ int main(int argc, char **argv) {
                           .finish();
         fs_sup->do_process();
 
-        auto main_window = fltk::main_window_t(*sup_fltk);
+        auto app_w = cfg.fltk_config.main_window_width;
+        auto app_h = cfg.fltk_config.main_window_height;
+        auto main_window = fltk::main_window_t(*sup_fltk, app_w, app_h);
         Fl::visual(FL_DOUBLE | FL_INDEX);
         main_window.show(argc, argv);
 

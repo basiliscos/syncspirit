@@ -50,8 +50,3 @@ tree_view_t::tree_view_t(app_supervisor_t &supervisor_, int x, int y, int w, int
 
     callback(tree_view_callback);
 }
-
-void tree_view_t::resize(int x, int y, int w, int h) {
-    printf("tree_view_t  = %d, %d, %d, %d\n", x, y, w, h);
-    parent_t::resize(x, y, w, h);
-}

@@ -5,7 +5,7 @@
 using namespace syncspirit::fltk;
 
 static constexpr int padding = 2;
-static constexpr int button_h = 8;
+static constexpr int button_h = 20;
 
 static void set_show_deleted(Fl_Widget *widget, void *data) {
     auto toolbar = reinterpret_cast<toolbar_t *>(data);
@@ -22,4 +22,5 @@ toolbar_t::toolbar_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
     bool display_deleted = supervisor.get_app_config().fltk_config.display_deleted;
     button_show_deleted->value(display_deleted ? 1 : 0);
     end();
+    resizable(nullptr);
 }

@@ -1,4 +1,5 @@
 #include "app_supervisor.h"
+#include "main_window.h"
 #include "tree_item/devices.h"
 #include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
@@ -7,6 +8,7 @@
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
 #include "net/names.h"
+#include "config/utils.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
@@ -18,6 +20,7 @@
 
 #include <utility>
 #include <sstream>
+#include <fstream>
 #include <iomanip>
 #include <functional>
 
@@ -55,8 +58,9 @@ struct callback_impl_t final : callback_t {
 
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
-      app_config(std::move(config.app_config)), content{nullptr}, devices{nullptr}, folders{nullptr},
-      pending_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr} {
+      app_config(std::move(config.app_config)), app_config_original{app_config}, content{nullptr}, devices{nullptr},
+      folders{nullptr}, pending_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr},
+      main_window{nullptr} {
     started_at = clock_t::now();
     sequencer = model::make_sequencer(started_at.time_since_epoch().count());
 }
@@ -93,6 +97,23 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             p.subscribe_actor(&app_supervisor_t::on_db_info_response);
         },
         r::plugin::config_phase_t::PREINIT);
+}
+
+void app_supervisor_t::shutdown_finish() noexcept {
+    parent_t::shutdown_finish();
+    LOG_TRACE(log, "shutdown_finish");
+    if (main_window) {
+        main_window->on_shutdown();
+    }
+    std::stringstream out;
+    std::stringstream out_orig;
+    auto r = config::serialize(app_config, out);
+    auto r_orig = config::serialize(app_config_original, out_orig);
+    if (r.has_value() && r_orig.has_value()) {
+        if (out.str() != out_orig.str()) {
+            write_config(app_config);
+        }
+    }
 }
 
 void app_supervisor_t::on_model_response(model::message::model_response_t &res) noexcept {
@@ -171,6 +192,7 @@ void app_supervisor_t::set_devices(tree_item_t *node) { devices = node; }
 void app_supervisor_t::set_folders(tree_item_t *node) { folders = node; }
 void app_supervisor_t::set_pending_devices(tree_item_t *node) { pending_devices = node; }
 void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices = node; }
+void app_supervisor_t::set_main_window(main_window_t *window) { main_window = window; }
 
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
     request<net::payload::db_info_request_t>(coordinator).send(init_timeout * 5 / 6);
@@ -336,4 +358,17 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &di
         folder.set_augmentation(augmentation);
     }
     return diff.visit_next(*this, custom);
+}
+
+void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
+    log->debug("going to write config");
+    auto &path = get_config_path();
+    std::fstream f_cfg(path, f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
+    auto r = config::serialize(cfg, f_cfg);
+    if (!r) {
+        log->error("cannot save default config at {}: {}", path, r.error().message());
+    } else {
+        log->info("succesfully stored config at {}. Restart to apply", path);
+    }
+    app_config_original = app_config = cfg;
 }

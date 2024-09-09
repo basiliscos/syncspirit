@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
-#include <cstdint>
 #include <boost/outcome.hpp>
 #include "main.h"
 #include "syncspirit-export.h"

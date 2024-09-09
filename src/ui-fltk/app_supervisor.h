@@ -24,6 +24,7 @@ namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
 
 struct app_supervisor_t;
+struct main_window_t;
 struct tree_item_t;
 
 struct db_info_viewer_t {
@@ -87,11 +88,14 @@ struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_vi
     app_supervisor_t(const app_supervisor_t &) = delete;
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void shutdown_finish() noexcept override;
+
     utils::dist_sink_t &get_dist_sink();
     const bfs::path &get_config_path();
     config::main_t &get_app_config();
     model::cluster_ptr_t &get_cluster();
     model::sequencer_t &get_sequencer();
+    void write_config(const config::main_t &) noexcept;
 
     std::string get_uptime() noexcept;
     utils::logger_t &get_logger() noexcept;
@@ -119,6 +123,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_vi
         send<Payload>(coordinator, std::forward<Args>(args)...);
     }
 
+    void set_main_window(main_window_t *window);
     void set_devices(tree_item_t *node);
     void set_folders(tree_item_t *node);
     void set_pending_devices(tree_item_t *node);
@@ -153,6 +158,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_vi
     utils::dist_sink_t dist_sink;
     bfs::path config_path;
     config::main_t app_config;
+    config::main_t app_config_original;
     model::cluster_ptr_t cluster;
     content_t *content;
     tree_item_t *devices;
@@ -161,6 +167,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_vi
     tree_item_t *ignored_devices;
     db_info_viewer_t *db_info_viewer;
     callbacks_t callbacks;
+    main_window_t *main_window;
 
     friend struct db_info_viewer_guard_t;
 };

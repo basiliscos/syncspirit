@@ -400,6 +400,30 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
             return "fltk/display_deleted is incorrect or missing";
         }
         c.display_deleted = display_deleted.value();
+
+        auto main_window_width = t["main_window_width"].value<std::int64_t>();
+        if (!main_window_width) {
+            return "fltk/main_window_width is incorrect or missing";
+        }
+        c.main_window_width = main_window_width.value();
+
+        auto main_window_height = t["main_window_height"].value<std::int64_t>();
+        if (!main_window_height) {
+            return "fltk/main_window_height is incorrect or missing";
+        }
+        c.main_window_height = main_window_height.value();
+
+        auto left_panel_share = t["left_panel_share"].value<double>();
+        if (!left_panel_share) {
+            return "fltk/left_panel_share is incorrect or missing";
+        }
+        c.left_panel_share = left_panel_share.value();
+
+        auto bottom_panel_share = t["bottom_panel_share"].value<double>();
+        if (!bottom_panel_share) {
+            return "fltk/bottom_panel_share is incorrect or missing";
+        }
+        c.bottom_panel_share = bottom_panel_share.value();
     }
 
     return cfg;
@@ -505,6 +529,10 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"fltk", toml::table{{
                      {"level", get_level(cfg.fltk_config.level)},
                      {"display_deleted", cfg.fltk_config.display_deleted},
+                     {"main_window_width", cfg.fltk_config.main_window_width},
+                     {"main_window_height", cfg.fltk_config.main_window_height},
+                     {"left_panel_share", cfg.fltk_config.left_panel_share},
+                     {"bottom_panel_share", cfg.fltk_config.bottom_panel_share},
                  }}},
     }};
     // clang-format on
@@ -614,6 +642,10 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     cfg.fltk_config = fltk_config_t {
         spdlog::level::level_enum::info,    /* level */
         false,                              /* display_deleted */
+        700,                                /* main_window_width */
+        480,                                /* main_window_height */
+        0.5,                                /* left_panel_share */
+        0.3,                                /* bottom_panel_share */
     };
     return cfg;
 }
