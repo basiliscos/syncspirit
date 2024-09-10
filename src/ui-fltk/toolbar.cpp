@@ -4,7 +4,7 @@
 
 using namespace syncspirit::fltk;
 
-static constexpr int padding = 2;
+static constexpr int padding = 5;
 static constexpr int button_h = 20;
 
 static void set_show_deleted(Fl_Widget *widget, void *data) {
