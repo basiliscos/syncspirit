@@ -27,7 +27,7 @@ outcome::result<uri_ptr_t> make_announce_request(fmt::memory_buffer &buff, const
     payload["addresses"] = addresses;
 
     auto uri = announce_uri->clone();
-    uri->set_path("/v2");
+    uri->set_path("/v2/");
     http::request<http::string_body> req;
     req.method(http::verb::post);
     req.version(11);
