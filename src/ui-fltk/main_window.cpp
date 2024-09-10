@@ -20,8 +20,6 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
 
     auto resizeable_area = new Fl_Box(w() * 0.1, h() * 0.1, w() * 0.9, h() * 0.8);
 
-    supervisor.get_logger()->warn("w = {}", w());
-
     auto left_w = static_cast<int>(w() * left_share);
     auto right_w = w() - left_w;
     auto top_h = static_cast<int>(h() * (1 - bottom_share));

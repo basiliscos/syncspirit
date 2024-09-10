@@ -45,7 +45,6 @@ struct tree_item_t : Fl_Tree_Item {
         return std::move(r);
     }
 
-    int bisect_pos(std::string_view name, int start_index = 0, int end_index = MAX_INDEX);
     auto insert_by_label(tree_item_t *child, int start_index = 0, int end_index = MAX_INDEX) -> tree_item_t *;
 
     app_supervisor_t &supervisor;

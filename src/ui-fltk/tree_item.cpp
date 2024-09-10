@@ -1,7 +1,5 @@
 #include "tree_item.h"
-
-#include "static_table.h"
-#include <algorithm>
+#include "utils.hpp"
 
 using namespace syncspirit::fltk;
 
@@ -72,49 +70,10 @@ void tree_item_t::select_other() {
 
 auto tree_item_t::get_proxy() -> augmentation_ptr_t { return augmentation; }
 
-int tree_item_t::bisect_pos(std::string_view new_label, int start_index, int end_index) {
-    auto children_count = children();
-    end_index = std::min(children_count - 1, end_index);
-    if (end_index < 0) {
-        return 0;
-    }
-
-    auto right = std::string_view(child(end_index)->label());
-    if (new_label > right) {
-        return end_index + 1;
-    } else if (new_label >= right) {
-        return end_index;
-    }
-    auto left = std::string_view(child(start_index)->label());
-    if (left >= new_label) {
-        return start_index;
-    }
-
-    // int pos = start_index;
-    while (start_index <= end_index) {
-        auto left = std::string_view(child(start_index)->label());
-        if (left >= new_label) {
-            return start_index;
-        }
-        auto right = std::string_view(child(end_index)->label());
-        if (right <= new_label) {
-            return end_index;
-        }
-
-        auto mid_index = (start_index + end_index) / 2;
-        auto mid = std::string_view(child(mid_index)->label());
-        if (mid > new_label) {
-            end_index = mid_index;
-        } else {
-            start_index = mid_index;
-        }
-    }
-    return start_index;
-}
-
 auto tree_item_t::insert_by_label(tree_item_t *child_node, int start_index, int end_index) -> tree_item_t * {
     auto new_label = std::string_view(child_node->label());
-    auto pos = bisect_pos(new_label, start_index, end_index);
+    auto name_provider = [this](int index) { return std::string_view(child(index)->label()); };
+    auto pos = bisect(new_label, start_index, end_index, children(), name_provider);
     auto tmp_node = insert(prefs(), "", pos);
     replace_child(tmp_node, child_node);
     return child_node;
