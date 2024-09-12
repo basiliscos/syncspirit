@@ -128,6 +128,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_vi
     void set_folders(tree_item_t *node);
     void set_pending_devices(tree_item_t *node);
     void set_ignored_devices(tree_item_t *node);
+    void set_show_deleted(bool value);
 
     callback_ptr_t call_select_folder(std::string_view folder_id);
     callback_ptr_t call_share_folders(std::string folder_id, std::vector<std::string> devices);

@@ -7,6 +7,7 @@
 #include "tree_item/pending_devices.h"
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
+#include "tree_item/virtual_dir.h"
 #include "net/names.h"
 #include "config/utils.h"
 #include "model/diff/load/load_cluster.h"
@@ -371,4 +372,25 @@ void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
         log->info("succesfully stored config at {}. Restart to apply", path);
     }
     app_config_original = app_config = cfg;
+}
+
+void app_supervisor_t::set_show_deleted(bool value) {
+    log->debug("display deleted = {}", value);
+    app_config.fltk_config.display_deleted = value;
+
+    auto &self = cluster->get_device();
+    for (auto &it_f : cluster->get_folders()) {
+        for (auto &it : it_f.item->get_folder_infos()) {
+            if (it.item->get_device() != self.get()) {
+                auto generic_augmnetation = it.item->get_augmentation();
+                if (generic_augmnetation) {
+                    auto augmentation = static_cast<augmentation_t *>(generic_augmnetation.get());
+                    auto virtual_dir = dynamic_cast<tree_item::virtual_dir_t *>(augmentation->get_owner());
+                    if (virtual_dir) {
+                        virtual_dir->show_deleted(value);
+                    }
+                }
+            }
+        }
+    }
 }

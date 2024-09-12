@@ -11,7 +11,7 @@ static void set_show_deleted(Fl_Widget *widget, void *data) {
     auto toolbar = reinterpret_cast<toolbar_t *>(data);
     auto button = static_cast<Fl_Toggle_Button *>(widget);
     auto value = button->value() ? true : false;
-    toolbar->supervisor.get_app_config().fltk_config.display_deleted = value;
+    toolbar->supervisor.set_show_deleted(value);
 }
 
 toolbar_t::toolbar_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)

@@ -52,5 +52,5 @@ void peer_folder_t::on_open() {
     }
     tree()->redraw();
 
-    supervisor.get_logger()->debug("expanded, {} files", files.size());
+    supervisor.get_logger()->debug("{}, expanded {} file records", folder_info.get_folder()->get_label(), files.size());
 }
