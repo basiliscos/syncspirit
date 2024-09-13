@@ -5,7 +5,7 @@
 using namespace syncspirit::fltk::tree_item;
 
 peer_dir_base_t::peer_dir_base_t(app_supervisor_t &supervisor, Fl_Tree *tree, bool has_augmentation)
-    : tree_item_t(supervisor, tree, has_augmentation) {}
+    : tree_item_t(supervisor, tree, has_augmentation), dirs_count{0} {}
 
 peer_dir_base_t::~peer_dir_base_t() {
     for (auto item : orphaned_items) {
@@ -41,40 +41,32 @@ void peer_dir_base_t::add_entry(model::file_info_t &file) {
     auto start_index = int{0};
     auto end_index = int{0};
     auto t = tree();
-    auto node = within_tree([&]() -> tree_item_t * {
-        if (file.is_dir()) {
-            end_index = static_cast<int>(dirs_map.size()) - 1;
-            auto dir = new peer_dir_t(supervisor, t, true);
-            dirs_map[name] = dir;
-            return dir;
-        } else {
-            start_index = dirs_map.size();
-            end_index = children() - 1;
-            return new tree_item_t(supervisor, tree(), true);
-        }
-    });
+    auto node = within_tree([&]() -> peer_dir_t * { return new peer_dir_t(supervisor, t, file); });
 
-    node->label(name.c_str());
-    file.set_augmentation(node->get_proxy());
-    if (deleted) {
-        node->labelfgcolor(FL_DARK1);
+    if (file.is_dir()) {
+        dirs_map[name] = node;
     }
     if (deleted) {
         deleted_items.emplace(node);
     }
+
+    node->label(name.c_str());
+    if (deleted) {
+        node->labelfgcolor(FL_DARK1);
+    }
     if (!deleted || show_deleted) {
-        auto pos = bisect(node->label(), start_index, end_index, children(), name_provider);
-        auto tmp_node = insert(prefs(), "", pos);
-        replace_child(tmp_node, node);
-        if (file.is_dir()) {
-            t->close(node, 0);
-        }
+        insert_node(node);
     } else {
         orphaned_items.emplace(node);
     }
 }
 
-void peer_dir_base_t::remove_child(tree_item_t *child) {
+void peer_dir_base_t::remove_child(tree_item_t *child) { remove_node(dynamic_cast<peer_dir_base_t *>(child)); }
+
+void peer_dir_base_t::remove_node(peer_dir_base_t *child) {
+    if (child->get_entry()->is_dir()) {
+        --dirs_count;
+    }
     if (child->augmentation) {
         auto index = find_child(child);
         deparent(index);
@@ -88,21 +80,33 @@ void peer_dir_base_t::remove_child(tree_item_t *child) {
     }
 }
 
+void peer_dir_base_t::insert_node(peer_dir_base_t *node) {
+    auto name_provider = [this](int index) { return std::string_view(child(index)->label()); };
+    auto start_index = int{0};
+    auto end_index = int{0};
+    auto directory = node->get_entry()->is_dir();
+
+    if (directory) {
+        end_index = dirs_count - 1;
+        ++dirs_count;
+    } else {
+        start_index = dirs_count;
+        end_index = children() - 1;
+    }
+
+    auto pos = bisect(node->label(), start_index, end_index, children(), name_provider);
+    auto tmp_node = insert(prefs(), "", pos);
+    replace_child(tmp_node, node);
+
+    if (directory) {
+        tree()->close(node);
+    }
+}
+
 void peer_dir_base_t::show_deleted(bool value) {
     if (value) {
-        auto name_provider = [this](int index) { return std::string_view(child(index)->label()); };
         for (auto node : deleted_items) {
-            auto start_index = int{0};
-            auto end_index = int{0};
-            if (auto dir = dynamic_cast<virtual_dir_t *>(node); dir) {
-                std::abort();
-            } else {
-                start_index = dirs_map.size();
-                end_index = children() - 1;
-            }
-            auto pos = bisect(node->label(), start_index, end_index, children(), name_provider);
-            auto tmp_node = insert(prefs(), "", pos);
-            replace_child(tmp_node, node);
+            insert_node(node);
             orphaned_items.erase(node);
         }
         tree()->redraw();

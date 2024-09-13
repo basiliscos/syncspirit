@@ -54,3 +54,5 @@ void peer_folder_t::on_open() {
 
     supervisor.get_logger()->debug("{}, expanded {} file records", folder_info.get_folder()->get_label(), files.size());
 }
+
+auto peer_folder_t::get_entry() -> model::file_info_t * { return nullptr; }

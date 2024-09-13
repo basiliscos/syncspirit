@@ -46,7 +46,7 @@ add_executable(syncspirit-fltk WIN32
     tree_item/pending_folders.cpp
     tree_item/self_device.cpp
     tree_item/settings.cpp
-    tree_item/virtual_dir.cpp
+
 )
 
 target_link_libraries(syncspirit-fltk

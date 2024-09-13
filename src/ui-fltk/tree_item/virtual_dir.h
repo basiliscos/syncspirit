@@ -1,5 +1,6 @@
 #pragma once
 
+#include "virtual_entry.h"
 #include "model/file_info.h"
 #include <boost/filesystem.hpp>
 
@@ -7,7 +8,9 @@ namespace syncspirit::fltk::tree_item {
 
 namespace bfs = boost::filesystem;
 
-struct virtual_dir_t {
+struct virtual_dir_t : virtual_entry_t {
+
+    using virtual_entry_t::virtual_entry_t;
     virtual ~virtual_dir_t() = default;
 
     virtual virtual_dir_t *locate_dir(const bfs::path &parent) = 0;
