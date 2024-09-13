@@ -7,7 +7,7 @@
 #include "tree_item/pending_devices.h"
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
-#include "tree_item/virtual_dir.h"
+#include "tree_item/virtual_entry.h"
 #include "net/names.h"
 #include "config/utils.h"
 #include "model/diff/load/load_cluster.h"
@@ -385,9 +385,9 @@ void app_supervisor_t::set_show_deleted(bool value) {
                 auto generic_augmnetation = it.item->get_augmentation();
                 if (generic_augmnetation) {
                     auto augmentation = static_cast<augmentation_t *>(generic_augmnetation.get());
-                    auto virtual_dir = dynamic_cast<tree_item::virtual_dir_t *>(augmentation->get_owner());
-                    if (virtual_dir) {
-                        virtual_dir->show_deleted(value);
+                    auto virtual_entry = dynamic_cast<tree_item::virtual_entry_t *>(augmentation->get_owner());
+                    if (virtual_entry) {
+                        virtual_entry->show_deleted(value);
                     }
                 }
             }

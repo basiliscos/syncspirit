@@ -1,21 +1,21 @@
-#include "peer_dir_base.h"
-#include "peer_dir.h"
+#include "peer_entry_base.h"
+#include "peer_entry.h"
 #include "../utils.hpp"
 
 using namespace syncspirit::fltk::tree_item;
 
-peer_dir_base_t::peer_dir_base_t(app_supervisor_t &supervisor, Fl_Tree *tree, bool has_augmentation)
+peer_entry_base_t::peer_entry_base_t(app_supervisor_t &supervisor, Fl_Tree *tree, bool has_augmentation)
     : tree_item_t(supervisor, tree, has_augmentation), dirs_count{0} {}
 
-peer_dir_base_t::~peer_dir_base_t() {
+peer_entry_base_t::~peer_entry_base_t() {
     for (auto item : orphaned_items) {
         delete item;
     }
     orphaned_items.clear();
 }
 
-auto peer_dir_base_t::locate_dir(const bfs::path &parent) -> virtual_dir_t * {
-    auto current = (virtual_dir_t *)(this);
+auto peer_entry_base_t::locate_dir(const bfs::path &parent) -> virtual_entry_t * {
+    auto current = (virtual_entry_t *)(this);
     for (auto &piece : parent) {
         auto name = piece.string();
         current = current->locate_own_dir(name);
@@ -23,17 +23,17 @@ auto peer_dir_base_t::locate_dir(const bfs::path &parent) -> virtual_dir_t * {
     return current;
 }
 
-virtual_dir_t *peer_dir_base_t::locate_own_dir(std::string_view name) {
+virtual_entry_t *peer_entry_base_t::locate_own_dir(std::string_view name) {
     if (name.empty()) {
         return this;
     }
 
     auto it = dirs_map.find(name);
     assert(it != dirs_map.end());
-    return dynamic_cast<virtual_dir_t *>(it->second);
+    return dynamic_cast<virtual_entry_t *>(it->second);
 }
 
-void peer_dir_base_t::add_entry(model::file_info_t &file) {
+void peer_entry_base_t::add_entry(model::file_info_t &file) {
     bool deleted = file.is_deleted();
     bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
     auto name = file.get_path().filename().string();
@@ -41,7 +41,7 @@ void peer_dir_base_t::add_entry(model::file_info_t &file) {
     auto start_index = int{0};
     auto end_index = int{0};
     auto t = tree();
-    auto node = within_tree([&]() -> peer_dir_t * { return new peer_dir_t(supervisor, t, file); });
+    auto node = within_tree([&]() -> peer_entry_t * { return new peer_entry_t(supervisor, t, file); });
 
     if (file.is_dir()) {
         dirs_map[name] = node;
@@ -61,9 +61,9 @@ void peer_dir_base_t::add_entry(model::file_info_t &file) {
     }
 }
 
-void peer_dir_base_t::remove_child(tree_item_t *child) { remove_node(dynamic_cast<peer_dir_base_t *>(child)); }
+void peer_entry_base_t::remove_child(tree_item_t *child) { remove_node(dynamic_cast<peer_entry_base_t *>(child)); }
 
-void peer_dir_base_t::remove_node(peer_dir_base_t *child) {
+void peer_entry_base_t::remove_node(peer_entry_base_t *child) {
     if (child->get_entry()->is_dir()) {
         --dirs_count;
     }
@@ -80,7 +80,7 @@ void peer_dir_base_t::remove_node(peer_dir_base_t *child) {
     }
 }
 
-void peer_dir_base_t::insert_node(peer_dir_base_t *node) {
+void peer_entry_base_t::insert_node(peer_entry_base_t *node) {
     auto name_provider = [this](int index) { return std::string_view(child(index)->label()); };
     auto start_index = int{0};
     auto end_index = int{0};
@@ -103,7 +103,7 @@ void peer_dir_base_t::insert_node(peer_dir_base_t *node) {
     }
 }
 
-void peer_dir_base_t::show_deleted(bool value) {
+void peer_entry_base_t::show_deleted(bool value) {
     if (value) {
         for (auto node : deleted_items) {
             insert_node(node);
