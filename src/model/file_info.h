@@ -113,6 +113,8 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     bool need_download(const file_info_t &other) noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
+    inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }
+    inline std::int32_t get_modified_by() const noexcept { return modified_by; }
 
     file_info_ptr_t local_file() noexcept;
 
@@ -138,6 +140,9 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     file_info_ptr_t actualize() const noexcept;
     proto::Index generate() noexcept;
     std::size_t expected_meta_size() const noexcept;
+
+    std::uint32_t get_permissions() const noexcept;
+    bool has_no_permissions() const noexcept;
 
   private:
     using marks_vector_t = std::vector<bool>;
