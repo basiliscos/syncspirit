@@ -108,10 +108,12 @@ void peer_dir_base_t::show_deleted(bool value) {
         for (auto node : deleted_items) {
             insert_node(node);
             orphaned_items.erase(node);
+            node->show_deleted(value);
         }
         tree()->redraw();
     } else {
         for (auto node : deleted_items) {
+            node->show_deleted(value);
             remove_child(node);
         }
     }
