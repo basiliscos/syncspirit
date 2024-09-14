@@ -9,6 +9,7 @@
 #include "model/diff/local/file_availability.h"
 #include "model/diff/contact/update_contact.h"
 #include "model/diff/cluster_visitor.h"
+#include <cstring>
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -65,6 +66,10 @@ TEST_CASE("with file", "[model]") {
     REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
     auto file = folder_info->get_file_infos().by_name("a.txt");
     REQUIRE(file);
+
+    auto &v = file->get_version();
+    REQUIRE(v.counters_size() == 1);
+    REQUIRE(my_device->matches(v.counters(0).id()));
 
     SECTION("lock/unlock") {
         auto diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, true));
