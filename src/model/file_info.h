@@ -70,8 +70,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     db::FileInfo as_db(bool include_blocks = true) const noexcept;
     std::string serialize(bool include_blocks = true) const noexcept;
 
-    void update(const proto::FileInfo &remote_info) noexcept;
-    bool update(const local_file_t &local_file) noexcept;
+    void update(const file_info_t &updated) noexcept;
 
     inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
     std::string_view get_name() const noexcept;

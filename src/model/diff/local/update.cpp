@@ -96,6 +96,7 @@ auto update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<
     auto file_info = std::move(opt.value());
 
     auto &blocks_map = cluster.get_blocks();
+    assert(!(file.blocks_size() && file.deleted()));
     for (int i = 0; i < file.blocks_size(); ++i) {
         auto &block = file.blocks(i);
         auto strict_hash = block_info_t::make_strict_hash(block.hash());

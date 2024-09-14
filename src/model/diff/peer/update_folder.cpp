@@ -59,7 +59,15 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
                 file->assign_block(block, (size_t)i);
             }
         }
+        if (auto prev_file = fm.by_name(file->get_name()); prev_file) {
+            prev_file->update(*file);
+            file = std::move(prev_file);
+        }
+
         folder_info->add(file, true);
+        if (auto aug = file->get_augmentation(); aug) {
+            aug->on_update();
+        }
     }
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
@@ -147,6 +155,9 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
             if (!blocks.get(strict_hash.get_hash())) {
                 new_blocks.emplace_back(std::move(b));
             }
+        }
+        if (!f.version().counters_size()) {
+            return make_error_code(error_code_t::missing_version);
         }
         files.emplace_back(std::move(message.files(i)));
     }

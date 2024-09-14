@@ -7,11 +7,13 @@
 #include "misc/error_code.h"
 #include "misc/version_utils.h"
 #include "utils/log.h"
+#include "utils/string_comparator.hpp"
 #include "db/prefix.h"
 #include "fs/utils.h"
 #include <zlib.h>
 #include <spdlog/spdlog.h>
 #include <algorithm>
+#include <set>
 
 #ifdef uuid_t
 #undef uuid_t
@@ -246,6 +248,7 @@ void file_info_t::mark_local() noexcept { flags = flags | f_local; }
 void file_info_t::mark_local_available(size_t block_index) noexcept {
     assert(block_index < blocks.size());
     assert(!marks[block_index]);
+    assert(missing_blocks);
     blocks[block_index]->mark_local_available(this);
     marks[block_index] = true;
     --missing_blocks;
@@ -432,6 +435,50 @@ file_info_ptr_t file_info_t::actualize() const noexcept { return folder_info->ge
 std::uint32_t file_info_t::get_permissions() const noexcept { return permissions; }
 
 bool file_info_t::has_no_permissions() const noexcept { return flags & f_no_permissions; }
+
+void file_info_t::update(const file_info_t &other) noexcept {
+    using hashes_t = std::set<std::string, utils::string_comparator_t>;
+    assert(this->get_key() == other.get_key());
+    assert(this->name == other.name);
+    type = other.type;
+    size = other.size;
+    permissions = other.permissions;
+    modified_s = other.modified_s;
+    modified_ns = other.modified_ns;
+    modified_by = other.modified_by;
+    flags = other.flags;
+    version = other.version;
+    source_version = other.source_version;
+    sequence = other.sequence;
+    block_size = other.block_size;
+    symlink_target = other.symlink_target;
+
+    auto local_block_hashes = hashes_t{};
+    for (auto &b : blocks) {
+        if (b) {
+            for (auto &fb : b->get_file_blocks()) {
+                if (fb.is_locally_available() && fb.file() == this) {
+                    local_block_hashes.insert(std::string(b->get_hash()));
+                    break;
+                }
+            }
+        }
+    }
+    remove_blocks();
+
+    marks = other.marks;
+    blocks.resize(other.blocks.size());
+    missing_blocks = blocks.size();
+    for (size_t i = 0; i < other.blocks.size(); ++i) {
+        auto &b = other.blocks[i];
+        if (b) {
+            assign_block(b, i);
+            if (local_block_hashes.contains(b->get_hash())) {
+                mark_local_available(i);
+            }
+        }
+    }
+}
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const file_info_ptr_t &item) noexcept {
     return item->get_uuid();

@@ -46,7 +46,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
         b->set_hash("123");
         b->set_size(5ul);
 
-        REQUIRE(builder.make_index(sha256, "1234-5678").add(file).finish().apply());
+        REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
 
         auto &peer_files = peer_folder_info->get_file_infos();
         REQUIRE(peer_files.size() == 1);
@@ -56,15 +56,15 @@ TEST_CASE("update folder (via Index)", "[model]") {
 
         auto key = std::string(f->get_key());
 
-        SECTION("when a file with existing name is added, key is kept") {
+        SECTION("when a file with existing name is added, key & instance are kept") {
             peer_folder_info->set_max_sequence(11ul);
             file.set_modified_s(2);
             file.set_sequence(11ul);
-            REQUIRE(builder.make_index(sha256, "1234-5678").add(file).finish().apply());
+            REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
 
             REQUIRE(peer_files.size() == 1);
             auto same_f = peer_files.by_name(file.name());
-            CHECK(same_f.get() != f.get());
+            CHECK(same_f.get() == f.get());
             CHECK(same_f->get_key() == f->get_key());
         }
 
@@ -76,7 +76,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
             file.set_modified_s(2);
             file.set_sequence(11ul);
             file.mutable_blocks(0)->set_hash("345");
-            REQUIRE(builder.make_index(sha256, "1234-5678").add(file).finish().apply());
+            REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
 
             REQUIRE(peer_files.size() == 1);
             REQUIRE(blocks_map.size() == 1);
@@ -118,7 +118,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
         auto b = file.add_blocks();
         b->set_hash("123");
 
-        auto ec = builder.make_index(sha256, "1234-5678").add(file).fail();
+        auto ec = builder.make_index(sha256, "1234-5678").add(file, peer_device).fail();
         REQUIRE(ec);
         CHECK(ec == model::make_error_code(model::error_code_t::unexpected_blocks));
     }

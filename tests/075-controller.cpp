@@ -378,6 +378,11 @@ void test_index_receiving() {
                 file->set_name("some-dir");
                 file->set_type(proto::FileInfoType::DIRECTORY);
                 file->set_sequence(10);
+                auto v = file->mutable_version();
+                auto c = v->add_counters();
+                c->set_id(peer_device->as_uint());
+                c->set_value(1);
+
                 peer_actor->forward(proto::message::Index(new proto::Index(index)));
                 sup->do_process();
 
@@ -405,6 +410,11 @@ void test_index_receiving() {
                     file->set_name("some-dir-2");
                     file->set_type(proto::FileInfoType::DIRECTORY);
                     file->set_sequence(folder_1_peer->get_max_sequence() + 1);
+                    auto v = file->mutable_version();
+                    auto c = v->add_counters();
+                    c->set_id(peer_device->as_uint());
+                    c->set_value(1);
+
                     peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
 
                     sup->do_process();
@@ -669,6 +679,10 @@ void test_downloading() {
                 file->set_sequence(folder_1_peer->get_max_sequence() + 1);
                 file->set_block_size(0);
                 file->set_size(0);
+                auto v = file->mutable_version();
+                auto c = v->add_counters();
+                c->set_id(peer_device->as_uint());
+                c->set_value(1);
 
                 peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index)));
                 sup->do_process();

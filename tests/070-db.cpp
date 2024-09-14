@@ -428,7 +428,7 @@ void test_cluster_update_and_remove() {
                 .share_folder(sha256, folder_id)
                 .apply(*sup)
                 .make_index(sha256, folder_id)
-                .add(file)
+                .add(file, peer_device)
                 .finish()
                 .apply(*sup);
 
@@ -525,7 +525,7 @@ void test_unshare_and_remove_folder() {
                 .share_folder(sha256, folder_id)
                 .apply(*sup)
                 .make_index(sha256, folder_id)
-                .add(file)
+                .add(file, peer_device)
                 .finish()
                 .apply(*sup);
 
@@ -612,7 +612,7 @@ void test_clone_file() {
             auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
 
             SECTION("file without blocks") {
-                builder.make_index(sha256, folder_id).add(file).finish().apply(*sup);
+                builder.make_index(sha256, folder_id).add(file, peer_device).finish().apply(*sup);
 
                 auto file_peer = folder_peer->get_file_infos().by_name(file.name());
                 REQUIRE(file_peer);
@@ -647,7 +647,7 @@ void test_clone_file() {
                 b->set_size(5ul);
                 b->set_hash(utils::sha256_digest("12345").value());
 
-                builder.make_index(sha256, folder_id).add(file).finish().apply(*sup);
+                builder.make_index(sha256, folder_id).add(file, peer_device).finish().apply(*sup);
 
                 auto folder = cluster->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_infos().by_device(*my_device);
@@ -830,7 +830,7 @@ void test_remove_peer() {
                 .share_folder(sha256, folder_id)
                 .apply(*sup)
                 .make_index(sha256, folder_id)
-                .add(file)
+                .add(file, peer_device)
                 .finish()
                 .apply(*sup);
 

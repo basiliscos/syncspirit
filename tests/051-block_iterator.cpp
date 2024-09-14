@@ -69,6 +69,7 @@ TEST_CASE("block iterator", "[model]") {
         p_file.set_block_size(5ul);
 
         SECTION("no iteration upon deleted file") {
+            p_file.clear_blocks();
             p_file.set_deleted(true);
 
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());

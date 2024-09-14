@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <system_error>
 #include <boost/system/error_code.hpp>
 #include "syncspirit-export.h"
 
@@ -44,7 +43,8 @@ enum class error_code_t {
     malformed_deviceid,
     folder_is_not_shared,
     invalid_block_size,
-    unexpected_blocks
+    unexpected_blocks,
+    missing_version,
 };
 
 namespace detail {

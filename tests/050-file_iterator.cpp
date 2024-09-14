@@ -64,7 +64,7 @@ TEST_CASE("file iterator", "[model]") {
         auto file = proto::FileInfo();
         file.set_name("a.txt");
         file.set_sequence(10ul);
-        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file).finish().apply());
+        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
         auto peer_folder = folder_infos.by_device(*peer_device);
         auto peer_file = peer_folder->get_file_infos().by_name("a.txt");
@@ -93,7 +93,7 @@ TEST_CASE("file iterator", "[model]") {
         file.set_invalid(true);
         auto peer_folder = folder_infos.by_device(*peer_device);
 
-        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file).finish().apply());
+        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
         REQUIRE(!next(true));
     }
 
@@ -107,8 +107,11 @@ TEST_CASE("file iterator", "[model]") {
             file_2.set_name("b.txt");
             file_2.set_sequence(9ul);
 
-            REQUIRE(
-                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).add(file_2).finish().apply());
+            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id())
+                        .add(file_1, peer_device)
+                        .add(file_2, peer_device)
+                        .finish()
+                        .apply());
 
             SECTION("files are missing at my side") {
                 auto f1 = next(true);
@@ -159,7 +162,8 @@ TEST_CASE("file iterator", "[model]") {
             counter->set_id(12345ul);
             counter->set_value(1233ul);
 
-            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).finish().apply());
+            REQUIRE(
+                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1, peer_device).finish().apply());
 
             proto::Vector my_version;
             auto my_folder = folder_infos.by_device(*my_device);
@@ -181,7 +185,8 @@ TEST_CASE("file iterator", "[model]") {
             counter->set_id(12345ul);
             counter->set_value(1233ul);
 
-            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).finish().apply());
+            REQUIRE(
+                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1, peer_device).finish().apply());
 
             proto::Vector my_version;
             auto my_folder = folder_infos.by_device(*my_device);
@@ -200,7 +205,8 @@ TEST_CASE("file iterator", "[model]") {
             b->set_hash("123");
             b->set_size(5ul);
 
-            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).finish().apply());
+            REQUIRE(
+                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1, peer_device).finish().apply());
 
             auto my_folder = folder_infos.by_device(*my_device);
             my_folder->set_max_sequence(file_1.sequence());
@@ -221,7 +227,8 @@ TEST_CASE("file iterator", "[model]") {
             b->set_hash("123");
             b->set_size(5ul);
 
-            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).finish().apply());
+            REQUIRE(
+                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1, peer_device).finish().apply());
 
             auto peer_folder = folder_infos.by_device(*peer_device);
             auto file = file_info_t::create(sequencer->next_uuid(), file_1, peer_folder).value();
@@ -257,7 +264,11 @@ TEST_CASE("file iterator", "[model]") {
         counter_2->set_id(15ul);
         counter_2->set_value(1ul);
 
-        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1).add(file_2).finish().apply());
+        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id())
+                    .add(file_1, peer_device)
+                    .add(file_2, peer_device)
+                    .finish()
+                    .apply());
 
         auto peer_folder = folder_infos.by_device(*peer_device);
         auto &peer_files = peer_folder->get_file_infos();
@@ -294,7 +305,11 @@ TEST_CASE("file iterator", "[model]") {
         file_b.set_sequence(9ul);
         auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
 
-        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_a).add(file_b).finish().apply());
+        REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id())
+                    .add(file_a, peer_device)
+                    .add(file_b, peer_device)
+                    .finish()
+                    .apply());
         auto orig_file = peer_folder->get_file_infos().by_name("b.txt");
 
         auto f_1 = next(true);
@@ -354,8 +369,8 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     file2.set_name("b.txt");
     file2.set_sequence(11ul);
 
-    REQUIRE(builder.make_index(sha256, "1234").add(file1).finish().apply());
-    REQUIRE(builder.make_index(sha256, "5678").add(file2).finish().apply());
+    REQUIRE(builder.make_index(sha256, "1234").add(file1, peer_device).finish().apply());
+    REQUIRE(builder.make_index(sha256, "5678").add(file2, peer_device).finish().apply());
 
     auto files = std::unordered_set<std::string>{};
     auto f = next(true);
