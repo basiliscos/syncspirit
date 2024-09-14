@@ -54,22 +54,20 @@ version_relation_t compare(const proto::Vector &lhs, const proto::Vector &rhs) n
 void record_update(proto::Vector &v, const device_t &source) noexcept {
     bool append = true;
     auto sz = v.counters_size();
-    auto full_id = source.device_id().get_sha256();
-    auto half_id = uint64_t{};
-    memcpy(&half_id, full_id.data(), 8);
+    auto device_short = source.as_uint();
     auto value = uint64_t{};
     if (sz != 0) {
         auto &last = *v.mutable_counters(sz - 1);
         auto id = last.id();
         value = last.value() + 1;
-        if (id == half_id) {
+        if (id == device_short) {
             append = false;
             last.set_value(value);
         }
     }
     if (append) {
         auto &counter = *v.add_counters();
-        counter.set_id(half_id);
+        counter.set_id(device_short);
         counter.set_value(value);
     }
 }

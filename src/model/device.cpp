@@ -7,6 +7,10 @@
 #include "misc/error_code.h"
 #include "utils/time.h"
 
+#include <boost/endian/conversion.hpp>
+
+namespace be = boost::endian;
+
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::device);
@@ -60,13 +64,15 @@ device_t::device_t(const device_id_t &device_id_, std::string_view name_, std::s
 
 void device_t::update(const db::Device &source) noexcept { assign(source); }
 
-uint64_t device_t::as_uint() noexcept {
+uint64_t device_t::as_uint() const noexcept {
     auto device_id = id.get_sha256();
     uint64_t id;
     auto ptr = device_id.data();
     std::copy(ptr, ptr + sizeof(id), reinterpret_cast<char *>(&id));
-    return id;
+    return be::native_to_big(id);
 }
+
+bool device_t::matches(uint64_t value) const noexcept { return as_uint() == value; }
 
 std::string device_t::serialize(db::Device &r) const noexcept {
     r.set_name(name);

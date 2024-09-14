@@ -69,7 +69,8 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     void assign_uris(const uris_t &uris) noexcept;
 
     void update(const db::Device &source) noexcept;
-    uint64_t as_uint() noexcept;
+    uint64_t as_uint() const noexcept;
+    bool matches(uint64_t) const noexcept;
 
   protected:
     device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept;
