@@ -4,6 +4,7 @@
 #include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
 #include "tree_item/peer_device.h"
+#include "tree_item/peer_folder.h"
 #include "tree_item/pending_devices.h"
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
@@ -341,6 +342,10 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
 
 auto app_supervisor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+    auto r = diff.visit_next(*this, custom);
+    if (r.has_error()) {
+        return r;
+    }
     auto &device = *cluster->get_devices().by_sha256(diff.peer_id);
     auto &folder = *cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = *folder.is_shared_with(device);
@@ -348,7 +353,7 @@ auto app_supervisor_t::operator()(const model::diff::modify::share_folder_t &dif
     auto peer_node = devices_node->get_peer(device);
     auto folders_node = static_cast<tree_item::peer_folders_t *>(peer_node->get_folders());
     folders_node->add_folder(folder_info);
-    return diff.visit_next(*this, custom);
+    return r;
 }
 
 auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
@@ -369,14 +374,16 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
     auto folder_info = folder->get_folder_infos().by_device(*peer);
     if (auto generic_augmnetation = folder_info->get_augmentation(); generic_augmnetation) {
         auto augmentation = static_cast<augmentation_t *>(generic_augmnetation.get());
-        auto virtual_entry = dynamic_cast<tree_item::virtual_entry_t *>(augmentation->get_owner());
-        auto &files_map = folder_info->get_file_infos();
-        for (auto &file : diff.files) {
-            auto file_info = files_map.by_name(file.name());
-            if (!file_info->get_augmentation()) {
-                auto path = bfs::path(file_info->get_name());
-                auto dir = virtual_entry->locate_dir(path.parent_path());
-                dir->add_entry(*file_info);
+        auto folder_entry = dynamic_cast<tree_item::peer_folder_t *>(augmentation->get_owner());
+        if (folder_entry->expandend) {
+            auto &files_map = folder_info->get_file_infos();
+            for (auto &file : diff.files) {
+                auto file_info = files_map.by_name(file.name());
+                if (!file_info->get_augmentation()) {
+                    auto path = bfs::path(file_info->get_name());
+                    auto dir = folder_entry->locate_dir(path.parent_path());
+                    dir->add_entry(*file_info);
+                }
             }
         }
     }

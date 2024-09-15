@@ -9,6 +9,8 @@ peer_entry_t::peer_entry_t(app_supervisor_t &supervisor, Fl_Tree *tree, model::f
     entry.set_augmentation(get_proxy());
 }
 
+auto peer_entry_t::get_entry() -> model::file_info_t * { return &entry; }
+
 void peer_entry_t::update_label() {
     auto &entry = *get_entry();
     auto name = get_entry()->get_path().filename().string();
@@ -18,8 +20,6 @@ void peer_entry_t::update_label() {
     }
 }
 
-auto peer_entry_t::get_entry() -> model::file_info_t * { return &entry; }
-
 bool peer_entry_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
         auto prev = content->get_widget();
@@ -27,4 +27,15 @@ bool peer_entry_t::on_select() {
         return new content::remote_file_table_t(*this, x, y, w, h);
     });
     return true;
+}
+
+void peer_entry_t::on_update() {
+    parent_t::on_update();
+    auto &entry = *get_entry();
+    if (entry.is_deleted()) {
+        bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
+        if (!show_deleted) {
+            static_cast<tree_item_t *>(parent())->remove_child(this);
+        }
+    }
 }

@@ -23,6 +23,15 @@ void peer_folder_t::update_label() {
     tree()->redraw();
 }
 
+void peer_folder_t::on_update() {
+    parent_t::on_update();
+    if (!expandend && children() == 0 && folder_info.get_file_infos().size()) {
+        auto t = tree();
+        add(prefs(), "[dummy]", new Fl_Tree_Item(t));
+        t->close(this, 0);
+    }
+}
+
 void peer_folder_t::on_open() {
     if (expandend) {
         return;

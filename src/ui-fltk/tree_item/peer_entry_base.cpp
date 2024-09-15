@@ -61,10 +61,19 @@ void peer_entry_base_t::add_entry(model::file_info_t &file) {
 void peer_entry_base_t::remove_child(tree_item_t *child) { remove_node(dynamic_cast<peer_entry_base_t *>(child)); }
 
 void peer_entry_base_t::remove_node(peer_entry_base_t *child) {
-    if (child->get_entry()->is_dir()) {
+    auto &entry = *child->get_entry();
+    if (entry.is_dir()) {
         --dirs_count;
     }
     if (child->augmentation) {
+        if (entry.is_deleted()) {
+            deleted_items.emplace(child);
+        } else {
+            auto it = deleted_items.find(child);
+            if (it != deleted_items.end()) {
+                deleted_items.erase(it);
+            }
+        }
         auto index = find_child(child);
         deparent(index);
         orphaned_items.emplace(child);
