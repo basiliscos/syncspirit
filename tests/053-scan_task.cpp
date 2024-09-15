@@ -85,6 +85,13 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == true);
 
             r = task.advance();
+            auto *uf = std::get_if<unknown_file_t>(&r);
+            REQUIRE(uf);
+            CHECK(uf->path.filename() == "some-dir");
+            CHECK(uf->metadata.size() == 0);
+            CHECK(uf->metadata.type() == proto::FileInfoType::DIRECTORY);
+
+            r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == true);
 
@@ -145,7 +152,7 @@ TEST_CASE("scan_task", "[fs]") {
         counter->set_id(1);
         counter->set_value(peer_device->as_uint());
 
-        SECTION("meta is not changed") {
+        SECTION("meta is not changed (file)") {
             pr_file.set_block_size(5);
             pr_file.set_size(5);
             pr_file.set_modified_s(modified);
@@ -153,6 +160,31 @@ TEST_CASE("scan_task", "[fs]") {
             auto path = root_path / "a.txt";
             write_file(path, "12345");
             bfs::last_write_time(path, modified);
+
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
+        SECTION("meta is not changed (dir)") {
+            pr_file.set_name("a-dir");
+            pr_file.set_type(proto::FileInfoType::DIRECTORY);
+
+            auto dir = root_path / "a-dir";
+            bfs::create_directories(dir);
 
             auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             folder_my->add(file, false);
@@ -195,8 +227,52 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == false);
         }
 
+        SECTION("dir has been removed") {
+            pr_file.set_name("a-dir");
+            pr_file.set_type(proto::FileInfoType::DIRECTORY);
+
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<removed_t>(&r));
+            auto ref = std::get_if<removed_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
         SECTION("removed file does not exist => unchanged meta") {
             pr_file.set_deleted(true);
+
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
+        SECTION("removed dir does not exist => unchanged meta") {
+            pr_file.set_deleted(true);
+            pr_file.set_type(proto::FileInfoType::DIRECTORY);
 
             auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             folder_my->add(file, false);
@@ -448,6 +524,13 @@ TEST_CASE("scan_task", "[fs]") {
                 auto r = task.advance();
                 CHECK(std::get_if<bool>(&r));
                 CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task.advance();
+                auto *uf = std::get_if<unknown_file_t>(&r);
+                REQUIRE(uf);
+                CHECK(uf->path.filename() == "some");
+                CHECK(uf->metadata.size() == 0);
+                CHECK(uf->metadata.type() == proto::FileInfoType::DIRECTORY);
 
                 r = task.advance();
                 REQUIRE(std::get_if<scan_errors_t>(&r));

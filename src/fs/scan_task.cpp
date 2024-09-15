@@ -107,10 +107,6 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 errors.push_back(scan_error_t{child, ec});
                 continue;
             }
-            if (status.type() == bfs::file_type::directory_file) {
-                dirs_queue.push_back(child);
-                continue;
-            }
             auto rp = relativize(child, root);
             auto file = files.by_name(rp.path.string());
             if (file) {
@@ -137,6 +133,9 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 }
                 metadata.set_modified_s(modification_time);
 
+            } else if (status.type() == bfs::file_type::directory_file) {
+                metadata.set_type(proto::FileInfoType::DIRECTORY);
+                dirs_queue.push_back(child);
             } else if (status.type() == bfs::file_type::symlink_file) {
                 auto target = bfs::read_symlink(child, ec);
                 if (ec) {
@@ -167,6 +166,8 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
 scan_result_t scan_task_t::advance_file(const file_info_t &info) noexcept {
     if (info.file->is_file()) {
         return advance_regular_file(info);
+    } else if (info.file->is_dir()) {
+        return unchanged_meta_t{info.file};
     } else {
         assert(info.file->is_link());
         return advance_symlink_file(info);

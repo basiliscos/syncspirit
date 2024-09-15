@@ -131,11 +131,6 @@ void test_meta_changes() {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(folder_info->get_file_infos().size() == 0);
                 }
-                SECTION("just 1 dir") {
-                    CHECK(bfs::create_directories(root_path / "abc"));
-                    builder->scan_start(folder->get_id()).apply(*sup);
-                    CHECK(folder_info->get_file_infos().size() == 0);
-                }
 #ifndef SYNCSPIRIT_WIN
                 SECTION("just 1 subdir, which cannot be read") {
                     auto subdir = root_path / "abc";
@@ -145,7 +140,10 @@ void test_meta_changes() {
                     bfs::permissions(subdir, bfs::perms::owner_read, ec);
                     if (!ec) {
                         builder->scan_start(folder->get_id()).apply(*sup);
-                        CHECK(folder_info->get_file_infos().size() == 0);
+                        REQUIRE(folder_info->get_file_infos().size() == 1);
+                        auto fi = folder_info->get_file_infos().begin()->item;
+                        CHECK(fi->is_dir());
+                        CHECK(fi->get_name() == "abc");
                         bfs::permissions(subdir, bfs::perms::all_all);
                         REQUIRE(errors.size() == 1);
                         auto &errs = errors.at(0)->payload.errors;
@@ -408,6 +406,22 @@ void test_new_files() {
                 CHECK(file->is_locally_available());
                 CHECK(!file->is_file());
                 CHECK(file->is_link());
+                CHECK(file->get_block_size() == 0);
+                CHECK(file->get_size() == 0);
+                CHECK(blocks.size() == 0);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+            }
+
+            SECTION("new dir") {
+                auto dir_path = root_path / "some-dir";
+                bfs::create_directories(dir_path);
+                builder->scan_start(folder->get_id()).apply(*sup);
+
+                auto file = files->by_name("some-dir");
+                REQUIRE(file);
+                CHECK(file->is_locally_available());
+                CHECK(file->is_dir());
+                CHECK(!file->is_link());
                 CHECK(file->get_block_size() == 0);
                 CHECK(file->get_size() == 0);
                 CHECK(blocks.size() == 0);
