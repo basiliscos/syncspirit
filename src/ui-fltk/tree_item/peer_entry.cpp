@@ -9,6 +9,15 @@ peer_entry_t::peer_entry_t(app_supervisor_t &supervisor, Fl_Tree *tree, model::f
     entry.set_augmentation(get_proxy());
 }
 
+void peer_entry_t::update_label() {
+    auto &entry = *get_entry();
+    auto name = get_entry()->get_path().filename().string();
+    label(name.c_str());
+    if (entry.is_deleted()) {
+        labelfgcolor(FL_DARK1);
+    }
+}
+
 auto peer_entry_t::get_entry() -> model::file_info_t * { return &entry; }
 
 bool peer_entry_t::on_select() {

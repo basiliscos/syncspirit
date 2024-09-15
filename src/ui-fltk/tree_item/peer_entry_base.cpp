@@ -36,12 +36,13 @@ virtual_entry_t *peer_entry_base_t::locate_own_dir(std::string_view name) {
 void peer_entry_base_t::add_entry(model::file_info_t &file) {
     bool deleted = file.is_deleted();
     bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
-    auto name = file.get_path().filename().string();
     auto name_provider = [this](int index) { return std::string_view(child(index)->label()); };
     auto start_index = int{0};
     auto end_index = int{0};
     auto t = tree();
     auto node = within_tree([&]() -> peer_entry_t * { return new peer_entry_t(supervisor, t, file); });
+    node->update_label();
+    auto name = std::string(node->label());
 
     if (file.is_dir()) {
         dirs_map[name] = node;
@@ -50,10 +51,6 @@ void peer_entry_base_t::add_entry(model::file_info_t &file) {
         deleted_items.emplace(node);
     }
 
-    node->label(name.c_str());
-    if (deleted) {
-        node->labelfgcolor(FL_DARK1);
-    }
     if (!deleted || show_deleted) {
         insert_node(node);
     } else {
@@ -104,17 +101,21 @@ void peer_entry_base_t::insert_node(peer_entry_base_t *node) {
 }
 
 void peer_entry_base_t::show_deleted(bool value) {
-    if (value) {
-        for (auto node : deleted_items) {
-            insert_node(node);
-            orphaned_items.erase(node);
+    for (auto &it : dirs_map) {
+        it.second->show_deleted(value);
+    }
+
+    for (auto node : deleted_items) {
+        if (!node->get_entry()->is_dir()) {
             node->show_deleted(value);
         }
-        tree()->redraw();
-    } else {
-        for (auto node : deleted_items) {
-            node->show_deleted(value);
+
+        if (value) {
+            insert_node(node);
+            orphaned_items.erase(node);
+        } else {
             remove_child(node);
         }
     }
+    tree()->redraw();
 }

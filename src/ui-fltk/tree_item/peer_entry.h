@@ -10,6 +10,7 @@ struct peer_entry_t final : peer_entry_base_t {
 
     model::file_info_t *get_entry() override;
     bool on_select() override;
+    void update_label() override;
 
     model::file_info_t &entry;
 };
