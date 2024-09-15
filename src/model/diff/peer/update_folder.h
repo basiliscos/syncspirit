@@ -28,6 +28,7 @@ struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
 
     update_folder_t(std::string_view folder_id, std::string_view peer_id, files_t files, uuids_t uuids,
                     blocks_t new_blocks, orphaned_blocks_t::set_t removed_blocks) noexcept;
+
     std::string folder_id;
     std::string peer_id;
     files_t files;

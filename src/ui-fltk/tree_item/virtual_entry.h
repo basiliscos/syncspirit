@@ -5,7 +5,6 @@
 namespace syncspirit::fltk::tree_item {
 
 struct virtual_entry_t {
-
     virtual model::file_info_t *get_entry() = 0;
     virtual virtual_entry_t *locate_dir(const bfs::path &parent) = 0;
     virtual virtual_entry_t *locate_own_dir(std::string_view name) = 0;

@@ -17,6 +17,7 @@
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/share_folder.h"
+#include "model/diff/peer/update_folder.h"
 #include "utils/format.hpp"
 
 #include <utility>
@@ -357,6 +358,27 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &di
         auto folders_node = static_cast<tree_item::folders_t *>(folders);
         auto augmentation = folders_node->add_folder(folder);
         folder.set_augmentation(augmentation);
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
+-> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto peer = cluster->get_devices().by_sha256(diff.peer_id);
+    auto folder_info = folder->get_folder_infos().by_device(*peer);
+    if (auto generic_augmnetation = folder_info->get_augmentation(); generic_augmnetation) {
+        auto augmentation = static_cast<augmentation_t *>(generic_augmnetation.get());
+        auto virtual_entry = dynamic_cast<tree_item::virtual_entry_t *>(augmentation->get_owner());
+        auto& files_map = folder_info->get_file_infos();
+        for (auto& file: diff.files) {
+            auto file_info = files_map.by_name(file.name());
+            if (!file_info->get_augmentation()) {
+                auto path = bfs::path(file_info->get_name());
+                auto dir = virtual_entry->locate_dir(path.parent_path());
+                dir->add_entry(*file_info);
+            }
+        }
     }
     return diff.visit_next(*this, custom);
 }
