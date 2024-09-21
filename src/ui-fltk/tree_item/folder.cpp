@@ -4,6 +4,7 @@
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
 #include "../content/folder_table.h"
+#include "../symbols.h"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
 
@@ -20,7 +21,10 @@ folder_t::folder_t(model::folder_t &folder_, app_supervisor_t &supervisor, Fl_Tr
 void folder_t::update_label() {
     auto value = fmt::format("{}, {}", folder.get_label(), folder.get_id());
     if (folder.is_scanning()) {
-        value += "[s]";
+        value += symbols::scaning;
+    }
+    if (folder.is_scanning()) {
+        value += symbols::syncrhonizing;
     }
     label(value.data());
     tree()->redraw();

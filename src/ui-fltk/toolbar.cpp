@@ -1,4 +1,5 @@
 #include "toolbar.h"
+#include "symbols.h"
 
 #include <FL/Fl_Toggle_Button.H>
 
@@ -16,7 +17,8 @@ static void set_show_deleted(Fl_Widget *widget, void *data) {
 
 toolbar_t::toolbar_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
     : parent_t(x, y, w, button_h + padding * 2), supervisor{supervisor_} {
-    auto button_show_deleted = new Fl_Toggle_Button(x + padding, y + padding, 40 - padding * 2, button_h, "d");
+    auto button_show_deleted =
+        new Fl_Toggle_Button(x + padding, y + padding, 40 - padding * 2, button_h, symbols::deleted.data());
     button_show_deleted->tooltip("show deleted");
     button_show_deleted->callback(set_show_deleted, this);
     bool display_deleted = supervisor.get_app_config().fltk_config.display_deleted;

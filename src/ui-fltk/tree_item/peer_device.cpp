@@ -2,6 +2,7 @@
 #include "peer_folders.h"
 #include "pending_folders.h"
 #include "../qr_button.h"
+#include "../symbols.h"
 #include "../table_widget/checkbox.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/update_peer.h"
@@ -495,7 +496,7 @@ peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &superviso
 void peer_device_t::update_label() {
     auto name = peer.get_name();
     auto id = peer.device_id().get_short();
-    auto value = fmt::format("{}, {} [{}]", name, id, get_state());
+    auto value = fmt::format("{}, {} {}", name, id, get_state());
     label(value.data());
     tree()->redraw();
 }
@@ -512,13 +513,13 @@ bool peer_device_t::on_select() {
 std::string peer_device_t::get_state() {
     switch (peer.get_state()) {
     case model::device_state_t::online:
-        return "online";
+        return std::string(symbols::online);
     case model::device_state_t::discovering:
-        return "discovering";
+        return std::string(symbols::discovering);
     case model::device_state_t::connecting:
-        return "connecting";
+        return std::string(symbols::connecting);
     default:
-        return "offline";
+        return std::string(symbols::offline);
     }
 }
 
