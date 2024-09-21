@@ -34,6 +34,7 @@ void tree_item_t::refresh_content() {
 
 void tree_item_t::on_update() {
     update_label();
+    tree()->redraw();
     refresh_content();
 }
 

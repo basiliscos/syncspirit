@@ -21,13 +21,12 @@ folder_t::folder_t(model::folder_t &folder_, app_supervisor_t &supervisor, Fl_Tr
 void folder_t::update_label() {
     auto value = fmt::format("{}, {}", folder.get_label(), folder.get_id());
     if (folder.is_scanning()) {
-        value += symbols::scaning;
+        value += fmt::format(" {}", symbols::scaning);
     }
-    if (folder.is_scanning()) {
-        value += symbols::syncrhonizing;
+    if (folder.is_synchronizing()) {
+        value += fmt::format(" {}", symbols::syncrhonizing);
     }
     label(value.data());
-    tree()->redraw();
 }
 
 bool folder_t::on_select() {

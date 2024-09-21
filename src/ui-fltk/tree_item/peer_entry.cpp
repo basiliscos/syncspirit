@@ -18,6 +18,7 @@ void peer_entry_t::update_label() {
     if (entry.is_deleted()) {
         labelfgcolor(FL_DARK1);
     }
+    tree()->redraw();
 }
 
 bool peer_entry_t::on_select() {
