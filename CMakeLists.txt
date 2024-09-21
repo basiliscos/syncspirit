@@ -105,6 +105,8 @@ add_library(syncspirit_lib
     src/model/diff/local/scan_finish.cpp
     src/model/diff/local/scan_request.cpp
     src/model/diff/local/scan_start.cpp
+    src/model/diff/local/synchronization_finish.cpp
+    src/model/diff/local/synchronization_start.cpp
     src/model/diff/modify/add_blocks.cpp
     src/model/diff/modify/add_remote_folder_infos.cpp
     src/model/diff/modify/add_ignored_device.cpp

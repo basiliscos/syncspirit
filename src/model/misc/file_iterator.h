@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -23,7 +23,6 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
 
     file_info_ptr_t next() noexcept;
     void reset() noexcept;
-    void renew(file_info_t &file) noexcept;
 
   private:
     using queue_t = std::deque<file_info_ptr_t>;

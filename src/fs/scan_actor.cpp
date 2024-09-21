@@ -8,6 +8,8 @@
 #include "model/diff/local/update.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_start.h"
+#include "model/diff/local/synchronization_start.h"
+#include "model/diff/local/synchronization_finish.h"
 #include "net/names.h"
 #include "utils.h"
 #include <algorithm>
@@ -84,65 +86,74 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
     auto folder_id = task->get_folder_id();
     LOG_TRACE(log, "on_scan, folder = {}", folder_id);
 
-    auto r = task->advance();
+    auto folder = cluster->get_folders().by_id(folder_id);
+
     bool stop_processing = false;
     bool completed = false;
-    std::visit(
-        [&](auto &&r) {
-            using T = std::decay_t<decltype(r)>;
-            if constexpr (std::is_same_v<T, bool>) {
-                stop_processing = !r;
-                if (stop_processing) {
-                    completed = true;
-                }
-            } else if constexpr (std::is_same_v<T, scan_errors_t>) {
-                send<model::payload::io_error_t>(coordinator, std::move(r));
-            } else if constexpr (std::is_same_v<T, unchanged_meta_t>) {
-                auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::local::file_availability_t(r.file);
-                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-            } else if constexpr (std::is_same_v<T, removed_t>) {
-                on_remove(*r.file);
-            } else if constexpr (std::is_same_v<T, changed_meta_t>) {
-                auto &file = *r.file;
-                auto metadata = file.as_proto(true);
-                auto errs = initiate_hash(task, file.get_path(), metadata);
-                if (errs.empty()) {
-                    stop_processing = true;
-                } else {
-                    send<model::payload::io_error_t>(coordinator, std::move(errs));
-                }
-            } else if constexpr (std::is_same_v<T, unknown_file_t>) {
-                auto errs = initiate_hash(task, r.path, r.metadata);
-                if (errs.empty()) {
-                    stop_processing = true;
-                } else {
-                    send<model::payload::io_error_t>(coordinator, std::move(errs));
-                }
-            } else if constexpr (std::is_same_v<T, incomplete_t>) {
-                auto &f = r.file;
-                assert(f->get_source());
-                stop_processing = true;
-                send<payload::rehash_needed_t>(address, task, std::move(f), f->get_source(), std::move(r.opened_file));
-            } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
-                auto &file = *r.file;
-                if (file.is_locked()) {
+    if (folder->is_synchronizing()) {
+        LOG_DEBUG(log, "folder = {} synchronization in progress, cancel scanning", folder_id);
+        stop_processing = true;
+        completed = true;
+    } else {
+        auto r = task->advance();
+        std::visit(
+            [&](auto &&r) {
+                using T = std::decay_t<decltype(r)>;
+                if constexpr (std::is_same_v<T, bool>) {
+                    stop_processing = !r;
+                    if (stop_processing) {
+                        completed = true;
+                    }
+                } else if constexpr (std::is_same_v<T, scan_errors_t>) {
+                    send<model::payload::io_error_t>(coordinator, std::move(r));
+                } else if constexpr (std::is_same_v<T, unchanged_meta_t>) {
                     auto diff = model::diff::cluster_diff_ptr_t{};
-                    diff = new model::diff::modify::lock_file_t(file, false);
+                    diff = new model::diff::local::file_availability_t(r.file);
                     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+                } else if constexpr (std::is_same_v<T, removed_t>) {
+                    on_remove(*r.file);
+                } else if constexpr (std::is_same_v<T, changed_meta_t>) {
+                    auto &file = *r.file;
+                    auto metadata = file.as_proto(true);
+                    auto errs = initiate_hash(task, file.get_path(), metadata);
+                    if (errs.empty()) {
+                        stop_processing = true;
+                    } else {
+                        send<model::payload::io_error_t>(coordinator, std::move(errs));
+                    }
+                } else if constexpr (std::is_same_v<T, unknown_file_t>) {
+                    auto errs = initiate_hash(task, r.path, r.metadata);
+                    if (errs.empty()) {
+                        stop_processing = true;
+                    } else {
+                        send<model::payload::io_error_t>(coordinator, std::move(errs));
+                    }
+                } else if constexpr (std::is_same_v<T, incomplete_t>) {
+                    auto &f = r.file;
+                    assert(f->get_source());
+                    stop_processing = true;
+                    send<payload::rehash_needed_t>(address, task, std::move(f), f->get_source(),
+                                                   std::move(r.opened_file));
+                } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
+                    auto &file = *r.file;
+                    if (file.is_locked()) {
+                        auto diff = model::diff::cluster_diff_ptr_t{};
+                        diff = new model::diff::modify::lock_file_t(file, false);
+                        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+                    }
+                } else if constexpr (std::is_same_v<T, file_error_t>) {
+                    auto diff = model::diff::cluster_diff_ptr_t{};
+                    diff = new model::diff::modify::lock_file_t(*r.file, false);
+                    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+                    auto path = make_temporal(r.file->get_path());
+                    scan_errors_t errors{scan_error_t{path, r.ec}};
+                    send<model::payload::io_error_t>(coordinator, std::move(errors));
+                } else {
+                    static_assert(always_false_v<T>, "non-exhaustive visitor!");
                 }
-            } else if constexpr (std::is_same_v<T, file_error_t>) {
-                auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::lock_file_t(*r.file, false);
-                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-                auto path = make_temporal(r.file->get_path());
-                scan_errors_t errors{scan_error_t{path, r.ec}};
-                send<model::payload::io_error_t>(coordinator, std::move(errors));
-            } else {
-                static_assert(always_false_v<T>, "non-exhaustive visitor!");
-            }
-        },
-        r);
+            },
+            r);
+    }
 
     if (!stop_processing) {
         send<payload::scan_progress_t>(address, std::move(task));

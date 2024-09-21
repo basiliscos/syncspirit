@@ -589,10 +589,28 @@ void test_remove_file() {
     F().run();
 };
 
+void test_synchronization() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            sys::error_code ec;
+            auto &blocks = cluster->get_blocks();
+
+            auto file_path = root_path / "file.ext";
+            write_file(file_path, "12345");
+            builder->scan_start(folder->get_id()).synchronization_start(folder->get_id()).apply(*sup);
+            REQUIRE(!folder->get_scan_finish().is_not_a_date_time());
+            REQUIRE(!folder->is_scanning());
+            REQUIRE(files->size() == 0);
+        }
+    };
+    F().run();
+};
+
 int _init() {
     REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");
     REGISTER_TEST_CASE(test_new_files, "test_new_files", "[fs]");
     REGISTER_TEST_CASE(test_remove_file, "test_remove_file", "[fs]");
+    REGISTER_TEST_CASE(test_synchronization, "test_synchronization", "[fs]");
     return 1;
 }
 

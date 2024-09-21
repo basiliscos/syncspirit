@@ -17,6 +17,7 @@
 #include "fs/messages.h"
 
 #include <unordered_set>
+#include <unordered_map>
 #include <deque>
 
 namespace syncspirit {
@@ -117,6 +118,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
     using block_write_queue_t = std::deque<model::diff::cluster_diff_ptr_t>;
     using dispose_callback_t = model::diff::modify::block_transaction_t::dispose_callback_t;
+    using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, int>;
 
     void on_termination(message::termination_signal_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
@@ -187,6 +189,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     int substate = substate_t::none;
     locked_files_t locked_files;
     locked_files_t locally_locked_files;
+    synchronizing_folders_t synchronizing_folders;
     block_write_queue_t block_write_queue;
 };
 

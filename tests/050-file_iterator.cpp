@@ -125,19 +125,6 @@ TEST_CASE("file iterator", "[model]") {
                 REQUIRE(!next());
             }
 
-            SECTION("appending already visited file") {
-                auto f1 = next(true);
-                REQUIRE(f1);
-                CHECK(f1->get_name() == "a.txt");
-                file_iterator->renew(*f1);
-
-                auto f2 = next();
-                REQUIRE(f2);
-                CHECK(f2->get_name() == "b.txt");
-
-                REQUIRE(!next());
-            }
-
             SECTION("one file is already exists on my side") {
                 auto my_folder = folder_infos.by_device(*my_device);
                 auto pr_file = proto::FileInfo();

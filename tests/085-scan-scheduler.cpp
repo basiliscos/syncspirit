@@ -93,9 +93,21 @@ void test_1_folder() {
                 CHECK(folder->is_scanning());
 
                 SECTION("scan start/finish") {
-                    builder.scan_finish(folder_id).upsert_folder(db_folder).apply(*sup);
+                    builder.scan_finish(folder_id).apply(*sup);
                     REQUIRE(!folder->is_scanning());
 
+                    REQUIRE(sup->timers.size() == 1);
+                    sup->do_invoke_timer((*sup->timers.begin())->request_id);
+                    sup->do_process();
+                    REQUIRE(folder->is_scanning());
+                }
+
+                SECTION("synchronization start/finish") {
+                    builder.scan_finish(folder_id).synchronization_start(folder_id).scan_request(folder_id).apply(*sup);
+                    REQUIRE(!folder->is_scanning());
+                    REQUIRE(sup->timers.size() == 0);
+
+                    builder.synchronization_finish(folder_id).apply(*sup);
                     REQUIRE(sup->timers.size() == 1);
                     sup->do_invoke_timer((*sup->timers.begin())->request_id);
                     sup->do_process();

@@ -5,6 +5,8 @@
 #include "names.h"
 #include "constants.h"
 #include "model/diff/local/update.h"
+#include "model/diff/local/synchronization_finish.h"
+#include "model/diff/local/synchronization_start.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/block_rej.h"
@@ -113,6 +115,12 @@ void controller_actor_t::shutdown_finish() noexcept {
             ++diff_counter;
         };
 
+        for (auto &[folder, counter] : synchronizing_folders) {
+            if (counter) {
+                assign(new model::diff::local::synchronization_finish_t(folder->get_id()));
+            }
+        }
+
         for (auto &file : locked_files) {
             if (!file->is_unlocking()) {
                 LOG_TRACE(log, "going to unlock {} ({}); is_unlocking {}", file->get_full_name(), (void *)file.get(),
@@ -208,7 +216,7 @@ void controller_actor_t::push_pending() noexcept {
 
 model::file_info_ptr_t controller_actor_t::next_file(bool reset) noexcept {
     if (reset) {
-        file_iterator = new model::file_iterator_t(*cluster, peer);
+        file_iterator.reset(new model::file_iterator_t(*cluster, peer));
     }
     if (file_iterator && *file_iterator) {
         return file_iterator->next();
@@ -245,6 +253,12 @@ void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
             if (reset_block) {
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 diff = new model::diff::modify::lock_file_t(*file, true);
+                auto folder = model::folder_ptr_t{file->get_folder_info()->get_folder()};
+                auto &counter = ++synchronizing_folders[folder];
+                if (counter == 1) {
+                    auto raw = new model::diff::local::synchronization_start_t(folder->get_id());
+                    diff->sibling.reset(raw);
+                }
                 send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             } else {
                 preprocess_block(block);
@@ -384,6 +398,13 @@ auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff
         auto it = locked_files.find(file);
         assert(it != locked_files.end());
         locked_files.erase(it);
+        auto &counter = --synchronizing_folders[folder];
+        if (counter == 0) {
+            auto diff = model::diff::cluster_diff_ptr_t{};
+            diff = new model::diff::local::synchronization_finish_t(folder->get_id());
+            send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+            synchronizing_folders.erase(folder);
+        }
     }
     return diff.visit_next(*this, custom);
 }

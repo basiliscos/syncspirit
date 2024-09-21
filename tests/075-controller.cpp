@@ -129,14 +129,7 @@ struct sample_peer_t : r::actor_base_t {
         messages.emplace_back(fwd_msg);
     }
 
-    void on_block_request(net::message::block_request_t &req) noexcept {
-        block_requests.push_front(&req);
-        ++blocks_requested;
-        log->debug("{}, requesting block # {}", identity,
-                   block_requests.front()->payload.request_payload.block.block_index());
-        if (block_responses.size()) {
-            log->debug("{}, top response block # {}", identity, block_responses.front().block_index);
-        }
+    void process_block_requests() noexcept {
         auto condition = [&]() -> bool {
             return block_requests.size() && block_responses.size() &&
                    block_requests.front()->payload.request_payload.block.block_index() ==
@@ -154,6 +147,17 @@ struct sample_peer_t : r::actor_base_t {
             block_responses.pop_front();
             block_requests.pop_front();
         }
+    }
+
+    void on_block_request(net::message::block_request_t &req) noexcept {
+        block_requests.push_front(&req);
+        ++blocks_requested;
+        log->debug("{}, requesting block # {}", identity,
+                   block_requests.front()->payload.request_payload.block.block_index());
+        if (block_responses.size()) {
+            log->debug("{}, top response block # {}", identity, block_responses.front().block_index);
+        }
+        process_block_requests();
     }
 
     void forward(net::payload::forwarded_message_t payload) noexcept {
@@ -561,11 +565,17 @@ void test_downloading() {
 
                 auto folder_my = folder_infos.by_device(*my_device);
                 CHECK(folder_my->get_max_sequence() == 0ul);
+                CHECK(!folder_my->get_folder()->is_synchronizing());
 
                 peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                sup->do_process();
+                CHECK(folder_my->get_folder()->is_synchronizing());
+
                 peer_actor->push_block("12345", 0);
+                peer_actor->process_block_requests();
                 sup->do_process();
 
+                CHECK(!folder_my->get_folder()->is_synchronizing());
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
@@ -927,6 +937,8 @@ void test_downloading_errors() {
             auto lf = f->local_file();
             CHECK(!lf->is_locally_locked());
             CHECK(!lf->is_locked());
+
+            CHECK(!folder_my->get_folder()->is_synchronizing());
 
             sup->do_process();
         }

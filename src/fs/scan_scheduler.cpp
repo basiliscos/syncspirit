@@ -7,6 +7,7 @@
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_request.h"
 #include "model/diff/local/scan_start.h"
+#include "model/diff/local/synchronization_finish.h"
 
 using namespace syncspirit::fs;
 
@@ -72,6 +73,14 @@ auto scan_scheduler_t::operator()(const model::diff::local::scan_finish_t &diff,
     return diff.visit_next(*this, custom);
 }
 
+auto scan_scheduler_t::operator()(const model::diff::local::synchronization_finish_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (!scan_in_progress) {
+        scan_next_or_schedule();
+    }
+    return diff.visit_next(*this, custom);
+}
+
 void scan_scheduler_t::scan_next_or_schedule() noexcept {
     auto next = scan_next();
     if (!next) {
@@ -80,7 +89,7 @@ void scan_scheduler_t::scan_next_or_schedule() noexcept {
     bool do_start_timer = false;
     if (timer_id) {
         if (schedule_option->at > next.value().at) {
-            LOG_TRACE(log, "cancellling previous schedule");
+            LOG_TRACE(log, "cancelling previous schedule");
             cancel_timer(*timer_id);
             do_start_timer = true;
         }
@@ -98,7 +107,8 @@ auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
     while (!scan_queue.empty()) {
         auto folder_id = scan_queue.front();
         scan_queue.pop_front();
-        if (!cluster->get_folders().by_id(folder_id)) {
+        auto folder = cluster->get_folders().by_id(folder_id);
+        if (!folder || folder->is_synchronizing()) {
             continue;
         }
         for (auto it = scan_queue.begin(); it != scan_queue.end();) {
@@ -116,18 +126,19 @@ auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
     auto deadline = r::pt::ptime{};
     auto now = r::pt::second_clock::local_time();
     for (auto it : cluster->get_folders()) {
-        auto interval = it.item->get_rescan_interval();
-        if (!interval || it.item->is_scanning()) {
+        auto &f = it.item;
+        auto interval = f->get_rescan_interval();
+        if (!interval || f->is_scanning() || f->is_synchronizing()) {
             continue;
         }
         auto interval_s = r::pt::seconds{interval};
-        auto prev_scan = it.item->get_scan_finish();
+        auto prev_scan = f->get_scan_finish();
         auto it_deadline = prev_scan.is_not_a_date_time() ? now : prev_scan + interval_s;
         auto eq = it_deadline == deadline;
         auto select_it = !folder || it_deadline < deadline ||
                          ((it_deadline == deadline) && (folder->get_rescan_interval() > interval));
         if (select_it) {
-            folder = it.item;
+            folder = f;
             deadline = it_deadline;
         }
     }

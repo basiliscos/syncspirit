@@ -7,6 +7,8 @@
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_request.h"
 #include "model/diff/local/scan_start.h"
+#include "model/diff/local/synchronization_finish.h"
+#include "model/diff/local/synchronization_start.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/append_block.h"
@@ -252,6 +254,14 @@ diff_builder_t &diff_builder_t::scan_finish(std::string_view id, const r::pt::pt
 
 diff_builder_t &diff_builder_t::scan_request(std::string_view id) noexcept {
     return assign(new model::diff::local::scan_request_t(std::string(id)));
+}
+
+diff_builder_t &diff_builder_t::synchronization_start(std::string_view id) noexcept {
+    return assign(new model::diff::local::synchronization_start_t(std::string(id)));
+}
+
+diff_builder_t &diff_builder_t::synchronization_finish(std::string_view id) noexcept {
+    return assign(new model::diff::local::synchronization_finish_t(std::string(id)));
 }
 
 template <typename Holder, typename Diff> static void generic_assign(Holder *holder, Diff *diff) noexcept {

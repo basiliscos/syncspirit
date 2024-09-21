@@ -38,9 +38,9 @@ outcome::result<folder_ptr_t> folder_t::create(const uuid_t &uuid, const db::Fol
     return outcome::success(std::move(ptr));
 }
 
-folder_t::folder_t(std::string_view key_) noexcept { std::copy(key_.begin(), key_.end(), key); }
+folder_t::folder_t(std::string_view key_) noexcept : synchronizing{false} { std::copy(key_.begin(), key_.end(), key); }
 
-folder_t::folder_t(const uuid_t &uuid) noexcept {
+folder_t::folder_t(const uuid_t &uuid) noexcept : synchronizing{false} {
     key[0] = prefix;
     std::copy(uuid.begin(), uuid.end(), key + 1);
 }
@@ -112,6 +112,13 @@ const bool folder_t::is_scanning() const noexcept {
         return true;
     }
     return scan_start > scan_finish;
+}
+
+const bool folder_t::is_synchronizing() const noexcept { return synchronizing; }
+
+void folder_t::set_synchronizing(bool value) noexcept {
+    assert(synchronizing != value);
+    synchronizing = value;
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_ptr_t &item) noexcept { return item->get_key(); }
