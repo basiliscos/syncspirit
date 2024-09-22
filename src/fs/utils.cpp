@@ -73,6 +73,7 @@ bool is_temporal(const bfs::path &path) noexcept {
 
 relative_result_t relativize(const bfs::path &path, const boost::filesystem::path &root) noexcept {
     auto sub = bfs::relative(path, root);
+    sub = sub.parent_path() / path.filename();
     if (!is_temporal(path)) {
         return {sub, false};
     }

@@ -119,7 +119,7 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == false);
         }
 
-        SECTION("no dirs, symlinks") {
+        SECTION("no dirs, symlink to non-existing target") {
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto file_path = root_path / "symlink";
             bfs::create_symlink(bfs::path("/some/where"), file_path);
@@ -611,7 +611,7 @@ TEST_CASE("scan_task", "[fs]") {
         counter->set_id(1);
         counter->set_value(peer_device->as_uint());
 
-        SECTION("the same symlink exists") {
+        SECTION("symlink does not exists") {
             pr_file.set_modified_s(modified);
 
             auto path = root_path / "a.txt";
@@ -630,6 +630,50 @@ TEST_CASE("scan_task", "[fs]") {
             REQUIRE(std::get_if<unchanged_meta_t>(&r));
             auto ref = std::get_if<unchanged_meta_t>(&r);
             CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
+        SECTION("symlink does exists") {
+            pr_file.set_modified_s(modified);
+            pr_file.set_symlink_target("b");
+
+            auto path = root_path / "a.txt";
+            auto target = bfs::path("b");
+            bfs::create_symlink(target, path);
+            bfs::create_directories(root_path / target);
+
+            auto pr_dir = proto::FileInfo{};
+            pr_dir.set_name("b");
+            pr_dir.set_sequence(3);
+            pr_dir.set_type(proto::FileInfoType::DIRECTORY);
+            *pr_dir.mutable_version() = pr_file.version();
+
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            auto dir = file_info_t::create(sequencer->next_uuid(), pr_dir, folder_my).value();
+            folder_my->add(file, false);
+            folder_my->add(dir, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == dir);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
 
             r = task.advance();
             CHECK(std::get_if<bool>(&r));
