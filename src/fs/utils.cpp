@@ -71,15 +71,29 @@ bool is_temporal(const bfs::path &path) noexcept {
     return (pos != name.npos);
 }
 
-relative_result_t relativize(const bfs::path &path, const boost::filesystem::path &root) noexcept {
-    auto sub = bfs::relative(path, root);
-    sub = sub.parent_path() / path.filename();
-    if (!is_temporal(path)) {
+relative_result_t relativize(const bfs::path &path, const bfs::path &root) noexcept {
+    auto it_path = path.begin();
+    auto it_root = root.begin();
+
+    while (it_path != path.end() && it_root != root.end() && *it_path == *it_root) {
+        ++it_path;
+        ++it_root;
+    }
+
+    auto sub = bfs::path();
+    while (it_path != path.end()) {
+        sub /= *it_path;
+        ++it_path;
+    }
+
+    auto name = sub.filename();
+    if (!is_temporal(name)) {
         return {sub, false};
     }
-    auto str = sub.string();
-    auto new_path = str.substr(0, str.size() - tmp_suffix.size());
-    return {bfs::path(new_path), true};
+    auto name_str = name.string();
+    auto new_name = name_str.substr(0, name.size() - tmp_suffix.size());
+    auto new_path = sub.parent_path() / new_name;
+    return {new_path, true};
 }
 
 } // namespace syncspirit::fs

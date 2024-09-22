@@ -680,6 +680,32 @@ TEST_CASE("scan_task", "[fs]") {
             CHECK(*std::get_if<bool>(&r) == false);
         }
 
+        SECTION("symlink to root") {
+            pr_file.set_modified_s(modified);
+            pr_file.set_symlink_target("/");
+
+            auto path = root_path / "a.txt";
+            auto target = bfs::path("/");
+            bfs::create_symlink(target, path);
+
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
         SECTION("symlink points to something different") {
             pr_file.set_modified_s(modified);
 
