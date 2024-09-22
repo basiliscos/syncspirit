@@ -24,8 +24,7 @@ struct syncspirit::fltk::fltk_sink_t final : base_sink_t {
     log_panel_t *widget;
 };
 
-static void pull_in_logs(void* data)
-{
+static void pull_in_logs(void *data) {
     auto widget = reinterpret_cast<log_panel_t *>(data);
     auto lock = std::unique_lock(widget->incoming_mutex);
     auto &source = widget->incoming_records;
