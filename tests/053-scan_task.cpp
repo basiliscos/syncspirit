@@ -201,6 +201,57 @@ TEST_CASE("scan_task", "[fs]") {
 
             r = task.advance();
             CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+        }
+
+        SECTION("meta is not changed (dir + file inside)") {
+            auto pr_dir = pr_file;
+            pr_dir.set_name("a-dir-2");
+            pr_dir.set_type(proto::FileInfoType::DIRECTORY);
+
+            pr_file.set_block_size(5);
+            pr_file.set_size(5);
+            pr_file.set_modified_s(modified);
+            pr_file.set_name("a-dir-2/a.txt");
+
+            auto dir = root_path / "a-dir-2";
+            bfs::create_directories(dir);
+
+            auto path = root_path / "a-dir-2" / "a.txt";
+            write_file(path, "12345");
+            bfs::last_write_time(path, modified);
+
+            auto info_dir = file_info_t::create(sequencer->next_uuid(), pr_dir, folder_my).value();
+            folder_my->add(info_dir, false);
+
+            auto info_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            folder_my->add(info_file, false);
+
+            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            auto ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == info_dir);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            REQUIRE(std::get_if<unchanged_meta_t>(&r));
+            ref = std::get_if<unchanged_meta_t>(&r);
+            CHECK(ref->file == info_file);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
         }
 

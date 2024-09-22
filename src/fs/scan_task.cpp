@@ -112,6 +112,9 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             if (file) {
                 files_queue.push_back(file_info_t{file, rp.temp});
                 removed.put(file);
+                if (status.type() == bfs::file_type::directory_file) {
+                    dirs_queue.push_back(child);
+                }
                 continue;
             }
 
