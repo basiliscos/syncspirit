@@ -19,27 +19,24 @@ struct syncspirit::fltk::fltk_sink_t final : base_sink_t {
     void forward(log_record_ptr_t record) override {
         auto lock = std::unique_lock(widget->incoming_mutex);
         widget->incoming_records.push_back(std::move(record));
-        bool size = widget->incoming_records.size();
-        lock.unlock();
-
-        if (size == 1) {
-            Fl::awake(
-                [](void *data) {
-                    auto widget = reinterpret_cast<log_panel_t *>(data);
-                    auto lock = std::unique_lock(widget->incoming_mutex);
-                    auto &source = widget->incoming_records;
-                    auto &dest = widget->records;
-                    std::move(begin(source), end(source), std::back_insert_iterator(dest));
-                    source.clear();
-                    widget->update();
-                    lock.unlock();
-                },
-                widget);
-        }
     }
 
     log_panel_t *widget;
 };
+
+static void pull_in_logs(void* data)
+{
+    auto widget = reinterpret_cast<log_panel_t *>(data);
+    auto lock = std::unique_lock(widget->incoming_mutex);
+    auto &source = widget->incoming_records;
+    if (source.size()) {
+        auto &dest = widget->records;
+        std::move(begin(source), end(source), std::back_insert_iterator(dest));
+        source.clear();
+        lock.unlock();
+        widget->update();
+    }
+}
 
 static void auto_scroll_toggle(Fl_Widget *widget, void *data) {
     auto button = static_cast<Fl_Toggle_Button *>(widget);
@@ -223,10 +220,13 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
         }
     }
 
+    Fl::add_idle(pull_in_logs, this);
+
     dist_sink->add_sink(bridge_sink);
 }
 
 log_panel_t::~log_panel_t() {
+    Fl::remove_idle(pull_in_logs, this);
     supervisor.get_dist_sink()->remove_sink(bridge_sink);
     bridge_sink.reset();
 }
