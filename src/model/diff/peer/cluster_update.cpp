@@ -66,10 +66,9 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
 
     for (int i = 0; i < message.folders_size(); ++i) {
         auto &f = message.folders(i);
-        auto folder = folders.by_id(f.id());
-        auto &device_id = f.id();
-        LOG_TRACE(log, "cluster_update_t, folder = '{}', device = {}", f.label(),
-                  spdlog::to_hex(device_id.begin(), device_id.end()));
+        auto &folder_id = f.id();
+        auto folder = folders.by_id(folder_id);
+        LOG_TRACE(log, "cluster_update_t, folder = '{}', id = '{}'", f.label(), folder_id);
         if (!folder) {
             for (int i = 0; i < f.devices_size(); ++i) {
                 auto &d = f.devices(i);
