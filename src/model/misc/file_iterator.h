@@ -9,7 +9,7 @@
 #include "../folder.h"
 #include "syncspirit-export.h"
 #include <deque>
-#include <unordered_set>
+#include <unordered_map>
 
 namespace syncspirit::model {
 
@@ -23,22 +23,22 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     file_info_ptr_t next() noexcept;
 
   private:
+    struct visit_info_t {
+        std::uint64_t index;
+        std::int64_t visited_sequence;
+    };
+
     using queue_t = std::deque<file_info_ptr_t>;
-    using files_set_t = std::unordered_set<file_info_ptr_t>;
-    using folder_set_t = std::unordered_set<folder_ptr_t>;
+    using visited_folders_t = std::unordered_map<folder_t *, visit_info_t>;
 
     void prepare() noexcept;
-    bool append(file_info_t &file) noexcept;
+    bool accept(file_info_t &file) noexcept;
 
     cluster_t &cluster;
     device_ptr_t peer;
-    queue_t missing;
-    queue_t incomplete;
-    queue_t needed;
-    files_set_t missing_done;
-    files_set_t incomplete_done;
-    files_set_t needed_done;
-    folder_set_t visited_folders;
+    queue_t folder_queue;
+    queue_t locked_queue;
+    visited_folders_t visited;
 };
 
 using file_iterator_ptr_t = intrusive_ptr_t<file_iterator_t>;
