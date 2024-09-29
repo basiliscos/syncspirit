@@ -327,10 +327,7 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
         if (reset) {
             file_iterator = new file_iterator_t(*cluster, peer_device);
         }
-        if (file_iterator && *file_iterator) {
-            return file_iterator->next();
-        }
-        return {};
+        return file_iterator->next();
     };
 
     auto builder = diff_builder_t(*cluster);
