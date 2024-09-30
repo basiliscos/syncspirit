@@ -41,7 +41,10 @@ r::plugin::resource_id_t hash = 1;
 controller_actor_t::file_lock_t::file_lock_t(model::file_info_ptr_t file_, controller_actor_t &controller_) noexcept
     : file{file_}, controller{controller_} {
     file->locally_lock();
-    controller.assign_diff(new model::diff::modify::lock_file_t(*file, true));
+    is_locked = file->get_size();
+    if (is_locked) {
+        controller.assign_diff(new model::diff::modify::lock_file_t(*file, true));
+    }
 
     auto folder = model::folder_ptr_t{file->get_folder_info()->get_folder()};
     auto &counter = ++controller.synchronizing_folders[folder];
@@ -58,7 +61,7 @@ controller_actor_t::file_lock_t::~file_lock_t() {
         controller.assign_diff(new model::diff::local::synchronization_finish_t(folder->get_id()));
     }
 
-    if (!file->is_unlocking()) {
+    if (is_locked) {
         LOG_TRACE(controller.log, "going to unlock {} ({}); is_unlocking {}", file->get_full_name(), (void *)file.get(),
                   file->is_unlocking());
         controller.assign_diff(new model::diff::modify::lock_file_t(*file, false));
@@ -261,7 +264,6 @@ AGAIN:
     }
 
     bool reset_file = false;
-    bool forget_file = false;
     bool try_next = false;
     if (file && block_iterator && cluster->get_write_requests()) {
         auto block = block_iterator->next(true);
@@ -278,9 +280,6 @@ AGAIN:
     if (reset_file) {
         auto it = file_locks.find(file->get_full_name());
         assert(it != file_locks.end());
-        if (forget_file) {
-            file_locks.erase(it);
-        }
         file.reset();
     }
     if (!file) {
@@ -290,6 +289,9 @@ AGAIN:
             file_locks[file->get_full_name()] = std::move(file_lock);
             if (!file->local_file()) {
                 assign_diff(new model::diff::modify::clone_file_t(*file, *sequencer));
+            }
+            if (!file->get_size()) {
+                try_next = true;
             }
         }
     }

@@ -106,6 +106,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         model::file_info_ptr_t file;
         controller_actor_t &controller;
         model::diff::cluster_diff_ptr_t *diff_storage;
+        bool is_locked;
 
         file_lock_t(model::file_info_ptr_t file, controller_actor_t &controller) noexcept;
         ~file_lock_t();

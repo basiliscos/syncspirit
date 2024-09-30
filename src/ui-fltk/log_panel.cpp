@@ -35,7 +35,7 @@ static void pull_in_logs(void *data) {
         lock.unlock();
         widget->update();
     }
-    Fl::repeat_timeout(0.05, pull_in_logs, data);
+    Fl::add_timeout(0.05, pull_in_logs, data);
 }
 
 static void auto_scroll_toggle(Fl_Widget *widget, void *data) {
