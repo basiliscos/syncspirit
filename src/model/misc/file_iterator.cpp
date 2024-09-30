@@ -10,48 +10,6 @@ using namespace syncspirit::model;
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
     : cluster{cluster_}, peer{peer_} {}
 
-#if 0
-bool file_iterator_t::append(file_info_t &file) noexcept {
-    bool skip = file.is_locally_locked() || file.is_locked() || file.is_unreachable() || file.is_invalid();
-    if (skip) {
-        return false;
-    }
-
-    auto &folder_infos = file.get_folder_info()->get_folder()->get_folder_infos();
-    auto local_folder = folder_infos.by_device(*cluster.get_device());
-
-    auto local_file = local_folder->get_file_infos().by_name(file.get_name());
-    if (!local_file) {
-        if (!missing_done.count(&file)) {
-            missing_done.emplace(&file);
-            missing.push_back(&file);
-            return true;
-        }
-    }
-    if (!local_file->is_local()) {
-        return false;
-    }
-    bool needs_download = local_file->need_download(file);
-    if (!needs_download) {
-        return false;
-    }
-    if (local_file->is_partly_available()) {
-        if (!incomplete_done.count(&file)) {
-            incomplete.push_back(&file);
-            incomplete_done.emplace(&file);
-            return true;
-        }
-    } else {
-        if (!needed_done.count(&file)) {
-            needed.push_back(&file);
-            needed_done.emplace(&file);
-            return true;
-        }
-    }
-    return false;
-}
-#endif
-
 bool file_iterator_t::accept(file_info_t &file) noexcept {
     if (file.is_unreachable() || file.is_invalid()) {
         return false;
@@ -81,13 +39,15 @@ file_info_ptr_t file_iterator_t::next() noexcept {
             return file->actualize();
         }
     }
-    while (!locked_queue.empty()) {
-        file = locked_queue.front();
-        locked_queue.pop_front();
-        if (file->is_locked() || file->is_locally_locked()) {
-            continue;
-        } else if (accept(*file)) {
-            return file->actualize();
+    for (auto it = locked_queue.begin(); it != locked_queue.end();) {
+        auto f = *it;
+        if (!f->is_locked() && !f->is_locally_locked()) {
+            it = locked_queue.erase(it);
+            if (accept(*f)) {
+                return f->actualize();
+            }
+        } else {
+            ++it;
         }
     }
 

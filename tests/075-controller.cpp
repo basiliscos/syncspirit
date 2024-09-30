@@ -615,6 +615,74 @@ void test_downloading() {
                     CHECK(f->get_sequence() == 2ul);
                 }
             }
+
+            SECTION("download 2 files") {
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                auto index = proto::Index{};
+                index.set_folder(std::string(folder_1->get_id()));
+                auto file_1 = index.add_files();
+                file_1->set_name("file-1");
+                file_1->set_type(proto::FileInfoType::FILE);
+                file_1->set_sequence(folder_1_peer->get_max_sequence());
+                file_1->set_block_size(5);
+                file_1->set_size(5);
+                auto version_1 = file_1->mutable_version();
+                auto counter_1 = version_1->add_counters();
+                counter_1->set_id(1ul);
+                counter_1->set_value(1ul);
+
+                auto file_2 = index.add_files();
+                file_2->set_name("file-2");
+                file_2->set_type(proto::FileInfoType::FILE);
+                file_2->set_sequence(folder_1_peer->get_max_sequence());
+                file_2->set_block_size(5);
+                file_2->set_size(5);
+                auto version_2 = file_2->mutable_version();
+                auto counter_2 = version_2->add_counters();
+                counter_2->set_id(1ul);
+                counter_2->set_value(2ul);
+
+                auto b1 = file_1->add_blocks();
+                b1->set_hash(utils::sha256_digest("12345").value());
+                b1->set_offset(0);
+                b1->set_size(5);
+
+                auto b2 = file_2->add_blocks();
+                b2->set_hash(utils::sha256_digest("67890").value());
+                b2->set_offset(0);
+                b2->set_size(5);
+
+                auto folder_my = folder_infos.by_device(*my_device);
+                CHECK(folder_my->get_max_sequence() == 0ul);
+                CHECK(!folder_my->get_folder()->is_synchronizing());
+
+                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                peer_actor->push_block("12345", 0);
+                peer_actor->push_block("67890", 0);
+                sup->do_process();
+
+                CHECK(!folder_my->get_folder()->is_synchronizing());
+                CHECK(peer_actor->blocks_requested == 2);
+                REQUIRE(folder_my);
+                CHECK(folder_my->get_max_sequence() == 2ul);
+                REQUIRE(folder_my->get_file_infos().size() == 2);
+                {
+                    auto f = folder_my->get_file_infos().by_name(file_1->name());
+                    REQUIRE(f);
+                    CHECK(f->get_size() == 5);
+                    CHECK(f->get_blocks().size() == 1);
+                    CHECK(f->is_locally_available());
+                    CHECK(!f->is_locked());
+                }
+                {
+                    auto f = folder_my->get_file_infos().by_name(file_2->name());
+                    REQUIRE(f);
+                    CHECK(f->get_size() == 5);
+                    CHECK(f->get_blocks().size() == 1);
+                    CHECK(f->is_locally_available());
+                    CHECK(!f->is_locked());
+                }
+            }
             SECTION("cluster config is the same, but there are non-downloaded files") {
                 auto folder_peer = folder_infos.by_device(*peer_device);
 
@@ -710,6 +778,7 @@ void test_downloading() {
                 CHECK(f->get_sequence() == 1ul);
                 CHECK(peer_actor->blocks_requested == 0);
             }
+
             SECTION("new file via index_update => download it") {
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
 
@@ -773,6 +842,7 @@ void test_downloading() {
 
                 peer_actor->forward(proto::message::Index(new proto::Index(index)));
                 sup->do_process();
+                CHECK(!folder_my->get_folder()->is_synchronizing());
 
                 auto folder_my = folder_infos.by_device(*my_device);
                 CHECK(folder_my->get_max_sequence() == 1ul);
@@ -807,6 +877,7 @@ void test_downloading() {
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_locked());
+                CHECK(!f->is_deleted());
             }
 
             SECTION("download a file, which has the same blocks locally") {

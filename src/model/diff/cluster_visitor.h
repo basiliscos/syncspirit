@@ -29,6 +29,7 @@ struct load_cluster_t;
 
 namespace local {
 struct blocks_availability_t;
+struct custom_t;
 struct file_availability_t;
 struct scan_finish_t;
 struct scan_request_t;
@@ -90,6 +91,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const load::load_cluster_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::blocks_availability_t &, void *custom) noexcept;
 
+    virtual outcome::result<void> operator()(const local::custom_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::file_availability_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_finish_t &, void *custom) noexcept;

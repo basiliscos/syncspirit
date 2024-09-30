@@ -100,6 +100,7 @@ add_library(syncspirit_lib
     src/model/diff/load/pending_devices.cpp
     src/model/diff/load/pending_folders.cpp
     src/model/diff/local/blocks_availability.cpp
+    src/model/diff/local/custom.cpp
     src/model/diff/local/file_availability.cpp
     src/model/diff/local/update.cpp
     src/model/diff/local/scan_finish.cpp

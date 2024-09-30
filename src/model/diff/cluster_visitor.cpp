@@ -15,6 +15,7 @@
 #include "load/load_cluster.h"
 #include "load/pending_devices.h"
 #include "local/blocks_availability.h"
+#include "local/custom.h"
 #include "local/file_availability.h"
 #include "local/scan_finish.h"
 #include "local/scan_request.h"
@@ -103,6 +104,10 @@ auto cluster_visitor_t::operator()(const load::pending_devices_t &diff, void *cu
 }
 
 auto cluster_visitor_t::operator()(const load::load_cluster_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const local::custom_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
