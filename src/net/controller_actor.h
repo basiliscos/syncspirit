@@ -194,6 +194,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     // diff
     model::diff::cluster_diff_ptr_t diff;
     model::diff::cluster_diff_t *current_diff;
+    std::uint32_t planned_pulls;
 
     int64_t request_pool;
     uint32_t blocks_max_kept;

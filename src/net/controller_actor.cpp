@@ -77,6 +77,7 @@ controller_actor_t::controller_actor_t(config_t &config)
     assert(cluster);
     assert(sequencer);
     current_diff = nullptr;
+    planned_pulls = 0;
 }
 
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -234,9 +235,13 @@ void controller_actor_t::assign_diff(model::diff::cluster_diff_ptr_t new_diff) n
     }
 }
 
-void controller_actor_t::pull_ready() noexcept { assign_diff(new pull_signal_t(this)); }
+void controller_actor_t::pull_ready() noexcept { ++planned_pulls; }
 
 void controller_actor_t::send_diff() {
+    if (planned_pulls && !diff) {
+        assign_diff(new pull_signal_t(this));
+        planned_pulls = 0;
+    }
     if (diff) {
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
         current_diff = nullptr;
@@ -325,12 +330,21 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
 }
 
 void controller_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
+    auto custom = const_cast<void *>(message.payload.custom);
+    auto pulls = std::uint32_t{0};
+    if (custom == this) {
+        pulls = planned_pulls;
+        planned_pulls = 0;
+    }
+    LOG_TRACE(log, "on_model_update, planned pulls = {}", pulls);
     auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this, const_cast<void *>(message.payload.custom));
+    auto r = diff.visit(*this, custom);
     if (!r) {
         auto ee = make_error(r.assume_error());
         return do_shutdown(ee);
+    }
+    if (pulls) {
+        pull_next();
     }
     push_pending();
     send_diff();
@@ -365,9 +379,8 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &d
 
 auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    if (custom == this) {
-        reset_sync();
-    }
+    reset_sync();
+    pull_ready();
     return diff.visit_next(*this, custom);
 }
 
