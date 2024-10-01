@@ -693,7 +693,7 @@ void test_downloading() {
                     }
                 }
 
-                SECTION("with the same clock") {
+                SECTION("with the same block") {
                     *file_2->add_blocks() = *b1;
 
                     auto folder_my = folder_infos.by_device(*my_device);
@@ -722,6 +722,42 @@ void test_downloading() {
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
+                }
+
+                SECTION("with the same blocks") {
+                    *file_2->add_blocks() = *b1;
+                    *file_2->add_blocks() = *b1;
+                    file_2->set_size(10);
+
+                    auto folder_my = folder_infos.by_device(*my_device);
+                    CHECK(folder_my->get_max_sequence() == 0ul);
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+
+                    peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                    peer_actor->push_block("12345", 0, file_1->name());
+                    sup->do_process();
+
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+                    CHECK(peer_actor->blocks_requested == 1);
+                    REQUIRE(folder_my);
+                    CHECK(folder_my->get_max_sequence() == 2ul);
+                    REQUIRE(folder_my->get_file_infos().size() == 2);
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_1->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 5);
+                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_2->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 10);
+                        CHECK(f->get_blocks().size() == 2);
                         CHECK(f->is_locally_available());
                         CHECK(!f->is_locked());
                     }

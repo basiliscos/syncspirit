@@ -294,8 +294,8 @@ void controller_actor_t::pull_next() noexcept {
                     LOG_TRACE(log, "iterating blocks on {}", file->get_name());
                     block_iterator = new model::blocks_iterator_t(*file);
                     if (!*block_iterator) {
-                        auto bi = new model::blocks_iterator_t(*file);
-                        assert(*block_iterator);
+                        block_iterator.reset();
+                        file.reset();
                     }
                 }
             }
