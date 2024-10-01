@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/cluster.h"
@@ -26,7 +26,7 @@ TEST_CASE("block iterator", "[model]") {
                 block_iterator = new blocks_iterator_t(*source);
             }
             if (block_iterator && *block_iterator) {
-                return block_iterator->next(!reset);
+                return block_iterator->next();
             }
         }
         return {};
@@ -94,12 +94,6 @@ TEST_CASE("block iterator", "[model]") {
             CHECK(fb1.block_index() == 0);
             CHECK(fb1.file() == my_file.get());
 
-            auto fb1_1 = next(my_file);
-            REQUIRE(fb1_1);
-            CHECK(fb1_1.block()->get_hash() == b1_hash);
-            CHECK(fb1_1.block_index() == 0);
-            CHECK(fb1_1.file() == my_file.get());
-
             auto fb2 = next(my_file);
             REQUIRE(fb2);
             CHECK(fb2.block()->get_hash() == b2_hash);
@@ -150,28 +144,5 @@ TEST_CASE("block iterator", "[model]") {
         CHECK(fb1.block()->get_hash() == b1_hash);
         CHECK(fb1.block_index() == 0);
         CHECK(fb1.file() == my_file.get());
-    }
-
-    SECTION("locked/unlock blocks") {
-        p_file.set_size(5ul);
-        p_file.set_block_size(5ul);
-
-        REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
-        auto my_file = my_folder->get_file_infos().by_name(p_file.name());
-
-        auto bi1 = cluster->get_blocks().get(b1_hash);
-        my_file->remove_blocks();
-        my_file->assign_block(bi1, 0);
-        REQUIRE(!my_file->is_locally_available());
-
-        auto fb = next(my_file, true);
-        REQUIRE(fb);
-        auto block = fb.block();
-
-        block->lock();
-        REQUIRE(!next(my_file, true));
-
-        block->unlock();
-        REQUIRE(next(my_file, true));
     }
 }

@@ -28,14 +28,16 @@ bool file_iterator_t::accept(file_info_t &file) noexcept {
     return true;
 }
 
+void file_iterator_t::requeue_content(queue_t queue) noexcept {
+    std::move(queue.begin(), queue.end(), std::back_insert_iterator(content_queue));
+}
+
 file_info_ptr_t file_iterator_t::next() noexcept {
     auto file = file_info_ptr_t{};
-    while (!folder_queue.empty()) {
-        file = folder_queue.front();
-        folder_queue.pop_front();
-        if (file->is_locked() || file->is_locally_locked()) {
-            locked_queue.emplace_back(file);
-        } else if (accept(*file)) {
+    if (!content_queue.empty()) {
+        file = content_queue.front();
+        if (file->local_file()) {
+            content_queue.pop_front();
             return file->actualize();
         }
     }
@@ -48,6 +50,19 @@ file_info_ptr_t file_iterator_t::next() noexcept {
             }
         } else {
             ++it;
+        }
+    }
+    while (!folder_queue.empty()) {
+        file = folder_queue.front();
+        folder_queue.pop_front();
+        if (file->is_locked() || file->is_locally_locked()) {
+            locked_queue.emplace_back(file);
+        } else if (accept(*file)) {
+            auto f = file->actualize();
+            if (f->get_size() && !f->local_file()) {
+                content_queue.emplace_back(f);
+            }
+            return f;
         }
     }
 

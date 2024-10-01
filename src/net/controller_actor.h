@@ -118,6 +118,13 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         void *controller;
     };
 
+    struct forget_file_t final : model::diff::local::custom_t {
+        forget_file_t(void *controller, std::string full_name) noexcept;
+        outcome::result<void> visit(model::diff::cluster_visitor_t &, void *) const noexcept override;
+        void *controller;
+        std::string full_name;
+    };
+
     using file_lock_ptr_t = r::intrusive_ptr_t<file_lock_t>;
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     using locked_files_t = std::unordered_map<std::string, file_lock_ptr_t>;
@@ -145,6 +152,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_message(proto::message::DownloadProgress &message) noexcept;
 
     void on_cutom(const pull_signal_t &diff) noexcept;
+    void on_cutom(const forget_file_t &diff) noexcept;
 
     void request_block(const model::file_block_t &block) noexcept;
     void pull_next() noexcept;

@@ -47,6 +47,7 @@ struct sample_peer_t : r::actor_base_t {
     using remote_messages_t = std::list<remote_message_t>;
 
     struct block_response_t {
+        std::string name;
         size_t block_index;
         std::string data;
         sys::error_code ec;
@@ -131,14 +132,21 @@ struct sample_peer_t : r::actor_base_t {
 
     void process_block_requests() noexcept {
         auto condition = [&]() -> bool {
-            return block_requests.size() && block_responses.size() &&
-                   block_requests.front()->payload.request_payload.block.block_index() ==
-                       block_responses.front().block_index;
+            if (block_requests.size() && block_responses.size()) {
+                auto &req = block_requests.front();
+                auto &res = block_responses.front();
+                auto &req_payload = req->payload.request_payload;
+                if (req_payload.block.block_index() == res.block_index) {
+                    auto &name = res.name;
+                    return name.empty() || name == req_payload.file->get_name();
+                }
+            }
+            return false;
         };
         while (condition()) {
             auto &reply = block_responses.front();
             auto &request = *block_requests.front();
-            log->debug("{}, matched, replying..., ec = {}", identity, reply.ec.value());
+            log->debug("{}, matched '{}', replying..., ec = {}", identity, reply.name, reply.ec.value());
             if (!reply.ec) {
                 reply_to(request, reply.data);
             } else {
@@ -166,18 +174,18 @@ struct sample_peer_t : r::actor_base_t {
 
     static const constexpr size_t next_block = 1000000;
 
-    void push_block(std::string_view data, size_t index) {
+    void push_block(std::string_view data, size_t index, std::string name = {}) {
         if (index == next_block) {
             index = block_responses.size();
         }
-        block_responses.push_back(block_response_t{index, std::string(data)});
+        block_responses.push_back(block_response_t{std::move(name), index, std::string(data), {}});
     }
 
     void push_block(sys::error_code ec, size_t index) {
         if (index == next_block) {
             index = block_responses.size();
         }
-        block_responses.push_back(block_response_t{index, std::string{}, ec});
+        block_responses.push_back(block_response_t{std::string{}, index, std::string{}, ec});
     }
 
     size_t blocks_requested = 0;
@@ -647,42 +655,79 @@ void test_downloading() {
                 b1->set_offset(0);
                 b1->set_size(5);
 
-                auto b2 = file_2->add_blocks();
-                b2->set_hash(utils::sha256_digest("67890").value());
-                b2->set_offset(0);
-                b2->set_size(5);
+                SECTION("with different blocks") {
+                    auto b2 = file_2->add_blocks();
+                    b2->set_hash(utils::sha256_digest("67890").value());
+                    b2->set_offset(0);
+                    b2->set_size(5);
 
-                auto folder_my = folder_infos.by_device(*my_device);
-                CHECK(folder_my->get_max_sequence() == 0ul);
-                CHECK(!folder_my->get_folder()->is_synchronizing());
+                    auto folder_my = folder_infos.by_device(*my_device);
+                    CHECK(folder_my->get_max_sequence() == 0ul);
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
 
-                peer_actor->forward(proto::message::Index(new proto::Index(index)));
-                peer_actor->push_block("12345", 0);
-                peer_actor->push_block("67890", 0);
-                sup->do_process();
+                    peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                    peer_actor->push_block("12345", 0, file_1->name());
+                    peer_actor->push_block("67890", 0, file_2->name());
+                    sup->do_process();
 
-                CHECK(!folder_my->get_folder()->is_synchronizing());
-                CHECK(peer_actor->blocks_requested == 2);
-                REQUIRE(folder_my);
-                CHECK(folder_my->get_max_sequence() == 2ul);
-                REQUIRE(folder_my->get_file_infos().size() == 2);
-                {
-                    auto f = folder_my->get_file_infos().by_name(file_1->name());
-                    REQUIRE(f);
-                    CHECK(f->get_size() == 5);
-                    CHECK(f->get_blocks().size() == 1);
-                    CHECK(f->is_locally_available());
-                    CHECK(!f->is_locked());
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+                    CHECK(peer_actor->blocks_requested == 2);
+                    REQUIRE(folder_my);
+                    CHECK(folder_my->get_max_sequence() == 2ul);
+                    REQUIRE(folder_my->get_file_infos().size() == 2);
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_1->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 5);
+                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_2->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 5);
+                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
                 }
-                {
-                    auto f = folder_my->get_file_infos().by_name(file_2->name());
-                    REQUIRE(f);
-                    CHECK(f->get_size() == 5);
-                    CHECK(f->get_blocks().size() == 1);
-                    CHECK(f->is_locally_available());
-                    CHECK(!f->is_locked());
+
+                SECTION("with the same clock") {
+                    *file_2->add_blocks() = *b1;
+
+                    auto folder_my = folder_infos.by_device(*my_device);
+                    CHECK(folder_my->get_max_sequence() == 0ul);
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+
+                    peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                    peer_actor->push_block("12345", 0, file_1->name());
+                    sup->do_process();
+
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+                    CHECK(peer_actor->blocks_requested == 1);
+                    REQUIRE(folder_my);
+                    CHECK(folder_my->get_max_sequence() == 2ul);
+                    REQUIRE(folder_my->get_file_infos().size() == 2);
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_1->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 5);
+                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_2->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 5);
+                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
                 }
             }
+
             SECTION("cluster config is the same, but there are non-downloaded files") {
                 auto folder_peer = folder_infos.by_device(*peer_device);
 

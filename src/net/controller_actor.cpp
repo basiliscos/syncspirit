@@ -253,54 +253,76 @@ void controller_actor_t::send_diff() {
 
 void controller_actor_t::on_cutom(const pull_signal_t &) noexcept { pull_next(); }
 
+void controller_actor_t::on_cutom(const forget_file_t &diff) noexcept {
+    auto it = file_locks.find(diff.full_name);
+    assert(it != file_locks.end());
+    file_locks.erase(it);
+}
+
 void controller_actor_t::pull_next() noexcept {
     LOG_TRACE(log, "pull_next (pull_signal_t), blocks requested = {}", rx_blocks_requested);
-AGAIN:
-    bool ignore = (rx_blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
-                  || (state != r::state_t::OPERATIONAL) // request pool sz = 32505856e are shutting down
-        ;
-    if (ignore) {
-        return;
-    }
+    auto cloned_files = std::uint_fast32_t{0};
+    auto can_pull_more = [&]() -> bool {
+        bool ignore = (rx_blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
+                      || (state != r::state_t::OPERATIONAL) // request pool sz = 32505856e are shutting down
+                      || !cluster->get_write_requests() || cloned_files > 10;
+        return !ignore;
+    };
 
-    bool reset_file = false;
-    bool try_next = false;
-    if (file && block_iterator && cluster->get_write_requests()) {
-        auto block = block_iterator->next(true);
-        if (!*block_iterator) {
-            block_iterator.reset();
-        }
-        if (block) {
-            preprocess_block(block);
-        } else {
-            reset_file = true;
-        }
-        try_next = true;
-    }
-    if (reset_file) {
-        auto it = file_locks.find(file->get_full_name());
-        assert(it != file_locks.end());
-        file.reset();
-    }
-    if (!file) {
-        file = next_file();
+    auto requeued = model::file_iterator_t::queue_t{};
+    while (can_pull_more()) {
         if (file) {
-            auto file_lock = file_lock_ptr_t(new file_lock_t(file, *this));
-            file_locks[file->get_full_name()] = std::move(file_lock);
-            if (!file->local_file()) {
-                assign_diff(new model::diff::modify::clone_file_t(*file, *sequencer));
-            }
-            if (!file->get_size()) {
-                try_next = true;
+            if (block_iterator) {
+                if (cluster->get_write_requests()) {
+                    if (*block_iterator) {
+                        auto file_block = block_iterator->next();
+                        if (file_block.block()->is_locked()) {
+                            requeued.emplace_back(file);
+                        } else {
+                            preprocess_block(file_block);
+                        }
+                    } else {
+                        block_iterator.reset();
+                        file.reset();
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                if (file->local_file()) {
+                    assert(file->get_size());
+                    LOG_TRACE(log, "iterating blocks on {}", file->get_name());
+                    block_iterator = new model::blocks_iterator_t(*file);
+                    if (!*block_iterator) {
+                        auto bi = new model::blocks_iterator_t(*file);
+                        assert(*block_iterator);
+                    }
+                }
             }
         }
-    }
-    if (try_next) {
-        goto AGAIN;
+        if (!file) {
+            file = next_file();
+            if (file) {
+                if (!file_locks.count(file->get_full_name())) {
+                    auto file_lock = file_lock_ptr_t(new file_lock_t(file, *this));
+                    file_locks[file->get_full_name()] = std::move(file_lock);
+                }
+                if (!file->local_file()) {
+                    assign_diff(new model::diff::modify::clone_file_t(*file, *sequencer));
+                    file.reset();
+                    ++cloned_files;
+                }
+            } else {
+                break;
+            }
+        }
     }
     if (diff) {
         pull_ready();
         send_diff();
+    }
+    if (!requeued.empty()) {
+        file_iterator->requeue_content(std::move(requeued));
     }
 }
 
@@ -392,15 +414,8 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto folder_info = folder->get_folder_infos().by_device(*peer);
         auto file = folder_info->get_file_infos().by_name(diff.file.name());
-        if (file->get_size()) {
-            block_iterator = new model::blocks_iterator_t(*file);
-            if (!*block_iterator) {
-                block_iterator.reset();
-            }
-        } else {
-            auto it = file_locks.find(file->get_full_name());
-            assert(it != file_locks.end());
-            file_locks.erase(it);
+        if (!file->get_size()) {
+            assign_diff(new forget_file_t(this, file->get_full_name()));
         }
     }
     return diff.visit_next(*this, custom);
@@ -769,6 +784,19 @@ auto controller_actor_t::make_callback() noexcept -> dispose_callback_t {
 controller_actor_t::pull_signal_t::pull_signal_t(void *controller_) noexcept : controller{controller_} {}
 
 auto controller_actor_t::pull_signal_t::visit(model::diff::cluster_visitor_t &visitor, void *custom) const noexcept
+    -> outcome::result<void> {
+    auto r = visitor(*this, custom);
+    if (r && custom == controller) {
+        auto self = reinterpret_cast<controller_actor_t *>(custom);
+        self->on_cutom(*this);
+    }
+    return r;
+}
+
+controller_actor_t::forget_file_t::forget_file_t(void *controller_, std::string full_name_) noexcept
+    : controller{controller_}, full_name{std::move(full_name_)} {}
+
+auto controller_actor_t::forget_file_t::visit(model::diff::cluster_visitor_t &visitor, void *custom) const noexcept
     -> outcome::result<void> {
     auto r = visitor(*this, custom);
     if (r && custom == controller) {
