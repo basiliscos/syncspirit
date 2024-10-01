@@ -216,6 +216,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     model::updates_streamer_t updates_streamer;
     int substate = substate_t::none;
     locked_files_t file_locks;
+    model::block_infos_map_t block_locks;
     synchronizing_folders_t synchronizing_folders;
     block_write_queue_t block_write_queue;
 };

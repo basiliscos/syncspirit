@@ -329,6 +329,9 @@ void controller_actor_t::pull_next() noexcept {
 void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexcept {
     using namespace model::diff;
     assert(file->local_file());
+    auto block = file_block.block();
+    block_locks.put(block);
+    block->lock();
 
     if (file_block.is_locally_available()) {
         LOG_TRACE(log, "cloning locally available block, file = {}, block index = {} / {}", file->get_full_name(),
@@ -336,7 +339,6 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
         auto diff = cluster_diff_ptr_t(new modify::clone_block_t(file_block, make_callback()));
         push_block_write(std::move(diff));
     } else {
-        auto block = file_block.block();
         auto sz = block->get_size();
         LOG_TRACE(log, "request_block on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}",
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
@@ -519,6 +521,9 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto source_file = folder_info->get_file_infos().by_name(diff.file_name);
+    auto block = source_file->get_blocks().at(diff.block_index);
+    block->unlock();
+    block_locks.remove(block);
     if (source_file->is_locally_available()) {
         LOG_TRACE(log, "on_block_update, finalizing {}", source_file->get_name());
         auto my_file = source_file->local_file();

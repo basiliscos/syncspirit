@@ -728,6 +728,8 @@ void test_downloading() {
                 }
 
                 SECTION("with the same blocks") {
+                    auto concurrent_writes = GENERATE(1, 5);
+                    cluster->modify_write_requests(concurrent_writes);
                     *file_2->add_blocks() = *b1;
                     *file_2->add_blocks() = *b1;
                     file_2->set_size(10);
