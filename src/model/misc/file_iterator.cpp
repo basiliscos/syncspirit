@@ -58,11 +58,7 @@ file_info_ptr_t file_iterator_t::next() noexcept {
         if (file->is_locked() || file->is_locally_locked()) {
             locked_queue.emplace_back(file);
         } else if (accept(*file)) {
-            auto f = file->actualize();
-            if (f->get_size() && !f->local_file()) {
-                content_queue.emplace_back(f);
-            }
-            return f;
+            return file->actualize();
         }
     }
 

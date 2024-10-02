@@ -81,6 +81,7 @@ controller_actor_t::controller_actor_t(config_t &config)
     assert(sequencer);
     current_diff = nullptr;
     planned_pulls = 0;
+    file_iterator.reset(new model::file_iterator_t(*cluster, peer));
 }
 
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -124,7 +125,6 @@ void controller_actor_t::on_start() noexcept {
 
     resources->acquire(resource::peer);
     LOG_INFO(log, "is online");
-    file_iterator.reset(new model::file_iterator_t(*cluster, peer));
 }
 
 void controller_actor_t::shutdown_start() noexcept {
@@ -214,17 +214,21 @@ void controller_actor_t::push_pending() noexcept {
 }
 
 model::file_info_ptr_t controller_actor_t::next_file() noexcept {
-    if (file_iterator) {
-        auto r = file_iterator->next();
-        if (r) {
-            LOG_TRACE(log, "next_file = {}", r->get_name());
-        }
-        return r;
+    auto r = file_iterator->next();
+    if (r) {
+        LOG_TRACE(log, "next_file = {}", r->get_name());
     }
-    return {};
+    return r;
 }
 
-void controller_actor_t::reset_sync() noexcept { file.reset(); }
+void controller_actor_t::reset_sync() noexcept {
+    if (file) {
+        // using queue_t = model::file_iterator_t::queue_t;
+        // file_iterator->requeue_content(queue_t{file});
+        // file.reset();
+        // block_iterator.reset();
+    }
+}
 
 void controller_actor_t::assign_diff(model::diff::cluster_diff_ptr_t new_diff) noexcept {
     if (current_diff) {
@@ -291,9 +295,10 @@ void controller_actor_t::pull_next() noexcept {
             } else {
                 if (file->local_file()) {
                     assert(file->get_size());
-                    LOG_TRACE(log, "iterating blocks on {}", file->get_name());
                     block_iterator = new model::blocks_iterator_t(*file);
-                    if (!*block_iterator) {
+                    bool has_blocks = *block_iterator;
+                    LOG_TRACE(log, "iterating blocks on {}, has blocks: {}", file->get_name(), has_blocks);
+                    if (!has_blocks) {
                         block_iterator.reset();
                         file.reset();
                     }
@@ -418,6 +423,9 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
         auto file = folder_info->get_file_infos().by_name(diff.file.name());
         if (!file->get_size()) {
             assign_diff(new forget_file_t(this, file->get_full_name()));
+        } else {
+            using queue_t = model::file_iterator_t::queue_t;
+            file_iterator->requeue_content(queue_t{file});
         }
     }
     return diff.visit_next(*this, custom);
