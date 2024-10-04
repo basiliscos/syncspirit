@@ -447,14 +447,6 @@ auto controller_actor_t::operator()(const model::diff::modify::finish_file_ack_t
     return diff.visit_next(*this, custom);
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    // if (custom == this && diff.locked) {
-    //     pull_ready()
-    // }
-    return diff.visit_next(*this, custom);
-}
-
 auto controller_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (diff.peer_id != peer->device_id().get_sha256()) {
@@ -495,18 +487,6 @@ auto controller_actor_t::operator()(const model::diff::local::update_t &diff, vo
     push_pending();
     return diff.visit_next(*this, custom);
 }
-
-#if 0
-auto controller_actor_t::operator()(const model::diff::local::custom_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto r = diff.visit_next(*this, custom);
-    if (!r.has_error() && custom == this) {
-        auto payload = static_cast<const pull_signal_t&>(diff);
-        on_cutom(payload);
-    }
-    return r;
-}
-#endif
 
 auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t &diff, void *custom) noexcept
     -> outcome::result<void> {
