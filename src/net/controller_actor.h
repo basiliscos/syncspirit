@@ -36,6 +36,7 @@ struct controller_actor_config_t : r::actor_config_t {
     pt::time_duration request_timeout;
     uint32_t blocks_max_requested = 8;
     uint32_t outgoing_buffer_max = 0;
+    std::uint32_t file_clones_per_iteration = 10;
 };
 
 template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -75,6 +76,11 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
 
     builder_t &&blocks_max_requested(uint32_t value) && noexcept {
         parent_t::config.blocks_max_requested = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&file_clones_per_iteration(uint32_t value) && noexcept {
+        parent_t::config.file_clones_per_iteration = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -206,6 +212,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     int64_t request_pool;
     uint32_t blocks_max_kept;
     uint32_t blocks_max_requested;
+    uint32_t file_clones_per_iteration;
     utils::logger_t log;
     unlink_requests_t unlink_requests;
     model::file_info_ptr_t file;

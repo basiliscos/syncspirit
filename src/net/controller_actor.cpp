@@ -77,12 +77,15 @@ controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
       peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, rx_blocks_requested{0},
       tx_blocks_requested{0}, outgoing_buffer{0}, outgoing_buffer_max{config.outgoing_buffer_max},
-      request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested} {
-    assert(cluster);
-    assert(sequencer);
-    current_diff = nullptr;
-    planned_pulls = 0;
-    file_iterator.reset(new model::file_iterator_t(*cluster, peer));
+      request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested},
+      file_clones_per_iteration{config.file_clones_per_iteration} {
+    {
+        assert(cluster);
+        assert(sequencer);
+        current_diff = nullptr;
+        planned_pulls = 0;
+        file_iterator.reset(new model::file_iterator_t(*cluster, peer));
+    }
 }
 
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -261,7 +264,7 @@ void controller_actor_t::pull_next() noexcept {
     auto can_pull_more = [&]() -> bool {
         bool ignore = (rx_blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
                       || (state != r::state_t::OPERATIONAL) // request pool sz = 32505856e are shutting down
-                      || !cluster->get_write_requests() || cloned_files > 10;
+                      || !cluster->get_write_requests() || cloned_files > file_clones_per_iteration;
         return !ignore;
     };
 
