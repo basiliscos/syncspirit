@@ -75,6 +75,15 @@ struct connect_timeout_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
+struct file_clones_per_iteration_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    file_clones_per_iteration_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
 struct request_timeout_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 

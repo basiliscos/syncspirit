@@ -25,6 +25,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new bep::blocks_max_requested_t(bep.blocks_max_requested, bep_def.blocks_max_requested)),
             property_ptr_t(new bep::blocks_simultaneous_write_t(bep.blocks_simultaneous_write, bep_def.blocks_simultaneous_write)),
             property_ptr_t(new bep::connect_timeout_t(bep.connect_timeout, bep_def.connect_timeout)),
+            property_ptr_t(new bep::file_clones_per_iteration_t(bep.file_clones_per_iteration, bep_def.file_clones_per_iteration)),
             property_ptr_t(new bep::request_timeout_t(bep.request_timeout, bep_def.request_timeout)),
             property_ptr_t(new bep::rx_buff_size_t(bep.rx_buff_size, bep_def.rx_buff_size)),
             property_ptr_t(new bep::rx_timeout_t(bep.rx_timeout, bep_def.rx_timeout)),
