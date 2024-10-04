@@ -270,27 +270,6 @@ TEST_CASE("file iterator", "[model]") {
         REQUIRE(((r1 == f1) || (r1 == f2)));
         REQUIRE(r2);
         REQUIRE(((r2 == f1) || (r2 == f2)));
-
-#if 0
-        SECTION("non-downloaded file takes priority over non-existing") {
-            REQUIRE(builder.clone_file(*f2).apply());
-            REQUIRE(next(true) == f2);
-            REQUIRE(next(false) == f1);
-            REQUIRE(!next(false));
-        }
-
-        SECTION("partly-downloaded file takes priority over non-downloaded") {
-            REQUIRE(builder.clone_file(*f1).clone_file(*f2).apply());
-            auto f2_local = f2->local_file();
-            REQUIRE(f2_local);
-
-            f2_local->mark_local_available(0ul);
-
-            REQUIRE(next(true) == f2);
-            REQUIRE(next(false) == f1);
-            REQUIRE(!next(false));
-        }
-#endif
     }
 
     SECTION("file actualization") {
