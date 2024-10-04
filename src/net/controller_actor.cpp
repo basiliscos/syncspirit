@@ -19,6 +19,7 @@
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/unshare_folder.h"
+#include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 #include "proto/bep_support.h"
@@ -38,13 +39,53 @@ r::plugin::resource_id_t hash = 1;
 } // namespace resource
 } // namespace
 
+controller_actor_t::file_lock_t::file_lock_t(model::file_info_ptr_t file_, controller_actor_t &controller_) noexcept
+    : file{file_}, controller{controller_} {
+    file->locally_lock();
+    is_locked = file->get_size();
+    if (is_locked) {
+        controller.assign_diff(new model::diff::modify::lock_file_t(*file, true));
+    }
+
+    auto folder = model::folder_ptr_t{file->get_folder_info()->get_folder()};
+    auto &counter = ++controller.synchronizing_folders[folder];
+    if (counter == 1) {
+        controller.assign_diff(new model::diff::local::synchronization_start_t(folder->get_id()));
+    }
+}
+
+controller_actor_t::file_lock_t::~file_lock_t() {
+    auto folder = model::folder_ptr_t{file->get_folder_info()->get_folder()};
+    auto &counter = --controller.synchronizing_folders[folder];
+    if (counter == 0) {
+        controller.synchronizing_folders.erase(folder);
+        controller.assign_diff(new model::diff::local::synchronization_finish_t(folder->get_id()));
+    }
+
+    if (is_locked) {
+        LOG_TRACE(controller.log, "going to unlock {} ({}); is_unlocking {}", file->get_full_name(), (void *)file.get(),
+                  file->is_unlocking());
+        controller.assign_diff(new model::diff::modify::lock_file_t(*file, false));
+    }
+    if (controller.file == file) {
+        controller.file.reset();
+    }
+    file->locally_unlock();
+}
+
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
       peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, rx_blocks_requested{0},
       tx_blocks_requested{0}, outgoing_buffer{0}, outgoing_buffer_max{config.outgoing_buffer_max},
-      request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested} {
-    assert(cluster);
-    assert(sequencer);
+      request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested},
+      file_clones_per_iteration{config.file_clones_per_iteration} {
+    {
+        assert(cluster);
+        assert(sequencer);
+        current_diff = nullptr;
+        planned_pulls = 0;
+        file_iterator.reset(new model::file_iterator_t(*cluster, peer));
+    }
 }
 
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -70,7 +111,6 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(peer_addr, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
-        p.subscribe_actor(&controller_actor_t::on_pull_ready);
         p.subscribe_actor(&controller_actor_t::on_termination);
         p.subscribe_actor(&controller_actor_t::on_block);
         p.subscribe_actor(&controller_actor_t::on_transfer_pop);
@@ -101,43 +141,8 @@ void controller_actor_t::shutdown_start() noexcept {
 
 void controller_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish, blocks_requested = {}", rx_blocks_requested);
-    if (!locked_files.empty()) {
-        auto diff = model::diff::cluster_diff_ptr_t{};
-        auto current = (model::diff::cluster_diff_t *){nullptr};
-        int diff_counter{0};
-        auto assign = [&](model::diff::cluster_diff_t *new_diff) {
-            if (!diff) {
-                diff = new_diff;
-                current = new_diff;
-            } else {
-                current = current->assign_sibling(new_diff);
-            }
-            ++diff_counter;
-        };
-
-        for (auto &[folder, counter] : synchronizing_folders) {
-            if (counter) {
-                assign(new model::diff::local::synchronization_finish_t(folder->get_id()));
-            }
-        }
-
-        for (auto &file : locked_files) {
-            if (!file->is_unlocking()) {
-                LOG_TRACE(log, "going to unlock {} ({}); is_unlocking {}", file->get_full_name(), (void *)file.get(),
-                          file->is_unlocking());
-                assign(new model::diff::modify::lock_file_t(*file, false));
-            }
-            file->set_unlocking(false);
-        }
-        for (auto &file : locally_locked_files) {
-            file->locally_unlock();
-        }
-
-        LOG_DEBUG(log, "unlocking {} model files and {} local files", diff_counter, locally_locked_files.size());
-        if (diff) {
-            send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-        }
-    }
+    file_locks.clear();
+    send_diff();
     r::actor_base_t::shutdown_finish();
 }
 
@@ -173,8 +178,6 @@ void controller_actor_t::on_termination(message::termination_signal_t &message) 
     LOG_TRACE(log, "on_termination reason: {}", ee->message());
     do_shutdown(ee);
 }
-
-void controller_actor_t::pull_ready() noexcept { send<payload::pull_signal_t>(get_address()); }
 
 void controller_actor_t::push_pending() noexcept {
     using pair_t = std::pair<model::folder_info_t *, proto::IndexUpdate>;
@@ -214,83 +217,121 @@ void controller_actor_t::push_pending() noexcept {
     }
 }
 
-model::file_info_ptr_t controller_actor_t::next_file(bool reset) noexcept {
-    if (reset) {
-        file_iterator.reset(new model::file_iterator_t(*cluster, peer));
+model::file_info_ptr_t controller_actor_t::next_file() noexcept {
+    auto r = file_iterator->next();
+    if (r) {
+        LOG_TRACE(log, "next_file = {}", r->get_name());
     }
-    if (file_iterator && *file_iterator) {
-        return file_iterator->next();
-    }
-    return {};
+    return r;
 }
 
-model::file_block_t controller_actor_t::next_block(bool reset) noexcept {
-    if (file->is_file() && !file->is_deleted()) {
-        if (reset) {
-            block_iterator = new model::blocks_iterator_t(*file);
-        }
-        if (block_iterator && *block_iterator) {
-            return block_iterator->next(!reset);
+void controller_actor_t::assign_diff(model::diff::cluster_diff_ptr_t new_diff) noexcept {
+    if (current_diff) {
+        current_diff = current_diff->assign_sibling(new_diff.get());
+    } else {
+        diff = std::move(new_diff);
+        current_diff = diff.get();
+        while (current_diff->sibling) {
+            current_diff = current_diff->sibling.get();
         }
     }
-    return {};
 }
 
-void controller_actor_t::on_pull_ready(message::pull_signal_t &) noexcept {
-    LOG_TRACE(log, "on_pull_ready, blocks requested = {}", rx_blocks_requested);
-    bool ignore = (rx_blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
-                  || (state != r::state_t::OPERATIONAL) // request pool sz = 32505856e are shutting down
-        ;
-    if (ignore) {
-        return;
-    }
+void controller_actor_t::pull_ready() noexcept { ++planned_pulls; }
 
-    if (file && file->get_size() && file->local_file() && cluster->get_write_requests()) {
-        auto reset_block = !(substate & substate_t::iterating_blocks);
-        auto block = next_block(reset_block);
-        if (block) {
-            substate |= substate_t::iterating_blocks;
-            if (reset_block) {
-                auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::lock_file_t(*file, true);
-                auto folder = model::folder_ptr_t{file->get_folder_info()->get_folder()};
-                auto &counter = ++synchronizing_folders[folder];
-                if (counter == 1) {
-                    auto raw = new model::diff::local::synchronization_start_t(folder->get_id());
-                    diff->sibling.reset(raw);
-                }
-                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-            } else {
-                preprocess_block(block);
-            }
-        } else {
-            substate = substate & ~substate_t::iterating_blocks;
-        }
+void controller_actor_t::send_diff() {
+    if (planned_pulls && !diff) {
+        assign_diff(new pull_signal_t(this));
+        planned_pulls = 0;
     }
-    if (!(substate & substate_t::iterating_blocks)) {
-        bool reset_file = !(substate & substate_t::iterating_files);
-        file = next_file(reset_file);
+    if (diff) {
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+        current_diff = nullptr;
+    }
+}
+
+void controller_actor_t::on_cutom(const pull_signal_t &) noexcept { pull_next(); }
+
+void controller_actor_t::on_cutom(const forget_file_t &diff) noexcept {
+    auto it = file_locks.find(diff.full_name);
+    assert(it != file_locks.end());
+    file_locks.erase(it);
+}
+
+void controller_actor_t::pull_next() noexcept {
+    LOG_TRACE(log, "pull_next (pull_signal_t), blocks requested = {}", rx_blocks_requested);
+    auto cloned_files = std::uint_fast32_t{0};
+    auto can_pull_more = [&]() -> bool {
+        bool ignore = (rx_blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
+                      || (state != r::state_t::OPERATIONAL) // request pool sz = 32505856e are shutting down
+                      || !cluster->get_write_requests() || cloned_files > file_clones_per_iteration;
+        return !ignore;
+    };
+
+    auto requeued = model::file_iterator_t::files_set_t{};
+    while (can_pull_more()) {
         if (file) {
-            substate |= substate_t::iterating_files;
-            if (!file->local_file()) {
-                LOG_DEBUG(log, "next_file = {}", file->get_name());
-                file->locally_lock();
-                locally_locked_files.emplace(file);
-                auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::clone_file_t(*file, *sequencer);
-                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+            if (block_iterator) {
+                if (cluster->get_write_requests()) {
+                    if (*block_iterator) {
+                        auto file_block = block_iterator->next();
+                        if (file_block.block()->is_locked()) {
+                            requeued.emplace(file);
+                        } else {
+                            preprocess_block(file_block);
+                        }
+                    } else {
+                        block_iterator.reset();
+                        file.reset();
+                    }
+                } else {
+                    break;
+                }
             } else {
-                pull_ready();
+                if (file->local_file()) {
+                    assert(file->get_size());
+                    block_iterator = new model::blocks_iterator_t(*file);
+                    bool has_blocks = *block_iterator;
+                    LOG_TRACE(log, "iterating blocks on {}, has blocks: {}", file->get_name(), has_blocks);
+                    if (!has_blocks) {
+                        block_iterator.reset();
+                        file.reset();
+                    }
+                }
             }
-        } else {
-            substate = substate & ~substate_t::iterating_files;
         }
+        if (!file) {
+            file = next_file();
+            if (file) {
+                if (!file_locks.count(file->get_full_name())) {
+                    auto file_lock = file_lock_ptr_t(new file_lock_t(file, *this));
+                    file_locks[file->get_full_name()] = std::move(file_lock);
+                }
+                if (!file->local_file()) {
+                    assign_diff(new model::diff::modify::clone_file_t(*file, *sequencer));
+                    file.reset();
+                    ++cloned_files;
+                }
+            } else {
+                break;
+            }
+        }
+    }
+    if (diff) {
+        pull_ready();
+        send_diff();
+    }
+    if (!requeued.empty()) {
+        file_iterator->requeue_unchecked(std::move(requeued));
     }
 }
 
 void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexcept {
     using namespace model::diff;
     assert(file->local_file());
+    auto block = file_block.block();
+    block_locks.put(block);
+    block->lock();
 
     if (file_block.is_locally_available()) {
         LOG_TRACE(log, "cloning locally available block, file = {}, block index = {} / {}", file->get_full_name(),
@@ -298,7 +339,6 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
         auto diff = cluster_diff_ptr_t(new modify::clone_block_t(file_block, make_callback()));
         push_block_write(std::move(diff));
     } else {
-        auto block = file_block.block();
         auto sz = block->get_size();
         LOG_TRACE(log, "request_block on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}",
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
@@ -306,7 +346,6 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
         ++rx_blocks_requested;
         request_pool -= (int64_t)sz;
     }
-    pull_ready();
 }
 
 void controller_actor_t::on_forward(message::forwarded_message_t &message) noexcept {
@@ -317,16 +356,26 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
 }
 
 void controller_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
+    auto custom = const_cast<void *>(message.payload.custom);
+    auto pulls = std::uint32_t{0};
+    if (custom == this) {
+        pulls = planned_pulls;
+        planned_pulls = 0;
+    }
+    LOG_TRACE(log, "on_model_update, planned pulls = {}", pulls);
     auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this, const_cast<void *>(message.payload.custom));
+    auto r = diff.visit(*this, custom);
     if (!r) {
         auto ee = make_error(r.assume_error());
         return do_shutdown(ee);
     }
-    pull_ready();
+    if (pulls) {
+        pull_next();
+    }
     push_pending();
+    send_diff();
 }
+
 auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (custom != this) {
@@ -349,24 +398,39 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &d
         }
     }
     updates_streamer = model::updates_streamer_t(*cluster, *peer);
+    return diff.visit_next(*this, custom);
+}
 
+auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (custom == this) {
+        auto added_files = model::file_iterator_t::files_list_t{};
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto peer_folder = folder->is_shared_with(*peer);
+        auto &files_map = peer_folder->get_file_infos();
+        for (auto &f : diff.files) {
+            auto file = files_map.by_name(f.name());
+            added_files.emplace_back(std::move(file));
+        }
+        file_iterator->append_folder(peer_folder, added_files);
+        pull_ready();
+    }
     return diff.visit_next(*this, custom);
 }
 
 auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    if (custom != this) {
-        return diff.visit_next(*this, custom);
+    if (custom == this) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto &folder_infos = folder->get_folder_infos();
+        auto folder_peer = folder_infos.by_device(*peer);
+        auto file = folder_peer->get_file_infos().by_name(diff.file.name());
+        if (file->get_size()) {
+            file_iterator->requeue_unchecked(std::move(file));
+        } else {
+            assign_diff(new forget_file_t(this, file->get_full_name()));
+        }
     }
-
-    auto folder_id = diff.folder_id;
-    auto file_name = diff.file.name();
-    auto folder = cluster->get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*peer);
-    auto file = folder_info->get_file_infos().by_name(file_name);
-    file->locally_unlock();
-    auto it = locally_locked_files.find(file);
-    locally_locked_files.erase(it);
     return diff.visit_next(*this, custom);
 }
 
@@ -377,35 +441,12 @@ auto controller_actor_t::operator()(const model::diff::modify::finish_file_ack_t
     auto file = folder_info->get_file_infos().by_name(diff.file_name);
     assert(file);
     updates_streamer.on_update(*file);
-    return diff.visit_next(*this, custom);
-}
 
-auto controller_actor_t::operator()(const model::diff::modify::lock_file_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (custom != this) {
-        return diff.visit_next(*this, custom);
-    }
+    auto it = file_locks.find(file->get_full_name());
+    assert(it != file_locks.end());
+    file_locks.erase(it);
+    pull_ready();
 
-    auto &folder_id = diff.folder_id;
-    auto &file_name = diff.file_name;
-    auto folder = cluster->get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*peer);
-    auto file = folder_info->get_file_infos().by_name(file_name);
-    if (diff.locked) {
-        locked_files.emplace(std::move(file));
-    } else {
-        file->set_unlocking(false);
-        auto it = locked_files.find(file);
-        assert(it != locked_files.end());
-        locked_files.erase(it);
-        auto &counter = --synchronizing_folders[folder];
-        if (counter == 0) {
-            auto diff = model::diff::cluster_diff_ptr_t{};
-            diff = new model::diff::local::synchronization_finish_t(folder->get_id());
-            send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-            synchronizing_folders.erase(folder);
-        }
-    }
     return diff.visit_next(*this, custom);
 }
 
@@ -415,6 +456,11 @@ auto controller_actor_t::operator()(const model::diff::modify::share_folder_t &d
         return diff.visit_next(*this, custom);
     }
 
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto peer_folder = folder->get_folder_infos().by_device(*peer);
+    file_iterator->append_folder(peer_folder);
+
+    pull_ready();
     send_cluster_config();
     return diff.visit_next(*this, custom);
 }
@@ -455,10 +501,11 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
         auto device = cluster->get_devices().by_sha256(diff.device_id);
         auto folder_info = folder_infos.by_device(*device);
         auto file = folder_info->get_file_infos().by_name(file_name);
-        auto diff = model::diff::cluster_diff_ptr_t{};
-        file->set_unlocking(true);
-        diff = new model::diff::modify::lock_file_t(*file, false);
-        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+
+        auto it = file_locks.find(file->get_full_name());
+        assert(it != file_locks.end());
+        file_locks.erase(it);
+        pull_ready();
     }
     push_pending();
     return diff.visit_next(*this, custom);
@@ -470,19 +517,19 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto source_file = folder_info->get_file_infos().by_name(diff.file_name);
+    auto block = source_file->get_blocks().at(diff.block_index);
+    block->unlock();
+    block_locks.remove(block);
     if (source_file->is_locally_available()) {
         LOG_TRACE(log, "on_block_update, finalizing {}", source_file->get_name());
         auto my_file = source_file->local_file();
-        source_file->set_unlocking(true);
-        auto diff = model::diff::cluster_diff_ptr_t{};
-        diff = new model::diff::modify::lock_file_t(*source_file, false);
-        diff->assign_sibling(new model::diff::modify::finish_file_t(*my_file));
-        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+        assign_diff(new model::diff::modify::finish_file_t(*my_file));
     }
 
     cluster->modify_write_requests(1);
-    process_block_write();
     pull_ready();
+    process_block_write();
+    send_diff();
 
     return diff.visit_next(*this, custom);
 }
@@ -504,6 +551,16 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_peer_t &di
     return diff.visit_next(*this, custom);
 }
 
+auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (custom == this && peer->device_id().get_sha256() == diff.device_id) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto folder_info = folder->is_shared_with(*peer);
+        file_iterator->on_upsert(folder_info);
+    }
+    return diff.visit_next(*this, custom);
+}
+
 void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
     LOG_DEBUG(log, "on_message (ClusterConfig)");
     auto diff_opt = model::diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer, *message);
@@ -512,7 +569,10 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
-    send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
+    auto &diff = diff_opt.assume_value();
+    assign_diff(diff.get());
+    pull_ready();
+    send_diff();
 }
 
 void controller_actor_t::on_message(proto::message::Index &message) noexcept {
@@ -524,9 +584,12 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
+    auto &diff = diff_opt.assume_value();
     auto folder = cluster->get_folders().by_id(msg.folder());
     LOG_DEBUG(log, "on_message (Index), folder = {}, files = {}", folder->get_label(), msg.files_size());
-    send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
+    assign_diff(diff.get());
+    pull_ready();
+    send_diff();
 }
 
 void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
@@ -538,9 +601,12 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
+    auto &diff = diff_opt.assume_value();
     auto folder = cluster->get_folders().by_id(msg.folder());
     LOG_DEBUG(log, "on_message (IndexUpdate), folder = {}, files = {}", folder->get_label(), msg.files_size());
-    send<model::payload::model_update_t>(coordinator, std::move(diff_opt.assume_value()), this);
+    assign_diff(diff.get());
+    pull_ready();
+    send_diff();
 }
 
 void controller_actor_t::on_message(proto::message::Request &req) noexcept {
@@ -621,11 +687,10 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
                 LOG_WARN(log, "can't receive block from file '{}': {}; marking unreachable", file->get_full_name(),
                          ec.message());
                 file->mark_unreachable(true);
-                auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::mark_reachable_t(*file, false);
-                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+                assign_diff(new model::diff::modify::mark_reachable_t(*file, false));
             }
             pull_ready();
+            send_diff();
         } else {
             LOG_WARN(log, "can't receive block : {}", ee->message());
             do_shutdown(ee);
@@ -639,7 +704,8 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
 
     request<hasher::payload::validation_request_t>(hasher_proxy, data, hash, &message).send(init_timeout);
     resources->acquire(resource::hash);
-    return pull_ready();
+    pull_ready();
+    send_diff();
 }
 
 void controller_actor_t::on_validation(hasher::message::validation_response_t &res) noexcept {
@@ -660,11 +726,10 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
                 auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
                 LOG_WARN(log, "digest mismatch for '{}'; marking reachable", file->get_full_name(), ec.message());
                 file->mark_unreachable(true);
-                auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::mark_reachable_t(*file, false);
-                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+                assign_diff(new model::diff::modify::mark_reachable_t(*file, false));
             }
             pull_ready();
+            send_diff();
         } else {
             auto &data = block_res->payload.res.data;
             auto index = payload.block.block_index();
@@ -697,12 +762,13 @@ void controller_actor_t::process_block_write() noexcept {
     auto sent = 0;
     while (requests_left > 0 && !block_write_queue.empty()) {
         auto &diff = block_write_queue.front();
-        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+        assign_diff(diff.get());
         --requests_left;
         ++sent;
         block_write_queue.pop_front();
     }
     if (sent) {
+        send_diff();
         LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
         cluster->modify_write_requests(-sent);
     }
@@ -724,4 +790,29 @@ auto controller_actor_t::make_callback() noexcept -> dispose_callback_t {
         auto msg = r::make_message<model::payload::model_update_t>(coordinator, std::move(diff), this);
         sup->enqueue(std::move(msg));
     };
+}
+
+controller_actor_t::pull_signal_t::pull_signal_t(void *controller_) noexcept : controller{controller_} {}
+
+auto controller_actor_t::pull_signal_t::visit(model::diff::cluster_visitor_t &visitor, void *custom) const noexcept
+    -> outcome::result<void> {
+    auto r = visitor(*this, custom);
+    if (r && custom == controller) {
+        auto self = reinterpret_cast<controller_actor_t *>(custom);
+        self->on_cutom(*this);
+    }
+    return r;
+}
+
+controller_actor_t::forget_file_t::forget_file_t(void *controller_, std::string full_name_) noexcept
+    : controller{controller_}, full_name{std::move(full_name_)} {}
+
+auto controller_actor_t::forget_file_t::visit(model::diff::cluster_visitor_t &visitor, void *custom) const noexcept
+    -> outcome::result<void> {
+    auto r = visitor(*this, custom);
+    if (r && custom == controller) {
+        auto self = reinterpret_cast<controller_actor_t *>(custom);
+        self->on_cutom(*this);
+    }
+    return r;
 }

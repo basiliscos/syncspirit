@@ -47,6 +47,7 @@ struct sample_peer_t : r::actor_base_t {
     using remote_messages_t = std::list<remote_message_t>;
 
     struct block_response_t {
+        std::string name;
         size_t block_index;
         std::string data;
         sys::error_code ec;
@@ -131,14 +132,21 @@ struct sample_peer_t : r::actor_base_t {
 
     void process_block_requests() noexcept {
         auto condition = [&]() -> bool {
-            return block_requests.size() && block_responses.size() &&
-                   block_requests.front()->payload.request_payload.block.block_index() ==
-                       block_responses.front().block_index;
+            if (block_requests.size() && block_responses.size()) {
+                auto &req = block_requests.front();
+                auto &res = block_responses.front();
+                auto &req_payload = req->payload.request_payload;
+                if (req_payload.block.block_index() == res.block_index) {
+                    auto &name = res.name;
+                    return name.empty() || name == req_payload.file->get_name();
+                }
+            }
+            return false;
         };
         while (condition()) {
             auto &reply = block_responses.front();
             auto &request = *block_requests.front();
-            log->debug("{}, matched, replying..., ec = {}", identity, reply.ec.value());
+            log->debug("{}, matched '{}', replying..., ec = {}", identity, reply.name, reply.ec.value());
             if (!reply.ec) {
                 reply_to(request, reply.data);
             } else {
@@ -166,18 +174,18 @@ struct sample_peer_t : r::actor_base_t {
 
     static const constexpr size_t next_block = 1000000;
 
-    void push_block(std::string_view data, size_t index) {
+    void push_block(std::string_view data, size_t index, std::string name = {}) {
         if (index == next_block) {
             index = block_responses.size();
         }
-        block_responses.push_back(block_response_t{index, std::string(data)});
+        block_responses.push_back(block_response_t{std::move(name), index, std::string(data), {}});
     }
 
     void push_block(sys::error_code ec, size_t index) {
         if (index == next_block) {
             index = block_responses.size();
         }
-        block_responses.push_back(block_response_t{index, std::string{}, ec});
+        block_responses.push_back(block_response_t{std::string{}, index, std::string{}, ec});
     }
 
     size_t blocks_requested = 0;
@@ -615,45 +623,147 @@ void test_downloading() {
                     CHECK(f->get_sequence() == 2ul);
                 }
             }
-            SECTION("cluster config is the same, but there are non-downloaded files") {
-                auto folder_peer = folder_infos.by_device(*peer_device);
 
-                auto pr_fi = proto::FileInfo{};
-                pr_fi.set_name("some-file");
-                pr_fi.set_type(proto::FileInfoType::FILE);
-                pr_fi.set_sequence(folder_1_peer->get_max_sequence());
-                pr_fi.set_block_size(5);
-                pr_fi.set_size(5);
-                auto version = pr_fi.mutable_version();
-                auto counter = version->add_counters();
-                counter->set_id(1);
-                counter->set_value(peer_device->as_uint());
-                auto b1 = pr_fi.add_blocks();
+            SECTION("download 2 files") {
+                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                auto index = proto::Index{};
+                index.set_folder(std::string(folder_1->get_id()));
+                auto file_1 = index.add_files();
+                file_1->set_name("file-1");
+                file_1->set_type(proto::FileInfoType::FILE);
+                file_1->set_sequence(folder_1_peer->get_max_sequence());
+                file_1->set_block_size(5);
+                file_1->set_size(5);
+                auto version_1 = file_1->mutable_version();
+                auto counter_1 = version_1->add_counters();
+                counter_1->set_id(1ul);
+                counter_1->set_value(1ul);
+
+                auto file_2 = index.add_files();
+                file_2->set_name("file-2");
+                file_2->set_type(proto::FileInfoType::FILE);
+                file_2->set_sequence(folder_1_peer->get_max_sequence());
+                file_2->set_block_size(5);
+                file_2->set_size(5);
+                auto version_2 = file_2->mutable_version();
+                auto counter_2 = version_2->add_counters();
+                counter_2->set_id(1ul);
+                counter_2->set_value(2ul);
+
+                auto b1 = file_1->add_blocks();
                 b1->set_hash(utils::sha256_digest("12345").value());
                 b1->set_offset(0);
                 b1->set_size(5);
-                auto b = model::block_info_t::create(*b1).value();
 
-                auto uuid = sup->sequencer->next_uuid();
-                auto file_info = model::file_info_t::create(uuid, pr_fi, folder_peer).value();
-                file_info->assign_block(b, 0);
-                folder_peer->add(file_info, true);
+                SECTION("with different blocks") {
+                    auto b2 = file_2->add_blocks();
+                    b2->set_hash(utils::sha256_digest("67890").value());
+                    b2->set_offset(0);
+                    b2->set_size(5);
 
-                d_peer->set_max_sequence(folder_peer->get_max_sequence());
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                    auto folder_my = folder_infos.by_device(*my_device);
+                    CHECK(folder_my->get_max_sequence() == 0ul);
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
 
-                peer_actor->push_block("12345", 0);
-                sup->do_process();
+                    peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                    peer_actor->push_block("12345", 0, file_1->name());
+                    peer_actor->push_block("67890", 0, file_2->name());
+                    sup->do_process();
 
-                CHECK(folder_my->get_max_sequence() == 1ul);
-                REQUIRE(folder_my->get_file_infos().size() == 1);
-                auto f = folder_my->get_file_infos().begin()->item;
-                REQUIRE(f);
-                CHECK(f->get_name() == pr_fi.name());
-                CHECK(f->get_size() == 5);
-                CHECK(f->get_blocks().size() == 1);
-                CHECK(f->is_locally_available());
-                CHECK(!f->is_locked());
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+                    CHECK(peer_actor->blocks_requested == 2);
+                    REQUIRE(folder_my);
+                    CHECK(folder_my->get_max_sequence() == 2ul);
+                    REQUIRE(folder_my->get_file_infos().size() == 2);
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_1->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 5);
+                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_2->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 5);
+                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
+                }
+
+                SECTION("with the same block") {
+                    *file_2->add_blocks() = *b1;
+
+                    auto folder_my = folder_infos.by_device(*my_device);
+                    CHECK(folder_my->get_max_sequence() == 0ul);
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+
+                    peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                    peer_actor->push_block("12345", 0, file_1->name());
+                    sup->do_process();
+
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+                    CHECK(peer_actor->blocks_requested == 1);
+                    REQUIRE(folder_my);
+                    CHECK(folder_my->get_max_sequence() == 2ul);
+                    REQUIRE(folder_my->get_file_infos().size() == 2);
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_1->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 5);
+                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_2->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 5);
+                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
+                }
+
+                SECTION("with the same blocks") {
+                    auto concurrent_writes = GENERATE(1, 5);
+                    cluster->modify_write_requests(concurrent_writes);
+                    *file_2->add_blocks() = *b1;
+                    *file_2->add_blocks() = *b1;
+                    file_2->set_size(10);
+
+                    auto folder_my = folder_infos.by_device(*my_device);
+                    CHECK(folder_my->get_max_sequence() == 0ul);
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+
+                    peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                    peer_actor->push_block("12345", 0, file_1->name());
+                    sup->do_process();
+
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+                    CHECK(peer_actor->blocks_requested == 1);
+                    REQUIRE(folder_my);
+                    CHECK(folder_my->get_max_sequence() == 2ul);
+                    REQUIRE(folder_my->get_file_infos().size() == 2);
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_1->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 5);
+                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_2->name());
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 10);
+                        CHECK(f->get_blocks().size() == 2);
+                        CHECK(f->is_locally_available());
+                        CHECK(!f->is_locked());
+                    }
+                }
             }
 
             SECTION("don't attempt to download a file, which is deleted") {
@@ -710,6 +820,7 @@ void test_downloading() {
                 CHECK(f->get_sequence() == 1ul);
                 CHECK(peer_actor->blocks_requested == 0);
             }
+
             SECTION("new file via index_update => download it") {
                 peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
 
@@ -773,6 +884,7 @@ void test_downloading() {
 
                 peer_actor->forward(proto::message::Index(new proto::Index(index)));
                 sup->do_process();
+                CHECK(!folder_my->get_folder()->is_synchronizing());
 
                 auto folder_my = folder_infos.by_device(*my_device);
                 CHECK(folder_my->get_max_sequence() == 1ul);
@@ -807,6 +919,7 @@ void test_downloading() {
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_locked());
+                CHECK(!f->is_deleted());
             }
 
             SECTION("download a file, which has the same blocks locally") {
@@ -944,6 +1057,65 @@ void test_downloading_errors() {
         }
     };
     F(true, 10).run();
+}
+
+void test_download_from_scratch() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            sup->do_process();
+
+            auto builder = diff_builder_t(*cluster);
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            auto cc = proto::ClusterConfig{};
+            auto folder = cc.add_folders();
+            folder->set_id(std::string(folder_1->get_id()));
+            auto d_peer = folder->add_devices();
+            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
+            d_peer->set_max_sequence(15);
+            d_peer->set_index_id(12345);
+
+            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            sup->do_process();
+
+            builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
+
+            auto index = proto::Index{};
+            index.set_folder(std::string(folder_1->get_id()));
+            auto file = index.add_files();
+            file->set_name("some-file");
+            file->set_type(proto::FileInfoType::FILE);
+            file->set_sequence(154);
+            file->set_block_size(5);
+            file->set_size(5);
+            auto version = file->mutable_version();
+            auto counter = version->add_counters();
+            counter->set_id(1ul);
+            counter->set_value(1ul);
+
+            auto b1 = file->add_blocks();
+            b1->set_hash(utils::sha256_digest("12345").value());
+            b1->set_offset(0);
+            b1->set_size(5);
+
+            peer_actor->forward(proto::message::Index(new proto::Index(index)));
+            peer_actor->push_block("12345", 0, file->name());
+            sup->do_process();
+
+            auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
+            CHECK(folder_my->get_max_sequence() == 1ul);
+            CHECK(!folder_my->get_folder()->is_synchronizing());
+
+            auto f = folder_my->get_file_infos().by_name(file->name());
+            REQUIRE(f);
+            CHECK(f->get_size() == 5);
+            CHECK(f->get_blocks().size() == 1);
+            CHECK(f->is_locally_available());
+            CHECK(!f->is_locked());
+        }
+    };
+    F(false, 10, false).run();
 }
 
 void test_my_sharing() {
@@ -1135,6 +1307,7 @@ int _init() {
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
     REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
+    REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
     REGISTER_TEST_CASE(test_my_sharing, "test_my_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");

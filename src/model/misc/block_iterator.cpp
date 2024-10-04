@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
-#include "../cluster.h"
+#include "model/file_info.h"
 #include "block_iterator.h"
 #include <cassert>
 
@@ -9,7 +9,6 @@ using namespace syncspirit::model;
 
 blocks_iterator_t::blocks_iterator_t(file_info_t &source_) noexcept : i{0}, source{&source_} {
     auto &sb = source->get_blocks();
-
     if (i == sb.size()) {
         source.reset();
         return;
@@ -17,11 +16,13 @@ blocks_iterator_t::blocks_iterator_t(file_info_t &source_) noexcept : i{0}, sour
     advance();
 }
 
+blocks_iterator_t::operator bool() const noexcept { return source != nullptr; }
+
 void blocks_iterator_t::advance() noexcept {
     auto &sb = source->get_blocks();
     auto max = sb.size();
     while (i < max && sb[i]) {
-        if (!source->is_locally_available(i) && !sb[i]->is_locked()) {
+        if (!source->is_locally_available(i)) {
             break;
         }
         ++i;
@@ -38,18 +39,12 @@ void blocks_iterator_t::prepare() noexcept {
     }
 }
 
-void blocks_iterator_t::reset() noexcept { source.reset(); }
-
-file_block_t blocks_iterator_t::next(bool advance_) noexcept {
+file_block_t blocks_iterator_t::next() noexcept {
     assert(source);
     auto src = source.get();
     auto &sb = src->get_blocks();
     auto idx = i;
-    if (advance_) {
-        ++i;
-        advance();
-    }
+    ++i;
+    advance();
     return {sb[idx].get(), src, idx};
 }
-
-file_info_ptr_t blocks_iterator_t::get_source() noexcept { return source; }

@@ -446,7 +446,7 @@ void file_info_t::update(const file_info_t &other) noexcept {
     modified_s = other.modified_s;
     modified_ns = other.modified_ns;
     modified_by = other.modified_by;
-    flags = other.flags;
+    flags = (other.flags & 0b111) | (flags & ~0b111); // local flags are preserved
     version = other.version;
     source_version = other.source_version;
     sequence = other.sequence;

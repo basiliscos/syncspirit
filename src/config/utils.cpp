@@ -322,6 +322,12 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
             return "bep/blocks_simultaneous_write is incorrect or missing";
         }
         c.blocks_simultaneous_write = blocks_simultaneous_write.value();
+
+        auto file_clones_per_iteration = t["file_clones_per_iteration"].value<std::uint32_t>();
+        if (!file_clones_per_iteration) {
+            return "bep/file_clones_per_iteration is incorrect or missing";
+        }
+        c.file_clones_per_iteration = file_clones_per_iteration.value();
     }
 
     // dialer
@@ -506,6 +512,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                     {"rx_timeout", cfg.bep_config.rx_timeout},
                     {"blocks_max_requested", cfg.bep_config.blocks_max_requested},
                     {"blocks_simultaneous_write", cfg.bep_config.blocks_simultaneous_write},
+                    {"file_clones_per_iteration", cfg.bep_config.file_clones_per_iteration},
                 }}},
         {"dialer", toml::table{{
                        {"enabled", cfg.dialer_config.enabled},
@@ -617,6 +624,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         300000,             /* rx_timeout */
         16,                 /* blocks_max_requested */
         32,                 /* blocks_simultaneous_write */
+        10,                 /* file_clones_per_iteration */
     };
     cfg.dialer_config = dialer_config_t {
         true,       /* enabled */

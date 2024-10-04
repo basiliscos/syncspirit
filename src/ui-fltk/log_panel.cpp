@@ -35,6 +35,7 @@ static void pull_in_logs(void *data) {
         lock.unlock();
         widget->update();
     }
+    Fl::add_timeout(0.05, pull_in_logs, data);
 }
 
 static void auto_scroll_toggle(Fl_Widget *widget, void *data) {
@@ -219,13 +220,13 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
         }
     }
 
-    Fl::add_idle(pull_in_logs, this);
+    Fl::add_timeout(0.05, pull_in_logs, this);
 
     dist_sink->add_sink(bridge_sink);
 }
 
 log_panel_t::~log_panel_t() {
-    Fl::remove_idle(pull_in_logs, this);
+    Fl::remove_timeout(pull_in_logs, this);
     supervisor.get_dist_sink()->remove_sink(bridge_sink);
     bridge_sink.reset();
 }
