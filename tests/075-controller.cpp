@@ -1104,7 +1104,7 @@ void test_download_from_scratch() {
             sup->do_process();
 
             auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
-            CHECK(folder_my->get_max_sequence() ==1ul);
+            CHECK(folder_my->get_max_sequence() == 1ul);
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
             auto f = folder_my->get_file_infos().by_name(file->name());
@@ -1117,7 +1117,6 @@ void test_download_from_scratch() {
     };
     F(false, 10, false).run();
 }
-
 
 void test_my_sharing() {
     struct F : fixture_t {
