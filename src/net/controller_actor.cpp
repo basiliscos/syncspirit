@@ -19,6 +19,7 @@
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/unshare_folder.h"
+#include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 #include "proto/bep_support.h"
@@ -221,15 +222,6 @@ model::file_info_ptr_t controller_actor_t::next_file() noexcept {
     return r;
 }
 
-void controller_actor_t::reset_sync() noexcept {
-    if (file) {
-        // using queue_t = model::file_iterator_t::queue_t;
-        // file_iterator->requeue_content(queue_t{file});
-        // file.reset();
-        // block_iterator.reset();
-    }
-}
-
 void controller_actor_t::assign_diff(model::diff::cluster_diff_ptr_t new_diff) noexcept {
     if (current_diff) {
         current_diff = current_diff->assign_sibling(new_diff.get());
@@ -273,7 +265,7 @@ void controller_actor_t::pull_next() noexcept {
         return !ignore;
     };
 
-    auto requeued = model::file_iterator_t::queue_t{};
+    auto requeued = model::file_iterator_t::files_set_t{};
     while (can_pull_more()) {
         if (file) {
             if (block_iterator) {
@@ -281,7 +273,7 @@ void controller_actor_t::pull_next() noexcept {
                     if (*block_iterator) {
                         auto file_block = block_iterator->next();
                         if (file_block.block()->is_locked()) {
-                            requeued.emplace_back(file);
+                            requeued.emplace(file);
                         } else {
                             preprocess_block(file_block);
                         }
@@ -327,7 +319,7 @@ void controller_actor_t::pull_next() noexcept {
         send_diff();
     }
     if (!requeued.empty()) {
-        file_iterator->requeue_content(std::move(requeued));
+        file_iterator->requeue_unchecked(std::move(requeued));
     }
 }
 
@@ -403,15 +395,23 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &d
         }
     }
     updates_streamer = model::updates_streamer_t(*cluster, *peer);
-    reset_sync();
-
     return diff.visit_next(*this, custom);
 }
 
 auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    reset_sync();
-    pull_ready();
+    if (custom == this) {
+        auto added_files = model::file_iterator_t::files_list_t{};
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto peer_folder = folder->is_shared_with(*peer);
+        auto &files_map = peer_folder->get_file_infos();
+        for (auto &f : diff.files) {
+            auto file = files_map.by_name(f.name());
+            added_files.emplace_back(std::move(file));
+        }
+        file_iterator->append_folder(peer_folder, added_files);
+        pull_ready();
+    }
     return diff.visit_next(*this, custom);
 }
 
@@ -419,13 +419,13 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
     -> outcome::result<void> {
     if (custom == this) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto folder_info = folder->get_folder_infos().by_device(*peer);
-        auto file = folder_info->get_file_infos().by_name(diff.file.name());
-        if (!file->get_size()) {
-            assign_diff(new forget_file_t(this, file->get_full_name()));
+        auto &folder_infos = folder->get_folder_infos();
+        auto folder_peer = folder_infos.by_device(*peer);
+        auto file = folder_peer->get_file_infos().by_name(diff.file.name());
+        if (file->get_size()) {
+            file_iterator->requeue_unchecked(std::move(file));
         } else {
-            using queue_t = model::file_iterator_t::queue_t;
-            file_iterator->requeue_content(queue_t{file});
+            assign_diff(new forget_file_t(this, file->get_full_name()));
         }
     }
     return diff.visit_next(*this, custom);
@@ -461,6 +461,11 @@ auto controller_actor_t::operator()(const model::diff::modify::share_folder_t &d
         return diff.visit_next(*this, custom);
     }
 
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto peer_folder = folder->get_folder_infos().by_device(*peer);
+    file_iterator->append_folder(peer_folder);
+
+    pull_ready();
     send_cluster_config();
     return diff.visit_next(*this, custom);
 }
@@ -559,6 +564,16 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_peer_t &di
         auto ec = utils::make_error_code(utils::error_code_t::peer_has_been_removed);
         auto reason = make_error(ec);
         do_shutdown(reason);
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (custom == this && peer->device_id().get_sha256() == diff.device_id) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto folder_info = folder->is_shared_with(*peer);
+        file_iterator->on_upsert(folder_info);
     }
     return diff.visit_next(*this, custom);
 }

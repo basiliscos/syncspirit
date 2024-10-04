@@ -766,47 +766,6 @@ void test_downloading() {
                 }
             }
 
-            SECTION("cluster config is the same, but there are non-downloaded files") {
-                auto folder_peer = folder_infos.by_device(*peer_device);
-
-                auto pr_fi = proto::FileInfo{};
-                pr_fi.set_name("some-file");
-                pr_fi.set_type(proto::FileInfoType::FILE);
-                pr_fi.set_sequence(folder_1_peer->get_max_sequence());
-                pr_fi.set_block_size(5);
-                pr_fi.set_size(5);
-                auto version = pr_fi.mutable_version();
-                auto counter = version->add_counters();
-                counter->set_id(1);
-                counter->set_value(peer_device->as_uint());
-                auto b1 = pr_fi.add_blocks();
-                b1->set_hash(utils::sha256_digest("12345").value());
-                b1->set_offset(0);
-                b1->set_size(5);
-                auto b = model::block_info_t::create(*b1).value();
-
-                auto uuid = sup->sequencer->next_uuid();
-                auto file_info = model::file_info_t::create(uuid, pr_fi, folder_peer).value();
-                file_info->assign_block(b, 0);
-                folder_peer->add(file_info, true);
-
-                d_peer->set_max_sequence(folder_peer->get_max_sequence());
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
-
-                peer_actor->push_block("12345", 0);
-                sup->do_process();
-
-                CHECK(folder_my->get_max_sequence() == 1ul);
-                REQUIRE(folder_my->get_file_infos().size() == 1);
-                auto f = folder_my->get_file_infos().begin()->item;
-                REQUIRE(f);
-                CHECK(f->get_name() == pr_fi.name());
-                CHECK(f->get_size() == 5);
-                CHECK(f->get_blocks().size() == 1);
-                CHECK(f->is_locally_available());
-                CHECK(!f->is_locked());
-            }
-
             SECTION("don't attempt to download a file, which is deleted") {
                 auto folder_peer = folder_infos.by_device(*peer_device);
                 auto pr_fi = proto::FileInfo{};

@@ -9,6 +9,7 @@
 #include "../folder.h"
 #include "syncspirit-export.h"
 #include <deque>
+#include <unordered_set>
 #include <unordered_map>
 
 namespace syncspirit::model {
@@ -17,31 +18,43 @@ struct cluster_t;
 struct blocks_iterator_t;
 
 struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
-    using queue_t = std::deque<file_info_ptr_t>;
+    using files_list_t = std::deque<file_info_ptr_t>;
+    using files_set_t = std::unordered_set<file_info_ptr_t>;
 
     file_iterator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
     file_iterator_t(const file_iterator_t &) = delete;
 
     file_info_ptr_t next() noexcept;
-    void requeue_content(queue_t queue) noexcept;
+    void requeue_unchecked(files_set_t set) noexcept;
+    void requeue_unchecked(file_info_ptr_t file) noexcept;
+    void append_folder(folder_info_ptr_t peer_folder) noexcept;
+    void append_folder(folder_info_ptr_t peer_folder, files_list_t queue) noexcept;
+    void on_upsert(folder_info_ptr_t peer_folder) noexcept;
 
   private:
-    struct visit_info_t {
+    using visited_map_t = std::unordered_map<file_info_ptr_t, std::uint64_t>;
+    struct folder_iterator_t {
+        model::folder_info_ptr_t peer_folder;
         std::uint64_t index;
-        std::int64_t visited_sequence;
+        files_list_t files_list;
+        std::size_t file_index;
+        visited_map_t visited_map;
     };
+    using folder_iterators_t = std::vector<folder_iterator_t>;
 
-    using visited_folders_t = std::unordered_map<folder_t *, visit_info_t>;
+    bool accept(file_info_t &file, int folder_index, bool check_version = true) noexcept;
+    folder_iterator_t prepare_folder(folder_info_ptr_t peer_folder) noexcept;
 
-    void prepare() noexcept;
-    bool accept(file_info_t &file) noexcept;
+    file_info_ptr_t next_uncheked() noexcept;
+    file_info_ptr_t next_locked() noexcept;
+    file_info_ptr_t next_from_folder() noexcept;
 
     cluster_t &cluster;
     device_ptr_t peer;
-    queue_t content_queue;
-    queue_t folder_queue;
-    queue_t locked_queue;
-    visited_folders_t visited;
+    files_list_t uncheked_list;
+    files_list_t locked_list;
+    folder_iterators_t folders_list;
+    std::size_t folder_index;
 };
 
 using file_iterator_ptr_t = intrusive_ptr_t<file_iterator_t>;

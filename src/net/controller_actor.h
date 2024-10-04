@@ -161,7 +161,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void send_cluster_config() noexcept;
     void push_block_write(model::diff::cluster_diff_ptr_t block) noexcept;
     void process_block_write() noexcept;
-    void reset_sync() noexcept;
     dispose_callback_t make_callback() noexcept;
 
     void assign_diff(model::diff::cluster_diff_ptr_t) noexcept;
@@ -182,6 +181,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     outcome::result<void> operator()(const model::diff::modify::block_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_rej_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
 
     model::sequencer_ptr_t sequencer;
     model::cluster_ptr_t cluster;

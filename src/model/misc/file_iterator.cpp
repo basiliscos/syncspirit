@@ -8,60 +8,7 @@
 using namespace syncspirit::model;
 
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
-    : cluster{cluster_}, peer{peer_} {}
-
-bool file_iterator_t::accept(file_info_t &file) noexcept {
-    if (file.is_unreachable() || file.is_invalid()) {
-        return false;
-    }
-
-    auto &folder_infos = file.get_folder_info()->get_folder()->get_folder_infos();
-    auto local_folder = folder_infos.by_device(*cluster.get_device());
-
-    auto local_file = local_folder->get_file_infos().by_name(file.get_name());
-    if (!local_file) {
-        return true;
-    }
-    if (!local_file->is_local()) {
-        return false;
-    }
-    return true;
-}
-
-void file_iterator_t::requeue_content(queue_t queue) noexcept {
-    std::move(queue.begin(), queue.end(), std::back_insert_iterator(content_queue));
-}
-
-file_info_ptr_t file_iterator_t::next() noexcept {
-    auto file = file_info_ptr_t{};
-    if (!content_queue.empty()) {
-        file = content_queue.front();
-        if (file->local_file()) {
-            content_queue.pop_front();
-            return file->actualize();
-        }
-    }
-    for (auto it = locked_queue.begin(); it != locked_queue.end();) {
-        auto f = *it;
-        if (!f->is_locked() && !f->is_locally_locked()) {
-            it = locked_queue.erase(it);
-            if (accept(*f)) {
-                return f->actualize();
-            }
-        } else {
-            ++it;
-        }
-    }
-    while (!folder_queue.empty()) {
-        file = folder_queue.front();
-        folder_queue.pop_front();
-        if (file->is_locked() || file->is_locally_locked()) {
-            locked_queue.emplace_back(file);
-        } else if (accept(*file)) {
-            return file->actualize();
-        }
-    }
-
+    : cluster{cluster_}, peer{peer_}, folder_index{0} {
     auto &folders = cluster.get_folders();
     for (auto &[folder, _] : folders) {
         auto peer_folder = folder->get_folder_infos().by_device(*peer);
@@ -72,29 +19,168 @@ file_info_ptr_t file_iterator_t::next() noexcept {
         if (!my_folder) {
             continue;
         }
-        auto filter = visit_info_t{0, 0};
-        auto it = visited.find(folder.get());
-        if (it != visited.end()) {
-            filter = it->second;
-        }
-        if (filter.index == peer_folder->get_index() && filter.visited_sequence == peer_folder->get_max_sequence()) {
-            continue;
-        }
+        append_folder(peer_folder);
+    }
+}
 
-        auto accept_all = filter.index != peer_folder->get_index();
-        auto new_sequence = std::int64_t{};
-        auto &files = peer_folder->get_file_infos();
-        for (auto &[file, _] : files) {
-            auto sequence = file->get_sequence();
-            if (accept_all || sequence > filter.visited_sequence) {
-                new_sequence = std::max(sequence, new_sequence);
-                folder_queue.emplace_back(file);
+void file_iterator_t::append_folder(folder_info_ptr_t peer_folder) noexcept {
+    folders_list.emplace_back(prepare_folder(std::move(peer_folder)));
+}
+
+bool file_iterator_t::accept(file_info_t &file, int folder_index, bool check_version) noexcept {
+    if (file.is_unreachable() || file.is_invalid()) {
+        return false;
+    }
+
+    auto peer_folder = file.get_folder_info();
+    auto &folder_infos = peer_folder->get_folder()->get_folder_infos();
+    auto local_folder = folder_infos.by_device(*cluster.get_device());
+
+    auto local_file = local_folder->get_file_infos().by_name(file.get_name());
+    if (local_file && !local_file->is_local()) {
+        return false;
+    }
+
+    auto fi = (folder_iterator_t *){nullptr};
+    if (folder_index >= 0)
+        fi = &folders_list[folder_index];
+    else {
+        for (auto &f : folders_list) {
+            if (f.peer_folder == peer_folder) {
+                fi = &f;
+                break;
             }
         }
-        if (!folder_queue.empty()) {
-            visited[folder.get()] = {peer_folder->get_index(), new_sequence};
-            return next();
+    }
+    assert(fi && "should not happen");
+
+    if (check_version) {
+        auto &v = file.get_version();
+        auto version = v.counters(v.counters_size() - 1).value();
+        auto &visited_version = fi->visited_map[&file];
+        if (visited_version < version) {
+            visited_version = version;
+            return true;
+        }
+        return false;
+    }
+    if (local_file->need_download(file)) {
+        return true;
+    }
+    if (!local_file->is_locally_available()) {
+        return true;
+    }
+    return false;
+}
+
+void file_iterator_t::requeue_unchecked(files_set_t set) noexcept {
+    for (auto &file : set) {
+        requeue_unchecked(std::move(file));
+    }
+}
+
+void file_iterator_t::requeue_unchecked(file_info_ptr_t file) noexcept {
+    if (accept(*file, -1, false)) {
+        uncheked_list.emplace_back(std::move(file));
+    }
+}
+
+file_info_ptr_t file_iterator_t::next_uncheked() noexcept {
+    if (!uncheked_list.empty()) {
+        auto file = uncheked_list.front();
+        uncheked_list.pop_front();
+        return file->actualize();
+    }
+    return {};
+}
+
+file_info_ptr_t file_iterator_t::next_locked() noexcept {
+    for (auto it = locked_list.begin(); it != locked_list.end();) {
+        auto f = *it;
+        if (!f->is_locked() && !f->is_locally_locked()) {
+            it = locked_list.erase(it);
+            return f->actualize();
+        } else {
+            ++it;
         }
     }
     return {};
+}
+
+file_info_ptr_t file_iterator_t::next_from_folder() noexcept {
+    auto folders_count = folders_list.size();
+    auto scan_count = size_t{0};
+
+    while (scan_count < folders_count) {
+        auto &fi = folders_list[folder_index];
+        if (fi.file_index >= fi.files_list.size()) {
+            fi.file_index = 0;
+            ++scan_count;
+            folder_index = (folder_index + 1) % folders_count;
+            continue;
+        }
+        while (fi.file_index < fi.files_list.size()) {
+            auto file = fi.files_list[fi.file_index++];
+            if (accept(*file, static_cast<int>(folder_index))) {
+                if (file->is_locked() || file->is_locally_locked()) {
+                    locked_list.emplace_back(std::move(file));
+                } else {
+                    return file->actualize();
+                }
+            } else if (accept(*file, static_cast<int>(folder_index))) {
+            }
+        }
+    }
+    return {};
+}
+
+file_info_ptr_t file_iterator_t::next() noexcept {
+    while (true) {
+        auto file = next_uncheked();
+        if (!file)
+            file = next_locked();
+        if (!file)
+            file = next_from_folder();
+
+        return file;
+    }
+
+    return {};
+}
+
+auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t {
+    auto fi = folder_iterator_t{};
+    fi.peer_folder = peer_folder;
+    fi.index = peer_folder->get_index();
+    fi.file_index = 0;
+    auto &files = peer_folder->get_file_infos();
+    for (auto &[file, _] : files) {
+        fi.files_list.push_back(file);
+        fi.visited_map[file] = 0;
+    }
+    return fi;
+}
+
+void file_iterator_t::on_upsert(folder_info_ptr_t folder_info) noexcept {
+    for (auto &fi : folders_list) {
+        if (fi.peer_folder == folder_info) {
+            if (fi.index != folder_info->get_index()) {
+                fi = prepare_folder(folder_info);
+                break;
+            }
+        }
+    }
+}
+
+void file_iterator_t::append_folder(folder_info_ptr_t peer_folder, files_list_t queue) noexcept {
+    for (auto &fi : folders_list) {
+        if (fi.peer_folder == peer_folder) {
+            for (auto &file : queue) {
+                if (fi.visited_map.count(file) == 0) {
+                    fi.files_list.emplace_back(file);
+                    fi.visited_map[file] = 0;
+                }
+            }
+        }
+    }
 }
