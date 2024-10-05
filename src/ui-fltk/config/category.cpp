@@ -2,9 +2,6 @@
 
 #include "properties.h"
 
-#include <charconv>
-#include <cassert>
-
 namespace syncspirit::fltk::config {
 
 category_t::category_t(std::string label_, std::string explanation_, properties_t properties_)
