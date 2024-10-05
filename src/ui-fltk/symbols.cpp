@@ -4,13 +4,13 @@
 
 namespace syncspirit::fltk::symbols {
 
-static const auto scanning_raw = u8"⟳\0";
-static const auto synchronizing_raw = u8"↓\0";
-static const auto online_raw = u8"⚑\0";
-static const auto offline_raw = u8"⚐\0";
-static const auto connecting_raw = u8"🗲\0";
-static const auto discovering_raw = u8"…\0";
-static const auto deleted_raw = u8"♻\0";
+static const auto scanning_raw = u8"⟳";
+static const auto synchronizing_raw = u8"↓";
+static const auto online_raw = u8"⚑";
+static const auto offline_raw = u8"⚐";
+static const auto connecting_raw = u8"🗲";
+static const auto discovering_raw = u8"…";
+static const auto deleted_raw = u8"♻";
 
 // ♨
 // ♻
