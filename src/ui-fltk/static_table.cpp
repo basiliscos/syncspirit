@@ -130,6 +130,12 @@ void static_table_t::resize(int x, int y, int w, int h) {
 
 auto static_table_t::calc_col_widths() -> col_sizes_t {
     fl_font(FL_HELVETICA, 16);
+    auto w = tiw;
+    if (table_rows.empty()) {
+        auto w2 = w / 2;
+        return {w2, w2, w2, w2, true};
+    }
+
     col_sizes_t r = {0, 0, 0, 0};
     for (auto &row : table_rows) {
         int x, y, w, h;
@@ -140,7 +146,6 @@ auto static_table_t::calc_col_widths() -> col_sizes_t {
     }
     r.w1 = r.w1_min;
     r.w2 = r.w2_min;
-    auto w = tiw;
     auto delta = w - (r.w1 + r.w2);
     if (r.w1 + r.w2 < w) {
         auto tmp_w1_1 = r.w1 + static_cast<int>(delta * (double(r.w1_min) / r.w2_min));
