@@ -117,8 +117,8 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
 
     rx_buff->consume(msg.payload.res->bytes);
     auto &igd = igd_result.value();
-    auto host = std::string_view(main_url->host());
-    auto port = std::string_view(main_url->port());
+    auto host = std::string(main_url->host());
+    auto port = std::string(main_url->port());
     std::string control_url = fmt::format("http://{0}:{1}{2}", host, port, igd.control_path);
     std::string descr_url = fmt::format("http://{0}:{1}{2}", host, port, igd.description_path);
     LOG_DEBUG(log, "IGD control url: {}, description url: {}", control_url, descr_url);
