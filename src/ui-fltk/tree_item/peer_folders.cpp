@@ -16,10 +16,9 @@ peer_folders_t::peer_folders_t(model::device_t &peer_, app_supervisor_t &supervi
         auto &f = *it.item;
         if (auto folder_info = f.is_shared_with(peer)) {
             auto folder = new peer_folder_t(*folder_info, supervisor, tree);
-            add(prefs(), folder->label(), folder);
+            insert_by_label(folder);
         }
     }
-    tree->redraw();
 }
 
 void peer_folders_t::update_label() {
@@ -37,7 +36,7 @@ void peer_folders_t::update_label() {
 }
 
 augmentation_ptr_t peer_folders_t::add_folder(model::folder_info_t &folder_info) {
-    auto augmentation = within_tree([&]() {
+    auto augmentation = within_tree([&]() -> augmentation_ptr_t {
         auto item = new peer_folder_t(folder_info, supervisor, tree());
         return insert_by_label(item)->get_proxy();
     });

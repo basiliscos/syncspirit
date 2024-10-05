@@ -16,6 +16,7 @@
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
 #include "model/diff/modify/upsert_folder.h"
+#include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/peer/update_folder.h"
@@ -340,22 +341,6 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
     return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto r = diff.visit_next(*this, custom);
-    if (r.has_error()) {
-        return r;
-    }
-    auto &device = *cluster->get_devices().by_sha256(diff.peer_id);
-    auto &folder = *cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = *folder.is_shared_with(device);
-    auto devices_node = static_cast<tree_item::devices_t *>(devices);
-    auto peer_node = devices_node->get_peer(device);
-    auto folders_node = static_cast<tree_item::peer_folders_t *>(peer_node->get_folders());
-    folders_node->add_folder(folder_info);
-    return r;
-}
-
 auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &folder = *cluster->get_folders().by_id(diff.db.id());
@@ -365,6 +350,23 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &di
         folder.set_augmentation(augmentation);
     }
     return diff.visit_next(*this, custom);
+}
+
+auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = diff.visit_next(*this, custom);
+    auto &folder = *cluster->get_folders().by_id(diff.folder_id);
+    auto &device = *cluster->get_devices().by_sha256(diff.device_id);
+    if (&device != cluster->get_device()) {
+        auto folder_info = folder.is_shared_with(device);
+        auto devices_node = static_cast<tree_item::devices_t *>(devices);
+        auto peer_node = devices_node->get_peer(device);
+        auto folders_node = static_cast<tree_item::peer_folders_t *>(peer_node->get_folders());
+        if (!folder_info->get_augmentation()) {
+            folders_node->add_folder(*folder_info);
+        }
+    }
+    return r;
 }
 
 auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept

@@ -20,7 +20,6 @@ void peer_folder_t::update_label() {
     auto &folder = *folder_info.get_folder();
     auto value = fmt::format("{}, {}", folder.get_label(), folder.get_id());
     label(value.data());
-    tree()->redraw();
 }
 
 void peer_folder_t::on_update() {

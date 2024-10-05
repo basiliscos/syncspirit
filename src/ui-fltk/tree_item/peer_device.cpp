@@ -525,14 +525,11 @@ std::string peer_device_t::get_state() {
 
 tree_item_t *peer_device_t::get_folders() {
     if (!folders) {
-        auto count = children();
-        folders = new peer_folders_t(peer, supervisor, tree());
-        add(prefs(), folders->label(), folders);
-        if (count) {
-            auto pending = child(0);
-            folders->move_above(pending);
-        }
-        tree()->redraw();
+        folders = within_tree([&]() {
+            auto item = new peer_folders_t(peer, supervisor, tree());
+            insert(prefs(), "", 0)->replace(item);
+            return item;
+        });
     }
     return folders;
 }
