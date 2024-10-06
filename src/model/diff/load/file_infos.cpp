@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "file_infos.h"
-#include "../../cluster.h"
-#include "../../../db/prefix.h"
-#include "../../misc/error_code.h"
+#include "model/cluster.h"
+#include "model/misc/error_code.h"
+#include "db/prefix.h"
+#include <unordered_map>
 
 using namespace syncspirit::model::diff::load;
 
 auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    using folder_info_by_id_t = std::unordered_map<std::string_view, folder_info_ptr_t>;
 
-    folder_infos_map_t all_fi;
+    auto all_fi = folder_info_by_id_t{};
     auto &folders = cluster.get_folders();
     for (auto f : folders) {
-        for (auto fi : f.item->get_folder_infos()) {
-            all_fi.put(fi.item);
+        for (auto it : f.item->get_folder_infos()) {
+            auto &f = it.item;
+            all_fi[f->get_uuid()] = f;
         }
     }
 
@@ -23,7 +26,7 @@ auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     for (auto &pair : container) {
         auto key = pair.key;
         auto folder_info_uuid = key.substr(1, uuid_length);
-        auto folder_info = all_fi.get(folder_info_uuid);
+        auto folder_info = all_fi[folder_info_uuid];
         assert(folder_info);
 
         auto data = pair.value;
