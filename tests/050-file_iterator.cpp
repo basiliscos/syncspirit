@@ -210,6 +210,11 @@ TEST_CASE("file iterator", "[model]") {
         SECTION("folder info is non-actual") {
             file_1.set_size(5ul);
             file_1.set_block_size(5ul);
+            auto version_1 = file_1.mutable_version();
+            auto counter_1 = version_1->add_counters();
+            counter_1->set_id(14ul);
+            counter_1->set_value(1ul);
+
             auto b = file_1.add_blocks();
             b->set_hash("123");
             b->set_size(5ul);
@@ -264,7 +269,9 @@ TEST_CASE("file iterator", "[model]") {
 
         // temporally
         auto r1 = next(true);
+        file_iterator->done();
         auto r2 = next(false);
+        file_iterator->done();
         REQUIRE(!next());
         REQUIRE(r1);
         REQUIRE(((r1 == f1) || (r1 == f2)));

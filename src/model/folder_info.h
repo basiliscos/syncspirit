@@ -58,6 +58,7 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     std::string serialize() noexcept;
 
     inline std::uint64_t get_index() const noexcept { return index; }
+    void set_index(std::uint64_t value) noexcept;
 
     inline device_t *get_device() const noexcept { return device; }
     inline folder_t *get_folder() const noexcept { return folder; }

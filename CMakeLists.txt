@@ -132,6 +132,7 @@ add_library(syncspirit_lib
     src/model/diff/modify/remove_ignored_device.cpp
     src/model/diff/modify/remove_pending_device.cpp
     src/model/diff/modify/remove_pending_folders.cpp
+    src/model/diff/modify/reset_folder_infos.cpp
     src/model/diff/modify/share_folder.cpp
     src/model/diff/modify/unshare_folder.cpp
     src/model/diff/modify/update_peer.cpp

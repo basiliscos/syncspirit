@@ -3,16 +3,21 @@
 
 #include "file_iterator.h"
 #include "../cluster.h"
-#include <algorithm>
 
 using namespace syncspirit::model;
+
+file_iterator_t::postponed_files_t::postponed_files_t(file_iterator_t &iterator_) : iterator{iterator_} {
+    iterator.requeue_unchecked(std::move(postponed));
+}
+
+file_iterator_t::postponed_files_t::~postponed_files_t() { iterator.requeue_unchecked(std::move(postponed)); }
 
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
     : cluster{cluster_}, peer{peer_}, folder_index{0} {
     auto &folders = cluster.get_folders();
     for (auto &[folder, _] : folders) {
         auto peer_folder = folder->get_folder_infos().by_device(*peer);
-        if (!peer_folder || !peer_folder->is_actual()) {
+        if (!peer_folder) {
             continue;
         }
         auto my_folder = folder->get_folder_infos().by_device(*cluster.get_device());
@@ -134,18 +139,31 @@ file_info_ptr_t file_iterator_t::next_from_folder() noexcept {
     return {};
 }
 
-file_info_ptr_t file_iterator_t::next() noexcept {
+auto file_iterator_t::prepare_postponed() noexcept -> postponed_files_t { return postponed_files_t(*this); }
+
+file_info_t *file_iterator_t::current() noexcept { return current_file.get(); }
+
+auto file_iterator_t::next() noexcept -> file_info_t * {
+    assert(!current_file);
     while (true) {
-        auto file = next_uncheked();
-        if (!file)
-            file = next_locked();
-        if (!file)
-            file = next_from_folder();
-
-        return file;
+        current_file = next_uncheked();
+        if (!current_file)
+            current_file = next_locked();
+        if (!current_file)
+            current_file = next_from_folder();
+        break;
     }
-
     return {};
+}
+
+void file_iterator_t::done() noexcept {
+    assert(current_file);
+    current_file.reset();
+}
+
+void file_iterator_t::postpone(postponed_files_t &postponed) noexcept {
+    assert(current_file);
+    postponed.postponed.emplace(std::move(current_file));
 }
 
 auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t {

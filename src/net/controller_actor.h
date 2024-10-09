@@ -172,8 +172,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void assign_diff(model::diff::cluster_diff_ptr_t) noexcept;
     void send_diff();
 
-    model::file_info_ptr_t next_file() noexcept;
-
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::local::update_t &, void *) noexcept override;
@@ -215,7 +213,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     uint32_t file_clones_per_iteration;
     utils::logger_t log;
     unlink_requests_t unlink_requests;
-    model::file_info_ptr_t file;
     model::file_iterator_ptr_t file_iterator;
     model::block_iterator_ptr_t block_iterator;
     model::updates_streamer_t updates_streamer;

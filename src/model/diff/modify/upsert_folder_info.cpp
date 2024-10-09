@@ -27,13 +27,14 @@ auto upsert_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outc
     }
     auto &folder_infos = folder->get_folder_infos();
     auto fi = folder_infos.by_device(*device);
-    if (fi && fi->get_index() == index_id) {
+    if (fi) {
         fi->set_max_sequence(max_sequence);
-        LOG_TRACE(log, "applying upsert_folder_info_t (update), folder = {} ({}), device = {}", folder->get_label(),
-                  folder_id, device->device_id());
+        fi->set_index(index_id);
+        LOG_TRACE(log, "applying upsert_folder_info_t (update), folder = {} ({}), device = {}, index = {:x}",
+                  folder->get_label(), folder_id, device->device_id(), index_id);
     } else {
-        LOG_TRACE(log, "applying upsert_folder_info_t (create), folder = {} ({}), device = {}", folder->get_label(),
-                  folder_id, device->device_id());
+        LOG_TRACE(log, "applying upsert_folder_info_t (create), folder = {} ({}), device = {}, index = {:x}",
+                  folder->get_label(), folder_id, device->device_id(), index_id);
         db::FolderInfo db;
         db.set_index_id(index_id);
         db.set_max_sequence(max_sequence);

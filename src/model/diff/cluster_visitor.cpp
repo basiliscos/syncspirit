@@ -45,6 +45,7 @@
 #include "modify/remove_peer.h"
 #include "modify/remove_pending_device.h"
 #include "modify/remove_pending_folders.h"
+#include "modify/reset_folder_infos.h"
 #include "modify/share_folder.h"
 #include "modify/unshare_folder.h"
 #include "modify/update_peer.h"
@@ -250,6 +251,11 @@ auto cluster_visitor_t::operator()(const modify::remove_pending_device_t &diff, 
 }
 
 auto cluster_visitor_t::operator()(const modify::remove_pending_folders_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const modify::reset_folder_infos_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }

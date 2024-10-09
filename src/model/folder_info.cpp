@@ -126,8 +126,16 @@ std::string folder_info_t::serialize() noexcept {
 bool folder_info_t::is_actual() noexcept { return actualized; }
 
 void folder_info_t::set_max_sequence(std::int64_t value) noexcept {
-    actualized = false;
     max_sequence = value;
+    actualized = false;
+}
+
+void folder_info_t::set_index(std::uint64_t value) noexcept {
+    if (value != this->index) {
+        actualized = false;
+        index = value;
+        file_infos.clear();
+    }
 }
 
 std::optional<proto::Index> folder_info_t::generate() noexcept {

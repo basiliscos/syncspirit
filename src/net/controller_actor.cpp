@@ -67,9 +67,6 @@ controller_actor_t::file_lock_t::~file_lock_t() {
                   file->is_unlocking());
         controller.assign_diff(new model::diff::modify::lock_file_t(*file, false));
     }
-    if (controller.file == file) {
-        controller.file.reset();
-    }
     file->locally_unlock();
 }
 
@@ -217,14 +214,6 @@ void controller_actor_t::push_pending() noexcept {
     }
 }
 
-model::file_info_ptr_t controller_actor_t::next_file() noexcept {
-    auto r = file_iterator->next();
-    if (r) {
-        LOG_TRACE(log, "next_file = {}", r->get_name());
-    }
-    return r;
-}
-
 void controller_actor_t::assign_diff(model::diff::cluster_diff_ptr_t new_diff) noexcept {
     if (current_diff) {
         current_diff = current_diff->assign_sibling(new_diff.get());
@@ -268,21 +257,22 @@ void controller_actor_t::pull_next() noexcept {
         return !ignore;
     };
 
-    auto requeued = model::file_iterator_t::files_set_t{};
+    auto postponed = file_iterator->prepare_postponed();
     while (can_pull_more()) {
+        auto file = file_iterator->current();
         if (file) {
             if (block_iterator) {
                 if (cluster->get_write_requests()) {
                     if (*block_iterator) {
                         auto file_block = block_iterator->next();
                         if (file_block.block()->is_locked()) {
-                            requeued.emplace(file);
+                            file_iterator->postpone(postponed);
                         } else {
                             preprocess_block(file_block);
                         }
                     } else {
                         block_iterator.reset();
-                        file.reset();
+                        file_iterator.reset();
                     }
                 } else {
                     break;
@@ -295,21 +285,23 @@ void controller_actor_t::pull_next() noexcept {
                     LOG_TRACE(log, "iterating blocks on {}, has blocks: {}", file->get_name(), has_blocks);
                     if (!has_blocks) {
                         block_iterator.reset();
-                        file.reset();
+                        file_iterator->done();
                     }
                 }
             }
         }
         if (!file) {
-            file = next_file();
+            file = file_iterator->next();
             if (file) {
-                if (!file_locks.count(file->get_full_name())) {
+                auto &name = file->get_full_name();
+                LOG_TRACE(log, "next_file = {}", name);
+                if (!file_locks.count(name)) {
                     auto file_lock = file_lock_ptr_t(new file_lock_t(file, *this));
-                    file_locks[file->get_full_name()] = std::move(file_lock);
+                    file_locks[name] = std::move(file_lock);
                 }
                 if (!file->local_file()) {
                     assign_diff(new model::diff::modify::clone_file_t(*file, *sequencer));
-                    file.reset();
+                    file_iterator->done();
                     ++cloned_files;
                 }
             } else {
@@ -321,14 +313,12 @@ void controller_actor_t::pull_next() noexcept {
         pull_ready();
         send_diff();
     }
-    if (!requeued.empty()) {
-        file_iterator->requeue_unchecked(std::move(requeued));
-    }
 }
 
 void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexcept {
     using namespace model::diff;
-    assert(file->local_file());
+    auto file = file_iterator->current();
+    assert(file && file->local_file());
     auto block = file_block.block();
     block_locks.put(block);
     block->lock();

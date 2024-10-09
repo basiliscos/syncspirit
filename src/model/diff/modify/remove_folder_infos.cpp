@@ -2,8 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Ivan Baidakou
 
 #include "remove_folder_infos.h"
-#include "remove_files.h"
-#include "remove_blocks.h"
+#include "reset_folder_infos.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include <algorithm>
@@ -19,22 +18,9 @@ remove_folder_infos_t::remove_folder_infos_t(const folder_infos_map_t &map, orph
     for (auto &it : map) {
         auto &folder_info = *it.item;
         keys.emplace(folder_info.get_key());
-        auto &files_info = folder_info.get_file_infos();
-        if (files_info.size()) {
-            auto diff = cluster_diff_ptr_t{};
-            diff = new remove_files_t(*folder_info.get_device(), files_info, &orphaned_blocks);
-            current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
-        }
-    }
-    if (!orphaned_blocks_) {
-        auto block_keys = local_orphaned_blocks.deduce();
-        if (block_keys.size()) {
-            auto diff = cluster_diff_ptr_t{};
-            diff = new remove_blocks_t(std::move(block_keys));
-            current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
-        }
     }
     std::copy(keys.begin(), keys.end(), std::back_inserter(this->keys));
+    assign_child(new reset_folder_infos_t(map, orphaned_blocks_));
 }
 
 auto remove_folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
