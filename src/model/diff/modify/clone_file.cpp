@@ -3,7 +3,8 @@
 
 #include "clone_file.h"
 #include "../cluster_visitor.h"
-#include "../../cluster.h"
+#include "model/cluster.h"
+#include "model/misc/file_iterator.h"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -114,6 +115,10 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
         folder_my->add(new_file, false);
         LOG_TRACE(log, "clone_file_t, new file; folder = {}, name = {}, blocks = {}", folder_id, file.name(),
                   blocks.size());
+    }
+
+    if (auto iterator = folder_peer->get_device()->get_iterator(); iterator) {
+        iterator->requeue_unchecked(std::move(peer_file));
     }
 
     return applicator_t::apply_sibling(cluster);

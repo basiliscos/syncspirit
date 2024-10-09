@@ -22,7 +22,10 @@ namespace outcome = boost::outcome_v2;
 namespace pt = boost::posix_time;
 
 struct device_t;
+struct file_iterator_t;
+struct cluster_t;
 using device_ptr_t = intrusive_ptr_t<device_t>;
+using file_iterator_ptr_t = intrusive_ptr_t<file_iterator_t>;
 
 enum class device_state_t { offline, discovering, connecting, online };
 
@@ -34,7 +37,7 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     static outcome::result<device_ptr_t> create(std::string_view key, const db::Device &data) noexcept;
     static outcome::result<device_ptr_t> create(const device_id_t &device_id, std::string_view name,
                                                 std::string_view cert_name = "") noexcept;
-    virtual ~device_t() = default;
+    virtual ~device_t();
 
     virtual std::string_view get_key() const noexcept;
     bool operator==(const device_t &other) const noexcept { return other.id == id; }
@@ -72,6 +75,10 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     uint64_t as_uint() const noexcept;
     bool matches(uint64_t) const noexcept;
 
+    file_iterator_ptr_t create_iterator(cluster_t &) noexcept;
+    void release_iterator(file_iterator_ptr_t &) noexcept;
+    file_iterator_t *get_iterator() noexcept;
+
   protected:
     device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept;
     template <typename T> void assign(const T &item) noexcept;
@@ -90,6 +97,8 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     tcp::endpoint endpoint;
     std::string client_name;
     std::string client_version;
+
+    file_iterator_ptr_t iterator;
 
     remote_folder_infos_map_t remote_folder_infos;
     pt::ptime last_seen;

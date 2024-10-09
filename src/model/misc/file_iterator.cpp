@@ -6,11 +6,13 @@
 
 using namespace syncspirit::model;
 
-file_iterator_t::postponed_files_t::postponed_files_t(file_iterator_t &iterator_) : iterator{iterator_} {
-    iterator.requeue_unchecked(std::move(postponed));
-}
+file_iterator_t::postponed_files_t::postponed_files_t(file_iterator_t &iterator_) : iterator{iterator_} {}
 
-file_iterator_t::postponed_files_t::~postponed_files_t() { iterator.requeue_unchecked(std::move(postponed)); }
+file_iterator_t::postponed_files_t::~postponed_files_t() {
+    if (!postponed.empty()) {
+        iterator.requeue_unchecked(std::move(postponed));
+    }
+}
 
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
     : cluster{cluster_}, peer{peer_}, folder_index{0} {
@@ -24,12 +26,8 @@ file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_)
         if (!my_folder) {
             continue;
         }
-        append_folder(peer_folder);
+        folders_list.emplace_back(prepare_folder(std::move(peer_folder)));
     }
-}
-
-void file_iterator_t::append_folder(folder_info_ptr_t peer_folder) noexcept {
-    folders_list.emplace_back(prepare_folder(std::move(peer_folder)));
 }
 
 bool file_iterator_t::accept(file_info_t &file, int folder_index, bool check_version) noexcept {
@@ -153,7 +151,7 @@ auto file_iterator_t::next() noexcept -> file_info_t * {
             current_file = next_from_folder();
         break;
     }
-    return {};
+    return current_file.get();
 }
 
 void file_iterator_t::done() noexcept {
@@ -163,7 +161,7 @@ void file_iterator_t::done() noexcept {
 
 void file_iterator_t::postpone(postponed_files_t &postponed) noexcept {
     assert(current_file);
-    postponed.postponed.emplace(std::move(current_file));
+    postponed.postponed.emplace(current_file);
 }
 
 auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t {
@@ -184,16 +182,18 @@ void file_iterator_t::on_upsert(folder_info_ptr_t folder_info) noexcept {
         if (fi.peer_folder == folder_info) {
             if (fi.index != folder_info->get_index()) {
                 fi = prepare_folder(folder_info);
-                break;
             }
+            return;
         }
     }
+    folders_list.emplace_back(prepare_folder(std::move(folder_info)));
 }
 
 void file_iterator_t::append_folder(folder_info_ptr_t peer_folder, files_list_t queue) noexcept {
     for (auto &fi : folders_list) {
         if (fi.peer_folder == peer_folder) {
             for (auto &file : queue) {
+                assert(file);
                 if (fi.visited_map.count(file) == 0) {
                     fi.files_list.emplace_back(file);
                     fi.visited_map[file] = 0;

@@ -6,6 +6,7 @@
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
+#include "model/misc/file_iterator.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
@@ -43,9 +44,14 @@ auto upsert_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outc
         if (!opt) {
             return opt.assume_error();
         }
-        auto &fi = opt.value();
+        fi = std::move(opt.value());
         folder->get_folder_infos().put(fi);
     }
+
+    if (auto iterator = fi->get_device()->get_iterator(); iterator) {
+        iterator->on_upsert(fi);
+    }
+
     return applicator_t::apply_sibling(cluster);
 }
 

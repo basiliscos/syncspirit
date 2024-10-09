@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "update_folder.h"
+#include "model/misc/file_iterator.h"
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/cluster_visitor.h"
@@ -40,6 +41,9 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
 
     auto max_seq = folder_info->get_max_sequence();
     auto &fm = folder_info->get_file_infos();
+    auto added_files = model::file_iterator_t::files_list_t();
+    added_files.reserve(files.size());
+
     for (std::size_t i = 0; i < files.size(); ++i) {
         auto &f = files[i];
         auto &uuid = uuids[i];
@@ -68,10 +72,17 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         if (auto aug = file->get_augmentation(); aug) {
             aug->on_update();
         }
+        added_files.push_back(std::move(file));
     }
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
+
     r = applicator_t::apply_sibling(cluster);
+
+    if (auto iterator = folder_info->get_device()->get_iterator(); iterator) {
+        iterator->append_folder(folder_info, std::move(added_files));
+    }
+
     if (auto aug = folder_info->get_augmentation(); aug) {
         aug->on_update();
     }

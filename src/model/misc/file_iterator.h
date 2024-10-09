@@ -8,6 +8,7 @@
 #include "../folder_info.h"
 #include "../folder.h"
 #include "syncspirit-export.h"
+#include <vector>
 #include <deque>
 #include <unordered_set>
 #include <unordered_map>
@@ -18,7 +19,8 @@ struct cluster_t;
 struct blocks_iterator_t;
 
 struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
-    using files_list_t = std::deque<file_info_ptr_t>;
+    using files_list_t = std::vector<file_info_ptr_t>;
+    using files_queue_t = std::deque<file_info_ptr_t>;
     using files_set_t = std::unordered_set<file_info_ptr_t>;
 
     struct postponed_files_t {
@@ -43,7 +45,6 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     file_info_t *next() noexcept;
 
     void requeue_unchecked(file_info_ptr_t file) noexcept;
-    void append_folder(folder_info_ptr_t peer_folder) noexcept;
     void append_folder(folder_info_ptr_t peer_folder, files_list_t queue) noexcept;
     void on_upsert(folder_info_ptr_t peer_folder) noexcept;
 
@@ -68,8 +69,8 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
 
     cluster_t &cluster;
     device_ptr_t peer;
-    files_list_t uncheked_list;
-    files_list_t locked_list;
+    files_queue_t uncheked_list;
+    files_queue_t locked_list;
     folder_iterators_t folders_list;
     std::size_t folder_index;
     file_info_ptr_t current_file;

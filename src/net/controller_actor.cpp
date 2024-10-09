@@ -81,7 +81,7 @@ controller_actor_t::controller_actor_t(config_t &config)
         assert(sequencer);
         current_diff = nullptr;
         planned_pulls = 0;
-        file_iterator.reset(new model::file_iterator_t(*cluster, peer));
+        file_iterator = peer->create_iterator(*cluster);
     }
 }
 
@@ -140,6 +140,7 @@ void controller_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish, blocks_requested = {}", rx_blocks_requested);
     file_locks.clear();
     send_diff();
+    peer->release_iterator(file_iterator);
     r::actor_base_t::shutdown_finish();
 }
 
@@ -272,7 +273,7 @@ void controller_actor_t::pull_next() noexcept {
                         }
                     } else {
                         block_iterator.reset();
-                        file_iterator.reset();
+                        file_iterator->done();
                     }
                 } else {
                     break;
@@ -301,6 +302,9 @@ void controller_actor_t::pull_next() noexcept {
                 }
                 if (!file->local_file()) {
                     assign_diff(new model::diff::modify::clone_file_t(*file, *sequencer));
+                    if (!file->get_size()) {
+                        assign_diff(new forget_file_t(this, file->get_full_name()));
+                    }
                     file_iterator->done();
                     ++cloned_files;
                 }
@@ -394,32 +398,7 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &d
 auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (custom == this) {
-        auto added_files = model::file_iterator_t::files_list_t{};
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto peer_folder = folder->is_shared_with(*peer);
-        auto &files_map = peer_folder->get_file_infos();
-        for (auto &f : diff.files) {
-            auto file = files_map.by_name(f.name());
-            added_files.emplace_back(std::move(file));
-        }
-        file_iterator->append_folder(peer_folder, added_files);
         pull_ready();
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (custom == this) {
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto &folder_infos = folder->get_folder_infos();
-        auto folder_peer = folder_infos.by_device(*peer);
-        auto file = folder_peer->get_file_infos().by_name(diff.file.name());
-        if (file->get_size()) {
-            file_iterator->requeue_unchecked(std::move(file));
-        } else {
-            assign_diff(new forget_file_t(this, file->get_full_name()));
-        }
     }
     return diff.visit_next(*this, custom);
 }
@@ -445,10 +424,6 @@ auto controller_actor_t::operator()(const model::diff::modify::share_folder_t &d
     if (diff.peer_id != peer->device_id().get_sha256()) {
         return diff.visit_next(*this, custom);
     }
-
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto peer_folder = folder->get_folder_infos().by_device(*peer);
-    file_iterator->append_folder(peer_folder);
 
     pull_ready();
     send_cluster_config();
@@ -537,16 +512,6 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_peer_t &di
         auto ec = utils::make_error_code(utils::error_code_t::peer_has_been_removed);
         auto reason = make_error(ec);
         do_shutdown(reason);
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (custom == this && peer->device_id().get_sha256() == diff.device_id) {
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto folder_info = folder->is_shared_with(*peer);
-        file_iterator->on_upsert(folder_info);
     }
     return diff.visit_next(*this, custom);
 }
