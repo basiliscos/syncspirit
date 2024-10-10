@@ -52,7 +52,7 @@ TEST_CASE("new file diff", "[model]") {
 
             auto new_file = files.by_name(file->get_name());
             REQUIRE(new_file);
-            CHECK(new_file.get() != file.get());
+            CHECK(new_file.get() == file.get());
             CHECK(new_file->get_key() == file->get_key());
             REQUIRE(new_file->get_version().counters_size() == 1);
             CHECK(new_file->get_version().counters(0).value() == 1);

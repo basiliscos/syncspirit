@@ -112,12 +112,12 @@ void folder_info_t::add(const file_info_ptr_t &file_info, bool inc_max_sequence)
     }
 }
 
-void folder_info_t::serialize(db::FolderInfo &storage) noexcept {
+void folder_info_t::serialize(db::FolderInfo &storage) const noexcept {
     storage.set_index_id(index);
     storage.set_max_sequence(max_sequence);
 }
 
-std::string folder_info_t::serialize() noexcept {
+std::string folder_info_t::serialize() const noexcept {
     db::FolderInfo r;
     serialize(r);
     return r.SerializeAsString();

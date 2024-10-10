@@ -36,17 +36,17 @@ auto finish_file_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
     if (!opt) {
         return opt.assume_error();
     }
-    auto new_file = std::move(opt.assume_value());
+    file->update(*opt.assume_value());
 
     auto &blocks = source->get_blocks();
     for (size_t i = 0; i < blocks.size(); ++i) {
         auto &b = blocks[i];
         assert(b);
-        new_file->assign_block(b, i);
-        new_file->mark_local_available(i);
+        file->assign_block(b, i);
+        file->mark_local_available(i);
     }
-    new_file->mark_local();
-    folder_info->add(new_file, true);
+    file->mark_local();
+    folder_info->add(file, true);
 
     return applicator_t::apply_sibling(cluster);
 }

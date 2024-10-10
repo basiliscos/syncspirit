@@ -205,13 +205,14 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     CHECK(file->is_locally_available());
                 }
+
                 SECTION("meta is changed (modification)") {
                     write_file(path, "12345");
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(files->size() == 1);
                     auto new_file = files->by_name(pr_fi.name());
                     REQUIRE(new_file);
-                    CHECK(file != new_file);
+                    CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
                     CHECK(new_file->get_size() == 5);
                     REQUIRE(new_file->get_blocks().size() == 1);
@@ -225,7 +226,7 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     auto new_file = files->by_name(pr_fi.name());
                     REQUIRE(new_file);
-                    CHECK(file != new_file);
+                    CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
                     CHECK(new_file->get_size() == 5);
                     REQUIRE(new_file->get_blocks().size() == 1);
@@ -238,7 +239,7 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     auto new_file = files->by_name(pr_fi.name());
                     REQUIRE(new_file);
-                    CHECK(file != new_file);
+                    CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
                     CHECK(new_file->get_size() == 5);
                     REQUIRE(new_file->get_blocks().size() == 1);

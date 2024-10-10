@@ -473,7 +473,10 @@ void file_info_t::update(const file_info_t &other) noexcept {
         auto &b = other.blocks[i];
         if (b) {
             assign_block(b, i);
-            if (local_block_hashes.contains(b->get_hash())) {
+            auto already_local = marks[i];
+            if (already_local) {
+                --missing_blocks;
+            } else if (local_block_hashes.contains(b->get_hash())) {
                 mark_local_available(i);
             }
         }
