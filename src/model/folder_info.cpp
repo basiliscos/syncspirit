@@ -123,8 +123,6 @@ std::string folder_info_t::serialize() noexcept {
     return r.SerializeAsString();
 }
 
-bool folder_info_t::is_actual() noexcept { return actualized; }
-
 void folder_info_t::set_max_sequence(std::int64_t value) noexcept {
     max_sequence = value;
     actualized = false;

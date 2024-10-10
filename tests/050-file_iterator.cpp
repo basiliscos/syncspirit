@@ -28,7 +28,11 @@ TEST_CASE("file iterator", "[model]") {
             file_iterator = new file_iterator_t(*cluster, peer_device);
         }
         if (file_iterator) {
-            return file_iterator->next();
+            auto f = file_iterator->next();
+            if (f) {
+                file_iterator->done();
+            }
+            return f;
         }
         return {};
     };
@@ -149,8 +153,8 @@ TEST_CASE("file iterator", "[model]") {
             counter->set_id(12345ul);
             counter->set_value(1233ul);
 
-            REQUIRE(
-                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1, peer_device).finish().apply());
+            builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1, peer_device).finish();
+            REQUIRE(builder.apply());
 
             proto::Vector my_version;
             auto my_folder = folder_infos.by_device(*my_device);
@@ -206,29 +210,6 @@ TEST_CASE("file iterator", "[model]") {
             CHECK(f->get_name() == "a.txt");
             REQUIRE(!next());
         }
-
-        SECTION("folder info is non-actual") {
-            file_1.set_size(5ul);
-            file_1.set_block_size(5ul);
-            auto version_1 = file_1.mutable_version();
-            auto counter_1 = version_1->add_counters();
-            counter_1->set_id(14ul);
-            counter_1->set_value(1ul);
-
-            auto b = file_1.add_blocks();
-            b->set_hash("123");
-            b->set_size(5ul);
-
-            REQUIRE(
-                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1, peer_device).finish().apply());
-
-            auto peer_folder = folder_infos.by_device(*peer_device);
-            auto file = file_info_t::create(sequencer->next_uuid(), file_1, peer_folder).value();
-            peer_folder->add(file, true);
-            peer_folder->set_max_sequence(peer_folder->get_max_sequence() + 20);
-            REQUIRE(!peer_folder->is_actual());
-            REQUIRE(!next(true));
-        }
     }
 
     SECTION("file priorities") {
@@ -269,9 +250,7 @@ TEST_CASE("file iterator", "[model]") {
 
         // temporally
         auto r1 = next(true);
-        file_iterator->done();
         auto r2 = next(false);
-        file_iterator->done();
         REQUIRE(!next());
         REQUIRE(r1);
         REQUIRE(((r1 == f1) || (r1 == f2)));
@@ -324,7 +303,11 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
         if (reset) {
             file_iterator = new file_iterator_t(*cluster, peer_device);
         }
-        return file_iterator->next();
+        auto f = file_iterator->next();
+        if (f) {
+            file_iterator->done();
+        }
+        return f;
     };
 
     auto builder = diff_builder_t(*cluster);
@@ -362,7 +345,6 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     REQUIRE(f);
     files.emplace(f->get_full_name());
 
-    REQUIRE(!next());
     CHECK(files.size() == 2);
     CHECK(files.count("my-label-1/a.txt"));
     CHECK(files.count("my-label-2/b.txt"));

@@ -40,7 +40,10 @@ bool file_iterator_t::accept(file_info_t &file, int folder_index, bool check_ver
     auto local_folder = folder_infos.by_device(*cluster.get_device());
 
     auto local_file = local_folder->get_file_infos().by_name(file.get_name());
-    if (local_file && !local_file->is_local()) {
+    if (!local_file) {
+        return true;
+    }
+    if (!local_file->is_local()) {
         return false;
     }
 
@@ -61,11 +64,9 @@ bool file_iterator_t::accept(file_info_t &file, int folder_index, bool check_ver
         auto &v = file.get_version();
         auto version = v.counters(v.counters_size() - 1).value();
         auto &visited_version = fi->visited_map[&file];
-        if (visited_version < version) {
-            visited_version = version;
-            return true;
+        if (visited_version == version) {
+            return false;
         }
-        return false;
     }
     if (local_file->need_download(file)) {
         return true;

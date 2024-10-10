@@ -50,7 +50,6 @@ TEST_CASE("update folder (via Index)", "[model]") {
 
         auto &peer_files = peer_folder_info->get_file_infos();
         REQUIRE(peer_files.size() == 1);
-        CHECK(peer_folder_info->is_actual());
         auto f = peer_files.by_name("a.txt");
         REQUIRE(f);
 

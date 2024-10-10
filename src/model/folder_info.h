@@ -66,7 +66,6 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     void set_max_sequence(std::int64_t value) noexcept;
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
     inline const file_infos_map_t &get_file_infos() const noexcept { return file_infos; }
-    bool is_actual() noexcept;
     std::optional<proto::Index> generate() noexcept;
 
   private:

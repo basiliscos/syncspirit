@@ -69,9 +69,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         }
 
         folder_info->add(file, true);
-        if (auto aug = file->get_augmentation(); aug) {
-            aug->on_update();
-        }
+        folder->notify_update();
         added_files.push_back(std::move(file));
     }
 
@@ -83,9 +81,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         iterator->append_folder(folder_info, std::move(added_files));
     }
 
-    if (auto aug = folder_info->get_augmentation(); aug) {
-        aug->on_update();
-    }
+    folder_info->notify_update();
     return r;
 }
 

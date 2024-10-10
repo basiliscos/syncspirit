@@ -13,9 +13,7 @@ auto synchronization_start_t::apply_impl(cluster_t &cluster) const noexcept -> o
     auto folder = cluster.get_folders().by_id(folder_id);
     folder->set_synchronizing(true);
     auto r = applicator_t::apply_sibling(cluster);
-    if (auto aug = folder->get_augmentation(); aug) {
-        aug->on_update();
-    }
+    folder->notify_update();
     return r;
 }
 

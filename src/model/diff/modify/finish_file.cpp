@@ -17,10 +17,6 @@ finish_file_t::finish_file_t(const model::file_info_t &file) noexcept {
     assert(fi->get_device() == folder->get_cluster()->get_device().get());
 }
 
-auto finish_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    return applicator_t::apply_sibling(cluster);
-}
-
 auto finish_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting finish_file_t (visitor = {}), folder = {}, file = {}", (const void *)&visitor, folder_id,
               file_name);

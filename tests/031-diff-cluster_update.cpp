@@ -204,12 +204,10 @@ TEST_CASE("cluster update, new folder", "[model]") {
             auto &diff = diff_opt.value();
             auto r_a = diff->apply(*cluster);
             CHECK(r_a);
-            CHECK(!folder_info_peer->is_actual());
             auto pr_file = proto::FileInfo();
             pr_file.set_sequence(folder_info_peer->get_max_sequence());
             auto peer_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_info_peer).value();
             folder_info_peer->add(peer_file, false);
-            CHECK(folder_info_peer->is_actual());
 
             bool visited = false;
             auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
@@ -229,7 +227,6 @@ TEST_CASE("cluster update, new folder", "[model]") {
 
             auto &diff = diff_opt.value();
             auto r_a = diff->apply(*cluster);
-            CHECK(!folder_info_peer->is_actual());
             CHECK(r_a);
 
             bool visited = false;
