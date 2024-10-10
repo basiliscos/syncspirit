@@ -451,21 +451,6 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_t &diff, vo
     return commit(true);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (cluster->is_tainted()) {
-        return outcome::success();
-    }
-    auto &txn = *get_txn().assume_value();
-
-    auto r = diff.visit_next(*this, custom);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    return commit(true);
-}
-
 auto db_actor_t::operator()(const model::diff::modify::add_blocks_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
@@ -610,20 +595,6 @@ auto db_actor_t::operator()(const model::diff::modify::remove_pending_folders_t 
     return (*this)(diff);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (cluster->is_tainted()) {
-        return outcome::success();
-    }
-    auto &txn = *get_txn().assume_value();
-    auto r = diff.visit_next(*this, custom);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    return commit(true);
-}
-
 auto db_actor_t::operator()(const model::diff::modify::remove_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &txn = *get_txn().assume_value();
@@ -759,12 +730,7 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void 
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
     auto file = folder_info->get_file_infos().by_name(diff.file.name());
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     {
         auto key = file->get_key();
