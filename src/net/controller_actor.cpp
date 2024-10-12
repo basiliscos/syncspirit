@@ -39,7 +39,7 @@ r::plugin::resource_id_t hash = 1;
 } // namespace resource
 } // namespace
 
-controller_actor_t::file_lock_t::file_lock_t(model::file_info_ptr_t file_, controller_actor_t &controller_) noexcept
+controller_actor_t::file_guard_t::file_guard_t(model::file_info_ptr_t file_, controller_actor_t &controller_) noexcept
     : file{file_}, controller{controller_} {
     file->locally_lock();
     is_locked = file->get_size();
@@ -54,7 +54,7 @@ controller_actor_t::file_lock_t::file_lock_t(model::file_info_ptr_t file_, contr
     }
 }
 
-controller_actor_t::file_lock_t::~file_lock_t() {
+controller_actor_t::file_guard_t::~file_guard_t() {
     auto folder = model::folder_ptr_t{file->get_folder_info()->get_folder()};
     auto &counter = --controller.synchronizing_folders[folder];
     if (counter == 0) {
@@ -138,7 +138,7 @@ void controller_actor_t::shutdown_start() noexcept {
 
 void controller_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish, blocks_requested = {}", rx_blocks_requested);
-    file_locks.clear();
+    guarded_files.clear();
     send_diff();
     peer->release_iterator(file_iterator);
     r::actor_base_t::shutdown_finish();
@@ -240,12 +240,12 @@ void controller_actor_t::send_diff() {
     }
 }
 
-void controller_actor_t::on_cutom(const pull_signal_t &) noexcept { pull_next(); }
+void controller_actor_t::on_custom(const pull_signal_t &) noexcept { pull_next(); }
 
-void controller_actor_t::on_cutom(const forget_file_t &diff) noexcept {
-    auto it = file_locks.find(diff.full_name);
-    assert(it != file_locks.end());
-    file_locks.erase(it);
+void controller_actor_t::on_custom(const forget_file_t &diff) noexcept {
+    auto it = guarded_files.find(diff.full_name);
+    assert(it != guarded_files.end());
+    guarded_files.erase(it);
 }
 
 void controller_actor_t::pull_next() noexcept {
@@ -296,12 +296,12 @@ void controller_actor_t::pull_next() noexcept {
             if (file) {
                 auto &name = file->get_full_name();
                 LOG_TRACE(log, "next_file = {}", name);
-                if (!file_locks.count(name)) {
-                    auto file_lock = file_lock_ptr_t(new file_lock_t(file, *this));
-                    file_locks[name] = std::move(file_lock);
+                if (!guarded_files.count(name)) {
+                    auto file_lock = file_guard_ptr_t(new file_guard_t(file, *this));
+                    guarded_files[name] = std::move(file_lock);
                 }
                 if (!file->local_file()) {
-                    assign_diff(new model::diff::modify::clone_file_t(*file, *sequencer));
+                    assign_diff(model::diff::modify::clone_file_t::create(*file, *sequencer));
                     if (!file->get_size()) {
                         assign_diff(new forget_file_t(this, file->get_full_name()));
                     }
@@ -411,9 +411,9 @@ auto controller_actor_t::operator()(const model::diff::modify::finish_file_ack_t
     assert(file);
     updates_streamer.on_update(*file);
 
-    auto it = file_locks.find(file->get_full_name());
-    assert(it != file_locks.end());
-    file_locks.erase(it);
+    auto it = guarded_files.find(file->get_full_name());
+    assert(it != guarded_files.end());
+    guarded_files.erase(it);
     pull_ready();
 
     return diff.visit_next(*this, custom);
@@ -467,9 +467,9 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
         auto folder_info = folder_infos.by_device(*device);
         auto file = folder_info->get_file_infos().by_name(file_name);
 
-        auto it = file_locks.find(file->get_full_name());
-        assert(it != file_locks.end());
-        file_locks.erase(it);
+        auto it = guarded_files.find(file->get_full_name());
+        assert(it != guarded_files.end());
+        guarded_files.erase(it);
         pull_ready();
     }
     push_pending();
@@ -754,7 +754,7 @@ auto controller_actor_t::pull_signal_t::visit(model::diff::cluster_visitor_t &vi
     auto r = visitor(*this, custom);
     if (r && custom == controller) {
         auto self = reinterpret_cast<controller_actor_t *>(custom);
-        self->on_cutom(*this);
+        self->on_custom(*this);
     }
     return r;
 }
@@ -767,7 +767,7 @@ auto controller_actor_t::forget_file_t::visit(model::diff::cluster_visitor_t &vi
     auto r = visitor(*this, custom);
     if (r && custom == controller) {
         auto self = reinterpret_cast<controller_actor_t *>(custom);
-        self->on_cutom(*this);
+        self->on_custom(*this);
     }
     return r;
 }

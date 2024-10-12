@@ -61,7 +61,7 @@ TEST_CASE("new file diff", "[model]") {
             auto bi = model::block_info_t::create(*b).value();
             blocks_map.put(bi);
 
-            auto file_my = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
+            auto file_my = file_info_t::create(sequencer->next_uuid(), file_info, folder_my).value();
             file_my->assign_block(bi, 0);
             file_my->mark_local_available(0);
             folder_my->add(file_my, false);
@@ -70,6 +70,7 @@ TEST_CASE("new file diff", "[model]") {
             auto file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
             folder_peer->add(file_peer, false);
             file_peer->assign_block(bi, 0);
+            file_peer->mark_local_available(0);
             REQUIRE(builder.clone_file(*file_peer).apply());
 
             file_my = folder_my->get_file_infos().by_name(file_info.name());

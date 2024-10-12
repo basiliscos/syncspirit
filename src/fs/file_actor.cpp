@@ -194,8 +194,8 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome
 auto file_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
-    auto file = file_info->get_file_infos().by_name(diff.file.name());
+    auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
+    auto file = file_info->get_file_infos().by_name(diff.proto_file.name());
     auto r = reflect(file);
     return r ? diff.visit_next(*this, custom) : r;
 }

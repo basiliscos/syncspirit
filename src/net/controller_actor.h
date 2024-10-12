@@ -108,14 +108,14 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
   private:
     enum substate_t { none = 0, iterating_files, iterating_blocks };
 
-    struct file_lock_t : model::arc_base_t<file_lock_t> {
+    struct file_guard_t : model::arc_base_t<file_guard_t> {
         model::file_info_ptr_t file;
         controller_actor_t &controller;
         model::diff::cluster_diff_ptr_t *diff_storage;
         bool is_locked;
 
-        file_lock_t(model::file_info_ptr_t file, controller_actor_t &controller) noexcept;
-        ~file_lock_t();
+        file_guard_t(model::file_info_ptr_t file, controller_actor_t &controller) noexcept;
+        ~file_guard_t();
     };
 
     struct pull_signal_t final : model::diff::local::custom_t {
@@ -131,9 +131,9 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         std::string full_name;
     };
 
-    using file_lock_ptr_t = r::intrusive_ptr_t<file_lock_t>;
+    using file_guard_ptr_t = r::intrusive_ptr_t<file_guard_t>;
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
-    using locked_files_t = std::unordered_map<std::string, file_lock_ptr_t>;
+    using guarded_files_t = std::unordered_map<std::string, file_guard_ptr_t>;
     using unlink_request_t = r::message::unlink_request_t;
     using unlink_request_ptr_t = r::intrusive_ptr_t<unlink_request_t>;
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
@@ -157,8 +157,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_message(proto::message::Request &message) noexcept;
     void on_message(proto::message::DownloadProgress &message) noexcept;
 
-    void on_cutom(const pull_signal_t &diff) noexcept;
-    void on_cutom(const forget_file_t &diff) noexcept;
+    void on_custom(const pull_signal_t &diff) noexcept;
+    void on_custom(const forget_file_t &diff) noexcept;
 
     void request_block(const model::file_block_t &block) noexcept;
     void pull_next() noexcept;
@@ -215,7 +215,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     model::block_iterator_ptr_t block_iterator;
     model::updates_streamer_t updates_streamer;
     int substate = substate_t::none;
-    locked_files_t file_locks;
+    guarded_files_t guarded_files;
     model::block_infos_map_t block_locks;
     synchronizing_folders_t synchronizing_folders;
     block_write_queue_t block_write_queue;
