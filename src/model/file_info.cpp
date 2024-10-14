@@ -430,8 +430,6 @@ std::size_t file_info_t::expected_meta_size() const noexcept {
     return r;
 }
 
-file_info_ptr_t file_info_t::actualize() const noexcept { return folder_info->get_file_infos().get(get_uuid()); }
-
 std::uint32_t file_info_t::get_permissions() const noexcept { return permissions; }
 
 bool file_info_t::has_no_permissions() const noexcept { return flags & f_no_permissions; }

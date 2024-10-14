@@ -136,7 +136,6 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
 
     outcome::result<void> fields_update(const db::FileInfo &) noexcept;
 
-    file_info_ptr_t actualize() const noexcept;
     proto::Index generate() noexcept;
     std::size_t expected_meta_size() const noexcept;
 

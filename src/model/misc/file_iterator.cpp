@@ -167,7 +167,9 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
             }
 
             auto &seen_sequence = fi.committed_map[file];
-            if (seen_sequence < file->get_sequence() && local_file->need_download(*file)) {
+            auto accept =
+                seen_sequence < file->get_sequence() && local_file->is_local() && local_file->need_download(*file);
+            if (accept) {
                 fi.guarded_files.emplace(file->get_name(), new guard_t(file, *this));
                 return file.get();
             }
