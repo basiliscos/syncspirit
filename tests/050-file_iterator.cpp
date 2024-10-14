@@ -12,13 +12,11 @@ using namespace syncspirit::test;
 using namespace syncspirit::model;
 
 struct dummy_sink_t final : model::diff_sink_t {
-    dummy_sink_t(diff_builder_t& builder_) noexcept: builder{builder_} {}
+    dummy_sink_t(diff_builder_t &builder_) noexcept : builder{builder_} {}
 
-    void push(diff::cluster_diff_ptr_t d) noexcept override {
-        builder.assign(d.get());
-    }
+    void push(diff::cluster_diff_ptr_t d) noexcept override { builder.assign(d.get()); }
 
-    diff_builder_t& builder;
+    diff_builder_t &builder;
 };
 
 TEST_CASE("file iterator", "[model]") {
@@ -44,10 +42,10 @@ TEST_CASE("file iterator", "[model]") {
     REQUIRE(folder_infos.size() == 2u);
 
     auto peer_folder = folder_infos.by_device(*peer_device);
-    auto& peer_files = peer_folder->get_file_infos();
+    auto &peer_files = peer_folder->get_file_infos();
 
     auto my_folder = folder_infos.by_device(*my_device);
-    auto& my_files = my_folder->get_file_infos();
+    auto &my_files = my_folder->get_file_infos();
 
     auto file_iterator = peer_device->create_iterator(*cluster);
     file_iterator->activate(sink);
@@ -92,7 +90,10 @@ TEST_CASE("file iterator", "[model]") {
             auto file_2 = proto::FileInfo();
             file_2.set_name("b.txt");
             file_2.set_sequence(10ul);
-            builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_1, peer_device).add(file_2, peer_device).finish();
+            builder.make_index(peer_id.get_sha256(), folder->get_id())
+                .add(file_1, peer_device)
+                .add(file_2, peer_device)
+                .finish();
             REQUIRE(builder.apply());
 
             SECTION("both files are missing on my side") {
@@ -201,14 +202,16 @@ TEST_CASE("file iterator", "[model]") {
 
             REQUIRE(!file_iterator->next_need_cloning());
             f = file_iterator->next_need_sync();
+            CHECK(folder->is_synchronizing());
             REQUIRE(f);
+            REQUIRE(file_iterator->next_need_sync() == f);
+            file_iterator->commit(f);
 
             CHECK(f->get_name() == "a.txt");
             CHECK(f->is_locked());
-            REQUIRE(file_iterator->next_need_sync() == f);
+            CHECK(!file_iterator->next_need_sync());
 
             REQUIRE(builder.apply());
-            CHECK(folder->is_synchronizing());
 
             auto lf = my_files.by_name(f->get_name());
             f->mark_local_available(0);
@@ -246,10 +249,14 @@ TEST_CASE("file iterator", "[model]") {
             CHECK(f->get_name() == "a.txt");
             CHECK(!f->is_locked());
             REQUIRE(file_iterator->next_need_sync() == f);
-
             REQUIRE(builder.apply());
             CHECK(folder->is_synchronizing());
             CHECK(f->is_locked());
+
+            file_iterator->commit(f);
+            REQUIRE(builder.apply());
+            CHECK(!folder->is_synchronizing());
+            CHECK(!f->is_locked());
         }
 
         SECTION("1 file, have local, local is newer") {
@@ -290,16 +297,13 @@ TEST_CASE("file iterator", "[model]") {
             REQUIRE(f);
 
             REQUIRE(builder.clone_file(*f).mark_reacheable(f, false).apply());
+            file_iterator->commit(f);
+            REQUIRE(builder.apply());
+
             CHECK(!folder->is_synchronizing());
             CHECK(!f->is_locked());
-
             CHECK(!file_iterator->next_need_cloning());
             CHECK(!file_iterator->next_need_sync());
-
-            REQUIRE(builder.mark_reacheable(f, true).apply());
-            f = file_iterator->next_need_sync();
-            REQUIRE(f);
-            REQUIRE(file_iterator->next_need_sync() == f);
         }
     }
 

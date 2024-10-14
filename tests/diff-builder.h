@@ -92,8 +92,8 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     model::sequencer_t &get_sequencer() noexcept;
 
     diff_builder_t &assign(model::diff::cluster_diff_t *) noexcept;
-  private:
 
+  private:
     model::sequencer_ptr_t sequencer;
     model::cluster_t &cluster;
     model::diff::cluster_diff_ptr_t cluster_diff;

@@ -49,10 +49,6 @@ auto finish_file_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
     file->mark_local();
     folder_info->add(file, true);
 
-    if (auto iterator = source->get_folder_info()->get_device()->get_iterator(); iterator) {
-        iterator->commit(std::move(source));
-    }
-
     return applicator_t::apply_sibling(cluster);
 }
 

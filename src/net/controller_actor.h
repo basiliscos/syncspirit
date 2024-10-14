@@ -95,7 +95,9 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
     }
 };
 
-struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t, private model::diff_sink_t {
+struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
+                                           private model::diff::cluster_visitor_t,
+                                           private model::diff_sink_t {
     using config_t = controller_actor_config_t;
     template <typename Actor> using config_builder_t = controller_actor_config_builder_t<Actor>;
 
@@ -160,7 +162,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void push_block_write(model::diff::cluster_diff_ptr_t block) noexcept;
     void process_block_write() noexcept;
     dispose_callback_t make_callback() noexcept;
-
 
     void push(model::diff::cluster_diff_ptr_t diff) noexcept override;
     void send_diff();

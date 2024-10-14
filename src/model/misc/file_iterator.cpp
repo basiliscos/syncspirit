@@ -9,7 +9,8 @@
 
 using namespace syncspirit::model;
 
-file_iterator_t::guard_t::guard_t(model::file_info_ptr_t file_, file_iterator_t &owner_) noexcept: file{file_}, owner{owner_} {
+file_iterator_t::guard_t::guard_t(model::file_info_ptr_t file_, file_iterator_t &owner_) noexcept
+    : file{file_}, owner{owner_} {
     assert(!file->is_locally_locked());
     file->locally_lock();
 
@@ -19,8 +20,8 @@ file_iterator_t::guard_t::guard_t(model::file_info_ptr_t file_, file_iterator_t 
     }
 
     auto folder = file->get_folder_info()->get_folder();
-    auto& it = owner.find_folder(folder);
-    auto& guarded = it.guarded_files;
+    auto &it = owner.find_folder(folder);
+    auto &guarded = it.guarded_files;
     if (guarded.size() == 0) {
         owner.sink->push(new model::diff::local::synchronization_start_t(folder->get_id()));
     }
@@ -30,8 +31,8 @@ file_iterator_t::guard_t::~guard_t() {
     file->locally_unlock();
 
     auto folder = file->get_folder_info()->get_folder();
-    auto& it = owner.find_folder(folder);
-    auto& guarded = it.guarded_files;
+    auto &it = owner.find_folder(folder);
+    auto &guarded = it.guarded_files;
     if (guarded.size() == 1) {
         owner.sink->push(new model::diff::local::synchronization_finish_t(folder->get_id()));
     }
@@ -57,7 +58,7 @@ file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_)
     }
 }
 
-void file_iterator_t::activate(diff_sink_t& sink_) noexcept {
+void file_iterator_t::activate(diff_sink_t &sink_) noexcept {
     assert(!sink);
     sink = &sink_;
 }
@@ -67,8 +68,8 @@ void file_iterator_t::deactivate() noexcept {
     sink = nullptr;
 }
 
-auto file_iterator_t::find_folder(folder_t* folder) noexcept -> folder_iterator_t& {
-    for (auto& it: folders_list) {
+auto file_iterator_t::find_folder(folder_t *folder) noexcept -> folder_iterator_t & {
+    for (auto &it : folders_list) {
         if (it.peer_folder->get_folder() == folder) {
             return it;
         }
@@ -76,9 +77,8 @@ auto file_iterator_t::find_folder(folder_t* folder) noexcept -> folder_iterator_
     assert(0 && "should not happen");
 }
 
-
-auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t& {
-    auto& files = peer_folder->get_file_infos();
+auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t & {
+    auto &files = peer_folder->get_file_infos();
     folders_list.emplace_back(folder_iterator_t{peer_folder, files.begin(), files.begin(), {}});
     return folders_list.back();
 }
@@ -92,15 +92,15 @@ file_info_t *file_iterator_t::next_need_cloning() noexcept {
         auto &fi = folders_list[folder_index];
         auto &it = fi.it_clone;
         auto files_scan = size_t{0};
-        auto& files_map = fi.peer_folder->get_file_infos();
+        auto &files_map = fi.peer_folder->get_file_infos();
         auto local_folder = fi.peer_folder->get_folder()->get_folder_infos().by_device(*cluster.get_device());
-        auto& local_files_map = local_folder->get_file_infos();
+        auto &local_files_map = local_folder->get_file_infos();
 
         while (files_scan < files_map.size()) {
             if (it == files_map.end()) {
                 it = files_map.begin();
             }
-            auto& file = it->item;
+            auto &file = it->item;
             ++files_scan;
             ++it;
 
@@ -130,10 +130,10 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
     while (folder_scans < folders_count) {
         auto &fi = folders_list[folder_index];
         auto local_folder = fi.peer_folder->get_folder()->get_folder_infos().by_device(*cluster.get_device());
-        auto& local_files_map = local_folder->get_file_infos();
+        auto &local_files_map = local_folder->get_file_infos();
 
         // check for already locked files (aka just cloned files)
-        for (auto& [name, guard]: fi.guarded_files) {
+        for (auto &[name, guard] : fi.guarded_files) {
             auto local_file = local_files_map.by_name(name);
             if (local_file) {
                 return guard->file.get();
@@ -142,14 +142,14 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
 
         auto &it = fi.it_sync;
         auto files_scan = size_t{0};
-        auto& files_map = fi.peer_folder->get_file_infos();
+        auto &files_map = fi.peer_folder->get_file_infos();
 
         // check other files
         while (files_scan < files_map.size()) {
             if (it == files_map.end()) {
                 it = files_map.begin();
             }
-            auto& file = it->item;
+            auto &file = it->item;
             ++files_scan;
             ++it;
 
@@ -166,7 +166,8 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
                 continue;
             }
 
-            if (local_file->need_download(*file)) {
+            auto &seen_sequence = fi.committed_map[file];
+            if (seen_sequence < file->get_sequence() && local_file->need_download(*file)) {
                 fi.guarded_files.emplace(file->get_name(), new guard_t(file, *this));
                 return file.get();
             }
@@ -179,10 +180,12 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
 
 void file_iterator_t::commit(file_info_ptr_t file) noexcept {
     auto folder = file->get_folder_info()->get_folder();
-    auto& guarded = find_folder(folder).guarded_files;
+    auto &fi = find_folder(folder);
+    auto &guarded = fi.guarded_files;
     auto it = guarded.find(file->get_name());
     // if needed for cloning files without iterator (i.e. in tests)
     if (it != guarded.end()) {
+        fi.committed_map[file] = file->get_sequence();
         guarded.erase(it);
     }
 }
@@ -195,8 +198,8 @@ void file_iterator_t::on_clone(file_info_ptr_t file) noexcept {
 
 void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
     auto folder = peer_folder->get_folder();
-    auto& files = peer_folder->get_file_infos();
-    for (auto& it: folders_list) {
+    auto &files = peer_folder->get_file_infos();
+    for (auto &it : folders_list) {
         if (it.peer_folder->get_folder() == folder) {
             it.it_clone = it.it_sync = files.begin();
             return;
