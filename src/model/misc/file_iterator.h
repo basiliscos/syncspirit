@@ -7,6 +7,7 @@
 #include "../file_info.h"
 #include "../folder_info.h"
 #include "../folder.h"
+#include "../diff/cluster_diff.h"
 #include "syncspirit-export.h"
 #include <vector>
 #include <deque>
@@ -15,10 +16,65 @@
 
 namespace syncspirit::model {
 
-struct cluster_t;
-struct blocks_iterator_t;
+struct diff_sink_t {
+    virtual void push(diff::cluster_diff_ptr_t diff) noexcept = 0;
+};
+
 
 struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
+    using files_list_t = std::vector<file_info_ptr_t>;
+
+    file_iterator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
+    file_iterator_t(const file_iterator_t &) = delete;
+
+    void activate(diff_sink_t& sink) noexcept;
+    void deactivate() noexcept;
+
+    file_info_t *next_need_cloning() noexcept;
+    file_info_t *next_need_sync() noexcept;
+    void commit(file_info_ptr_t file) noexcept;
+
+    void on_clone(file_info_ptr_t file) noexcept;
+    void on_upsert(folder_info_ptr_t peer_folder) noexcept;
+
+private:
+	struct guard_t : model::arc_base_t<guard_t> {
+		guard_t(model::file_info_ptr_t file, file_iterator_t &owner) noexcept;
+		~guard_t();
+
+        model::file_info_ptr_t file;
+        file_iterator_t &owner;
+        bool is_locked;
+	};
+    using guard_ptr_t = model::intrusive_ptr_t<guard_t>;
+    using guarded_files_t = std::unordered_map<std::string_view, guard_ptr_t>;
+
+	struct folder_iterator_t {
+		using it_t = typename model::file_infos_map_t::iterator_t;
+		model::folder_info_ptr_t peer_folder;
+        it_t it_clone;
+        it_t it_sync;
+        guarded_files_t guarded_files;
+	};
+	using folder_iterators_t = std::vector<folder_iterator_t>;
+
+    folder_iterator_t& prepare_folder(folder_info_ptr_t peer_folder) noexcept;
+    folder_iterator_t& find_folder(folder_t* folder) noexcept;
+
+	cluster_t &cluster;
+	device_ptr_t peer;
+	std::size_t folder_index;
+	diff_sink_t* sink;
+	folder_iterators_t folders_list;
+
+	friend struct guard_t;
+};
+
+#if 0
+struct cluster_t;
+
+struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
+
     using files_list_t = std::vector<file_info_ptr_t>;
     using files_queue_t = std::deque<file_info_ptr_t>;
     using files_set_t = std::unordered_set<file_info_ptr_t>;
@@ -77,6 +133,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
 
     friend struct postponed_files_t;
 };
+#endif
 
 using file_iterator_ptr_t = intrusive_ptr_t<file_iterator_t>;
 

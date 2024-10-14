@@ -41,8 +41,6 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
 
     auto max_seq = folder_info->get_max_sequence();
     auto &fm = folder_info->get_file_infos();
-    auto added_files = model::file_iterator_t::files_list_t();
-    added_files.reserve(files.size());
 
     for (std::size_t i = 0; i < files.size(); ++i) {
         auto &f = files[i];
@@ -70,7 +68,6 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
 
         folder_info->add(file, true);
         folder->notify_update();
-        added_files.push_back(std::move(file));
     }
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
@@ -78,7 +75,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     r = applicator_t::apply_sibling(cluster);
 
     if (auto iterator = folder_info->get_device()->get_iterator(); iterator) {
-        iterator->append_folder(folder_info, std::move(added_files));
+        iterator->on_upsert(folder_info);
     }
 
     folder_info->notify_update();

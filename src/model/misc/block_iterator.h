@@ -20,6 +20,7 @@ struct SYNCSPIRIT_API blocks_iterator_t : arc_base_t<blocks_iterator_t> {
     operator bool() const noexcept;
 
     file_block_t next() noexcept;
+    file_info_ptr_t get_source() noexcept;
 
   private:
     void prepare() noexcept;

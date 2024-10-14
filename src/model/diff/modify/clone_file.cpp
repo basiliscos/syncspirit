@@ -94,7 +94,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
               blocks.size());
 
     if (auto iterator = folder_peer->get_device()->get_iterator(); iterator) {
-        iterator->requeue_unchecked(std::move(peer_file));
+        iterator->on_clone(std::move(peer_file));
     }
 
     return applicator_t::apply_sibling(cluster);

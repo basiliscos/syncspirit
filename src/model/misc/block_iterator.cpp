@@ -18,6 +18,8 @@ blocks_iterator_t::blocks_iterator_t(file_info_t &source_) noexcept : i{0}, sour
 
 blocks_iterator_t::operator bool() const noexcept { return source != nullptr; }
 
+file_info_ptr_t blocks_iterator_t::get_source() noexcept { return source; }
+
 void blocks_iterator_t::advance() noexcept {
     auto &sb = source->get_blocks();
     auto max = sb.size();

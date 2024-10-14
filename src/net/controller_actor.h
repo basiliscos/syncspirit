@@ -95,7 +95,7 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
     }
 };
 
-struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
+struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t, private model::diff_sink_t {
     using config_t = controller_actor_config_t;
     template <typename Actor> using config_builder_t = controller_actor_config_builder_t<Actor>;
 
@@ -122,13 +122,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         pull_signal_t(void *controller) noexcept;
         outcome::result<void> visit(model::diff::cluster_visitor_t &, void *) const noexcept override;
         void *controller;
-    };
-
-    struct forget_file_t final : model::diff::local::custom_t {
-        forget_file_t(void *controller, std::string full_name) noexcept;
-        outcome::result<void> visit(model::diff::cluster_visitor_t &, void *) const noexcept override;
-        void *controller;
-        std::string full_name;
     };
 
     using file_guard_ptr_t = r::intrusive_ptr_t<file_guard_t>;
@@ -158,7 +151,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_message(proto::message::DownloadProgress &message) noexcept;
 
     void on_custom(const pull_signal_t &diff) noexcept;
-    void on_custom(const forget_file_t &diff) noexcept;
 
     void request_block(const model::file_block_t &block) noexcept;
     void pull_next() noexcept;
@@ -169,7 +161,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void process_block_write() noexcept;
     dispose_callback_t make_callback() noexcept;
 
-    void assign_diff(model::diff::cluster_diff_ptr_t) noexcept;
+
+    void push(model::diff::cluster_diff_ptr_t diff) noexcept override;
     void send_diff();
 
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
@@ -215,7 +208,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     model::block_iterator_ptr_t block_iterator;
     model::updates_streamer_t updates_streamer;
     int substate = substate_t::none;
-    guarded_files_t guarded_files;
     model::block_infos_map_t block_locks;
     synchronizing_folders_t synchronizing_folders;
     block_write_queue_t block_write_queue;

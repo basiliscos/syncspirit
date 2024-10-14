@@ -70,7 +70,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         auto &f = message.folders(i);
         auto &folder_id = f.id();
         auto folder = folders.by_id(folder_id);
-        LOG_TRACE(log, "cluster_update_t, folder = '{}', id = '{}'", f.label(), folder_id);
+        LOG_TRACE(log, "cluster_update_t, folder label = '{}', id = '{}'", f.label(), folder_id);
         if (!folder) {
             for (int i = 0; i < f.devices_size(); ++i) {
                 auto &d = f.devices(i);

@@ -17,6 +17,7 @@
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/finish_file_ack.h"
+#include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
@@ -263,6 +264,10 @@ diff_builder_t &diff_builder_t::synchronization_start(std::string_view id) noexc
 
 diff_builder_t &diff_builder_t::synchronization_finish(std::string_view id) noexcept {
     return assign(new model::diff::local::synchronization_finish_t(std::string(id)));
+}
+
+diff_builder_t &diff_builder_t::mark_reacheable(model::file_info_ptr_t peer_file, bool value) noexcept {
+    return assign(new model::diff::modify::mark_reachable_t(*peer_file, value));
 }
 
 template <typename Holder, typename Diff> static void generic_assign(Holder *holder, Diff *diff) noexcept {
