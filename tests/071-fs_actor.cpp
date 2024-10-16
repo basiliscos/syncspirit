@@ -66,7 +66,12 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         auto sha256 = peer_device->device_id().get_sha256();
-        file_actor = sup->create_actor<fs::file_actor_t>().mru_size(2).cluster(cluster).timeout(timeout).finish();
+        file_actor = sup->create_actor<fs::file_actor_t>()
+                         .mru_size(2)
+                         .cluster(cluster)
+                         .sequencer(sup->sequencer)
+                         .timeout(timeout)
+                         .finish();
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         file_addr = file_actor->get_address();
