@@ -203,7 +203,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_file_t &diff, voi
 auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
+    auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
     auto file = file_info->get_file_infos().by_name(diff.file_name);
 
     auto path = file->get_path().string();
@@ -231,9 +231,10 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
 
     auto ack = model::diff::cluster_diff_ptr_t{};
-    ack = new model::diff::modify::finish_file_ack_t(*file, diff.peer_id);
-    send<model::payload::model_update_t>(coordinator, std::move(ack), this);
-    return diff.visit_next(*this, custom);
+    std::abort();
+    // ack = new model::diff::modify::finish_file_ack_t(*file);
+    // send<model::payload::model_update_t>(coordinator, std::move(ack), this);
+    // return diff.visit_next(*this, custom);
 }
 
 auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, void *custom) noexcept

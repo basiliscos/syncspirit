@@ -139,7 +139,7 @@ TEST_CASE("new file diff", "[model]") {
         }
 
         file_peer->mark_local_available(0);
-        REQUIRE(builder.finish_file_ack(*file_my, *peer_device).apply());
+        REQUIRE(builder.finish_file_ack(*file_peer).apply());
 
         file_my = folder_my->get_file_infos().by_name(file_info.name());
         CHECK(file_my->is_local());

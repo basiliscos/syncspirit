@@ -45,6 +45,7 @@ enum class error_code_t {
     invalid_block_size,
     unexpected_blocks,
     missing_version,
+    invalid_sequence,
 };
 
 namespace detail {

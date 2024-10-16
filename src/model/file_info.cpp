@@ -264,7 +264,7 @@ const boost::filesystem::path &file_info_t::get_path() const noexcept {
     return path.value();
 }
 
-auto file_info_t::local_file() noexcept -> file_info_ptr_t {
+auto file_info_t::local_file() const noexcept -> file_info_ptr_t {
     auto device = folder_info->get_device();
     auto cluster = folder_info->get_folder()->get_cluster();
     auto &my_device = *cluster->get_device();
@@ -427,6 +427,29 @@ void file_info_t::update(const file_info_t &other) noexcept {
             }
         }
     }
+}
+
+bool file_info_t::is_global() const noexcept {
+    using V = version_relation_t;
+    auto self = folder_info->get_device();
+    auto folder = folder_info->get_folder();
+    for (auto &it : folder->get_folder_infos()) {
+        if (it.item->get_device() == self) {
+            continue;
+        }
+        auto &files = it.item->get_file_infos();
+        auto file = files.by_name(name);
+        if (!file) {
+            continue;
+        }
+        auto &v_other = file->get_version();
+        auto v_result = compare(version, v_other);
+        if (v_result == V::identity || v_result == V::newer) {
+            continue;
+        }
+        return false;
+    }
+    return true;
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const file_info_ptr_t &item) noexcept {

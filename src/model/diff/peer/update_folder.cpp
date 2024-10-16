@@ -141,6 +141,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         return make_error_code(error_code_t::folder_is_not_shared);
     }
 
+    auto log = update_folder_t::get_log();
     auto max_seq = fi->get_max_sequence();
     auto &blocks = cluster.get_blocks();
     update_folder_t::files_t files;
@@ -149,9 +150,12 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
     for (int i = 0; i < message.files_size(); ++i) {
         auto &f = message.files(i);
         if (f.deleted() && f.blocks_size()) {
-            auto log = update_folder_t::get_log();
-            LOG_WARN(log, "file {}, should not have blocks", f.name());
+            LOG_WARN(log, "file {} should not have blocks", f.name());
             return make_error_code(error_code_t::unexpected_blocks);
+        }
+        if (f.sequence() <= 0) {
+            LOG_WARN(log, "file '{}' has wrong sequnce", f.name(), f.sequence());
+            return make_error_code(error_code_t::invalid_sequence);
         }
         for (int j = 0; j < f.blocks_size(); ++j) {
             auto &b = f.blocks(j);

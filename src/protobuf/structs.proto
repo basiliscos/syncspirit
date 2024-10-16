@@ -77,8 +77,7 @@ message FileInfo {
     int32                           block_size     = 13;
     string                          symlink_target = 16;
     repeated                        bytes blocks   = 17;
-    syncspirit.proto.Vector         source_version = 18;
-    bytes                           source_device  = 19;
+    bytes                           transient      = 18;
 }
 
 message IngoredFolder {

@@ -115,13 +115,14 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }
     inline std::int32_t get_modified_by() const noexcept { return modified_by; }
 
-    file_info_ptr_t local_file() noexcept;
+    file_info_ptr_t local_file() const noexcept;
 
     bool is_locked() const noexcept;
     void lock() noexcept;
     void unlock() noexcept;
 
     bool is_locally_locked() const noexcept;
+    bool is_global() const noexcept;
     void locally_lock() noexcept;
     void locally_unlock() noexcept;
 
@@ -139,6 +140,8 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
 
     std::uint32_t get_permissions() const noexcept;
     bool has_no_permissions() const noexcept;
+
+    void commit_transient() noexcept;
 
   private:
     using marks_vector_t = std::vector<bool>;
@@ -173,6 +176,8 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     std::string full_name;
     marks_vector_t marks;
     size_t missing_blocks;
+
+    file_info_ptr_t transient;
 
     friend struct blocks_iterator_t;
 };

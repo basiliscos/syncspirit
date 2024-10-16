@@ -122,7 +122,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
     using block_write_queue_t = std::deque<model::diff::cluster_diff_ptr_t>;
     using dispose_callback_t = model::diff::modify::block_transaction_t::dispose_callback_t;
-    using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, int>;
+    using block_set_t = std::unordered_set<model::block_info_ptr_t>;
+    using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, block_set_t>;
 
     void on_termination(message::termination_signal_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
@@ -152,7 +153,9 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     dispose_callback_t make_callback() noexcept;
 
     void push(model::diff::cluster_diff_ptr_t diff) noexcept override;
-    void send_diff();
+    void send_diff() noexcept;
+    void acquire_block(const model::file_block_t &block) noexcept;
+    void release_block(const model::file_block_t &block) noexcept;
 
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
@@ -196,7 +199,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     model::block_iterator_ptr_t block_iterator;
     model::updates_streamer_t updates_streamer;
     int substate = substate_t::none;
-    model::block_infos_map_t block_locks;
     synchronizing_folders_t synchronizing_folders;
     block_write_queue_t block_write_queue;
 };

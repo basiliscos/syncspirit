@@ -29,8 +29,10 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
 
     file_info_t *next_need_cloning() noexcept;
     file_info_t *next_need_sync() noexcept;
-    void commit(file_info_ptr_t file) noexcept;
+    void commit_clone(file_info_ptr_t file) noexcept;
+    void commit_sync(file_info_ptr_t file) noexcept;
 
+    void on_block_ack(const file_info_t &file, size_t block_index);
     void on_clone(file_info_ptr_t file) noexcept;
     void on_upsert(folder_info_ptr_t peer_folder) noexcept;
 
@@ -42,6 +44,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
         model::file_info_ptr_t file;
         file_iterator_t &owner;
         bool is_locked;
+        bool clone_only;
     };
     using guard_ptr_t = model::intrusive_ptr_t<guard_t>;
     using guarded_files_t = std::unordered_map<std::string_view, guard_ptr_t>;
@@ -52,7 +55,8 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
         model::folder_info_ptr_t peer_folder;
         it_t it_clone;
         it_t it_sync;
-        guarded_files_t guarded_files;
+        guarded_files_t guarded_clones;
+        guarded_files_t guarded_syncs;
         visited_map_t committed_map;
     };
     using folder_iterators_t = std::vector<folder_iterator_t>;

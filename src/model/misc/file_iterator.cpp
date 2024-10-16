@@ -17,29 +17,29 @@ file_iterator_t::guard_t::guard_t(model::file_info_ptr_t file_, file_iterator_t 
 
     is_locked = file->get_size() > 0;
     if (is_locked) {
-        owner.sink->push(new model::diff::modify::lock_file_t(*file, true));
-    }
-
-    auto folder = file->get_folder_info()->get_folder();
-    auto &it = owner.find_folder(folder);
-    auto &guarded = it.guarded_files;
-    if (guarded.size() == 0) {
-        owner.sink->push(new model::diff::local::synchronization_start_t(folder->get_id()));
+        // owner.sink->push(new model::diff::modify::lock_file_t(*file, true));
+    } else {
+        auto folder = file->get_folder_info()->get_folder();
+        auto &it = owner.find_folder(folder);
+        auto guarded = it.guarded_clones.size() + it.guarded_syncs.size();
+        if (guarded == 0) {
+            owner.sink->push(new model::diff::local::synchronization_start_t(folder->get_id()));
+        }
     }
 }
 
 file_iterator_t::guard_t::~guard_t() {
     file->locally_unlock();
 
-    auto folder = file->get_folder_info()->get_folder();
-    auto &it = owner.find_folder(folder);
-    auto &guarded = it.guarded_files;
-    if (guarded.size() == 1) {
-        owner.sink->push(new model::diff::local::synchronization_finish_t(folder->get_id()));
-    }
-
     if (is_locked) {
-        owner.sink->push(new model::diff::modify::lock_file_t(*file, false));
+        // owner.sink->push(new model::diff::modify::lock_file_t(*file, false));
+    } else {
+        auto folder = file->get_folder_info()->get_folder();
+        auto &it = owner.find_folder(folder);
+        auto guarded = it.guarded_clones.size() + it.guarded_syncs.size();
+        if (guarded == 1) {
+            owner.sink->push(new model::diff::local::synchronization_finish_t(folder->get_id()));
+        }
     }
 }
 
@@ -65,6 +65,7 @@ void file_iterator_t::activate(diff_sink_t &sink_) noexcept {
 }
 
 void file_iterator_t::deactivate() noexcept {
+    folders_list = {};
     assert(sink);
     sink = nullptr;
 }
@@ -104,19 +105,18 @@ file_info_t *file_iterator_t::next_need_cloning() noexcept {
             ++files_scan;
             ++it;
 
-            if (!file->is_locally_locked() && !file->is_invalid()) {
-                auto local_file = file->local_file();
-                bool needed = false;
-                if (!local_file) {
-                    needed = true;
-                } else if (local_file->is_local()) {
-                    auto &v_peer = file->get_version();
-                    auto &v_my = local_file->get_version();
-                    needed = compare(v_my, v_peer) == version_relation_t::older;
+            if (!file->is_locally_locked() && !file->is_invalid() && file->is_global()) {
+                auto local = file->local_file();
+                bool need_clone = !local;
+                if (local) {
+                    using V = version_relation_t;
+                    auto result = compare(file->get_version(), local->get_version());
+                    need_clone = result == V::newer && file->is_locally_available();
+                } else {
+                    need_clone = file->get_size() == 0;
                 }
-
-                if (needed) {
-                    fi.guarded_files.emplace(file->get_name(), new guard_t(file, *this));
+                if (need_clone) {
+                    fi.guarded_clones.emplace(file->get_name(), new guard_t(file, *this));
                     return file.get();
                 }
             }
@@ -140,8 +140,7 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
         auto &fi = folders_list[folder_index];
         auto local_folder = fi.peer_folder->get_folder()->get_folder_infos().by_device(*cluster.get_device());
 
-        // check for already locked files (aka just cloned files)
-        for (auto &[_, guard] : fi.guarded_files) {
+        for (auto &[_, guard] : fi.guarded_syncs) {
             auto file = guard->file.get();
             if (file->local_file()) {
                 return file;
@@ -165,28 +164,30 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
                 continue;
             }
 
-            // auto local_file = local_files_map.by_name(file->get_name());
-            auto local_file = file->local_file();
-            if (!local_file) {
-                continue;
-            }
-
             if (file->is_unreachable()) {
                 continue;
             }
 
-            auto &v_peer = file->get_version();
-            auto &v_my = local_file->get_version();
+            if (file->is_locally_available()) {
+                continue;
+            }
 
+            if (!file->get_size()) {
+                continue;
+            }
+
+            if (!file->is_global()) {
+                continue;
+            }
+
+            if (auto local_file = file->local_file(); local_file) {
+            }
             // clang-format off
             auto &seen_sequence = fi.committed_map[file];
-            auto accept = seen_sequence < file->get_sequence()
-                    && local_file->is_local()
-                    && !local_file->is_locally_available()
-                    && compare(v_my, v_peer) == version_relation_t::identity;
+            auto accept = seen_sequence < file->get_sequence();
             // clang-format on
             if (accept) {
-                fi.guarded_files.emplace(file->get_name(), new guard_t(file, *this));
+                fi.guarded_syncs.emplace(file->get_name(), new guard_t(file, *this));
                 return file.get();
             }
         }
@@ -196,10 +197,22 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
     return {};
 }
 
-void file_iterator_t::commit(file_info_ptr_t file) noexcept {
+void file_iterator_t::commit_clone(file_info_ptr_t file) noexcept {
     auto folder = file->get_folder_info()->get_folder();
     auto &fi = find_folder(folder);
-    auto &guarded = fi.guarded_files;
+    auto &guarded = fi.guarded_clones;
+    auto it = guarded.find(file->get_name());
+    // if needed for cloning files without iterator (i.e. in tests)
+    if (it != guarded.end()) {
+        fi.committed_map[file] = file->get_sequence();
+        guarded.erase(it);
+    }
+}
+
+void file_iterator_t::commit_sync(file_info_ptr_t file) noexcept {
+    auto folder = file->get_folder_info()->get_folder();
+    auto &fi = find_folder(folder);
+    auto &guarded = fi.guarded_syncs;
     auto it = guarded.find(file->get_name());
     // if needed for cloning files without iterator (i.e. in tests)
     if (it != guarded.end()) {
@@ -210,7 +223,7 @@ void file_iterator_t::commit(file_info_ptr_t file) noexcept {
 
 void file_iterator_t::on_clone(file_info_ptr_t file) noexcept {
     if (file->get_size() == 0) {
-        commit(file);
+        commit_clone(file);
     }
 }
 
@@ -226,76 +239,17 @@ void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
     prepare_folder(peer_folder);
 }
 
-#if 0
-file_iterator_t::postponed_files_t::postponed_files_t(file_iterator_t &iterator_) : iterator{iterator_} {}
-
-file_iterator_t::postponed_files_t::~postponed_files_t() {
-    if (!postponed.empty()) {
-        iterator.requeue_unchecked(std::move(postponed));
-    }
-}
-
-file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
-    : cluster{cluster_}, peer{peer_}, folder_index{0} {
-    auto &folders = cluster.get_folders();
-    for (auto &[folder, _] : folders) {
-        auto peer_folder = folder->get_folder_infos().by_device(*peer);
-        if (!peer_folder) {
-            continue;
-        }
-        auto my_folder = folder->get_folder_infos().by_device(*cluster.get_device());
-        if (!my_folder) {
-            continue;
-        }
-        folders_list.emplace_back(prepare_folder(std::move(peer_folder)));
-    }
-}
-
-bool file_iterator_t::accept(file_info_t &file, int folder_index, bool check_version) noexcept {
-    if (file.is_unreachable() || file.is_invalid()) {
-        return false;
-    }
-
-    auto peer_folder = file.get_folder_info();
-    auto &folder_infos = peer_folder->get_folder()->get_folder_infos();
-    auto local_folder = folder_infos.by_device(*cluster.get_device());
-
-    auto local_file = local_folder->get_file_infos().by_name(file.get_name());
-    if (!local_file) {
-        return true;
-    }
-    if (!local_file->is_local()) {
-        return false;
-    }
-
-    auto fi = (folder_iterator_t *){nullptr};
-    if (folder_index >= 0)
-        fi = &folders_list[folder_index];
-    else {
-        for (auto &f : folders_list) {
-            if (f.peer_folder == peer_folder) {
-                fi = &f;
-                break;
+void file_iterator_t::on_block_ack(const file_info_t &file, size_t block_index) {
+    auto block = file.get_blocks().at(block_index);
+    auto fi = file.get_folder_info();
+    auto &committed_map = find_folder(fi->get_folder()).committed_map;
+    for (auto &fb : block->get_file_blocks()) {
+        auto f = fb.file();
+        if (f->get_folder_info() == fi) {
+            auto it = committed_map.find(f);
+            if (it != committed_map.end()) {
+                committed_map.erase(it);
             }
         }
     }
-    assert(fi && "should not happen");
-
-    if (check_version) {
-        auto &v = file.get_version();
-        auto version = v.counters(v.counters_size() - 1).value();
-        auto &visited_version = fi->visited_map[&file];
-        if (visited_version == version) {
-            return false;
-        }
-    }
-    if (local_file->need_download(file)) {
-        return true;
-    }
-    if (!local_file->is_locally_available()) {
-        return true;
-    }
-    return false;
 }
-
-#endif

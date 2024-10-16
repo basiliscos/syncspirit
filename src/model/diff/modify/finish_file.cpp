@@ -8,13 +8,13 @@
 
 using namespace syncspirit::model::diff::modify;
 
-finish_file_t::finish_file_t(const model::file_info_t &file, const model::device_t &peer) noexcept {
+finish_file_t::finish_file_t(const model::file_info_t &file) noexcept {
     auto fi = file.get_folder_info();
     auto folder = fi->get_folder();
     folder_id = folder->get_id();
     file_name = file.get_name();
-    peer_id = peer.device_id().get_sha256();
-    assert(fi->get_device() == folder->get_cluster()->get_device().get());
+    peer_id = fi->get_device()->device_id().get_sha256();
+    assert(fi->get_device() != folder->get_cluster()->get_device().get());
 }
 
 auto finish_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
