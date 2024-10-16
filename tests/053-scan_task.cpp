@@ -423,7 +423,6 @@ TEST_CASE("scan_task", "[fs]") {
                 auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
                 folder_my->add(file_my, false);
                 folder_peer->add(file_peer, false);
-                file_my->set_source(file_peer);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
                 auto r = task.advance();
@@ -468,7 +467,6 @@ TEST_CASE("scan_task", "[fs]") {
                 auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
                 folder_my->add(file_my, false);
                 folder_peer->add(file_peer, false);
-                file_my->set_source(file_peer);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
                 auto r = task.advance();
@@ -496,7 +494,6 @@ TEST_CASE("scan_task", "[fs]") {
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
             folder_my->add(file_my, false);
             folder_peer->add(file_peer, false);
-            file_my->set_source(file_peer);
 
             auto path = root_path / "a.txt";
             auto path_tmp = root_path / "a.txt.syncspirit-tmp";

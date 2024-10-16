@@ -82,6 +82,68 @@ TEST_CASE("file iterator", "[model]") {
             CHECK(!f->is_locked());
         }
 
+        SECTION("version checks") {
+            auto file = proto::FileInfo();
+            file.set_name("a.txt");
+            file.set_sequence(10ul);
+            auto c_1 = file.mutable_version()->add_counters();
+            c_1->set_id(1);
+            c_1->set_value(5);
+
+            builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish();
+
+            SECTION("my version < peer version") {
+                REQUIRE(builder.apply());
+
+                c_1->set_value(3);
+
+                auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                my_file->mark_local();
+                my_files.put(my_file);
+
+                auto f = file_iterator->next_need_cloning();
+                REQUIRE(f);
+                CHECK(f->get_folder_info()->get_device() == peer_device.get());
+                REQUIRE(!file_iterator->next_need_cloning());
+            }
+
+            SECTION("my version < peer version, but not scanned yet") {
+                REQUIRE(builder.apply());
+
+                c_1->set_value(3);
+
+                auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                my_files.put(my_file);
+
+                auto f = file_iterator->next_need_cloning();
+                REQUIRE(!f);
+            }
+
+            SECTION("my version > peer version") {
+                REQUIRE(builder.apply());
+
+                c_1->set_value(10);
+
+                auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                my_file->mark_local();
+                my_files.put(my_file);
+
+                auto f = file_iterator->next_need_cloning();
+                REQUIRE(!f);
+            }
+
+            SECTION("my version == peer version") {
+                REQUIRE(builder.apply());
+
+                auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                my_file->mark_local();
+                my_files.put(my_file);
+
+                auto f = file_iterator->next_need_cloning();
+                REQUIRE(!f);
+            }
+        }
+
         SECTION("2 emtpy file") {
             auto files = model::file_infos_map_t();
             auto file_1 = proto::FileInfo();
@@ -216,7 +278,7 @@ TEST_CASE("file iterator", "[model]") {
             auto lf = my_files.by_name(f->get_name());
             f->mark_local_available(0);
 
-            REQUIRE(builder.finish_file_ack(*lf).apply());
+            REQUIRE(builder.finish_file_ack(*lf, *peer_device).apply());
             REQUIRE(!file_iterator->next_need_cloning());
             REQUIRE(!file_iterator->next_need_sync());
             CHECK(!folder->is_synchronizing());
@@ -246,8 +308,8 @@ TEST_CASE("file iterator", "[model]") {
             SECTION("has been scanned") {
                 my_file->mark_local();
 
-                CHECK(!file_iterator->next_need_cloning());
-                auto f = file_iterator->next_need_sync();
+                CHECK(!file_iterator->next_need_sync());
+                auto f = file_iterator->next_need_cloning();
                 REQUIRE(f);
                 CHECK(f->get_name() == "a.txt");
                 CHECK(!f->is_locked());

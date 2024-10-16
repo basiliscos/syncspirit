@@ -39,37 +39,6 @@ r::plugin::resource_id_t hash = 1;
 } // namespace resource
 } // namespace
 
-controller_actor_t::file_guard_t::file_guard_t(model::file_info_ptr_t file_, controller_actor_t &controller_) noexcept
-    : file{file_}, controller{controller_} {
-    file->locally_lock();
-    is_locked = file->get_size();
-    if (is_locked) {
-        controller.push(new model::diff::modify::lock_file_t(*file, true));
-    }
-
-    auto folder = model::folder_ptr_t{file->get_folder_info()->get_folder()};
-    auto &counter = ++controller.synchronizing_folders[folder];
-    if (counter == 1) {
-        controller.push(new model::diff::local::synchronization_start_t(folder->get_id()));
-    }
-}
-
-controller_actor_t::file_guard_t::~file_guard_t() {
-    auto folder = model::folder_ptr_t{file->get_folder_info()->get_folder()};
-    auto &counter = --controller.synchronizing_folders[folder];
-    if (counter == 0) {
-        controller.synchronizing_folders.erase(folder);
-        controller.push(new model::diff::local::synchronization_finish_t(folder->get_id()));
-    }
-
-    if (is_locked) {
-        LOG_TRACE(controller.log, "going to unlock {} ({}); is_unlocking {}", file->get_full_name(), (void *)file.get(),
-                  file->is_unlocking());
-        controller.push(new model::diff::modify::lock_file_t(*file, false));
-    }
-    file->locally_unlock();
-}
-
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
       peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, rx_blocks_requested{0},
@@ -269,69 +238,20 @@ void controller_actor_t::pull_next() noexcept {
         if (auto file = file_iterator->next_need_sync(); file) {
             block_iterator = new model::blocks_iterator_t(*file);
             continue;
+            if (*block_iterator) {
+                LOG_TRACE(log, "going to scan blocks on '{}' from folder '{}'", file->get_name(),
+                          file->get_folder_info()->get_folder()->get_label());
+            }
         }
         if (auto file = file_iterator->next_need_cloning(); file) {
+            LOG_TRACE(log, "going to clone file '{}' from folder '{}'", file->get_name(),
+                      file->get_folder_info()->get_folder()->get_label());
             push(model::diff::modify::clone_file_t::create(*file, *sequencer));
             ++cloned_files;
+            continue;
         }
+        break;
     }
-#if 0
-    auto postponed = file_iterator->prepare_postponed();
-    while (can_pull_more()) {
-        auto file = file_iterator->current();
-        if (file) {
-            if (block_iterator) {
-                if (cluster->get_write_requests()) {
-                    if (*block_iterator) {
-                        auto file_block = block_iterator->next();
-                        if (file_block.block()->is_locked()) {
-                            file_iterator->postpone(postponed);
-                        } else {
-                            preprocess_block(file_block);
-                        }
-                    } else {
-                        block_iterator.reset();
-                        file_iterator->done();
-                    }
-                } else {
-                    break;
-                }
-            } else {
-                if (file->local_file()) {
-                    assert(file->get_size());
-                    block_iterator = new model::blocks_iterator_t(*file);
-                    bool has_blocks = *block_iterator;
-                    LOG_TRACE(log, "iterating blocks on {}, has blocks: {}", file->get_name(), has_blocks);
-                    if (!has_blocks) {
-                        block_iterator.reset();
-                        file_iterator->done();
-                    }
-                }
-            }
-        }
-        if (!file) {
-            file = file_iterator->next();
-            if (file) {
-                auto &name = file->get_full_name();
-                LOG_TRACE(log, "next_file = {}", name);
-                if (!guarded_files.count(name)) {
-                    auto file_lock = file_guard_ptr_t(new file_guard_t(file, *this));
-                    guarded_files[name] = std::move(file_lock);
-                }
-                if (!file->local_file()) {
-                    push(model::diff::modify::clone_file_t::create(*file, *sequencer));
-                    if (!file->get_size()) {
-                        push(new forget_file_t(this, file->get_full_name()));
-                    }
-                    file_iterator->done();
-                    ++cloned_files;
-                }
-            } else {
-                break;
-            }
-        }
-    }
-#endif
     if (diff) {
         pull_ready();
         send_diff();
@@ -343,6 +263,10 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
     auto file = file_block.file();
     assert(file && file->local_file());
     auto block = file_block.block();
+    if (block_locks.size() == 0) {
+        auto folder_id = file->get_folder_info()->get_folder()->get_id();
+        push(new model::diff::local::synchronization_start_t(folder_id));
+    }
     block_locks.put(block);
     block->lock();
 
@@ -497,10 +421,13 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
     auto block = source_file->get_blocks().at(diff.block_index);
     block->unlock();
     block_locks.remove(block);
+    if (block_locks.size() == 0) {
+        push(new model::diff::local::synchronization_finish_t(diff.folder_id));
+    }
     if (source_file->is_locally_available()) {
         LOG_TRACE(log, "on_block_update, finalizing {}", source_file->get_name());
         auto my_file = source_file->local_file();
-        push(new model::diff::modify::finish_file_t(*my_file));
+        push(new model::diff::modify::finish_file_t(*my_file, *peer));
     }
 
     cluster->modify_write_requests(1);

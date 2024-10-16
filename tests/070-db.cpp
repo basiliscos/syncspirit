@@ -635,7 +635,6 @@ void test_clone_file() {
                     REQUIRE(file_clone->get_name() == file.name());
                     REQUIRE(file_clone->get_blocks().size() == 0);
                     REQUIRE(file_clone->get_sequence() == 1);
-                    REQUIRE(!file_clone->get_source());
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
                 }
             }
@@ -683,7 +682,7 @@ void test_clone_file() {
                 REQUIRE(file_peer->is_locally_available());
 
                 auto file_my = folder_my->get_file_infos().by_name(file.name());
-                builder.finish_file_ack(*file_my).apply(*sup);
+                builder.finish_file_ack(*file_my, *peer_device).apply(*sup);
 
                 {
                     sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);

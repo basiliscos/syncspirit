@@ -774,6 +774,11 @@ void test_downloading() {
                 pr_fi.set_sequence(folder_1_peer->get_max_sequence());
                 pr_fi.set_block_size(5);
                 pr_fi.set_size(5);
+                auto version = pr_fi.mutable_version();
+                auto counter = version->add_counters();
+                counter->set_id(1ul);
+                counter->set_value(1ul);
+
                 auto b1 = pr_fi.add_blocks();
                 b1->set_hash(utils::sha256_digest("12345").value());
                 b1->set_offset(0);

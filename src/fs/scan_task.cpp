@@ -221,18 +221,24 @@ scan_result_t scan_task_t::advance_regular_file(const file_info_t &info) noexcep
         return incomplete_removed_t{file};
     }
 
-    auto source = file->get_source();
-    if (!source) {
-        LOG_DEBUG(log, "source file missing for {}, removing", path.string());
-        bfs::remove(path, ec);
-        if (ec) {
-            return file_error_t{file, ec};
+    auto folder_info = file->get_folder_info();
+    bool size_matches = false;
+    for (auto &it : folder_info->get_folder()->get_folder_infos()) {
+        auto &fi = *it.item;
+        if (fi.get_device() == folder_info->get_device()) {
+            continue;
         }
-        return incomplete_removed_t{file};
+        auto peer_file = fi.get_file_infos().by_name(file->get_name());
+        if (peer_file) {
+            if (static_cast<size_t>(peer_file->get_size()) == sz) {
+                size_matches = true;
+                break;
+            }
+        }
     }
 
-    if (sz != (size_t)source->get_size()) {
-        LOG_DEBUG(log, "removing size-mismatched temporally {}", path.string());
+    if (!size_matches) {
+        LOG_DEBUG(log, "removing temporally '{}' because of size-mismatch or outdated source", path.string());
         bfs::remove(path, ec);
         if (ec) {
             return file_error_t{file, ec};

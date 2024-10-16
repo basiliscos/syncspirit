@@ -6,6 +6,7 @@
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/local/synchronization_start.h"
 #include "model/diff/local/synchronization_finish.h"
+#include "model/misc/version_utils.h"
 
 using namespace syncspirit::model;
 
@@ -94,7 +95,6 @@ file_info_t *file_iterator_t::next_need_cloning() noexcept {
         auto files_scan = size_t{0};
         auto &files_map = fi.peer_folder->get_file_infos();
         auto local_folder = fi.peer_folder->get_folder()->get_folder_infos().by_device(*cluster.get_device());
-        auto &local_files_map = local_folder->get_file_infos();
 
         while (files_scan < files_map.size()) {
             if (it == files_map.end()) {
@@ -105,8 +105,17 @@ file_info_t *file_iterator_t::next_need_cloning() noexcept {
             ++it;
 
             if (!file->is_locally_locked() && !file->is_invalid()) {
-                auto local_file = local_files_map.by_name(file->get_name());
+                auto local_file = file->local_file();
+                bool needed = false;
                 if (!local_file) {
+                    needed = true;
+                } else if (local_file->is_local()) {
+                    auto &v_peer = file->get_version();
+                    auto &v_my = local_file->get_version();
+                    needed = compare(v_my, v_peer) == version_relation_t::older;
+                }
+
+                if (needed) {
                     fi.guarded_files.emplace(file->get_name(), new guard_t(file, *this));
                     return file.get();
                 }
@@ -130,13 +139,12 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
     while (folder_scans < folders_count) {
         auto &fi = folders_list[folder_index];
         auto local_folder = fi.peer_folder->get_folder()->get_folder_infos().by_device(*cluster.get_device());
-        auto &local_files_map = local_folder->get_file_infos();
 
         // check for already locked files (aka just cloned files)
-        for (auto &[name, guard] : fi.guarded_files) {
-            auto local_file = local_files_map.by_name(name);
-            if (local_file) {
-                return guard->file.get();
+        for (auto &[_, guard] : fi.guarded_files) {
+            auto file = guard->file.get();
+            if (file->local_file()) {
+                return file;
             }
         }
 
@@ -157,7 +165,8 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
                 continue;
             }
 
-            auto local_file = local_files_map.by_name(file->get_name());
+            // auto local_file = local_files_map.by_name(file->get_name());
+            auto local_file = file->local_file();
             if (!local_file) {
                 continue;
             }
@@ -166,9 +175,16 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
                 continue;
             }
 
+            auto &v_peer = file->get_version();
+            auto &v_my = local_file->get_version();
+
+            // clang-format off
             auto &seen_sequence = fi.committed_map[file];
-            auto accept =
-                seen_sequence < file->get_sequence() && local_file->is_local() && local_file->need_download(*file);
+            auto accept = seen_sequence < file->get_sequence()
+                    && local_file->is_local()
+                    && !local_file->is_locally_available()
+                    && compare(v_my, v_peer) == version_relation_t::identity;
+            // clang-format on
             if (accept) {
                 fi.guarded_files.emplace(file->get_name(), new guard_t(file, *this));
                 return file.get();

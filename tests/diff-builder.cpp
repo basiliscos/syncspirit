@@ -179,12 +179,12 @@ diff_builder_t &diff_builder_t::clone_file(const model::file_info_t &source) noe
     return assign(diff.get());
 }
 
-diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &source) noexcept {
-    return assign(new diff::modify::finish_file_t(source));
+diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &file, const model::device_t &peer) noexcept {
+    return assign(new diff::modify::finish_file_t(file, peer));
 }
 
-diff_builder_t &diff_builder_t::finish_file_ack(const model::file_info_t &source) noexcept {
-    return assign(new diff::modify::finish_file_ack_t(source));
+diff_builder_t &diff_builder_t::finish_file_ack(const model::file_info_t &file, const model::device_t &peer) noexcept {
+    return assign(new diff::modify::finish_file_ack_t(file, peer.device_id().get_sha256()));
 }
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {

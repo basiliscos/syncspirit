@@ -130,10 +130,12 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     }
                 } else if constexpr (std::is_same_v<T, incomplete_t>) {
                     auto &f = r.file;
-                    assert(f->get_source());
                     stop_processing = true;
+#if 0
                     send<payload::rehash_needed_t>(address, task, std::move(f), f->get_source(),
                                                    std::move(r.opened_file));
+#endif
+                    std::abort();
                 } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
                     auto &file = *r.file;
                     if (file.is_locked()) {

@@ -114,11 +114,11 @@ const bool folder_t::is_scanning() const noexcept {
     return scan_start > scan_finish;
 }
 
-const bool folder_t::is_synchronizing() const noexcept { return synchronizing; }
+const bool folder_t::is_synchronizing() const noexcept { return synchronizing > 0; }
 
-void folder_t::set_synchronizing(bool value) noexcept {
-    assert(synchronizing != value);
-    synchronizing = value;
+void folder_t::adjust_synchronization(std::int_fast32_t delta) noexcept {
+    synchronizing += delta;
+    assert(synchronizing >= 0);
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_ptr_t &item) noexcept { return item->get_key(); }

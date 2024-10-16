@@ -110,25 +110,13 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
   private:
     enum substate_t { none = 0, iterating_files, iterating_blocks };
 
-    struct file_guard_t : model::arc_base_t<file_guard_t> {
-        model::file_info_ptr_t file;
-        controller_actor_t &controller;
-        model::diff::cluster_diff_ptr_t *diff_storage;
-        bool is_locked;
-
-        file_guard_t(model::file_info_ptr_t file, controller_actor_t &controller) noexcept;
-        ~file_guard_t();
-    };
-
     struct pull_signal_t final : model::diff::local::custom_t {
         pull_signal_t(void *controller) noexcept;
         outcome::result<void> visit(model::diff::cluster_visitor_t &, void *) const noexcept override;
         void *controller;
     };
 
-    using file_guard_ptr_t = r::intrusive_ptr_t<file_guard_t>;
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
-    using guarded_files_t = std::unordered_map<std::string, file_guard_ptr_t>;
     using unlink_request_t = r::message::unlink_request_t;
     using unlink_request_ptr_t = r::intrusive_ptr_t<unlink_request_t>;
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
@@ -180,7 +168,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     model::sequencer_ptr_t sequencer;
     model::cluster_ptr_t cluster;
     model::device_ptr_t peer;
-    model::folder_ptr_t folder;
     r::address_ptr_t coordinator;
     r::address_ptr_t peer_addr;
     r::address_ptr_t hasher_proxy;

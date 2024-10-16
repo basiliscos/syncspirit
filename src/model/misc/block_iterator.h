@@ -26,6 +26,7 @@ struct SYNCSPIRIT_API blocks_iterator_t : arc_base_t<blocks_iterator_t> {
     void prepare() noexcept;
     void advance() noexcept;
     size_t i = 0;
+    std::int64_t sequence;
     file_info_ptr_t source;
 };
 

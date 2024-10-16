@@ -56,7 +56,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     void set_scan_finish(const pt::ptime &value) noexcept;
     const bool is_scanning() const noexcept;
     const bool is_synchronizing() const noexcept;
-    void set_synchronizing(bool value) noexcept;
+    void adjust_synchronization(std::int_fast32_t delta) noexcept;
 
     using folder_data_t::get_path;
     using folder_data_t::set_path;
@@ -78,7 +78,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     folder_infos_map_t folder_infos;
     cluster_t *cluster = nullptr;
     char key[data_length];
-    bool synchronizing;
+    std::int_fast32_t synchronizing = 0;
 };
 
 struct SYNCSPIRIT_API folders_map_t : generic_map_t<folder_ptr_t, 2> {

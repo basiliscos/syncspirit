@@ -205,7 +205,6 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
     auto file = file_info->get_file_infos().by_name(diff.file_name);
-    assert(file->get_source()->is_locally_available());
 
     auto path = file->get_path().string();
     auto backend = rw_cache.get(path);
@@ -232,7 +231,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
 
     auto ack = model::diff::cluster_diff_ptr_t{};
-    ack = new model::diff::modify::finish_file_ack_t(*file);
+    ack = new model::diff::modify::finish_file_ack_t(*file, diff.peer_id);
     send<model::payload::model_update_t>(coordinator, std::move(ack), this);
     return diff.visit_next(*this, custom);
 }

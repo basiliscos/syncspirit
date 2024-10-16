@@ -195,7 +195,6 @@ void test_meta_changes() {
 
                 builder->clone_file(*file_peer).apply(*sup);
                 auto file = files->by_name(pr_fi.name());
-                file->set_source(nullptr);
                 auto path = file->get_path();
 
                 SECTION("meta is not changed") {
@@ -292,7 +291,6 @@ void test_meta_changes() {
                 }
 
                 SECTION("source is missing -> tmp is removed") {
-                    file->set_source({});
                     file->unlock();
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available());
@@ -306,7 +304,6 @@ void test_meta_changes() {
                 SECTION("corrupted content") {
                     SECTION("1st block") { write_file(path, "2234567890"); }
                     SECTION("2nd block") { write_file(path, "1234567899"); }
-                    SECTION("missing source file") { file->set_source(nullptr); }
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
@@ -378,7 +375,6 @@ void test_meta_changes() {
                 builder->scan_start(folder->get_id()).apply(*sup);
 
                 CHECK(file_my->is_locally_available());
-                CHECK(file_my->get_source() == file_peer);
                 CHECK(!file_peer->is_locally_available());
                 CHECK(file_peer->is_locally_available(0));
                 CHECK(file_peer->is_locally_available(1));

@@ -108,7 +108,7 @@ auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
         auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
         auto file = file_info->get_file_infos().by_name(diff.file_name);
         auto ack = model::diff::cluster_diff_ptr_t{};
-        ack = new model::diff::modify::finish_file_ack_t(*file);
+        ack = new model::diff::modify::finish_file_ack_t(*file, diff.peer_id);
         send<model::payload::model_update_t>(get_address(), std::move(ack), this);
     }
     return outcome::success();

@@ -5,35 +5,37 @@
 
 #include "../cluster_visitor.h"
 #include "model/cluster.h"
-#include "model/misc/file_iterator.h"
 
 using namespace syncspirit::model::diff::modify;
 
-finish_file_ack_t::finish_file_ack_t(const model::file_info_t &file) noexcept {
+finish_file_ack_t::finish_file_ack_t(const model::file_info_t &file, std::string_view peer_id_) noexcept {
     auto fi = file.get_folder_info();
     auto folder = fi->get_folder();
     folder_id = folder->get_id();
     file_name = file.get_name();
+    peer_id = peer_id_;
     assert(fi->get_device() == folder->get_cluster()->get_device().get());
 }
 
 auto finish_file_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    auto peer = cluster.get_devices().by_sha256(peer_id);
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
-    auto &files = folder_info->get_file_infos();
+    auto &folder_infos = folder->get_folder_infos();
+    auto my_folder = folder_infos.by_device(*cluster.get_device());
+    auto peer_folder = folder_infos.by_device(*peer);
+    auto &files = my_folder->get_file_infos();
     auto file = files.by_name(file_name);
     LOG_TRACE(log, "finish_file_ack for {}", file->get_full_name());
 
-    auto source = file->get_source();
-    assert(source->is_locally_available());
-
     uuid_t uuid;
     model::assign(uuid, file->get_uuid());
+    auto source = peer_folder->get_file_infos().by_name(file_name);
+    assert(source->is_locally_available());
     auto data = source->as_proto(false);
-    auto seq = folder_info->get_max_sequence() + 1;
+    auto seq = my_folder->get_max_sequence() + 1;
     data.set_sequence(seq);
 
-    auto opt = file_info_t::create(uuid, data, folder_info);
+    auto opt = file_info_t::create(uuid, data, my_folder);
     if (!opt) {
         return opt.assume_error();
     }
@@ -47,7 +49,7 @@ auto finish_file_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
         file->mark_local_available(i);
     }
     file->mark_local();
-    folder_info->add(file, true);
+    my_folder->add(file, true);
 
     return applicator_t::apply_sibling(cluster);
 }
