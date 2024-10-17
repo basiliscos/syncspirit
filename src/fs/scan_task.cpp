@@ -183,23 +183,36 @@ scan_result_t scan_task_t::advance_regular_file(const file_info_t &file) noexcep
     sys::error_code ec;
 
     auto path = file->get_path();
+    auto meta = proto::FileInfo();
+    bool changed = false;
 
     auto sz = bfs::file_size(path, ec);
     if (ec) {
         return file_error_t{path, ec};
     }
 
+    meta.set_size(sz);
     if (sz != (size_t)file->get_size()) {
-        return changed_meta_t{file};
+        changed = true;
     }
 
     auto modified = bfs::last_write_time(path, ec);
     if (ec) {
         return file_error_t{path, ec};
     }
+
+    meta.set_modified_s(modified);
     if (modified != file->get_modified_s()) {
-        return changed_meta_t{file};
+        changed = true;
     }
+
+    if (changed) {
+        using FT = proto::FileInfoType;
+        meta.set_name(std::string(file->get_name()));
+        meta.set_type(FT::FILE);
+        return changed_meta_t{file, std::move(meta)};
+    }
+
     return unchanged_meta_t{file};
 }
 
@@ -220,7 +233,12 @@ scan_result_t scan_task_t::advance_symlink_file(const file_info_t &file) noexcep
     if (target.string() == file->get_link_target()) {
         return unchanged_meta_t{file};
     } else {
-        return changed_meta_t{file};
+        using FT = proto::FileInfoType;
+        auto meta = proto::FileInfo();
+        meta.set_name(std::string(file->get_name()));
+        meta.set_type(FT::SYMLINK);
+        meta.set_symlink_target(target.string());
+        return changed_meta_t{file, std::move(meta)};
     }
 }
 

@@ -125,6 +125,7 @@ void test_meta_changes() {
     struct F : fixture_t {
         void main() noexcept override {
             sys::error_code ec;
+
             SECTION("trivial") {
                 SECTION("no files") {
                     builder->scan_start(folder->get_id()).apply(*sup);
@@ -174,7 +175,6 @@ void test_meta_changes() {
             bi.set_offset(0);
 
             auto b = block_info_t::create(bi).value();
-
             SECTION("a file does not physically exist") {
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
@@ -227,9 +227,9 @@ void test_meta_changes() {
                     REQUIRE(new_file);
                     CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
-                    CHECK(new_file->get_size() == 5);
+                    CHECK(new_file->get_size() == 6);
                     REQUIRE(new_file->get_blocks().size() == 1);
-                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
+                    CHECK(new_file->get_blocks()[0]->get_size() == 6);
                 }
 
                 SECTION("meta is changed (content)") {
@@ -376,6 +376,32 @@ void test_meta_changes() {
                 CHECK(file_peer->is_locally_available(0));
                 CHECK(file_peer->is_locally_available(1));
                 CHECK(!file_peer->is_locally_available(2));
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+            }
+
+            SECTION("local (previous) file changes") {
+                pr_fi.set_size(15ul);
+                pr_fi.set_block_size(5ul);
+                auto uuid_1 = sup->sequencer->next_uuid();
+                auto file_my = file_info_t::create(uuid_1, pr_fi, folder_info).value();
+                file_my->assign_block(b, 0);
+                file_my->assign_block(b, 1);
+                file_my->assign_block(b, 2);
+                file_my->lock();
+                cluster->get_blocks().put(b);
+                folder_info->add(file_my, false);
+
+                pr_fi.set_size(15ul);
+                counter->set_id(2);
+
+                auto file = files->by_name(pr_fi.name());
+                auto path_my = file->get_path().string();
+                write_file(path_my, "12345");
+                bfs::last_write_time(path_my, modified);
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+
+                CHECK(file_my->is_locally_available());
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
         }

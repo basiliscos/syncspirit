@@ -31,6 +31,7 @@ struct unchanged_meta_t {
 
 struct changed_meta_t {
     model::file_info_ptr_t file;
+    proto::FileInfo metadata;
 };
 
 struct incomplete_t {

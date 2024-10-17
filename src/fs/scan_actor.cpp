@@ -114,7 +114,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     on_remove(*r.file);
                 } else if constexpr (std::is_same_v<T, changed_meta_t>) {
                     auto &file = *r.file;
-                    auto metadata = file.as_proto(true);
+                    auto &metadata = r.metadata;
                     auto errs = initiate_hash(task, file.get_path(), metadata);
                     if (errs.empty()) {
                         stop_processing = true;

@@ -374,6 +374,8 @@ TEST_CASE("scan_task", "[fs]") {
             auto task = scan_task_ptr_t{};
             auto file = file_info_ptr_t{};
 
+            auto r = scan_result_t{};
+
             SECTION("file size differs") {
                 pr_file.set_block_size(5);
                 pr_file.set_size(6);
@@ -385,6 +387,19 @@ TEST_CASE("scan_task", "[fs]") {
 
                 file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 folder_my->add(file, false);
+
+                task = new scan_task_t(cluster, folder->get_id(), config);
+
+                r = task->advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task->advance();
+                REQUIRE(std::get_if<changed_meta_t>(&r));
+                auto ref = std::get_if<changed_meta_t>(&r);
+                CHECK(ref->file == file);
+                CHECK(ref->metadata.size() == 5);
+                CHECK(ref->metadata.modified_s() == modified);
             }
 
             SECTION("modification time differs") {
@@ -398,16 +413,20 @@ TEST_CASE("scan_task", "[fs]") {
 
                 file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 folder_my->add(file, false);
-            }
-            task = new scan_task_t(cluster, folder->get_id(), config);
-            auto r = task->advance();
-            CHECK(std::get_if<bool>(&r));
-            CHECK(*std::get_if<bool>(&r) == true);
 
-            r = task->advance();
-            REQUIRE(std::get_if<changed_meta_t>(&r));
-            auto ref = std::get_if<changed_meta_t>(&r);
-            CHECK(ref->file == file);
+                task = new scan_task_t(cluster, folder->get_id(), config);
+
+                r = task->advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task->advance();
+                REQUIRE(std::get_if<changed_meta_t>(&r));
+                auto ref = std::get_if<changed_meta_t>(&r);
+                CHECK(ref->file == file);
+                CHECK(ref->metadata.size() == 5);
+                CHECK(ref->metadata.modified_s() == modified);
+            }
 
             r = task->advance();
             CHECK(std::get_if<bool>(&r));
