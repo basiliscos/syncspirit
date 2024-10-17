@@ -8,19 +8,18 @@
 
 using namespace syncspirit::model::diff::local;
 
-blocks_availability_t::blocks_availability_t(const file_info_t &file, size_t last_block_index) noexcept
-    : block_diff_t{file, last_block_index} {
-    version = file.get_version();
+blocks_availability_t::blocks_availability_t(const file_info_t &file, valid_blocks_map_t valid_blocks_map_) noexcept
+    : block_diff_t{file}, valid_blocks_map{std::move(valid_blocks_map_)} {
     assert(!file.is_locally_available());
+    assert(file.get_blocks().size() == valid_blocks_map.size());
 }
 
 auto blocks_availability_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device_id(device_id);
     auto file = folder_info->get_file_infos().by_name(file_name);
-    auto ok = file && (compare(version, file->get_version()) == version_relation_t::identity);
-    if (ok) {
-        for (size_t i = 0; i <= block_index; ++i) {
+    for (size_t i = 0; i < valid_blocks_map.size(); ++i) {
+        if (valid_blocks_map[i]) {
             file->mark_local_available(i);
         }
     }

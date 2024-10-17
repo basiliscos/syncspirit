@@ -125,7 +125,6 @@ void test_meta_changes() {
     struct F : fixture_t {
         void main() noexcept override {
             sys::error_code ec;
-
             SECTION("trivial") {
                 SECTION("no files") {
                     builder->scan_start(folder->get_id()).apply(*sup);
@@ -175,6 +174,7 @@ void test_meta_changes() {
             bi.set_offset(0);
 
             auto b = block_info_t::create(bi).value();
+
             SECTION("a file does not physically exist") {
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
@@ -258,15 +258,13 @@ void test_meta_changes() {
                 auto b2 = block_info_t::create(bi_2).value();
 
                 auto uuid = sup->sequencer->next_uuid();
-                auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
-                file_peer->assign_block(b, 0);
-                file_peer->assign_block(b2, 1);
-                folder_info_peer->add(file_peer, false);
+                auto file = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
+                file->assign_block(b, 0);
+                file->assign_block(b2, 1);
+                folder_info_peer->add(file, false);
 
-                builder->clone_file(*file_peer).apply(*sup);
-                auto file = files->by_name(pr_fi.name());
+                // auto file = files->by_name(pr_fi.name());
                 auto path = file->get_path().string() + ".syncspirit-tmp";
-                file->lock(); // should be locked on db, as there is a source
                 auto content = "12345\0\0\0\0\0";
                 write_file(path, std::string(content, 10));
 
@@ -281,35 +279,34 @@ void test_meta_changes() {
                 SECTION("just 1st block is valid, tmp is kept") {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available());
-                    CHECK(!file->is_locally_available(0));
+                    CHECK(file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
-                    CHECK(!file->is_locked());
-                    CHECK(!file_peer->is_locally_available());
-                    CHECK(file_peer->is_locally_available(0));
-                    CHECK(!file_peer->is_locally_available(1));
+                    CHECK(bfs::exists(path));
+                }
+
+                SECTION("just 2nd block is valid, tmp is kept") {
+                    write_file(path, "2234567890");
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(!file->is_locally_available());
+                    CHECK(!file->is_locally_available(0));
+                    CHECK(file->is_locally_available(1));
                     CHECK(bfs::exists(path));
                 }
 
                 SECTION("source is missing -> tmp is removed") {
+                    folder_info_peer->get_file_infos().remove(file);
                     file->unlock();
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available());
-                    CHECK(!file->is_locked());
-                    CHECK(!file_peer->is_locally_available());
-                    CHECK(!file_peer->is_locally_available(0));
-                    CHECK(!file_peer->is_locally_available(1));
                     CHECK(!bfs::exists(path));
                 }
 
                 SECTION("corrupted content") {
-                    SECTION("1st block") { write_file(path, "2234567890"); }
-                    SECTION("2nd block") { write_file(path, "1234567899"); }
+                    SECTION("1st block") { write_file(path, "223456789z"); }
+                    SECTION("2nd block") { write_file(path, "z234567899"); }
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
-                    CHECK(!file->is_locked());
-                    CHECK(!file_peer->is_locally_available(0));
-                    CHECK(!file_peer->is_locally_available(1));
                     CHECK(!bfs::exists(path));
                 }
 
@@ -328,6 +325,7 @@ void test_meta_changes() {
 #endif
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
+
             SECTION("local (previous) file exists") {
                 pr_fi.set_size(15ul);
                 pr_fi.set_block_size(5ul);
@@ -363,7 +361,6 @@ void test_meta_changes() {
                 file_peer->assign_block(b3, 2);
                 folder_info_peer->add(file_peer, false);
 
-                builder->clone_file(*file_peer).apply(*sup);
                 auto file = files->by_name(pr_fi.name());
                 auto path_my = file->get_path().string();
                 auto path_peer = file->get_path().string() + ".syncspirit-tmp";
