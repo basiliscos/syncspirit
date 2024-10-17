@@ -7,7 +7,7 @@
 
 namespace syncspirit::fs {
 
-static const std::string_view tmp_suffix = ".syncspirit-tmp";
+const std::string_view tmp_suffix = ".syncspirit-tmp";
 
 static const std::size_t _block_sizes[] = {
     (1 << 7) * 1024,  (1 << 8) * 1024,  (1 << 9) * 1024,  (1 << 10) * 1024,
@@ -71,7 +71,7 @@ bool is_temporal(const bfs::path &path) noexcept {
     return (pos != name.npos);
 }
 
-relative_result_t relativize(const bfs::path &path, const bfs::path &root) noexcept {
+bfs::path relativize(const bfs::path &path, const bfs::path &root) noexcept {
     auto it_path = path.begin();
     auto it_root = root.begin();
 
@@ -86,14 +86,7 @@ relative_result_t relativize(const bfs::path &path, const bfs::path &root) noexc
         ++it_path;
     }
 
-    auto name = sub.filename();
-    if (!is_temporal(name)) {
-        return {sub, false};
-    }
-    auto name_str = name.string();
-    auto new_name = name_str.substr(0, name.size() - tmp_suffix.size());
-    auto new_path = sub.parent_path() / new_name;
-    return {new_path, true};
+    return sub;
 }
 
 } // namespace syncspirit::fs

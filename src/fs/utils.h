@@ -27,15 +27,11 @@ SYNCSPIRIT_API bfs::path make_temporal(const bfs::path &path) noexcept;
 SYNCSPIRIT_API bool is_temporal(const bfs::path &path) noexcept;
 SYNCSPIRIT_API block_division_t get_block_size(size_t file_size, int32_t prev_size) noexcept;
 
-struct relative_result_t {
-    bfs::path path;
-    bool temp;
-};
-
-SYNCSPIRIT_API relative_result_t relativize(const bfs::path &path, const bfs::path &root) noexcept;
+SYNCSPIRIT_API bfs::path relativize(const bfs::path &path, const bfs::path &root) noexcept;
 
 SYNCSPIRIT_API extern const std::size_t block_sizes_sz;
 SYNCSPIRIT_API extern const std::size_t *block_sizes;
+SYNCSPIRIT_API extern const std::string_view tmp_suffix;
 
 } // namespace fs
 } // namespace syncspirit
