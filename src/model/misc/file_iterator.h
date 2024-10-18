@@ -65,7 +65,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     folder_iterator_t &find_folder(folder_t *folder) noexcept;
 
     cluster_t &cluster;
-    device_ptr_t peer;
+    device_t *peer;
     std::size_t folder_index;
     diff_sink_t *sink;
     folder_iterators_t folders_list;

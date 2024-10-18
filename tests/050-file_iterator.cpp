@@ -11,7 +11,6 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 
-
 struct dummy_sink_t final : model::diff_sink_t {
     dummy_sink_t(diff_builder_t &builder_) noexcept : builder{builder_} {}
 
@@ -65,14 +64,14 @@ TEST_CASE("file iterator, single folder", "[model]") {
         CHECK(!file_iterator->next_need_cloning());
         CHECK(!file_iterator->next_need_sync());
     }
-
     SECTION("cloning (empty files)") {
         SECTION("1 file") {
             SECTION("no local file") {
                 auto file = proto::FileInfo();
                 file.set_name("a.txt");
                 file.set_sequence(10ul);
-                REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
+                REQUIRE(
+                    builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
                 auto f = file_iterator->next_need_cloning();
                 REQUIRE(f);
@@ -90,7 +89,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(!folder->is_synchronizing());
                 CHECK(!f->is_locked());
             }
-
             SECTION("invalid file is ignored") {
                 auto file = proto::FileInfo();
                 file.set_name("a.txt");
@@ -113,7 +111,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 SECTION("my version < peer version") {
                     c_1->set_value(3);
                     REQUIRE(builder.apply());
-
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
                     my_file->mark_local();
@@ -159,7 +156,77 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 }
             }
         }
+        SECTION("2 files") {
+            auto files = model::file_infos_map_t();
+            auto file_1 = proto::FileInfo();
+            file_1.set_name("a.txt");
+            file_1.set_sequence(10ul);
+            auto file_2 = proto::FileInfo();
+            file_2.set_name("b.txt");
+            file_2.set_sequence(10ul);
+            builder.make_index(peer_id.get_sha256(), folder->get_id())
+                .add(file_1, peer_device)
+                .add(file_2, peer_device)
+                .finish();
+            REQUIRE(builder.apply());
+
+            SECTION("both files are missing on my side") {
+                auto f = file_iterator->next_need_cloning();
+                REQUIRE(f);
+                CHECK((f->get_name() == "a.txt" || f->get_name() == "b.txt"));
+                CHECK(!f->is_locked());
+                files.put(f);
+                REQUIRE(builder.apply());
+                CHECK(folder->is_synchronizing());
+
+                REQUIRE(builder.clone_file(*f).apply());
+
+                f = file_iterator->next_need_cloning();
+                REQUIRE(f);
+                CHECK((f->get_name() == "a.txt" || f->get_name() == "b.txt"));
+                CHECK(!f->is_locked());
+                files.put(f);
+                REQUIRE(builder.apply());
+                CHECK(folder->is_synchronizing());
+                REQUIRE(builder.clone_file(*f).apply());
+
+                REQUIRE(!file_iterator->next_need_cloning());
+                REQUIRE(!file_iterator->next_need_sync());
+
+                CHECK(!folder->is_synchronizing());
+                CHECK(files.by_name("a.txt"));
+                CHECK(files.by_name("b.txt"));
+            }
+
+            SECTION("1 file is missing on my side") {
+                auto peer_file = peer_files.by_name("a.txt");
+                REQUIRE(peer_file);
+                REQUIRE(builder.clone_file(*peer_file).apply());
+                auto f = file_iterator->next_need_cloning();
+                REQUIRE(f);
+                CHECK(f->get_name() == "b.txt");
+                CHECK(!f->is_locked());
+
+                REQUIRE(builder.apply());
+                CHECK(folder->is_synchronizing());
+                REQUIRE(!file_iterator->next_need_cloning());
+
+                REQUIRE(builder.clone_file(*f).apply());
+                REQUIRE(!file_iterator->next_need_cloning());
+                REQUIRE(!file_iterator->next_need_sync());
+                CHECK(!folder->is_synchronizing());
+                CHECK(!f->is_locked());
+            }
+
+            SECTION("0 files are missing on my side") {
+                auto peer_file_1 = peer_files.by_name("a.txt");
+                auto peer_file_2 = peer_files.by_name("b.txt");
+                REQUIRE(builder.clone_file(*peer_file_1).clone_file(*peer_file_2).apply());
+                REQUIRE(!file_iterator->next_need_cloning());
+            }
+        }
     }
+    file_iterator->deactivate();
 }
 
 #if 0

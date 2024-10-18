@@ -44,7 +44,7 @@ file_iterator_t::guard_t::~guard_t() {
 }
 
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
-    : cluster{cluster_}, peer{peer_}, folder_index{0}, sink{nullptr} {
+    : cluster{cluster_}, peer{peer_.get()}, folder_index{0}, sink{nullptr} {
     auto &folders = cluster.get_folders();
     for (auto &[folder, _] : folders) {
         auto peer_folder = folder->get_folder_infos().by_device(*peer);
