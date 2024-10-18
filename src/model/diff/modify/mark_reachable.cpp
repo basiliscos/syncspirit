@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "mark_reachable.h"
 #include "../cluster_visitor.h"
-#include "../../cluster.h"
+#include "model/cluster.h"
+#include "model/misc/file_iterator.h"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -20,6 +21,7 @@ auto mark_reachable_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
 
     LOG_TRACE(log, "applyging reachable ({}) for '{}'", reachable, file->get_full_name());
     file->mark_unreachable(!reachable);
+
     return applicator_t::apply_sibling(cluster);
 }
 

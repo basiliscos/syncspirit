@@ -106,6 +106,11 @@ auto update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<
         file_info->mark_local_available(i);
     }
     file_info->mark_local();
+    if (prev_file) {
+        prev_file->update(*file_info);
+        file_info = std::move(prev_file);
+    }
+
     folder_info->add(file_info, true);
     return applicator_t::apply_sibling(cluster);
 }

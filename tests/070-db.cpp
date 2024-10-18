@@ -635,7 +635,6 @@ void test_clone_file() {
                     REQUIRE(file_clone->get_name() == file.name());
                     REQUIRE(file_clone->get_blocks().size() == 0);
                     REQUIRE(file_clone->get_sequence() == 1);
-                    REQUIRE(!file_clone->get_source());
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
                 }
             }
@@ -682,8 +681,7 @@ void test_clone_file() {
                 file_peer->mark_local_available(0);
                 REQUIRE(file_peer->is_locally_available());
 
-                auto file_my = folder_my->get_file_infos().by_name(file.name());
-                builder.finish_file_ack(*file_my).apply(*sup);
+                builder.finish_file_ack(*file_peer).apply(*sup);
 
                 {
                     sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
@@ -906,6 +904,117 @@ void test_update_peer() {
     F().run();
 }
 
+void test_peer_3_folders_6_files() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto f1_id = "123";
+            auto f2_id = "356";
+            auto f3_id = "789";
+
+            auto make_file = [&](std::string name) {
+                auto file = proto::FileInfo();
+                file.set_name(name);
+                file.set_size(0);
+                file.set_block_size(0);
+                file.set_sequence(6ul);
+                auto version = file.mutable_version();
+                auto counter = version->add_counters();
+                counter->set_id(1);
+                counter->set_value(peer_device->as_uint());
+                return file;
+            };
+
+            auto builder = diff_builder_t(*cluster);
+
+            // clang-format off
+            builder
+                .update_peer(peer_device->device_id())
+                .apply(*sup)
+                .upsert_folder(f1_id, "/my/path1", "my-label1")
+                .upsert_folder(f2_id, "/my/path2", "my-label2")
+                .upsert_folder(f3_id, "/my/path3", "my-label3")
+                .configure_cluster(sha256)
+                    .add(sha256, f1_id, 10, 5)
+                    .add(sha256, f2_id, 11, 5)
+                    .add(sha256, f3_id, 12, 5)
+                .finish()
+                .apply(*sup)
+                    .share_folder(sha256, f1_id)
+                    .share_folder(sha256, f2_id)
+                    .share_folder(sha256, f3_id)
+                .apply(*sup)
+                    .make_index(sha256, f1_id).add(make_file("f1.1"), peer_device).add(make_file("f1.2"), peer_device).finish()
+                    .make_index(sha256, f2_id).add(make_file("f2.1"), peer_device).add(make_file("f2.2"), peer_device).finish()
+                    .make_index(sha256, f3_id).add(make_file("f3.1"), peer_device).add(make_file("f3.2"), peer_device).finish()
+                .apply(*sup);
+            // clang-format on
+
+            {
+                auto get_peer_file = [&](std::string_view folder_id, std::string_view name) {
+                    auto folder = cluster->get_folders().by_id(folder_id);
+                    auto folder_info = folder->get_folder_infos().by_device(*peer_device);
+                    auto file = folder_info->get_file_infos().by_name(name);
+                    return file;
+                };
+
+                auto file_11 = get_peer_file(f1_id, "f1.1");
+                auto file_12 = get_peer_file(f1_id, "f1.2");
+                auto file_21 = get_peer_file(f2_id, "f2.1");
+                auto file_22 = get_peer_file(f2_id, "f2.2");
+                auto file_31 = get_peer_file(f3_id, "f3.1");
+                auto file_32 = get_peer_file(f3_id, "f3.2");
+
+                REQUIRE(file_11);
+                REQUIRE(file_12);
+                REQUIRE(file_21);
+                REQUIRE(file_22);
+                REQUIRE(file_31);
+                REQUIRE(file_32);
+
+                // clang-format off
+                builder
+                    .clone_file(*file_11).clone_file(*file_12)
+                    .clone_file(*file_21).clone_file(*file_22)
+                    .clone_file(*file_31).clone_file(*file_32)
+                .apply(*sup);
+                // clang-format on
+            }
+
+            {
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                REQUIRE(!reply->payload.ee);
+                auto cluster_clone = make_cluster();
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+
+                auto get_my_file = [&](std::string_view folder_id, std::string_view name) {
+                    auto folder = cluster->get_folders().by_id(folder_id);
+                    auto folder_info = folder->get_folder_infos().by_device(*my_device);
+                    auto file = folder_info->get_file_infos().by_name(name);
+                    return file;
+                };
+
+                auto file_11 = get_my_file(f1_id, "f1.1");
+                auto file_12 = get_my_file(f1_id, "f1.2");
+                auto file_21 = get_my_file(f2_id, "f2.1");
+                auto file_22 = get_my_file(f2_id, "f2.2");
+                auto file_31 = get_my_file(f3_id, "f3.1");
+                auto file_32 = get_my_file(f3_id, "f3.2");
+
+                REQUIRE(file_11);
+                REQUIRE(file_12);
+                REQUIRE(file_21);
+                REQUIRE(file_22);
+                REQUIRE(file_31);
+                REQUIRE(file_32);
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
     REGISTER_TEST_CASE(test_unknown_and_ignored_devices_1, "test_unknown_and_ignored_devices_1", "[db]");
@@ -920,6 +1029,7 @@ int _init() {
     REGISTER_TEST_CASE(test_peer_going_offline, "test_peer_going_offline", "[db]");
     REGISTER_TEST_CASE(test_remove_peer, "test_remove_peer", "[db]");
     REGISTER_TEST_CASE(test_update_peer, "test_update_peer", "[db]");
+    REGISTER_TEST_CASE(test_peer_3_folders_6_files, "test_peer_3_folders_6_files", "[db]");
     return 1;
 }
 

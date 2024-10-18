@@ -99,7 +99,10 @@ TEST_CASE("various block diffs", "[model]") {
     }
 
     SECTION("availability") {
-        auto diff = diff::cluster_diff_ptr_t(new diff::local::blocks_availability_t(*file, 1));
+        using blocks_map_t = diff::local::blocks_availability_t::valid_blocks_map_t;
+        auto map = blocks_map_t(2);
+        map[0] = map[1] = true;
+        auto diff = diff::cluster_diff_ptr_t(new diff::local::blocks_availability_t(*file, map));
         REQUIRE(diff->apply(*cluster));
         CHECK(file->is_locally_available());
     }

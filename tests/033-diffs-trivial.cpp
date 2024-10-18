@@ -49,7 +49,6 @@ TEST_CASE("with file", "[model]") {
 
     auto folder = cluster->get_folders().by_id("1234-5678");
     auto folder_info = folder->get_folder_infos().by_device(*my_device);
-    CHECK(folder_info->is_actual());
 
     proto::FileInfo pr_file_info;
     pr_file_info.set_name("a.txt");

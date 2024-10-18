@@ -105,10 +105,10 @@ auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     -> outcome::result<void> {
     if (auto_finish) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
+        auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
         auto file = file_info->get_file_infos().by_name(diff.file_name);
         auto ack = model::diff::cluster_diff_ptr_t{};
-        ack = new model::diff::modify::finish_file_ack_t(*file);
+        ack = new model::diff::modify::finish_file_ack_t(*file, *sequencer);
         send<model::payload::model_update_t>(get_address(), std::move(ack), this);
     }
     return outcome::success();

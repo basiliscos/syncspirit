@@ -129,10 +129,6 @@ outcome::result<void> file_info_t::fields_update(const Source &s, size_t block_c
     symlink_target = s.symlink_target();
     version = s.version();
     full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
-    if constexpr (std::is_same_v<Source, db::FileInfo>) {
-        source_device = s.source_device();
-        source_version = s.source_version();
-    }
     block_size = size ? s.block_size() : 0;
     return reserve_blocks(size ? block_count : 0);
 }
@@ -177,8 +173,6 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
             r.mutable_blocks()->Add(std::string(db_key));
         }
     }
-    r.set_source_device(source_device);
-    (*r.mutable_source_version()) = source_version;
     return r;
 }
 
@@ -263,42 +257,6 @@ bool file_info_t::is_locally_available() const noexcept { return missing_blocks 
 
 bool file_info_t::is_partly_available() const noexcept { return missing_blocks < blocks.size(); }
 
-void file_info_t::set_source(const file_info_ptr_t &peer_file) noexcept {
-    if (peer_file) {
-        auto &version = peer_file->get_version();
-        auto sz = version.counters_size();
-        assert(sz && "source file should have some version");
-        auto &counter = version.counters(sz - 1);
-        assert(counter.id());
-        auto peer = peer_file->get_folder_info()->get_device();
-        source_device = peer->device_id().get_sha256();
-        source_version = peer_file->get_version();
-
-    } else {
-        source_device = {};
-        source_version = {};
-    }
-}
-
-file_info_ptr_t file_info_t::get_source() const noexcept {
-    if (!source_device.empty()) {
-        auto folder = get_folder_info()->get_folder();
-        auto peer_folder = folder->get_folder_infos().by_device_id(source_device);
-        if (!peer_folder) {
-            return {};
-        }
-        auto peer_file = peer_folder->get_file_infos().by_name(get_name());
-        if (!peer_file) {
-            return {};
-        }
-        if (compare(peer_file->version, source_version) != version_relation_t::identity) {
-            return {};
-        }
-        return peer_file;
-    }
-    return {};
-}
-
 const boost::filesystem::path &file_info_t::get_path() const noexcept {
     if (!path) {
         path = folder_info->get_folder()->get_path() / std::string(get_name());
@@ -306,7 +264,7 @@ const boost::filesystem::path &file_info_t::get_path() const noexcept {
     return path.value();
 }
 
-auto file_info_t::local_file() noexcept -> file_info_ptr_t {
+auto file_info_t::local_file() const noexcept -> file_info_ptr_t {
     auto device = folder_info->get_device();
     auto cluster = folder_info->get_folder()->get_cluster();
     auto &my_device = *cluster->get_device();
@@ -317,16 +275,7 @@ auto file_info_t::local_file() noexcept -> file_info_ptr_t {
     }
 
     auto local_file = my_folder_info->get_file_infos().by_name(get_name());
-    if (!local_file) {
-        return {};
-    }
-
-    auto source = local_file->get_source();
-    if (source.get() == this) {
-        return local_file;
-    }
-
-    return {};
+    return local_file;
 }
 
 void file_info_t::unlock() noexcept { flags = flags & ~flags_t::f_locked; }
@@ -430,8 +379,6 @@ std::size_t file_info_t::expected_meta_size() const noexcept {
     return r;
 }
 
-file_info_ptr_t file_info_t::actualize() const noexcept { return folder_info->get_file_infos().get(get_uuid()); }
-
 std::uint32_t file_info_t::get_permissions() const noexcept { return permissions; }
 
 bool file_info_t::has_no_permissions() const noexcept { return flags & f_no_permissions; }
@@ -448,7 +395,6 @@ void file_info_t::update(const file_info_t &other) noexcept {
     modified_by = other.modified_by;
     flags = (other.flags & 0b111) | (flags & ~0b111); // local flags are preserved
     version = other.version;
-    source_version = other.source_version;
     sequence = other.sequence;
     block_size = other.block_size;
     symlink_target = other.symlink_target;
@@ -473,11 +419,37 @@ void file_info_t::update(const file_info_t &other) noexcept {
         auto &b = other.blocks[i];
         if (b) {
             assign_block(b, i);
-            if (local_block_hashes.contains(b->get_hash())) {
+            auto already_local = marks[i];
+            if (already_local) {
+                --missing_blocks;
+            } else if (local_block_hashes.contains(b->get_hash())) {
                 mark_local_available(i);
             }
         }
     }
+}
+
+bool file_info_t::is_global() const noexcept {
+    using V = version_relation_t;
+    auto self = folder_info->get_device();
+    auto folder = folder_info->get_folder();
+    for (auto &it : folder->get_folder_infos()) {
+        if (it.item->get_device() == self) {
+            continue;
+        }
+        auto &files = it.item->get_file_infos();
+        auto file = files.by_name(name);
+        if (!file) {
+            continue;
+        }
+        auto &v_other = file->get_version();
+        auto v_result = compare(version, v_other);
+        if (v_result == V::identity || v_result == V::newer) {
+            continue;
+        }
+        return false;
+    }
+    return true;
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const file_info_ptr_t &item) noexcept {

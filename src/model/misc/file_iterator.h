@@ -7,54 +7,70 @@
 #include "../file_info.h"
 #include "../folder_info.h"
 #include "../folder.h"
+#include "../diff/cluster_diff.h"
 #include "syncspirit-export.h"
-#include <deque>
-#include <unordered_set>
+#include <vector>
 #include <unordered_map>
 
 namespace syncspirit::model {
 
-struct cluster_t;
-struct blocks_iterator_t;
+struct diff_sink_t {
+    virtual void push(diff::cluster_diff_ptr_t diff) noexcept = 0;
+};
 
 struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
-    using files_list_t = std::deque<file_info_ptr_t>;
-    using files_set_t = std::unordered_set<file_info_ptr_t>;
+    using files_list_t = std::vector<file_info_ptr_t>;
 
     file_iterator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
     file_iterator_t(const file_iterator_t &) = delete;
 
-    file_info_ptr_t next() noexcept;
-    void requeue_unchecked(files_set_t set) noexcept;
-    void requeue_unchecked(file_info_ptr_t file) noexcept;
-    void append_folder(folder_info_ptr_t peer_folder) noexcept;
-    void append_folder(folder_info_ptr_t peer_folder, files_list_t queue) noexcept;
+    void activate(diff_sink_t &sink) noexcept;
+    void deactivate() noexcept;
+
+    file_info_t *next_need_cloning() noexcept;
+    file_info_t *next_need_sync() noexcept;
+    void commit_sync(file_info_ptr_t file) noexcept;
+
+    void on_block_ack(const file_info_t &file, size_t block_index);
+    void on_clone(file_info_ptr_t file) noexcept;
     void on_upsert(folder_info_ptr_t peer_folder) noexcept;
 
   private:
+    struct guard_t : model::arc_base_t<guard_t> {
+        guard_t(model::file_info_ptr_t file, file_iterator_t &owner) noexcept;
+        ~guard_t();
+
+        model::file_info_ptr_t file;
+        file_iterator_t &owner;
+        bool is_locked;
+        bool clone_only;
+    };
+    using guard_ptr_t = model::intrusive_ptr_t<guard_t>;
+    using guarded_files_t = std::unordered_map<std::string_view, guard_ptr_t>;
     using visited_map_t = std::unordered_map<file_info_ptr_t, std::uint64_t>;
+
     struct folder_iterator_t {
+        using it_t = typename model::file_infos_map_t::iterator_t;
         model::folder_info_ptr_t peer_folder;
-        std::uint64_t index;
-        files_list_t files_list;
-        std::size_t file_index;
-        visited_map_t visited_map;
+        it_t it_clone;
+        it_t it_sync;
+        guarded_files_t guarded_clones;
+        guarded_files_t guarded_syncs;
+        visited_map_t committed_map;
     };
     using folder_iterators_t = std::vector<folder_iterator_t>;
 
-    bool accept(file_info_t &file, int folder_index, bool check_version = true) noexcept;
-    folder_iterator_t prepare_folder(folder_info_ptr_t peer_folder) noexcept;
-
-    file_info_ptr_t next_uncheked() noexcept;
-    file_info_ptr_t next_locked() noexcept;
-    file_info_ptr_t next_from_folder() noexcept;
+    void commit_clone(file_info_ptr_t file) noexcept;
+    folder_iterator_t &prepare_folder(folder_info_ptr_t peer_folder) noexcept;
+    folder_iterator_t &find_folder(folder_t *folder) noexcept;
 
     cluster_t &cluster;
-    device_ptr_t peer;
-    files_list_t uncheked_list;
-    files_list_t locked_list;
-    folder_iterators_t folders_list;
+    device_t *peer;
     std::size_t folder_index;
+    diff_sink_t *sink;
+    folder_iterators_t folders_list;
+
+    friend struct guard_t;
 };
 
 using file_iterator_ptr_t = intrusive_ptr_t<file_iterator_t>;

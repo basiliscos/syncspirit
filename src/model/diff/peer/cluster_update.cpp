@@ -7,6 +7,7 @@
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/remove_pending_folders.h"
+#include "model/diff/modify/reset_folder_infos.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
@@ -33,6 +34,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     auto &known_pending_folders = cluster.get_pending_folders();
     auto new_pending_folders = diff::modify::add_pending_folders_t::container_t{};
     auto remote_folders = diff::modify::add_remote_folder_infos_t::container_t{};
+    folder_infos_map_t reset_folders;
     folder_infos_map_t removed_folders;
     folder_infos_map_t reshared_folders;
     keys_t removed_pending_folders;
@@ -68,7 +70,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         auto &f = message.folders(i);
         auto &folder_id = f.id();
         auto folder = folders.by_id(folder_id);
-        LOG_TRACE(log, "cluster_update_t, folder = '{}', id = '{}'", f.label(), folder_id);
+        LOG_TRACE(log, "cluster_update_t, folder label = '{}', id = '{}'", f.label(), folder_id);
         if (!folder) {
             for (int i = 0; i < f.devices_size(); ++i) {
                 auto &d = f.devices(i);
@@ -131,7 +133,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             if (d.index_id() != folder_info->get_index()) {
                 LOG_TRACE(log, "cluster_update_t, reseting folder: {}, new index = {:#x}, max_seq = {}", f.label(),
                           d.index_id(), d.max_sequence());
-                removed_folders.put(folder_info);
+                reset_folders.put(folder_info);
                 do_update = true;
             } else if (d.max_sequence() > folder_info->get_max_sequence()) {
                 LOG_TRACE(log, "cluster_update_t, updating folder = {}, index = {:#x}, max seq = {} -> {}",
@@ -180,13 +182,18 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     }
 
     auto current = (cluster_diff_t *){nullptr};
+    if (reset_folders.size()) {
+        auto diff = cluster_diff_ptr_t{};
+        diff = new modify::reset_folder_infos_t(std::move(reset_folders), &orphaned_blocks);
+        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
+    }
+    if (folder_update_diff) { // must be applied after folders reset
+        auto &diff = folder_update_diff;
+        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
+    }
     if (removed_folders.size()) {
         auto diff = cluster_diff_ptr_t{};
         diff = new modify::remove_folder_infos_t(std::move(removed_folders), &orphaned_blocks);
-        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
-    }
-    if (folder_update_diff) { // must be applied after folders removal
-        auto &diff = folder_update_diff;
         current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }
     auto removed_blocks = orphaned_blocks.deduce();

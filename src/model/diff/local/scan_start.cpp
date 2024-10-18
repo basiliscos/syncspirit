@@ -14,9 +14,7 @@ auto scan_start_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     auto folder = cluster.get_folders().by_id(folder_id);
     folder->set_scan_start(at);
     auto r = applicator_t::apply_sibling(cluster);
-    if (auto aug = folder->get_augmentation(); aug) {
-        aug->on_update();
-    }
+    folder->notify_update();
     return r;
 }
 

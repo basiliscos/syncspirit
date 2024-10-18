@@ -66,7 +66,12 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         auto sha256 = peer_device->device_id().get_sha256();
-        file_actor = sup->create_actor<fs::file_actor_t>().mru_size(2).cluster(cluster).timeout(timeout).finish();
+        file_actor = sup->create_actor<fs::file_actor_t>()
+                         .mru_size(2)
+                         .cluster(cluster)
+                         .sequencer(sup->sequencer)
+                         .timeout(timeout)
+                         .finish();
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         file_addr = file_actor->get_address();
@@ -284,10 +289,7 @@ void test_append_block() {
 
                 auto file = folder_my->get_file_infos().by_name(pr_source.name());
 
-                builder.append_block(*peer_file, 0, "12345", callback)
-                    .apply(*sup)
-                    .finish_file(*peer_file->local_file())
-                    .apply(*sup);
+                builder.append_block(*peer_file, 0, "12345", callback).apply(*sup).finish_file(*peer_file).apply(*sup);
 
                 auto path = root_path / std::string(file->get_name());
                 REQUIRE(bfs::exists(path));
@@ -317,7 +319,7 @@ void test_append_block() {
                 builder.append_block(*peer_file, 1, "67890", callback).apply(*sup);
 
                 SECTION("add 2nd block") {
-                    builder.finish_file(*peer_file->local_file()).apply(*sup);
+                    builder.finish_file(*peer_file).apply(*sup);
 
                     filename = std::string(file->get_name());
                     path = root_path / filename;
@@ -331,7 +333,7 @@ void test_append_block() {
 #ifndef SYNCSPIRIT_WIN
                 SECTION("remove folder (simulate err)") {
                     bfs::remove_all(root_path);
-                    diff_builder_t(*cluster).finish_file(*peer_file->local_file()).apply(*sup);
+                    diff_builder_t(*cluster).finish_file(*peer_file).apply(*sup);
                     CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() ==
                           r::state_t::SHUT_DOWN);
                 }
@@ -411,15 +413,12 @@ void test_clone_block() {
 
                     builder.append_block(*source_file, 0, "12345", callback)
                         .apply(*sup)
-                        .finish_file(*source_file->local_file())
+                        .finish_file(*source_file)
                         .apply(*sup);
 
                     auto block = source_file->get_blocks()[0];
                     auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
-                    builder.clone_block(file_block, callback)
-                        .apply(*sup)
-                        .finish_file(*target->local_file())
-                        .apply(*sup);
+                    builder.clone_block(file_block, callback).apply(*sup).finish_file(*target).apply(*sup);
 
                     auto path = root_path / std::string(target_file->get_name());
                     REQUIRE(bfs::exists(path));
@@ -450,7 +449,7 @@ void test_clone_block() {
                     builder.clone_block(fb_1, callback)
                         .clone_block(fb_2, callback)
                         .apply(*sup)
-                        .finish_file(*target->local_file())
+                        .finish_file(*target)
                         .apply(*sup);
 
                     auto filename = std::string(target_file->get_name());
@@ -481,7 +480,7 @@ void test_clone_block() {
 
                     auto blocks = source_file->get_blocks();
                     auto fb = model::file_block_t(blocks[0].get(), target_file.get(), 1);
-                    builder.clone_block(fb, callback).apply(*sup).finish_file(*target->local_file()).apply(*sup);
+                    builder.clone_block(fb, callback).apply(*sup).finish_file(*target).apply(*sup);
 
                     auto filename = std::string(target_file->get_name());
                     auto path = root_path / filename;
@@ -509,7 +508,7 @@ void test_clone_block() {
 
                 auto block = source_file->get_blocks()[0];
                 auto file_block = model::file_block_t(block.get(), target_file.get(), 1);
-                builder.clone_block(file_block, callback).apply(*sup).finish_file(*source->local_file()).apply(*sup);
+                builder.clone_block(file_block, callback).apply(*sup).finish_file(*source).apply(*sup);
 
                 auto path = root_path / std::string(target_file->get_name());
                 REQUIRE(bfs::exists(path));

@@ -50,6 +50,7 @@ void fs_supervisor_t::launch() noexcept {
         auto timeout = shutdown_timeout * 9 / 10;
         return create_actor<file_actor_t>()
             .cluster(cluster)
+            .sequencer(sequencer)
             .mru_size(fs_config.mru_size)
             .timeout(timeout)
             .spawner_address(spawner)

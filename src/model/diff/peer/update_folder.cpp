@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "update_folder.h"
+#include "model/misc/file_iterator.h"
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/cluster_visitor.h"
@@ -40,6 +41,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
 
     auto max_seq = folder_info->get_max_sequence();
     auto &fm = folder_info->get_file_infos();
+
     for (std::size_t i = 0; i < files.size(); ++i) {
         auto &f = files[i];
         auto &uuid = uuids[i];
@@ -65,16 +67,18 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
         }
 
         folder_info->add(file, true);
-        if (auto aug = file->get_augmentation(); aug) {
-            aug->on_update();
-        }
+        folder->notify_update();
     }
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
+
     r = applicator_t::apply_sibling(cluster);
-    if (auto aug = folder_info->get_augmentation(); aug) {
-        aug->on_update();
+
+    if (auto iterator = folder_info->get_device()->get_iterator(); iterator) {
+        iterator->on_upsert(folder_info);
     }
+
+    folder_info->notify_update();
     return r;
 }
 
@@ -137,6 +141,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         return make_error_code(error_code_t::folder_is_not_shared);
     }
 
+    auto log = update_folder_t::get_log();
     auto max_seq = fi->get_max_sequence();
     auto &blocks = cluster.get_blocks();
     update_folder_t::files_t files;
@@ -145,9 +150,12 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
     for (int i = 0; i < message.files_size(); ++i) {
         auto &f = message.files(i);
         if (f.deleted() && f.blocks_size()) {
-            auto log = update_folder_t::get_log();
-            LOG_WARN(log, "file {}, should not have blocks", f.name());
+            LOG_WARN(log, "file {} should not have blocks", f.name());
             return make_error_code(error_code_t::unexpected_blocks);
+        }
+        if (f.sequence() <= 0) {
+            LOG_WARN(log, "file '{}' has wrong sequnce", f.name(), f.sequence());
+            return make_error_code(error_code_t::invalid_sequence);
         }
         for (int j = 0; j < f.blocks_size(); ++j) {
             auto &b = f.blocks(j);

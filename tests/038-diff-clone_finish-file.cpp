@@ -48,7 +48,6 @@ TEST_CASE("new file diff", "[model]") {
             CHECK(file_my->is_locally_available());
             CHECK(file_my->get_sequence() == 1);
             CHECK(file_my->get_folder_info() == folder_my.get());
-            CHECK(!file_my->get_source());
             CHECK(folder_my->get_max_sequence() == 1);
         }
 
@@ -61,7 +60,7 @@ TEST_CASE("new file diff", "[model]") {
             auto bi = model::block_info_t::create(*b).value();
             blocks_map.put(bi);
 
-            auto file_my = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
+            auto file_my = file_info_t::create(sequencer->next_uuid(), file_info, folder_my).value();
             file_my->assign_block(bi, 0);
             file_my->mark_local_available(0);
             folder_my->add(file_my, false);
@@ -70,6 +69,7 @@ TEST_CASE("new file diff", "[model]") {
             auto file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
             folder_peer->add(file_peer, false);
             file_peer->assign_block(bi, 0);
+            file_peer->mark_local_available(0);
             REQUIRE(builder.clone_file(*file_peer).apply());
 
             file_my = folder_my->get_file_infos().by_name(file_info.name());
@@ -78,7 +78,6 @@ TEST_CASE("new file diff", "[model]") {
             CHECK(file_my->get_sequence() == 1);
             CHECK(file_my->get_modified_s() == 123);
             CHECK(file_my->get_folder_info() == folder_my.get());
-            CHECK(!file_my->get_source());
             CHECK(folder_my->get_max_sequence() == 1);
         }
     }
@@ -107,7 +106,6 @@ TEST_CASE("new file diff", "[model]") {
             CHECK(file_my->get_sequence() == 0);
             CHECK(file_my->get_modified_s() == 123);
             CHECK(file_my->get_folder_info() == folder_my.get());
-            CHECK(file_my->get_source() == file_peer);
             CHECK(folder_my->get_max_sequence() == 0);
         }
 
@@ -135,19 +133,17 @@ TEST_CASE("new file diff", "[model]") {
             CHECK(file_my->is_locally_available());
             CHECK(file_my->get_sequence() == 0);
             CHECK(file_my->get_modified_s() == 0);
-            CHECK(file_my->get_source() == file_peer);
             CHECK(file_my->get_blocks().at(0) == bi);
             CHECK(file_my->get_folder_info() == folder_my.get());
             CHECK(folder_my->get_max_sequence() == 0);
         }
 
         file_peer->mark_local_available(0);
-        REQUIRE(builder.finish_file_ack(*file_my).apply());
+        REQUIRE(builder.finish_file_ack(*file_peer).apply());
 
         file_my = folder_my->get_file_infos().by_name(file_info.name());
         CHECK(file_my->is_local());
         CHECK(file_my->is_locally_available());
-        CHECK(!file_my->get_source());
         CHECK(file_my->get_sequence() == 1);
         CHECK(file_my->get_modified_s() == 123);
         CHECK(folder_my->get_max_sequence() == 1);

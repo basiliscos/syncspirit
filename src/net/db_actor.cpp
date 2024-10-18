@@ -46,6 +46,7 @@
 
 #include "model/diff/cluster_visitor.h"
 #include <string_view>
+#include <set>
 
 #ifdef WIN32_LEAN_AND_MEAN
 #include <malloc.h>
@@ -68,9 +69,11 @@ static void _my_log(MDBX_log_level_t loglevel, const char *function,int line, co
 }
 #endif
 
+using folder_infos_set_t = std::unordered_set<const model::folder_info_t *>;
+
 db_actor_t::db_actor_t(config_t &config)
     : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, db_config{config.db_config},
-      cluster{config.cluster}, txn_counter{0} {
+      cluster{config.cluster} {
     // mdbx_module_handler({}, {}, {});
     // mdbx_setup_debug(MDBX_LOG_TRACE, MDBX_DBG_ASSERT, &_my_log);
     auto r = mdbx_env_create(&env);
@@ -172,27 +175,21 @@ auto db_actor_t::get_txn() noexcept -> outcome::result<db::transaction_t *> {
         txn_holder.reset(new db::transaction_t(std::move(txn.assume_value())));
         uncommitted = 0;
     }
-    ++txn_counter;
     return txn_holder.get();
 }
 
-auto db_actor_t::commit(bool force) noexcept -> outcome::result<void> {
-    assert(txn_holder);
-    --txn_counter;
-    if (txn_counter == 0) {
-        if (force) {
-            LOG_INFO(log, "committing tx");
-            auto r = txn_holder->commit();
-            txn_holder.reset();
-            return r;
-        }
-        if (++uncommitted >= db_config.uncommitted_threshold) {
-            LOG_INFO(log, "committing tx");
-            auto r = txn_holder->commit();
-            txn_holder.reset();
-            return r;
-        }
+auto db_actor_t::commit_on_demand() noexcept -> outcome::result<void> {
+    if (txn_holder && (++uncommitted >= db_config.uncommitted_threshold)) {
+        LOG_DEBUG(log, "committing tx");
+        auto r = txn_holder->commit();
+        txn_holder.reset();
+        return r;
     }
+    return outcome::success();
+}
+
+auto db_actor_t::force_commit() noexcept -> outcome::result<void> {
+    uncommitted = db_config.uncommitted_threshold;
     return outcome::success();
 }
 
@@ -203,7 +200,7 @@ void db_actor_t::on_start() noexcept {
 
 void db_actor_t::shutdown_finish() noexcept {
     if (txn_holder) {
-        auto r = commit(true);
+        auto r = commit_on_demand();
         if (!r) {
             auto &err = r.assume_error();
             LOG_ERROR(log, "cannot commit tx: {}", err.message());
@@ -310,12 +307,45 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
 void db_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update", identity);
     auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this, nullptr);
+    auto set = folder_infos_set_t{};
+
+    auto r = diff.visit(*this, &set);
+    while (r && !set.empty()) {
+        r = save_folder_info(**set.begin(), &set);
+    }
+
+    if (r) {
+        r = commit_on_demand();
+    }
     if (!r) {
         auto ee = make_error(r.assume_error());
         LOG_ERROR(log, "on_model_update error: {}", r.assume_error().message());
         do_shutdown(ee);
     }
+}
+
+auto db_actor_t::save_folder_info(const model::folder_info_t &folder_info, void *custom) noexcept
+    -> outcome::result<void> {
+    auto txn_opt = get_txn();
+    if (!txn_opt) {
+        return txn_opt.assume_error();
+    }
+    auto &txn = *txn_opt.assume_value();
+
+    auto fi_key = folder_info.get_key();
+    auto fi_data = folder_info.serialize();
+    auto r = db::save({fi_key, fi_data}, txn);
+
+    if (!r) {
+        return r;
+    }
+
+    auto folder_infos = reinterpret_cast<folder_infos_set_t *>(custom);
+    auto it = folder_infos->find(&folder_info);
+    if (it != folder_infos->end()) {
+        folder_infos->erase(it);
+    }
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
@@ -324,11 +354,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
         return outcome::success();
     }
 
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto &pending = cluster->get_pending_folders();
     if (pending.size()) {
@@ -349,7 +375,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::local::update_t &diff, void *custom) noexcept -> outcome::result<void> {
@@ -360,12 +386,7 @@ auto db_actor_t::operator()(const model::diff::local::update_t &diff, void *cust
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
     auto file = folder_info->get_file_infos().by_name(diff.file.name());
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     {
         auto key = folder_info->get_key();
@@ -391,7 +412,7 @@ auto db_actor_t::operator()(const model::diff::local::update_t &diff, void *cust
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
@@ -399,11 +420,7 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_t &diff, vo
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto &db = diff.db;
     auto folder = cluster->get_folders().by_id(db.id());
@@ -421,27 +438,7 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_t &diff, vo
         return r.assume_error();
     }
 
-    return commit(true);
-}
-
-auto db_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (cluster->is_tainted()) {
-        return outcome::success();
-    }
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
-
-    auto r = diff.visit_next(*this, custom);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::add_blocks_t &diff, void *custom) noexcept
@@ -449,11 +446,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_blocks_t &diff, void 
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto &blocks_map = cluster->get_blocks();
     for (const auto it : diff.blocks) {
@@ -471,7 +464,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_blocks_t &diff, void 
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::add_pending_folders_t &diff, void *custom) noexcept
@@ -479,11 +472,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_folders_t &di
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto &pending = cluster->get_pending_folders();
     for (auto &item : diff.container) {
@@ -507,7 +496,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_folders_t &di
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &diff, void *custom) noexcept
@@ -515,11 +504,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &dif
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto r = diff.visit_next(*this, custom);
     if (!r) {
@@ -535,7 +520,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &dif
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::add_pending_device_t &diff, void *custom) noexcept
@@ -543,11 +528,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_device_t &dif
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
     auto device = cluster->get_pending_devices().by_sha256(diff.device_id.get_sha256());
 
     auto key = device->get_key();
@@ -562,19 +543,14 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_device_t &dif
     if (!r) {
         return r.assume_error();
     }
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) noexcept -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     for (auto &key : diff.keys) {
         auto r = db::remove(key, txn);
@@ -588,7 +564,7 @@ auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) n
         return r.assume_error();
     }
 
-    return commit(false);
+    return force_commit();
 }
 auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *) noexcept
     -> outcome::result<void> {
@@ -609,33 +585,9 @@ auto db_actor_t::operator()(const model::diff::modify::remove_pending_folders_t 
     return (*this)(diff);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (cluster->is_tainted()) {
-        return outcome::success();
-    }
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
-
-    auto r = diff.visit_next(*this, custom);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    return commit(true);
-}
-
 auto db_actor_t::operator()(const model::diff::modify::remove_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto r = db::remove(diff.folder_key, txn);
     if (!r) {
@@ -647,7 +599,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_folder_t &diff, vo
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void *custom) noexcept
@@ -655,12 +607,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto r = diff.visit_next(*this, custom);
     if (!r) {
@@ -671,7 +618,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_ignored_device_t &diff, void *custom) noexcept
@@ -679,12 +626,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_ignored_device_t &
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto r = db::remove(diff.device_key, txn);
     if (!r) {
@@ -696,7 +638,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_ignored_device_t &
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_pending_device_t &diff, void *custom) noexcept
@@ -704,12 +646,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_pending_device_t &
     if (cluster->is_tainted()) {
         return outcome::success();
     }
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto r = db::remove(diff.device_key, txn);
     if (!r) {
@@ -721,7 +658,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_pending_device_t &
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void *custom) noexcept
@@ -736,12 +673,7 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void
 
     auto key = device->get_key();
     auto data = device->serialize();
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto r = db::save({key, data}, txn);
     if (!r) {
@@ -753,7 +685,7 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
@@ -762,20 +694,11 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &dif
         return outcome::success();
     }
 
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
-
     auto device = cluster->get_devices().by_sha256(diff.device_id);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*device);
-    assert(folder_info);
 
-    auto fi_key = folder_info->get_key();
-    auto fi_data = folder_info->serialize();
-    auto r = db::save({fi_key, fi_data}, txn);
+    auto r = save_folder_info(*folder_info, custom);
     if (!r) {
         return r.assume_error();
     }
@@ -785,7 +708,7 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &dif
         return r.assume_error();
     }
 
-    return commit(true);
+    return r;
 }
 
 auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
@@ -796,13 +719,8 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void 
 
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file = folder_info->get_file_infos().by_name(diff.file.name());
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto file = folder_info->get_file_infos().by_name(diff.proto_file.name());
+    auto &txn = *get_txn().assume_value();
 
     {
         auto key = file->get_key();
@@ -813,23 +731,15 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void 
         }
     }
 
-    bool save_fi = diff.identical || diff.create_new_file;
-    if (save_fi) {
-        auto key = folder_info->get_key();
-        auto data = folder_info->serialize();
-
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
+    auto folder_infos = reinterpret_cast<folder_infos_set_t *>(custom);
+    folder_infos->emplace(folder_info.get());
 
     auto r = diff.visit_next(*this, custom);
     if (!r) {
         return r.assume_error();
     }
 
-    return commit(false);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, void *custom) noexcept
@@ -841,12 +751,7 @@ auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, 
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
     auto file = folder_info->get_file_infos().by_name(diff.file_name);
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     {
         auto key = file->get_key();
@@ -872,7 +777,7 @@ auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, 
         return r.assume_error();
     }
 
-    return commit(false);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
@@ -914,7 +819,7 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept
@@ -933,12 +838,7 @@ auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void
 
     auto key = device->get_key();
     auto data = device->serialize();
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto r = db::save({key, data}, txn);
     if (!r) {
@@ -950,7 +850,7 @@ auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::contact::ignored_connected_t &diff, void *custom) noexcept
@@ -964,12 +864,7 @@ auto db_actor_t::operator()(const model::diff::contact::ignored_connected_t &dif
 
     auto key = device->get_key();
     auto data = device->serialize();
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto r = db::save({key, data}, txn);
     if (!r) {
@@ -981,7 +876,7 @@ auto db_actor_t::operator()(const model::diff::contact::ignored_connected_t &dif
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::contact::unknown_connected_t &diff, void *custom) noexcept
@@ -995,12 +890,7 @@ auto db_actor_t::operator()(const model::diff::contact::unknown_connected_t &dif
 
     auto key = device->get_key();
     auto data = device->serialize();
-
-    auto txn_opt = get_txn();
-    if (!txn_opt) {
-        return txn_opt.assume_error();
-    }
-    auto &txn = *txn_opt.assume_value();
+    auto &txn = *get_txn().assume_value();
 
     auto r = db::save({key, data}, txn);
     if (!r) {
@@ -1012,7 +902,7 @@ auto db_actor_t::operator()(const model::diff::contact::unknown_connected_t &dif
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 } // namespace syncspirit::net

@@ -195,7 +195,6 @@ void test_meta_changes() {
 
                 builder->clone_file(*file_peer).apply(*sup);
                 auto file = files->by_name(pr_fi.name());
-                file->set_source(nullptr);
                 auto path = file->get_path();
 
                 SECTION("meta is not changed") {
@@ -205,13 +204,14 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     CHECK(file->is_locally_available());
                 }
+
                 SECTION("meta is changed (modification)") {
                     write_file(path, "12345");
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(files->size() == 1);
                     auto new_file = files->by_name(pr_fi.name());
                     REQUIRE(new_file);
-                    CHECK(file != new_file);
+                    CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
                     CHECK(new_file->get_size() == 5);
                     REQUIRE(new_file->get_blocks().size() == 1);
@@ -225,11 +225,11 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     auto new_file = files->by_name(pr_fi.name());
                     REQUIRE(new_file);
-                    CHECK(file != new_file);
+                    CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
-                    CHECK(new_file->get_size() == 5);
+                    CHECK(new_file->get_size() == 6);
                     REQUIRE(new_file->get_blocks().size() == 1);
-                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
+                    CHECK(new_file->get_blocks()[0]->get_size() == 6);
                 }
 
                 SECTION("meta is changed (content)") {
@@ -238,7 +238,7 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     auto new_file = files->by_name(pr_fi.name());
                     REQUIRE(new_file);
-                    CHECK(file != new_file);
+                    CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
                     CHECK(new_file->get_size() == 5);
                     REQUIRE(new_file->get_blocks().size() == 1);
@@ -258,15 +258,13 @@ void test_meta_changes() {
                 auto b2 = block_info_t::create(bi_2).value();
 
                 auto uuid = sup->sequencer->next_uuid();
-                auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
-                file_peer->assign_block(b, 0);
-                file_peer->assign_block(b2, 1);
-                folder_info_peer->add(file_peer, false);
+                auto file = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
+                file->assign_block(b, 0);
+                file->assign_block(b2, 1);
+                folder_info_peer->add(file, false);
 
-                builder->clone_file(*file_peer).apply(*sup);
-                auto file = files->by_name(pr_fi.name());
+                // auto file = files->by_name(pr_fi.name());
                 auto path = file->get_path().string() + ".syncspirit-tmp";
-                file->lock(); // should be locked on db, as there is a source
                 auto content = "12345\0\0\0\0\0";
                 write_file(path, std::string(content, 10));
 
@@ -281,37 +279,34 @@ void test_meta_changes() {
                 SECTION("just 1st block is valid, tmp is kept") {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available());
-                    CHECK(!file->is_locally_available(0));
+                    CHECK(file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
-                    CHECK(!file->is_locked());
-                    CHECK(!file_peer->is_locally_available());
-                    CHECK(file_peer->is_locally_available(0));
-                    CHECK(!file_peer->is_locally_available(1));
+                    CHECK(bfs::exists(path));
+                }
+
+                SECTION("just 2nd block is valid, tmp is kept") {
+                    write_file(path, "2234567890");
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(!file->is_locally_available());
+                    CHECK(!file->is_locally_available(0));
+                    CHECK(file->is_locally_available(1));
                     CHECK(bfs::exists(path));
                 }
 
                 SECTION("source is missing -> tmp is removed") {
-                    file->set_source({});
+                    folder_info_peer->get_file_infos().remove(file);
                     file->unlock();
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available());
-                    CHECK(!file->is_locked());
-                    CHECK(!file_peer->is_locally_available());
-                    CHECK(!file_peer->is_locally_available(0));
-                    CHECK(!file_peer->is_locally_available(1));
                     CHECK(!bfs::exists(path));
                 }
 
                 SECTION("corrupted content") {
-                    SECTION("1st block") { write_file(path, "2234567890"); }
-                    SECTION("2nd block") { write_file(path, "1234567899"); }
-                    SECTION("missing source file") { file->set_source(nullptr); }
+                    SECTION("1st block") { write_file(path, "223456789z"); }
+                    SECTION("2nd block") { write_file(path, "z234567899"); }
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available(0));
                     CHECK(!file->is_locally_available(1));
-                    CHECK(!file->is_locked());
-                    CHECK(!file_peer->is_locally_available(0));
-                    CHECK(!file_peer->is_locally_available(1));
                     CHECK(!bfs::exists(path));
                 }
 
@@ -330,6 +325,7 @@ void test_meta_changes() {
 #endif
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
+
             SECTION("local (previous) file exists") {
                 pr_fi.set_size(15ul);
                 pr_fi.set_block_size(5ul);
@@ -365,7 +361,6 @@ void test_meta_changes() {
                 file_peer->assign_block(b3, 2);
                 folder_info_peer->add(file_peer, false);
 
-                builder->clone_file(*file_peer).apply(*sup);
                 auto file = files->by_name(pr_fi.name());
                 auto path_my = file->get_path().string();
                 auto path_peer = file->get_path().string() + ".syncspirit-tmp";
@@ -377,11 +372,36 @@ void test_meta_changes() {
                 builder->scan_start(folder->get_id()).apply(*sup);
 
                 CHECK(file_my->is_locally_available());
-                CHECK(file_my->get_source() == file_peer);
                 CHECK(!file_peer->is_locally_available());
                 CHECK(file_peer->is_locally_available(0));
                 CHECK(file_peer->is_locally_available(1));
                 CHECK(!file_peer->is_locally_available(2));
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+            }
+
+            SECTION("local (previous) file changes") {
+                pr_fi.set_size(15ul);
+                pr_fi.set_block_size(5ul);
+                auto uuid_1 = sup->sequencer->next_uuid();
+                auto file_my = file_info_t::create(uuid_1, pr_fi, folder_info).value();
+                file_my->assign_block(b, 0);
+                file_my->assign_block(b, 1);
+                file_my->assign_block(b, 2);
+                file_my->lock();
+                cluster->get_blocks().put(b);
+                folder_info->add(file_my, false);
+
+                pr_fi.set_size(15ul);
+                counter->set_id(2);
+
+                auto file = files->by_name(pr_fi.name());
+                auto path_my = file->get_path().string();
+                write_file(path_my, "12345");
+                bfs::last_write_time(path_my, modified);
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+
+                CHECK(file_my->is_locally_available());
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
         }

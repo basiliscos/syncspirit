@@ -30,7 +30,10 @@ file_actor_t::write_ack_t::~write_ack_t() {
 }
 
 file_actor_t::file_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, cluster{cfg.cluster}, rw_cache(cfg.mru_size), ro_cache(cfg.mru_size) {}
+    : r::actor_base_t{cfg}, cluster{cfg.cluster}, sequencer(cfg.sequencer), rw_cache(cfg.mru_size),
+      ro_cache(cfg.mru_size) {
+    assert(sequencer);
+}
 
 void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -194,8 +197,8 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome
 auto file_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
-    auto file = file_info->get_file_infos().by_name(diff.file.name());
+    auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
+    auto file = file_info->get_file_infos().by_name(diff.proto_file.name());
     auto r = reflect(file);
     return r ? diff.visit_next(*this, custom) : r;
 }
@@ -203,9 +206,8 @@ auto file_actor_t::operator()(const model::diff::modify::clone_file_t &diff, voi
 auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
+    auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
     auto file = file_info->get_file_infos().by_name(diff.file_name);
-    assert(file->get_source()->is_locally_available());
 
     auto path = file->get_path().string();
     auto backend = rw_cache.get(path);
@@ -232,7 +234,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
 
     auto ack = model::diff::cluster_diff_ptr_t{};
-    ack = new model::diff::modify::finish_file_ack_t(*file);
+    ack = new model::diff::modify::finish_file_ack_t(*file, *sequencer);
     send<model::payload::model_update_t>(coordinator, std::move(ack), this);
     return diff.visit_next(*this, custom);
 }

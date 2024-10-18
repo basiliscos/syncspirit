@@ -11,11 +11,9 @@ synchronization_start_t::synchronization_start_t(std::string_view folder_id_) : 
 
 auto synchronization_start_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
-    folder->set_synchronizing(true);
+    folder->adjust_synchronization(1);
     auto r = applicator_t::apply_sibling(cluster);
-    if (auto aug = folder->get_augmentation(); aug) {
-        aug->on_update();
-    }
+    folder->notify_update();
     return r;
 }
 

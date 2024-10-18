@@ -23,11 +23,14 @@ TEST_CASE("scan_task", "[fs]") {
     auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
+    auto peer2_id = device_id_t::from_string("XBOWTOU-Y7H6RM6-D7WT3UB-7P2DZ5G-R6GNZG6-T5CCG54-SGVF3U5-LBM7RQB").value();
+    auto peer2_device = device_t::create(peer2_id, "peer2-device").value();
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto sequencer = make_sequencer(4);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
+    cluster->get_devices().put(peer2_device);
 
     auto db_folder = db::Folder();
     db_folder.set_id("some-id");
@@ -41,8 +44,10 @@ TEST_CASE("scan_task", "[fs]") {
     db_folder_info.set_max_sequence(3);
     auto folder_my = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
     auto folder_peer = folder_info_t::create(sequencer->next_uuid(), db_folder_info, peer_device, folder).value();
+    auto folder_peer2 = folder_info_t::create(sequencer->next_uuid(), db_folder_info, peer2_device, folder).value();
     folder->get_folder_infos().put(folder_my);
     folder->get_folder_infos().put(folder_peer);
+    folder->get_folder_infos().put(folder_peer2);
 
     SECTION("without files") {
 
@@ -369,6 +374,8 @@ TEST_CASE("scan_task", "[fs]") {
             auto task = scan_task_ptr_t{};
             auto file = file_info_ptr_t{};
 
+            auto r = scan_result_t{};
+
             SECTION("file size differs") {
                 pr_file.set_block_size(5);
                 pr_file.set_size(6);
@@ -380,6 +387,19 @@ TEST_CASE("scan_task", "[fs]") {
 
                 file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 folder_my->add(file, false);
+
+                task = new scan_task_t(cluster, folder->get_id(), config);
+
+                r = task->advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task->advance();
+                REQUIRE(std::get_if<changed_meta_t>(&r));
+                auto ref = std::get_if<changed_meta_t>(&r);
+                CHECK(ref->file == file);
+                CHECK(ref->metadata.size() == 5);
+                CHECK(ref->metadata.modified_s() == modified);
             }
 
             SECTION("modification time differs") {
@@ -393,16 +413,20 @@ TEST_CASE("scan_task", "[fs]") {
 
                 file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 folder_my->add(file, false);
-            }
-            task = new scan_task_t(cluster, folder->get_id(), config);
-            auto r = task->advance();
-            CHECK(std::get_if<bool>(&r));
-            CHECK(*std::get_if<bool>(&r) == true);
 
-            r = task->advance();
-            REQUIRE(std::get_if<changed_meta_t>(&r));
-            auto ref = std::get_if<changed_meta_t>(&r);
-            CHECK(ref->file == file);
+                task = new scan_task_t(cluster, folder->get_id(), config);
+
+                r = task->advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task->advance();
+                REQUIRE(std::get_if<changed_meta_t>(&r));
+                auto ref = std::get_if<changed_meta_t>(&r);
+                CHECK(ref->file == file);
+                CHECK(ref->metadata.size() == 5);
+                CHECK(ref->metadata.modified_s() == modified);
+            }
 
             r = task->advance();
             CHECK(std::get_if<bool>(&r));
@@ -419,11 +443,8 @@ TEST_CASE("scan_task", "[fs]") {
             SECTION("size match -> ok, will recalc") {
                 write_file(path, "12345");
 
-                auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
-                folder_my->add(file_my, false);
                 folder_peer->add(file_peer, false);
-                file_my->set_source(file_peer);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
                 auto r = task.advance();
@@ -441,11 +462,11 @@ TEST_CASE("scan_task", "[fs]") {
                 CHECK(*std::get_if<bool>(&r) == false);
             }
 
-            SECTION("source is missing") {
-                write_file(path, "12345");
+            SECTION("size mismatch -> remove & ignore") {
+                write_file(path, "123456");
 
-                auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
-                folder_my->add(file_my, false);
+                auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+                folder_peer->add(file_peer, false);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
                 auto r = task.advance();
@@ -454,21 +475,27 @@ TEST_CASE("scan_task", "[fs]") {
 
                 r = task.advance();
                 CHECK(std::get_if<incomplete_removed_t>(&r));
-                CHECK(std::get_if<incomplete_removed_t>(&r)->file == file_my);
+                CHECK(std::get_if<incomplete_removed_t>(&r)->file == file_peer);
 
                 r = task.advance();
                 CHECK(std::get_if<bool>(&r));
                 CHECK(*std::get_if<bool>(&r) == false);
+                CHECK(!bfs::exists(path));
             }
 
-            SECTION("size mismatch -> remove & ignore") {
+            SECTION("size mismatch for global source -> remove & ignore") {
                 write_file(path, "123456");
 
-                auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
-                folder_my->add(file_my, false);
                 folder_peer->add(file_peer, false);
-                file_my->set_source(file_peer);
+
+                pr_file.set_size(file_peer->get_size() + 10);
+                auto c2 = version->add_counters();
+                c2->set_id(peer2_device->as_uint());
+                c2->set_value(2);
+
+                auto file_peer2 = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer2).value();
+                folder_peer2->add(file_peer2, false);
 
                 auto task = scan_task_t(cluster, folder->get_id(), config);
                 auto r = task.advance();
@@ -477,7 +504,25 @@ TEST_CASE("scan_task", "[fs]") {
 
                 r = task.advance();
                 CHECK(std::get_if<incomplete_removed_t>(&r));
-                CHECK(std::get_if<incomplete_removed_t>(&r)->file == file_my);
+                CHECK(std::get_if<incomplete_removed_t>(&r)->file == file_peer2);
+
+                r = task.advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == false);
+                CHECK(!bfs::exists(path));
+            }
+
+            SECTION("no source -> remove") {
+                write_file(path, "123456");
+
+                auto task = scan_task_t(cluster, folder->get_id(), config);
+                auto r = task.advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task.advance();
+                CHECK(std::get_if<orphaned_removed_t>(&r));
+                CHECK(std::get_if<orphaned_removed_t>(&r)->path == path);
 
                 r = task.advance();
                 CHECK(std::get_if<bool>(&r));
@@ -485,7 +530,6 @@ TEST_CASE("scan_task", "[fs]") {
                 CHECK(!bfs::exists(path));
             }
         }
-
         SECTION("tmp & non-tmp: both are returned") {
             pr_file.set_block_size(5);
             pr_file.set_size(5);
@@ -496,7 +540,6 @@ TEST_CASE("scan_task", "[fs]") {
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
             folder_my->add(file_my, false);
             folder_peer->add(file_peer, false);
-            file_my->set_source(file_peer);
 
             auto path = root_path / "a.txt";
             auto path_tmp = root_path / "a.txt.syncspirit-tmp";
@@ -551,7 +594,7 @@ TEST_CASE("scan_task", "[fs]") {
             r = task.advance();
             REQUIRE(std::get_if<file_error_t>(&r));
             auto err = std::get_if<file_error_t>(&r);
-            REQUIRE(err->file == file);
+            REQUIRE(err->path == path);
             REQUIRE(err->ec);
 
             r = task.advance();

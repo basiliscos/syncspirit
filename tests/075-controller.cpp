@@ -544,7 +544,7 @@ void test_downloading() {
             folder->set_id(std::string(folder_1->get_id()));
             auto d_peer = folder->add_devices();
             d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
+            d_peer->set_max_sequence(10);
             d_peer->set_index_id(folder_1_peer->get_index());
             auto d_my = folder->add_devices();
             d_my->set_id(std::string(my_device->device_id().get_sha256()));
@@ -558,7 +558,7 @@ void test_downloading() {
                 auto file = index.add_files();
                 file->set_name("some-file");
                 file->set_type(proto::FileInfoType::FILE);
-                file->set_sequence(folder_1_peer->get_max_sequence());
+                file->set_sequence(folder_1_peer->get_max_sequence() + 1);
                 file->set_block_size(5);
                 file->set_size(5);
                 auto version = file->mutable_version();
@@ -631,7 +631,7 @@ void test_downloading() {
                 auto file_1 = index.add_files();
                 file_1->set_name("file-1");
                 file_1->set_type(proto::FileInfoType::FILE);
-                file_1->set_sequence(folder_1_peer->get_max_sequence());
+                file_1->set_sequence(folder_1_peer->get_max_sequence() + 1);
                 file_1->set_block_size(5);
                 file_1->set_size(5);
                 auto version_1 = file_1->mutable_version();
@@ -642,7 +642,7 @@ void test_downloading() {
                 auto file_2 = index.add_files();
                 file_2->set_name("file-2");
                 file_2->set_type(proto::FileInfoType::FILE);
-                file_2->set_sequence(folder_1_peer->get_max_sequence());
+                file_2->set_sequence(folder_1_peer->get_max_sequence() + 2);
                 file_2->set_block_size(5);
                 file_2->set_size(5);
                 auto version_2 = file_2->mutable_version();
@@ -774,6 +774,11 @@ void test_downloading() {
                 pr_fi.set_sequence(folder_1_peer->get_max_sequence());
                 pr_fi.set_block_size(5);
                 pr_fi.set_size(5);
+                auto version = pr_fi.mutable_version();
+                auto counter = version->add_counters();
+                counter->set_id(1ul);
+                counter->set_value(1ul);
+
                 auto b1 = pr_fi.add_blocks();
                 b1->set_hash(utils::sha256_digest("12345").value());
                 b1->set_offset(0);
@@ -998,7 +1003,7 @@ void test_downloading_errors() {
             folder->set_id(std::string(folder_1->get_id()));
             auto d_peer = folder->add_devices();
             d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
+            d_peer->set_max_sequence(folder_1_peer->get_max_sequence() + 1);
             d_peer->set_index_id(folder_1_peer->get_index());
             auto d_my = folder->add_devices();
             d_my->set_id(std::string(my_device->device_id().get_sha256()));
@@ -1012,7 +1017,7 @@ void test_downloading_errors() {
             auto file = index.add_files();
             file->set_name("some-file");
             file->set_type(proto::FileInfoType::FILE);
-            file->set_sequence(folder_1_peer->get_max_sequence());
+            file->set_sequence(folder_1_peer->get_max_sequence() + 1);
             file->set_block_size(5);
             file->set_size(5);
             auto version = file->mutable_version();
@@ -1047,10 +1052,7 @@ void test_downloading_errors() {
             CHECK(!f->is_locally_locked());
             CHECK(!f->is_locked());
 
-            auto lf = f->local_file();
-            CHECK(!lf->is_locally_locked());
-            CHECK(!lf->is_locked());
-
+            CHECK(!f->local_file());
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
             sup->do_process();

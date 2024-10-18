@@ -69,6 +69,7 @@ struct remove_ignored_device_t;
 struct remove_peer_t;
 struct remove_pending_device_t;
 struct remove_pending_folders_t;
+struct reset_folder_infos_t;
 struct share_folder_t;
 struct unshare_folder_t;
 struct update_peer_t;
@@ -125,6 +126,7 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const modify::remove_peer_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_pending_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_pending_folders_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::reset_folder_infos_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::share_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::unshare_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::update_peer_t &, void *custom) noexcept;

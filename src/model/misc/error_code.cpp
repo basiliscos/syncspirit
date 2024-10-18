@@ -120,6 +120,9 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::missing_version:
         r = "file version is missing";
         break;
+    case error_code_t::invalid_sequence:
+        r = "file sequence is invalid";
+        break;
     default:
         r = "unknown";
         break;

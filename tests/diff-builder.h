@@ -66,8 +66,8 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &share_folder(std::string_view sha256, std::string_view folder_id) noexcept;
     diff_builder_t &unshare_folder(model::folder_info_t &fi) noexcept;
     diff_builder_t &clone_file(const model::file_info_t &source) noexcept;
-    diff_builder_t &finish_file(const model::file_info_t &source) noexcept;
-    diff_builder_t &finish_file_ack(const model::file_info_t &source) noexcept;
+    diff_builder_t &finish_file(const model::file_info_t &file) noexcept;
+    diff_builder_t &finish_file_ack(const model::file_info_t &file) noexcept;
     diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
     diff_builder_t &append_block(const model::file_info_t &target, size_t block_index, std::string data,
                                  dispose_callback_t) noexcept;
@@ -87,12 +87,13 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &scan_request(std::string_view id) noexcept;
     diff_builder_t &synchronization_start(std::string_view id) noexcept;
     diff_builder_t &synchronization_finish(std::string_view id) noexcept;
+    diff_builder_t &mark_reacheable(model::file_info_ptr_t peer_file, bool value) noexcept;
 
     model::sequencer_t &get_sequencer() noexcept;
 
-  private:
     diff_builder_t &assign(model::diff::cluster_diff_t *) noexcept;
 
+  private:
     model::sequencer_ptr_t sequencer;
     model::cluster_t &cluster;
     model::diff::cluster_diff_ptr_t cluster_diff;

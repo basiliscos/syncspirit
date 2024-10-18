@@ -353,34 +353,6 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         CHECK(!target->is_locked());
     }
 
-    SECTION("via diff + lock when have a source") {
-        db_folder_info.set_index_id(3);
-        auto folder_peer = folder_info_t::create(sequencer->next_uuid(), db_folder_info, peer_device, folder).value();
-        folder->get_folder_infos().put(folder_peer);
-        auto version = pr_fi.mutable_version();
-        auto counter = version->add_counters();
-        counter->set_id(5);
-        counter->set_value(peer_device->as_uint());
-        auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
-        folder_peer->add(file_peer, false);
-
-        diff::load::container_t container;
-        fi->set_source(file_peer);
-        auto data = fi->serialize(true);
-        container.emplace_back(diff::load::pair_t{fi->get_key(), data});
-        auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(container));
-        REQUIRE(diff->apply(*cluster));
-        auto &map = folder_info->get_file_infos();
-        REQUIRE(map.size() == 1);
-        target = map.get(fi->get_uuid());
-        REQUIRE(target);
-        REQUIRE(map.by_name(fi->get_name()));
-        REQUIRE(target->get_blocks().size() == 11);
-        REQUIRE(target->get_blocks().begin()->get()->get_hash() == block->get_hash());
-        CHECK(target->is_locked());
-        CHECK(target->get_source() == file_peer);
-    }
-
     CHECK(target->get_key() == fi->get_key());
     CHECK(target->get_name() == fi->get_name());
     CHECK(target->get_full_name() == fi->get_full_name());

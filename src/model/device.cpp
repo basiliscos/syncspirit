@@ -6,6 +6,7 @@
 #include "db/prefix.h"
 #include "misc/error_code.h"
 #include "utils/time.h"
+#include "misc/file_iterator.h"
 
 #include <boost/endian/conversion.hpp>
 
@@ -62,6 +63,8 @@ device_t::device_t(const device_id_t &device_id_, std::string_view name_, std::s
       introducer{false}, auto_accept{false}, paused{false}, skip_introduction_removals{false},
       state{device_state_t::offline}, last_seen{pt::from_time_t(0)} {}
 
+device_t::~device_t() {}
+
 void device_t::update(const db::Device &source) noexcept { assign(source); }
 
 uint64_t device_t::as_uint() const noexcept {
@@ -117,6 +120,22 @@ std::string_view device_t::get_key() const noexcept { return id.get_key(); }
 void device_t::set_static_uris(uris_t uris) noexcept { static_uris = std::move(uris); }
 
 void device_t::assign_uris(const uris_t &uris_) noexcept { uris = uris_; }
+
+auto device_t::create_iterator(cluster_t &cluster) noexcept -> file_iterator_ptr_t {
+    assert(!iterator);
+    iterator = new file_iterator_t(cluster, this);
+    return iterator;
+}
+
+void device_t::release_iterator(file_iterator_ptr_t &it) noexcept {
+    assert(it == iterator);
+    iterator.reset();
+}
+
+file_iterator_t *device_t::get_iterator() noexcept { return iterator.get(); }
+
+void release_iterator(file_iterator_ptr_t &) noexcept;
+file_iterator_t *get_iterator() noexcept;
 
 local_device_t::local_device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept
     : device_t(device_id, name, cert_name) {

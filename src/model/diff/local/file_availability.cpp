@@ -19,6 +19,7 @@ auto file_availability_t::apply_impl(cluster_t &cluster) const noexcept -> outco
         auto f = folder_info->get_file_infos().by_name(file->get_name());
         if (f && compare(version, f->get_version()) == version_relation_t::identity) {
             f->mark_local();
+            LOG_TRACE(log, "file_availability_t, mark local file = {}, folder = {}, ", file->get_name(), folder_id);
             auto &blocks = f->get_blocks();
             for (size_t i = 0; i < blocks.size(); ++i) {
                 if (!f->is_locally_available(i)) {

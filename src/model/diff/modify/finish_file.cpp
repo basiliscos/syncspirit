@@ -9,16 +9,12 @@
 using namespace syncspirit::model::diff::modify;
 
 finish_file_t::finish_file_t(const model::file_info_t &file) noexcept {
-    assert(file.get_source());
     auto fi = file.get_folder_info();
     auto folder = fi->get_folder();
     folder_id = folder->get_id();
     file_name = file.get_name();
-    assert(fi->get_device() == folder->get_cluster()->get_device().get());
-}
-
-auto finish_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    return applicator_t::apply_sibling(cluster);
+    peer_id = fi->get_device()->device_id().get_sha256();
+    assert(fi->get_device() != folder->get_cluster()->get_device().get());
 }
 
 auto finish_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

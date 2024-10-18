@@ -17,6 +17,7 @@
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/finish_file_ack.h"
+#include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
@@ -174,15 +175,16 @@ diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcep
 }
 
 diff_builder_t &diff_builder_t::clone_file(const model::file_info_t &source) noexcept {
-    return assign(new diff::modify::clone_file_t(source, *sequencer));
+    auto diff = diff::modify::clone_file_t::create(source, *sequencer);
+    return assign(diff.get());
 }
 
-diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &source) noexcept {
-    return assign(new diff::modify::finish_file_t(source));
+diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &file) noexcept {
+    return assign(new diff::modify::finish_file_t(file));
 }
 
-diff_builder_t &diff_builder_t::finish_file_ack(const model::file_info_t &source) noexcept {
-    return assign(new diff::modify::finish_file_ack_t(source));
+diff_builder_t &diff_builder_t::finish_file_ack(const model::file_info_t &file) noexcept {
+    return assign(new diff::modify::finish_file_ack_t(file, *sequencer));
 }
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
@@ -262,6 +264,10 @@ diff_builder_t &diff_builder_t::synchronization_start(std::string_view id) noexc
 
 diff_builder_t &diff_builder_t::synchronization_finish(std::string_view id) noexcept {
     return assign(new model::diff::local::synchronization_finish_t(std::string(id)));
+}
+
+diff_builder_t &diff_builder_t::mark_reacheable(model::file_info_ptr_t peer_file, bool value) noexcept {
+    return assign(new model::diff::modify::mark_reachable_t(*peer_file, value));
 }
 
 template <typename Holder, typename Diff> static void generic_assign(Holder *holder, Diff *diff) noexcept {

@@ -114,7 +114,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     on_remove(*r.file);
                 } else if constexpr (std::is_same_v<T, changed_meta_t>) {
                     auto &file = *r.file;
-                    auto metadata = file.as_proto(true);
+                    auto &metadata = r.metadata;
                     auto errs = initiate_hash(task, file.get_path(), metadata);
                     if (errs.empty()) {
                         stop_processing = true;
@@ -130,10 +130,8 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     }
                 } else if constexpr (std::is_same_v<T, incomplete_t>) {
                     auto &f = r.file;
-                    assert(f->get_source());
                     stop_processing = true;
-                    send<payload::rehash_needed_t>(address, task, std::move(f), f->get_source(),
-                                                   std::move(r.opened_file));
+                    send<payload::rehash_needed_t>(address, task, std::move(f), std::move(r.opened_file));
                 } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
                     auto &file = *r.file;
                     if (file.is_locked()) {
@@ -141,13 +139,18 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                         diff = new model::diff::modify::lock_file_t(file, false);
                         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
                     }
+                } else if constexpr (std::is_same_v<T, orphaned_removed_t>) {
+                    // NO-OP
                 } else if constexpr (std::is_same_v<T, file_error_t>) {
+#if 0
                     auto diff = model::diff::cluster_diff_ptr_t{};
                     diff = new model::diff::modify::lock_file_t(*r.file, false);
                     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
                     auto path = make_temporal(r.file->get_path());
                     scan_errors_t errors{scan_error_t{path, r.ec}};
                     send<model::payload::io_error_t>(coordinator, std::move(errors));
+#endif
+                    std::abort();
                 } else {
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
                 }
@@ -218,6 +221,7 @@ void scan_actor_t::hash_next(Message &message, const r::address_ptr_t &reply_add
                 model::io_errors_t errs;
                 errs.push_back(model::io_error_t{info.get_path(), ec});
                 send<model::payload::io_error_t>(coordinator, std::move(errs));
+                return;
             } else {
                 auto &chunk = opt.assume_value();
                 if (chunk.data.size()) {
@@ -249,44 +253,34 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
         return do_shutdown(ee);
     }
 
+    auto diff = model::diff::cluster_diff_ptr_t{};
+
     bool queued_next = false;
-    if (info.is_valid()) {
-        auto &digest = res.payload.res.digest;
-        auto block_index = rp.block_index;
-        if (info.ack_block(digest, block_index)) {
-            hash_next(*msg, address);
-            bool can_process_more = requested_hashes < requested_hashes_limit;
-            queued_next = !can_process_more;
-            if (info.is_complete()) {
-                auto valid_blocks = info.has_valid_blocks();
-                if (valid_blocks >= 0) {
-                    auto diff = model::diff::cluster_diff_ptr_t{};
-                    diff = new model::diff::local::blocks_availability_t(*info.get_source(), valid_blocks);
-                    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-                }
-                auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::lock_file_t(*info.get_file(), false);
-                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+    auto &digest = res.payload.res.digest;
+    auto block_index = rp.block_index;
+    info.ack_block(digest, block_index);
+    hash_next(*msg, address);
+    bool can_process_more = requested_hashes < requested_hashes_limit;
+    queued_next = !can_process_more;
+    if (info.is_complete()) {
+        if (info.has_valid_blocks()) {
+            diff.reset(new model::diff::local::blocks_availability_t(*info.get_file(), info.valid_blocks()));
+        } else {
+            auto &file = *info.get_file();
+            LOG_DEBUG(log, "removing temporal of '{}' as it corrupted", file.get_full_name());
+            auto r = info.remove();
+            if (r) {
+                model::io_errors_t errors{model::io_error_t{info.get_path(), r.assume_error()}};
+                send<model::payload::io_error_t>(coordinator, std::move(errors));
             }
-        }
-    }
-
-    if (!info.is_valid() && info.get_queue_size() == 0) {
-        auto &file = *info.get_file();
-        auto diff = model::diff::cluster_diff_ptr_t{};
-        diff = new model::diff::modify::lock_file_t(file, false);
-        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-
-        LOG_DEBUG(log, "removing temporal of '{}' as it corrupted", file.get_full_name());
-        auto r = info.remove();
-        if (r) {
-            model::io_errors_t errors{model::io_error_t{info.get_path(), r.assume_error()}};
-            send<model::payload::io_error_t>(coordinator, std::move(errors));
         }
     }
 
     if (!queued_next && !requested_hashes) {
         send<payload::scan_progress_t>(address, info.get_task());
+    }
+    if (diff) {
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
 }
 

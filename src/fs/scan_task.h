@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -15,7 +15,6 @@
 #include <boost/filesystem.hpp>
 #include <list>
 #include <variant>
-#include <optional>
 
 namespace syncspirit::fs {
 
@@ -32,6 +31,7 @@ struct unchanged_meta_t {
 
 struct changed_meta_t {
     model::file_info_ptr_t file;
+    proto::FileInfo metadata;
 };
 
 struct incomplete_t {
@@ -43,12 +43,16 @@ struct incomplete_removed_t {
     model::file_info_ptr_t file;
 };
 
+struct orphaned_removed_t {
+    bfs::path path;
+};
+
 struct removed_t {
     model::file_info_ptr_t file;
 };
 
 struct file_error_t {
-    model::file_info_ptr_t file;
+    bfs::path path;
     sys::error_code ec;
 };
 
@@ -58,13 +62,10 @@ struct unknown_file_t {
 };
 
 using scan_result_t = std::variant<bool, scan_errors_t, changed_meta_t, unchanged_meta_t, incomplete_t, removed_t,
-                                   incomplete_removed_t, unknown_file_t, file_error_t>;
+                                   incomplete_removed_t, orphaned_removed_t, unknown_file_t, file_error_t>;
 
 struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, boost::thread_unsafe_counter> {
-    struct file_info_t {
-        model::file_info_ptr_t file;
-        bool temp;
-    };
+    using file_info_t = model::file_info_ptr_t;
 
     using path_queue_t = std::list<bfs::path>;
     using files_queue_t = std::list<file_info_t>;
@@ -81,8 +82,10 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
     scan_result_t advance_file(const file_info_t &file) noexcept;
     scan_result_t advance_regular_file(const file_info_t &file) noexcept;
     scan_result_t advance_symlink_file(const file_info_t &file) noexcept;
+    scan_result_t advance_unknown_file(const unknown_file_t &file) noexcept;
 
     std::string folder_id;
+    model::folder_ptr_t folder;
     model::cluster_ptr_t cluster;
     model::file_infos_map_t files;
     utils::logger_t log;

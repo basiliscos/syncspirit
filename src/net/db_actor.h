@@ -64,11 +64,14 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
 
     void open() noexcept;
     outcome::result<db::transaction_t *> get_txn() noexcept;
-    outcome::result<void> commit(bool force = false) noexcept;
+    outcome::result<void> commit_on_demand() noexcept;
+    outcome::result<void> force_commit() noexcept;
 
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
     void on_db_info(message::db_info_request_t &) noexcept;
+    void extracted(const model::folder_info_t &folder_info);
+    outcome::result<void> save_folder_info(const model::folder_info_t &, void *) noexcept;
 
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
@@ -90,8 +93,6 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_pending_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_pending_folders_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::share_folder_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::unshare_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
@@ -105,8 +106,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     config::db_config_t db_config;
     model::cluster_ptr_t cluster;
     transaction_ptr_t txn_holder;
-    std::uint32_t txn_counter;
-    size_t uncommitted;
+    std::int_fast32_t uncommitted;
 };
 
 } // namespace net
