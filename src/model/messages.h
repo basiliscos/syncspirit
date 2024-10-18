@@ -4,12 +4,14 @@
 #pragma once
 
 #include <rotor/request.hpp>
+#include <boost/system/errc.hpp>
 #include "cluster.h"
 #include "diff/cluster_diff.h"
 
 namespace syncspirit::model {
 
 namespace r = rotor;
+namespace sys = boost::system;
 
 struct io_error_t {
     bfs::path path;

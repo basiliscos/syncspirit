@@ -11,9 +11,7 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 
-TEST_CASE("file iterator", "[model]") {}
 
-#if 0
 struct dummy_sink_t final : model::diff_sink_t {
     dummy_sink_t(diff_builder_t &builder_) noexcept : builder{builder_} {}
 
@@ -21,6 +19,146 @@ struct dummy_sink_t final : model::diff_sink_t {
 
     diff_builder_t &builder;
 };
+
+TEST_CASE("file iterator, single folder", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+
+    auto builder = diff_builder_t(*cluster);
+    auto sink = dummy_sink_t(builder);
+
+    auto &blocks_map = cluster->get_blocks();
+    auto &folders = cluster->get_folders();
+    REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+    auto folder = folders.by_id("1234-5678");
+    auto &folder_infos = cluster->get_folders().by_id(folder->get_id())->get_folder_infos();
+    REQUIRE(folder_infos.size() == 2u);
+
+    auto peer_folder = folder_infos.by_device(*peer_device);
+    auto &peer_files = peer_folder->get_file_infos();
+
+    auto my_folder = folder_infos.by_device(*my_device);
+    auto &my_files = my_folder->get_file_infos();
+
+    auto file_iterator = peer_device->create_iterator(*cluster);
+    file_iterator->activate(sink);
+
+    SECTION("emtpy folders (1)") {
+        CHECK(!file_iterator->next_need_cloning());
+        CHECK(!file_iterator->next_need_sync());
+    }
+
+    REQUIRE(builder.configure_cluster(peer_id.get_sha256())
+                .add(peer_id.get_sha256(), folder->get_id(), 123, 10u)
+                .finish()
+                .apply());
+
+    SECTION("emtpy folders (2)") {
+        CHECK(!file_iterator->next_need_cloning());
+        CHECK(!file_iterator->next_need_sync());
+    }
+
+    SECTION("cloning (empty files)") {
+        SECTION("1 file") {
+            SECTION("no local file") {
+                auto file = proto::FileInfo();
+                file.set_name("a.txt");
+                file.set_sequence(10ul);
+                REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
+
+                auto f = file_iterator->next_need_cloning();
+                REQUIRE(f);
+                CHECK(f->get_name() == "a.txt");
+                CHECK(!f->is_locked());
+
+                REQUIRE(builder.apply());
+                CHECK(folder->is_synchronizing());
+                REQUIRE(!file_iterator->next_need_cloning());
+                REQUIRE(!file_iterator->next_need_sync());
+
+                REQUIRE(builder.clone_file(*f).apply());
+                REQUIRE(!file_iterator->next_need_cloning());
+                REQUIRE(!file_iterator->next_need_sync());
+                CHECK(!folder->is_synchronizing());
+                CHECK(!f->is_locked());
+            }
+
+            SECTION("version checks") {
+                auto file = proto::FileInfo();
+                file.set_name("a.txt");
+                file.set_sequence(10ul);
+                auto c_1 = file.mutable_version()->add_counters();
+                c_1->set_id(1);
+                c_1->set_value(5);
+
+                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish();
+
+                SECTION("my version < peer version") {
+                    c_1->set_value(3);
+                    REQUIRE(builder.apply());
+
+
+                    auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                    my_file->mark_local();
+                    my_files.put(my_file);
+
+                    auto f = file_iterator->next_need_cloning();
+                    REQUIRE(f);
+                    CHECK(f->get_folder_info()->get_device() == peer_device.get());
+                    REQUIRE(!file_iterator->next_need_cloning());
+                }
+
+#if 0
+                SECTION("my version < peer version, but not scanned yet") {
+                    REQUIRE(builder.apply());
+
+                    c_1->set_value(3);
+
+                    auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                    my_files.put(my_file);
+
+                    auto f = file_iterator->next_need_cloning();
+                    REQUIRE(!f);
+                }
+
+                SECTION("my version > peer version") {
+                    REQUIRE(builder.apply());
+
+                    c_1->set_value(10);
+
+                    auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                    my_file->mark_local();
+                    my_files.put(my_file);
+
+                    auto f = file_iterator->next_need_cloning();
+                    REQUIRE(!f);
+                }
+
+                SECTION("my version == peer version") {
+                    REQUIRE(builder.apply());
+
+                    auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                    my_file->mark_local();
+                    my_files.put(my_file);
+
+                    auto f = file_iterator->next_need_cloning();
+                    REQUIRE(!f);
+                }
+#endif
+            }
+        }
+    }
+}
+
+#if 0
 
 TEST_CASE("file iterator", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();

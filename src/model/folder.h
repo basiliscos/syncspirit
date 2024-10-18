@@ -10,7 +10,6 @@
 #include "misc/augmentation.hpp"
 #include "device.h"
 #include "folder_info.h"
-#include "misc/local_file.h"
 #include "misc/uuid.h"
 #include "folder_data.h"
 #include "syncspirit-export.h"
@@ -60,7 +59,6 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
 
     using folder_data_t::get_path;
     using folder_data_t::set_path;
-    void update(local_file_map_t &local_files) noexcept;
     std::optional<proto::Folder> generate(const model::device_t &device) const noexcept;
 
     template <typename T> auto &access() noexcept;
