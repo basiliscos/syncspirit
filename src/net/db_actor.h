@@ -64,7 +64,8 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
 
     void open() noexcept;
     outcome::result<db::transaction_t *> get_txn() noexcept;
-    outcome::result<void> commit(bool force = false) noexcept;
+    outcome::result<void> commit_on_demand() noexcept;
+    outcome::result<void> force_commit() noexcept;
 
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
@@ -105,8 +106,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     config::db_config_t db_config;
     model::cluster_ptr_t cluster;
     transaction_ptr_t txn_holder;
-    std::int32_t txn_counter;
-    size_t uncommitted;
+    std::int_fast32_t uncommitted;
 };
 
 } // namespace net

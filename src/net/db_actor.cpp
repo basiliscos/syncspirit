@@ -73,7 +73,7 @@ using folder_infos_set_t = std::unordered_set<const model::folder_info_t *>;
 
 db_actor_t::db_actor_t(config_t &config)
     : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, db_config{config.db_config},
-      cluster{config.cluster}, txn_counter{0} {
+      cluster{config.cluster} {
     // mdbx_module_handler({}, {}, {});
     // mdbx_setup_debug(MDBX_LOG_TRACE, MDBX_DBG_ASSERT, &_my_log);
     auto r = mdbx_env_create(&env);
@@ -175,28 +175,21 @@ auto db_actor_t::get_txn() noexcept -> outcome::result<db::transaction_t *> {
         txn_holder.reset(new db::transaction_t(std::move(txn.assume_value())));
         uncommitted = 0;
     }
-    ++txn_counter;
     return txn_holder.get();
 }
 
-auto db_actor_t::commit(bool force) noexcept -> outcome::result<void> {
-    assert(txn_holder);
-    assert(txn_counter > 0);
-    --txn_counter;
-    if (txn_counter == 0) {
-        if (force) {
-            LOG_INFO(log, "committing tx");
-            auto r = txn_holder->commit();
-            txn_holder.reset();
-            return r;
-        }
-        if (++uncommitted >= db_config.uncommitted_threshold) {
-            LOG_INFO(log, "committing tx");
-            auto r = txn_holder->commit();
-            txn_holder.reset();
-            return r;
-        }
+auto db_actor_t::commit_on_demand() noexcept -> outcome::result<void> {
+    if (txn_holder && (++uncommitted >= db_config.uncommitted_threshold)) {
+        LOG_DEBUG(log, "committing tx");
+        auto r = txn_holder->commit();
+        txn_holder.reset();
+        return r;
     }
+    return outcome::success();
+}
+
+auto db_actor_t::force_commit() noexcept -> outcome::result<void> {
+    uncommitted = db_config.uncommitted_threshold;
     return outcome::success();
 }
 
@@ -207,7 +200,7 @@ void db_actor_t::on_start() noexcept {
 
 void db_actor_t::shutdown_finish() noexcept {
     if (txn_holder) {
-        auto r = commit(true);
+        auto r = commit_on_demand();
         if (!r) {
             auto &err = r.assume_error();
             LOG_ERROR(log, "cannot commit tx: {}", err.message());
@@ -316,17 +309,14 @@ void db_actor_t::on_model_update(model::message::model_update_t &message) noexce
     auto &diff = *message.payload.diff;
     auto set = folder_infos_set_t{};
 
-    auto &txn = *get_txn().assume_value();
-
     auto r = diff.visit(*this, &set);
     while (r && !set.empty()) {
         r = save_folder_info(**set.begin(), &set);
     }
 
     if (r) {
-        r = commit(true);
+        r = commit_on_demand();
     }
-
     if (!r) {
         auto ee = make_error(r.assume_error());
         LOG_ERROR(log, "on_model_update error: {}", r.assume_error().message());
@@ -355,7 +345,7 @@ auto db_actor_t::save_folder_info(const model::folder_info_t &folder_info, void 
     if (it != folder_infos->end()) {
         folder_infos->erase(it);
     }
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
@@ -385,7 +375,7 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::local::update_t &diff, void *custom) noexcept -> outcome::result<void> {
@@ -422,7 +412,7 @@ auto db_actor_t::operator()(const model::diff::local::update_t &diff, void *cust
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
@@ -448,7 +438,7 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_t &diff, vo
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::add_blocks_t &diff, void *custom) noexcept
@@ -474,7 +464,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_blocks_t &diff, void 
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::add_pending_folders_t &diff, void *custom) noexcept
@@ -506,7 +496,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_folders_t &di
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &diff, void *custom) noexcept
@@ -530,7 +520,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_ignored_device_t &dif
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::add_pending_device_t &diff, void *custom) noexcept
@@ -553,7 +543,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_device_t &dif
     if (!r) {
         return r.assume_error();
     }
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) noexcept -> outcome::result<void> {
@@ -574,7 +564,7 @@ auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) n
         return r.assume_error();
     }
 
-    return commit(false);
+    return force_commit();
 }
 auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *) noexcept
     -> outcome::result<void> {
@@ -609,7 +599,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_folder_t &diff, vo
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void *custom) noexcept
@@ -628,7 +618,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_ignored_device_t &diff, void *custom) noexcept
@@ -648,7 +638,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_ignored_device_t &
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_pending_device_t &diff, void *custom) noexcept
@@ -668,7 +658,7 @@ auto db_actor_t::operator()(const model::diff::modify::remove_pending_device_t &
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void *custom) noexcept
@@ -695,7 +685,7 @@ auto db_actor_t::operator()(const model::diff::modify::update_peer_t &diff, void
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
@@ -749,7 +739,7 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void 
         return r.assume_error();
     }
 
-    return commit(false);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, void *custom) noexcept
@@ -787,7 +777,7 @@ auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, 
         return r.assume_error();
     }
 
-    return commit(false);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
@@ -829,7 +819,7 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept
@@ -860,7 +850,7 @@ auto db_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::contact::ignored_connected_t &diff, void *custom) noexcept
@@ -886,7 +876,7 @@ auto db_actor_t::operator()(const model::diff::contact::ignored_connected_t &dif
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 auto db_actor_t::operator()(const model::diff::contact::unknown_connected_t &diff, void *custom) noexcept
@@ -912,7 +902,7 @@ auto db_actor_t::operator()(const model::diff::contact::unknown_connected_t &dif
         return r.assume_error();
     }
 
-    return commit(true);
+    return force_commit();
 }
 
 } // namespace syncspirit::net
