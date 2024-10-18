@@ -6,6 +6,7 @@
 #include "model/misc/file_iterator.h"
 #include "model/misc/sequencer.h"
 #include "diff-builder.h"
+#include <set>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -341,7 +342,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
     file_iterator->deactivate();
 }
 
-#if 0
 TEST_CASE("file iterator for 2 folders", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -349,23 +349,30 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
-    auto file_iterator = file_iterator_ptr_t();
-    auto next = [&](bool reset = false) -> file_info_ptr_t {
-        if (reset) {
-            file_iterator = new file_iterator_t(*cluster, peer_device);
-        }
-        auto f = file_iterator->next();
-        if (f) {
-            file_iterator->done();
-        }
-        return f;
-    };
-
     auto builder = diff_builder_t(*cluster);
+    auto sink = dummy_sink_t(builder);
+
+    auto &blocks_map = cluster->get_blocks();
     auto &folders = cluster->get_folders();
+    REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+    auto folder = folders.by_id("1234-5678");
+    auto &folder_infos = cluster->get_folders().by_id(folder->get_id())->get_folder_infos();
+    REQUIRE(folder_infos.size() == 2u);
+
+    auto peer_folder = folder_infos.by_device(*peer_device);
+    auto &peer_files = peer_folder->get_file_infos();
+
+    auto my_folder = folder_infos.by_device(*my_device);
+    auto &my_files = my_folder->get_file_infos();
+
+    auto file_iterator = peer_device->create_iterator(*cluster);
+    file_iterator->activate(sink);
+
     auto sha256 = peer_id.get_sha256();
 
     REQUIRE(builder.upsert_folder("1234", "/", "my-label-1").upsert_folder("5678", "/", "my-label-2").apply());
@@ -387,23 +394,65 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     file2.set_name("b.txt");
     file2.set_sequence(11ul);
 
-    REQUIRE(builder.make_index(sha256, "1234").add(file1, peer_device).finish().apply());
-    REQUIRE(builder.make_index(sha256, "5678").add(file2, peer_device).finish().apply());
+    using set_t = std::set<std::string_view>;
 
-    auto files = std::unordered_set<std::string>{};
-    auto f = next(true);
-    REQUIRE(f);
-    files.emplace(f->get_full_name());
+    SECTION("cloning") {
+        REQUIRE(builder.make_index(sha256, "1234").add(file1, peer_device).add(file2, peer_device).finish().apply());
 
-    f = next();
-    REQUIRE(f);
-    files.emplace(f->get_full_name());
+        auto f1 = file_iterator->next_need_cloning();
+        auto f2 = file_iterator->next_need_cloning();
+        REQUIRE(f1);
+        REQUIRE(f2);
 
-    CHECK(files.size() == 2);
-    CHECK(files.count("my-label-1/a.txt"));
-    CHECK(files.count("my-label-2/b.txt"));
+        auto files = set_t{};
+        files.emplace(f1->get_name());
+        files.emplace(f2->get_name());
+
+        CHECK((files == set_t{"a.txt", "b.txt"}));
+        CHECK(!file_iterator->next_need_cloning());
+    }
+
+    SECTION("syncing") {
+        auto b1 = proto::BlockInfo();
+        b1.set_hash(utils::sha256_digest("12345").value());
+        b1.set_weak_hash(555);
+        b1.set_size(5ul);
+        auto b2 = proto::BlockInfo();
+        b2.set_hash(utils::sha256_digest("67890").value());
+        b2.set_weak_hash(123);
+        b2.set_size(5ul);
+
+        auto &blocks_map = cluster->get_blocks();
+        blocks_map.put(block_info_t::create(b1).value());
+        blocks_map.put(block_info_t::create(b2).value());
+
+        *file1.add_blocks() = b1;
+        file1.set_size(b1.size());
+
+        *file2.add_blocks() = b2;
+        file2.set_size(b2.size());
+
+        using set_t = std::set<std::string_view>;
+        REQUIRE(builder.make_index(sha256, "1234").add(file1, peer_device).add(file2, peer_device).finish().apply());
+
+        auto files = set_t{};
+        auto f1 = file_iterator->next_need_sync();
+        REQUIRE(f1);
+        files.emplace(f1->get_name());
+        file_iterator->commit_sync(f1);
+
+        auto f2 = file_iterator->next_need_sync();
+        REQUIRE(f2);
+        files.emplace(f2->get_name());
+        file_iterator->commit_sync(f2);
+
+        files.emplace(f1->get_name());
+        files.emplace(f2->get_name());
+
+        CHECK((files == set_t{"a.txt", "b.txt"}));
+    }
+    file_iterator->deactivate();
 }
-#endif
 
 int _init() {
     utils::set_default("trace");
