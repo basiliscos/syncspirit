@@ -105,7 +105,7 @@ file_info_t *file_iterator_t::next_need_cloning() noexcept {
             ++files_scan;
             ++it;
 
-            if (!file->is_locally_locked() && !file->is_invalid() && file->is_global()) {
+            if (!file->is_locally_locked() && !file->is_invalid() && file->is_global() && !file->is_invalid()) {
                 auto local = file->local_file();
                 bool need_clone = !local;
                 if (local) {

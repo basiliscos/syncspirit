@@ -91,6 +91,15 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(!f->is_locked());
             }
 
+            SECTION("invalid file is ignored") {
+                auto file = proto::FileInfo();
+                file.set_name("a.txt");
+                file.set_sequence(10ul);
+                file.set_invalid(true);
+                REQUIRE(builder.apply());
+                REQUIRE(!file_iterator->next_need_cloning());
+            }
+
             SECTION("version checks") {
                 auto file = proto::FileInfo();
                 file.set_name("a.txt");
