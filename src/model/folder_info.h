@@ -82,7 +82,6 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     device_t *device;
     folder_t *folder;
     file_infos_map_t file_infos;
-    bool actualized;
 };
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
