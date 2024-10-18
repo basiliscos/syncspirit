@@ -29,7 +29,6 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
 
     file_info_t *next_need_cloning() noexcept;
     file_info_t *next_need_sync() noexcept;
-    void commit_clone(file_info_ptr_t file) noexcept;
     void commit_sync(file_info_ptr_t file) noexcept;
 
     void on_block_ack(const file_info_t &file, size_t block_index);
@@ -61,6 +60,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     };
     using folder_iterators_t = std::vector<folder_iterator_t>;
 
+    void commit_clone(file_info_ptr_t file) noexcept;
     folder_iterator_t &prepare_folder(folder_info_ptr_t peer_folder) noexcept;
     folder_iterator_t &find_folder(folder_t *folder) noexcept;
 

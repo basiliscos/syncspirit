@@ -170,6 +170,10 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
                 continue;
             }
 
+            if (file->is_invalid()) {
+                continue;
+            }
+
             if (file->is_locally_available()) {
                 continue;
             }
@@ -182,12 +186,21 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
                 continue;
             }
 
-            if (auto local_file = file->local_file(); local_file) {
+            auto accept = true;
+
+            if (auto local = file->local_file(); local) {
+                if (!local->is_local()) {
+                    accept = false; // file is not has been scanned
+                } else {
+                    using V = version_relation_t;
+                    auto result = compare(file->get_version(), local->get_version());
+                    accept = result == V::newer;
+                }
             }
-            // clang-format off
+
             auto &seen_sequence = fi.committed_map[file];
-            auto accept = seen_sequence < file->get_sequence();
-            // clang-format on
+            accept = accept && seen_sequence < file->get_sequence();
+
             if (accept) {
                 fi.guarded_syncs.emplace(file->get_name(), new guard_t(file, *this));
                 return file.get();
