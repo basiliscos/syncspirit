@@ -109,9 +109,11 @@ file_info_t *file_iterator_t::next_need_cloning() noexcept {
                 auto local = file->local_file();
                 bool need_clone = !local;
                 if (local) {
-                    using V = version_relation_t;
-                    auto result = compare(file->get_version(), local->get_version());
-                    need_clone = result == V::newer && file->is_locally_available();
+                    if (local->is_local()) {
+                        using V = version_relation_t;
+                        auto result = compare(file->get_version(), local->get_version());
+                        need_clone = result == V::newer && file->is_locally_available();
+                    }
                 } else {
                     need_clone = file->get_size() == 0;
                 }

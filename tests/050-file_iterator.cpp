@@ -116,7 +116,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     REQUIRE(!file_iterator->next_need_cloning());
                 }
 
-#if 0
                 SECTION("my version < peer version, but not scanned yet") {
                     REQUIRE(builder.apply());
 
@@ -125,8 +124,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
                     my_files.put(my_file);
 
-                    auto f = file_iterator->next_need_cloning();
-                    REQUIRE(!f);
+                    REQUIRE(!file_iterator->next_need_cloning());
                 }
 
                 SECTION("my version > peer version") {
@@ -138,8 +136,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     my_file->mark_local();
                     my_files.put(my_file);
 
-                    auto f = file_iterator->next_need_cloning();
-                    REQUIRE(!f);
+                    REQUIRE(!file_iterator->next_need_cloning());
                 }
 
                 SECTION("my version == peer version") {
@@ -149,10 +146,8 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     my_file->mark_local();
                     my_files.put(my_file);
 
-                    auto f = file_iterator->next_need_cloning();
-                    REQUIRE(!f);
+                    REQUIRE(!file_iterator->next_need_cloning());
                 }
-#endif
             }
         }
     }
