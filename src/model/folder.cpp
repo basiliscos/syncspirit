@@ -89,7 +89,7 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
         pd.set_index_id(fi.get_index());
         pd.set_introducer(d.is_introducer());
         pd.set_skip_introduction_removals(d.get_skip_introduction_removals());
-        spdlog::trace("folder_t::generate (==>), folder = {} (index = {}), device = {}, max_seq = {}", label,
+        spdlog::trace("folder_t::generate (==>), folder = {} (index = 0x{:x}), device = {}, max_seq = {}", label,
                       fi.get_index(), d.device_id(), max_seq);
     }
     return r;
