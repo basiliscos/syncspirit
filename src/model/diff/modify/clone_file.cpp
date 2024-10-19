@@ -61,31 +61,16 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
         file->assign_block(b, i);
     }
 
-    bool inc_sequence = false;
     if (prev_file) {
-        bool refresh = peer_file->is_locally_available() || !prev_file->is_locally_available();
-        if (refresh) {
-            prev_file->update(*file);
-        }
+        prev_file->update(*file);
         file = std::move(prev_file);
-        if (peer_file->is_locally_available() || (refresh && file->is_locally_available())) {
-            inc_sequence = true;
-        }
-    } else {
-        inc_sequence = blocks.empty();
     }
 
     file->mark_local();
 
-    if (inc_sequence) {
-        auto value = folder_my->get_max_sequence() + 1;
-        file->set_sequence(value);
-        folder_my->set_max_sequence(value);
-    }
-
-    if (!prev_file) {
-        folder_my->add(file, false);
-    }
+    auto value = folder_my->get_max_sequence() + 1;
+    file->set_sequence(value);
+    folder_my->add(file, true);
 
     LOG_TRACE(log, "clone_file_t, new file; folder = {}, name = {}, blocks = {}", folder_id, file->get_name(),
               blocks.size());

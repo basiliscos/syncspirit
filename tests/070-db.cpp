@@ -655,7 +655,7 @@ void test_clone_file() {
                 REQUIRE(file_peer);
 
                 builder.clone_file(*file_peer).apply(*sup);
-                REQUIRE(folder_my->get_max_sequence() == 0);
+                REQUIRE(folder_my->get_max_sequence() == 1);
 
                 {
                     sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
@@ -673,8 +673,8 @@ void test_clone_file() {
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name() == file.name());
                     REQUIRE(file_clone->get_blocks().size() == 1);
-                    REQUIRE(file_clone->get_sequence() == 0);
-                    REQUIRE(folder_info_clone->get_max_sequence() == 0);
+                    REQUIRE(file_clone->get_sequence() == 1);
+                    REQUIRE(folder_info_clone->get_max_sequence() == 1);
                 }
 
                 file_peer = folder_peer->get_file_infos().by_name(file.name());
@@ -700,8 +700,8 @@ void test_clone_file() {
                     REQUIRE(file_clone->get_name() == file.name());
                     REQUIRE(file_clone->get_blocks().size() == 1);
                     REQUIRE(file_clone->get_blocks().at(0));
-                    REQUIRE(file_clone->get_sequence() == 1);
-                    REQUIRE(folder_info_clone->get_max_sequence() == 1);
+                    REQUIRE(file_clone->get_sequence() == 2);
+                    REQUIRE(folder_info_clone->get_max_sequence() == 2);
                 }
             }
         }
