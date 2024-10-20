@@ -207,7 +207,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             auto pr_file = proto::FileInfo();
             pr_file.set_sequence(folder_info_peer->get_max_sequence());
             auto peer_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_info_peer).value();
-            folder_info_peer->add(peer_file, false);
+            folder_info_peer->add_strict(peer_file);
 
             bool visited = false;
             auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
@@ -215,27 +215,6 @@ TEST_CASE("cluster update, new folder", "[model]") {
             REQUIRE(r_v);
             REQUIRE(visited);
             REQUIRE(visitor.updated_folders == 0);
-        }
-
-        SECTION("max sequence increased") {
-            auto max_seq = folder_info_peer->get_max_sequence() + 1;
-            p_peer->set_max_sequence(max_seq);
-            p_peer->set_index_id(folder_info_peer->get_index());
-
-            auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
-            REQUIRE(diff_opt);
-
-            auto &diff = diff_opt.value();
-            auto r_a = diff->apply(*cluster);
-            CHECK(r_a);
-
-            bool visited = false;
-            auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
-            auto r_v = diff->visit(visitor, nullptr);
-            REQUIRE(r_v);
-            REQUIRE(visited);
-            REQUIRE(visitor.updated_folders == 1);
-            REQUIRE(folder_info_peer->get_max_sequence() == max_seq);
         }
     }
 
@@ -286,7 +265,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             REQUIRE(r_a);
             auto fi = folder_infos.by_device(*peer_device);
             REQUIRE(fi->get_index() == 7ul);
-            REQUIRE(fi->get_max_sequence() == 123456u);
+            REQUIRE(fi->get_max_sequence() == 0);
             REQUIRE(fi.get() == folder_info_peer.get());
 
             bool visited = false;
@@ -365,23 +344,26 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     pr_fi_my.set_name("a/b.txt");
     pr_fi_my.set_size(5ul);
     pr_fi_my.set_block_size(5ul);
+    pr_fi_my.set_sequence(1);
     auto fi_my = file_info_t::create(sequencer->next_uuid(), pr_fi_my, folder_info_my).value();
-    folder_info_my->add(fi_my, false);
+    folder_info_my->add_strict(fi_my);
 
     proto::FileInfo pr_fi_peer1;
     pr_fi_peer1.set_name("a/c.txt");
     pr_fi_peer1.set_size(5ul);
     pr_fi_peer1.set_block_size(5ul);
+    pr_fi_peer1.set_sequence(1);
     auto fi_peer1 = file_info_t::create(sequencer->next_uuid(), pr_fi_peer1, folder_info_peer).value();
-    folder_info_peer->add(fi_peer1, false);
+    REQUIRE(folder_info_peer->add_strict(fi_peer1));
     REQUIRE(folder_info_peer->get_file_infos().size() == 1);
 
     proto::FileInfo pr_fi_peer2;
     pr_fi_peer2.set_name("a/d.txt");
     pr_fi_peer2.set_size(10ul);
     pr_fi_peer2.set_block_size(5ul);
+    pr_fi_peer2.set_sequence(2);
     auto fi_peer2 = file_info_t::create(sequencer->next_uuid(), pr_fi_peer2, folder_info_peer).value();
-    folder_info_peer->add(fi_peer2, false);
+    REQUIRE(folder_info_peer->add_strict(fi_peer2));
     REQUIRE(folder_info_peer->get_file_infos().size() == 2);
 
     fi_my->assign_block(b1, 0);
@@ -410,7 +392,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     REQUIRE(folder_info_peer_new == folder_info_peer);
     REQUIRE(folder_info_peer_new->get_file_infos().size() == 0);
     CHECK(folder_info_peer_new->get_index() == 7ul);
-    CHECK(folder_info_peer_new->get_max_sequence() == p_peer->max_sequence());
+    CHECK(folder_info_peer_new->get_max_sequence() == 0);
 
     CHECK(folder_info_peer->get_file_infos().size() == 0);
     CHECK(fi_peer1->use_count() == 1);
@@ -586,9 +568,11 @@ TEST_CASE("cluster update nothing shared", "[model]") {
         pr_fi_peer.set_name("a/c.txt");
         pr_fi_peer.set_size(5ul);
         pr_fi_peer.set_block_size(5ul);
+        pr_fi_peer.set_sequence(5);
+
         auto fi_peer = file_info_t::create(sequencer->next_uuid(), pr_fi_peer, folder_info_peer).value();
-        folder_info_peer->add(fi_peer, false);
         fi_peer->assign_block(b1, 0);
+        REQUIRE(folder_info_peer->add_strict(fi_peer));
 
         REQUIRE(folder_info_peer->get_file_infos().size() == 1);
     }

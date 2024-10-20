@@ -33,6 +33,7 @@ TEST_CASE("new file diff", "[model]") {
 
     proto::FileInfo file_info;
     file_info.set_name("a.txt");
+    file_info.set_sequence(folder_peer->get_max_sequence() + 1);
     auto version = file_info.mutable_version();
     auto counter = version->add_counters();
     counter->set_value(1);
@@ -41,7 +42,7 @@ TEST_CASE("new file diff", "[model]") {
     SECTION("trivial cases") {
         SECTION("no file on my side, clone blockless file") {
             auto file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
-            folder_peer->add(file_peer, false);
+            REQUIRE(folder_peer->add_strict(file_peer));
             REQUIRE(builder.clone_file(*file_peer).apply());
             auto file_my = folder_my->get_file_infos().by_name(file_info.name());
             REQUIRE(file_my);
@@ -63,11 +64,11 @@ TEST_CASE("new file diff", "[model]") {
             auto file_my = file_info_t::create(sequencer->next_uuid(), file_info, folder_my).value();
             file_my->assign_block(bi, 0);
             file_my->mark_local_available(0);
-            folder_my->add(file_my, false);
+            REQUIRE(folder_my->add_strict(file_my));
 
             file_info.set_modified_s(123);
             auto file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
-            folder_peer->add(file_peer, false);
+            REQUIRE(folder_peer->add_strict(file_peer));
             file_peer->assign_block(bi, 0);
             file_peer->mark_local_available(0);
             REQUIRE(builder.clone_file(*file_peer).apply());
@@ -75,10 +76,10 @@ TEST_CASE("new file diff", "[model]") {
             file_my = folder_my->get_file_infos().by_name(file_info.name());
             REQUIRE(file_my);
             CHECK(file_my->is_locally_available());
-            CHECK(file_my->get_sequence() == 1);
+            CHECK(file_my->get_sequence() == 2);
             CHECK(file_my->get_modified_s() == 123);
             CHECK(file_my->get_folder_info() == folder_my.get());
-            CHECK(folder_my->get_max_sequence() == 1);
+            CHECK(folder_my->get_max_sequence() == 2);
         }
     }
 }

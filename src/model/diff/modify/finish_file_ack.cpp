@@ -57,7 +57,7 @@ auto finish_file_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
         local_file->mark_local_available(i);
     }
     local_file->mark_local();
-    local_folder->add(local_file, true);
+    local_folder->add_strict(local_file);
 
     return applicator_t::apply_sibling(cluster);
 }

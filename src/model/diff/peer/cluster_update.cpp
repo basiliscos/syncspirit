@@ -139,13 +139,12 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                 LOG_TRACE(log, "cluster_update_t, updating folder = {}, index = {:#x}, max seq = {} -> {}",
                           folder->get_label(), folder_info->get_index(), folder_info->get_max_sequence(),
                           d.max_sequence());
-                do_update = true;
             }
             if (do_update) {
                 auto uuid = uuid_t{};
                 assign(uuid, folder_info->get_uuid());
                 auto ptr = cluster_diff_ptr_t{};
-                ptr = new modify::upsert_folder_info_t(uuid, peer_id, f.id(), d.index_id(), d.max_sequence());
+                ptr = new modify::upsert_folder_info_t(uuid, peer_id, f.id(), d.index_id());
                 if (folder_update) {
                     folder_update = folder_update->assign_sibling(ptr.get());
                 } else {
@@ -213,7 +212,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             auto uuid = uuid_t{};
             assign(uuid, f.get_uuid());
             auto diff = cluster_diff_ptr_t{};
-            diff = new modify::upsert_folder_info_t(uuid, peer_id, f.get_folder()->get_id(), 0, 0);
+            diff = new modify::upsert_folder_info_t(uuid, peer_id, f.get_folder()->get_id(), 0);
             current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
         }
     }

@@ -197,10 +197,13 @@ TEST_CASE("file_info_t::local_file", "[model]") {
     }
 
     SECTION("there is identical local file") {
+        pr_file.set_sequence(folder_my->get_max_sequence() + 1);
         auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
-        folder_my->add(file_my, false);
+        REQUIRE(folder_my->add_strict(file_my));
+
+        pr_file.set_sequence(folder_peer->get_max_sequence() + 1);
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
-        folder_peer->add(file_peer, false);
+        REQUIRE(folder_peer->add_strict(file_peer));
 
         auto lf = file_peer->local_file();
         REQUIRE(lf);

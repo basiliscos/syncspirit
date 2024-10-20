@@ -164,7 +164,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
             file_1.set_sequence(10ul);
             auto file_2 = proto::FileInfo();
             file_2.set_name("b.txt");
-            file_2.set_sequence(10ul);
+            file_2.set_sequence(11ul);
             builder.make_index(peer_id.get_sha256(), folder->get_id())
                 .add(file_1, peer_device)
                 .add(file_2, peer_device)

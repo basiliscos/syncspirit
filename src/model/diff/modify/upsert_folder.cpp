@@ -34,7 +34,7 @@ upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, uuid_t uuid_, db::Folde
         auto fi_uuid = sequencer.next_uuid();
         auto fi_index = sequencer.next_uint64();
         auto diff = cluster_diff_ptr_t{};
-        diff = new upsert_folder_info_t(fi_uuid, device.device_id().get_sha256(), db.id(), fi_index, 0);
+        diff = new upsert_folder_info_t(fi_uuid, device.device_id().get_sha256(), db.id(), fi_index);
         assign_child(diff);
     }
 }

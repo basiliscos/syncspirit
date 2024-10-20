@@ -86,7 +86,6 @@ folder_info_t::folder_info_t(const uuid_t &uuid, const device_ptr_t &device_, co
 void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
     index = fi.index_id();
     max_sequence = fi.max_sequence();
-    max_sequence == 0;
 }
 
 std::string_view folder_info_t::get_key() const noexcept { return std::string_view(key, data_length); }
@@ -100,14 +99,20 @@ bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
     return r.first == key + data_length;
 }
 
-void folder_info_t::add(const file_info_ptr_t &file_info, bool inc_max_sequence) noexcept {
+void folder_info_t::add_relaxed(const file_info_ptr_t &file_info) noexcept {
     file_infos.put(file_info);
     auto seq = file_info->get_sequence();
-    if (inc_max_sequence && seq > max_sequence) {
+    max_sequence = std::max(max_sequence, seq);
+}
+
+bool folder_info_t::add_strict(const file_info_ptr_t &file_info) noexcept {
+    auto seq = file_info->get_sequence();
+    if (seq > max_sequence) {
         max_sequence = seq;
-    } else {
-        assert(seq <= max_sequence);
+        file_infos.put(file_info);
+        return true;
     }
+    return false;
 }
 
 void folder_info_t::serialize(db::FolderInfo &storage) const noexcept {
@@ -121,11 +126,10 @@ std::string folder_info_t::serialize() const noexcept {
     return r.SerializeAsString();
 }
 
-void folder_info_t::set_max_sequence(std::int64_t value) noexcept { max_sequence = value; }
-
 void folder_info_t::set_index(std::uint64_t value) noexcept {
     if (value != this->index) {
         index = value;
+        max_sequence = 0;
         file_infos.clear();
     }
 }

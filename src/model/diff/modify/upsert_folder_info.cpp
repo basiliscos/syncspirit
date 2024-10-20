@@ -12,9 +12,8 @@
 using namespace syncspirit::model::diff::modify;
 
 upsert_folder_info_t::upsert_folder_info_t(const uuid_t &uuid_, std::string_view device_id_,
-                                           std::string_view folder_id_, std::uint64_t index_id_,
-                                           std::int64_t max_sequence_) noexcept
-    : uuid{uuid_}, device_id{device_id_}, folder_id{folder_id_}, index_id{index_id_}, max_sequence{max_sequence_} {}
+                                           std::string_view folder_id_, std::uint64_t index_id_) noexcept
+    : uuid{uuid_}, device_id{device_id_}, folder_id{folder_id_}, index_id{index_id_} {}
 
 auto upsert_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto device = cluster.get_devices().by_sha256(device_id);
@@ -29,16 +28,15 @@ auto upsert_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outc
     auto &folder_infos = folder->get_folder_infos();
     auto fi = folder_infos.by_device(*device);
     if (fi) {
-        fi->set_max_sequence(max_sequence);
         fi->set_index(index_id);
         LOG_TRACE(log, "applying upsert_folder_info_t (update), folder = {} ({}), device = {}, index = {:x}",
                   folder->get_label(), folder_id, device->device_id(), index_id);
+        fi->notify_update();
     } else {
         LOG_TRACE(log, "applying upsert_folder_info_t (create), folder = {} ({}), device = {}, index = {:x}",
                   folder->get_label(), folder_id, device->device_id(), index_id);
         db::FolderInfo db;
         db.set_index_id(index_id);
-        db.set_max_sequence(max_sequence);
 
         auto opt = folder_info_t::create(uuid, db, device, folder);
         if (!opt) {

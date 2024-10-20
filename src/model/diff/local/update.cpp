@@ -80,7 +80,6 @@ auto update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<
 
     auto file = this->file;
     auto seq = folder_info->get_max_sequence() + 1;
-    folder_info->set_max_sequence(seq);
     file.set_sequence(seq);
     auto version_ptr = file.mutable_version();
 
@@ -111,7 +110,7 @@ auto update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<
         file_info = std::move(prev_file);
     }
 
-    folder_info->add(file_info, true);
+    folder_info->add_strict(file_info);
     return applicator_t::apply_sibling(cluster);
 }
 

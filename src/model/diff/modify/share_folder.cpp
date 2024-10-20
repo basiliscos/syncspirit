@@ -35,14 +35,13 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
     }
 
     return new share_folder_t(sequencer.next_uuid(), peer.device_id().get_sha256(), folder.get_id(), index,
-                              max_sequence, pending_folder);
+                              pending_folder);
 }
 
 share_folder_t::share_folder_t(const uuid_t &uuid, std::string_view device_id, std::string_view folder_id_,
-                               std::uint64_t index_id, std::int64_t max_sequence,
-                               model::pending_folder_ptr_t uf) noexcept
+                               std::uint64_t index_id, model::pending_folder_ptr_t uf) noexcept
     : peer_id(device_id), folder_id{folder_id_} {
-    auto current = assign_child(new upsert_folder_info_t(uuid, device_id, folder_id, index_id, max_sequence));
+    auto current = assign_child(new upsert_folder_info_t(uuid, device_id, folder_id, index_id));
     if (uf) {
         auto keys = remove_pending_folders_t::keys_t{};
         keys.emplace_back(std::string{uf->get_key()});

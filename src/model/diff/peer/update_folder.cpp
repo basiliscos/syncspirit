@@ -66,9 +66,10 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
             file = std::move(prev_file);
         }
 
-        folder_info->add(file, true);
-        folder->notify_update();
+        folder_info->add_strict(file);
     }
+
+    folder->notify_update();
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
 

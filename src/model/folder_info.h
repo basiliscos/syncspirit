@@ -53,7 +53,8 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     bool operator==(const folder_info_t &other) const noexcept;
     bool operator!=(const folder_info_t &other) const noexcept { return !(*this == other); }
 
-    void add(const file_info_ptr_t &file_info, bool inc_max_sequence) noexcept;
+    void add_relaxed(const file_info_ptr_t &file_info) noexcept;
+    bool add_strict(const file_info_ptr_t &file_info) noexcept;
     void serialize(db::FolderInfo &storage) const noexcept;
     std::string serialize() const noexcept;
 
@@ -63,7 +64,6 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     inline device_t *get_device() const noexcept { return device; }
     inline folder_t *get_folder() const noexcept { return folder; }
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
-    void set_max_sequence(std::int64_t value) noexcept;
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
     inline const file_infos_map_t &get_file_infos() const noexcept { return file_infos; }
     std::optional<proto::Index> generate() noexcept;

@@ -912,12 +912,14 @@ void test_peer_3_folders_6_files() {
             auto f2_id = "356";
             auto f3_id = "789";
 
+            auto next_sequence = 6ul;
+
             auto make_file = [&](std::string name) {
                 auto file = proto::FileInfo();
                 file.set_name(name);
                 file.set_size(0);
                 file.set_block_size(0);
-                file.set_sequence(6ul);
+                file.set_sequence(++next_sequence);
                 auto version = file.mutable_version();
                 auto counter = version->add_counters();
                 counter->set_id(1);

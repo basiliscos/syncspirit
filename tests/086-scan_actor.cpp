@@ -162,6 +162,7 @@ void test_meta_changes() {
             pr_fi.set_modified_s(modified);
             pr_fi.set_block_size(5ul);
             pr_fi.set_size(5ul);
+            pr_fi.set_sequence(folder_info_peer->get_max_sequence() + 1);
 
             auto version = pr_fi.mutable_version();
             auto counter = version->add_counters();
@@ -179,7 +180,7 @@ void test_meta_changes() {
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
-                folder_info_peer->add(file_peer, false);
+                REQUIRE(folder_info_peer->add_strict(file_peer));
                 builder->clone_file(*file_peer).scan_start(folder->get_id()).apply(*sup);
 
                 auto file = files->by_name(pr_fi.name());
@@ -191,7 +192,7 @@ void test_meta_changes() {
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
-                folder_info_peer->add(file_peer, false);
+                REQUIRE(folder_info_peer->add_strict(file_peer));
 
                 builder->clone_file(*file_peer).apply(*sup);
                 auto file = files->by_name(pr_fi.name());
@@ -261,7 +262,7 @@ void test_meta_changes() {
                 auto file = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file->assign_block(b, 0);
                 file->assign_block(b2, 1);
-                folder_info_peer->add(file, false);
+                REQUIRE(folder_info_peer->add_strict(file));
 
                 // auto file = files->by_name(pr_fi.name());
                 auto path = file->get_path().string() + ".syncspirit-tmp";
@@ -349,7 +350,7 @@ void test_meta_changes() {
                 auto file_my = file_info_t::create(uuid_1, pr_fi, folder_info).value();
                 file_my->assign_block(b, 0);
                 file_my->lock();
-                folder_info->add(file_my, false);
+                REQUIRE(folder_info->add_strict(file_my));
 
                 pr_fi.set_size(15ul);
                 counter->set_id(2);
@@ -359,7 +360,7 @@ void test_meta_changes() {
                 file_peer->assign_block(b, 0);
                 file_peer->assign_block(b2, 1);
                 file_peer->assign_block(b3, 2);
-                folder_info_peer->add(file_peer, false);
+                REQUIRE(folder_info_peer->add_strict(file_peer));
 
                 auto file = files->by_name(pr_fi.name());
                 auto path_my = file->get_path().string();
@@ -389,7 +390,7 @@ void test_meta_changes() {
                 file_my->assign_block(b, 2);
                 file_my->lock();
                 cluster->get_blocks().put(b);
-                folder_info->add(file_my, false);
+                REQUIRE(folder_info->add_strict(file_my));
 
                 pr_fi.set_size(15ul);
                 counter->set_id(2);

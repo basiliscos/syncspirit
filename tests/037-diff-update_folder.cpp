@@ -34,7 +34,6 @@ TEST_CASE("update folder (via Index)", "[model]") {
     auto sha256 = peer_id.get_sha256();
     SECTION("successful case") {
         auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
-        peer_folder_info->set_max_sequence(10ul);
 
         auto file = proto::FileInfo();
         file.set_name("a.txt");
@@ -56,7 +55,6 @@ TEST_CASE("update folder (via Index)", "[model]") {
         auto key = std::string(f->get_key());
 
         SECTION("when a file with existing name is added, key & instance are kept") {
-            peer_folder_info->set_max_sequence(11ul);
             file.set_modified_s(2);
             file.set_sequence(11ul);
             REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
@@ -71,7 +69,6 @@ TEST_CASE("update folder (via Index)", "[model]") {
             auto &blocks_map = cluster->get_blocks();
             REQUIRE(blocks_map.size() == 1);
             auto prev_block = blocks_map.begin()->item;
-            peer_folder_info->set_max_sequence(11ul);
             file.set_modified_s(2);
             file.set_sequence(11ul);
             file.mutable_blocks(0)->set_hash("345");
@@ -95,17 +92,6 @@ TEST_CASE("update folder (via Index)", "[model]") {
         REQUIRE(ec);
         CHECK(ec == model::make_error_code(model::error_code_t::folder_is_not_shared));
     }
-
-#if 0
-    SECTION("exceed max sequence") {
-        pr_index.set_folder(db_folder_1.id());
-        auto f = pr_index.add_files();
-        f->set_sequence(999);
-        auto opt = diff::peer::update_folder_t::create(*cluster, *peer_device, pr_index);
-        REQUIRE(!opt);
-        CHECK(opt.error() == model::make_error_code(model::error_code_t::exceed_max_sequence));
-    }
-#endif
 
     SECTION("blocks are not expected") {
         auto file = proto::FileInfo();

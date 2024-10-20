@@ -126,6 +126,7 @@ void test_clone_file() {
             std::int64_t modified = 1641828421;
             pr_fi.set_name("q.txt");
             pr_fi.set_modified_s(modified);
+            pr_fi.set_sequence(folder_peer->get_max_sequence() + 1);
             auto version = pr_fi.mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1);
@@ -133,7 +134,7 @@ void test_clone_file() {
 
             auto make_file = [&]() {
                 auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
-                folder_peer->add(file, false);
+                REQUIRE(folder_peer->add_strict(file));
                 return file;
             };
 
@@ -240,6 +241,7 @@ void test_append_block() {
         void main() noexcept override {
             std::int64_t modified = 1641828421;
             proto::FileInfo pr_source;
+            auto next_sequence = 7ul;
             pr_source.set_name("q.txt");
             pr_source.set_block_size(5ul);
             pr_source.set_modified_s(modified);
@@ -267,11 +269,12 @@ void test_append_block() {
             auto blocks = std::vector<block_info_ptr_t>{b, b2};
 
             auto make_file = [&](size_t count) {
+                pr_source.set_sequence(++next_sequence);
                 auto file = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
                 for (size_t i = 0; i < count; ++i) {
                     file->assign_block(blocks[i], i);
                 }
-                folder_peer->add(file, false);
+                REQUIRE(folder_peer->add_strict(file));
                 return file;
             };
 
@@ -375,13 +378,16 @@ void test_clone_block() {
             auto counter = version->add_counters();
             counter->set_id(1);
             counter->set_value(peer_device->as_uint());
+            auto next_sequence = 7ul;
 
             auto make_file = [&](const proto::FileInfo &fi, size_t count) {
-                auto file = file_info_t::create(sequencer->next_uuid(), fi, folder_peer).value();
+                auto copy = fi;
+                copy.set_sequence(++next_sequence);
+                auto file = file_info_t::create(sequencer->next_uuid(), copy, folder_peer).value();
                 for (size_t i = 0; i < count; ++i) {
                     file->assign_block(blocks[i], i);
                 }
-                folder_peer->add(file, false);
+                REQUIRE(folder_peer->add_strict(file));
                 return file;
             };
 
@@ -465,9 +471,10 @@ void test_clone_block() {
                     pr_target.set_size(10ul);
                     auto target = make_file(pr_target, 2);
 
+                    pr_source.set_sequence(folder_peer->get_max_sequence() + 1);
                     auto source = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
                     source->assign_block(blocks[1], 0);
-                    folder_peer->add(source, false);
+                    REQUIRE(folder_peer->add_strict(source));
 
                     builder.clone_file(*source).clone_file(*target).apply(*sup);
 
@@ -492,12 +499,13 @@ void test_clone_block() {
             }
 
             SECTION("source & target are is the same file") {
+                pr_source.set_sequence(folder_peer->get_max_sequence() + 1);
                 pr_source.set_size(10ul);
 
                 auto source = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
                 source->assign_block(blocks[0], 0);
                 source->assign_block(blocks[0], 1);
-                folder_peer->add(source, false);
+                REQUIRE(folder_peer->add_strict(source));
 
                 builder.clone_file(*source).apply(*sup);
 
@@ -550,6 +558,7 @@ void test_requesting_block() {
             pr_source.set_block_size(5ul);
             pr_source.set_modified_s(modified);
             pr_source.set_size(10);
+            pr_source.set_sequence(folder_my->get_max_sequence() + 1);
             auto version = pr_source.mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1);
@@ -560,7 +569,7 @@ void test_requesting_block() {
             auto file = file_info_t::create(sequencer->next_uuid(), pr_source, folder_my).value();
             file->assign_block(b, 0);
             file->assign_block(b2, 1);
-            folder_my->add(file, false);
+            folder_my->add_relaxed(file);
 
             auto req = proto::Request();
             req.set_folder(std::string(folder->get_id()));

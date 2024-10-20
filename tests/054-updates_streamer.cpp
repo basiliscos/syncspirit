@@ -57,8 +57,7 @@ TEST_CASE("updates_streamer", "[model]") {
         pr_file.set_name(name);
         pr_file.set_sequence(seq++);
         auto f = file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value();
-        my_files.put(f);
-        my_folder->set_max_sequence(f->get_sequence());
+        my_folder->add_strict(f);
         return f;
     };
 
@@ -135,7 +134,7 @@ TEST_CASE("updates_streamer", "[model]") {
         REQUIRE(streamer);
 
         f1->set_sequence(++seq);
-        my_folder->set_max_sequence(seq);
+        my_folder->add_strict(f1);
         streamer.on_update(*f1);
 
         REQUIRE(streamer.next() == f2);
