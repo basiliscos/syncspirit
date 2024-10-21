@@ -391,7 +391,7 @@ void test_folder_sharing() {
             REQUIRE(folder->get_folder_infos().size() == 2);
             auto fi = folder->get_folder_infos().by_device(*peer_device);
             REQUIRE(fi);
-            CHECK(fi->get_index() != 5);
+            CHECK(fi->get_index() == 5);
             CHECK(fi->get_max_sequence() == 0);
             REQUIRE(cluster_clone->get_pending_folders().size() == 0);
         }

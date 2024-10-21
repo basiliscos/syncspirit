@@ -1125,7 +1125,6 @@ void test_download_from_scratch() {
     F(false, 10, false).run();
 }
 
-#if 0
 void test_download_resuming() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -1147,6 +1146,8 @@ void test_download_resuming() {
             sup->do_process();
 
             builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
+            auto folder_peer = folder_1->get_folder_infos().by_device(*peer_device);
+            REQUIRE(folder_peer->get_index() == d_peer->index_id());
 
             auto index = proto::Index{};
             index.set_folder(std::string(folder_1->get_id()));
@@ -1178,6 +1179,11 @@ void test_download_resuming() {
             target->do_shutdown();
             sup->do_process();
 
+            CHECK(!folder_1->is_synchronizing());
+            for(auto& it: cluster->get_blocks()) {
+                REQUIRE(!it.item->is_locked());
+            }
+
             start_target();
             peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
             peer_actor->push_block("67890", 1, file->name());
@@ -1197,7 +1203,6 @@ void test_download_resuming() {
     };
     F(false, 10, false).run();
 }
-#endif
 
 void test_my_sharing() {
     struct F : fixture_t {
@@ -1390,7 +1395,7 @@ int _init() {
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
     REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
     REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
-    // REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
+    REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
     REGISTER_TEST_CASE(test_my_sharing, "test_my_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");

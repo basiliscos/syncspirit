@@ -255,7 +255,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
 
         SECTION("peer index has changed") {
             p_peer->set_max_sequence(123456u);
-            p_peer->set_index_id(7ul);
+            p_peer->set_index_id(1234ul);
 
             auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
             REQUIRE(diff_opt);
@@ -264,7 +264,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             auto r_a = diff->apply(*cluster);
             REQUIRE(r_a);
             auto fi = folder_infos.by_device(*peer_device);
-            REQUIRE(fi->get_index() == 7ul);
+            REQUIRE(fi->get_index() == 1234ul);
             REQUIRE(fi->get_max_sequence() == 0);
             REQUIRE(fi.get() == folder_info_peer.get());
 

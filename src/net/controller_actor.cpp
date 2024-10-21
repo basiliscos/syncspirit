@@ -109,6 +109,14 @@ void controller_actor_t::shutdown_finish() noexcept {
     file_iterator->deactivate();
     peer->release_iterator(file_iterator);
     file_iterator.reset();
+    for (auto& [folder, blocks]: synchronizing_folders) {
+        if (blocks.size()) {
+            push(new model::diff::local::synchronization_finish_t(folder->get_id()));
+            for (auto& b: blocks) {
+                b->unlock();
+            }
+        }
+    }
     send_diff();
     r::actor_base_t::shutdown_finish();
 }

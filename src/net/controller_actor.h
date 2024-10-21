@@ -108,8 +108,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     void shutdown_finish() noexcept override;
 
   private:
-    enum substate_t { none = 0, iterating_files, iterating_blocks };
-
     struct pull_signal_t final : model::diff::local::custom_t {
         pull_signal_t(void *controller) noexcept;
         outcome::result<void> visit(model::diff::cluster_visitor_t &, void *) const noexcept override;
@@ -198,7 +196,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     model::file_iterator_ptr_t file_iterator;
     model::block_iterator_ptr_t block_iterator;
     model::updates_streamer_t updates_streamer;
-    int substate = substate_t::none;
     synchronizing_folders_t synchronizing_folders;
     block_write_queue_t block_write_queue;
 };

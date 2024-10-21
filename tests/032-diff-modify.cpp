@@ -54,7 +54,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         CHECK(folder->get_label() == "label-2");
     }
 
-    SECTION("share folder (w/o unknown folder)") {
+    SECTION("share folder") {
         REQUIRE(builder.upsert_folder(id, path, label).apply());
 
         SECTION("w/o unknown folder") {
@@ -94,7 +94,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
 
             CHECK(fi_peer->get_device() == peer_device);
             CHECK(fi_peer->get_max_sequence() == 0);
-            CHECK(fi_peer->get_index() != db_fi->index_id());
+            CHECK(fi_peer->get_index() == db_fi->index_id());
             CHECK(cluster->get_pending_folders().size() == 0);
 
             auto pr_file_1 = proto::FileInfo();
