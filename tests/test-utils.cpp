@@ -72,9 +72,7 @@ std::string hash_string(const std::string_view &hash) noexcept {
     auto r = std::string();
     r.reserve(hash.size() * 2);
     for (size_t i = 0; i < hash.size(); ++i) {
-        char buff[3];
-        sprintf(buff, "%02x", (unsigned char)hash[i]);
-        r += std::string_view(buff, 2);
+        r += fmt::format("{:02x}", (unsigned char)hash[i]);
     }
     return r;
 }
