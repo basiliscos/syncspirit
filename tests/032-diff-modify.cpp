@@ -5,19 +5,11 @@
 #include "diff-builder.h"
 #include "model/cluster.h"
 #include "model/misc/sequencer.h"
-#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
-
-template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor_t {
-    F fn;
-
-    my_cluster_update_visitor_t(F &&fn_) : fn{std::forward<F>(fn_)} {}
-    outcome::result<void> operator()(const diff::peer::cluster_update_t &diff) noexcept override { return fn(diff); }
-};
 
 TEST_CASE("cluster modifications from ui", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
