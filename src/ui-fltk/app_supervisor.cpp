@@ -393,9 +393,10 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
 }
 
 void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
+    using F = std::ios_base;
     log->debug("going to write config");
     auto &path = get_config_path();
-    std::fstream f_cfg(path, f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
+    std::fstream f_cfg(path, F::binary | F::trunc | F::in | F::out);
     auto r = config::serialize(cfg, f_cfg);
     if (!r) {
         log->error("cannot save default config at {}: {}", path, r.error().message());
