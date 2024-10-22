@@ -71,12 +71,9 @@ void file_iterator_t::deactivate() noexcept {
 }
 
 auto file_iterator_t::find_folder(folder_t *folder) noexcept -> folder_iterator_t & {
-    for (auto &it : folders_list) {
-        if (it.peer_folder->get_folder() == folder) {
-            return it;
-        }
-    }
-    assert(0 && "should not happen");
+    auto predicate = [&](auto &it) -> bool { return it.peer_folder->get_folder() == folder; };
+    auto it = std::find_if(folders_list.begin(), folders_list.end(), predicate);
+    return *it;
 }
 
 auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t & {
