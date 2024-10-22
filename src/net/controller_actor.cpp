@@ -15,9 +15,9 @@
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/finish_file_ack.h"
-#include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_peer.h"
-#include "model/diff/modify/unshare_folder.h"
+#include "model/diff/modify/remove_folder_infos.h"
+#include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 #include "proto/bep_support.h"
@@ -35,6 +35,12 @@ namespace resource {
 r::plugin::resource_id_t peer = 0;
 r::plugin::resource_id_t hash = 1;
 } // namespace resource
+
+struct context_t {
+    bool from_self;
+    bool notify_cluster_change;
+};
+
 } // namespace
 
 controller_actor_t::controller_actor_t(config_t &config)
@@ -109,10 +115,10 @@ void controller_actor_t::shutdown_finish() noexcept {
     file_iterator->deactivate();
     peer->release_iterator(file_iterator);
     file_iterator.reset();
-    for (auto& [folder, blocks]: synchronizing_folders) {
+    for (auto &[folder, blocks] : synchronizing_folders) {
         if (blocks.size()) {
             push(new model::diff::local::synchronization_finish_t(folder->get_id()));
-            for (auto& b: blocks) {
+            for (auto &b : blocks) {
                 b->unlock();
             }
         }
@@ -301,12 +307,19 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
         pulls = planned_pulls;
         planned_pulls = 0;
     }
+    auto ctx = context_t{custom == this, false};
     LOG_TRACE(log, "on_model_update, planned pulls = {}", pulls);
     auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this, custom);
+    auto r = diff.visit(*this, &ctx);
     if (!r) {
         auto ee = make_error(r.assume_error());
         return do_shutdown(ee);
+    }
+    if (ctx.notify_cluster_change) {
+        send_cluster_config();
+        if (updates_streamer) {
+            updates_streamer = model::updates_streamer_t(*cluster, *peer);
+        }
     }
     if (pulls) {
         pull_next();
@@ -317,7 +330,8 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
 
 auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    if (custom != this) {
+    auto ctx = reinterpret_cast<context_t *>(custom);
+    if (!ctx->from_self) {
         return diff.visit_next(*this, custom);
     }
 
@@ -342,7 +356,8 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &d
 
 auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    if (custom == this) {
+    auto ctx = reinterpret_cast<context_t *>(custom);
+    if (ctx->from_self) {
         pull_ready();
     }
     return diff.visit_next(*this, custom);
@@ -360,26 +375,29 @@ auto controller_actor_t::operator()(const model::diff::modify::finish_file_ack_t
     return diff.visit_next(*this, custom);
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
+auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    if (diff.peer_id != peer->device_id().get_sha256()) {
-        return diff.visit_next(*this, custom);
+    auto process = (diff.device_id == peer->device_id().get_sha256()) ||
+                   (diff.device_id == cluster->get_device()->device_id().get_sha256());
+    if (process) {
+        auto ctx = reinterpret_cast<context_t *>(custom);
+        ctx->notify_cluster_change = true;
+        pull_ready();
     }
 
-    pull_ready();
-    send_cluster_config();
     return diff.visit_next(*this, custom);
 }
 
-auto controller_actor_t::operator()(const model::diff::modify::unshare_folder_t &diff, void *custom) noexcept
+auto controller_actor_t::operator()(const model::diff::modify::remove_folder_infos_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    if (diff.peer_id != peer->device_id().get_sha256()) {
-        return diff.visit_next(*this, custom);
-    }
-
-    send_cluster_config();
-    if (updates_streamer) {
-        updates_streamer = model::updates_streamer_t(*cluster, *peer);
+    for (auto &key : diff.keys) {
+        auto decomposed = model::folder_info_t::decompose_key(key);
+        auto device_key = decomposed.device_key();
+        if (device_key == peer->get_key() || device_key == cluster->get_device()->get_key()) {
+            auto ctx = reinterpret_cast<context_t *>(custom);
+            ctx->notify_cluster_change = true;
+            break;
+        }
     }
 
     return diff.visit_next(*this, custom);
@@ -399,7 +417,8 @@ auto controller_actor_t::operator()(const model::diff::local::update_t &diff, vo
 
 auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    if (custom == this) {
+    auto ctx = reinterpret_cast<context_t *>(custom);
+    if (ctx->from_self) {
         auto &folder_id = diff.folder_id;
         auto &file_name = diff.file_name;
         auto folder = cluster->get_folders().by_id(folder_id);
@@ -638,16 +657,6 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     }
 }
 
-#if 0
-void controller_actor_t::on_write_ack(model::message::write_ack_t &message) noexcept {
-    cluster->modify_write_requests(1);
-    if (message.payload.custom == this) {
-        process_block_write();
-        pull_ready();
-    }
-}
-#endif
-
 void controller_actor_t::push_block_write(model::diff::cluster_diff_ptr_t diff) noexcept {
     block_write_queue.emplace_back(std::move(diff));
     process_block_write();
@@ -715,8 +724,9 @@ controller_actor_t::pull_signal_t::pull_signal_t(void *controller_) noexcept : c
 auto controller_actor_t::pull_signal_t::visit(model::diff::cluster_visitor_t &visitor, void *custom) const noexcept
     -> outcome::result<void> {
     auto r = visitor(*this, custom);
-    if (r && custom == controller) {
-        auto self = reinterpret_cast<controller_actor_t *>(custom);
+    auto ctx = reinterpret_cast<context_t *>(custom);
+    auto self = static_cast<controller_actor_t *>(&visitor);
+    if (r && self == controller && ctx->from_self) {
         self->on_custom(*this);
     }
     return r;

@@ -15,6 +15,7 @@
 #include "utils/error_code.h"
 #include "proto/bep_support.h"
 #include <boost/core/demangle.hpp>
+#include <type_traits>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -1071,6 +1072,7 @@ void test_download_from_scratch() {
         using fixture_t::fixture_t;
         void main(diff_builder_t &) noexcept override {
             sup->do_process();
+            peer_actor->messages.clear();
 
             auto builder = diff_builder_t(*cluster);
             auto sha256 = peer_device->device_id().get_sha256();
@@ -1180,7 +1182,7 @@ void test_download_resuming() {
             sup->do_process();
 
             CHECK(!folder_1->is_synchronizing());
-            for(auto& it: cluster->get_blocks()) {
+            for (auto &it : cluster->get_blocks()) {
                 REQUIRE(!it.item->is_locked());
             }
 
@@ -1204,7 +1206,7 @@ void test_download_resuming() {
     F(false, 10, false).run();
 }
 
-void test_my_sharing() {
+void test_initiate_my_sharing() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main(diff_builder_t &) noexcept override {
@@ -1234,11 +1236,35 @@ void test_my_sharing() {
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(peer_actor->messages.size() == 1);
-            peer_msg = &peer_actor->messages.front()->payload;
-            peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
-            REQUIRE(peer_cluster_msg);
-            REQUIRE(*peer_cluster_msg);
-            REQUIRE((*peer_cluster_msg)->folders_size() == 1);
+            {
+                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
+                REQUIRE((peer_cluster_msg && *peer_cluster_msg));
+                auto &msg = *peer_cluster_msg;
+                REQUIRE(msg->folders_size() == 1);
+                auto f = msg->folders(0);
+                REQUIRE(f.devices_size() == 2);
+
+                using f_t = std::remove_reference_t<std::remove_cv_t<decltype(f.devices(0))>>;
+                auto f_my = (f_t *){};
+                auto f_peer = (f_t *){};
+                for (int i = 0; i < f.devices_size(); ++i) {
+                    auto &d = f.devices(i);
+                    if (d.id() == my_device->device_id().get_sha256()) {
+                        f_my = &d;
+                    } else if (d.id() == peer_device->device_id().get_sha256()) {
+                        f_peer = &d;
+                    }
+                }
+                REQUIRE(f_peer);
+                CHECK(f_peer->index_id());
+                CHECK(f_peer->max_sequence() == 0);
+
+                REQUIRE(f_my);
+                auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
+                CHECK(f_my->index_id() == folder_my->get_index());
+                CHECK(f_my->max_sequence() == 0);
+            }
 
             // unshare folder_1
             auto peer_fi = folder_1->get_folder_infos().by_device(*peer_device);
@@ -1252,6 +1278,93 @@ void test_my_sharing() {
             REQUIRE(peer_cluster_msg);
             REQUIRE(*peer_cluster_msg);
             REQUIRE((*peer_cluster_msg)->folders_size() == 0);
+        }
+    };
+    F(false, 10, false).run();
+}
+
+void test_initiate_peer_sharing() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            sup->do_process();
+
+            auto cc = proto::ClusterConfig{};
+            auto folder = cc.add_folders();
+            folder->set_id(std::string(folder_1->get_id()));
+            auto d_peer = folder->add_devices();
+            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
+            d_peer->set_max_sequence(15);
+            d_peer->set_index_id(0x12345);
+
+            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            sup->do_process();
+
+            REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+            REQUIRE(peer_actor->messages.size() == 1);
+            {
+                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
+                REQUIRE(peer_cluster_msg);
+                REQUIRE(*peer_cluster_msg);
+                REQUIRE((*peer_cluster_msg)->folders_size() == 0);
+            }
+
+            // share folder_1
+            peer_actor->messages.clear();
+            auto sha256 = peer_device->device_id().get_sha256();
+            diff_builder_t(*cluster).share_folder(sha256, folder_1->get_id()).apply(*sup);
+
+            REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+            REQUIRE(peer_actor->messages.size() == 1);
+            {
+                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
+                REQUIRE((peer_cluster_msg && *peer_cluster_msg));
+                auto &msg = *peer_cluster_msg;
+                REQUIRE(msg->folders_size() == 1);
+                auto f = msg->folders(0);
+                REQUIRE(f.devices_size() == 2);
+
+                using f_t = std::remove_reference_t<std::remove_cv_t<decltype(f.devices(0))>>;
+                auto f_my = (f_t *){};
+                auto f_peer = (f_t *){};
+                for (int i = 0; i < f.devices_size(); ++i) {
+                    auto &d = f.devices(i);
+                    if (d.id() == my_device->device_id().get_sha256()) {
+                        f_my = &d;
+                    } else if (d.id() == peer_device->device_id().get_sha256()) {
+                        f_peer = &d;
+                    }
+                }
+                REQUIRE(f_peer);
+                CHECK(f_peer->index_id() == d_peer->index_id());
+                CHECK(f_peer->max_sequence() == 0);
+
+                REQUIRE(f_my);
+                auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
+                CHECK(f_my->index_id() == folder_my->get_index());
+                CHECK(f_my->max_sequence() == 0);
+            }
+
+            // unshare folder_1
+            auto peer_fi = folder_1->get_folder_infos().by_device(*peer_device);
+            peer_actor->messages.clear();
+            diff_builder_t(*cluster).unshare_folder(*peer_fi).apply(*sup);
+            REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            REQUIRE(peer_actor->messages.size() == 1);
+            {
+                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
+                REQUIRE(peer_cluster_msg);
+                REQUIRE(*peer_cluster_msg);
+                REQUIRE((*peer_cluster_msg)->folders_size() == 0);
+            }
         }
     };
     F(false, 10, false).run();
@@ -1396,7 +1509,8 @@ int _init() {
     REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
     REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
     REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
-    REGISTER_TEST_CASE(test_my_sharing, "test_my_sharing", "[net]");
+    REGISTER_TEST_CASE(test_initiate_my_sharing, "test_initiate_my_sharing", "[net]");
+    REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
     REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
