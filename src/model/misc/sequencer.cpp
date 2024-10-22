@@ -7,7 +7,7 @@ namespace syncspirit::model {
 
 sequencer_t::sequencer_t(size_t seed) noexcept : uuid_generator(rng_engine) { rng_engine.seed(seed); }
 
-uuid_t sequencer_t::next_uuid() noexcept {
+bu::uuid sequencer_t::next_uuid() noexcept {
     auto lock = lock_t(mutex);
     return uuid_generator();
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -9,9 +9,10 @@
 
 namespace syncspirit::model {
 
-static const constexpr size_t uuid_length = 16;
-using uuid_t = boost::uuids::uuid;
+namespace bu = boost::uuids;
 
-SYNCSPIRIT_API void assign(uuid_t &, std::string_view source) noexcept;
+static const constexpr size_t uuid_length = 16;
+
+SYNCSPIRIT_API void assign(bu::uuid &, std::string_view source) noexcept;
 
 } // namespace syncspirit::model

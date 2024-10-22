@@ -141,7 +141,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                           d.max_sequence());
             }
             if (do_update) {
-                auto uuid = uuid_t{};
+                auto uuid = bu::uuid{};
                 assign(uuid, folder_info->get_uuid());
                 auto ptr = cluster_diff_ptr_t{};
                 ptr = new modify::upsert_folder_info_t(uuid, peer_id, f.id(), d.index_id());
@@ -209,7 +209,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     if (reshared_folders.size()) {
         for (auto &it : reshared_folders) {
             auto &f = *it.item;
-            auto uuid = uuid_t{};
+            auto uuid = bu::uuid{};
             assign(uuid, f.get_uuid());
             auto diff = cluster_diff_ptr_t{};
             diff = new modify::upsert_folder_info_t(uuid, peer_id, f.get_folder()->get_id(), 0);

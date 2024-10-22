@@ -2,10 +2,6 @@
 #include "db/prefix.h"
 #include "misc/error_code.h"
 
-#ifdef uuid_t
-#undef uuid_t
-#endif
-
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(syncspirit::db::prefix::pending_folder);
@@ -32,7 +28,7 @@ outcome::result<pending_folder_ptr_t> pending_folder_t::create(std::string_view 
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<pending_folder_ptr_t> pending_folder_t::create(const uuid_t &uuid, const db::PendingFolder &data,
+outcome::result<pending_folder_ptr_t> pending_folder_t::create(const bu::uuid &uuid, const db::PendingFolder &data,
                                                                const device_id_t &device_) noexcept {
     auto ptr = pending_folder_ptr_t();
     ptr = new pending_folder_t(uuid, device_);
@@ -40,7 +36,7 @@ outcome::result<pending_folder_ptr_t> pending_folder_t::create(const uuid_t &uui
     return outcome::success(std::move(ptr));
 }
 
-pending_folder_t::pending_folder_t(const uuid_t &uuid, const device_id_t &device_) noexcept : device{device_} {
+pending_folder_t::pending_folder_t(const bu::uuid &uuid, const device_id_t &device_) noexcept : device{device_} {
     key[0] = prefix;
     std::copy(uuid.begin(), uuid.end(), key + 1);
     auto sha256 = device.get_sha256();

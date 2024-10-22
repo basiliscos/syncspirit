@@ -39,7 +39,7 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
                               pending_folder);
 }
 
-share_folder_t::share_folder_t(const uuid_t &uuid, std::string_view device_id, std::string_view folder_id_,
+share_folder_t::share_folder_t(const bu::uuid &uuid, std::string_view device_id, std::string_view folder_id_,
                                std::uint64_t index_id, model::pending_folder_ptr_t uf) noexcept
     : peer_id(device_id), folder_id{folder_id_} {
     auto current = assign_child(new upsert_folder_info_t(uuid, device_id, folder_id, index_id));

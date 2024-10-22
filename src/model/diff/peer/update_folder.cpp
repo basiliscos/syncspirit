@@ -101,7 +101,7 @@ static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, st
     auto orphaned_candidates = orphaned_blocks_t{};
     for (const auto &f : files) {
         auto file = file_info_ptr_t{};
-        uuid_t file_uuid;
+        bu::uuid file_uuid;
         auto prev_file = fm.by_name(f.name());
         if (prev_file) {
             assign(file_uuid, prev_file->get_uuid());

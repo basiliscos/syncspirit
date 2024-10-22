@@ -21,7 +21,7 @@ struct SYNCSPIRIT_API sequencer_t : arc_base_t<sequencer_t> {
     sequencer_t(sequencer_t &&) = delete;
     sequencer_t(const sequencer_t &) = delete;
 
-    uuid_t next_uuid() noexcept;
+    bu::uuid next_uuid() noexcept;
     uint64_t next_uint64() noexcept;
 
   private:

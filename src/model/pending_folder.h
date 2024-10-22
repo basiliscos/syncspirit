@@ -23,7 +23,7 @@ using pending_folder_ptr_t = intrusive_ptr_t<pending_folder_t>;
 struct SYNCSPIRIT_API pending_folder_t final : augmentable_t<pending_folder_t>, folder_data_t {
 
     static outcome::result<pending_folder_ptr_t> create(std::string_view key, const db::PendingFolder &data) noexcept;
-    static outcome::result<pending_folder_ptr_t> create(const uuid_t &uuid, const db::PendingFolder &data,
+    static outcome::result<pending_folder_ptr_t> create(const bu::uuid &uuid, const db::PendingFolder &data,
                                                         const device_id_t &device_) noexcept;
 
     inline const device_id_t &device_id() const noexcept { return device; }
@@ -35,7 +35,7 @@ struct SYNCSPIRIT_API pending_folder_t final : augmentable_t<pending_folder_t>, 
 
   private:
     pending_folder_t(std::string_view key, const device_id_t &device_) noexcept;
-    pending_folder_t(const uuid_t &uuid, const device_id_t &device_) noexcept;
+    pending_folder_t(const bu::uuid &uuid, const device_id_t &device_) noexcept;
     void assign_fields(const db::PendingFolder &data) noexcept;
 
     device_id_t device;

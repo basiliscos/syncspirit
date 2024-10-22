@@ -18,11 +18,11 @@ struct SYNCSPIRIT_API upsert_folder_t final : cluster_diff_t {
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
-    uuid_t uuid;
+    bu::uuid uuid;
     db::Folder db;
 
   private:
-    upsert_folder_t(sequencer_t &sequencer, uuid_t uuid, db::Folder db, model::folder_info_ptr_t folder_info,
+    upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid, db::Folder db, model::folder_info_ptr_t folder_info,
                     const model::device_t &device) noexcept;
 };
 

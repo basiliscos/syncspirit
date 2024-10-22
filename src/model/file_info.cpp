@@ -15,10 +15,6 @@
 #include <algorithm>
 #include <set>
 
-#ifdef uuid_t
-#undef uuid_t
-#endif
-
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
@@ -50,7 +46,7 @@ outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const
     return outcome::success(std::move(ptr));
 }
 
-auto file_info_t::create(const uuid_t &uuid_, const proto::FileInfo &info_,
+auto file_info_t::create(const bu::uuid &uuid_, const proto::FileInfo &info_,
                          const folder_info_ptr_t &folder_info_) noexcept -> outcome::result<file_info_ptr_t> {
     auto ptr = file_info_ptr_t();
     ptr = new file_info_t(uuid_, folder_info_);
@@ -69,21 +65,21 @@ file_info_t::file_info_t(std::string_view key_, const folder_info_ptr_t &folder_
     std::copy(key_.begin(), key_.end(), key);
 }
 
-static void fill(char *key, const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept {
+static void fill(char *key, const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
     key[0] = prefix;
     auto fi_key = folder_info_->get_uuid();
     std::copy(fi_key.begin(), fi_key.end(), key + 1);
     std::copy(uuid.begin(), uuid.end(), key + 1 + fi_key.size());
 }
 
-std::string file_info_t::create_key(const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept {
+std::string file_info_t::create_key(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
     std::string key;
     key.resize(data_length);
     fill(key.data(), uuid, folder_info_);
     return key;
 }
 
-file_info_t::file_info_t(const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept
+file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept
     : folder_info{folder_info_.get()} {
     fill(key, uuid, folder_info_);
 }

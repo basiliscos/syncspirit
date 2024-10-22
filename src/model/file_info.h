@@ -54,9 +54,9 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
 
     static outcome::result<file_info_ptr_t> create(std::string_view key, const db::FileInfo &data,
                                                    const folder_info_ptr_t &folder_info_) noexcept;
-    static outcome::result<file_info_ptr_t> create(const uuid_t &uuid, const proto::FileInfo &info_,
+    static outcome::result<file_info_ptr_t> create(const bu::uuid &uuid, const proto::FileInfo &info_,
                                                    const folder_info_ptr_t &folder_info_) noexcept;
-    static std::string create_key(const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept;
+    static std::string create_key(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
 
     static decomposed_key_t decompose_key(std::string_view key);
 
@@ -150,7 +150,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     template <typename T> T as() const noexcept;
 
     file_info_t(std::string_view key, const folder_info_ptr_t &folder_info_) noexcept;
-    file_info_t(const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept;
+    file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
     outcome::result<void> reserve_blocks(size_t block_count) noexcept;
 
     void update_blocks(const proto::FileInfo &remote_info) noexcept;

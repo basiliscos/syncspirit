@@ -13,7 +13,7 @@ namespace syncspirit::model::diff::peer {
 
 struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
     using files_t = std::vector<proto::FileInfo>;
-    using uuids_t = std::vector<uuid_t>;
+    using uuids_t = std::vector<bu::uuid>;
     using blocks_t = std::vector<proto::BlockInfo>;
 
     static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, sequencer_t &sequencer,

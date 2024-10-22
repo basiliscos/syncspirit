@@ -21,7 +21,7 @@ auto clone_file_t::create(const model::file_info_t &source, sequencer_t &sequenc
     auto my_folder_info = my_folder_infos.by_device_id(device_id);
     auto &my_files = my_folder_info->get_file_infos();
     auto my_file = my_files.by_name(source.get_name());
-    uuid_t uuid;
+    bu::uuid uuid;
 
     if (!my_file) {
         uuid = sequencer.next_uuid();
@@ -35,7 +35,7 @@ auto clone_file_t::create(const model::file_info_t &source, sequencer_t &sequenc
 }
 
 clone_file_t::clone_file_t(proto::FileInfo proto_file_, std::string_view folder_id_, std::string_view peer_id_,
-                           uuid_t uuid_) noexcept
+                           bu::uuid uuid_) noexcept
     : proto_file{std::move(proto_file_)}, folder_id{folder_id_}, peer_id{peer_id_}, uuid{uuid_} {
     proto_file.set_sequence(0);
 }

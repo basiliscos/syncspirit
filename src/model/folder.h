@@ -30,7 +30,7 @@ using folder_ptr_t = intrusive_ptr_t<folder_t>;
 struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
 
     static outcome::result<folder_ptr_t> create(std::string_view key, const db::Folder &folder) noexcept;
-    static outcome::result<folder_ptr_t> create(const uuid_t &uuid, const db::Folder &folder) noexcept;
+    static outcome::result<folder_ptr_t> create(const bu::uuid &uuid, const db::Folder &folder) noexcept;
 
     using folder_data_t::assign_fields;
     using folder_data_t::serialize;
@@ -68,7 +68,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
 
   private:
     folder_t(std::string_view key) noexcept;
-    folder_t(const uuid_t &uuid) noexcept;
+    folder_t(const bu::uuid &uuid) noexcept;
 
     pt::ptime scan_start;
     pt::ptime scan_finish;

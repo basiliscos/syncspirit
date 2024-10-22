@@ -19,7 +19,7 @@ struct SYNCSPIRIT_API finish_file_ack_t final : cluster_diff_t {
     std::string folder_id;
     std::string peer_id;
     std::string file_name;
-    uuid_t uuid;
+    bu::uuid uuid;
 };
 
 } // namespace syncspirit::model::diff::modify

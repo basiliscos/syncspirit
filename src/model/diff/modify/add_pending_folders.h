@@ -14,7 +14,7 @@ struct SYNCSPIRIT_API add_pending_folders_t final : cluster_diff_t {
     struct item_t {
         db::PendingFolder db;
         std::string peer_id;
-        uuid_t uuid;
+        bu::uuid uuid;
     };
     using container_t = std::vector<item_t>;
 

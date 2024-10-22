@@ -14,7 +14,7 @@ auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, d
     auto &device = *cluster.get_device();
     auto prev_folder = folders.by_id(db.id());
     auto folder_info = prev_folder ? prev_folder->get_folder_infos().by_device(device) : nullptr;
-    auto uuid = uuid_t{};
+    auto uuid = bu::uuid{};
     if (prev_folder) {
         assign(uuid, prev_folder->get_uuid());
     } else {
@@ -26,7 +26,7 @@ auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, d
     return outcome::success(diff);
 }
 
-upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, uuid_t uuid_, db::Folder db_,
+upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Folder db_,
                                  model::folder_info_ptr_t folder_info, const model::device_t &device) noexcept
     : db{std::move(db_)}, uuid{uuid_} {
 

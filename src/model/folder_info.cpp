@@ -10,10 +10,6 @@
 #include <spdlog/spdlog.h>
 #include <algorithm>
 
-#ifdef uuid_t
-#undef uuid_t
-#endif
-
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder_info);
@@ -55,7 +51,7 @@ outcome::result<folder_info_ptr_t> folder_info_t::create(std::string_view key, c
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<folder_info_ptr_t> folder_info_t::create(const uuid_t &uuid, const db::FolderInfo &data,
+outcome::result<folder_info_ptr_t> folder_info_t::create(const bu::uuid &uuid, const db::FolderInfo &data,
                                                          const device_ptr_t &device_,
                                                          const folder_ptr_t &folder_) noexcept {
     auto ptr = folder_info_ptr_t();
@@ -73,7 +69,7 @@ folder_info_t::folder_info_t(std::string_view key_, const device_ptr_t &device_,
     std::copy(key_.begin(), key_.end(), key);
 }
 
-folder_info_t::folder_info_t(const uuid_t &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept
+folder_info_t::folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept
     : device{device_.get()}, folder{folder_.get()} {
     auto device_key = device->get_key().substr(1);
     auto folder_key = folder->get_key().substr(1);

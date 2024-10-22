@@ -45,7 +45,7 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
 
     static outcome::result<folder_info_ptr_t> create(std::string_view key, const db::FolderInfo &data,
                                                      const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
-    static outcome::result<folder_info_ptr_t> create(const uuid_t &uuid, const db::FolderInfo &data,
+    static outcome::result<folder_info_ptr_t> create(const bu::uuid &uuid, const db::FolderInfo &data,
                                                      const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     std::string_view get_key() const noexcept;
     std::string_view get_uuid() const noexcept;
@@ -70,7 +70,7 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
 
   private:
     folder_info_t(std::string_view key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
-    folder_info_t(const uuid_t &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
+    folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     void assign_fields(const db::FolderInfo &data) noexcept;
 
     static const constexpr auto data_length = uuid_length * 2 + device_id_t::digest_length + 1;

@@ -23,7 +23,7 @@ struct SYNCSPIRIT_API update_t final : cluster_diff_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string folder_id;
-    uuid_t uuid;
+    bu::uuid uuid;
     proto::FileInfo file;
     bool already_exists;
 };

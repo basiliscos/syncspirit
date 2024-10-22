@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "folder.h"
 #include "db/utils.h"
@@ -8,10 +8,6 @@
 #include "misc/error_code.h"
 #include "utils/format.hpp"
 #include <spdlog/spdlog.h>
-
-#ifdef uuid_t
-#undef uuid_t
-#endif
 
 namespace syncspirit::model {
 
@@ -31,7 +27,7 @@ outcome::result<folder_ptr_t> folder_t::create(std::string_view key, const db::F
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<folder_ptr_t> folder_t::create(const uuid_t &uuid, const db::Folder &folder) noexcept {
+outcome::result<folder_ptr_t> folder_t::create(const bu::uuid &uuid, const db::Folder &folder) noexcept {
     auto ptr = folder_ptr_t();
     ptr = new folder_t(uuid);
     ptr->assign_fields(folder);
@@ -40,7 +36,7 @@ outcome::result<folder_ptr_t> folder_t::create(const uuid_t &uuid, const db::Fol
 
 folder_t::folder_t(std::string_view key_) noexcept : synchronizing{false} { std::copy(key_.begin(), key_.end(), key); }
 
-folder_t::folder_t(const uuid_t &uuid) noexcept : synchronizing{false} {
+folder_t::folder_t(const bu::uuid &uuid) noexcept : synchronizing{false} {
     key[0] = prefix;
     std::copy(uuid.begin(), uuid.end(), key + 1);
 }

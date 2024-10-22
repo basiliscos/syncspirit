@@ -23,7 +23,7 @@ struct SYNCSPIRIT_API share_folder_t final : cluster_diff_t {
     std::string folder_id;
 
   private:
-    share_folder_t(const uuid_t &uuid, std::string_view device_id, std::string_view folder_id, std::uint64_t index_id,
+    share_folder_t(const bu::uuid &uuid, std::string_view device_id, std::string_view folder_id, std::uint64_t index_id,
                    model::pending_folder_ptr_t uf) noexcept;
 };
 
