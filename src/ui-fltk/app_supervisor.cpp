@@ -396,7 +396,7 @@ void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
     using F = std::ios_base;
     log->debug("going to write config");
     auto &path = get_config_path();
-    std::fstream f_cfg(path, F::binary | F::trunc | F::in | F::out);
+    std::fstream f_cfg(path.string(), F::binary | F::trunc | F::in | F::out);
     auto r = config::serialize(cfg, f_cfg);
     if (!r) {
         log->error("cannot save default config at {}: {}", path, r.error().message());
