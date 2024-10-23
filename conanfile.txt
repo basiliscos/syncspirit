@@ -6,7 +6,7 @@ lz4/1.9.4
 nlohmann_json/3.11.2
 protobuf/3.21.9
 pugixml/1.13
-rotor/0.30
+rotor/0.31
 spdlog/1.13.0
 tomlplusplus/3.3.0
 zlib/1.2.13

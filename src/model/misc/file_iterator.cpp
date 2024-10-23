@@ -37,7 +37,7 @@ file_iterator_t::guard_t::~guard_t() {
         auto folder = file->get_folder_info()->get_folder();
         auto &it = owner.find_folder(folder);
         auto guarded = it.guarded_clones.size() + it.guarded_syncs.size();
-        if (guarded == 1) {
+        if (guarded == 0) {
             owner.sink->push(new model::diff::local::synchronization_finish_t(folder->get_id()));
         }
     }
@@ -217,6 +217,7 @@ void file_iterator_t::commit_clone(file_info_ptr_t file) noexcept {
     // if needed for cloning files without iterator (i.e. in tests)
     if (it != guarded.end()) {
         fi.committed_map[file] = file->get_sequence();
+        auto guard = std::move(*it);
         guarded.erase(it);
     }
 }
