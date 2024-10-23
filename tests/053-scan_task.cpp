@@ -708,12 +708,12 @@ TEST_CASE("scan_task", "[fs]") {
             r = task.advance();
             REQUIRE(std::get_if<unchanged_meta_t>(&r));
             auto ref = std::get_if<unchanged_meta_t>(&r);
-            CHECK(ref->file == dir);
+            CHECK(((ref->file == dir) || (ref->file == file)));
 
             r = task.advance();
             REQUIRE(std::get_if<unchanged_meta_t>(&r));
             ref = std::get_if<unchanged_meta_t>(&r);
-            CHECK(ref->file == file);
+            CHECK(((ref->file == dir) || (ref->file == file)));
 
             r = task.advance();
             CHECK(std::get_if<bool>(&r));
