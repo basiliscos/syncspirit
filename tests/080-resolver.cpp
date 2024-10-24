@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include <catch2/catch_all.hpp>
 #include <rotor.hpp>
@@ -12,6 +12,7 @@
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::net;
+using namespace std::chrono_literals;
 
 namespace asio = boost::asio;
 namespace sys = boost::system;
@@ -20,6 +21,7 @@ namespace ra = r::asio;
 
 using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
 using response_ptr_t = r::intrusive_ptr_t<message::resolve_response_t>;
+using Catch::Matchers::StartsWith;
 
 auto timeout = r::pt::time_duration{r::pt::millisec{1000}};
 
@@ -63,7 +65,6 @@ struct fixture_t {
         sup->start();
         sup->do_process();
 
-        resolv_conf_path = root_path / "resolv.conf";
         hosts_path = root_path / "hosts";
 
         auto ep = asio::ip::udp::endpoint(asio::ip::make_address("127.0.0.1"), 0);
@@ -83,7 +84,6 @@ struct fixture_t {
     asio::io_context io_ctx{1};
     ra::system_context_asio_t ctx;
     bfs::path root_path;
-    bfs::path resolv_conf_path;
     bfs::path hosts_path;
     path_guard_t path_quard;
     utils::logger_t log;
@@ -98,13 +98,12 @@ void test_local_resolver() {
     struct F : fixture_t {
         void main() noexcept override {
 
-            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", 1234));
             write_file(hosts_path, "127.0.0.2 lclhst.localdomain lclhst\n");
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
                            .hosts_path(hosts_path.c_str())
-                           .resolvconf_path(resolv_conf_path.c_str())
+                           .server_addresses("127.0.0.1:1234")
                            .timeout(timeout)
                            .finish();
 
@@ -135,7 +134,6 @@ void test_success_resolver() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
             write_file(hosts_path, "");
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -155,7 +153,7 @@ void test_success_resolver() {
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
                            .hosts_path(hosts_path.c_str())
-                           .resolvconf_path(resolv_conf_path.c_str())
+                           .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
 
@@ -167,7 +165,7 @@ void test_success_resolver() {
 
             auto &results = sup->responses.at(0)->payload.res->results;
             REQUIRE(results.size() == 1);
-            REQUIRE(results.at(0) == asio::ip::make_address("142.250.203.142"));
+            REQUIRE_THAT(results.at(0).to_string(), StartsWith("142.250."));
         }
     };
     F().run();
@@ -177,13 +175,12 @@ void test_success_ip() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
             write_file(hosts_path, "");
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
                            .hosts_path(hosts_path.c_str())
-                           .resolvconf_path(resolv_conf_path.c_str())
+                           .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
 
@@ -206,13 +203,12 @@ void test_success_ipv6() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
             write_file(hosts_path, "");
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
                            .hosts_path(hosts_path.c_str())
-                           .resolvconf_path(resolv_conf_path.c_str())
+                           .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
 
@@ -237,7 +233,6 @@ void test_garbage() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
             write_file(hosts_path, "");
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -254,7 +249,7 @@ void test_garbage() {
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
                            .hosts_path(hosts_path.c_str())
-                           .resolvconf_path(resolv_conf_path.c_str())
+                           .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
 
@@ -276,7 +271,6 @@ void test_multi_replies() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
             write_file(hosts_path, "");
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -299,7 +293,7 @@ void test_multi_replies() {
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
                            .hosts_path(hosts_path.c_str())
-                           .resolvconf_path(resolv_conf_path.c_str())
+                           .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
 
@@ -322,7 +316,6 @@ void test_wrong() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
             write_file(hosts_path, "");
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -342,7 +335,7 @@ void test_wrong() {
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
                            .hosts_path(hosts_path.c_str())
-                           .resolvconf_path(resolv_conf_path.c_str())
+                           .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
 
@@ -364,13 +357,12 @@ void test_timeout() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
             write_file(hosts_path, "");
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
                            .hosts_path(hosts_path.c_str())
-                           .resolvconf_path(resolv_conf_path.c_str())
+                           .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
 
@@ -392,13 +384,12 @@ void test_cancellation() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(resolv_conf_path, fmt::format("nameserver 127.0.0.1:{}\n", local_port));
             write_file(hosts_path, "");
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
                            .hosts_path(hosts_path.c_str())
-                           .resolvconf_path(resolv_conf_path.c_str())
+                           .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
 

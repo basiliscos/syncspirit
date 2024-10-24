@@ -27,7 +27,7 @@ r::plugin::resource_id_t recv = 2;
 
 resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
     : r::actor_base_t{config}, io_timeout{config.resolve_timeout}, hosts_path{config.hosts_path},
-      resolvconf_path{config.resolvconf_path},
+      server_addresses{std::move(config.server_addresses)},
       strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, channel{nullptr} {
 
     rx_buff.resize(1500);
@@ -41,10 +41,6 @@ void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
     int opts_mask = 0;
     memset(&opts, 0, sizeof(opts));
 
-    if (resolvconf_path.size()) {
-        opts.resolvconf_path = const_cast<char *>(resolvconf_path.data());
-        opts_mask |= ARES_OPT_RESOLVCONF;
-    }
     if (hosts_path.size()) {
         opts.hosts_path = const_cast<char *>(hosts_path.data());
         opts_mask |= ARES_OPT_HOSTS_FILE;
@@ -57,17 +53,21 @@ void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
         return do_shutdown(make_error(ec));
     }
 
-    auto servers = ares_get_servers_csv(channel);
-    if (!servers) {
-        LOG_ERROR(log, "cannot get dns servers");
-        auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
-        return do_shutdown(make_error(ec));
+    auto dns_servers = std::string(server_addresses);
+    if (dns_servers.empty()) {
+        auto servers = ares_get_servers_csv(channel);
+        if (!servers) {
+            LOG_ERROR(log, "cannot get dns servers");
+            auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+            return do_shutdown(make_error(ec));
+        }
+
+        auto servers_guard = make_guard(servers, [](auto str) { ares_free_string(str); });
+        LOG_TRACE(log, "got dns servers: {}", servers);
+        dns_servers = servers;
     }
 
-    auto servers_guard = make_guard(servers, [](auto str) { ares_free_string(str); });
-    LOG_TRACE(log, "got dns servers: {}", servers);
-
-    auto dns_addresses = utils::parse_dns_servers(servers);
+    auto dns_addresses = utils::parse_dns_servers(dns_servers);
     if (dns_addresses.empty()) {
         LOG_ERROR(log, "no valid dns servers found");
         auto ec = utils::make_error_code(utils::error_code_t::cares_failure);

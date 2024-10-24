@@ -17,7 +17,7 @@ struct resolver_actor_config_t : public r::actor_config_t {
     using r::actor_config_t::actor_config_t;
     r::pt::time_duration resolve_timeout;
     std::string_view hosts_path;
-    std::string_view resolvconf_path;
+    std::string server_addresses;
 };
 
 template <typename Actor> struct resolver_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -35,8 +35,8 @@ template <typename Actor> struct resolver_actor_config_builder_t : r::actor_conf
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&resolvconf_path(std::string_view value) && noexcept {
-        parent_t::config.resolvconf_path = value;
+    builder_t &&server_addresses(std::string value) && noexcept {
+        parent_t::config.server_addresses = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -91,7 +91,7 @@ struct SYNCSPIRIT_API resolver_actor_t : public r::actor_base_t {
     utils::logger_t log;
     pt::time_duration io_timeout;
     std::string_view hosts_path;
-    std::string_view resolvconf_path;
+    std::string server_addresses;
     asio::io_context::strand &strand;
     std::optional<r::request_id_t> timer_id;
     socket_ptr_t sock;
