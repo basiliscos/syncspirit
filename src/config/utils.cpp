@@ -600,7 +600,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     cfg.global_announce_config = global_announce_config_t{
         true,                                                   /* enabled */
         false,                                                  /* debug */
-        utils::parse("https://discovery.syncthing.net/"),
+        utils::parse("https://discovery.syncthing.net/v2/"),    /* announce_url */
         "LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW",
         cert_file,
         key_file,
