@@ -24,6 +24,7 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
+using namespace std::chrono_literals;
 
 namespace asio = boost::asio;
 namespace sys = boost::system;
@@ -77,7 +78,7 @@ using actor_ptr_t = r::intrusive_ptr_t<peer_actor_t>;
 struct fixture_t : private model::diff::cluster_visitor_t {
     using acceptor_t = asio::ip::tcp::acceptor;
 
-    fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
+    fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx), pre_main_counter{2} {
         utils::set_default("trace");
         log = utils::get_logger("fixture");
     }
@@ -143,13 +144,22 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         transport::error_fn_t on_error = [&](auto &ec) { on_client_error(ec); };
         transport::connect_fn_t on_connect = [addresses_ptr, this](const tcp::endpoint &ep) {
             LOG_INFO(log, "active/connected");
-            // main();
+            try_main();
         };
 
         client_trans->async_connect(addresses_ptr, on_connect, on_error);
 
+        std::this_thread::sleep_for(1ms);
         io_ctx.run();
         CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+    }
+
+    void try_main() {
+        --pre_main_counter;
+        LOG_DEBUG(log, "try_main, counter = {}", pre_main_counter);
+        if (!pre_main_counter) {
+            main();
+        }
     }
 
     virtual void main() noexcept {}
@@ -162,7 +172,8 @@ struct fixture_t : private model::diff::cluster_visitor_t {
 
         auto bep_config = config::bep_config_t();
         bep_config.rx_buff_size = 1024;
-        bep_config.rx_buff_size = rx_timeout;
+        bep_config.rx_timeout = rx_timeout;
+        LOG_INFO(log, "crearing actor, timeout = {}", rx_timeout);
 
         return sup->create_actor<actor_ptr_t::element_type>()
             .timeout(timeout)
@@ -184,7 +195,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         auto uri = utils::parse("tcp://127.0.0.1:0/");
         auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         peer_trans = transport::initiate_stream(cfg);
-        main();
+        try_main();
     }
 
     virtual void on_client_write(std::size_t bytes) noexcept { LOG_INFO(log, "client sent {} bytes", bytes); }
@@ -230,6 +241,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     fmt::memory_buffer tx_buff;
     char rx_buff[2000];
     bool known_peer = false;
+    int pre_main_counter;
 };
 
 void test_shutdown_on_hello_timeout() {
