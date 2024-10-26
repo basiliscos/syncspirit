@@ -239,10 +239,8 @@ void local_discovery_actor_t::handle(const model::device_id_t &device_id, utils:
         db.set_name(std::string(device_id.get_short()));
         db.set_address(uris_str);
         db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
-        auto cluster_diff = cluster_diff_ptr_t{};
-        cluster_diff = new model::diff::modify::add_pending_device_t(device_id, db);
-        send<model::payload::model_update_t>(coordinator, std::move(cluster_diff));
-        diff = new contact::unknown_connected_t(*cluster, device_id, std::move(db));
+        diff = new model::diff::modify::add_pending_device_t(device_id, db);
+        diff->assign_sibling(new contact::unknown_connected_t(*cluster, device_id, std::move(db)));
     }
     if (diff) {
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);

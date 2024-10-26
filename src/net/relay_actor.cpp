@@ -9,6 +9,8 @@
 #include "model/messages.h"
 #include "model/diff/contact/update_contact.h"
 #include "model/diff/contact/relay_connect_request.h"
+#include "model/diff/contact/unknown_connected.h"
+#include "model/diff/modify/add_pending_device.h"
 #include "transport/stream.h"
 #include <spdlog/fmt/bin_to_hex.h>
 #include "messages.h"
@@ -377,8 +379,18 @@ bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
         relay_ep = asio::ip::tcp::endpoint{master_endpoint.address(), (uint16_t)msg.port};
     }
 
-    diff = new model::diff::contact::relay_connect_request_t(std::move(device_opt.value()), std::move(msg.key),
-                                                             std::move(relay_ep));
+    auto &device_id = device_opt.value();
+    if (cluster->get_devices().by_sha256(device_id.get_sha256())) {
+        diff = new model::diff::contact::relay_connect_request_t(std::move(device_id), std::move(msg.key),
+                                                                 std::move(relay_ep));
+    } else {
+        db::SomeDevice db;
+        db.set_name(std::string(device_id.get_short()));
+        db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
+        diff = new model::diff::modify::add_pending_device_t(device_id, db);
+        diff->assign_sibling(new model::diff::contact::unknown_connected_t(*cluster, device_id, std::move(db)));
+    }
+
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     return true;
 }

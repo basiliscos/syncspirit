@@ -10,6 +10,7 @@
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/contact/relay_connect_request.h"
+#include "model/diff/contact/unknown_connected.h"
 #include "net/names.h"
 #include "net/messages.h"
 #include "net/relay_actor.h"
@@ -365,13 +366,56 @@ void test_passive() {
         bool sent = false;
         bool received = false;
     };
+    F().run();
+}
 
+void test_passive_unknown() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto act = create_actor();
+            cluster->get_devices().remove(peer_device);
+            io_ctx.run();
+            CHECK(sent);
+            CHECK(unknownon_connected);
+            CHECK(sup->get_state() == r::state_t::OPERATIONAL);
+
+            sup->shutdown();
+            io_ctx.restart();
+            io_ctx.run();
+
+            CHECK(my_device->get_uris().size() == 0);
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+        }
+
+        void on(model::message::model_update_t &update) noexcept override {
+            LOG_INFO(log, "contact_update_t");
+            fixture_t::on(update);
+            if (my_device->get_uris().size() == 1 && !sent) {
+                sent = true;
+                auto msg = proto::relay::session_invitation_t{
+                    std::string(peer_device->device_id().get_sha256()), session_key, {}, 12345, true};
+                send_relay(msg);
+            }
+        }
+
+        outcome::result<void> operator()(const model::diff::contact::unknown_connected_t &diff,
+                                         void *) noexcept override {
+            CHECK(diff.device_id == peer_device->device_id());
+            unknownon_connected = true;
+            io_ctx.stop();
+            return outcome::success();
+        }
+
+        bool sent = false;
+        bool unknownon_connected = false;
+    };
     F().run();
 }
 
 int _init() {
     REGISTER_TEST_CASE(test_master_connect, "test_master_connect", "[relay]");
     REGISTER_TEST_CASE(test_passive, "test_passive", "[relay]");
+    REGISTER_TEST_CASE(test_passive_unknown, "test_passive_unknown", "[relay]");
 
     return 1;
 }
