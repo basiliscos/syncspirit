@@ -333,9 +333,14 @@ int main(int argc, char **argv) {
             thread.join();
         }
         spdlog::trace("everything has been terminated");
+    } catch (const po::error &ex) {
+        spdlog::critical("program options exceptionn: {}", ex.what());
+        return 1;
+    } catch (std::exception &ex) {
+        spdlog::critical("std::exception: {}", ex.what());
+        return 1;
     } catch (...) {
         spdlog::critical("unknown exception");
-        // spdlog::critical("Starting failure : {}", ex.what());
         return 1;
     }
 
