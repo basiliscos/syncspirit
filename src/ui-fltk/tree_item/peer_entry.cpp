@@ -17,6 +17,8 @@ void peer_entry_t::update_label() {
     label(name.c_str());
     if (entry.is_deleted()) {
         labelfgcolor(FL_DARK1);
+    } else {
+        labelfgcolor(FL_BLACK);
     }
     tree()->redraw();
 }
@@ -34,9 +36,12 @@ void peer_entry_t::on_update() {
     parent_t::on_update();
     auto &entry = *get_entry();
     if (entry.is_deleted()) {
+        auto host = static_cast<peer_entry_base_t *>(parent());
         bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
         if (!show_deleted) {
-            static_cast<tree_item_t *>(parent())->remove_child(this);
+            host->remove_child(this);
+        } else {
+            host->deleted_items.emplace(this);
         }
     }
 }
