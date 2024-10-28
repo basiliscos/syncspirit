@@ -17,6 +17,7 @@
 #include "utils/location.h"
 #include "utils/log.h"
 #include "utils/platform.h"
+#include "constants.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"
 #include "hasher/hasher_supervisor.h"
@@ -191,6 +192,24 @@ int main(int argc, char **argv) {
         }
         auto &dist_sink = init_result.value();
         dist_sink->add_sink(spdlog::sink_ptr(new fltk::im_memory_sink_t()));
+
+        if (populate) {
+            spdlog::info("Generating cryptographic keys...");
+            auto pair = utils::generate_pair(constants::issuer_name);
+            if (!pair) {
+                spdlog::error("cannot generate cryptographic keys :: {}", pair.error().message());
+                return 1;
+            }
+            auto &keys = pair.value();
+            auto &cert_path = cfg.global_announce_config.cert_file;
+            auto &key_path = cfg.global_announce_config.key_file;
+            auto save_result = keys.save(cert_path.c_str(), key_path.c_str());
+            if (!save_result) {
+                spdlog::error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
+                              save_result.error().message());
+                return 1;
+            }
+        }
 
         asio::io_context io_context;
         ra::system_context_ptr_t sys_context{new asio_sys_context_t{io_context}};
