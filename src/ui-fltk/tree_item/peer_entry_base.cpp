@@ -128,3 +128,21 @@ void peer_entry_base_t::show_deleted(bool value) {
     }
     tree()->redraw();
 }
+
+void peer_entry_base_t::apply(const entry_visitor_t &visitor, void *data) {
+    auto entry = get_entry();
+    if (entry) {
+        visitor.visit(*entry, data);
+    }
+    bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
+    for (int i = 0; i < children(); ++i) {
+        auto &child_entry = dynamic_cast<peer_entry_base_t &>(*child(i));
+        child_entry.apply(visitor, data);
+    }
+
+    if (!show_deleted) {
+        for (auto &it : orphaned_items) {
+            it->apply(visitor, data);
+        }
+    }
+}

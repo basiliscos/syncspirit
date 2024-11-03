@@ -20,6 +20,7 @@ struct peer_entry_base_t : tree_item_t, virtual_entry_t {
     void add_entry(model::file_info_t &file) override;
     void show_deleted(bool value) override;
     void remove_child(tree_item_t *child) override;
+    void apply(const entry_visitor_t &visitor, void *data) override;
 
     void remove_node(peer_entry_base_t *child);
     void insert_node(peer_entry_base_t *node);

@@ -35,7 +35,8 @@ remote_file_table_t::remote_file_table_t(tree_item_t &container_, int x, int y, 
 }
 
 void remote_file_table_t::refresh() {
-    auto &entry = *dynamic_cast<tree_item::virtual_entry_t *>(&container)->get_entry();
+    auto host = dynamic_cast<tree_item::virtual_entry_t *>(&container);
+    auto &entry = *host->get_entry();
     auto &devices = container.supervisor.get_cluster()->get_devices();
     auto data = table_rows_t();
     auto modified_s = entry.get_modified_s();
@@ -71,5 +72,25 @@ void remote_file_table_t::refresh() {
     data.push_back({"is_invalid", make_checkbox(*this, entry.is_invalid())});
     data.push_back({"no_permissions", make_checkbox(*this, entry.has_no_permissions())});
     data.push_back({"symlink_target", std::string(entry.get_link_target())});
+
+    struct size_data_t {
+        std::size_t entries_count = 0;
+        std::size_t entries_size = 0;
+    };
+
+    struct size_visitor_t final : tree_item::entry_visitor_t {
+        void visit(const model::file_info_t &file, void *data) const override {
+            auto size_data = reinterpret_cast<size_data_t *>(data);
+            size_data->entries_count += 1;
+            size_data->entries_size += file.get_size();
+        }
+    };
+
+    auto size_data = size_data_t{};
+    host->apply(size_visitor_t{}, &size_data);
+
+    data.push_back({"entries", fmt::format("{}", size_data.entries_count)});
+    data.push_back({"entries size", fmt::format("{}", size_data.entries_size)});
+
     assign_rows(std::move(data));
 }
