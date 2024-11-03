@@ -3,29 +3,21 @@
 
 #pragma once
 
-#include "../device.h"
-#include "../file_info.h"
-#include "../folder_info.h"
-#include "../folder.h"
-#include "../diff/cluster_diff.h"
+#include "model/device.h"
+#include "model/file_info.h"
+#include "model/folder_info.h"
+#include "model/folder.h"
 #include "syncspirit-export.h"
 #include <vector>
 #include <unordered_map>
 
 namespace syncspirit::model {
 
-struct diff_sink_t {
-    virtual void push(diff::cluster_diff_ptr_t diff) noexcept = 0;
-};
-
 struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     using files_list_t = std::vector<file_info_ptr_t>;
 
     file_iterator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
     file_iterator_t(const file_iterator_t &) = delete;
-
-    void activate(diff_sink_t &sink) noexcept;
-    void deactivate() noexcept;
 
     file_info_t *next_need_cloning() noexcept;
     file_info_t *next_need_sync() noexcept;
@@ -67,7 +59,6 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     cluster_t &cluster;
     device_t *peer;
     std::size_t folder_index;
-    diff_sink_t *sink;
     folder_iterators_t folders_list;
 
     friend struct guard_t;

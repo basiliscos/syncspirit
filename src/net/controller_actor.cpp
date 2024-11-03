@@ -43,6 +43,50 @@ struct context_t {
 
 } // namespace
 
+using C = controller_actor_t;
+
+C::folder_synchronization_t::folder_synchronization_t(controller_actor_t &controller_,
+                                                      model::folder_t &folder_) noexcept
+    : controller{controller_}, folder{&folder_}, synchronizing{false} {}
+
+C::folder_synchronization_t::~folder_synchronization_t() {
+    if (blocks.size()) {
+        controller.push(new model::diff::local::synchronization_finish_t(folder->get_id()));
+        for (auto &b : blocks) {
+            b->unlock();
+        }
+    }
+}
+
+void C::folder_synchronization_t::start_fetching(model::block_info_t *block) noexcept {
+    block->lock();
+    if (blocks.empty() && !synchronizing) {
+        start_sync();
+    }
+    blocks.emplace(block);
+}
+
+void C::folder_synchronization_t::finish_fetching(model::block_info_t *block) noexcept {
+    block->unlock();
+    blocks.erase(block);
+    if (blocks.size() == 0 && synchronizing) {
+        finish_sync();
+    }
+}
+
+void C::folder_synchronization_t::start_sync() noexcept {
+    controller.push(new model::diff::local::synchronization_start_t(folder->get_id()));
+    synchronizing = true;
+}
+
+void C::folder_synchronization_t::finish_sync() noexcept {
+    controller.push(new model::diff::local::synchronization_finish_t(folder->get_id()));
+    synchronizing = false;
+}
+
+void C::folder_synchronization_t::start_cloning(const model::file_info_t &) noexcept {}
+void C::folder_synchronization_t::finish_cloning(const model::file_info_t &) noexcept {}
+
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
       peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, rx_blocks_requested{0},
@@ -55,7 +99,6 @@ controller_actor_t::controller_actor_t(config_t &config)
         current_diff = nullptr;
         planned_pulls = 0;
         file_iterator = peer->create_iterator(*cluster);
-        file_iterator->activate(*this);
     }
 }
 
@@ -112,17 +155,9 @@ void controller_actor_t::shutdown_start() noexcept {
 
 void controller_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish, blocks_requested = {}", rx_blocks_requested);
-    file_iterator->deactivate();
     peer->release_iterator(file_iterator);
     file_iterator.reset();
-    for (auto &[folder, blocks] : synchronizing_folders) {
-        if (blocks.size()) {
-            push(new model::diff::local::synchronization_finish_t(folder->get_id()));
-            for (auto &b : blocks) {
-                b->unlock();
-            }
-        }
-    }
+    synchronizing_folders.clear();
     send_diff();
     r::actor_base_t::shutdown_finish();
 }
@@ -260,6 +295,7 @@ void controller_actor_t::pull_next() noexcept {
             LOG_TRACE(log, "going to clone file '{}' from folder '{}'", file->get_name(),
                       file->get_folder_info()->get_folder()->get_label());
             push(model::diff::modify::clone_file_t::create(*file, *sequencer));
+            get_sync_info(file->get_folder_info()->get_folder())->start_cloning(*file);
             ++cloned_files;
             continue;
         }
@@ -359,6 +395,18 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
     auto ctx = reinterpret_cast<context_t *>(custom);
     if (ctx->from_self) {
         pull_ready();
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto ctx = reinterpret_cast<context_t *>(custom);
+    if (ctx->from_self) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto folder_info = folder->get_folder_infos().by_device_id(diff.peer_id);
+        auto file_info = folder_info->get_file_infos().by_name(diff.proto_file.name());
+        get_sync_info(folder.get())->finish_cloning(*file_info);
     }
     return diff.visit_next(*this, custom);
 }
@@ -679,26 +727,27 @@ void controller_actor_t::process_block_write() noexcept {
     }
 }
 
+auto controller_actor_t::get_sync_info(model::folder_t *folder) noexcept -> folder_synchronization_ptr_t {
+    auto it = synchronizing_folders.find(folder);
+    if (it == synchronizing_folders.end()) {
+        auto info = folder_synchronization_ptr_t(new folder_synchronization_t(*this, *folder));
+        synchronizing_folders.emplace(folder, info);
+        return info;
+    }
+    return it->second;
+}
+
 void controller_actor_t::acquire_block(const model::file_block_t &file_block) noexcept {
     auto block = file_block.block();
-    block->lock();
     auto folder = file_block.file()->get_folder_info()->get_folder();
-    auto &blocks = synchronizing_folders[folder];
-    blocks.emplace(block);
-    if (blocks.size() == 1) {
-        push(new model::diff::local::synchronization_start_t(folder->get_id()));
-    }
+    auto it = synchronizing_folders.find(folder);
+    get_sync_info(folder)->start_fetching(block);
 }
 
 void controller_actor_t::release_block(const model::file_block_t &file_block) noexcept {
     auto block = file_block.block();
-    block->unlock();
     auto folder = file_block.file()->get_folder_info()->get_folder();
-    auto &blocks = synchronizing_folders[folder];
-    blocks.erase(block);
-    if (blocks.size() == 0) {
-        push(new model::diff::local::synchronization_finish_t(folder->get_id()));
-    }
+    get_sync_info(folder)->finish_fetching(block);
 }
 
 auto controller_actor_t::make_callback() noexcept -> dispose_callback_t {

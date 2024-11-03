@@ -95,9 +95,7 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
     }
 };
 
-struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
-                                           private model::diff::cluster_visitor_t,
-                                           private model::diff_sink_t {
+struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = controller_actor_config_t;
     template <typename Actor> using config_builder_t = controller_actor_config_builder_t<Actor>;
 
@@ -121,7 +119,27 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     using block_write_queue_t = std::deque<model::diff::cluster_diff_ptr_t>;
     using dispose_callback_t = model::diff::modify::block_transaction_t::dispose_callback_t;
     using block_set_t = std::unordered_set<model::block_info_ptr_t>;
-    using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, block_set_t>;
+
+    struct folder_synchronization_t : model::arc_base_t<folder_synchronization_t> {
+        folder_synchronization_t(controller_actor_t &controller, model::folder_t &folder) noexcept;
+        ~folder_synchronization_t();
+
+        void start_cloning(const model::file_info_t &) noexcept;
+        void finish_cloning(const model::file_info_t &) noexcept;
+        void start_fetching(model::block_info_t *) noexcept;
+        void finish_fetching(model::block_info_t *) noexcept;
+
+        void start_sync() noexcept;
+        void finish_sync() noexcept;
+
+        controller_actor_t &controller;
+        model::folder_t *folder;
+        block_set_t blocks;
+        std::size_t file_clones;
+        bool synchronizing;
+    };
+    using folder_synchronization_ptr_t = model::intrusive_ptr_t<folder_synchronization_t>;
+    using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, folder_synchronization_ptr_t>;
 
     void on_termination(message::termination_signal_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
@@ -150,16 +168,18 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t,
     void process_block_write() noexcept;
     dispose_callback_t make_callback() noexcept;
 
-    void push(model::diff::cluster_diff_ptr_t diff) noexcept override;
+    void push(model::diff::cluster_diff_ptr_t diff) noexcept;
     void send_diff() noexcept;
     void acquire_block(const model::file_block_t &block) noexcept;
     void release_block(const model::file_block_t &block) noexcept;
+    folder_synchronization_ptr_t get_sync_info(model::folder_t *folder) noexcept;
 
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::local::update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_rej_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::finish_file_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::mark_reachable_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;

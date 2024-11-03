@@ -12,14 +12,6 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 
-struct dummy_sink_t final : model::diff_sink_t {
-    dummy_sink_t(diff_builder_t &builder_) noexcept : builder{builder_} {}
-
-    void push(diff::cluster_diff_ptr_t d) noexcept override { builder.assign(d.get()); }
-
-    diff_builder_t &builder;
-};
-
 TEST_CASE("file iterator, single folder", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -32,7 +24,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
     cluster->get_devices().put(peer_device);
 
     auto builder = diff_builder_t(*cluster);
-    auto sink = dummy_sink_t(builder);
 
     auto &blocks_map = cluster->get_blocks();
     auto &folders = cluster->get_folders();
@@ -49,7 +40,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
     auto &my_files = my_folder->get_file_infos();
 
     auto file_iterator = peer_device->create_iterator(*cluster);
-    file_iterator->activate(sink);
 
     SECTION("emtpy folders (1)") {
         CHECK(!file_iterator->next_need_cloning());
@@ -80,14 +70,12 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(!f->is_locked());
 
                 REQUIRE(builder.apply());
-                CHECK(folder->is_synchronizing());
                 REQUIRE(!file_iterator->next_need_cloning());
                 REQUIRE(!file_iterator->next_need_sync());
 
                 REQUIRE(builder.clone_file(*f).apply());
                 REQUIRE(!file_iterator->next_need_cloning());
                 REQUIRE(!file_iterator->next_need_sync());
-                CHECK(!folder->is_synchronizing());
                 CHECK(!f->is_locked());
             }
             SECTION("invalid file is ignored") {
@@ -178,7 +166,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(!f->is_locked());
                 files.put(f);
                 REQUIRE(builder.apply());
-                CHECK(folder->is_synchronizing());
 
                 REQUIRE(builder.clone_file(*f).apply());
 
@@ -188,13 +175,11 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(!f->is_locked());
                 files.put(f);
                 REQUIRE(builder.apply());
-                CHECK(folder->is_synchronizing());
                 REQUIRE(builder.clone_file(*f).apply());
 
                 REQUIRE(!file_iterator->next_need_cloning());
                 REQUIRE(!file_iterator->next_need_sync());
 
-                CHECK(!folder->is_synchronizing());
                 CHECK(files.by_name("a.txt"));
                 CHECK(files.by_name("b.txt"));
             }
@@ -209,13 +194,11 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(!f->is_locked());
 
                 REQUIRE(builder.apply());
-                CHECK(folder->is_synchronizing());
                 REQUIRE(!file_iterator->next_need_cloning());
 
                 REQUIRE(builder.clone_file(*f).apply());
                 REQUIRE(!file_iterator->next_need_cloning());
                 REQUIRE(!file_iterator->next_need_sync());
-                CHECK(!folder->is_synchronizing());
                 CHECK(!f->is_locked());
             }
 
@@ -338,8 +321,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
             CHECK(!file_iterator->next_need_sync());
         }
     }
-
-    file_iterator->deactivate();
 }
 
 TEST_CASE("file iterator for 2 folders", "[model]") {
@@ -354,7 +335,6 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     cluster->get_devices().put(peer_device);
 
     auto builder = diff_builder_t(*cluster);
-    auto sink = dummy_sink_t(builder);
 
     auto &blocks_map = cluster->get_blocks();
     auto &folders = cluster->get_folders();
@@ -371,7 +351,6 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     auto &my_files = my_folder->get_file_infos();
 
     auto file_iterator = peer_device->create_iterator(*cluster);
-    file_iterator->activate(sink);
 
     auto sha256 = peer_id.get_sha256();
 
@@ -451,7 +430,6 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
 
         CHECK((files == set_t{"a.txt", "b.txt"}));
     }
-    file_iterator->deactivate();
 }
 
 int _init() {

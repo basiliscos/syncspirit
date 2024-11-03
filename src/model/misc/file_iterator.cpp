@@ -2,10 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "file_iterator.h"
-#include "../cluster.h"
-#include "model/diff/modify/lock_file.h"
-#include "model/diff/local/synchronization_start.h"
-#include "model/diff/local/synchronization_finish.h"
+#include "model/cluster.h"
 #include "model/misc/version_utils.h"
 
 using namespace syncspirit::model;
@@ -16,35 +13,12 @@ file_iterator_t::guard_t::guard_t(model::file_info_ptr_t file_, file_iterator_t 
     file->locally_lock();
 
     is_locked = file->get_size() > 0;
-    if (is_locked) {
-        // owner.sink->push(new model::diff::modify::lock_file_t(*file, true));
-    } else {
-        auto folder = file->get_folder_info()->get_folder();
-        auto &it = owner.find_folder(folder);
-        auto guarded = it.guarded_clones.size() + it.guarded_syncs.size();
-        if (guarded == 0) {
-            owner.sink->push(new model::diff::local::synchronization_start_t(folder->get_id()));
-        }
-    }
 }
 
-file_iterator_t::guard_t::~guard_t() {
-    file->locally_unlock();
-
-    if (is_locked) {
-        // owner.sink->push(new model::diff::modify::lock_file_t(*file, false));
-    } else {
-        auto folder = file->get_folder_info()->get_folder();
-        auto &it = owner.find_folder(folder);
-        auto guarded = it.guarded_clones.size() + it.guarded_syncs.size();
-        if (guarded == 0) {
-            owner.sink->push(new model::diff::local::synchronization_finish_t(folder->get_id()));
-        }
-    }
-}
+file_iterator_t::guard_t::~guard_t() { file->locally_unlock(); }
 
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
-    : cluster{cluster_}, peer{peer_.get()}, folder_index{0}, sink{nullptr} {
+    : cluster{cluster_}, peer{peer_.get()}, folder_index{0} {
     auto &folders = cluster.get_folders();
     for (auto &[folder, _] : folders) {
         auto peer_folder = folder->get_folder_infos().by_device(*peer);
@@ -57,17 +31,6 @@ file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_)
         }
         prepare_folder(std::move(peer_folder));
     }
-}
-
-void file_iterator_t::activate(diff_sink_t &sink_) noexcept {
-    assert(!sink);
-    sink = &sink_;
-}
-
-void file_iterator_t::deactivate() noexcept {
-    folders_list = {};
-    assert(sink);
-    sink = nullptr;
 }
 
 auto file_iterator_t::find_folder(folder_t *folder) noexcept -> folder_iterator_t & {
@@ -83,7 +46,6 @@ auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> 
 }
 
 file_info_t *file_iterator_t::next_need_cloning() noexcept {
-    assert(sink);
     auto folders_count = folders_list.size();
     auto folder_scans = size_t{0};
 
@@ -131,7 +93,6 @@ file_info_t *file_iterator_t::next_need_cloning() noexcept {
 }
 
 file_info_t *file_iterator_t::next_need_sync() noexcept {
-    assert(sink);
     auto folders_count = folders_list.size();
     auto folder_scans = size_t{0};
 
