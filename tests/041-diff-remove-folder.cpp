@@ -124,4 +124,7 @@ TEST_CASE("remove folder", "[model]") {
     REQUIRE(builder.remove_folder(*f1).remove_folder(*f2).apply());
     CHECK(cluster->get_blocks().size() == 0);
     CHECK(cluster->get_folders().size() == 0);
+
+    auto &pending = cluster->get_pending_folders();
+    REQUIRE(pending.size() == 1);
 }

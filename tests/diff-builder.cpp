@@ -197,7 +197,7 @@ diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcep
 }
 
 diff_builder_t &diff_builder_t::remove_folder(const model::folder_t &folder) noexcept {
-    return assign(new diff::modify::remove_folder_t(cluster, folder));
+    return assign(new diff::modify::remove_folder_t(cluster, *sequencer, folder));
     return *this;
 }
 

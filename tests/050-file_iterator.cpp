@@ -432,6 +432,50 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     }
 }
 
+TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+
+    auto builder = diff_builder_t(*cluster);
+
+    auto &folders = cluster->get_folders();
+    REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+    auto folder = folders.by_id("1234-5678");
+    auto &folder_infos = cluster->get_folders().by_id(folder->get_id())->get_folder_infos();
+    REQUIRE(folder_infos.size() == 2u);
+
+    auto file_iterator = peer_device->create_iterator(*cluster);
+    auto file = proto::FileInfo();
+    file.set_name("a.txt");
+    file.set_sequence(10ul);
+    REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
+
+    auto f = file_iterator->next_need_cloning();
+    REQUIRE(f);
+    CHECK(f->get_name() == "a.txt");
+    CHECK(!f->is_locked());
+
+    REQUIRE(builder.apply());
+    REQUIRE(!file_iterator->next_need_cloning());
+    REQUIRE(!file_iterator->next_need_sync());
+    REQUIRE(builder.remove_folder(*folder).upsert_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+    REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
+    folder = folders.by_id("1234-5678");
+
+    f = file_iterator->next_need_cloning();
+    REQUIRE(f);
+    CHECK(f->get_name() == "a.txt");
+}
+
 int _init() {
     utils::set_default("trace");
     return 1;

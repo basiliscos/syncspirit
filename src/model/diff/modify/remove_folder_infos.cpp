@@ -5,6 +5,7 @@
 #include "reset_folder_infos.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/misc/file_iterator.h"
 #include <algorithm>
 
 using namespace syncspirit::model::diff::modify;
@@ -34,6 +35,12 @@ auto remove_folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> out
         auto &folder_infos = folder->get_folder_infos();
         auto device_key = decomposed.device_key();
         auto folder_info = folder_infos.by_device_key(device_key);
+        if (auto iterator = folder_info->get_device()->get_iterator(); iterator) {
+            if (folder_info->get_device() != cluster.get_device()) {
+                iterator->on_remove(folder_info);
+            }
+        }
+
         folder_infos.remove(folder_info);
     }
     return applicator_t::apply_sibling(cluster);

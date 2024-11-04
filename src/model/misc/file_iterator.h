@@ -26,6 +26,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     void on_block_ack(const file_info_t &file, size_t block_index);
     void on_clone(file_info_ptr_t file) noexcept;
     void on_upsert(folder_info_ptr_t peer_folder) noexcept;
+    void on_remove(folder_info_ptr_t peer_folder) noexcept;
 
   private:
     struct guard_t : model::arc_base_t<guard_t> {

@@ -16,7 +16,7 @@ struct SYNCSPIRIT_API folder_data_t {
     enum class folder_type_t { send = 0, receive, send_and_receive };
     enum class pull_order_t { random = 0, alphabetic, smallest, largest, oldest, newest };
 
-    inline const std::string &get_label() noexcept { return label; }
+    inline const std::string &get_label() const noexcept { return label; }
     inline std::string_view get_id() const noexcept { return id; }
     inline void set_id(std::string_view value) noexcept { id = value; }
     inline bool is_read_only() const noexcept { return read_only; }

@@ -227,3 +227,12 @@ void file_iterator_t::on_block_ack(const file_info_t &file, size_t block_index) 
         }
     }
 }
+
+void file_iterator_t::on_remove(folder_info_ptr_t peer_folder) noexcept {
+    for (auto it = folders_list.begin(); it != folders_list.end(); ++it) {
+        if (it->peer_folder == peer_folder) {
+            folders_list.erase(it);
+            return;
+        }
+    }
+}

@@ -926,9 +926,10 @@ void folder_table_t::on_remove() {
     }
     auto &sup = container.supervisor;
     auto &cluster = *sup.get_cluster();
+    auto &sequencer = sup.get_sequencer();
     auto &folder = *cluster.get_folders().by_id(folder_data.get_id());
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::modify::remove_folder_t(cluster, folder);
+    diff = new model::diff::modify::remove_folder_t(cluster, sequencer, folder);
     sup.send_model<model::payload::model_update_t>(std::move(diff), this);
 }
 
