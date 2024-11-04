@@ -11,6 +11,7 @@ struct peer_folder_t final : peer_entry_base_t {
     void update_label() override;
     void on_update() override;
     void on_open() override;
+    bool on_select() override;
 
     model::file_info_t *get_entry() override;
 
