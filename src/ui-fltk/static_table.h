@@ -28,7 +28,27 @@ struct widgetable_t : boost::intrusive_ref_counter<widgetable_t, boost::thread_u
 
 using widgetable_ptr_t = boost::intrusive_ptr<widgetable_t>;
 
-using value_provider_t = std::variant<std::string, widgetable_ptr_t>;
+struct string_provider_t : boost::intrusive_ref_counter<string_provider_t, boost::thread_unsafe_counter> {
+    string_provider_t() = default;
+    virtual ~string_provider_t() = default;
+
+    virtual std::string_view value() const = 0;
+};
+using string_provider_ptr_t = boost::intrusive_ptr<string_provider_t>;
+
+struct static_string_provider_t : string_provider_t {
+    static_string_provider_t(std::string_view value = {});
+    void update(std::string value);
+    void update(std::string_view value);
+
+    std::string_view value() const override;
+
+  private:
+    std::string str;
+};
+using static_string_provider_ptr_t = boost::intrusive_ptr<static_string_provider_t>;
+
+using value_provider_t = std::variant<string_provider_ptr_t, widgetable_ptr_t>;
 
 struct table_row_t {
     std::string label;
@@ -59,11 +79,11 @@ struct static_table_t : contentable_t<Fl_Table_Row> {
     void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
     int handle(int event) override;
     void resize(int x, int y, int w, int h) override;
-    void update_value(std::size_t row, std::string value);
     table_rows_t &get_rows();
     void remove_row(widgetable_t &);
+    void remove_row(int index);
     int find_row(const widgetable_t &);
-    void insert_row(std::string_view label, widgetable_ptr_t &, size_t index);
+    void insert_row(std::string_view label, value_provider_t, size_t index);
 
     void reset() override;
     bool store(void *) override;
@@ -72,12 +92,12 @@ struct static_table_t : contentable_t<Fl_Table_Row> {
     void create_widgets();
     void draw_data(int row, int col, int x, int y, int w, int h);
     void draw_label(const std::string &, bool selected, int x, int y, int w, int h);
-    void draw_value(const std::string &, bool selected, int x, int y, int w, int h);
+    void draw_value(const string_provider_ptr_t &, bool selected, int x, int y, int w, int h);
     void draw_value(const widgetable_ptr_t &, bool selected, int x, int y, int w, int h);
-    void calc_dimensions(const std::string &, int &x, int &y, int &w, int &h);
+    void calc_dimensions(const string_provider_ptr_t &, int &x, int &y, int &w, int &h);
     void calc_dimensions(const widgetable_ptr_t &, int &x, int &y, int &w, int &h);
-    void draw_text(const std::string &, bool selected, int x, int y, int w, int h);
-    void make_widget(const std::string &, int row);
+    void draw_text(const std::string_view &, bool selected, int x, int y, int w, int h);
+    void make_widget(const string_provider_ptr_t &, int row);
     void make_widget(const widgetable_ptr_t &, int row);
     void resize_widgets();
 

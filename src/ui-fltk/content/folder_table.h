@@ -56,6 +56,10 @@ struct folder_table_t : static_table_t {
     tree_item_t &container;
     std::string error;
     widgetable_ptr_t notice;
+    static_string_provider_ptr_t entries_cell;
+    static_string_provider_ptr_t max_sequence_cell;
+    static_string_provider_ptr_t scan_start_cell;
+    static_string_provider_ptr_t scan_finish_cell;
     Fl_Widget *apply_button;
     Fl_Widget *share_button;
     Fl_Widget *reset_button;

@@ -52,20 +52,24 @@ struct my_table_t : static_table_t {
 
         auto device_id = peer.device_id().get_value();
         auto device_id_short = peer.device_id().get_short();
-        auto cert_name = peer.get_cert_name();
-        auto endpoint = ep.port() ? fmt::format("{}", ep) : "";
-        auto last_seen = ep.port() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
+
+        last_seen_cell = new static_string_provider_t();
+        endpoint_cell = new static_string_provider_t();
+        state_cell = new static_string_provider_t();
+        certname_cell = new static_string_provider_t();
+        client_name_cell = new static_string_provider_t();
+        client_version_cell = new static_string_provider_t();
 
         data.push_back({"name", make_name(*this)});
-        data.push_back({"last_seen", last_seen});
+        data.push_back({"last_seen", last_seen_cell});
         data.push_back({"addresses", make_addresses(*this)});
-        data.push_back({"endpoint", endpoint});
-        data.push_back({"state", container.get_state()});
-        data.push_back({"cert name", cert_name.value_or("")});
-        data.push_back({"client name", std::string(peer.get_client_name())});
-        data.push_back({"client version", std::string(peer.get_client_version())});
-        data.push_back({"device id (short)", std::string(device_id_short)});
-        data.push_back({"device id", device_id});
+        data.push_back({"endpoint", endpoint_cell});
+        data.push_back({"state", state_cell});
+        data.push_back({"cert name", certname_cell});
+        data.push_back({"client name", client_name_cell});
+        data.push_back({"client version", client_version_cell});
+        data.push_back({"device id (short)", new static_string_provider_t(device_id_short)});
+        data.push_back({"device id", new static_string_provider_t(device_id)});
         data.push_back({"introducer", make_introducer(*this)});
         data.push_back({"auto accept", make_auto_accept(*this)});
         data.push_back({"paused", make_paused(*this)});
@@ -73,6 +77,7 @@ struct my_table_t : static_table_t {
         data.push_back({"actions", make_actions(*this)});
 
         assign_rows(std::move(data));
+        refresh();
     }
 
     void on_remove() {
@@ -125,27 +130,26 @@ struct my_table_t : static_table_t {
             reset_button->deactivate();
         }
 
-        auto &rows = get_rows();
-        for (size_t i = 0; i < rows.size(); ++i) {
-            if (rows[i].label == "state") {
-                update_value(i, container.get_state());
-            } else if (rows[i].label == "last_seen") {
-                auto last_seen = peer.get_endpoint().port() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
-                update_value(i, last_seen);
-            } else if (rows[i].label == "endpoint") {
-                auto endpoint = peer.get_endpoint().port() ? fmt::format("{}", peer.get_endpoint()) : "";
-                update_value(i, endpoint);
-            } else if (rows[i].label == "client name") {
-                update_value(i, std::string(peer.get_client_name()));
-            } else if (rows[i].label == "client version") {
-                update_value(i, std::string(peer.get_client_version()));
-            }
-        }
+        auto last_seen = peer.get_endpoint().port() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
+        auto endpoint = peer.get_endpoint().port() ? fmt::format("{}", peer.get_endpoint()) : "";
+
+        last_seen_cell->update(std::move(last_seen));
+        endpoint_cell->update(std::move(endpoint));
+        state_cell->update(std::move(container.get_state()));
+        certname_cell->update(peer.get_cert_name().value_or(""));
+        client_name_cell->update(peer.get_client_name());
+        client_version_cell->update(peer.get_client_version());
     }
 
     peer_device_t &container;
     Fl_Widget *apply_button;
     Fl_Widget *reset_button;
+    static_string_provider_ptr_t last_seen_cell;
+    static_string_provider_ptr_t endpoint_cell;
+    static_string_provider_ptr_t state_cell;
+    static_string_provider_ptr_t certname_cell;
+    static_string_provider_ptr_t client_name_cell;
+    static_string_provider_ptr_t client_version_cell;
 };
 
 struct checkbox_widget_t : table_widget::checkbox_t {

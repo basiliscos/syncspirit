@@ -24,7 +24,8 @@ void widgetable_t::reset() {}
 
 bool widgetable_t::store(void *) { return true; }
 
-static void resize_value(const std::string &, int, int, int, int) {}
+static void resize_value(const string_provider_ptr_t &, int, int, int, int) {}
+
 static void resize_value(widgetable_ptr_t &widget, int x, int y, int w, int h) {
     auto impl = widget->get_widget();
     if (impl) {
@@ -36,17 +37,22 @@ static void resize_value(widgetable_ptr_t &widget, int x, int y, int w, int h) {
     };
 }
 
-static void reset_widget(std::string &) {}
+static void reset_widget(string_provider_ptr_t &) {}
 static void reset_widget(widgetable_ptr_t &widget) { widget->reset(); }
 
-static bool store_widget(std::string &, void *) { return true; }
+static bool store_widget(string_provider_ptr_t &, void *) { return true; }
 static bool store_widget(widgetable_ptr_t &widget, void *data) { return widget->store(data); }
 
-static int handle_value(const std::string &, int) { return 0; }
+static int handle_value(const string_provider_t &, int) { return 0; }
 static int handle_value(widgetable_ptr_t &widget, int event) {
     auto impl = widget->get_widget();
     return impl ? impl->handle(event) : 0;
 }
+
+static_string_provider_t::static_string_provider_t(std::string_view value) : str{std::move(value)} {}
+void static_string_provider_t::update(std::string value) { str = value; }
+void static_string_provider_t::update(std::string_view value) { str = value; }
+std::string_view static_string_provider_t::value() const { return str; }
 
 static_table_t::static_table_t(int x, int y, int w, int h, table_rows_t &&rows_) : parent_t(x, y, w, h) {
     // box(FL_ENGRAVED_BOX);
@@ -167,13 +173,6 @@ void static_table_t::draw_data(int r, int col, int x, int y, int w, int h) {
     }
 }
 
-void static_table_t::update_value(std::size_t row, std::string value) {
-    auto &v = table_rows.at(row).value;
-    assert(std::get_if<std::string>(&v));
-    v = std::move(value);
-    redraw_range(row, row, 1, 1);
-}
-
 auto static_table_t::get_rows() -> table_rows_t & { return table_rows; }
 
 std::string static_table_t::gather_selected() {
@@ -182,13 +181,13 @@ std::string static_table_t::gather_selected() {
     for (size_t i = 0; i < table_rows.size(); ++i) {
         if (row_selected(static_cast<int>(i))) {
             auto &row = table_rows.at(i);
-            auto value = std::get_if<std::string>(&row.value);
-            if (value) {
+            auto provider = std::get_if<string_provider_ptr_t>(&row.value);
+            if (provider) {
                 if (count) {
                     buff << eol;
                 };
                 ++count;
-                buff << row.label << "\t" << *value;
+                buff << row.label << "\t" << (**provider).value();
             }
         }
     }
@@ -227,7 +226,7 @@ int static_table_t::handle(int event) {
     return r;
 }
 
-void static_table_t::draw_text(const std::string &text, bool selected, int x, int y, int w, int h) {
+void static_table_t::draw_text(const std::string_view &text, bool selected, int x, int y, int w, int h) {
     fl_push_clip(x, y, w, h);
     {
         fl_font(FL_HELVETICA, 16);
@@ -245,7 +244,8 @@ void static_table_t::draw_text(const std::string &text, bool selected, int x, in
     fl_pop_clip();
 }
 
-void static_table_t::calc_dimensions(const std::string &str, int &x, int &y, int &w, int &h) {
+void static_table_t::calc_dimensions(const string_provider_ptr_t &provider, int &x, int &y, int &w, int &h) {
+    auto str = provider->value();
     fl_text_extents(str.data(), x, y, w, h);
 }
 
@@ -255,7 +255,8 @@ void static_table_t::draw_label(const std::string &value, bool selected, int x, 
     draw_text(value, selected, x, y, w, h);
 }
 
-void static_table_t::draw_value(const std::string &value, bool selected, int x, int y, int w, int h) {
+void static_table_t::draw_value(const string_provider_ptr_t &provider, bool selected, int x, int y, int w, int h) {
+    auto value = provider->value();
     draw_text(value, selected, x, y, w, h);
 }
 
@@ -268,7 +269,7 @@ void static_table_t::create_widgets() {
     }
 }
 
-void static_table_t::make_widget(const std::string &, int) {}
+void static_table_t::make_widget(const string_provider_ptr_t &, int) {}
 
 void static_table_t::make_widget(const widgetable_ptr_t &w, int row) {
     int xx, yy, ww, hh;
@@ -318,8 +319,7 @@ void static_table_t::resize_widgets() {
     init_sizes();
 }
 
-void static_table_t::remove_row(widgetable_t &item) {
-    int index = find_row(item);
+void static_table_t::remove_row(int index) {
     if (index >= 0) {
         if (index != static_cast<int>(table_rows.size()) - 1) {
             table_rows[index].value = {};
@@ -334,7 +334,9 @@ void static_table_t::remove_row(widgetable_t &item) {
     }
 }
 
-void static_table_t::insert_row(std::string_view label, widgetable_ptr_t &w, size_t index) {
+void static_table_t::remove_row(widgetable_t &item) { remove_row(find_row(item)); }
+
+void static_table_t::insert_row(std::string_view label, value_provider_t w, size_t index) {
     assert(index <= table_rows.size());
     table_rows.resize(table_rows.size() + 1);
     for (size_t j = table_rows.size() - 1; j > index; --j) {
@@ -342,7 +344,7 @@ void static_table_t::insert_row(std::string_view label, widgetable_ptr_t &w, siz
     }
     table_rows[index] = table_row_t{label, w};
     rows(table_rows.size());
-    make_widget(w, static_cast<int>(index));
+    std::visit([&](auto &&arg) { make_widget(arg, static_cast<int>(index)); }, w);
     resize_widgets();
     redraw();
 }

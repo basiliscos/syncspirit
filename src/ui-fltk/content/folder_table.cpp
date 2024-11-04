@@ -628,8 +628,10 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
     data.push_back({"type", make_folder_type(*this)});
     data.push_back({"pull order", make_pull_order(*this)});
     if (mode != mode_t::create) {
-        data.push_back({"entries", std::to_string(entries)});
-        data.push_back({"max sequence", std::to_string(max_sequence)});
+        entries_cell = new static_string_provider_t(std::to_string(entries));
+        max_sequence_cell = new static_string_provider_t(std::to_string(max_sequence));
+        data.push_back({"entries", entries_cell});
+        data.push_back({"max sequence", max_sequence_cell});
     }
     data.push_back({"index", make_index(*this)});
     if (mode == mode_t::edit) {
@@ -639,8 +641,10 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
         auto &date_finish = folder->get_scan_finish();
         auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
         auto scan_finish = date_finish.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_finish);
-        data.push_back({"scan start", scan_start});
-        data.push_back({"scan finish", scan_finish});
+        scan_start_cell = new static_string_provider_t(scan_start);
+        scan_finish_cell = new static_string_provider_t(scan_finish);
+        data.push_back({"scan start", scan_start_cell});
+        data.push_back({"scan finish", scan_finish_cell});
     }
     data.push_back({"read only", make_read_only(*this)});
     data.push_back({"rescan interval", make_rescan_interval(*this)});
@@ -794,14 +798,8 @@ void folder_table_t::refresh() {
         auto &date_finish = folder->get_scan_finish();
         auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
         auto scan_finish = date_finish.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_finish);
-        auto &rows = get_rows();
-        for (size_t i = 0; i < rows.size(); ++i) {
-            if (rows[i].label == "scan start") {
-                update_value(i, scan_start);
-            } else if (rows[i].label == "scan finish") {
-                update_value(i, scan_finish);
-            }
-        }
+        scan_start_cell->update(scan_start);
+        scan_finish_cell->update(scan_finish);
     }
 
     notice->reset();

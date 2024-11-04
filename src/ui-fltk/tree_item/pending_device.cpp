@@ -34,34 +34,32 @@ struct my_table_t : static_table_t {
         auto data = table_rows_t();
         auto last_seen = model::pt::to_simple_string(device.get_last_seen());
 
-        data.push_back({"name", std::string(device.get_name())});
-        data.push_back({"device id (short)", std::string(device_id.get_short())});
-        data.push_back({"device id", std::string(device_id.get_value())});
-        data.push_back({"client", std::string(device.get_client_name())});
-        data.push_back({"client version", std::string(device.get_client_version())});
-        data.push_back({"address", std::string(device.get_address())});
-        data.push_back({"last_seen", last_seen});
+        name_cell = new static_string_provider_t();
+        client_name_cell = new static_string_provider_t();
+        client_version_cell = new static_string_provider_t();
+        address_cell = new static_string_provider_t();
+        last_seen_cell = new static_string_provider_t();
+
+        data.push_back({"name", name_cell});
+        data.push_back({"device id (short)", new static_string_provider_t(device_id.get_short())});
+        data.push_back({"device id", new static_string_provider_t(device_id.get_value())});
+        data.push_back({"client", client_name_cell});
+        data.push_back({"client version", client_version_cell});
+        data.push_back({"address", address_cell});
+        data.push_back({"last_seen", last_seen_cell});
         data.push_back({"actions", make_actions(*this)});
         assign_rows(std::move(data));
+        refresh();
     }
 
     void refresh() override {
         auto &device = container.device;
-        auto &rows = get_rows();
-        for (size_t i = 0; i < rows.size(); ++i) {
-            if (rows[i].label == "name") {
-                update_value(i, std::string(device.get_name()));
-            } else if (rows[i].label == "client") {
-                update_value(i, std::string(device.get_client_name()));
-            } else if (rows[i].label == "client version") {
-                update_value(i, std::string(device.get_client_version()));
-            } else if (rows[i].label == "address") {
-                update_value(i, std::string(device.get_address()));
-            } else if (rows[i].label == "last_seen") {
-                auto last_seen = model::pt::to_simple_string(device.get_last_seen());
-                update_value(i, last_seen);
-            }
-        }
+        name_cell->update(device.get_name());
+        client_name_cell->update(device.get_client_name());
+        client_version_cell->update(device.get_client_version());
+        address_cell->update(device.get_address());
+        name_cell->update(device.get_name());
+        last_seen_cell->update(model::pt::to_simple_string(device.get_last_seen()));
         redraw();
     }
 
@@ -97,6 +95,11 @@ struct my_table_t : static_table_t {
     }
 
     pending_device_t &container;
+    static_string_provider_ptr_t name_cell;
+    static_string_provider_ptr_t client_name_cell;
+    static_string_provider_ptr_t client_version_cell;
+    static_string_provider_ptr_t address_cell;
+    static_string_provider_ptr_t last_seen_cell;
 };
 
 static widgetable_ptr_t make_actions(my_table_t &container) {
