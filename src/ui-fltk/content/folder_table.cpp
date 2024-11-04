@@ -627,10 +627,12 @@ folder_table_t::folder_table_t(tree_item_t &container_, const folder_description
     data.push_back({"label", make_label(*this)});
     data.push_back({"type", make_folder_type(*this)});
     data.push_back({"pull order", make_pull_order(*this)});
-    if (mode != mode_t::create) {
+    if (mode == mode_t::edit) {
         entries_cell = new static_string_provider_t(std::to_string(entries));
-        max_sequence_cell = new static_string_provider_t(std::to_string(max_sequence));
         data.push_back({"entries", entries_cell});
+    }
+    if (mode != mode_t::create) {
+        max_sequence_cell = new static_string_provider_t(std::to_string(max_sequence));
         data.push_back({"max sequence", max_sequence_cell});
     }
     data.push_back({"index", make_index(*this)});
