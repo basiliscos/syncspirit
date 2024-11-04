@@ -17,6 +17,8 @@ void peer_entry_t::update_label() {
     label(name.c_str());
     if (entry.is_deleted()) {
         labelfgcolor(FL_DARK1);
+    } else if (entry.is_global()) {
+        labelfgcolor(FL_GREEN);
     } else {
         labelfgcolor(FL_BLACK);
     }
