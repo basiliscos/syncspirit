@@ -610,7 +610,7 @@ void folder_table_t::on_share() {
     auto &peer = ctx.shared_with.begin()->item;
     log->info("going to create folder {}({}) & share it with {}", folder.label(), folder.id(), peer->get_name());
     auto peer_id = peer->device_id().get_sha256();
-    auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder);
+    auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder, 0);
     if (!opt) {
         log->error("cannot create folder: {}", opt.assume_error().message());
         return;
@@ -632,7 +632,7 @@ void folder_table_t::on_apply() {
     auto log = sup.get_logger();
     auto &cluster = *sup.get_cluster();
 
-    auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder_db);
+    auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder_db, ctx.index);
     if (!opt) {
         log->error("cannot create folder: {}", opt.assume_error().message());
         return;

@@ -89,12 +89,11 @@ void peer_folder_t::on_update() {
 }
 
 void peer_folder_t::on_open() {
-    if (expandend) {
+    if (expandend || !children()) {
         return;
     }
 
     using files_t = std::vector<model::file_info_ptr_t>;
-    assert(children());
     auto dummy = child(0);
     Fl_Tree_Item::remove_child(dummy);
     expandend = true;

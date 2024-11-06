@@ -94,7 +94,7 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
         }
     }
 
-    auto opt = modify::upsert_folder_t::create(*cluster, *actor.sequencer, folder);
+    auto opt = modify::upsert_folder_t::create(*cluster, *actor.sequencer, folder, 0);
     if (opt.has_error()) {
         auto message = opt.assume_error().message();
         log->warn("{}, cannot create folder '{}' on '{}': {}", actor.get_identity(), folder.label(), folder.path(),

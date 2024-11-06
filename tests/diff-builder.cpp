@@ -126,18 +126,18 @@ auto diff_builder_t::apply() noexcept -> outcome::result<void> {
     return r;
 }
 
-diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, std::string_view path,
-                                              std::string_view label) noexcept {
+diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, std::string_view path, std::string_view label,
+                                              std::uint64_t index_id) noexcept {
     db::Folder db_folder;
     db_folder.set_id(std::string(id));
     db_folder.set_label(std::string(label));
     db_folder.set_path(std::string(path));
-    auto opt = diff::modify::upsert_folder_t::create(cluster, *sequencer, db_folder);
+    auto opt = diff::modify::upsert_folder_t::create(cluster, *sequencer, db_folder, index_id);
     return assign(opt.value().get());
 }
 
-diff_builder_t &diff_builder_t::upsert_folder(const db::Folder &data) noexcept {
-    auto opt = diff::modify::upsert_folder_t::create(cluster, *sequencer, data);
+diff_builder_t &diff_builder_t::upsert_folder(const db::Folder &data, std::uint64_t index_id) noexcept {
+    auto opt = diff::modify::upsert_folder_t::create(cluster, *sequencer, data, index_id);
     return assign(opt.value().get());
 }
 

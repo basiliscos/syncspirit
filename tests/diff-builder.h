@@ -59,8 +59,9 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     outcome::result<void> apply() noexcept;
     index_maker_t make_index(std::string_view sha256, std::string_view folder_id) noexcept;
 
-    diff_builder_t &upsert_folder(std::string_view id, std::string_view path, std::string_view label = "") noexcept;
-    diff_builder_t &upsert_folder(const db::Folder &data) noexcept;
+    diff_builder_t &upsert_folder(std::string_view id, std::string_view path, std::string_view label = "",
+                                  std::uint64_t index_id = 0) noexcept;
+    diff_builder_t &upsert_folder(const db::Folder &data, std::uint64_t index_id = 0) noexcept;
     diff_builder_t &update_peer(const model::device_id_t &device, std::string_view name = "",
                                 std::string_view cert_name = "", bool auto_accept = true) noexcept;
     diff_builder_t &share_folder(std::string_view sha256, std::string_view folder_id) noexcept;

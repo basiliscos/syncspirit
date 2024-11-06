@@ -8,8 +8,8 @@
 
 using namespace syncspirit::model::diff::modify;
 
-auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, db::Folder db) noexcept
-    -> outcome::result<cluster_diff_ptr_t> {
+auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, db::Folder db,
+                             std::uint64_t index_id) noexcept -> outcome::result<cluster_diff_ptr_t> {
     auto &folders = cluster.get_folders();
     auto &device = *cluster.get_device();
     auto prev_folder = folders.by_id(db.id());
@@ -21,20 +21,24 @@ auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, d
         uuid = sequencer.next_uuid();
     }
 
+    if (!index_id) {
+        index_id = sequencer.next_uint64();
+    }
+
     auto diff = cluster_diff_ptr_t{};
-    diff = new upsert_folder_t(sequencer, uuid, std::move(db), folder_info, device);
+    diff = new upsert_folder_t(sequencer, uuid, std::move(db), folder_info, device, index_id);
     return outcome::success(diff);
 }
 
 upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Folder db_,
-                                 model::folder_info_ptr_t folder_info, const model::device_t &device) noexcept
+                                 model::folder_info_ptr_t folder_info, const model::device_t &device,
+                                 std::uint64_t index_id) noexcept
     : db{std::move(db_)}, uuid{uuid_} {
 
     if (!folder_info) {
         auto fi_uuid = sequencer.next_uuid();
-        auto fi_index = sequencer.next_uint64();
         auto diff = cluster_diff_ptr_t{};
-        diff = new upsert_folder_info_t(fi_uuid, device.device_id().get_sha256(), db.id(), fi_index);
+        diff = new upsert_folder_info_t(fi_uuid, device.device_id().get_sha256(), db.id(), index_id);
         assign_child(diff);
     }
 }

@@ -12,8 +12,8 @@ namespace syncspirit::model::diff::modify {
 
 struct SYNCSPIRIT_API upsert_folder_t final : cluster_diff_t {
 
-    static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, sequencer_t &sequencer,
-                                                      db::Folder db) noexcept;
+    static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, sequencer_t &sequencer, db::Folder db,
+                                                      std::uint64_t index_id) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
@@ -23,7 +23,7 @@ struct SYNCSPIRIT_API upsert_folder_t final : cluster_diff_t {
 
   private:
     upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid, db::Folder db, model::folder_info_ptr_t folder_info,
-                    const model::device_t &device) noexcept;
+                    const model::device_t &device, std::uint64_t index_id) noexcept;
 };
 
 } // namespace syncspirit::model::diff::modify
