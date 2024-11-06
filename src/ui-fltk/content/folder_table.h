@@ -11,8 +11,6 @@ struct folder_table_t : static_table_t {
     using parent_t = static_table_t;
     using shared_devices_t = boost::local_shared_ptr<model::devices_map_t>;
 
-    enum class mode_t { share, edit, create };
-
     struct serialiazation_context_t {
         db::Folder folder;
         std::uint64_t index;
@@ -28,10 +26,26 @@ struct folder_table_t : static_table_t {
         shared_devices_t non_shared_with;
     };
 
-    folder_table_t(tree_item_t &container_, const folder_description_t &description, mode_t mode, int x, int y, int w,
-                   int h);
+    static widgetable_ptr_t make_title(folder_table_t &container, std::string_view title);
+    static widgetable_ptr_t make_path(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_id(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_label(folder_table_t &container);
+    static widgetable_ptr_t make_folder_type(folder_table_t &container);
+    static widgetable_ptr_t make_pull_order(folder_table_t &container);
+    static widgetable_ptr_t make_index(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_read_only(folder_table_t &container);
+    static widgetable_ptr_t make_rescan_interval(folder_table_t &container);
+    static widgetable_ptr_t make_ignore_permissions(folder_table_t &container);
+    static widgetable_ptr_t make_ignore_delete(folder_table_t &container);
+    static widgetable_ptr_t make_disable_tmp(folder_table_t &container);
+    static widgetable_ptr_t make_paused(folder_table_t &container);
+    static widgetable_ptr_t make_shared_with(folder_table_t &container, model::device_ptr_t device, bool disabled);
+    static widgetable_ptr_t make_notice(folder_table_t &container);
+    // static widgetable_ptr_t make_actions(folder_table_t &container);
 
-    void refresh() override;
+    folder_table_t(tree_item_t &container_, const folder_description_t &description, int x, int y, int w, int h);
+
+    // void refresh() override;
 
     bool on_remove_share(widgetable_t &widget, model::device_ptr_t device, model::device_ptr_t initial);
     void on_select(model::device_ptr_t device, model::device_ptr_t previous);
@@ -45,7 +59,6 @@ struct folder_table_t : static_table_t {
     void on_rescan();
 
     model::folder_data_t folder_data;
-    mode_t mode;
     std::size_t entries;
     std::uint64_t index;
     std::int64_t max_sequence;

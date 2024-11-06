@@ -24,28 +24,11 @@ static constexpr int padding = 2;
 
 namespace {
 
-auto static make_title(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_path(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_id(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_label(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_folder_type(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_pull_order(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_index(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_read_only(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_rescan_interval(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_ignore_permissions(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_ignore_delete(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_disable_tmp(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_paused(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_shared_with(folder_table_t &container, model::device_ptr_t device) -> widgetable_ptr_t;
-auto static make_notice(folder_table_t &container) -> widgetable_ptr_t;
-auto static make_actions(folder_table_t &container) -> widgetable_ptr_t;
-
 using ctx_t = folder_table_t::serialiazation_context_t;
 
 struct device_share_widget_t final : widgetable_t {
     using parent_t = widgetable_t;
-    device_share_widget_t(folder_table_t &container, model::device_ptr_t device_);
+    device_share_widget_t(folder_table_t &container, model::device_ptr_t device_, bool disabled_);
 
     Fl_Widget *create_widget(int x, int y, int w, int h) override;
     void reset() override;
@@ -54,10 +37,11 @@ struct device_share_widget_t final : widgetable_t {
     model::device_ptr_t initial_device;
     model::device_ptr_t device;
     Fl_Choice *input;
+    bool disabled;
 };
 
-device_share_widget_t::device_share_widget_t(folder_table_t &container, model::device_ptr_t device_)
-    : parent_t(container), initial_device{device_}, device{device_}, input{nullptr} {}
+device_share_widget_t::device_share_widget_t(folder_table_t &container, model::device_ptr_t device_, bool disabled_)
+    : parent_t(container), initial_device{device_}, device{device_}, input{nullptr}, disabled{disabled_} {}
 
 Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
     auto group = new Fl_Group(x, y, w, h);
@@ -143,7 +127,7 @@ void device_share_widget_t::reset() {
         ++i;
     }
     input->value(this->device ? index : 0);
-    if (table.mode == folder_table_t::mode_t::share) {
+    if (disabled) {
         widget->deactivate();
     }
 }
@@ -167,38 +151,33 @@ struct checkbox_widget_t : table_widget::checkbox_t {
     }
 };
 
-auto static make_title(folder_table_t &container) -> widgetable_ptr_t {
+} // namespace
+
+auto folder_table_t::make_title(folder_table_t &container, std::string_view title) -> widgetable_ptr_t {
     struct widget_t final : table_widget::label_t {
         using parent_t = table_widget::label_t;
-        using parent_t::parent_t;
 
-        void reset() override {
-            auto text = std::string_view("");
-            auto &container = static_cast<folder_table_t &>(this->container);
-            if (container.mode == folder_table_t::mode_t::edit) {
-                text = "editing existing folder";
-            } else if (container.mode == folder_table_t::mode_t::create) {
-                text = "creating new folder";
-            } else if (container.mode == folder_table_t::mode_t::share) {
-                text = "accepting pending folder";
-            }
-            input->label(text.data());
-        }
+        widget_t(Fl_Widget &container, std::string_view title_) : parent_t(container), title{title_} {}
+
+        void reset() override { input->label(title.data()); }
+
+        std::string_view title;
     };
-    return new widget_t(container);
+    return new widget_t(container, title);
 }
 
-auto static make_path(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_path(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : table_widget::path_t {
         using parent_t = table_widget::path_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, std::string title, bool disabled_)
+            : parent_t{container, title}, disabled{disabled_} {}
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
             input->when(input->when() | FL_WHEN_CHANGED);
             input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
             auto &container = static_cast<folder_table_t &>(this->container);
-            if (container.mode == folder_table_t::mode_t::edit) {
+            if (disabled) {
                 widget->deactivate();
             }
             return r;
@@ -216,21 +195,23 @@ auto static make_path(folder_table_t &container) -> widgetable_ptr_t {
             ctx->folder.set_path(input->value());
             return true;
         }
+
+        bool disabled;
     };
-    return new widget_t(container, "folder directory");
+    return new widget_t(container, "folder directory", disabled);
 }
 
-auto static make_id(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_id(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : table_widget::input_t {
         using parent_t = table_widget::input_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
             input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
             input->when(input->when() | FL_WHEN_CHANGED);
             auto &container = static_cast<folder_table_t &>(this->container);
-            if (container.mode != folder_table_t::mode_t::create) {
+            if (disabled) {
                 widget->deactivate();
             }
             return r;
@@ -247,11 +228,13 @@ auto static make_id(folder_table_t &container) -> widgetable_ptr_t {
             ctx->folder.set_id(input->value());
             return true;
         }
+
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
-auto static make_label(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_label(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::input_t {
         using parent_t = table_widget::input_t;
         using parent_t::parent_t;
@@ -285,7 +268,7 @@ auto static make_label(folder_table_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-auto static make_folder_type(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_folder_type(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::choice_t {
         using parent_t = table_widget::choice_t;
         using parent_t::parent_t;
@@ -318,7 +301,7 @@ auto static make_folder_type(folder_table_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-auto static make_pull_order(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_pull_order(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::choice_t {
         using parent_t = table_widget::choice_t;
         using parent_t::parent_t;
@@ -354,17 +337,17 @@ auto static make_pull_order(folder_table_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-auto static make_index(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_index(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : table_widget::int_input_t {
         using parent_t = table_widget::int_input_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
             input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
             input->when(input->when() | FL_WHEN_CHANGED);
             auto &container = static_cast<folder_table_t &>(this->container);
-            if (container.mode != folder_table_t::mode_t::create) {
+            if (disabled) {
                 widget->deactivate();
             }
             return r;
@@ -372,7 +355,7 @@ auto static make_index(folder_table_t &container) -> widgetable_ptr_t {
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            auto value_str = std::to_string(container.index);
+            auto value_str = fmt::format("0x{:x}", container.index);
             input->value(value_str.data());
         }
 
@@ -380,20 +363,26 @@ auto static make_index(folder_table_t &container) -> widgetable_ptr_t {
             auto ctx = reinterpret_cast<ctx_t *>(data);
             auto value_str = std::string_view(input->value());
             std::uint64_t value = 0;
-            auto result = std::from_chars(value_str.begin(), value_str.end(), value);
+            auto b = value_str.begin();
+            if (value_str.size() >= 2 && value_str.starts_with("0x")) {
+                b += 2;
+            }
+            auto result = std::from_chars(b, value_str.end(), value, 16);
             if (result.ec != std::errc() || value <= 0) {
                 auto &container = static_cast<folder_table_t &>(this->container);
                 container.error = "invalid index";
                 return false;
             }
-            ctx->index = static_cast<std::uint32_t>(value);
+            ctx->index = value;
             return true;
         }
+
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
-auto static make_read_only(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_read_only(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -412,7 +401,7 @@ auto static make_read_only(folder_table_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-auto static make_rescan_interval(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_rescan_interval(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::int_input_t {
         using parent_t = table_widget::int_input_t;
         using parent_t::parent_t;
@@ -449,7 +438,7 @@ auto static make_rescan_interval(folder_table_t &container) -> widgetable_ptr_t 
     return new widget_t(container);
 }
 
-auto static make_ignore_permissions(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_ignore_permissions(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -468,7 +457,7 @@ auto static make_ignore_permissions(folder_table_t &container) -> widgetable_ptr
     return new widget_t(container);
 }
 
-auto static make_ignore_delete(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_ignore_delete(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -486,7 +475,7 @@ auto static make_ignore_delete(folder_table_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-auto static make_disable_tmp(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_disable_tmp(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -504,7 +493,7 @@ auto static make_disable_tmp(folder_table_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-auto static make_paused(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_paused(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
         using parent_t::parent_t;
@@ -522,11 +511,12 @@ auto static make_paused(folder_table_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-auto static make_shared_with(folder_table_t &container, model::device_ptr_t device) -> widgetable_ptr_t {
-    return new device_share_widget_t(container, device);
+auto folder_table_t::make_shared_with(folder_table_t &container, model::device_ptr_t device, bool disabled)
+    -> widgetable_ptr_t {
+    return new device_share_widget_t(container, device, disabled);
 }
 
-auto static make_notice(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_notice(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : table_widget::label_t {
         using parent_t = table_widget::label_t;
         using parent_t::parent_t;
@@ -539,141 +529,12 @@ auto static make_notice(folder_table_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-auto static make_actions(folder_table_t &container) -> widgetable_ptr_t {
-    struct widget_t final : widgetable_t {
-        using parent_t = widgetable_t;
-        using parent_t::parent_t;
-
-        Fl_Widget *create_widget(int x, int y, int w, int h) override {
-            using M = folder_table_t::mode_t;
-            auto group = new Fl_Group(x, y, w, h);
-            group->begin();
-            group->box(FL_FLAT_BOX);
-            auto &container = static_cast<folder_table_t &>(this->container);
-
-            auto yy = y + padding, ww = 100, hh = h - padding * 2;
-            int xx;
-            if (container.mode == M::share) {
-                auto share = new Fl_Button(x + padding, yy, ww, hh, "share");
-                share->deactivate();
-                share->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_share(); }, &container);
-                xx = share->x() + ww + padding * 2;
-                container.share_button = share;
-            } else if (container.mode == M::edit) {
-                auto apply = new Fl_Button(x + padding, yy, ww, hh, "apply");
-                apply->deactivate();
-                apply->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_apply(); }, &container);
-                container.apply_button = apply;
-                xx = apply->x() + ww + padding * 2;
-            } else if (container.mode == M::create) {
-                auto apply = new Fl_Button(x + padding, yy, ww, hh, "create");
-                apply->deactivate();
-                apply->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_apply(); }, &container);
-                container.apply_button = apply;
-                xx = apply->x() + ww + padding * 2;
-            }
-            auto reset = new Fl_Button(xx, yy, ww, hh, "reset");
-            reset->deactivate();
-            reset->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_reset(); }, &container);
-            container.reset_button = reset;
-            xx = reset->x() + ww + padding * 2;
-
-            if (container.mode == M::edit) {
-                auto rescan = new Fl_Button(xx, yy, ww, hh, "rescan");
-                rescan->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_rescan(); },
-                                 &container);
-                rescan->deactivate();
-                container.rescan_button = rescan;
-
-                auto remove = new Fl_Button(rescan->x() + ww + padding * 2, yy, ww, hh, "remove");
-                remove->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_remove(); },
-                                 &container);
-                remove->color(FL_RED);
-                xx = remove->x() + ww + padding * 2;
-            }
-            auto invisible = new Fl_Box(xx, yy, w - (xx - group->x() + padding * 2), hh);
-            invisible->hide();
-            group->resizable(invisible);
-            group->end();
-            widget = group;
-
-            this->reset();
-            return widget;
-        }
-    };
-
-    return new widget_t(container);
-}
-
-} // namespace
-
-folder_table_t::folder_table_t(tree_item_t &container_, const folder_description_t &folder_descr, mode_t mode_, int x,
-                               int y, int w, int h)
-    : parent_t(x, y, w, h), container{container_}, folder_data{folder_descr.folder_data}, mode{mode_},
-      entries{folder_descr.entries}, index{folder_descr.index}, max_sequence{folder_descr.max_sequence},
-      shared_with{folder_descr.shared_with}, non_shared_with{folder_descr.non_shared_with}, apply_button{nullptr},
-      share_button{nullptr}, reset_button{nullptr} {
-
-    auto data = table_rows_t();
-    if (mode != mode_t::edit) {
-        auto &path = container.supervisor.get_app_config().default_location;
-        folder_data.set_path(path);
-        folder_data.set_rescan_interval(3600u);
-    }
-
-    data.push_back({"", make_title(*this)});
-    data.push_back({"path", make_path(*this)});
-    data.push_back({"id", make_id(*this)});
-    data.push_back({"label", make_label(*this)});
-    data.push_back({"type", make_folder_type(*this)});
-    data.push_back({"pull order", make_pull_order(*this)});
-    if (mode == mode_t::edit) {
-        entries_cell = new static_string_provider_t(std::to_string(entries));
-        data.push_back({"entries", entries_cell});
-    }
-    if (mode != mode_t::create) {
-        max_sequence_cell = new static_string_provider_t(std::to_string(max_sequence));
-        data.push_back({"max sequence", max_sequence_cell});
-    }
-    data.push_back({"index", make_index(*this)});
-    if (mode == mode_t::edit) {
-        auto cluster = container.supervisor.get_cluster();
-        auto folder = cluster->get_folders().by_id(folder_data.get_id());
-        auto &date_start = folder->get_scan_start();
-        auto &date_finish = folder->get_scan_finish();
-        auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
-        auto scan_finish = date_finish.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_finish);
-        scan_start_cell = new static_string_provider_t(scan_start);
-        scan_finish_cell = new static_string_provider_t(scan_finish);
-        data.push_back({"scan start", scan_start_cell});
-        data.push_back({"scan finish", scan_finish_cell});
-    }
-    data.push_back({"read only", make_read_only(*this)});
-    data.push_back({"rescan interval", make_rescan_interval(*this)});
-    data.push_back({"ignore permissions", make_ignore_permissions(*this)});
-    data.push_back({"ignore delete", make_ignore_delete(*this)});
-    data.push_back({"disable temp indixes", make_disable_tmp(*this)});
-    data.push_back({"paused", make_paused(*this)});
-
-    auto cluster = container.supervisor.get_cluster();
-    int shared_count = 0;
-    for (auto it : *shared_with) {
-        auto &device = it.item;
-        auto widget = make_shared_with(*this, device);
-        data.push_back({"shared_with", widget});
-        ++shared_count;
-    }
-    if (!shared_count) {
-        auto widget = make_shared_with(*this, {});
-        data.push_back({"shared_with", widget});
-    }
-    data.push_back({"", notice = make_notice(*this)});
-    data.push_back({"actions", make_actions(*this)});
-
-    initially_shared_with = *shared_with;
-    initially_non_shared_with = *non_shared_with;
-    assign_rows(std::move(data));
-}
+folder_table_t::folder_table_t(tree_item_t &container_, const folder_description_t &folder_descr, int x, int y, int w,
+                               int h)
+    : parent_t(x, y, w, h), container{container_}, folder_data{folder_descr.folder_data}, entries{folder_descr.entries},
+      index{folder_descr.index}, max_sequence{folder_descr.max_sequence}, shared_with{folder_descr.shared_with},
+      non_shared_with{folder_descr.non_shared_with}, apply_button{nullptr}, share_button{nullptr},
+      reset_button{nullptr} {}
 
 bool folder_table_t::on_remove_share(widgetable_t &widget, model::device_ptr_t device, model::device_ptr_t initial) {
     bool removed = false;
@@ -710,7 +571,7 @@ void folder_table_t::on_add_share(widgetable_t &widget) {
     if (count < container.supervisor.get_cluster()->get_devices().size() - 1) {
         assert(from_index);
         auto w = widgetable_ptr_t{};
-        w.reset(new device_share_widget_t(*this, {}));
+        w.reset(new device_share_widget_t(*this, {}, false));
         insert_row("shared with", w, from_index + 1);
         refresh();
     }
@@ -734,77 +595,6 @@ std::pair<int, int> folder_table_t::scan(widgetable_t &widget) {
         }
     }
     return {from_index, count};
-}
-
-void folder_table_t::refresh() {
-    serialiazation_context_t ctx;
-    folder_data.serialize(ctx.folder);
-
-    auto copy_data = ctx.folder.SerializeAsString();
-    error = {};
-    auto valid = store(&ctx);
-
-    // clang-format off
-    auto is_same = (copy_data == ctx.folder.SerializeAsString())
-                && (initially_shared_with == ctx.shared_with);
-    // clang-format on
-    if (!is_same) {
-        if (valid) {
-            if (mode == mode_t::edit) {
-                apply_button->activate();
-            }
-        }
-        reset_button->activate();
-        if (mode == mode_t::edit) {
-            rescan_button->deactivate();
-        }
-    } else {
-        if (mode == mode_t::edit) {
-            apply_button->deactivate();
-            auto &folders = container.supervisor.get_cluster()->get_folders();
-            auto folder = folders.by_id(ctx.folder.id());
-            if (!folder->is_scanning()) {
-                rescan_button->activate();
-            }
-        }
-        reset_button->deactivate();
-    }
-
-    if ((mode == mode_t::share) || (mode == mode_t::create)) {
-        if (valid) {
-            if (ctx.folder.path().empty()) {
-                error = "path should be defined";
-            } else {
-                auto path = bfs::path(ctx.folder.path());
-                auto ec = sys::error_code{};
-                if (bfs::exists(path, ec)) {
-                    if (!bfs::is_empty(path, ec)) {
-                        error = "referred directory should be empty";
-                    }
-                }
-            }
-        }
-
-        auto target_button = (mode == mode_t::share) ? share_button : apply_button;
-        if (valid && error.empty()) {
-            target_button->activate();
-        } else {
-            target_button->deactivate();
-        }
-    }
-
-    if (mode == mode_t::edit) {
-        auto cluster = container.supervisor.get_cluster();
-        auto folder = cluster->get_folders().by_id(folder_data.get_id());
-        auto &date_start = folder->get_scan_start();
-        auto &date_finish = folder->get_scan_finish();
-        auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
-        auto scan_finish = date_finish.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_finish);
-        scan_start_cell->update(scan_start);
-        scan_finish_cell->update(scan_finish);
-    }
-
-    notice->reset();
 }
 
 void folder_table_t::on_share() {
