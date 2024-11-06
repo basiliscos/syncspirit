@@ -1257,7 +1257,7 @@ void test_initiate_my_sharing() {
                     }
                 }
                 REQUIRE(f_peer);
-                CHECK(f_peer->index_id());
+                CHECK(!f_peer->index_id());
                 CHECK(f_peer->max_sequence() == 0);
 
                 REQUIRE(f_my);

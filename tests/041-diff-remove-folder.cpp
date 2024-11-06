@@ -85,7 +85,7 @@ TEST_CASE("remove folder", "[model]") {
 
     auto file_2 = [&]() {
         proto::FileInfo pr_fi;
-        pr_fi.set_name("a.txt");
+        pr_fi.set_name("b.txt");
         pr_fi.set_block_size(5);
         pr_fi.set_size(5);
         auto b_hash = utils::sha256_digest("2").value();
@@ -121,10 +121,19 @@ TEST_CASE("remove folder", "[model]") {
     REQUIRE(cluster->get_devices().size() == 2);
     REQUIRE(cluster->get_folders().size() == 2);
 
-    REQUIRE(builder.remove_folder(*f1).remove_folder(*f2).apply());
-    CHECK(cluster->get_blocks().size() == 0);
-    CHECK(cluster->get_folders().size() == 0);
+    SECTION("never exchanged info with a peer (index == 0") {
+        REQUIRE(builder.remove_folder(*f1).remove_folder(*f2).apply());
+        CHECK(cluster->get_pending_folders().size() == 0);
+        CHECK(cluster->get_blocks().size() == 0);
+        CHECK(cluster->get_folders().size() == 0);
+    }
 
-    auto &pending = cluster->get_pending_folders();
-    REQUIRE(pending.size() == 1);
+    SECTION("peer has seen the folder (index != 0)") {
+        fi_1_peer->set_index(123);
+        fi_1_peer->get_file_infos().put(file_1);
+        REQUIRE(builder.remove_folder(*f1).remove_folder(*f2).apply());
+        CHECK(cluster->get_pending_folders().size() == 1);
+        CHECK(cluster->get_blocks().size() == 0);
+        CHECK(cluster->get_folders().size() == 0);
+    }
 }

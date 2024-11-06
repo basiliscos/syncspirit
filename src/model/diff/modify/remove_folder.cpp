@@ -32,7 +32,7 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
         auto &fi = *it.item;
         auto d = fi.get_device();
         assign(new unshare_folder_t(cluster, *it.item, &orphaned_blocks));
-        if (d != self) {
+        if (d != self && fi.get_index()) {
             auto db = db::PendingFolder();
             auto db_fi = db.mutable_folder_info();
             auto db_f = db.mutable_folder();

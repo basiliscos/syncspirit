@@ -31,10 +31,6 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
         }
     }
 
-    if (!index) {
-        index = sequencer.next_uint64();
-    }
-
     return new share_folder_t(sequencer.next_uuid(), peer.device_id().get_sha256(), folder.get_id(), index,
                               pending_folder);
 }
