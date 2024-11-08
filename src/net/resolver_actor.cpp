@@ -138,19 +138,17 @@ void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
         auto &payload = it->payload;
         return payload.id == request_id && payload.origin == source;
     };
-    if (matches(queue.front())) {
-        assert(timer_id);
-        cancel_timer();
-    } else if (queue.size() > 1) {
-        auto it = queue.begin();
-        std::advance(it, 1);
-        for (; it != queue.end(); ++it) {
-            if (matches(*it)) {
+    for (auto it = queue.begin(); it != queue.end(); ++it) {
+        if (matches(*it)) {
+            if (current_query->payload.id == request_id && current_query->payload.origin == source) {
+                assert(timer_id);
+                cancel_timer();
+            } else {
                 auto ec = r::make_error_code(r::error_code_t::cancelled);
                 reply_with_error(**it, make_error(ec));
                 queue.erase(it);
-                return;
             }
+            return;
         }
     }
 }
