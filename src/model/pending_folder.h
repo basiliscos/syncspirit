@@ -31,6 +31,7 @@ struct SYNCSPIRIT_API pending_folder_t final : augmentable_t<pending_folder_t>, 
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
     std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
 
+    void serialize(db::PendingFolder &data) const noexcept;
     std::string serialize() const noexcept;
 
   private:

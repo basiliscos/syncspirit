@@ -61,13 +61,13 @@ static auto make_actions(folder_table_t &container) -> widgetable_ptr_t {
 
 struct table_t : content::folder_table_t {
     using parent_t = content::folder_table_t;
-    using parent_t::parent_t;
 
-    table_t(tree_item_t &container_, const folder_description_t &description, int x, int y, int w, int h)
-        : parent_t(container_, description, x, y, w, h) {
+    table_t(tree_item_t &container_, model::folder_info_ptr_t fi_, model::folder_ptr_t folder_, int x, int y, int w,
+            int h)
+        : parent_t(container_, *fi_, x, y, w, h), fi{fi_}, folder{folder_} {
 
-        entries_cell = new static_string_provider_t(std::to_string(entries));
-        max_sequence_cell = new static_string_provider_t(std::to_string(max_sequence));
+        entries_cell = new static_string_provider_t();
+        max_sequence_cell = new static_string_provider_t();
         scan_start_cell = new static_string_provider_t();
         scan_finish_cell = new static_string_provider_t();
 
@@ -85,7 +85,7 @@ struct table_t : content::folder_table_t {
         data.push_back({"ignore delete", make_ignore_delete(*this)});
         data.push_back({"disable temp indixes", make_disable_tmp(*this)});
         data.push_back({"paused", make_paused(*this)});
-        data.push_back({"shared_with", make_shared_with(*this, shared_with->begin()->item, true)});
+        data.push_back({"shared_with", make_shared_with(*this, fi->get_device(), true)});
         data.push_back({"", notice = make_notice(*this)});
         data.push_back({"actions", make_actions(*this)});
 
@@ -98,7 +98,7 @@ struct table_t : content::folder_table_t {
 
     void refresh() override {
         serialiazation_context_t ctx;
-        folder_data.serialize(ctx.folder);
+        folder->serialize(ctx.folder);
 
         auto copy_data = ctx.folder.SerializeAsString();
         error = {};
@@ -132,6 +132,9 @@ struct table_t : content::folder_table_t {
         notice->reset();
         redraw();
     }
+
+    model::folder_info_ptr_t fi;
+    model::folder_ptr_t folder;
 };
 
 } // namespace
@@ -146,31 +149,27 @@ pending_folder_t::pending_folder_t(model::pending_folder_t &folder_, app_supervi
 bool pending_folder_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
         auto prev = content->get_widget();
-        auto folder_data = model::folder_data_t(folder);
-        auto shared_with = table_t::shared_devices_t{new model::devices_map_t{}};
-        auto non_shared_with = table_t::shared_devices_t{new model::devices_map_t{}};
-
         auto cluster = supervisor.get_cluster();
+        auto &sequencer = supervisor.get_sequencer();
         auto &devices = cluster->get_devices();
-        auto &self = *cluster->get_device();
         auto &peer = static_cast<pending_folders_t *>(parent())->peer;
-        for (auto &it : devices) {
-            auto &device = *it.item;
-            if ((&device != &self) && (&device != &peer)) {
-                non_shared_with->put(it.item);
-            }
-        }
-
-        shared_with->put(&peer);
-
         auto &path = supervisor.get_app_config().default_location;
-        folder_data.set_path(path);
-        folder_data.set_rescan_interval(3600u);
 
-        auto description = table_t::folder_description_t{std::move(folder_data),    0,           folder.get_index(),
-                                                         folder.get_max_sequence(), shared_with, non_shared_with};
+        auto db = db::PendingFolder();
+        folder.serialize(db);
+        db.mutable_folder()->set_path(path.string());
+        db.mutable_folder()->set_rescan_interval(3600u);
+
+        auto folder = model::folder_t::create(sequencer.next_uuid(), db.folder()).value();
+        folder->assign_cluster(cluster);
+
+        auto db_folder_info = db::FolderInfo();
+        db_folder_info.set_index_id(sequencer.next_uint64());
+        auto fi = model::folder_info_t::create(sequencer.next_uuid(), db_folder_info, &peer, folder).value();
+        folder->get_folder_infos().put(fi);
+
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        return new table_t(*this, description, x, y, w, h);
+        return new table_t(*this, std::move(fi), std::move(folder), x, y, w, h);
     });
     return true;
 }

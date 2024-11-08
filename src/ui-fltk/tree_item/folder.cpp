@@ -89,9 +89,11 @@ struct table_t : content::folder_table_t {
     using parent_t = content::folder_table_t;
     using parent_t::parent_t;
 
-    table_t(tree_item_t &container_, const folder_description_t &description, int x, int y, int w, int h)
+    table_t(tree_item_t &container_, const model::folder_info_t &description, int x, int y, int w, int h)
         : parent_t(container_, description, x, y, w, h) {
 
+        auto entries = description.get_file_infos().size();
+        auto max_sequence = description.get_max_sequence();
         entries_cell = new static_string_provider_t(std::to_string(entries));
         max_sequence_cell = new static_string_provider_t(std::to_string(max_sequence));
         scan_start_cell = new static_string_provider_t();
@@ -140,7 +142,7 @@ struct table_t : content::folder_table_t {
 
     void refresh() override {
         serialiazation_context_t ctx;
-        folder_data.serialize(ctx.folder);
+        description.get_folder()->serialize(ctx.folder);
 
         auto copy_data = ctx.folder.SerializeAsString();
         error = {};
@@ -167,7 +169,7 @@ struct table_t : content::folder_table_t {
         }
 
         auto cluster = container.supervisor.get_cluster();
-        auto folder = cluster->get_folders().by_id(folder_data.get_id());
+        auto folder = description.get_folder();
         auto &date_start = folder->get_scan_start();
         auto &date_finish = folder->get_scan_finish();
         auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
@@ -209,26 +211,9 @@ bool folder_t::on_select() {
         auto cluster = supervisor.get_cluster();
         auto &folder_infos = folder.get_folder_infos();
         auto &folder_info = *folder_infos.by_device(*cluster->get_device());
-        for (auto it : cluster->get_devices()) {
-            auto &device = it.item;
-            if (device != cluster->get_device()) {
-                if (folder.is_shared_with(*device)) {
-                    shared_with->put(device);
-                } else {
-                    non_shared_with->put(device);
-                }
-            }
-        }
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        auto folder_descr = table_t::folder_description_t{folder,
-                                                          folder_info.get_file_infos().size(),
-                                                          folder_info.get_index(),
-                                                          folder_info.get_max_sequence(),
-                                                          shared_with,
-                                                          non_shared_with};
-
-        return new table_t(*this, folder_descr, x, y, w, h);
+        return new table_t(*this, folder_info, x, y, w, h);
     });
     return true;
 }

@@ -55,12 +55,16 @@ void pending_folder_t::assign_fields(const db::PendingFolder &data) noexcept {
     id = data.folder().id();
 }
 
-std::string pending_folder_t::serialize() const noexcept {
-    db::PendingFolder r;
-    folder_data_t::serialize(*r.mutable_folder());
-    auto &fi = *r.mutable_folder_info();
+void pending_folder_t::serialize(db::PendingFolder &data) const noexcept {
+    folder_data_t::serialize(*data.mutable_folder());
+    auto &fi = *data.mutable_folder_info();
     fi.set_index_id(index);
     fi.set_max_sequence(max_sequence);
+}
+
+std::string pending_folder_t::serialize() const noexcept {
+    db::PendingFolder r;
+    serialize(r);
     return r.SerializePartialAsString();
 }
 

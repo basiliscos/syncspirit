@@ -17,15 +17,6 @@ struct folder_table_t : static_table_t {
         model::devices_map_t shared_with;
     };
 
-    struct folder_description_t {
-        model::folder_data_t folder_data;
-        std::size_t entries;
-        std::uint64_t index;
-        std::int64_t max_sequence;
-        shared_devices_t shared_with;
-        shared_devices_t non_shared_with;
-    };
-
     static widgetable_ptr_t make_title(folder_table_t &container, std::string_view title);
     static widgetable_ptr_t make_path(folder_table_t &container, bool disabled);
     static widgetable_ptr_t make_id(folder_table_t &container, bool disabled);
@@ -41,9 +32,8 @@ struct folder_table_t : static_table_t {
     static widgetable_ptr_t make_paused(folder_table_t &container);
     static widgetable_ptr_t make_shared_with(folder_table_t &container, model::device_ptr_t device, bool disabled);
     static widgetable_ptr_t make_notice(folder_table_t &container);
-    // static widgetable_ptr_t make_actions(folder_table_t &container);
 
-    folder_table_t(tree_item_t &container_, const folder_description_t &description, int x, int y, int w, int h);
+    folder_table_t(tree_item_t &container_, const model::folder_info_t &description, int x, int y, int w, int h);
 
     // void refresh() override;
 
@@ -58,10 +48,7 @@ struct folder_table_t : static_table_t {
     void on_reset();
     void on_rescan();
 
-    model::folder_data_t folder_data;
-    std::size_t entries;
-    std::uint64_t index;
-    std::int64_t max_sequence;
+    const model::folder_info_t &description;
     model::devices_map_t initially_shared_with;
     model::devices_map_t initially_non_shared_with;
     shared_devices_t shared_with;

@@ -185,7 +185,7 @@ auto folder_table_t::make_path(folder_table_t &container, bool disabled) -> widg
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            auto path = container.folder_data.get_path();
+            auto path = container.description.get_folder()->get_path();
             auto value = path.string();
             input->value(value.data());
         }
@@ -219,7 +219,7 @@ auto folder_table_t::make_id(folder_table_t &container, bool disabled) -> widget
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            auto value = container.folder_data.get_id();
+            auto value = container.description.get_folder()->get_id();
             input->value(value.data());
         }
 
@@ -248,7 +248,7 @@ auto folder_table_t::make_label(folder_table_t &container) -> widgetable_ptr_t {
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            auto value = container.folder_data.get_label();
+            auto value = container.description.get_folder()->get_label();
             input->value(value.data());
         }
 
@@ -286,7 +286,7 @@ auto folder_table_t::make_folder_type(folder_table_t &container) -> widgetable_p
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            auto value = container.folder_data.get_folder_type();
+            auto value = container.description.get_folder()->get_folder_type();
             input->value(static_cast<int>(value));
         }
 
@@ -322,7 +322,7 @@ auto folder_table_t::make_pull_order(folder_table_t &container) -> widgetable_pt
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            auto value = container.folder_data.get_pull_order();
+            auto value = container.description.get_folder()->get_pull_order();
             input->value(static_cast<int>(value));
         }
 
@@ -355,7 +355,8 @@ auto folder_table_t::make_index(folder_table_t &container, bool disabled) -> wid
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            auto value_str = fmt::format("0x{:x}", container.index);
+            auto value = container.description.get_index();
+            auto value_str = fmt::format("0x{:x}", value);
             input->value(value_str.data());
         }
 
@@ -389,7 +390,7 @@ auto folder_table_t::make_read_only(folder_table_t &container) -> widgetable_ptr
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            input->value(container.folder_data.is_read_only());
+            input->value(container.description.get_folder()->is_read_only());
         }
 
         bool store(void *data) override {
@@ -415,7 +416,7 @@ auto folder_table_t::make_rescan_interval(folder_table_t &container) -> widgetab
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            auto value = container.folder_data.get_rescan_interval();
+            auto value = container.description.get_folder()->get_rescan_interval();
             auto value_str = std::to_string(value);
             input->value(value_str.data());
         }
@@ -445,7 +446,7 @@ auto folder_table_t::make_ignore_permissions(folder_table_t &container) -> widge
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            input->value(container.folder_data.are_permissions_ignored());
+            input->value(container.description.get_folder()->are_permissions_ignored());
         }
 
         bool store(void *data) override {
@@ -464,7 +465,7 @@ auto folder_table_t::make_ignore_delete(folder_table_t &container) -> widgetable
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            input->value(container.folder_data.is_deletion_ignored());
+            input->value(container.description.get_folder()->is_deletion_ignored());
         }
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
@@ -482,7 +483,7 @@ auto folder_table_t::make_disable_tmp(folder_table_t &container) -> widgetable_p
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            input->value(container.folder_data.are_temp_indixes_disabled());
+            input->value(container.description.get_folder()->are_temp_indixes_disabled());
         }
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
@@ -500,7 +501,7 @@ auto folder_table_t::make_paused(folder_table_t &container) -> widgetable_ptr_t 
 
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            input->value(container.folder_data.is_paused());
+            input->value(container.description.get_folder()->is_paused());
         }
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
@@ -529,12 +530,27 @@ auto folder_table_t::make_notice(folder_table_t &container) -> widgetable_ptr_t 
     return new widget_t(container);
 }
 
-folder_table_t::folder_table_t(tree_item_t &container_, const folder_description_t &folder_descr, int x, int y, int w,
+folder_table_t::folder_table_t(tree_item_t &container_, const model::folder_info_t &description_, int x, int y, int w,
                                int h)
-    : parent_t(x, y, w, h), container{container_}, folder_data{folder_descr.folder_data}, entries{folder_descr.entries},
-      index{folder_descr.index}, max_sequence{folder_descr.max_sequence}, shared_with{folder_descr.shared_with},
-      non_shared_with{folder_descr.non_shared_with}, apply_button{nullptr}, share_button{nullptr},
-      reset_button{nullptr} {}
+    : parent_t(x, y, w, h), container{container_}, description{description_}, apply_button{nullptr},
+      share_button{nullptr}, reset_button{nullptr} {
+
+    shared_with.reset(new model::devices_map_t{});
+    non_shared_with.reset(new model::devices_map_t{});
+
+    auto folder = description.get_folder();
+    auto cluster = folder->get_cluster();
+    for (auto it : cluster->get_devices()) {
+        auto &device = it.item;
+        if (device != cluster->get_device()) {
+            if (folder->is_shared_with(*device)) {
+                shared_with->put(device);
+            } else {
+                non_shared_with->put(device);
+            }
+        }
+    }
+}
 
 bool folder_table_t::on_remove_share(widgetable_t &widget, model::device_ptr_t device, model::device_ptr_t initial) {
     bool removed = false;
@@ -550,6 +566,7 @@ bool folder_table_t::on_remove_share(widgetable_t &widget, model::device_ptr_t d
         shared_with->remove(device);
         non_shared_with->put(device);
     }
+
     container.refresh_content();
     return removed;
 }
@@ -641,7 +658,7 @@ void folder_table_t::on_apply() {
     auto current = diff.get();
 
     if (initially_shared_with.size()) {
-        auto folder = cluster.get_folders().by_id(folder_data.get_id());
+        auto folder = description.get_folder();
         auto orphaned_blocks = model::orphaned_blocks_t{};
         auto &folder_infos = folder->get_folder_infos();
         for (auto it : initially_shared_with) {
@@ -717,17 +734,16 @@ void folder_table_t::on_remove() {
     auto &sup = container.supervisor;
     auto &cluster = *sup.get_cluster();
     auto &sequencer = sup.get_sequencer();
-    auto &folder = *cluster.get_folders().by_id(folder_data.get_id());
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::modify::remove_folder_t(cluster, sequencer, folder);
+    diff = new model::diff::modify::remove_folder_t(cluster, sequencer, *description.get_folder());
     sup.send_model<model::payload::model_update_t>(std::move(diff), this);
 }
 
 void folder_table_t::on_rescan() {
     auto &sup = container.supervisor;
     auto &cluster = *sup.get_cluster();
-    auto &folder = *cluster.get_folders().by_id(folder_data.get_id());
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::local::scan_request_t(folder_data.get_id());
+    auto folder_id = description.get_folder()->get_id();
+    diff = new model::diff::local::scan_request_t(folder_id);
     sup.send_model<model::payload::model_update_t>(std::move(diff), this);
 }

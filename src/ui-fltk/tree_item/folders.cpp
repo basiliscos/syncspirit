@@ -59,13 +59,11 @@ static auto make_actions(folder_table_t &container) -> widgetable_ptr_t {
 
 struct table_t : content::folder_table_t {
     using parent_t = content::folder_table_t;
-    using parent_t::parent_t;
 
-    table_t(tree_item_t &container_, const folder_description_t &description, int x, int y, int w, int h)
-        : parent_t(container_, description, x, y, w, h) {
+    table_t(tree_item_t &container_, model::folder_info_ptr_t fi_, model::folder_ptr_t folder_, int x, int y, int w,
+            int h)
+        : parent_t(container_, *fi_, x, y, w, h), fi{fi_}, folder{folder_} {
 
-        entries_cell = new static_string_provider_t(std::to_string(entries));
-        max_sequence_cell = new static_string_provider_t(std::to_string(max_sequence));
         scan_start_cell = new static_string_provider_t();
         scan_finish_cell = new static_string_provider_t();
 
@@ -89,6 +87,7 @@ struct table_t : content::folder_table_t {
 
         initially_shared_with = *shared_with;
         initially_non_shared_with = *non_shared_with;
+
         assign_rows(std::move(data));
 
         refresh();
@@ -96,7 +95,7 @@ struct table_t : content::folder_table_t {
 
     void refresh() override {
         serialiazation_context_t ctx;
-        folder_data.serialize(ctx.folder);
+        description.get_folder()->serialize(ctx.folder);
 
         auto copy_data = ctx.folder.SerializeAsString();
         error = {};
@@ -139,6 +138,9 @@ struct table_t : content::folder_table_t {
         notice->reset();
         redraw();
     }
+
+    model::folder_info_ptr_t fi;
+    model::folder_ptr_t folder;
 };
 
 } // namespace
@@ -186,22 +188,10 @@ void folders_t::select_folder(std::string_view folder_id) {
 
 bool folders_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
-        auto prev = content->get_widget();
-        auto folder_data = model::folder_data_t();
-        auto shared_with = table_t::shared_devices_t{new model::devices_map_t{}};
-        auto non_shared_with = table_t::shared_devices_t{new model::devices_map_t{}};
-
         auto cluster = supervisor.get_cluster();
         auto &devices = cluster->get_devices();
         auto &self = *cluster->get_device();
         auto &sequencer = supervisor.get_sequencer();
-        auto index = sequencer.next_uint64();
-        for (auto it : devices) {
-            if (it.item != cluster->get_device()) {
-                non_shared_with->put(it.item);
-            }
-        }
-
         auto &cfg = supervisor.get_app_config();
 
         auto random_id = sequencer.next_uint64();
@@ -211,16 +201,22 @@ bool folders_t::on_select() {
         std::transform(sample_id.begin(), sample_id.end(), sample_id.begin(), lower_caser);
         auto sz = sample_id.size();
         auto id = sample_id.substr(0, sz / 2) + "-" + sample_id.substr(sz / 2 + 1);
-        folder_data.set_id(id);
-
         auto &path = supervisor.get_app_config().default_location;
-        folder_data.set_path(path);
-        folder_data.set_rescan_interval(3600u);
 
-        auto description =
-            table_t::folder_description_t{std::move(folder_data), 0, index, 0, shared_with, non_shared_with};
+        auto db_folder = db::Folder();
+        db_folder.set_rescan_interval(3600u);
+        db_folder.set_path(path.string());
+        db_folder.set_id(id);
+        auto folder = model::folder_t::create(sequencer.next_uuid(), db_folder).value();
+        folder->assign_cluster(cluster);
+
+        auto db_folder_info = db::FolderInfo();
+        db_folder_info.set_index_id(sequencer.next_uint64());
+        auto fi = model::folder_info_t::create(sequencer.next_uuid(), db_folder_info, &self, folder).value();
+
+        auto prev = content->get_widget();
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        return new table_t(*this, description, x, y, w, h);
+        return new table_t(*this, std::move(fi), std::move(folder), x, y, w, h);
     });
     return true;
 }
