@@ -47,3 +47,7 @@ void peer_entry_t::on_update() {
         }
     }
 }
+
+auto peer_entry_t::make_entry(model::file_info_t &file) -> peer_entry_base_t * {
+    return new peer_entry_t(supervisor, tree(), file);
+}

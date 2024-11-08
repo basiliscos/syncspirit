@@ -14,6 +14,7 @@ struct peer_folder_t final : peer_entry_base_t {
     bool on_select() override;
 
     model::file_info_t *get_entry() override;
+    peer_entry_base_t *make_entry(model::file_info_t &file) override;
 
     model::folder_info_t &folder_info;
     bool expandend;

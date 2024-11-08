@@ -1,5 +1,4 @@
 #include "peer_entry_base.h"
-#include "peer_entry.h"
 #include "../utils.hpp"
 
 using namespace syncspirit::fltk::tree_item;
@@ -40,7 +39,7 @@ void peer_entry_base_t::add_entry(model::file_info_t &file) {
     auto start_index = int{0};
     auto end_index = int{0};
     auto t = tree();
-    auto node = within_tree([&]() -> peer_entry_t * { return new peer_entry_t(supervisor, t, file); });
+    auto node = within_tree([&]() -> peer_entry_base_t * { return make_entry(file); });
     node->update_label();
     auto name = std::string(node->label());
 

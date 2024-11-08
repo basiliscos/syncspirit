@@ -25,6 +25,8 @@ struct peer_entry_base_t : tree_item_t, virtual_entry_t {
     void remove_node(peer_entry_base_t *child);
     void insert_node(peer_entry_base_t *node);
 
+    virtual peer_entry_base_t *make_entry(model::file_info_t &file) = 0;
+
     int dirs_count;
     dirs_map_t dirs_map;
     items_t orphaned_items;

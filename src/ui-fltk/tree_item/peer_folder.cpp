@@ -1,4 +1,5 @@
 #include "peer_folder.h"
+#include "peer_entry.h"
 #include "../static_table.h"
 #include <algorithm>
 #include <boost/filesystem.hpp>
@@ -131,4 +132,8 @@ bool peer_folder_t::on_select() {
     });
 
     return true;
+}
+
+auto peer_folder_t::make_entry(model::file_info_t &file) -> peer_entry_base_t * {
+    return new peer_entry_t(supervisor, tree(), file);
 }
