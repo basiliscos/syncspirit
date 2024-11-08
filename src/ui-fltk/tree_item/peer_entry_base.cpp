@@ -145,3 +145,23 @@ void peer_entry_base_t::apply(const entry_visitor_t &visitor, void *data) {
         }
     }
 }
+
+void peer_entry_base_t::make_hierarchy(model::file_infos_map_t &files_map) {
+    using files_t = std::vector<model::file_info_ptr_t>;
+    auto files = files_t();
+    files.reserve(files_map.size());
+    for (auto &it : files_map) {
+        files.push_back(it.item);
+    }
+    auto sorter = [](const model::file_info_ptr_t &l, const model::file_info_ptr_t &r) {
+        return l->get_name() < r->get_name();
+    };
+    std::sort(files.begin(), files.end(), sorter);
+
+    for (auto &file : files) {
+        auto path = bfs::path(file->get_name());
+        auto dir = locate_dir(path.parent_path());
+        dir->add_entry(*file);
+    }
+    tree()->redraw();
+}

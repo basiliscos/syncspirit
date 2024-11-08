@@ -26,6 +26,8 @@ struct peer_entry_base_t : virtual_entry_t {
     void remove_node(peer_entry_base_t *child);
     void insert_node(peer_entry_base_t *node);
 
+    void make_hierarchy(model::file_infos_map_t &files);
+
     virtual peer_entry_base_t *make_entry(model::file_info_t &file) = 0;
 
     int dirs_count;

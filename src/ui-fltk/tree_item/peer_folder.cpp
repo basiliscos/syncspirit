@@ -94,30 +94,15 @@ void peer_folder_t::on_open() {
         return;
     }
 
-    using files_t = std::vector<model::file_info_ptr_t>;
     auto dummy = child(0);
     Fl_Tree_Item::remove_child(dummy);
     expandend = true;
 
     auto &files_map = folder_info.get_file_infos();
-    auto files = files_t();
-    files.reserve(files_map.size());
-    for (auto &it : folder_info.get_file_infos()) {
-        files.push_back(it.item);
-    }
-    auto sorter = [](const model::file_info_ptr_t &l, const model::file_info_ptr_t &r) {
-        return l->get_name() < r->get_name();
-    };
-    std::sort(files.begin(), files.end(), sorter);
+    make_hierarchy(files_map);
 
-    for (auto &file : files) {
-        auto path = bfs::path(file->get_name());
-        auto dir = locate_dir(path.parent_path());
-        dir->add_entry(*file);
-    }
-    tree()->redraw();
-
-    supervisor.get_logger()->debug("{}, expanded {} file records", folder_info.get_folder()->get_label(), files.size());
+    supervisor.get_logger()->debug("{} (peer), expanded {} file records", folder_info.get_folder()->get_label(),
+                                   files_map.size());
 }
 
 auto peer_folder_t::get_entry() -> model::file_info_t * { return nullptr; }
