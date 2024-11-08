@@ -8,7 +8,8 @@
 
 namespace syncspirit::fltk::tree_item {
 
-struct peer_entry_base_t : tree_item_t, virtual_entry_t {
+struct peer_entry_base_t : virtual_entry_t {
+    using parent_t = virtual_entry_t;
     using items_t = std::set<peer_entry_base_t *>;
     using dirs_map_t = std::map<std::string, peer_entry_base_t *, utils::string_comparator_t>;
 

@@ -376,7 +376,7 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
     auto folder_info = folder->get_folder_infos().by_device(*peer);
     if (auto generic_augmnetation = folder_info->get_augmentation(); generic_augmnetation) {
         auto augmentation = static_cast<augmentation_t *>(generic_augmnetation.get());
-        auto folder_entry = dynamic_cast<tree_item::peer_folder_t *>(augmentation->get_owner());
+        auto folder_entry = static_cast<tree_item::peer_folder_t *>(augmentation->get_owner());
         if (folder_entry->expandend) {
             auto &files_map = folder_info->get_file_infos();
             for (auto &file : diff.files) {
@@ -417,7 +417,7 @@ void app_supervisor_t::set_show_deleted(bool value) {
                 auto generic_augmnetation = it.item->get_augmentation();
                 if (generic_augmnetation) {
                     auto augmentation = static_cast<augmentation_t *>(generic_augmnetation.get());
-                    auto virtual_entry = dynamic_cast<tree_item::virtual_entry_t *>(augmentation->get_owner());
+                    auto virtual_entry = static_cast<tree_item::virtual_entry_t *>(augmentation->get_owner());
                     if (virtual_entry) {
                         virtual_entry->show_deleted(value);
                     }

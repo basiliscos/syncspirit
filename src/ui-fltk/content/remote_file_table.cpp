@@ -30,8 +30,7 @@ auto make_checkbox(Fl_Widget &container, bool value) -> widgetable_ptr_t { retur
 
 remote_file_table_t::remote_file_table_t(tree_item_t &container_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), container{container_}, top_modifitcation{-1} {
-    assert(dynamic_cast<tree_item::virtual_entry_t *>(&container));
-    auto host = dynamic_cast<tree_item::virtual_entry_t *>(&container);
+    auto host = static_cast<tree_item::virtual_entry_t *>(&container);
     auto &entry = *host->get_entry();
     auto data = table_rows_t();
 
@@ -84,7 +83,7 @@ void remote_file_table_t::refresh() {
         }
     };
 
-    auto host = dynamic_cast<tree_item::virtual_entry_t *>(&container);
+    auto host = static_cast<tree_item::virtual_entry_t *>(&container);
     auto &entry = *host->get_entry();
     auto &devices = container.supervisor.get_cluster()->get_devices();
     auto data = table_rows_t();

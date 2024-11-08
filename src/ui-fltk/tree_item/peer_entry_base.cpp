@@ -4,7 +4,7 @@
 using namespace syncspirit::fltk::tree_item;
 
 peer_entry_base_t::peer_entry_base_t(app_supervisor_t &supervisor, Fl_Tree *tree, bool has_augmentation)
-    : tree_item_t(supervisor, tree, has_augmentation), dirs_count{0} {}
+    : parent_t(supervisor, tree, has_augmentation), dirs_count{0} {}
 
 peer_entry_base_t::~peer_entry_base_t() {
     for (auto item : orphaned_items) {
@@ -29,7 +29,7 @@ virtual_entry_t *peer_entry_base_t::locate_own_dir(std::string_view name) {
 
     auto it = dirs_map.find(name);
     assert(it != dirs_map.end());
-    return dynamic_cast<virtual_entry_t *>(it->second);
+    return static_cast<virtual_entry_t *>(it->second);
 }
 
 void peer_entry_base_t::add_entry(model::file_info_t &file) {
@@ -57,7 +57,7 @@ void peer_entry_base_t::add_entry(model::file_info_t &file) {
     }
 }
 
-void peer_entry_base_t::remove_child(tree_item_t *child) { remove_node(dynamic_cast<peer_entry_base_t *>(child)); }
+void peer_entry_base_t::remove_child(tree_item_t *child) { remove_node(static_cast<peer_entry_base_t *>(child)); }
 
 void peer_entry_base_t::remove_node(peer_entry_base_t *child) {
     auto &entry = *child->get_entry();
@@ -135,7 +135,7 @@ void peer_entry_base_t::apply(const entry_visitor_t &visitor, void *data) {
     }
     bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
     for (int i = 0; i < children(); ++i) {
-        auto &child_entry = dynamic_cast<peer_entry_base_t &>(*child(i));
+        auto &child_entry = static_cast<peer_entry_base_t &>(*child(i));
         child_entry.apply(visitor, data);
     }
 
