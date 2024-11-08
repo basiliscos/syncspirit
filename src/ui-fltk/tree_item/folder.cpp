@@ -177,6 +177,11 @@ struct table_t : content::folder_table_t {
         scan_start_cell->update(scan_start);
         scan_finish_cell->update(scan_finish);
 
+        auto entries_count = description.get_file_infos().size();
+        auto max_sequence = description.get_max_sequence();
+        entries_cell->update(fmt::format("{}", entries_count));
+        max_sequence_cell->update(fmt::format("{}", max_sequence));
+
         notice->reset();
         redraw();
     }
@@ -187,6 +192,10 @@ struct table_t : content::folder_table_t {
 folder_t::folder_t(model::folder_t &folder_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree, true), folder{folder_} {
     update_label();
+
+    auto cluster = supervisor.get_cluster();
+    auto &fi = *folder.get_folder_infos().by_device(*cluster->get_device());
+    fi.set_augmentation(new augmentation_proxy_t(get_proxy()));
 }
 
 void folder_t::update_label() {

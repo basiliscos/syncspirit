@@ -72,14 +72,15 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     file->set_sequence(value);
     folder_my->add_strict(file);
 
-    file->notify_update();
-
     LOG_TRACE(log, "clone_file_t, new file; folder = {}, name = {}, blocks = {}", folder_id, file->get_name(),
               blocks.size());
 
     if (auto iterator = folder_peer->get_device()->get_iterator(); iterator) {
         iterator->on_clone(std::move(peer_file));
     }
+
+    file->notify_update();
+    folder_my->notify_update();
 
     return applicator_t::apply_sibling(cluster);
 }
