@@ -5,10 +5,10 @@
 #include "tree_item/ignored_devices.h"
 #include "tree_item/peer_device.h"
 #include "tree_item/peer_folder.h"
+#include "tree_item/peer_entry_base.h"
 #include "tree_item/pending_devices.h"
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
-#include "tree_item/virtual_entry.h"
 #include "net/names.h"
 #include "config/utils.h"
 #include "model/diff/load/load_cluster.h"
@@ -417,9 +417,9 @@ void app_supervisor_t::set_show_deleted(bool value) {
                 auto generic_augmnetation = it.item->get_augmentation();
                 if (generic_augmnetation) {
                     auto augmentation = static_cast<augmentation_t *>(generic_augmnetation.get());
-                    auto virtual_entry = static_cast<tree_item::virtual_entry_t *>(augmentation->get_owner());
-                    if (virtual_entry) {
-                        virtual_entry->show_deleted(value);
+                    auto entry = static_cast<tree_item::peer_entry_base_t *>(augmentation->get_owner());
+                    if (entry) {
+                        entry->show_deleted(value);
                     }
                 }
             }

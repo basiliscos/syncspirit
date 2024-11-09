@@ -13,8 +13,8 @@ peer_entry_base_t::~peer_entry_base_t() {
     orphaned_items.clear();
 }
 
-auto peer_entry_base_t::locate_dir(const bfs::path &parent) -> virtual_entry_t * {
-    auto current = (virtual_entry_t *)(this);
+auto peer_entry_base_t::locate_dir(const bfs::path &parent) -> peer_entry_base_t * {
+    auto current = this;
     for (auto &piece : parent) {
         auto name = piece.string();
         current = current->locate_own_dir(name);
@@ -22,14 +22,14 @@ auto peer_entry_base_t::locate_dir(const bfs::path &parent) -> virtual_entry_t *
     return current;
 }
 
-virtual_entry_t *peer_entry_base_t::locate_own_dir(std::string_view name) {
+peer_entry_base_t *peer_entry_base_t::locate_own_dir(std::string_view name) {
     if (name.empty()) {
         return this;
     }
 
     auto it = dirs_map.find(name);
     assert(it != dirs_map.end());
-    return static_cast<virtual_entry_t *>(it->second);
+    return it->second;
 }
 
 void peer_entry_base_t::add_entry(model::file_info_t &file) {
