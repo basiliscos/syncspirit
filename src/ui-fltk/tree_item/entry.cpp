@@ -1,19 +1,19 @@
-#include "peer_entry_base.h"
+#include "entry.h"
 #include "../utils.hpp"
 
 using namespace syncspirit::fltk::tree_item;
 
-peer_entry_base_t::peer_entry_base_t(app_supervisor_t &supervisor, Fl_Tree *tree, bool has_augmentation)
+entry_t::entry_t(app_supervisor_t &supervisor, Fl_Tree *tree, bool has_augmentation)
     : parent_t(supervisor, tree, has_augmentation), dirs_count{0} {}
 
-peer_entry_base_t::~peer_entry_base_t() {
+entry_t::~entry_t() {
     for (auto item : orphaned_items) {
         delete item;
     }
     orphaned_items.clear();
 }
 
-auto peer_entry_base_t::locate_dir(const bfs::path &parent) -> peer_entry_base_t * {
+auto entry_t::locate_dir(const bfs::path &parent) -> entry_t * {
     auto current = this;
     for (auto &piece : parent) {
         auto name = piece.string();
@@ -22,7 +22,7 @@ auto peer_entry_base_t::locate_dir(const bfs::path &parent) -> peer_entry_base_t
     return current;
 }
 
-peer_entry_base_t *peer_entry_base_t::locate_own_dir(std::string_view name) {
+entry_t *entry_t::locate_own_dir(std::string_view name) {
     if (name.empty()) {
         return this;
     }
@@ -32,14 +32,14 @@ peer_entry_base_t *peer_entry_base_t::locate_own_dir(std::string_view name) {
     return it->second;
 }
 
-void peer_entry_base_t::add_entry(model::file_info_t &file) {
+void entry_t::add_entry(model::file_info_t &file) {
     bool deleted = file.is_deleted();
     bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
     auto name_provider = [this](int index) { return std::string_view(child(index)->label()); };
     auto start_index = int{0};
     auto end_index = int{0};
     auto t = tree();
-    auto node = within_tree([&]() -> peer_entry_base_t * { return make_entry(file); });
+    auto node = within_tree([&]() -> entry_t * { return make_entry(file); });
     node->update_label();
     auto name = std::string(node->label());
 
@@ -57,9 +57,9 @@ void peer_entry_base_t::add_entry(model::file_info_t &file) {
     }
 }
 
-void peer_entry_base_t::remove_child(tree_item_t *child) { remove_node(static_cast<peer_entry_base_t *>(child)); }
+void entry_t::remove_child(tree_item_t *child) { remove_node(static_cast<entry_t *>(child)); }
 
-void peer_entry_base_t::remove_node(peer_entry_base_t *child) {
+void entry_t::remove_node(entry_t *child) {
     auto &entry = *child->get_entry();
     if (entry.is_dir()) {
         --dirs_count;
@@ -85,7 +85,7 @@ void peer_entry_base_t::remove_node(peer_entry_base_t *child) {
     }
 }
 
-void peer_entry_base_t::insert_node(peer_entry_base_t *node) {
+void entry_t::insert_node(entry_t *node) {
     auto name_provider = [this](int index) { return std::string_view(child(index)->label()); };
     auto start_index = int{0};
     auto end_index = int{0};
@@ -108,7 +108,7 @@ void peer_entry_base_t::insert_node(peer_entry_base_t *node) {
     }
 }
 
-void peer_entry_base_t::show_deleted(bool value) {
+void entry_t::show_deleted(bool value) {
     for (auto &it : dirs_map) {
         it.second->show_deleted(value);
     }
@@ -128,14 +128,14 @@ void peer_entry_base_t::show_deleted(bool value) {
     tree()->redraw();
 }
 
-void peer_entry_base_t::apply(const entry_visitor_t &visitor, void *data) {
+void entry_t::apply(const entry_visitor_t &visitor, void *data) {
     auto entry = get_entry();
     if (entry) {
         visitor.visit(*entry, data);
     }
     bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
     for (int i = 0; i < children(); ++i) {
-        auto &child_entry = static_cast<peer_entry_base_t &>(*child(i));
+        auto &child_entry = static_cast<entry_t &>(*child(i));
         child_entry.apply(visitor, data);
     }
 
@@ -146,7 +146,7 @@ void peer_entry_base_t::apply(const entry_visitor_t &visitor, void *data) {
     }
 }
 
-void peer_entry_base_t::make_hierarchy(model::file_infos_map_t &files_map) {
+void entry_t::make_hierarchy(model::file_infos_map_t &files_map) {
     using files_t = std::vector<model::file_info_ptr_t>;
     auto files = files_t();
     files.reserve(files_map.size());

@@ -119,6 +119,6 @@ bool peer_folder_t::on_select() {
     return true;
 }
 
-auto peer_folder_t::make_entry(model::file_info_t &file) -> peer_entry_base_t * {
+auto peer_folder_t::make_entry(model::file_info_t &file) -> entry_t * {
     return new peer_entry_t(supervisor, tree(), file);
 }

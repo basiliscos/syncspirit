@@ -38,7 +38,7 @@ void peer_entry_t::on_update() {
     parent_t::on_update();
     auto &entry = *get_entry();
     if (entry.is_deleted()) {
-        auto host = static_cast<peer_entry_base_t *>(parent());
+        auto host = static_cast<entry_t *>(parent());
         bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
         if (!show_deleted) {
             host->remove_child(this);
@@ -48,6 +48,6 @@ void peer_entry_t::on_update() {
     }
 }
 
-auto peer_entry_t::make_entry(model::file_info_t &file) -> peer_entry_base_t * {
+auto peer_entry_t::make_entry(model::file_info_t &file) -> entry_t * {
     return new peer_entry_t(supervisor, tree(), file);
 }
