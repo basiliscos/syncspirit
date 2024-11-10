@@ -57,6 +57,7 @@ struct folder_table_t : static_table_t {
     std::string error;
     widgetable_ptr_t notice;
     static_string_provider_ptr_t entries_cell;
+    static_string_provider_ptr_t entries_size_cell;
     static_string_provider_ptr_t max_sequence_cell;
     static_string_provider_ptr_t scan_start_cell;
     static_string_provider_ptr_t scan_finish_cell;

@@ -94,8 +94,9 @@ struct table_t : content::folder_table_t {
 
         auto entries = description.get_file_infos().size();
         auto max_sequence = description.get_max_sequence();
-        entries_cell = new static_string_provider_t(std::to_string(entries));
-        max_sequence_cell = new static_string_provider_t(std::to_string(max_sequence));
+        entries_cell = new static_string_provider_t();
+        entries_size_cell = new static_string_provider_t();
+        max_sequence_cell = new static_string_provider_t();
         scan_start_cell = new static_string_provider_t();
         scan_finish_cell = new static_string_provider_t();
 
@@ -107,6 +108,7 @@ struct table_t : content::folder_table_t {
         data.push_back({"type", make_folder_type(*this)});
         data.push_back({"pull order", make_pull_order(*this)});
         data.push_back({"entries", entries_cell});
+        data.push_back({"entries size", entries_size_cell});
         data.push_back({"max sequence", max_sequence_cell});
         data.push_back({"index", make_index(*this, true)});
         data.push_back({"scan start", scan_start_cell});
@@ -177,9 +179,14 @@ struct table_t : content::folder_table_t {
         scan_start_cell->update(scan_start);
         scan_finish_cell->update(scan_finish);
 
+        auto entries_size = std::size_t{0};
+        for (auto& it: static_cast<folder_t&>(container).folder_info->get_file_infos()) {
+            entries_size += it.item->get_size();
+        }
         auto entries_count = description.get_file_infos().size();
         auto max_sequence = description.get_max_sequence();
         entries_cell->update(fmt::format("{}", entries_count));
+        entries_size_cell->update(fmt::format("{}", entries_size));
         max_sequence_cell->update(fmt::format("{}", max_sequence));
 
         notice->reset();
@@ -194,14 +201,13 @@ folder_t::folder_t(model::folder_t &folder_, app_supervisor_t &supervisor, Fl_Tr
     update_label();
 
     auto cluster = supervisor.get_cluster();
-    auto &fi = *folder.get_folder_infos().by_device(*cluster->get_device());
+    folder_info = folder.get_folder_infos().by_device(*cluster->get_device()).get();
     auto augmentation = augmentation_ptr_t(new augmentation_proxy_t(get_proxy()));
-    fi.set_augmentation(augmentation);
+    folder_info->set_augmentation(augmentation);
 
     tree->close(this, 0);
 
-    auto &files_map = fi.get_file_infos();
-    make_hierarchy(files_map);
+    make_hierarchy(folder_info->get_file_infos());
 }
 
 void folder_t::update_label() {

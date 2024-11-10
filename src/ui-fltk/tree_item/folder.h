@@ -16,6 +16,7 @@ struct folder_t final : entry_t {
     entry_t *make_entry(model::file_info_t &file) override;
 
     model::folder_t &folder;
+    model::folder_info_t *folder_info;
 };
 
 } // namespace syncspirit::fltk::tree_item
