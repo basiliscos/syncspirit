@@ -1,10 +1,10 @@
 #include "folder.h"
 
+#include "local_entry.h"
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
 #include "../table_widget/label.h"
-
 #include "../content/folder_table.h"
 #include "../symbols.h"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
@@ -195,7 +195,13 @@ folder_t::folder_t(model::folder_t &folder_, app_supervisor_t &supervisor, Fl_Tr
 
     auto cluster = supervisor.get_cluster();
     auto &fi = *folder.get_folder_infos().by_device(*cluster->get_device());
-    fi.set_augmentation(new augmentation_proxy_t(get_proxy()));
+    auto augmentation = augmentation_ptr_t(new augmentation_proxy_t(get_proxy()));
+    fi.set_augmentation(augmentation);
+
+    tree->close(this, 0);
+
+    auto &files_map = fi.get_file_infos();
+    make_hierarchy(files_map);
 }
 
 void folder_t::update_label() {
@@ -226,3 +232,7 @@ bool folder_t::on_select() {
     });
     return true;
 }
+
+auto folder_t::get_entry() -> model::file_info_t * { return nullptr; }
+
+auto folder_t::make_entry(model::file_info_t &file) -> entry_t * { return new local_entry_t(supervisor, tree(), file); }

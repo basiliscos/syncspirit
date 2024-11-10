@@ -413,14 +413,12 @@ void app_supervisor_t::set_show_deleted(bool value) {
     auto &self = cluster->get_device();
     for (auto &it_f : cluster->get_folders()) {
         for (auto &it : it_f.item->get_folder_infos()) {
-            if (it.item->get_device() != self.get()) {
-                auto generic_augmnetation = it.item->get_augmentation();
-                if (generic_augmnetation) {
-                    auto augmentation = static_cast<augmentation_t *>(generic_augmnetation.get());
-                    auto entry = static_cast<tree_item::entry_t *>(augmentation->get_owner());
-                    if (entry) {
-                        entry->show_deleted(value);
-                    }
+            auto generic_augmnetation = it.item->get_augmentation();
+            if (generic_augmnetation) {
+                auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
+                auto entry = static_cast<tree_item::entry_t *>(augmentation->get_owner());
+                if (entry) {
+                    entry->show_deleted(value);
                 }
             }
         }

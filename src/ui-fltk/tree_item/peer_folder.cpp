@@ -1,7 +1,6 @@
 #include "peer_folder.h"
 #include "peer_entry.h"
 #include "../static_table.h"
-#include <algorithm>
 #include <boost/filesystem.hpp>
 
 using namespace syncspirit;
@@ -105,8 +104,6 @@ void peer_folder_t::on_open() {
                                    files_map.size());
 }
 
-auto peer_folder_t::get_entry() -> model::file_info_t * { return nullptr; }
-
 bool peer_folder_t::on_select() {
     if (!expandend) {
         on_open();
@@ -118,6 +115,8 @@ bool peer_folder_t::on_select() {
 
     return true;
 }
+
+auto peer_folder_t::get_entry() -> model::file_info_t * { return nullptr; }
 
 auto peer_folder_t::make_entry(model::file_info_t &file) -> entry_t * {
     return new peer_entry_t(supervisor, tree(), file);
