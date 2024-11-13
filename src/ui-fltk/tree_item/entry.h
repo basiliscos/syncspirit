@@ -27,15 +27,16 @@ struct entry_t : tree_item_t {
     virtual void add_entry(model::file_info_t &file);
     virtual void show_deleted(bool value);
     virtual void apply(const entry_visitor_t &visitor, void *data);
+    virtual void assign(entry_t &);
 
     void remove_child(tree_item_t *child) override;
 
     void remove_node(entry_t *child);
-    void insert_node(entry_t *node);
+    bool insert_node(entry_t *node);
 
     void make_hierarchy(model::file_infos_map_t &files);
 
-    virtual entry_t *make_entry(model::file_info_t &file) = 0;
+    virtual entry_t *make_entry(model::file_info_t *file, std::string filename) = 0;
 
     int dirs_count;
     dirs_map_t dirs_map;

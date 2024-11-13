@@ -28,24 +28,34 @@ entry_t *entry_t::locate_own_dir(std::string_view name) {
     }
 
     auto it = dirs_map.find(name);
-    assert(it != dirs_map.end());
-    return it->second;
+    if (it != dirs_map.end()) {
+        return it->second;
+    }
+
+    auto label = std::string(name);
+    auto node = within_tree([&]() -> entry_t * { return make_entry(nullptr, label); });
+    node->update_label();
+
+    auto name_provider = [this](int index) { return std::string_view(child(index)->label()); };
+    auto pos = bisect(node->label(), 0, dirs_count - 1, children(), name_provider);
+    auto tmp_node = insert(prefs(), "", pos);
+    replace_child(tmp_node, node);
+    tree()->close(node);
+    dirs_map[label] = node;
+
+    ++dirs_count;
+    assert(dirs_count <= children());
+    return node;
 }
 
 void entry_t::add_entry(model::file_info_t &file) {
     bool deleted = file.is_deleted();
     bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
     auto name_provider = [this](int index) { return std::string_view(child(index)->label()); };
-    auto start_index = int{0};
-    auto end_index = int{0};
     auto t = tree();
-    auto node = within_tree([&]() -> entry_t * { return make_entry(file); });
+    auto node = within_tree([&]() -> entry_t * { return make_entry(&file, file.get_path().filename().string()); });
     node->update_label();
-    auto name = std::string(node->label());
 
-    if (file.is_dir()) {
-        dirs_map[name] = node;
-    }
     if (deleted) {
         deleted_items.emplace(node);
     }
@@ -60,12 +70,13 @@ void entry_t::add_entry(model::file_info_t &file) {
 void entry_t::remove_child(tree_item_t *child) { remove_node(static_cast<entry_t *>(child)); }
 
 void entry_t::remove_node(entry_t *child) {
-    auto &entry = *child->get_entry();
-    if (entry.is_dir()) {
+    auto entry = child->get_entry();
+    if ((entry && entry->is_dir()) || !entry) {
         --dirs_count;
+        assert(dirs_count >= 0);
     }
     if (child->augmentation) {
-        if (entry.is_deleted()) {
+        if (entry && entry->is_deleted()) {
             deleted_items.emplace(child);
         } else {
             auto it = deleted_items.find(child);
@@ -85,7 +96,7 @@ void entry_t::remove_node(entry_t *child) {
     }
 }
 
-void entry_t::insert_node(entry_t *node) {
+bool entry_t::insert_node(entry_t *node) {
     auto name_provider = [this](int index) { return std::string_view(child(index)->label()); };
     auto start_index = int{0};
     auto end_index = int{0};
@@ -93,19 +104,44 @@ void entry_t::insert_node(entry_t *node) {
 
     if (directory) {
         end_index = dirs_count - 1;
-        ++dirs_count;
     } else {
         start_index = dirs_count;
         end_index = children() - 1;
     }
 
     auto pos = bisect(node->label(), start_index, end_index, children(), name_provider);
-    auto tmp_node = insert(prefs(), "", pos);
-    replace_child(tmp_node, node);
-
-    if (directory) {
-        tree()->close(node);
+    bool exists = false;
+    if (directory && pos <= end_index) {
+        auto previous = reinterpret_cast<entry_t *>(child(pos));
+        if (previous->label() == std::string_view(node->label())) {
+            assert(previous->dirs_count <= previous->children());
+            for (auto i = 0; previous->children(); ++i) {
+                auto c = previous->deparent(0);
+                node->reparent(c, i);
+            }
+            assert(!previous->children());
+            node->dirs_count = previous->dirs_count;
+            node->dirs_map = std::move(previous->dirs_map);
+            node->orphaned_items = std::move(previous->orphaned_items);
+            node->deleted_items = std::move(previous->deleted_items);
+            previous->augmentation.reset();
+            remove_node(previous);
+        }
     }
+
+    if (!exists) {
+        auto tmp_node = insert(prefs(), "", pos);
+        replace_child(tmp_node, node);
+
+        if (directory) {
+            auto name = std::string(node->label());
+            dirs_map[name] = node;
+            ++dirs_count;
+            tree()->close(node);
+        }
+    }
+
+    return exists;
 }
 
 void entry_t::show_deleted(bool value) {
@@ -165,3 +201,5 @@ void entry_t::make_hierarchy(model::file_infos_map_t &files_map) {
     }
     tree()->redraw();
 }
+
+void entry_t::assign(entry_t &) { assert(0 && "should not happen"); }

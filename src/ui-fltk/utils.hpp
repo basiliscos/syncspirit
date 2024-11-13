@@ -12,6 +12,9 @@ int bisect(std::string_view new_label, int start_index, int end_index, int child
     if (end_index < 0) {
         return 0;
     }
+    if (start_index > end_index) {
+        return start_index;
+    }
 
     auto right = name_provder(end_index);
     if (new_label > right) {

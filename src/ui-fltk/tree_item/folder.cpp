@@ -180,7 +180,7 @@ struct table_t : content::folder_table_t {
         scan_finish_cell->update(scan_finish);
 
         auto entries_size = std::size_t{0};
-        for (auto& it: static_cast<folder_t&>(container).folder_info->get_file_infos()) {
+        for (auto &it : static_cast<folder_t &>(container).folder_info->get_file_infos()) {
             entries_size += it.item->get_size();
         }
         auto entries_count = description.get_file_infos().size();
@@ -241,4 +241,6 @@ bool folder_t::on_select() {
 
 auto folder_t::get_entry() -> model::file_info_t * { return nullptr; }
 
-auto folder_t::make_entry(model::file_info_t &file) -> entry_t * { return new local_entry_t(supervisor, tree(), file); }
+auto folder_t::make_entry(model::file_info_t *file, std::string filename) -> entry_t * {
+    return new local_entry_t(supervisor, tree(), file, std::move(filename));
+}

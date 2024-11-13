@@ -13,7 +13,7 @@ struct folder_t final : entry_t {
     void update_label() override;
 
     model::file_info_t *get_entry() override;
-    entry_t *make_entry(model::file_info_t &file) override;
+    entry_t *make_entry(model::file_info_t *file, std::string filename) override;
 
     model::folder_t &folder;
     model::folder_info_t *folder_info;

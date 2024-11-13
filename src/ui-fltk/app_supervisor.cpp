@@ -1,6 +1,7 @@
 #include "app_supervisor.h"
 #include "main_window.h"
 #include "tree_item/devices.h"
+#include "tree_item/folder.h"
 #include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
 #include "tree_item/peer_device.h"
@@ -15,6 +16,8 @@
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
+#include "model/diff/modify/clone_file.h"
+#include "model/diff/modify/finish_file_ack.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/modify/update_peer.h"
@@ -338,6 +341,34 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
     auto &device = *cluster->get_ignored_devices().by_sha256(diff.device_id.get_sha256());
     auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
     device.set_augmentation(ignored_devices_node->add_device(device));
+    return diff.visit_next(*this, custom);
+}
+
+auto app_supervisor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
+    auto generic_augmnetation = folder_info->get_augmentation();
+    auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
+    auto folder_entry = static_cast<tree_item::folder_t *>(augmentation->get_owner());
+    auto file_info = folder_info->get_file_infos().by_name(diff.proto_file.name());
+    auto path = bfs::path(file_info->get_name());
+    auto dir = folder_entry->locate_dir(path.parent_path());
+    dir->add_entry(*file_info);
+    return diff.visit_next(*this, custom);
+}
+
+auto app_supervisor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
+    auto generic_augmnetation = folder_info->get_augmentation();
+    auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
+    auto folder_entry = static_cast<tree_item::folder_t *>(augmentation->get_owner());
+    auto file_info = folder_info->get_file_infos().by_name(diff.proto_file.name());
+    auto path = bfs::path(file_info->get_name());
+    auto dir = folder_entry->locate_dir(path.parent_path());
+    dir->add_entry(*file_info);
     return diff.visit_next(*this, custom);
 }
 

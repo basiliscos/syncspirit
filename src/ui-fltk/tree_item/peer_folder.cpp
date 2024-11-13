@@ -118,6 +118,6 @@ bool peer_folder_t::on_select() {
 
 auto peer_folder_t::get_entry() -> model::file_info_t * { return nullptr; }
 
-auto peer_folder_t::make_entry(model::file_info_t &file) -> entry_t * {
-    return new peer_entry_t(supervisor, tree(), file);
+auto peer_folder_t::make_entry(model::file_info_t *file, std::string filename) -> entry_t * {
+    return new peer_entry_t(supervisor, tree(), file, std::move(filename));
 }
