@@ -449,8 +449,8 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
     auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = cluster->get_folders().by_id(folder->get_id())->get_folder_infos();
-    REQUIRE(folder_infos.size() == 2u);
+    auto folder_infos = &folder->get_folder_infos();
+    REQUIRE(folder_infos->size() == 2u);
 
     auto file_iterator = peer_device->create_iterator(*cluster);
     auto file = proto::FileInfo();
@@ -466,10 +466,13 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     REQUIRE(builder.apply());
     REQUIRE(!file_iterator->next_need_cloning());
     REQUIRE(!file_iterator->next_need_sync());
-    REQUIRE(builder.remove_folder(*folder).upsert_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.remove_folder(*folder).apply());
+    REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
-    REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
     folder = folders.by_id("1234-5678");
+    folder_infos = &folder->get_folder_infos();
+    REQUIRE(folder_infos->size() == 2u);
+    REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
     f = file_iterator->next_need_cloning();
     REQUIRE(f);

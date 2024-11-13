@@ -54,7 +54,8 @@ file_info_t *file_iterator_t::next_need_cloning() noexcept {
         auto &it = fi.it_clone;
         auto files_scan = size_t{0};
         auto &files_map = fi.peer_folder->get_file_infos();
-        auto local_folder = fi.peer_folder->get_folder()->get_folder_infos().by_device(*cluster.get_device());
+        auto &folder_infos = fi.peer_folder->get_folder()->get_folder_infos();
+        auto local_folder = folder_infos.by_device(*cluster.get_device());
 
         if (!local_folder->get_folder()->is_paused()) {
             while (files_scan < files_map.size()) {
