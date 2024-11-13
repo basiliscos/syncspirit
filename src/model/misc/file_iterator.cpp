@@ -56,34 +56,36 @@ file_info_t *file_iterator_t::next_need_cloning() noexcept {
         auto &files_map = fi.peer_folder->get_file_infos();
         auto local_folder = fi.peer_folder->get_folder()->get_folder_infos().by_device(*cluster.get_device());
 
-        while (files_scan < files_map.size()) {
-            if (it == files_map.end()) {
-                it = files_map.begin();
-            }
-            auto &file = it->item;
-            ++files_scan;
-            ++it;
+        if (!local_folder->get_folder()->is_paused()) {
+            while (files_scan < files_map.size()) {
+                if (it == files_map.end()) {
+                    it = files_map.begin();
+                }
+                auto &file = it->item;
+                ++files_scan;
+                ++it;
 
-            if (!file->is_locally_locked() && !file->is_invalid() && file->is_global() && !file->is_invalid()) {
-                auto local = file->local_file();
-                bool need_clone = !local;
-                if (local) {
-                    if (local->is_local()) {
-                        using V = version_relation_t;
-                        auto result = compare(file->get_version(), local->get_version());
-                        need_clone = result == V::newer && file->is_locally_available();
+                if (!file->is_locally_locked() && !file->is_invalid() && file->is_global() && !file->is_invalid()) {
+                    auto local = file->local_file();
+                    bool need_clone = !local;
+                    if (local) {
+                        if (local->is_local()) {
+                            using V = version_relation_t;
+                            auto result = compare(file->get_version(), local->get_version());
+                            need_clone = result == V::newer && file->is_locally_available();
+                        }
+                    } else {
+                        need_clone = file->get_size() == 0;
                     }
-                } else {
-                    need_clone = file->get_size() == 0;
+                    if (need_clone) {
+                        fi.guarded_clones.emplace(file->get_name(), new guard_t(file, *this));
+                        return file.get();
+                    }
                 }
-                if (need_clone) {
-                    fi.guarded_clones.emplace(file->get_name(), new guard_t(file, *this));
-                    return file.get();
-                }
-            }
 
-            if (files_scan == files_map.size()) {
-                break;
+                if (files_scan == files_map.size()) {
+                    break;
+                }
             }
         }
         folder_index = (folder_index + 1) % folders_count;
@@ -112,56 +114,58 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
         auto &files_map = fi.peer_folder->get_file_infos();
 
         // check other files
-        while (files_scan < files_map.size()) {
-            if (it == files_map.end()) {
-                it = files_map.begin();
-            }
-            auto &file = it->item;
-            ++files_scan;
-            ++it;
-
-            if (file->is_locally_locked()) {
-                continue;
-            }
-
-            if (file->is_unreachable()) {
-                continue;
-            }
-
-            if (file->is_invalid()) {
-                continue;
-            }
-
-            if (file->is_locally_available()) {
-                continue;
-            }
-
-            if (!file->get_size()) {
-                continue;
-            }
-
-            if (!file->is_global()) {
-                continue;
-            }
-
-            auto accept = true;
-
-            if (auto local = file->local_file(); local) {
-                if (!local->is_local()) {
-                    accept = false; // file is not has been scanned
-                } else {
-                    using V = version_relation_t;
-                    auto result = compare(file->get_version(), local->get_version());
-                    accept = result == V::newer;
+        if (!local_folder->get_folder()->is_paused()) {
+            while (files_scan < files_map.size()) {
+                if (it == files_map.end()) {
+                    it = files_map.begin();
                 }
-            }
+                auto &file = it->item;
+                ++files_scan;
+                ++it;
 
-            auto &seen_sequence = fi.committed_map[file];
-            accept = accept && seen_sequence < file->get_sequence();
+                if (file->is_locally_locked()) {
+                    continue;
+                }
 
-            if (accept) {
-                fi.guarded_syncs.emplace(file->get_name(), new guard_t(file, *this));
-                return file.get();
+                if (file->is_unreachable()) {
+                    continue;
+                }
+
+                if (file->is_invalid()) {
+                    continue;
+                }
+
+                if (file->is_locally_available()) {
+                    continue;
+                }
+
+                if (!file->get_size()) {
+                    continue;
+                }
+
+                if (!file->is_global()) {
+                    continue;
+                }
+
+                auto accept = true;
+
+                if (auto local = file->local_file(); local) {
+                    if (!local->is_local()) {
+                        accept = false; // file is not has been scanned
+                    } else {
+                        using V = version_relation_t;
+                        auto result = compare(file->get_version(), local->get_version());
+                        accept = result == V::newer;
+                    }
+                }
+
+                auto &seen_sequence = fi.committed_map[file];
+                accept = accept && seen_sequence < file->get_sequence();
+
+                if (accept) {
+                    fi.guarded_syncs.emplace(file->get_name(), new guard_t(file, *this));
+                    return file.get();
+                }
             }
         }
         folder_index = (folder_index + 1) % folders_count;
