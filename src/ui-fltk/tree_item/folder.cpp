@@ -242,5 +242,5 @@ bool folder_t::on_select() {
 auto folder_t::get_entry() -> model::file_info_t * { return nullptr; }
 
 auto folder_t::make_entry(model::file_info_t *file, std::string filename) -> entry_t * {
-    return new local_entry_t(supervisor, tree(), file, std::move(filename));
+    return new file_entry_t(supervisor, tree(), file, std::move(filename));
 }

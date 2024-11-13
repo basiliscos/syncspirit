@@ -55,15 +55,9 @@ void entry_t::add_entry(model::file_info_t &file) {
     auto t = tree();
     auto node = within_tree([&]() -> entry_t * { return make_entry(&file, file.get_path().filename().string()); });
     node->update_label();
-
-    if (deleted) {
-        deleted_items.emplace(node);
-    }
-
-    if (!deleted || show_deleted) {
-        insert_node(node);
-    } else {
-        orphaned_items.emplace(node);
+    insert_node(node);
+    if (deleted && !show_deleted) {
+        remove_node(node);
     }
 }
 
