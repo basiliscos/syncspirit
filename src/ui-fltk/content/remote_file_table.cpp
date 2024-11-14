@@ -78,7 +78,7 @@ void remote_file_table_t::refresh() {
         std::size_t entries_count = 0;
         std::size_t entries_size = 0;
     };
-    struct size_visitor_t final : tree_item::entry_visitor_t {
+    struct size_visitor_t final : tree_item::file_visitor_t {
         void visit(const model::file_info_t &file, void *data) const override {
             auto size_data = reinterpret_cast<size_data_t *>(data);
             size_data->entries_count += 1;

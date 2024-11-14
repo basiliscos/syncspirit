@@ -13,7 +13,7 @@ void folder_data_t::assign_fields(const db::Folder &item) noexcept {
     folder_type = (folder_type_t)item.folder_type();
     rescan_interval = item.rescan_interval();
     pull_order = (pull_order_t)item.pull_order();
-    watched = item.watched();
+    scheduled = item.scheduled();
     read_only = item.read_only();
     ignore_permissions = item.ignore_permissions();
     ignore_delete = item.ignore_delete();
@@ -29,7 +29,7 @@ void folder_data_t::serialize(db::Folder &r) const noexcept {
     r.set_ignore_delete(ignore_delete);
     r.set_disable_temp_indexes(disable_temp_indixes);
     r.set_paused(paused);
-    r.set_watched(watched);
+    r.set_scheduled(scheduled);
     r.set_path(path.string());
     r.set_folder_type((db::FolderType)folder_type);
     r.set_pull_order((db::PullOrder)pull_order);

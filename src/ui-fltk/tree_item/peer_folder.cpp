@@ -36,7 +36,7 @@ struct my_table_t : static_table_t {
     }
 
     void refresh() override {
-        struct size_visitor_t final : tree_item::entry_visitor_t {
+        struct size_visitor_t final : tree_item::file_visitor_t {
             void visit(const model::file_info_t &file, void *data) const override {
                 auto sz = reinterpret_cast<size_t *>(data);
                 *sz += file.get_size();

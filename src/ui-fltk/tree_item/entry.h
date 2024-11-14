@@ -7,9 +7,16 @@
 
 namespace syncspirit::fltk::tree_item {
 
-struct entry_visitor_t {
-    virtual ~entry_visitor_t() = default;
+struct entry_t;
+
+struct file_visitor_t {
+    virtual ~file_visitor_t() = default;
     virtual void visit(const model::file_info_t &file, void *) const = 0;
+};
+
+struct node_visitor_t {
+    virtual ~node_visitor_t() = default;
+    virtual void visit(entry_t &node, void *) const = 0;
 };
 
 struct entry_t : tree_item_t {
@@ -26,7 +33,8 @@ struct entry_t : tree_item_t {
     virtual entry_t *locate_dir(const bfs::path &parent);
     virtual void add_entry(model::file_info_t &file);
     virtual void show_deleted(bool value);
-    virtual void apply(const entry_visitor_t &visitor, void *data);
+    virtual void apply(const file_visitor_t &visitor, void *data);
+    virtual void apply(const node_visitor_t &visitor, void *data);
     virtual void assign(entry_t &);
 
     void remove_child(tree_item_t *child) override;

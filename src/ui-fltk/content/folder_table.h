@@ -29,6 +29,7 @@ struct folder_table_t : static_table_t {
     static widgetable_ptr_t make_ignore_permissions(folder_table_t &container);
     static widgetable_ptr_t make_ignore_delete(folder_table_t &container);
     static widgetable_ptr_t make_disable_tmp(folder_table_t &container);
+    static widgetable_ptr_t make_scheduled(folder_table_t &container);
     static widgetable_ptr_t make_paused(folder_table_t &container);
     static widgetable_ptr_t make_shared_with(folder_table_t &container, model::device_ptr_t device, bool disabled);
     static widgetable_ptr_t make_notice(folder_table_t &container);

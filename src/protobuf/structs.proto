@@ -29,7 +29,7 @@ message Folder {
     bool        ignore_delete            = 5;
     bool        disable_temp_indexes     = 6;
     bool        paused                   = 7;
-    bool        watched                  = 8;
+    bool        scheduled                = 8;
     string      path                     = 9;
     FolderType  folder_type              = 10;
     PullOrder   pull_order               = 11;

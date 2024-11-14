@@ -56,8 +56,10 @@ file_info_t *file_iterator_t::next_need_cloning() noexcept {
         auto &files_map = fi.peer_folder->get_file_infos();
         auto &folder_infos = fi.peer_folder->get_folder()->get_folder_infos();
         auto local_folder = folder_infos.by_device(*cluster.get_device());
+        auto folder = local_folder->get_folder();
+        auto do_scan = !folder->is_paused() && !folder->is_scheduled();
 
-        if (!local_folder->get_folder()->is_paused()) {
+        if (do_scan) {
             while (files_scan < files_map.size()) {
                 if (it == files_map.end()) {
                     it = files_map.begin();
@@ -113,9 +115,11 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
         auto &it = fi.it_sync;
         auto files_scan = size_t{0};
         auto &files_map = fi.peer_folder->get_file_infos();
+        auto folder = local_folder->get_folder();
+        auto do_scan = !folder->is_paused() && !folder->is_scheduled();
 
         // check other files
-        if (!local_folder->get_folder()->is_paused()) {
+        if (do_scan) {
             while (files_scan < files_map.size()) {
                 if (it == files_map.end()) {
                     it = files_map.begin();

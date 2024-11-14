@@ -162,11 +162,26 @@ void entry_t::show_deleted(bool value) {
     tree()->redraw();
 }
 
-void entry_t::apply(const entry_visitor_t &visitor, void *data) {
+void entry_t::apply(const file_visitor_t &visitor, void *data) {
     auto entry = get_entry();
     if (entry) {
         visitor.visit(*entry, data);
     }
+    bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
+    for (int i = 0; i < children(); ++i) {
+        auto &child_entry = static_cast<entry_t &>(*child(i));
+        child_entry.apply(visitor, data);
+    }
+
+    if (!show_deleted) {
+        for (auto &it : orphaned_items) {
+            it->apply(visitor, data);
+        }
+    }
+}
+
+void entry_t::apply(const node_visitor_t &visitor, void *data) {
+    visitor.visit(*this, data);
     bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
     for (int i = 0; i < children(); ++i) {
         auto &child_entry = static_cast<entry_t &>(*child(i));

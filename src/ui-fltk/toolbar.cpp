@@ -15,14 +15,36 @@ static void set_show_deleted(Fl_Widget *widget, void *data) {
     toolbar->supervisor.set_show_deleted(value);
 }
 
+static void set_show_colorized(Fl_Widget *widget, void *data) {
+    auto toolbar = reinterpret_cast<toolbar_t *>(data);
+    auto button = static_cast<Fl_Toggle_Button *>(widget);
+    auto value = button->value() ? true : false;
+    toolbar->supervisor.set_show_colorized(value);
+}
+
 toolbar_t::toolbar_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
     : parent_t(x, y, w, button_h + padding * 2), supervisor{supervisor_} {
-    auto button_show_deleted =
-        new Fl_Toggle_Button(x + padding, y + padding, 40 - padding * 2, button_h, symbols::deleted.data());
-    button_show_deleted->tooltip("show deleted");
-    button_show_deleted->callback(set_show_deleted, this);
-    bool display_deleted = supervisor.get_app_config().fltk_config.display_deleted;
-    button_show_deleted->value(display_deleted ? 1 : 0);
+    auto ww = 40 - padding * 2;
+    auto xx = x + padding;
+    auto yy = y + padding;
+
+    [&]() {
+        auto button = new Fl_Toggle_Button(xx, yy, ww, button_h, symbols::deleted.data());
+        button->tooltip("show deleted");
+        button->callback(set_show_deleted, this);
+        bool value = supervisor.get_app_config().fltk_config.display_deleted;
+        button->value(value ? 1 : 0);
+        xx += ww + padding;
+    }();
+
+    [&]() {
+        auto button = new Fl_Toggle_Button(xx, yy, ww, button_h, symbols::colorize.data());
+        button->tooltip("show colorized");
+        button->callback(set_show_colorized, this);
+        bool value = supervisor.get_app_config().fltk_config.display_colorized;
+        button->value(value ? 1 : 0);
+    }();
+
     end();
     resizable(nullptr);
 }

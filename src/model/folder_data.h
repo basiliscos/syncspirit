@@ -24,6 +24,7 @@ struct SYNCSPIRIT_API folder_data_t {
     inline bool are_permissions_ignored() const noexcept { return ignore_permissions; }
     inline bool are_temp_indixes_disabled() const noexcept { return disable_temp_indixes; }
     inline bool is_paused() const noexcept { return paused; }
+    inline bool is_scheduled() const noexcept { return scheduled; }
     inline folder_type_t get_folder_type() const noexcept { return folder_type; }
     inline pull_order_t get_pull_order() const noexcept { return pull_order; }
     inline const bfs::path &get_path() noexcept { return path; }
@@ -42,7 +43,7 @@ struct SYNCSPIRIT_API folder_data_t {
     folder_type_t folder_type;
     std::uint32_t rescan_interval;
     pull_order_t pull_order;
-    bool watched;
+    bool scheduled;
     bool read_only;
     bool ignore_permissions;
     bool ignore_delete;

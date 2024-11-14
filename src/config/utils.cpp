@@ -407,6 +407,12 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         }
         c.display_deleted = display_deleted.value();
 
+        auto display_colorized = t["display_colorized"].value<bool>();
+        if (!display_colorized) {
+            return "fltk/display_colorized is incorrect or missing";
+        }
+        c.display_colorized = display_colorized.value();
+
         auto main_window_width = t["main_window_width"].value<std::int64_t>();
         if (!main_window_width) {
             return "fltk/main_window_width is incorrect or missing";
@@ -536,6 +542,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"fltk", toml::table{{
                      {"level", get_level(cfg.fltk_config.level)},
                      {"display_deleted", cfg.fltk_config.display_deleted},
+                     {"display_colorized", cfg.fltk_config.display_colorized},
                      {"main_window_width", cfg.fltk_config.main_window_width},
                      {"main_window_height", cfg.fltk_config.main_window_height},
                      {"left_panel_share", cfg.fltk_config.left_panel_share},
@@ -650,6 +657,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     cfg.fltk_config = fltk_config_t {
         spdlog::level::level_enum::info,    /* level */
         false,                              /* display_deleted */
+        true,                               /* display_colorized */
         700,                                /* main_window_width */
         480,                                /* main_window_height */
         0.5,                                /* left_panel_share */

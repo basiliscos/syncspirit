@@ -64,7 +64,7 @@ outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noex
     f.set_ignore_delete(false);
     f.set_disable_temp_indexes(true);
     f.set_paused(false);
-    f.set_watched(true);
+    f.set_scheduled(false);
     f.set_folder_type(db::FolderType::send_and_receive);
     f.set_pull_order(db::PullOrder::random);
     f.set_rescan_interval(3600);

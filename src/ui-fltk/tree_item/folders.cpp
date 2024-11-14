@@ -80,6 +80,7 @@ struct table_t : content::folder_table_t {
         data.push_back({"ignore permissions", make_ignore_permissions(*this)});
         data.push_back({"ignore delete", make_ignore_delete(*this)});
         data.push_back({"disable temp indixes", make_disable_tmp(*this)});
+        data.push_back({"scheduled", make_scheduled(*this)});
         data.push_back({"paused", make_paused(*this)});
         data.push_back({"shared_with", make_shared_with(*this, {}, false)});
         data.push_back({"", notice = make_notice(*this)});

@@ -456,19 +456,45 @@ void app_supervisor_t::set_show_deleted(bool value) {
     }
 }
 
+void app_supervisor_t::set_show_colorized(bool value) {
+    struct refresher_t final : tree_item::node_visitor_t {
+        void visit(tree_item::entry_t &node, void *) const override { node.update_label(); }
+    };
+
+    log->debug("display colorized = {}", value);
+    app_config.fltk_config.display_colorized = value;
+
+    auto &self = cluster->get_device();
+    auto refresher = refresher_t{};
+    for (auto &it_f : cluster->get_folders()) {
+        for (auto &it : it_f.item->get_folder_infos()) {
+            auto generic_augmnetation = it.item->get_augmentation();
+            if (generic_augmnetation) {
+                auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
+                auto entry = static_cast<tree_item::entry_t *>(augmentation->get_owner());
+                if (entry) {
+                    entry->apply(refresher, {});
+                }
+            }
+        }
+    }
+}
+
 Fl_Color app_supervisor_t::get_color(color_context_t context) const {
-    using C = color_context_t;
-    switch (context) {
-    case color_context_t::deleted:
-        return FL_DARK1;
-    case color_context_t::link:
-        return FL_DARK_BLUE;
-    case color_context_t::actualized:
-        return FL_DARK_GREEN;
-    case color_context_t::outdated:
-        return FL_DARK_YELLOW;
-    case color_context_t::conflicted:
-        return FL_RED;
+    if (app_config.fltk_config.display_colorized) {
+        using C = color_context_t;
+        switch (context) {
+        case color_context_t::deleted:
+            return FL_DARK1;
+        case color_context_t::link:
+            return FL_DARK_BLUE;
+        case color_context_t::actualized:
+            return FL_DARK_GREEN;
+        case color_context_t::outdated:
+            return FL_DARK_YELLOW;
+        case color_context_t::conflicted:
+            return FL_RED;
+        }
     }
     return FL_BLACK;
 }

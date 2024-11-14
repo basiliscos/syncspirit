@@ -512,6 +512,24 @@ auto folder_table_t::make_paused(folder_table_t &container) -> widgetable_ptr_t 
     return new widget_t(container);
 }
 
+auto folder_table_t::make_scheduled(folder_table_t &container) -> widgetable_ptr_t {
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
+        using parent_t::parent_t;
+
+        void reset() override {
+            auto &container = static_cast<folder_table_t &>(this->container);
+            input->value(container.description.get_folder()->is_scheduled());
+        }
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<ctx_t *>(data);
+            ctx->folder.set_scheduled(input->value());
+            return true;
+        }
+    };
+    return new widget_t(container);
+}
+
 auto folder_table_t::make_shared_with(folder_table_t &container, model::device_ptr_t device, bool disabled)
     -> widgetable_ptr_t {
     return new device_share_widget_t(container, device, disabled);
