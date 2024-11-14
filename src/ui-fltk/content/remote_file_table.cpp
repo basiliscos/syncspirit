@@ -58,8 +58,11 @@ remote_file_table_t::remote_file_table_t(tree_item_t &container_, int x, int y, 
     data.push_back({"modified_s", modified_s_cell});
     data.push_back({"modified_ns", modified_ns_cell});
     data.push_back({"modified_by", modified_by_cell});
+    data.push_back({"is_directory", make_checkbox(*this, entry.is_dir())});
+    data.push_back({"is_file", make_checkbox(*this, entry.is_file())});
     data.push_back({"is_link", make_checkbox(*this, entry.is_link())});
     data.push_back({"is_invalid", make_checkbox(*this, entry.is_invalid())});
+    data.push_back({"is_deleted", make_checkbox(*this, entry.is_deleted())});
     data.push_back({"no_permissions", make_checkbox(*this, entry.has_no_permissions())});
     data.push_back({"symlink_target", symlink_target_cell});
     data.push_back({"entries", entries_cell});
