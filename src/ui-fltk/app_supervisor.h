@@ -27,6 +27,8 @@ struct app_supervisor_t;
 struct main_window_t;
 struct tree_item_t;
 
+enum class color_context_t { unknown, deleted, link, actualized, outdated, conflicted };
+
 struct db_info_viewer_t {
     virtual void view(const net::payload::db_info_response_t &) = 0;
 };
@@ -122,6 +124,8 @@ struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_vi
     template <typename Payload, typename... Args> void send_model(Args &&...args) {
         send<Payload>(coordinator, std::forward<Args>(args)...);
     }
+
+    Fl_Color get_color(color_context_t context) const;
 
     void set_main_window(main_window_t *window);
     void set_devices(tree_item_t *node);

@@ -11,5 +11,6 @@ extern const std::string_view discovering;
 extern const std::string_view scaning;
 extern const std::string_view syncrhonizing;
 extern const std::string_view deleted;
+extern const std::string_view colorize;
 
 } // namespace syncspirit::fltk::symbols

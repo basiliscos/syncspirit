@@ -15,13 +15,16 @@ file_entry_t::file_entry_t(app_supervisor_t &supervisor, Fl_Tree *tree, model::f
 void file_entry_t::update_label() {
     if (entry) {
         filename = get_entry()->get_path().filename().string();
+        auto context = color_context_t::unknown;
         if (entry->is_deleted()) {
-            labelfgcolor(FL_DARK1);
+            context = color_context_t::deleted;
+        } else if (entry->is_link()) {
+            context = color_context_t::link;
         } else if (entry->is_global()) {
-            labelfgcolor(FL_GREEN);
-        } else {
-            labelfgcolor(FL_BLACK);
+            context = color_context_t::actualized;
         }
+        auto color = supervisor.get_color(context);
+        labelfgcolor(color);
     }
     label(filename.c_str());
     tree()->redraw();

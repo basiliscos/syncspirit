@@ -455,3 +455,20 @@ void app_supervisor_t::set_show_deleted(bool value) {
         }
     }
 }
+
+Fl_Color app_supervisor_t::get_color(color_context_t context) const {
+    using C = color_context_t;
+    switch (context) {
+    case color_context_t::deleted:
+        return FL_DARK1;
+    case color_context_t::link:
+        return FL_DARK_BLUE;
+    case color_context_t::actualized:
+        return FL_DARK_GREEN;
+    case color_context_t::outdated:
+        return FL_DARK_YELLOW;
+    case color_context_t::conflicted:
+        return FL_RED;
+    }
+    return FL_BLACK;
+}

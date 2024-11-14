@@ -11,6 +11,7 @@ static const auto offline_raw = u8"⚐";
 static const auto connecting_raw = u8"🗲";
 static const auto discovering_raw = u8"…";
 static const auto deleted_raw = u8"♻";
+static const auto colorize_raw = u8"◐";
 
 // ♨
 // ♻
@@ -24,5 +25,6 @@ const std::string_view offline = UTF8_CAST(offline_raw);
 const std::string_view connecting = UTF8_CAST(connecting_raw);
 const std::string_view discovering = UTF8_CAST(discovering_raw);
 const std::string_view deleted = UTF8_CAST(deleted_raw);
+const std::string_view colorize = UTF8_CAST(colorize_raw);
 
 } // namespace syncspirit::fltk::symbols
