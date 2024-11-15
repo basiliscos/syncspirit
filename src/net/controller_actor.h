@@ -124,8 +124,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         folder_synchronization_t(controller_actor_t &controller, model::folder_t &folder) noexcept;
         ~folder_synchronization_t();
 
-        void start_cloning(const model::file_info_t &) noexcept;
-        void finish_cloning(const model::file_info_t &) noexcept;
         void start_fetching(model::block_info_t *) noexcept;
         void finish_fetching(model::block_info_t *) noexcept;
 
@@ -180,7 +178,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     outcome::result<void> operator()(const model::diff::modify::block_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_rej_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::finish_file_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::mark_reachable_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_folder_infos_t &, void *) noexcept override;

@@ -14,7 +14,6 @@
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/finish_file.h"
-#include "model/diff/modify/finish_file_ack.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/upsert_folder_info.h"
@@ -83,9 +82,6 @@ void C::folder_synchronization_t::finish_sync() noexcept {
     controller.push(new model::diff::local::synchronization_finish_t(folder->get_id()));
     synchronizing = false;
 }
-
-void C::folder_synchronization_t::start_cloning(const model::file_info_t &) noexcept {}
-void C::folder_synchronization_t::finish_cloning(const model::file_info_t &) noexcept {}
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
@@ -295,7 +291,6 @@ void controller_actor_t::pull_next() noexcept {
             LOG_TRACE(log, "going to clone file '{}' from folder '{}'", file->get_name(),
                       file->get_folder_info()->get_folder()->get_label());
             push(model::diff::modify::clone_file_t::create(*file, *sequencer));
-            get_sync_info(file->get_folder_info()->get_folder())->start_cloning(*file);
             ++cloned_files;
             continue;
         }
@@ -402,23 +397,14 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
 auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto ctx = reinterpret_cast<context_t *>(custom);
-    if (ctx->from_self) {
+    if (diff.peer_id == peer->device_id().get_sha256()) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto folder_info = folder->get_folder_infos().by_device_id(diff.peer_id);
-        auto file_info = folder_info->get_file_infos().by_name(diff.proto_file.name());
-        get_sync_info(folder.get())->finish_cloning(*file_info);
+        auto file = folder_info->get_file_infos().by_name(diff.proto_file.name());
+        assert(file);
+        updates_streamer.on_update(*file);
+        pull_ready();
     }
-    return diff.visit_next(*this, custom);
-}
-
-auto controller_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*peer);
-    auto file = folder_info->get_file_infos().by_name(diff.proto_file.name());
-    assert(file);
-    updates_streamer.on_update(*file);
-    pull_ready();
     return diff.visit_next(*this, custom);
 }
 

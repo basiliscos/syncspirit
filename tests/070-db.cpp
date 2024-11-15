@@ -681,7 +681,7 @@ void test_clone_file() {
                 file_peer->mark_local_available(0);
                 REQUIRE(file_peer->is_locally_available());
 
-                builder.finish_file_ack(*file_peer).apply(*sup);
+                builder.clone_file(*file_peer).apply(*sup);
 
                 {
                     sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);

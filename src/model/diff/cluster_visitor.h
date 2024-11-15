@@ -56,7 +56,6 @@ struct block_rej_t;
 struct block_transaction_t;
 struct clone_block_t;
 struct clone_file_t;
-struct finish_file_ack_t;
 struct finish_file_t;
 struct generic_remove_t;
 struct lock_file_t;
@@ -114,7 +113,6 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const modify::block_rej_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::clone_block_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::clone_file_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const modify::finish_file_ack_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::finish_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::lock_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::mark_reachable_t &, void *custom) noexcept;

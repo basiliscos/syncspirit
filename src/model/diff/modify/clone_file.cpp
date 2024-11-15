@@ -43,44 +43,46 @@ clone_file_t::clone_file_t(proto::FileInfo proto_file_, std::string_view folder_
 auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto my_device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto folder_my = folder->get_folder_infos().by_device(*my_device);
-    auto folder_peer = folder->get_folder_infos().by_device_id(peer_id);
-    auto peer_file = folder_peer->get_file_infos().by_name(proto_file.name());
-    auto &blocks = peer_file->get_blocks();
+    auto local_folder = folder->get_folder_infos().by_device(*my_device);
+    auto peer_folder = folder->get_folder_infos().by_device_id(peer_id);
+    auto peer_file = peer_folder->get_file_infos().by_name(proto_file.name());
     assert(peer_file);
 
-    auto prev_file = folder_my->get_file_infos().by_name(peer_file->get_name());
-    auto file_opt = file_info_t::create(uuid, proto_file, folder_my);
-    if (!file_opt) {
-        return file_opt.assume_error();
+    auto prev_file = local_folder->get_file_infos().by_name(peer_file->get_name());
+    auto local_file_opt = file_info_t::create(uuid, proto_file, local_folder);
+    if (!local_file_opt) {
+        return local_file_opt.assume_error();
     }
 
-    auto file = std::move(file_opt.assume_value());
-    for (size_t i = 0; i < blocks.size(); ++i) {
-        auto &b = blocks[i];
-        file->assign_block(b, i);
-    }
+    auto local_file = std::move(local_file_opt.assume_value());
 
     if (prev_file) {
-        prev_file->update(*file);
-        file = std::move(prev_file);
+        prev_file->update(*local_file);
+        local_file = std::move(prev_file);
     }
 
-    file->mark_local();
+    auto &blocks = peer_file->get_blocks();
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        auto &b = blocks[i];
+        assert(b);
+        local_file->assign_block(b, i);
+        local_file->mark_local_available(i);
+    }
 
-    auto value = folder_my->get_max_sequence() + 1;
-    file->set_sequence(value);
-    folder_my->add_strict(file);
+    auto seqeuence = local_folder->get_max_sequence() + 1;
+    local_file->mark_local();
+    local_file->set_sequence(seqeuence);
+    local_folder->add_strict(local_file);
 
-    LOG_TRACE(log, "clone_file_t, new file; folder = {}, name = {}, blocks = {}", folder_id, file->get_name(),
-              blocks.size());
+    LOG_TRACE(log, "clone_file_t, folder = {}, name = {}, blocks = {}, seq. = {}", folder_id, local_file->get_name(),
+              blocks.size(), seqeuence);
 
-    if (auto iterator = folder_peer->get_device()->get_iterator(); iterator) {
+    if (auto iterator = peer_folder->get_device()->get_iterator(); iterator) {
         iterator->on_clone(std::move(peer_file));
     }
 
-    file->notify_update();
-    folder_my->notify_update();
+    local_file->notify_update();
+    local_folder->notify_update();
 
     return applicator_t::apply_sibling(cluster);
 }

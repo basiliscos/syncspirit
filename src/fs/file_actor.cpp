@@ -9,7 +9,6 @@
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/finish_file.h"
-#include "model/diff/modify/finish_file_ack.h"
 #include "utils.h"
 #include <fstream>
 
@@ -233,8 +232,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
 
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
 
-    auto ack = model::diff::cluster_diff_ptr_t{};
-    ack = new model::diff::modify::finish_file_ack_t(*file, *sequencer);
+    auto ack = model::diff::modify::clone_file_t::create(*file, *sequencer);
     send<model::payload::model_update_t>(coordinator, std::move(ack), this);
     return diff.visit_next(*this, custom);
 }

@@ -3,7 +3,6 @@
 
 #include "db_actor.h"
 #include "names.h"
-#include "utils/platform.h"
 #include "db/prefix.h"
 #include "db/utils.h"
 #include "db/error_code.h"
@@ -27,8 +26,6 @@
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
 #include "model/diff/modify/clone_file.h"
-#include "model/diff/modify/finish_file_ack.h"
-#include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_files.h"
 #include "model/diff/modify/remove_folder.h"
@@ -37,7 +34,6 @@
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/remove_pending_device.h"
 #include "model/diff/modify/remove_pending_folders.h"
-#include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
@@ -46,7 +42,6 @@
 
 #include "model/diff/cluster_visitor.h"
 #include <string_view>
-#include <set>
 
 #ifdef WIN32_LEAN_AND_MEAN
 #include <malloc.h>
@@ -731,37 +726,6 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void 
         }
     }
 
-    auto folder_infos = reinterpret_cast<folder_infos_set_t *>(custom);
-    folder_infos->emplace(folder_info.get());
-
-    auto r = diff.visit_next(*this, custom);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    return force_commit();
-}
-
-auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (cluster->is_tainted()) {
-        return outcome::success();
-    }
-
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file = folder_info->get_file_infos().by_name(diff.proto_file.name());
-    auto &txn = *get_txn().assume_value();
-
-    {
-        auto key = file->get_key();
-        auto data = file->serialize();
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-
     {
         auto key = folder_info->get_key();
         auto data = folder_info->serialize();
@@ -771,6 +735,9 @@ auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, 
             return r.assume_error();
         }
     }
+
+    auto folder_infos = reinterpret_cast<folder_infos_set_t *>(custom);
+    folder_infos->emplace(folder_info.get());
 
     auto r = diff.visit_next(*this, custom);
     if (!r) {

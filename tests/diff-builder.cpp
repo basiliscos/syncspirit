@@ -16,7 +16,6 @@
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/finish_file.h"
-#include "model/diff/modify/finish_file_ack.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/unshare_folder.h"
@@ -181,10 +180,6 @@ diff_builder_t &diff_builder_t::clone_file(const model::file_info_t &source) noe
 
 diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &file) noexcept {
     return assign(new diff::modify::finish_file_t(file));
-}
-
-diff_builder_t &diff_builder_t::finish_file_ack(const model::file_info_t &file) noexcept {
-    return assign(new diff::modify::finish_file_ack_t(file, *sequencer));
 }
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
