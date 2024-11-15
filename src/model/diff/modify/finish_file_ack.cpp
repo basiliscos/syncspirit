@@ -14,7 +14,6 @@ finish_file_ack_t::finish_file_ack_t(const model::file_info_t &file, sequencer_t
     auto device = fi->get_device();
     assert(device != folder->get_cluster()->get_device().get());
     folder_id = folder->get_id();
-    file_name = file.get_name();
     peer_id = fi->get_device()->device_id().get_sha256();
     proto_file = file.as_proto(false);
 
@@ -32,6 +31,7 @@ auto finish_file_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
     auto &folder_infos = folder->get_folder_infos();
     auto local_folder = folder_infos.by_device(*cluster.get_device());
     auto peer_folder = folder_infos.by_device(*peer);
+    auto &file_name = proto_file.name();
     auto peer_file = peer_folder->get_file_infos().by_name(file_name);
     auto data_copy = proto_file;
     data_copy.set_sequence(local_folder->get_max_sequence() + 1);
@@ -67,6 +67,6 @@ auto finish_file_ack_t::apply_impl(cluster_t &cluster) const noexcept -> outcome
 
 auto finish_file_ack_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting finish_file_ack (visitor = {}), folder = {}, file = {}", (const void *)&visitor, folder_id,
-              file_name);
+              proto_file.name());
     return visitor(*this, custom);
 }

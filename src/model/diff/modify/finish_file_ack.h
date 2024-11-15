@@ -18,7 +18,6 @@ struct SYNCSPIRIT_API finish_file_ack_t final : cluster_diff_t {
     proto::FileInfo proto_file;
     std::string folder_id;
     std::string peer_id;
-    std::string file_name;
     bu::uuid uuid;
 };
 

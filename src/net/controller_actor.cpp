@@ -415,11 +415,10 @@ auto controller_actor_t::operator()(const model::diff::modify::finish_file_ack_t
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*peer);
-    auto file = folder_info->get_file_infos().by_name(diff.file_name);
+    auto file = folder_info->get_file_infos().by_name(diff.proto_file.name());
     assert(file);
     updates_streamer.on_update(*file);
     pull_ready();
-
     return diff.visit_next(*this, custom);
 }
 
@@ -432,7 +431,6 @@ auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_inf
         ctx->notify_cluster_change = true;
         pull_ready();
     }
-
     return diff.visit_next(*this, custom);
 }
 

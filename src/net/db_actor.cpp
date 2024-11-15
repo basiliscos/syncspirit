@@ -750,7 +750,7 @@ auto db_actor_t::operator()(const model::diff::modify::finish_file_ack_t &diff, 
 
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file = folder_info->get_file_infos().by_name(diff.file_name);
+    auto file = folder_info->get_file_infos().by_name(diff.proto_file.name());
     auto &txn = *get_txn().assume_value();
 
     {
