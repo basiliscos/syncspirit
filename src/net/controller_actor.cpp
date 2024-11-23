@@ -282,10 +282,6 @@ void controller_actor_t::pull_next() noexcept {
         if (auto file = file_iterator->next_need_sync(); file) {
             block_iterator = new model::blocks_iterator_t(*file);
             continue;
-            if (*block_iterator) {
-                LOG_TRACE(log, "going to scan blocks on '{}' from folder '{}'", file->get_name(),
-                          file->get_folder_info()->get_folder()->get_label());
-            }
         }
         if (auto file = file_iterator->next_need_cloning(); file) {
             LOG_TRACE(log, "going to clone file '{}' from folder '{}'", file->get_name(),
