@@ -43,22 +43,8 @@ protobuf_generate_cpp(
     src/protobuf/bep.proto
     src/protobuf/structs.proto
 )
-add_library(syncspirit_pb ${PROTO_SRCS})
-generate_export_header(syncspirit_pb
-    EXPORT_MACRO_NAME SYNCSPIRIT_API
-    EXPORT_FILE_NAME include/syncspirit-export.h
-)
-target_compile_options(syncspirit_pb PRIVATE
-    -include ${CMAKE_CURRENT_BINARY_DIR}/include/syncspirit-export.h
-)
-target_include_directories(syncspirit_pb PUBLIC
-    ${Protobuf_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_BINARY_DIR}
-    ${CMAKE_CURRENT_BINARY_DIR}/include
-)
-target_link_libraries(syncspirit_pb protobuf::libprotobuf)
-
-add_library(syncspirit_lib
+add_library(syncspirit_core
+    ${PROTO_SRCS}
     src/constants.cpp
     src/config/utils.cpp
     src/db/cursor.cpp
@@ -198,6 +184,13 @@ add_library(syncspirit_lib
     src/utils/tls.cpp
     src/utils/uri.cpp
 )
+generate_export_header(syncspirit_core
+    EXPORT_MACRO_NAME SYNCSPIRIT_API
+    EXPORT_FILE_NAME include/syncspirit-export.h
+)
+target_compile_options(syncspirit_core PRIVATE
+    -include ${CMAKE_CURRENT_BINARY_DIR}/include/syncspirit-export.h
+)
 
 set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
 set(MDBX_BUILD_TOOLS true CACHE BOOL "MDBX_BUILD_TOOLS")
@@ -207,15 +200,17 @@ set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
 
 add_subdirectory("lib/mbdx")
 
-target_include_directories(syncspirit_lib PUBLIC
+target_include_directories(syncspirit_core PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/mbdx
+    ${Protobuf_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(syncspirit_lib
-    syncspirit_pb
+target_link_libraries(syncspirit_core
+    protobuf::libprotobuf
     rotor::asio
     rotor::thread
     pugixml::pugixml

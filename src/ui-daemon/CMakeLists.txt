@@ -14,7 +14,7 @@ add_executable(syncspirit-daemon
 )
 
 target_link_libraries(syncspirit-daemon
-    syncspirit_lib
+    syncspirit_core
     $<$<PLATFORM_ID:Windows>:ws2_32>
     $<$<PLATFORM_ID:Windows>:wsock32>
 )

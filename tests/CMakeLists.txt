@@ -23,7 +23,7 @@ add_library(syncspirit_test_lib
     test-utils.cpp
     diff-builder.cpp
 )
-target_link_libraries(syncspirit_test_lib syncspirit_lib
+target_link_libraries(syncspirit_test_lib syncspirit_core
     Catch2::Catch2WithMain
     $<$<PLATFORM_ID:Windows>:wsock32>
     $<$<PLATFORM_ID:Windows>:ws2_32>
