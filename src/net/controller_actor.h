@@ -138,6 +138,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     };
     using folder_synchronization_ptr_t = model::intrusive_ptr_t<folder_synchronization_t>;
     using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, folder_synchronization_ptr_t>;
+    using synchronizing_files_t = std::unordered_map<model::file_info_t *, model::file_info_t::guard_ptr_t>;
 
     void on_termination(message::termination_signal_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
@@ -214,6 +215,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     model::block_iterator_ptr_t block_iterator;
     model::updates_streamer_t updates_streamer;
     synchronizing_folders_t synchronizing_folders;
+    synchronizing_files_t synchronizing_files;
     block_write_queue_t block_write_queue;
 };
 

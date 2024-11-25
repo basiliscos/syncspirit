@@ -7,16 +7,6 @@
 
 using namespace syncspirit::model;
 
-file_iterator_t::guard_t::guard_t(model::file_info_ptr_t file_, file_iterator_t &owner_) noexcept
-    : file{file_}, owner{owner_} {
-    assert(!file->is_locally_locked());
-    file->locally_lock();
-
-    is_locked = file->get_size() > 0;
-}
-
-file_iterator_t::guard_t::~guard_t() { file->locally_unlock(); }
-
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
     : cluster{cluster_}, peer{peer_.get()}, folder_index{0} {
     auto &folders = cluster.get_folders();
@@ -45,72 +35,14 @@ auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> 
     return folders_list.back();
 }
 
-file_info_t *file_iterator_t::next_need_cloning() noexcept {
+file_info_t *file_iterator_t::next() noexcept {
     auto folders_count = folders_list.size();
     auto folder_scans = size_t{0};
 
     while (folder_scans < folders_count) {
         auto &fi = folders_list[folder_index];
-        auto &it = fi.it_clone;
-        auto files_scan = size_t{0};
-        auto &files_map = fi.peer_folder->get_file_infos();
-        auto &folder_infos = fi.peer_folder->get_folder()->get_folder_infos();
-        auto local_folder = folder_infos.by_device(*cluster.get_device());
-        auto folder = local_folder->get_folder();
-        auto do_scan = !folder->is_paused() && !folder->is_scheduled();
-
-        if (do_scan) {
-            while (files_scan < files_map.size()) {
-                if (it == files_map.end()) {
-                    it = files_map.begin();
-                }
-                auto &file = it->item;
-                ++files_scan;
-                ++it;
-
-                if (!file->is_locally_locked() && !file->is_invalid() && file->is_global() && !file->is_invalid()) {
-                    auto local = file->local_file();
-                    bool need_clone = !local;
-                    if (local) {
-                        if (local->is_local()) {
-                            using V = version_relation_t;
-                            auto result = compare(file->get_version(), local->get_version());
-                            need_clone = result == V::newer && file->is_locally_available();
-                        }
-                    } else {
-                        need_clone = file->get_size() == 0;
-                    }
-                    if (need_clone) {
-                        fi.guarded_clones.emplace(file->get_name(), new guard_t(file, *this));
-                        return file.get();
-                    }
-                }
-
-                if (files_scan == files_map.size()) {
-                    break;
-                }
-            }
-        }
-        folder_index = (folder_index + 1) % folders_count;
-        ++folder_scans;
-    }
-    return {};
-}
-
-file_info_t *file_iterator_t::next_need_sync() noexcept {
-    auto folders_count = folders_list.size();
-    auto folder_scans = size_t{0};
-
-    while (folder_scans < folders_count) {
-        auto &fi = folders_list[folder_index];
-        auto local_folder = fi.peer_folder->get_folder()->get_folder_infos().by_device(*cluster.get_device());
-
-        for (auto &[_, guard] : fi.guarded_syncs) {
-            auto file = guard->file.get();
-            if (file->local_file()) {
-                return file;
-            }
-        }
+        auto &file_infos = fi.peer_folder->get_folder()->get_folder_infos();
+        auto local_folder = file_infos.by_device(*cluster.get_device());
 
         auto &it = fi.it_sync;
         auto files_scan = size_t{0};
@@ -128,23 +60,11 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
                 ++files_scan;
                 ++it;
 
-                if (file->is_locally_locked()) {
-                    continue;
-                }
-
                 if (file->is_unreachable()) {
                     continue;
                 }
 
                 if (file->is_invalid()) {
-                    continue;
-                }
-
-                if (file->is_locally_available()) {
-                    continue;
-                }
-
-                if (!file->get_size()) {
                     continue;
                 }
 
@@ -164,11 +84,15 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
                     }
                 }
 
-                auto &seen_sequence = fi.committed_map[file];
-                accept = accept && seen_sequence < file->get_sequence();
+                auto visited_older = file->get_visited_sequence() < file->get_sequence();
 
-                if (accept) {
-                    fi.guarded_syncs.emplace(file->get_name(), new guard_t(file, *this));
+                if (accept && visited_older) {
+                    auto filename = file->get_name();
+                    if (!fi.guarded.count(filename)) {
+                        fi.guarded[filename] = file->guard_visited_sequence();
+                    } else {
+                        file->set_visited_sequence(file->get_sequence());
+                    }
                     return file.get();
                 }
             }
@@ -179,34 +103,14 @@ file_info_t *file_iterator_t::next_need_sync() noexcept {
     return {};
 }
 
-void file_iterator_t::commit_clone(file_info_ptr_t file) noexcept {
-    auto folder = file->get_folder_info()->get_folder();
-    auto &fi = find_folder(folder);
-    auto &guarded = fi.guarded_clones;
-    auto it = guarded.find(file->get_name());
-    // if needed for cloning files without iterator (i.e. in tests)
-    if (it != guarded.end()) {
-        fi.committed_map[file] = file->get_sequence();
-        auto guard = std::move(*it);
-        guarded.erase(it);
-    }
-}
-
 void file_iterator_t::commit_sync(file_info_ptr_t file) noexcept {
     auto folder = file->get_folder_info()->get_folder();
     auto &fi = find_folder(folder);
-    auto &guarded = fi.guarded_syncs;
+    auto &guarded = fi.guarded;
     auto it = guarded.find(file->get_name());
     // if needed for cloning files without iterator (i.e. in tests)
     if (it != guarded.end()) {
-        fi.committed_map[file] = file->get_sequence();
         guarded.erase(it);
-    }
-}
-
-void file_iterator_t::on_clone(file_info_ptr_t file) noexcept {
-    if (file->get_size() == 0) {
-        commit_clone(file);
     }
 }
 
@@ -220,21 +124,6 @@ void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
         }
     }
     prepare_folder(peer_folder);
-}
-
-void file_iterator_t::on_block_ack(const file_info_t &file, size_t block_index) {
-    auto block = file.get_blocks().at(block_index);
-    auto fi = file.get_folder_info();
-    auto &committed_map = find_folder(fi->get_folder()).committed_map;
-    for (auto &fb : block->get_file_blocks()) {
-        auto f = fb.file();
-        if (f->get_folder_info() == fi) {
-            auto it = committed_map.find(f);
-            if (it != committed_map.end()) {
-                committed_map.erase(it);
-            }
-        }
-    }
 }
 
 void file_iterator_t::on_remove(folder_info_ptr_t peer_folder) noexcept {

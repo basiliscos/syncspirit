@@ -41,20 +41,14 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
     auto file_iterator = peer_device->create_iterator(*cluster);
 
-    SECTION("emtpy folders (1)") {
-        CHECK(!file_iterator->next_need_cloning());
-        CHECK(!file_iterator->next_need_sync());
-    }
+    SECTION("emtpy folders (1)") { CHECK(!file_iterator->next()); }
 
     REQUIRE(builder.configure_cluster(peer_id.get_sha256())
                 .add(peer_id.get_sha256(), folder->get_id(), 123, 10u)
                 .finish()
                 .apply());
 
-    SECTION("emtpy folders (2)") {
-        CHECK(!file_iterator->next_need_cloning());
-        CHECK(!file_iterator->next_need_sync());
-    }
+    SECTION("emtpy folders (2)") { CHECK(!file_iterator->next()); }
     SECTION("cloning (empty files)") {
         SECTION("1 file") {
             SECTION("no local file") {
@@ -64,18 +58,16 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 REQUIRE(
                     builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
-                auto f = file_iterator->next_need_cloning();
+                auto f = file_iterator->next();
                 REQUIRE(f);
                 CHECK(f->get_name() == "a.txt");
                 CHECK(!f->is_locked());
 
                 REQUIRE(builder.apply());
-                REQUIRE(!file_iterator->next_need_cloning());
-                REQUIRE(!file_iterator->next_need_sync());
+                REQUIRE(!file_iterator->next());
 
                 REQUIRE(builder.clone_file(*f).apply());
-                REQUIRE(!file_iterator->next_need_cloning());
-                REQUIRE(!file_iterator->next_need_sync());
+                REQUIRE(!file_iterator->next());
                 CHECK(!f->is_locked());
             }
             SECTION("invalid file is ignored") {
@@ -84,7 +76,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 file.set_sequence(10ul);
                 file.set_invalid(true);
                 REQUIRE(builder.apply());
-                REQUIRE(!file_iterator->next_need_cloning());
+                REQUIRE(!file_iterator->next());
             }
 
             SECTION("version checks") {
@@ -105,10 +97,10 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     my_file->mark_local();
                     my_files.put(my_file);
 
-                    auto f = file_iterator->next_need_cloning();
+                    auto f = file_iterator->next();
                     REQUIRE(f);
                     CHECK(f->get_folder_info()->get_device() == peer_device.get());
-                    REQUIRE(!file_iterator->next_need_cloning());
+                    REQUIRE(!file_iterator->next());
                 }
 
                 SECTION("my version < peer version, but not scanned yet") {
@@ -119,7 +111,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
                     my_files.put(my_file);
 
-                    REQUIRE(!file_iterator->next_need_cloning());
+                    REQUIRE(!file_iterator->next());
                 }
 
                 SECTION("my version > peer version") {
@@ -131,7 +123,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     my_file->mark_local();
                     my_files.put(my_file);
 
-                    REQUIRE(!file_iterator->next_need_cloning());
+                    REQUIRE(!file_iterator->next());
                 }
 
                 SECTION("my version == peer version") {
@@ -141,7 +133,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     my_file->mark_local();
                     my_files.put(my_file);
 
-                    REQUIRE(!file_iterator->next_need_cloning());
+                    REQUIRE(!file_iterator->next());
                 }
             }
         }
@@ -160,7 +152,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
             REQUIRE(builder.apply());
 
             SECTION("both files are missing on my side") {
-                auto f = file_iterator->next_need_cloning();
+                auto f = file_iterator->next();
                 REQUIRE(f);
                 CHECK((f->get_name() == "a.txt" || f->get_name() == "b.txt"));
                 CHECK(!f->is_locked());
@@ -169,7 +161,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                 REQUIRE(builder.clone_file(*f).apply());
 
-                f = file_iterator->next_need_cloning();
+                f = file_iterator->next();
                 REQUIRE(f);
                 CHECK((f->get_name() == "a.txt" || f->get_name() == "b.txt"));
                 CHECK(!f->is_locked());
@@ -177,8 +169,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 REQUIRE(builder.apply());
                 REQUIRE(builder.clone_file(*f).apply());
 
-                REQUIRE(!file_iterator->next_need_cloning());
-                REQUIRE(!file_iterator->next_need_sync());
+                REQUIRE(!file_iterator->next());
 
                 CHECK(files.by_name("a.txt"));
                 CHECK(files.by_name("b.txt"));
@@ -188,17 +179,16 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 auto peer_file = peer_files.by_name("a.txt");
                 REQUIRE(peer_file);
                 REQUIRE(builder.clone_file(*peer_file).apply());
-                auto f = file_iterator->next_need_cloning();
+                auto f = file_iterator->next();
                 REQUIRE(f);
                 CHECK(f->get_name() == "b.txt");
                 CHECK(!f->is_locked());
 
                 REQUIRE(builder.apply());
-                REQUIRE(!file_iterator->next_need_cloning());
+                REQUIRE(!file_iterator->next());
 
                 REQUIRE(builder.clone_file(*f).apply());
-                REQUIRE(!file_iterator->next_need_cloning());
-                REQUIRE(!file_iterator->next_need_sync());
+                REQUIRE(!file_iterator->next());
                 CHECK(!f->is_locked());
             }
 
@@ -206,7 +196,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 auto peer_file_1 = peer_files.by_name("a.txt");
                 auto peer_file_2 = peer_files.by_name("b.txt");
                 REQUIRE(builder.clone_file(*peer_file_1).clone_file(*peer_file_2).apply());
-                REQUIRE(!file_iterator->next_need_cloning());
+                REQUIRE(!file_iterator->next());
             }
         }
     }
@@ -235,15 +225,16 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
             REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
-            auto f = file_iterator->next_need_sync();
-            CHECK(!file_iterator->next_need_sync());
+            auto f = file_iterator->next();
+            CHECK(!file_iterator->next());
             REQUIRE(f);
             CHECK(f->get_name() == "a.txt");
             CHECK(!f->is_locked());
 
             REQUIRE(builder.apply());
+
             file_iterator->commit_sync(f);
-            CHECK(!file_iterator->next_need_sync());
+            CHECK(file_iterator->next());
         }
 
         SECTION("have local, but outdated") {
@@ -269,18 +260,14 @@ TEST_CASE("file iterator, single folder", "[model]") {
             SECTION("has been scanned") {
                 my_file->mark_local();
 
-                auto f = file_iterator->next_need_sync();
+                auto f = file_iterator->next();
                 REQUIRE(f);
                 CHECK(f->get_name() == "a.txt");
-                REQUIRE(file_iterator->next_need_sync() == f);
-                REQUIRE(file_iterator->next_need_sync() == f);
+                CHECK(!file_iterator->next());
                 REQUIRE(builder.apply());
-
-                file_iterator->commit_sync(f);
-                CHECK(!file_iterator->next_need_sync());
             }
 
-            SECTION("has not bee scanned") { CHECK(!file_iterator->next_need_sync()); }
+            SECTION("has not bee scanned") { CHECK(!file_iterator->next()); }
         }
 
         SECTION("have local, local is newer") {
@@ -303,7 +290,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
             my_files.put(my_file);
 
             REQUIRE(builder.apply());
-            CHECK(!file_iterator->next_need_sync());
+            CHECK(!file_iterator->next());
         }
 
         SECTION("peer file is unreacheable") {
@@ -318,7 +305,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
             auto f = peer_files.by_name(file.name());
             REQUIRE(builder.clone_file(*f).mark_reacheable(f, false).apply());
 
-            CHECK(!file_iterator->next_need_sync());
+            CHECK(!file_iterator->next());
         }
     }
 }
@@ -378,8 +365,8 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     SECTION("cloning") {
         REQUIRE(builder.make_index(sha256, "1234").add(file1, peer_device).add(file2, peer_device).finish().apply());
 
-        auto f1 = file_iterator->next_need_cloning();
-        auto f2 = file_iterator->next_need_cloning();
+        auto f1 = file_iterator->next();
+        auto f2 = file_iterator->next();
         REQUIRE(f1);
         REQUIRE(f2);
 
@@ -388,7 +375,7 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
         files.emplace(f2->get_name());
 
         CHECK((files == set_t{"a.txt", "b.txt"}));
-        CHECK(!file_iterator->next_need_cloning());
+        CHECK(!file_iterator->next());
     }
 
     SECTION("syncing") {
@@ -415,12 +402,12 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
         REQUIRE(builder.make_index(sha256, "1234").add(file1, peer_device).add(file2, peer_device).finish().apply());
 
         auto files = set_t{};
-        auto f1 = file_iterator->next_need_sync();
+        auto f1 = file_iterator->next();
         REQUIRE(f1);
         files.emplace(f1->get_name());
         file_iterator->commit_sync(f1);
 
-        auto f2 = file_iterator->next_need_sync();
+        auto f2 = file_iterator->next();
         REQUIRE(f2);
         files.emplace(f2->get_name());
         file_iterator->commit_sync(f2);
@@ -458,14 +445,13 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     file.set_sequence(10ul);
     REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
-    auto f = file_iterator->next_need_cloning();
+    auto f = file_iterator->next();
     REQUIRE(f);
     CHECK(f->get_name() == "a.txt");
     CHECK(!f->is_locked());
 
     REQUIRE(builder.apply());
-    REQUIRE(!file_iterator->next_need_cloning());
-    REQUIRE(!file_iterator->next_need_sync());
+    REQUIRE(!file_iterator->next());
     REQUIRE(builder.remove_folder(*folder).apply());
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
@@ -474,7 +460,7 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     REQUIRE(folder_infos->size() == 2u);
     REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
-    f = file_iterator->next_need_cloning();
+    f = file_iterator->next();
     REQUIRE(f);
     CHECK(f->get_name() == "a.txt");
 }

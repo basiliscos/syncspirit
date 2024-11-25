@@ -59,12 +59,6 @@ auto file_info_t::create(const bu::uuid &uuid_, const proto::FileInfo &info_,
     return outcome::success(std::move(ptr));
 }
 
-file_info_t::file_info_t(std::string_view key_, const folder_info_ptr_t &folder_info_) noexcept
-    : folder_info{folder_info_.get()} {
-    assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
-    std::copy(key_.begin(), key_.end(), key);
-}
-
 static void fill(char *key, const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
     key[0] = prefix;
     auto fi_key = folder_info_->get_uuid();
@@ -72,15 +66,28 @@ static void fill(char *key, const bu::uuid &uuid, const folder_info_ptr_t &folde
     std::copy(uuid.begin(), uuid.end(), key + 1 + fi_key.size());
 }
 
-std::string file_info_t::create_key(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
-    std::string key;
-    key.resize(data_length);
-    fill(key.data(), uuid, folder_info_);
-    return key;
+file_info_t::guard_t::guard_t(file_info_t &file_, guarded_target_t target_) noexcept : file{&file_}, target{target_} {
+    if (target == guarded_target_t::synchonizing) {
+        file_.synchronizing_lock();
+    }
+}
+
+file_info_t::guard_t::~guard_t() {
+    if (target == guarded_target_t::synchonizing) {
+        file->synchronizing_unlock();
+    } else if (target == guarded_target_t::visited_sequence) {
+        file->visited_sequence = 0;
+    }
+}
+
+file_info_t::file_info_t(std::string_view key_, const folder_info_ptr_t &folder_info_) noexcept
+    : folder_info{folder_info_.get()}, visited_sequence{0l} {
+    assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
+    std::copy(key_.begin(), key_.end(), key);
 }
 
 file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept
-    : folder_info{folder_info_.get()} {
+    : folder_info{folder_info_.get()}, visited_sequence{0l} {
     fill(key, uuid, folder_info_);
 }
 
@@ -94,6 +101,13 @@ file_info_t::~file_info_t() {
             blocks[i].reset();
         }
     }
+}
+
+std::string file_info_t::create_key(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
+    std::string key;
+    key.resize(data_length);
+    fill(key.data(), uuid, folder_info_);
+    return key;
 }
 
 std::string_view file_info_t::get_name() const noexcept { return name; }
@@ -136,6 +150,8 @@ auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome:
 std::string_view file_info_t::get_uuid() const noexcept { return std::string_view(key + 1 + uuid_length, uuid_length); }
 
 void file_info_t::set_sequence(std::int64_t value) noexcept { sequence = value; }
+
+void file_info_t::set_visited_sequence(std::int64_t value) noexcept { visited_sequence = value; }
 
 template <typename T> T file_info_t::as() const noexcept {
     T r;
@@ -280,11 +296,11 @@ void file_info_t::lock() noexcept { flags |= flags_t::f_locked; }
 
 bool file_info_t::is_locked() const noexcept { return flags & flags_t::f_locked; }
 
-void file_info_t::locally_unlock() noexcept { flags = flags & ~flags_t::f_local_locked; }
+void file_info_t::synchronizing_unlock() noexcept { flags = flags & ~flags_t::f_synchronizing; }
 
-void file_info_t::locally_lock() noexcept { flags |= flags_t::f_local_locked; }
+void file_info_t::synchronizing_lock() noexcept { flags |= flags_t::f_synchronizing; }
 
-bool file_info_t::is_locally_locked() const noexcept { return flags & flags_t::f_local_locked; }
+bool file_info_t::is_synchronizing() const noexcept { return flags & flags_t::f_synchronizing; }
 
 bool file_info_t::is_unlocking() const noexcept { return flags & flags_t::f_unlocking; }
 
@@ -446,6 +462,15 @@ bool file_info_t::is_global() const noexcept {
         return false;
     }
     return true;
+}
+
+auto file_info_t::guard_visited_sequence() noexcept -> guard_ptr_t {
+    visited_sequence = sequence;
+    return new guard_t(*this, guarded_target_t::visited_sequence);
+}
+
+auto file_info_t::guard_synchronization() noexcept -> guard_ptr_t {
+    return new guard_t(*this, guarded_target_t::synchonizing);
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const file_info_ptr_t &item) noexcept {
