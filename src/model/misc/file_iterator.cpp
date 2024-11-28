@@ -31,7 +31,7 @@ auto file_iterator_t::find_folder(folder_t *folder) noexcept -> folder_iterator_
 
 auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t & {
     auto &files = peer_folder->get_file_infos();
-    folders_list.emplace_back(folder_iterator_t{peer_folder, files.begin(), files.begin(), {}});
+    folders_list.emplace_back(folder_iterator_t{peer_folder, files.begin(), {}});
     return folders_list.back();
 }
 
@@ -119,7 +119,7 @@ void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
     auto &files = peer_folder->get_file_infos();
     for (auto &it : folders_list) {
         if (it.peer_folder->get_folder() == folder) {
-            it.it_clone = it.it_sync = files.begin();
+            it.it_sync = files.begin();
             return;
         }
     }

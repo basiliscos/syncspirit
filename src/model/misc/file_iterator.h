@@ -31,7 +31,6 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     struct folder_iterator_t {
         using it_t = typename model::file_infos_map_t::iterator_t;
         model::folder_info_ptr_t peer_folder;
-        it_t it_clone;
         it_t it_sync;
         guarded_files_t guarded;
     };

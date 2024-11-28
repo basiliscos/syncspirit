@@ -44,6 +44,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
 
     for (std::size_t i = 0; i < files.size(); ++i) {
         auto &f = files[i];
+
         auto &uuid = uuids[i];
         auto file = file_info_ptr_t{};
         auto opt = file_info_t::create(uuid, f, folder_info);
@@ -94,7 +95,6 @@ static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, st
     auto folder = folder_info->get_folder();
 
     auto uuids = update_folder_t::uuids_t{};
-    auto max_seq = folder_info->get_max_sequence();
     uuids.reserve(files.size());
     auto &fm = folder_info->get_file_infos();
     auto orphaned_candidates = orphaned_blocks_t{};
@@ -142,10 +142,10 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
     }
 
     auto log = update_folder_t::get_log();
-    auto max_seq = fi->get_max_sequence();
     auto &blocks = cluster.get_blocks();
     update_folder_t::files_t files;
     update_folder_t::blocks_t new_blocks;
+    auto prev_sequence = fi->get_max_sequence();
     files.reserve(static_cast<size_t>(message.files_size()));
     for (int i = 0; i < message.files_size(); ++i) {
         auto &f = message.files(i);
@@ -153,6 +153,12 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
             LOG_WARN(log, "file {} should not have blocks", f.name());
             return make_error_code(error_code_t::unexpected_blocks);
         }
+        auto sequence = f.sequence();
+        if (sequence <= prev_sequence) {
+            LOG_WARN(log, "file '{}' has incorrect sequence", f.name(), f.sequence());
+            return make_error_code(error_code_t::invalid_sequence);
+        }
+
         if (f.sequence() <= 0) {
             LOG_WARN(log, "file '{}' has wrong sequnce", f.name(), f.sequence());
             return make_error_code(error_code_t::invalid_sequence);
