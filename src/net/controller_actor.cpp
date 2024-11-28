@@ -442,6 +442,12 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
         auto file = folder_info->get_file_infos().by_name(diff.proto_file.name());
         assert(file);
         updates_streamer.on_update(*file);
+        if (file->get_blocks().size()) {
+            auto it = synchronizing_files.find(file.get());
+            if(it != synchronizing_files.end()) {
+                synchronizing_files.erase(it);
+            }
+        }
         pull_ready();
     }
     return diff.visit_next(*this, custom);
