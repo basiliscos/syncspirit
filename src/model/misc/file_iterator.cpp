@@ -7,9 +7,27 @@
 
 using namespace syncspirit::model;
 
+bool file_iterator_t::file_comparator_t::operator()(const file_info_t *l, const file_info_t *r) const {
+    auto le = l->get_blocks().empty();
+    auto re = r->get_blocks().empty();
+
+    if (le && !re) {
+        return true;
+    } else if (re && !le) {
+        return false;
+    }
+
+    auto ln = l->get_name();
+    auto rn = r->get_name();
+
+    return std::lexicographical_compare(ln.begin(), ln.end(), rn.begin(), rn.end());
+}
+
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
     : cluster{cluster_}, peer{peer_.get()}, folder_index{0} {
     auto &folders = cluster.get_folders();
+    comparator.reset(new file_comparator_t());
+
     for (auto &[folder, _] : folders) {
         auto peer_folder = folder->get_folder_infos().by_device(*peer);
         if (!peer_folder) {
@@ -31,7 +49,18 @@ auto file_iterator_t::find_folder(folder_t *folder) noexcept -> folder_iterator_
 
 auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t & {
     auto &files = peer_folder->get_file_infos();
-    folders_list.emplace_back(folder_iterator_t{peer_folder, files.begin(), {}});
+    auto set = std::make_unique<queue_t>(*comparator);
+
+    for (auto it : files) {
+        auto f = it.item.get();
+        if (accept_file(*f)) {
+            set->emplace(f);
+        }
+    }
+
+    auto seen_sequence = peer_folder->get_max_sequence();
+    auto it = set->begin();
+    folders_list.emplace_back(folder_iterator_t{peer_folder, std::move(set), seen_sequence, it});
     return folders_list.back();
 }
 
@@ -44,57 +73,29 @@ file_info_t *file_iterator_t::next() noexcept {
         auto &file_infos = fi.peer_folder->get_folder()->get_folder_infos();
         auto local_folder = file_infos.by_device(*cluster.get_device());
 
-        auto &it = fi.it_sync;
-        auto files_scan = size_t{0};
-        auto &files_map = fi.peer_folder->get_file_infos();
+        auto &queue = fi.files_queue;
         auto folder = local_folder->get_folder();
-        auto do_scan = !folder->is_paused() && !folder->is_scheduled();
+        auto do_scan = !folder->is_paused() && !folder->is_scheduled() && !queue->empty();
 
         // check other files
         if (do_scan) {
-            while (files_scan < files_map.size()) {
-                if (it == files_map.end()) {
-                    it = files_map.begin();
-                }
-                auto &file = it->item;
-                ++files_scan;
-                ++it;
-
-                if (file->is_unreachable()) {
-                    continue;
-                }
-
-                if (file->is_invalid()) {
-                    continue;
-                }
-
-                if (!file->is_global()) {
-                    continue;
-                }
-
-                auto accept = true;
+            auto it = queue->begin();
+            while (it != queue->end()) {
+                auto file = *it;
 
                 if (auto local = file->local_file(); local) {
                     if (!local->is_local()) {
-                        accept = false; // file is not has been scanned
-                    } else {
-                        using V = version_relation_t;
-                        auto result = compare(file->get_version(), local->get_version());
-                        accept = result == V::newer;
+                        ++it;
+                        continue;
                     }
                 }
 
-                auto visited_older = file->get_visited_sequence() < file->get_sequence();
+                it = queue->erase(it);
 
-                if (accept && visited_older) {
-                    auto filename = file->get_name();
-                    if (!fi.guarded.count(filename)) {
-                        fi.guarded[filename] = file->guard_visited_sequence();
-                    } else {
-                        file->set_visited_sequence(file->get_sequence());
-                    }
-                    return file.get();
+                if (!accept_file(*file)) {
+                    continue;
                 }
+                return file;
             }
         }
         folder_index = (folder_index + 1) % folders_count;
@@ -103,27 +104,47 @@ file_info_t *file_iterator_t::next() noexcept {
     return {};
 }
 
-void file_iterator_t::commit_sync(file_info_ptr_t file) noexcept {
-    auto folder = file->get_folder_info()->get_folder();
-    auto &fi = find_folder(folder);
-    auto &guarded = fi.guarded;
-    auto it = guarded.find(file->get_name());
-    // if needed for cloning files without iterator (i.e. in tests)
-    if (it != guarded.end()) {
-        guarded.erase(it);
-    }
-}
-
 void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
     auto folder = peer_folder->get_folder();
     auto &files = peer_folder->get_file_infos();
     for (auto &it : folders_list) {
         if (it.peer_folder->get_folder() == folder) {
-            it.it_sync = files.begin();
+            auto &peer_folder = *it.peer_folder;
+            auto &files_map = peer_folder.get_file_infos();
+            auto seen_sequence = it.seen_sequence;
+            auto max_sequence = peer_folder.get_max_sequence();
+            auto [from, to] = files_map.range(seen_sequence, max_sequence);
+            for (auto fit = from; fit != to; ++fit) {
+                auto file = fit->item.get();
+                if (accept_file(*file)) {
+                    it.files_queue->insert(file);
+                }
+            }
+            it.it = it.files_queue->begin();
             return;
         }
     }
     prepare_folder(peer_folder);
+}
+
+bool file_iterator_t::accept_file(const file_info_t &file) noexcept {
+    if (file.is_unreachable()) {
+        return false;
+    }
+    if (file.is_invalid()) {
+        return false;
+    }
+    if (!file.is_global()) {
+        return false;
+    }
+
+    // make sure that the local file has been scanned
+    if (auto local = file.local_file(); local && local->is_local()) {
+        using V = version_relation_t;
+        auto result = compare(file.get_version(), local->get_version());
+        return result == V::newer;
+    }
+    return true;
 }
 
 void file_iterator_t::on_remove(folder_info_ptr_t peer_folder) noexcept {

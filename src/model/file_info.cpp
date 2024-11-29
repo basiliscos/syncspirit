@@ -66,28 +66,18 @@ static void fill(char *key, const bu::uuid &uuid, const folder_info_ptr_t &folde
     std::copy(uuid.begin(), uuid.end(), key + 1 + fi_key.size());
 }
 
-file_info_t::guard_t::guard_t(file_info_t &file_, guarded_target_t target_) noexcept : file{&file_}, target{target_} {
-    if (target == guarded_target_t::synchonizing) {
-        file_.synchronizing_lock();
-    }
-}
+file_info_t::guard_t::guard_t(file_info_t &file_) noexcept : file{&file_} { file_.synchronizing_lock(); }
 
-file_info_t::guard_t::~guard_t() {
-    if (target == guarded_target_t::synchonizing) {
-        file->synchronizing_unlock();
-    } else if (target == guarded_target_t::visited_sequence) {
-        file->visited_sequence = 0;
-    }
-}
+file_info_t::guard_t::~guard_t() { file->synchronizing_unlock(); }
 
 file_info_t::file_info_t(std::string_view key_, const folder_info_ptr_t &folder_info_) noexcept
-    : folder_info{folder_info_.get()}, visited_sequence{0l} {
+    : folder_info{folder_info_.get()} {
     assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
     std::copy(key_.begin(), key_.end(), key);
 }
 
 file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept
-    : folder_info{folder_info_.get()}, visited_sequence{0l} {
+    : folder_info{folder_info_.get()} {
     fill(key, uuid, folder_info_);
 }
 
@@ -150,8 +140,6 @@ auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome:
 std::string_view file_info_t::get_uuid() const noexcept { return std::string_view(key + 1 + uuid_length, uuid_length); }
 
 void file_info_t::set_sequence(std::int64_t value) noexcept { sequence = value; }
-
-void file_info_t::set_visited_sequence(std::int64_t value) noexcept { visited_sequence = value; }
 
 template <typename T> T file_info_t::as() const noexcept {
     T r;
@@ -464,14 +452,7 @@ bool file_info_t::is_global() const noexcept {
     return true;
 }
 
-auto file_info_t::guard_visited_sequence() noexcept -> guard_ptr_t {
-    visited_sequence = sequence;
-    return new guard_t(*this, guarded_target_t::visited_sequence);
-}
-
-auto file_info_t::guard_synchronization() noexcept -> guard_ptr_t {
-    return new guard_t(*this, guarded_target_t::synchonizing);
-}
+auto file_info_t::guard() noexcept -> guard_ptr_t { return new guard_t(*this); }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const file_info_ptr_t &item) noexcept {
     return item->get_uuid();

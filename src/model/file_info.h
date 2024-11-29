@@ -53,14 +53,11 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
         std::string_view file_id;
     };
 
-    enum class guarded_target_t { visited_sequence, synchonizing };
-
     struct guard_t : arc_base_t<guard_t> {
-        guard_t(file_info_t &file, guarded_target_t target) noexcept;
+        guard_t(file_info_t &file) noexcept;
         ~guard_t();
 
         file_info_ptr_t file;
-        guarded_target_t target;
     };
     using guard_ptr_t = intrusive_ptr_t<guard_t>;
 
@@ -90,9 +87,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     inline const proto::Vector &get_version() const noexcept { return version; }
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
-    inline std::int64_t get_visited_sequence() const noexcept { return visited_sequence; }
     void set_sequence(std::int64_t value) noexcept;
-    void set_visited_sequence(std::int64_t value) noexcept;
 
     inline const blocks_t &get_blocks() const noexcept { return blocks; }
 
@@ -156,8 +151,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     std::uint32_t get_permissions() const noexcept;
     bool has_no_permissions() const noexcept;
 
-    guard_ptr_t guard_visited_sequence() noexcept;
-    guard_ptr_t guard_synchronization() noexcept;
+    guard_ptr_t guard() noexcept;
 
   private:
     using marks_vector_t = std::vector<bool>;
@@ -192,7 +186,6 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     std::string full_name;
     marks_vector_t marks;
     size_t missing_blocks;
-    std::int64_t visited_sequence;
 
     friend struct blocks_iterator_t;
 };

@@ -318,7 +318,7 @@ OUTER:
                 bi = new model::blocks_iterator_t(*file);
                 if (*bi) {
                     block_iterator = bi;
-                    synchronizing_files[file] = file->guard_synchronization();
+                    synchronizing_files[file] = file->guard();
                 }
             }
 
@@ -503,7 +503,6 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
         auto device = cluster->get_devices().by_sha256(diff.device_id);
         auto folder_info = folder_infos.by_device(*device);
         auto file = folder_info->get_file_infos().by_name(file_name);
-        file_iterator->commit_sync(file);
         auto it = synchronizing_files.find(file.get());
         if (it != synchronizing_files.end()) {
             synchronizing_files.erase(it);

@@ -230,11 +230,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
             REQUIRE(f);
             CHECK(f->get_name() == "a.txt");
             CHECK(!f->is_locked());
-
-            REQUIRE(builder.apply());
-
-            file_iterator->commit_sync(f);
-            CHECK(file_iterator->next());
         }
 
         SECTION("have local, but outdated") {
@@ -405,12 +400,10 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
         auto f1 = file_iterator->next();
         REQUIRE(f1);
         files.emplace(f1->get_name());
-        file_iterator->commit_sync(f1);
 
         auto f2 = file_iterator->next();
         REQUIRE(f2);
         files.emplace(f2->get_name());
-        file_iterator->commit_sync(f2);
 
         files.emplace(f1->get_name());
         files.emplace(f2->get_name());

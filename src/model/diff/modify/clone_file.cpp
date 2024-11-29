@@ -78,10 +78,6 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     LOG_TRACE(log, "clone_file_t, folder = {}, name = {}, blocks = {}, seq. = {}", folder_id, local_file->get_name(),
               blocks.size(), seqeuence);
 
-    if (auto iterator = peer_folder->get_device()->get_iterator(); iterator) {
-        iterator->commit_sync(std::move(peer_file));
-    }
-
     local_file->notify_update();
     local_folder->notify_update();
 
