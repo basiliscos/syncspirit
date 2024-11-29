@@ -106,6 +106,7 @@ auto update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<
     }
     file_info->mark_local();
     if (prev_file) {
+        folder_info->get_file_infos().remove(prev_file);
         prev_file->update(*file_info);
         file_info = std::move(prev_file);
     }

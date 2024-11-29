@@ -53,7 +53,7 @@ add_executable(syncspirit-fltk WIN32
 )
 
 target_link_libraries(syncspirit-fltk
-    syncspirit_lib
+    syncspirit_core
     rotor::fltk
     $<$<PLATFORM_ID:Linux>:jpeg>
     $<$<PLATFORM_ID:Linux>:png>

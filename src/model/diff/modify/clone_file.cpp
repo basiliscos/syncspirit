@@ -57,6 +57,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     auto local_file = std::move(local_file_opt.assume_value());
 
     if (prev_file) {
+        local_folder->get_file_infos().remove(prev_file);
         prev_file->update(*local_file);
         local_file = std::move(prev_file);
     }
@@ -76,10 +77,6 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
 
     LOG_TRACE(log, "clone_file_t, folder = {}, name = {}, blocks = {}, seq. = {}", folder_id, local_file->get_name(),
               blocks.size(), seqeuence);
-
-    if (auto iterator = peer_folder->get_device()->get_iterator(); iterator) {
-        iterator->on_clone(std::move(peer_file));
-    }
 
     local_file->notify_update();
     local_folder->notify_update();

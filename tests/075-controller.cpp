@@ -1055,7 +1055,7 @@ void test_downloading_errors() {
             auto f = folder_peer->get_file_infos().begin()->item;
             REQUIRE(f);
             CHECK(f->is_unreachable());
-            CHECK(!f->is_locally_locked());
+            CHECK(!f->is_synchronizing());
             CHECK(!f->is_locked());
 
             CHECK(!f->local_file());

@@ -266,8 +266,13 @@ void controller_actor_t::pull_next() noexcept {
         return !ignore;
     };
 
+    using file_set_t = std::set<model::file_info_t *>;
+    auto seen_files = file_set_t();
+
+OUTER:
     while (can_pull_more()) {
         if (block_iterator) {
+            seen_files.emplace(block_iterator->get_source().get());
             if (*block_iterator) {
                 auto file_block = block_iterator->next();
                 if (!file_block.block()->is_locked()) {
@@ -275,23 +280,48 @@ void controller_actor_t::pull_next() noexcept {
                 }
                 continue;
             } else {
-                file_iterator->commit_sync(block_iterator->get_source());
+                // file_iterator->commit_sync(block_iterator->get_source());
                 block_iterator.reset();
             }
-        }
-        if (auto file = file_iterator->next_need_sync(); file) {
-            block_iterator = new model::blocks_iterator_t(*file);
             continue;
-            if (*block_iterator) {
-                LOG_TRACE(log, "going to scan blocks on '{}' from folder '{}'", file->get_name(),
-                          file->get_folder_info()->get_folder()->get_label());
+        }
+        if (!block_iterator && !synchronizing_files.empty()) {
+            for (auto &[file, _] : synchronizing_files) {
+                if (seen_files.contains(file)) {
+                    continue;
+                }
+                auto bi = model::block_iterator_ptr_t();
+                bi = new model::blocks_iterator_t(*file);
+                if (bi) {
+                    block_iterator = bi;
+                    goto OUTER;
+                }
             }
         }
-        if (auto file = file_iterator->next_need_cloning(); file) {
-            LOG_TRACE(log, "going to clone file '{}' from folder '{}'", file->get_name(),
-                      file->get_folder_info()->get_folder()->get_label());
-            push(model::diff::modify::clone_file_t::create(*file, *sequencer));
-            ++cloned_files;
+        if (auto file = file_iterator->next(); file) {
+            if (seen_files.contains(file)) {
+                break;
+            }
+            seen_files.emplace(file);
+
+            auto in_sync = synchronizing_files.count(file);
+            if (in_sync) {
+                continue;
+            }
+            if (file->is_locally_available()) {
+                ++cloned_files;
+                push(model::diff::modify::clone_file_t::create(*file, *sequencer));
+                LOG_TRACE(log, "going to clone file '{}' from folder '{}'", file->get_name(),
+                          file->get_folder_info()->get_folder()->get_label());
+            } else if (file->get_size()) {
+                auto bi = model::block_iterator_ptr_t();
+                bi = new model::blocks_iterator_t(*file);
+                if (*bi) {
+                    block_iterator = bi;
+                    synchronizing_files[file] = file->guard();
+                }
+            }
+
             continue;
         }
         break;
@@ -389,6 +419,15 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
     -> outcome::result<void> {
     auto ctx = reinterpret_cast<context_t *>(custom);
     if (ctx->from_self) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
+        for (auto &f : diff.files) {
+            auto file = files_map.by_name(f.name());
+            auto it = synchronizing_files.find(file.get());
+            if (it != synchronizing_files.end()) {
+                synchronizing_files.erase(it);
+            }
+        }
         pull_ready();
     }
     return diff.visit_next(*this, custom);
@@ -403,6 +442,12 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
         auto file = folder_info->get_file_infos().by_name(diff.proto_file.name());
         assert(file);
         updates_streamer.on_update(*file);
+        if (file->get_blocks().size()) {
+            auto it = synchronizing_files.find(file.get());
+            if (it != synchronizing_files.end()) {
+                synchronizing_files.erase(it);
+            }
+        }
         pull_ready();
     }
     return diff.visit_next(*this, custom);
@@ -458,7 +503,10 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
         auto device = cluster->get_devices().by_sha256(diff.device_id);
         auto folder_info = folder_infos.by_device(*device);
         auto file = folder_info->get_file_infos().by_name(file_name);
-        file_iterator->commit_sync(file);
+        auto it = synchronizing_files.find(file.get());
+        if (it != synchronizing_files.end()) {
+            synchronizing_files.erase(it);
+        }
         pull_ready();
     }
     push_pending();
@@ -478,7 +526,6 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
         push(new model::diff::modify::finish_file_t(*file));
     }
 
-    file_iterator->on_block_ack(*file, diff.block_index);
     cluster->modify_write_requests(1);
     pull_ready();
     process_block_write();
@@ -633,6 +680,8 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
                          ec.message());
                 file->mark_unreachable(true);
                 push(new model::diff::modify::mark_reachable_t(*file, false));
+                auto it = synchronizing_files.find(file);
+                synchronizing_files.erase(it);
             }
         } else {
             LOG_WARN(log, "can't receive block : {}", ee->message());
