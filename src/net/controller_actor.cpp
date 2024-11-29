@@ -444,7 +444,7 @@ auto controller_actor_t::operator()(const model::diff::modify::clone_file_t &dif
         updates_streamer.on_update(*file);
         if (file->get_blocks().size()) {
             auto it = synchronizing_files.find(file.get());
-            if(it != synchronizing_files.end()) {
+            if (it != synchronizing_files.end()) {
                 synchronizing_files.erase(it);
             }
         }

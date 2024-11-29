@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <boost/filesystem.hpp>
 #include <boost/outcome.hpp>
+#include <boost/multi_index/ordered_index.hpp>
 #include "misc/augmentation.hpp"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
@@ -196,9 +197,37 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     friend struct blocks_iterator_t;
 };
 
-struct SYNCSPIRIT_API file_infos_map_t : public generic_map_t<file_info_ptr_t, 2> {
-    using parent_t = generic_map_t<file_info_ptr_t, 2>;
+namespace details {
+
+template <> struct indexed_item_t<file_info_ptr_t, 3> {
+    static constexpr size_t size = 3;
+    using storage_t = std::tuple<std::string, std::string, std::int64_t>;
+    using item_t = file_info_ptr_t;
+    item_t item;
+    mutable storage_t keys;
+
+    indexed_item_t(const item_t &item_, const storage_t &keys_) noexcept : item{item_}, keys{keys_} {}
+
+    template <size_t I> auto &get() noexcept { return std::get<I>(keys); }
+};
+
+using indexed_file_item_t = indexed_item_t<file_info_ptr_t, 3>;
+
+template <> struct indexed_by<2, indexed_file_item_t> {
+    using K = indexed_file_item_t;
+    using type = mi::ordered_unique<mi::global_fun<const K &, singke_key_t<K, 2>, &get_key<2, K>>>;
+};
+
+} // namespace details
+
+struct SYNCSPIRIT_API file_infos_map_t : generic_map_t<file_info_ptr_t, 3> {
+    using parent_t = generic_map_t<file_info_ptr_t, 3>;
+    using seq_iterator_t = decltype(std::declval<map_t>().template get<2>().begin());
+    using range_t = std::pair<seq_iterator_t, seq_iterator_t>;
+
     file_info_ptr_t by_name(std::string_view name) noexcept;
+    file_info_ptr_t by_sequence(std::int64_t sequence) noexcept;
+    range_t range(std::int64_t lower, std::int64_t upper) noexcept;
 };
 
 using file_infos_set_t = std::unordered_set<file_info_ptr_t>;

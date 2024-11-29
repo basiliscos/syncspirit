@@ -57,6 +57,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     auto local_file = std::move(local_file_opt.assume_value());
 
     if (prev_file) {
+        local_folder->get_file_infos().remove(prev_file);
         prev_file->update(*local_file);
         local_file = std::move(prev_file);
     }

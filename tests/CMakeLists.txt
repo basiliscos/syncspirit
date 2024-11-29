@@ -94,6 +94,10 @@ add_executable(025-device_id 025-device_id.cpp $<$<PLATFORM_ID:Windows>:win32-re
 target_link_libraries(025-device_id syncspirit_test_lib)
 add_test(025-device_id "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/025-device_id")
 
+add_executable(026-file_info 026-file_info.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(026-file_info syncspirit_test_lib)
+add_test(026-file_info "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/026-file_info")
+
 add_executable(029-diff-generic 029-diff-generic.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(029-diff-generic syncspirit_test_lib)
 add_test(029-diff-generic "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/029-diff-generic")
