@@ -112,6 +112,8 @@ auto update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<
     }
 
     folder_info->add_strict(file_info);
+    file_info->notify_update();
+
     return applicator_t::apply_sibling(cluster);
 }
 
