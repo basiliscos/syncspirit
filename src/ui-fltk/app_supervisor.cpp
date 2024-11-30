@@ -315,7 +315,7 @@ auto app_supervisor_t::operator()(const model::diff::local::update_t &diff, void
     return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff, void *) noexcept
+auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto device = cluster->get_devices().by_sha256(diff.peer_id);
     auto augmentation = device->get_augmentation();
@@ -323,7 +323,7 @@ auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff
         auto devices_node = static_cast<tree_item::devices_t *>(devices);
         device->set_augmentation(devices_node->add_peer(*device));
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto app_supervisor_t::operator()(const model::diff::modify::add_pending_folders_t &diff, void *custom) noexcept
