@@ -17,7 +17,7 @@
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
-#include "model/diff/modify/clone_file.h"
+#include "model/diff/advance/remote_copy.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/modify/update_peer.h"
@@ -360,7 +360,7 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
     return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+auto app_supervisor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());

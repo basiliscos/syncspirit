@@ -8,13 +8,13 @@
 #include "model/misc/sequencer.h"
 #include "bep.pb.h"
 
-namespace syncspirit::model::diff::modify {
+namespace syncspirit::model::diff::advance {
 
-struct SYNCSPIRIT_API clone_file_t final : cluster_diff_t {
+struct SYNCSPIRIT_API remote_copy_t final : cluster_diff_t {
     static cluster_diff_ptr_t create(const model::file_info_t &source, sequencer_t &sequencer) noexcept;
 
-    clone_file_t(proto::FileInfo proto_file, std::string_view folder_id, std::string_view peer_id,
-                 bu::uuid uuid) noexcept;
+    remote_copy_t(proto::FileInfo proto_file, std::string_view folder_id, std::string_view peer_id,
+                  bu::uuid uuid) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
@@ -25,4 +25,4 @@ struct SYNCSPIRIT_API clone_file_t final : cluster_diff_t {
     bu::uuid uuid;
 };
 
-} // namespace syncspirit::model::diff::modify
+} // namespace syncspirit::model::diff::advance

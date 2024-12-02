@@ -25,7 +25,7 @@
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
-#include "model/diff/modify/clone_file.h"
+#include "model/diff/advance/remote_copy.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_files.h"
 #include "model/diff/modify/remove_folder.h"
@@ -706,7 +706,7 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &dif
     return r;
 }
 
-auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+auto db_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();

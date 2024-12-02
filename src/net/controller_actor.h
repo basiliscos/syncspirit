@@ -36,7 +36,7 @@ struct controller_actor_config_t : r::actor_config_t {
     pt::time_duration request_timeout;
     uint32_t blocks_max_requested = 8;
     uint32_t outgoing_buffer_max = 0;
-    std::uint32_t file_clones_per_iteration = 10;
+    std::uint32_t advances_per_iteration = 10;
 };
 
 template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -79,8 +79,8 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&file_clones_per_iteration(uint32_t value) && noexcept {
-        parent_t::config.file_clones_per_iteration = value;
+    builder_t &&advances_per_iteration(uint32_t value) && noexcept {
+        parent_t::config.advances_per_iteration = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -133,7 +133,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         controller_actor_t &controller;
         model::folder_t *folder;
         block_set_t blocks;
-        std::size_t file_clones;
         bool synchronizing;
     };
     using folder_synchronization_ptr_t = model::intrusive_ptr_t<folder_synchronization_t>;
@@ -178,7 +177,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     outcome::result<void> operator()(const model::diff::local::update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_rej_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::clone_file_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::advance::remote_copy_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::mark_reachable_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_folder_infos_t &, void *) noexcept override;
@@ -208,7 +207,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     int64_t request_pool;
     uint32_t blocks_max_kept;
     uint32_t blocks_max_requested;
-    uint32_t file_clones_per_iteration;
+    uint32_t advances_per_iteration;
     utils::logger_t log;
     unlink_requests_t unlink_requests;
     model::file_iterator_ptr_t file_iterator;

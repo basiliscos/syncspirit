@@ -67,6 +67,7 @@ add_library(syncspirit_core
     src/model/diff/base_diff.cpp
     src/model/diff/block_diff.cpp
     src/model/diff/cluster_visitor.cpp
+    src/model/diff/advance/remote_copy.cpp
     src/model/diff/contact/connect_request.cpp
     src/model/diff/contact/dial_request.cpp
     src/model/diff/contact/ignored_connected.cpp
@@ -104,7 +105,6 @@ add_library(syncspirit_core
     src/model/diff/modify/block_rej.cpp
     src/model/diff/modify/block_transaction.cpp
     src/model/diff/modify/clone_block.cpp
-    src/model/diff/modify/clone_file.cpp
     src/model/diff/modify/finish_file.cpp
     src/model/diff/modify/generic_remove.cpp
     src/model/diff/modify/lock_file.cpp

@@ -43,7 +43,7 @@ TEST_CASE("new file diff", "[model]") {
         SECTION("no file on my side, clone blockless file") {
             auto file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
             REQUIRE(folder_peer->add_strict(file_peer));
-            REQUIRE(builder.clone_file(*file_peer).apply());
+            REQUIRE(builder.remote_copy(*file_peer).apply());
             auto file_my = folder_my->get_file_infos().by_name(file_info.name());
             REQUIRE(file_my);
             CHECK(file_my->is_locally_available());
@@ -71,7 +71,7 @@ TEST_CASE("new file diff", "[model]") {
             REQUIRE(folder_peer->add_strict(file_peer));
             file_peer->assign_block(bi, 0);
             file_peer->mark_local_available(0);
-            REQUIRE(builder.clone_file(*file_peer).apply());
+            REQUIRE(builder.remote_copy(*file_peer).apply());
 
             file_my = folder_my->get_file_infos().by_name(file_info.name());
             REQUIRE(file_my);

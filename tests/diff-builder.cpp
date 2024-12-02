@@ -14,7 +14,7 @@
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/clone_block.h"
-#include "model/diff/modify/clone_file.h"
+#include "model/diff/advance/remote_copy.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/share_folder.h"
@@ -173,8 +173,8 @@ diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcep
     return assign(new diff::modify::unshare_folder_t(cluster, fi));
 }
 
-diff_builder_t &diff_builder_t::clone_file(const model::file_info_t &source) noexcept {
-    auto diff = diff::modify::clone_file_t::create(source, *sequencer);
+diff_builder_t &diff_builder_t::remote_copy(const model::file_info_t &source) noexcept {
+    auto diff = diff::advance::remote_copy_t::create(source, *sequencer);
     return assign(diff.get());
 }
 

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
-#include "clone_file.h"
+#include "remote_copy.h"
 #include "../cluster_visitor.h"
 #include "model/cluster.h"
 #include "model/misc/file_iterator.h"
 
-using namespace syncspirit::model::diff::modify;
+using namespace syncspirit::model::diff::advance;
 
-auto clone_file_t::create(const model::file_info_t &source, sequencer_t &sequencer) noexcept -> cluster_diff_ptr_t {
+auto remote_copy_t::create(const model::file_info_t &source, sequencer_t &sequencer) noexcept -> cluster_diff_ptr_t {
     auto proto_file = source.as_proto(false);
     auto peer_folder_info = source.get_folder_info();
     auto folder = peer_folder_info->get_folder();
@@ -30,17 +30,17 @@ auto clone_file_t::create(const model::file_info_t &source, sequencer_t &sequenc
     }
 
     auto diff = cluster_diff_ptr_t{};
-    diff.reset(new clone_file_t(std::move(proto_file), folder_id, peer_id, uuid));
+    diff.reset(new remote_copy_t(std::move(proto_file), folder_id, peer_id, uuid));
     return diff;
 }
 
-clone_file_t::clone_file_t(proto::FileInfo proto_file_, std::string_view folder_id_, std::string_view peer_id_,
-                           bu::uuid uuid_) noexcept
+remote_copy_t::remote_copy_t(proto::FileInfo proto_file_, std::string_view folder_id_, std::string_view peer_id_,
+                             bu::uuid uuid_) noexcept
     : proto_file{std::move(proto_file_)}, folder_id{folder_id_}, peer_id{peer_id_}, uuid{uuid_} {
     proto_file.set_sequence(0);
 }
 
-auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto remote_copy_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto my_device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto local_folder = folder->get_folder_infos().by_device(*my_device);
@@ -75,7 +75,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     local_file->set_sequence(seqeuence);
     local_folder->add_strict(local_file);
 
-    LOG_TRACE(log, "clone_file_t, folder = {}, name = {}, blocks = {}, seq. = {}", folder_id, local_file->get_name(),
+    LOG_TRACE(log, "remote_copy_t, folder = {}, name = {}, blocks = {}, seq. = {}", folder_id, local_file->get_name(),
               blocks.size(), seqeuence);
 
     local_file->notify_update();
@@ -84,7 +84,7 @@ auto clone_file_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
     return applicator_t::apply_sibling(cluster);
 }
 
-auto clone_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "visiting clone_file_t, folder = {}, file = {}", folder_id, proto_file.name());
+auto remote_copy_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+    LOG_TRACE(log, "visiting remote_copy_t, folder = {}, file = {}", folder_id, proto_file.name());
     return visitor(*this, custom);
 }

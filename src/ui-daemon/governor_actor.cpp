@@ -8,7 +8,7 @@
 #include "utils/error_code.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
-#include "model/diff/modify/clone_file.h"
+#include "model/diff/advance/remote_copy.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 
@@ -130,7 +130,7 @@ void governor_actor_t::add_callback(const void *pointer, command_callback_t &&ca
     callbacks_map.emplace(pointer, callback);
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+auto governor_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     refresh_deadline();
     return diff.visit_next(*this, custom);

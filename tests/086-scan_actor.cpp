@@ -181,7 +181,7 @@ void test_meta_changes() {
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 REQUIRE(folder_info_peer->add_strict(file_peer));
-                builder->clone_file(*file_peer).scan_start(folder->get_id()).apply(*sup);
+                builder->remote_copy(*file_peer).scan_start(folder->get_id()).apply(*sup);
 
                 auto file = files->by_name(pr_fi.name());
                 CHECK(files->size() == 1);
@@ -194,7 +194,7 @@ void test_meta_changes() {
                 file_peer->assign_block(b, 0);
                 REQUIRE(folder_info_peer->add_strict(file_peer));
 
-                builder->clone_file(*file_peer).apply(*sup);
+                builder->remote_copy(*file_peer).apply(*sup);
                 auto file = files->by_name(pr_fi.name());
                 auto path = file->get_path();
 

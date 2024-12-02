@@ -16,7 +16,7 @@ struct bep_config_t {
     std::uint32_t rx_timeout;
     std::uint32_t blocks_max_requested;
     std::uint32_t blocks_simultaneous_write;
-    std::uint32_t file_clones_per_iteration;
+    std::uint32_t advances_per_iteration;
 };
 
 } // namespace syncspirit::config

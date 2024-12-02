@@ -7,7 +7,7 @@
 #include "model/file_info.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
-#include "model/diff/modify/clone_file.h"
+#include "model/diff/advance/remote_copy.h"
 #include "model/diff/modify/finish_file.h"
 #include "utils.h"
 #include <fstream>
@@ -193,7 +193,7 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome
     return outcome::success();
 }
 
-auto file_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
@@ -232,7 +232,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
 
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
 
-    auto ack = model::diff::modify::clone_file_t::create(*file, *sequencer);
+    auto ack = model::diff::advance::remote_copy_t::create(*file, *sequencer);
     send<model::payload::model_update_t>(coordinator, std::move(ack), this);
     return diff.visit_next(*this, custom);
 }

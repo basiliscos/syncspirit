@@ -43,7 +43,6 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     using folder_iterators_t = std::vector<folder_iterator_t>;
 
     bool accept_file(const file_info_t &file) noexcept;
-    void commit_clone(file_info_ptr_t file) noexcept;
     folder_iterator_t &prepare_folder(folder_info_ptr_t peer_folder) noexcept;
     folder_iterator_t &find_folder(folder_t *folder) noexcept;
 

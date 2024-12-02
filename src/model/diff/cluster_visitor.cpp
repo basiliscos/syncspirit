@@ -3,6 +3,7 @@
 
 #include "cluster_diff.h"
 #include "cluster_visitor.h"
+#include "advance/remote_copy.h"
 #include "contact/connect_request.h"
 #include "contact/dial_request.h"
 #include "contact/ignored_connected.h"
@@ -32,7 +33,6 @@
 #include "modify/block_ack.h"
 #include "modify/block_rej.h"
 #include "modify/clone_block.h"
-#include "modify/clone_file.h"
 #include "modify/finish_file.h"
 #include "modify/lock_file.h"
 #include "modify/mark_reachable.h"
@@ -176,7 +176,7 @@ auto cluster_visitor_t::operator()(const modify::upsert_folder_t &diff, void *cu
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const modify::clone_file_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto cluster_visitor_t::operator()(const advance::remote_copy_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

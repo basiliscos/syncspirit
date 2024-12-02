@@ -66,7 +66,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 REQUIRE(builder.apply());
                 REQUIRE(!file_iterator->next());
 
-                REQUIRE(builder.clone_file(*f).apply());
+                REQUIRE(builder.remote_copy(*f).apply());
                 REQUIRE(!file_iterator->next());
                 CHECK(!f->is_locked());
             }
@@ -159,7 +159,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 files.put(f);
                 REQUIRE(builder.apply());
 
-                REQUIRE(builder.clone_file(*f).apply());
+                REQUIRE(builder.remote_copy(*f).apply());
 
                 f = file_iterator->next();
                 REQUIRE(f);
@@ -167,7 +167,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(!f->is_locked());
                 files.put(f);
                 REQUIRE(builder.apply());
-                REQUIRE(builder.clone_file(*f).apply());
+                REQUIRE(builder.remote_copy(*f).apply());
 
                 REQUIRE(!file_iterator->next());
 
@@ -178,7 +178,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
             SECTION("1 file is missing on my side") {
                 auto peer_file = peer_files.by_name("a.txt");
                 REQUIRE(peer_file);
-                REQUIRE(builder.clone_file(*peer_file).apply());
+                REQUIRE(builder.remote_copy(*peer_file).apply());
                 auto f = file_iterator->next();
                 REQUIRE(f);
                 CHECK(f->get_name() == "b.txt");
@@ -187,7 +187,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 REQUIRE(builder.apply());
                 REQUIRE(!file_iterator->next());
 
-                REQUIRE(builder.clone_file(*f).apply());
+                REQUIRE(builder.remote_copy(*f).apply());
                 REQUIRE(!file_iterator->next());
                 CHECK(!f->is_locked());
             }
@@ -195,7 +195,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
             SECTION("0 files are missing on my side") {
                 auto peer_file_1 = peer_files.by_name("a.txt");
                 auto peer_file_2 = peer_files.by_name("b.txt");
-                REQUIRE(builder.clone_file(*peer_file_1).clone_file(*peer_file_2).apply());
+                REQUIRE(builder.remote_copy(*peer_file_1).remote_copy(*peer_file_2).apply());
                 REQUIRE(!file_iterator->next());
             }
         }
@@ -298,7 +298,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
             REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
             auto f = peer_files.by_name(file.name());
-            REQUIRE(builder.clone_file(*f).mark_reacheable(f, false).apply());
+            REQUIRE(builder.remote_copy(*f).mark_reacheable(f, false).apply());
 
             CHECK(!file_iterator->next());
         }
