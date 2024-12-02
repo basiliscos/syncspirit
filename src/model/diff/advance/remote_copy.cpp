@@ -4,7 +4,6 @@
 #include "remote_copy.h"
 #include "../cluster_visitor.h"
 #include "model/cluster.h"
-#include "model/misc/file_iterator.h"
 
 using namespace syncspirit::model::diff::advance;
 
