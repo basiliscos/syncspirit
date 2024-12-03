@@ -139,10 +139,13 @@ bool file_iterator_t::accept_file(const file_info_t &file) noexcept {
     }
 
     // make sure that the local file has been scanned
-    if (auto local = file.local_file(); local && local->is_local()) {
-        using V = version_relation_t;
-        auto result = compare(file.get_version(), local->get_version());
-        return result == V::newer;
+    if (auto local = file.local_file(); local) {
+        if (local->is_local()) {
+            using V = version_relation_t;
+            auto result = compare(file.get_version(), local->get_version());
+            return result == V::newer;
+        }
+        return false;
     }
     return true;
 }
@@ -152,6 +155,17 @@ void file_iterator_t::on_remove(folder_info_ptr_t peer_folder) noexcept {
         if (it->peer_folder == peer_folder) {
             folders_list.erase(it);
             return;
+        }
+    }
+}
+
+void file_iterator_t::recheck(file_info_t &file) noexcept {
+    for (auto &fi : folders_list) {
+        if (fi.peer_folder.get() == file.get_folder_info()) {
+            if (accept_file(file)) {
+                fi.files_queue->emplace(&file);
+            }
+            break;
         }
     }
 }

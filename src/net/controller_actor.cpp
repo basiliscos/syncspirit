@@ -309,10 +309,13 @@ OUTER:
                 continue;
             }
             if (file->is_locally_available()) {
-                ++advances;
-                push(model::diff::advance::remote_copy_t::create(*file, *sequencer));
-                LOG_TRACE(log, "going to advance on file '{}' from folder '{}'", file->get_name(),
-                          file->get_folder_info()->get_folder()->get_label());
+                auto diff = model::diff::advance::advance_t::create(*file, *sequencer);
+                if (diff) {
+                    ++advances;
+                    push(std::move(diff));
+                    LOG_TRACE(log, "going to advance on file '{}' from folder '{}'", file->get_name(),
+                              file->get_folder_info()->get_folder()->get_label());
+                }
             } else if (file->get_size()) {
                 auto bi = model::block_iterator_ptr_t();
                 bi = new model::blocks_iterator_t(*file);

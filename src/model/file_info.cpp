@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
-#include "folder_info.h"
-#include "file_info.h"
 #include "cluster.h"
-#include "misc/error_code.h"
-#include "misc/version_utils.h"
-#include "utils/log.h"
-#include "utils/string_comparator.hpp"
+#include "file_info.h"
+#include "folder_info.h"
+#include "device.h"
 #include "db/prefix.h"
 #include "fs/utils.h"
+#include "misc/error_code.h"
+#include "misc/version_utils.h"
+#include "misc/file_iterator.h"
+#include "utils/log.h"
+#include "utils/string_comparator.hpp"
 #include <zlib.h>
 #include <spdlog/spdlog.h>
 #include <algorithm>
@@ -237,7 +239,24 @@ void file_info_t::mark_unreachable(bool value) noexcept {
     }
 }
 
-void file_info_t::mark_local() noexcept { flags = flags | f_local; }
+void file_info_t::mark_local() noexcept {
+    flags = flags | f_local;
+    auto self = folder_info->get_device();
+    auto folder = folder_info->get_folder();
+    for (auto it : folder->get_folder_infos()) {
+        auto fi = it.item.get();
+        auto peer = fi->get_device();
+        if (peer != self) {
+            auto fit = peer->get_iterator();
+            if (fit) {
+                auto peer_file = fi->get_file_infos().by_name(name);
+                if (peer_file) {
+                    fit->recheck(*peer_file);
+                }
+            }
+        }
+    }
+}
 
 void file_info_t::mark_local_available(size_t block_index) noexcept {
     assert(block_index < blocks.size());
