@@ -131,6 +131,7 @@ add_library(syncspirit_core
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/orphaned_blocks.cpp
+    src/model/misc/resolver.cpp
     src/model/misc/sequencer.cpp
     src/model/misc/updates_streamer.cpp
     src/model/misc/uuid.cpp

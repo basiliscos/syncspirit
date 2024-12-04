@@ -12,6 +12,9 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 
+using R = file_iterator_t::result_t;
+using A = advance_action_t;
+
 TEST_CASE("file iterator, single folder", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -41,14 +44,15 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
     auto file_iterator = peer_device->create_iterator(*cluster);
 
-    SECTION("emtpy folders (1)") { CHECK(!file_iterator->next()); }
+    SECTION("emtpy folders (1)") { CHECK(file_iterator->next() == R{nullptr, A::ignore}); }
 
     REQUIRE(builder.configure_cluster(peer_id.get_sha256())
                 .add(peer_id.get_sha256(), folder->get_id(), 123, 10u)
                 .finish()
                 .apply());
 
-    SECTION("emtpy folders (2)") { CHECK(!file_iterator->next()); }
+    SECTION("emtpy folders (2)") { CHECK(file_iterator->next() == R{nullptr, A::ignore}); }
+
     SECTION("cloning (empty files)") {
         SECTION("1 file") {
             SECTION("no local file") {
@@ -58,16 +62,17 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 REQUIRE(
                     builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
-                auto f = file_iterator->next();
+                auto [f, action] = file_iterator->next();
                 REQUIRE(f);
                 CHECK(f->get_name() == "a.txt");
                 CHECK(!f->is_locked());
+                CHECK(action == A::remote_copy);
 
                 REQUIRE(builder.apply());
-                REQUIRE(!file_iterator->next());
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
 
                 REQUIRE(builder.remote_copy(*f).apply());
-                REQUIRE(!file_iterator->next());
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
                 CHECK(!f->is_locked());
             }
             SECTION("invalid file is ignored") {
@@ -76,7 +81,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 file.set_sequence(10ul);
                 file.set_invalid(true);
                 REQUIRE(builder.apply());
-                REQUIRE(!file_iterator->next());
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
             }
 
             SECTION("version checks") {
@@ -97,21 +102,21 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     my_file->mark_local();
                     my_files.put(my_file);
 
-                    auto f = file_iterator->next();
+                    auto [f, action] = file_iterator->next();
                     REQUIRE(f);
+                    CHECK(action == A::remote_copy);
                     CHECK(f->get_folder_info()->get_device() == peer_device.get());
-                    REQUIRE(!file_iterator->next());
+                    CHECK(file_iterator->next() == R{nullptr, A::ignore});
                 }
 
                 SECTION("my version < peer version, but not scanned yet") {
                     REQUIRE(builder.apply());
-
                     c_1->set_value(3);
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
                     my_files.put(my_file);
 
-                    REQUIRE(!file_iterator->next());
+                    CHECK(file_iterator->next() == R{nullptr, A::ignore});
                 }
 
                 SECTION("my version > peer version") {
@@ -123,7 +128,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     my_file->mark_local();
                     my_files.put(my_file);
 
-                    REQUIRE(!file_iterator->next());
+                    CHECK(file_iterator->next() == R{nullptr, A::ignore});
                 }
 
                 SECTION("my version == peer version") {
@@ -133,7 +138,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     my_file->mark_local();
                     my_files.put(my_file);
 
-                    REQUIRE(!file_iterator->next());
+                    CHECK(file_iterator->next() == R{nullptr, A::ignore});
                 }
             }
         }
@@ -152,8 +157,9 @@ TEST_CASE("file iterator, single folder", "[model]") {
             REQUIRE(builder.apply());
 
             SECTION("both files are missing on my side") {
-                auto f = file_iterator->next();
+                auto [f, action] = file_iterator->next();
                 REQUIRE(f);
+                CHECK(action == A::remote_copy);
                 CHECK((f->get_name() == "a.txt" || f->get_name() == "b.txt"));
                 CHECK(!f->is_locked());
                 files.put(f);
@@ -161,34 +167,35 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                 REQUIRE(builder.remote_copy(*f).apply());
 
-                f = file_iterator->next();
+                std::tie(f, action) = file_iterator->next();
                 REQUIRE(f);
                 CHECK((f->get_name() == "a.txt" || f->get_name() == "b.txt"));
                 CHECK(!f->is_locked());
+                CHECK(action == A::remote_copy);
                 files.put(f);
                 REQUIRE(builder.apply());
                 REQUIRE(builder.remote_copy(*f).apply());
 
-                REQUIRE(!file_iterator->next());
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
 
                 CHECK(files.by_name("a.txt"));
                 CHECK(files.by_name("b.txt"));
             }
-
             SECTION("1 file is missing on my side") {
                 auto peer_file = peer_files.by_name("a.txt");
                 REQUIRE(peer_file);
                 REQUIRE(builder.remote_copy(*peer_file).apply());
-                auto f = file_iterator->next();
+                auto [f, action] = file_iterator->next();
                 REQUIRE(f);
+                CHECK(action == A::remote_copy);
                 CHECK(f->get_name() == "b.txt");
-                CHECK(!f->is_locked());
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
 
                 REQUIRE(builder.apply());
-                REQUIRE(!file_iterator->next());
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
 
                 REQUIRE(builder.remote_copy(*f).apply());
-                REQUIRE(!file_iterator->next());
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
                 CHECK(!f->is_locked());
             }
 
@@ -196,7 +203,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 auto peer_file_1 = peer_files.by_name("a.txt");
                 auto peer_file_2 = peer_files.by_name("b.txt");
                 REQUIRE(builder.remote_copy(*peer_file_1).remote_copy(*peer_file_2).apply());
-                REQUIRE(!file_iterator->next());
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
             }
         }
     }
@@ -225,11 +232,12 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
             REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
-            auto f = file_iterator->next();
-            CHECK(!file_iterator->next());
+            auto [f, action] = file_iterator->next();
             REQUIRE(f);
+            CHECK(action == A::remote_copy);
             CHECK(f->get_name() == "a.txt");
             CHECK(!f->is_locked());
+            CHECK(file_iterator->next() == R{nullptr, A::ignore});
         }
 
         SECTION("have local, but outdated") {
@@ -255,14 +263,15 @@ TEST_CASE("file iterator, single folder", "[model]") {
             SECTION("has been scanned") {
                 my_file->mark_local();
 
-                auto f = file_iterator->next();
+                auto [f, action] = file_iterator->next();
                 REQUIRE(f);
+                CHECK(action == A::remote_copy);
                 CHECK(f->get_name() == "a.txt");
-                CHECK(!file_iterator->next());
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
                 REQUIRE(builder.apply());
             }
 
-            SECTION("has not bee scanned") { CHECK(!file_iterator->next()); }
+            SECTION("has not bee scanned") { CHECK(file_iterator->next() == R{nullptr, A::ignore}); }
         }
 
         SECTION("have local, local is newer") {
@@ -285,7 +294,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
             my_files.put(my_file);
 
             REQUIRE(builder.apply());
-            CHECK(!file_iterator->next());
+            CHECK(file_iterator->next() == R{nullptr, A::ignore});
         }
 
         SECTION("peer file is unreacheable") {
@@ -300,7 +309,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
             auto f = peer_files.by_name(file.name());
             REQUIRE(builder.remote_copy(*f).mark_reacheable(f, false).apply());
 
-            CHECK(!file_iterator->next());
+            CHECK(file_iterator->next() == R{nullptr, A::ignore});
         }
     }
 }
@@ -360,17 +369,19 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     SECTION("cloning") {
         REQUIRE(builder.make_index(sha256, "1234").add(file1, peer_device).add(file2, peer_device).finish().apply());
 
-        auto f1 = file_iterator->next();
-        auto f2 = file_iterator->next();
+        auto [f1, action1] = file_iterator->next();
+        auto [f2, action2] = file_iterator->next();
         REQUIRE(f1);
         REQUIRE(f2);
+        CHECK(action1 == A::remote_copy);
+        CHECK(action2 == A::remote_copy);
 
         auto files = set_t{};
         files.emplace(f1->get_name());
         files.emplace(f2->get_name());
 
         CHECK((files == set_t{"a.txt", "b.txt"}));
-        CHECK(!file_iterator->next());
+        CHECK(file_iterator->next() == R{nullptr, A::ignore});
     }
 
     SECTION("syncing") {
@@ -397,12 +408,14 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
         REQUIRE(builder.make_index(sha256, "1234").add(file1, peer_device).add(file2, peer_device).finish().apply());
 
         auto files = set_t{};
-        auto f1 = file_iterator->next();
+        auto [f1, action1] = file_iterator->next();
         REQUIRE(f1);
+        CHECK(action1 == A::remote_copy);
         files.emplace(f1->get_name());
 
-        auto f2 = file_iterator->next();
+        auto [f2, action2] = file_iterator->next();
         REQUIRE(f2);
+        CHECK(action2 == A::remote_copy);
         files.emplace(f2->get_name());
 
         files.emplace(f1->get_name());
@@ -438,13 +451,14 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     file.set_sequence(10ul);
     REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
-    auto f = file_iterator->next();
+    auto [f, action] = file_iterator->next();
     REQUIRE(f);
     CHECK(f->get_name() == "a.txt");
     CHECK(!f->is_locked());
+    CHECK(action == A::remote_copy);
 
     REQUIRE(builder.apply());
-    REQUIRE(!file_iterator->next());
+    CHECK(file_iterator->next() == R{nullptr, A::ignore});
     REQUIRE(builder.remove_folder(*folder).apply());
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
@@ -453,8 +467,9 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     REQUIRE(folder_infos->size() == 2u);
     REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
-    f = file_iterator->next();
+    std::tie(f, action) = file_iterator->next();
     REQUIRE(f);
+    CHECK(action == A::remote_copy);
     CHECK(f->get_name() == "a.txt");
 }
 

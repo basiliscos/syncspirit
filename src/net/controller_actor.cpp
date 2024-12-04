@@ -268,7 +268,6 @@ void controller_actor_t::pull_next() noexcept {
 
     using file_set_t = std::set<model::file_info_t *>;
     auto seen_files = file_set_t();
-
 OUTER:
     while (can_pull_more()) {
         if (block_iterator) {
@@ -298,12 +297,7 @@ OUTER:
                 }
             }
         }
-        if (auto file = file_iterator->next(); file) {
-            if (seen_files.contains(file)) {
-                break;
-            }
-            seen_files.emplace(file);
-
+        if (auto [file, action] = file_iterator->next(); action != model::advance_action_t::ignore) {
             auto in_sync = synchronizing_files.count(file);
             if (in_sync) {
                 continue;
