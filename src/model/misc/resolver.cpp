@@ -84,11 +84,10 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local) no
             }
         }
     }
-    if (l_sz >= r_sz) {
-        return advance_action_t::ignore;
+    if (r_sz > l_sz) {
+        return advance_action_t::remote_copy;
     }
-
-    return advance_action_t::remote_copy;
+    return advance_action_t::ignore;
 }
 
 advance_action_t resolve(const file_info_t &remote) noexcept {

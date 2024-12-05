@@ -59,8 +59,8 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 auto file = proto::FileInfo();
                 file.set_name("a.txt");
                 file.set_sequence(10ul);
-                REQUIRE(
-                    builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
+                auto ec = builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply();
+                REQUIRE(ec);
 
                 auto [f, action] = file_iterator->next();
                 REQUIRE(f);
@@ -142,7 +142,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 }
             }
         }
-        SECTION("2 files") {
+        SECTION("2+ files") {
             auto files = model::file_infos_map_t();
             auto file_1 = proto::FileInfo();
             file_1.set_name("a.txt");
@@ -203,6 +203,35 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 auto peer_file_1 = peer_files.by_name("a.txt");
                 auto peer_file_2 = peer_files.by_name("b.txt");
                 REQUIRE(builder.remote_copy(*peer_file_1).remote_copy(*peer_file_2).apply());
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
+            }
+            SECTION("new file in new peer update") {
+                auto [f_1, action_1] = file_iterator->next();
+                REQUIRE(f_1);
+                CHECK(action_1 == A::remote_copy);
+                CHECK((f_1->get_name() == "a.txt" || f_1->get_name() == "b.txt"));
+                CHECK(!f_1->is_locked());
+                files.put(f_1);
+
+                auto [f_2, action_2] = file_iterator->next();
+                REQUIRE(f_2);
+                CHECK(action_2 == A::remote_copy);
+                CHECK((f_2->get_name() == "a.txt" || f_2->get_name() == "b.txt"));
+                CHECK(!f_2->is_locked());
+                files.put(f_2);
+
+                CHECK(files.by_name("a.txt"));
+                CHECK(files.by_name("b.txt"));
+
+                auto file_3 = proto::FileInfo();
+                file_3.set_name("c.txt");
+                file_3.set_sequence(12ul);
+                auto ec = builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_3, peer_device).finish().apply();
+
+                auto [f_3, action_3] = file_iterator->next();
+                REQUIRE(f_3);
+                CHECK(action_3 == A::remote_copy);
+                CHECK(f_3->get_name() == "c.txt");
                 CHECK(file_iterator->next() == R{nullptr, A::ignore});
             }
         }

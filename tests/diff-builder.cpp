@@ -89,13 +89,19 @@ diff_builder_t &index_maker_t::finish() noexcept {
     return builder;
 }
 
-diff_builder_t::diff_builder_t(model::cluster_t &cluster_) noexcept : cluster{cluster_} {
+diff_builder_t::diff_builder_t(model::cluster_t &cluster_, r::address_ptr_t receiver_) noexcept
+    : cluster{cluster_}, receiver{receiver_} {
     sequencer = model::make_sequencer(0);
 }
 
 diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
     auto has_diffs = [&]() -> bool { return (bool)cluster_diff; };
     assert(has_diffs());
+
+    if (receiver) {
+        sup.send<model::payload::model_update_t>(receiver, std::move(cluster_diff), nullptr);
+        sup.do_process();
+    }
 
     auto &addr = sup.get_address();
     bool do_try = true;

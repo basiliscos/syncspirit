@@ -42,16 +42,12 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(net::names::fs_actor, address);
-        p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&file_actor_t::on_model_update, coordinator);
-            }
-        });
+        p.discover_name(net::names::coordinator, coordinator, true).link(false);
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) { p.subscribe_actor(&file_actor_t::on_block_request); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&file_actor_t::on_block_request);
+        p.subscribe_actor(&file_actor_t::on_model_update);
+    });
 }
 
 void file_actor_t::on_start() noexcept {
@@ -67,12 +63,14 @@ void file_actor_t::shutdown_start() noexcept {
 
 void file_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this, nullptr);
+    auto &payload = message.payload;
+    auto &diff = payload.diff;
+    auto r = diff->visit(*this, nullptr);
     if (!r) {
         auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
+        return do_shutdown(ee);
     }
+    send<model::payload::model_update_t>(coordinator, std::move(diff), payload.custom);
 }
 
 void file_actor_t::on_block_request(message::block_request_t &message) noexcept {

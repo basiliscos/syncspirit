@@ -132,6 +132,8 @@ void test_remote_copy() {
             counter->set_id(1);
             counter->set_value(peer_device->as_uint());
 
+            auto builder = diff_builder_t(*cluster, file_addr);
+
             auto make_file = [&]() {
                 auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
                 REQUIRE(folder_peer->add_strict(file));
@@ -140,7 +142,7 @@ void test_remote_copy() {
 
             SECTION("empty regular file") {
                 auto peer_file = make_file();
-                diff_builder_t(*cluster).remote_copy(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto my_file = folder_my->get_file_infos().by_name(peer_file->get_name());
                 auto &path = my_file->get_path();
@@ -152,7 +154,7 @@ void test_remote_copy() {
             SECTION("empty regular file a subdir") {
                 pr_fi.set_name("a/b/c/d/e.txt");
                 auto peer_file = make_file();
-                diff_builder_t(*cluster).remote_copy(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
                 auto &path = file->get_path();
@@ -174,7 +176,7 @@ void test_remote_copy() {
 
                 auto peer_file = make_file();
                 peer_file->assign_block(bi, 0);
-                diff_builder_t(*cluster).remote_copy(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
@@ -188,7 +190,7 @@ void test_remote_copy() {
                 pr_fi.set_type(proto::FileInfoType::DIRECTORY);
 
                 auto peer_file = make_file();
-                diff_builder_t(*cluster).remote_copy(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
@@ -206,7 +208,7 @@ void test_remote_copy() {
                 pr_fi.set_symlink_target(target.string());
 
                 auto peer_file = make_file();
-                diff_builder_t(*cluster).remote_copy(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
@@ -224,7 +226,7 @@ void test_remote_copy() {
                 REQUIRE(bfs::exists(target));
 
                 auto peer_file = make_file();
-                diff_builder_t(*cluster).remote_copy(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
                 CHECK(file->is_deleted());
@@ -278,7 +280,7 @@ void test_append_block() {
                 return file;
             };
 
-            auto builder = diff_builder_t(*cluster);
+            auto builder = diff_builder_t(*cluster, file_addr);
 
             auto callback = [&](diff::modify::block_transaction_t &diff) {
                 REQUIRE(diff.errors.load() == 0);
@@ -336,7 +338,7 @@ void test_append_block() {
 #ifndef SYNCSPIRIT_WIN
                 SECTION("remove folder (simulate err)") {
                     bfs::remove_all(root_path);
-                    diff_builder_t(*cluster).finish_file(*peer_file).apply(*sup);
+                    builder.finish_file(*peer_file).apply(*sup);
                     CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() ==
                           r::state_t::SHUT_DOWN);
                 }
@@ -391,7 +393,7 @@ void test_clone_block() {
                 return file;
             };
 
-            auto builder = diff_builder_t(*cluster);
+            auto builder = diff_builder_t(*cluster, file_addr);
 
             auto callback = [&](diff::modify::block_transaction_t &diff) {
                 REQUIRE(diff.errors.load() == 0);

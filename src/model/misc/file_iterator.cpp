@@ -5,6 +5,8 @@
 #include "resolver.h"
 #include "model/cluster.h"
 
+#include <spdlog/spdlog.h>
+
 using namespace syncspirit::model;
 
 bool file_iterator_t::file_comparator_t::operator()(const file_info_t *l, const file_info_t *r) const {
@@ -104,13 +106,14 @@ void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
             auto &files_map = peer_folder.get_file_infos();
             auto seen_sequence = it.seen_sequence;
             auto max_sequence = peer_folder.get_max_sequence();
-            auto [from, to] = files_map.range(seen_sequence, max_sequence);
+            auto [from, to] = files_map.range(seen_sequence + 1, max_sequence);
             for (auto fit = from; fit != to; ++fit) {
                 auto file = fit->item.get();
                 if (resolve(*file) != advance_action_t::ignore) {
                     it.files_queue->insert(file);
                 }
             }
+            it.seen_sequence = max_sequence;
             it.it = it.files_queue->begin();
             return;
         }

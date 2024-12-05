@@ -249,7 +249,7 @@ void controller_actor_t::send_diff() noexcept {
         planned_pulls = 0;
     }
     if (diff) {
-        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::model_update_t>(fs_addr, std::move(diff), this);
         current_diff = nullptr;
     }
 }
@@ -379,9 +379,7 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
             updates_streamer = model::updates_streamer_t(*cluster, *peer);
         }
     }
-    if (pulls) {
-        pull_next();
-    }
+    pull_next();
     push_pending();
     send_diff();
 }
