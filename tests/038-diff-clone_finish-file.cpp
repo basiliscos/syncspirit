@@ -52,7 +52,7 @@ TEST_CASE("new file diff", "[model]") {
             CHECK(folder_my->get_max_sequence() == 1);
         }
 
-        SECTION("file with the same blocks already exists on my side") {
+        SECTION("with blocks") {
             file_info.set_size(5);
             file_info.set_block_size(5);
             auto b = file_info.add_blocks();
@@ -66,20 +66,39 @@ TEST_CASE("new file diff", "[model]") {
             file_my->mark_local_available(0);
             REQUIRE(folder_my->add_strict(file_my));
 
-            file_info.set_modified_s(123);
-            auto file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
-            REQUIRE(folder_peer->add_strict(file_peer));
-            file_peer->assign_block(bi, 0);
-            file_peer->mark_local_available(0);
-            REQUIRE(builder.remote_copy(*file_peer).apply());
+            SECTION("with same blocks as peer") {
+                file_info.set_modified_s(123);
+                auto file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
+                REQUIRE(folder_peer->add_strict(file_peer));
+                file_peer->assign_block(bi, 0);
+                file_peer->mark_local_available(0);
+                REQUIRE(builder.remote_copy(*file_peer).apply());
 
-            file_my = folder_my->get_file_infos().by_name(file_info.name());
-            REQUIRE(file_my);
-            CHECK(file_my->is_locally_available());
-            CHECK(file_my->get_sequence() == 2);
-            CHECK(file_my->get_modified_s() == 123);
-            CHECK(file_my->get_folder_info() == folder_my.get());
-            CHECK(folder_my->get_max_sequence() == 2);
+                file_my = folder_my->get_file_infos().by_name(file_info.name());
+                REQUIRE(file_my);
+                CHECK(file_my->is_locally_available());
+                CHECK(file_my->get_sequence() == 2);
+                CHECK(file_my->get_modified_s() == 123);
+                CHECK(file_my->get_folder_info() == folder_my.get());
+                CHECK(folder_my->get_max_sequence() == 2);
+            }
+
+            SECTION("emty peer file") {
+                file_info.set_size(0);
+                file_info.set_block_size(0);
+                auto file_peer = file_info_t::create(sequencer->next_uuid(), file_info, folder_peer).value();
+                REQUIRE(folder_peer->add_strict(file_peer));
+                REQUIRE(builder.remote_copy(*file_peer).apply());
+
+                file_my = folder_my->get_file_infos().by_name(file_info.name());
+                REQUIRE(file_my);
+                CHECK(file_my->is_locally_available());
+                CHECK(file_my->get_sequence() == 2);
+                CHECK(file_my->get_folder_info() == folder_my.get());
+                CHECK(file_my->get_blocks().size() == 0);
+                CHECK(folder_my->get_max_sequence() == 2);
+                CHECK(blocks_map.size() == 0);
+            }
         }
     }
 }

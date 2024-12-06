@@ -4,6 +4,8 @@
 #include "advance.h"
 #include "remote_copy.h"
 #include "model/cluster.h"
+#include "model/misc/orphaned_blocks.h"
+#include "model/diff/modify/remove_blocks.h"
 
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff::advance;
@@ -36,14 +38,30 @@ auto advance_t::create(const model::file_info_t &source, sequencer_t &sequencer)
     auto my_file = my_files.by_name(source.get_name());
     bu::uuid uuid;
 
+    auto possibly_orphaned_blocks = orphaned_blocks_t::set_t();
+
     if (!my_file) {
         uuid = sequencer.next_uuid();
     } else {
         assign(uuid, my_file->get_uuid());
+        auto orphaned = orphaned_blocks_t();
+        orphaned.record(*my_file);
+        possibly_orphaned_blocks = orphaned.deduce();
+        for (auto &b : source.get_blocks()) {
+            auto it = possibly_orphaned_blocks.find(b->get_key());
+            if (it != possibly_orphaned_blocks.end()) {
+                possibly_orphaned_blocks.erase(it);
+            }
+        }
     }
 
     auto diff = cluster_diff_ptr_t{};
     diff.reset(new remote_copy_t(std::move(proto_file), folder_id, peer_id, uuid));
+
+    if (!possibly_orphaned_blocks.empty()) {
+        diff->assign_child(new modify::remove_blocks_t(std::move(possibly_orphaned_blocks)));
+    }
+
     return diff;
 }
 
@@ -54,6 +72,10 @@ advance_t::advance_t(proto::FileInfo proto_file_, std::string_view folder_id_, s
 }
 
 auto advance_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(cluster);
+    if (!r) {
+        return r;
+    }
     auto my_device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto local_folder = folder->get_folder_infos().by_device(*my_device);
