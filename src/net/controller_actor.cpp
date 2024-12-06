@@ -4,6 +4,7 @@
 #include "controller_actor.h"
 #include "names.h"
 #include "constants.h"
+#include "model/diff/advance/advance.h".h "
 #include "model/diff/local/update.h"
 #include "model/diff/local/synchronization_finish.h"
 #include "model/diff/local/synchronization_start.h"
@@ -11,7 +12,6 @@
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/block_rej.h"
 #include "model/diff/modify/clone_block.h"
-#include "model/diff/advance/remote_copy.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/remove_peer.h"
@@ -428,7 +428,7 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
     return diff.visit_next(*this, custom);
 }
 
-auto controller_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
+auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto ctx = reinterpret_cast<context_t *>(custom);
     if (diff.peer_id == peer->device_id().get_sha256()) {

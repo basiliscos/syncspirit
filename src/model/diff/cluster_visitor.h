@@ -11,8 +11,9 @@ namespace syncspirit::model::diff {
 struct cluster_diff_t;
 
 namespace advance {
+struct advance_t;
 struct remote_copy_t;
-}
+} // namespace advance
 
 namespace contact {
 struct connect_request_t;
@@ -80,6 +81,7 @@ struct upsert_folder_t;
 } // namespace modify
 
 template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t> {
+    virtual outcome::result<void> operator()(const advance::advance_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const advance::remote_copy_t &, void *custom) noexcept;
 
     virtual outcome::result<void> operator()(const contact::connect_request_t &, void *custom) noexcept;

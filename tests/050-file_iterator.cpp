@@ -59,7 +59,8 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 auto file = proto::FileInfo();
                 file.set_name("a.txt");
                 file.set_sequence(10ul);
-                auto ec = builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply();
+                auto ec =
+                    builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply();
                 REQUIRE(ec);
 
                 auto [f, action] = file_iterator->next();
@@ -226,7 +227,10 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 auto file_3 = proto::FileInfo();
                 file_3.set_name("c.txt");
                 file_3.set_sequence(12ul);
-                auto ec = builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file_3, peer_device).finish().apply();
+                auto ec = builder.make_index(peer_id.get_sha256(), folder->get_id())
+                              .add(file_3, peer_device)
+                              .finish()
+                              .apply();
 
                 auto [f_3, action_3] = file_iterator->next();
                 REQUIRE(f_3);

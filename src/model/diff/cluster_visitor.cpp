@@ -55,6 +55,15 @@
 
 using namespace syncspirit::model::diff;
 
+auto cluster_visitor_t::operator()(const advance::advance_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const advance::remote_copy_t &diff, void *custom) noexcept -> outcome::result<void> {
+    auto advance_diff = static_cast<const advance::advance_t &>(diff);
+    return (*this)(advance_diff, custom);
+}
+
 auto cluster_visitor_t::operator()(const contact::connect_request_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
@@ -173,10 +182,6 @@ auto cluster_visitor_t::operator()(const modify::clone_block_t &diff, void *cust
 
 auto cluster_visitor_t::operator()(const modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const advance::remote_copy_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
