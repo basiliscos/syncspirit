@@ -11,6 +11,9 @@ struct SYNCSPIRIT_API remote_copy_t final : advance_t {
     using parent_t = advance_t;
     using parent_t::parent_t;
 
+    remote_copy_t(proto::FileInfo proto_file, std::string_view folder_id, std::string_view peer_id,
+                  bu::uuid uuid) noexcept;
+
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 };
 

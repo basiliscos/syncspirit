@@ -5,7 +5,21 @@
 #include "remote_copy.h"
 #include "model/cluster.h"
 
+using namespace syncspirit::model;
 using namespace syncspirit::model::diff::advance;
+
+static std::string_view stringify(advance_action_t action) {
+    if (action == advance_action_t::remote_copy) {
+        return "remote_copy";
+    } else if (action == advance_action_t::resurrect_remote) {
+        return "resurrect_remote";
+    } else if (action == advance_action_t::resolve_remote_win) {
+        return "resolve_remote_win";
+    } else if (action == advance_action_t::resolve_local_win) {
+        return "resolve_local_win";
+    }
+    return "ignore";
+}
 
 auto advance_t::create(const model::file_info_t &source, sequencer_t &sequencer) noexcept -> cluster_diff_ptr_t {
     auto proto_file = source.as_proto(false);
@@ -34,8 +48,8 @@ auto advance_t::create(const model::file_info_t &source, sequencer_t &sequencer)
 }
 
 advance_t::advance_t(proto::FileInfo proto_file_, std::string_view folder_id_, std::string_view peer_id_,
-                     bu::uuid uuid_) noexcept
-    : proto_file{std::move(proto_file_)}, folder_id{folder_id_}, peer_id{peer_id_}, uuid{uuid_} {
+                     bu::uuid uuid_, advance_action_t action_) noexcept
+    : proto_file{std::move(proto_file_)}, folder_id{folder_id_}, peer_id{peer_id_}, uuid{uuid_}, action{action_} {
     proto_file.set_sequence(0);
 }
 
@@ -74,8 +88,8 @@ auto advance_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result
     local_file->set_sequence(seqeuence);
     local_folder->add_strict(local_file);
 
-    LOG_TRACE(log, "advance_t, folder = {}, name = {}, blocks = {}, seq. = {}", folder_id, local_file->get_name(),
-              blocks.size(), seqeuence);
+    LOG_TRACE(log, "advance_t ({}), folder = {}, name = {}, blocks = {}, seq. = {}", stringify(action), folder_id,
+              local_file->get_name(), blocks.size(), seqeuence);
 
     local_file->notify_update();
     local_folder->notify_update();

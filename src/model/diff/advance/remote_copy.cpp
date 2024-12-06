@@ -6,6 +6,10 @@
 
 using namespace syncspirit::model::diff::advance;
 
+remote_copy_t::remote_copy_t(proto::FileInfo proto_file_, std::string_view folder_id_, std::string_view peer_id_,
+                             bu::uuid uuid_) noexcept
+    : advance_t(std::move(proto_file_), folder_id_, peer_id_, std::move(uuid_), advance_action_t::remote_copy) {}
+
 auto remote_copy_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting remote_copy_t, folder = {}, file = {}", folder_id, proto_file.name());
     return visitor(*this, custom);

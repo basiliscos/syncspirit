@@ -6,16 +6,10 @@
 #include "../cluster_diff.h"
 #include "model/file_info.h"
 #include "model/misc/sequencer.h"
+#include "model/misc/resolver.h"
 #include "bep.pb.h"
 
 namespace syncspirit::model::diff::advance {
-
-enum class advance_action_t {
-    remote_copy,
-    resurrect_local,
-    resolve_remote_win,
-    resolve_local_win,
-};
 
 struct SYNCSPIRIT_API advance_t : cluster_diff_t {
     static cluster_diff_ptr_t create(const model::file_info_t &source, sequencer_t &sequencer) noexcept;
@@ -26,9 +20,11 @@ struct SYNCSPIRIT_API advance_t : cluster_diff_t {
     std::string folder_id;
     std::string peer_id;
     bu::uuid uuid;
+    advance_action_t action;
 
   protected:
-    advance_t(proto::FileInfo proto_file, std::string_view folder_id, std::string_view peer_id, bu::uuid uuid) noexcept;
+    advance_t(proto::FileInfo proto_file, std::string_view folder_id, std::string_view peer_id, bu::uuid uuid,
+              advance_action_t action) noexcept;
 };
 
 } // namespace syncspirit::model::diff::advance
