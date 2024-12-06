@@ -463,10 +463,9 @@ bool file_info_t::is_global() const noexcept {
         }
         auto &v_other = file->get_version();
         auto v_result = compare(version, v_other);
-        if (v_result == V::identity || v_result == V::newer) {
-            continue;
+        if (v_result == V::older) {
+            return false;
         }
-        return false;
     }
     return true;
 }

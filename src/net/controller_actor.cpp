@@ -4,7 +4,7 @@
 #include "controller_actor.h"
 #include "names.h"
 #include "constants.h"
-#include "model/diff/advance/advance.h".h "
+#include "model/diff/advance/advance.h"
 #include "model/diff/local/update.h"
 #include "model/diff/local/synchronization_finish.h"
 #include "model/diff/local/synchronization_start.h"

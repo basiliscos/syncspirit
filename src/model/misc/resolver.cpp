@@ -58,7 +58,7 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local) no
             if (remote.is_deleted()) {
                 return advance_action_t::ignore;
             } else if (local->is_deleted()) {
-                return advance_action_t::resurrect_local;
+                return advance_action_t::resurrect_remote;
             } else {
                 if (rv > lv) {
                     return advance_action_t::resolve_remote_win;

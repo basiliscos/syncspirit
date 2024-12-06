@@ -230,7 +230,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
 
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
 
-    auto ack = model::diff::advance::remote_copy_t::create(*file, *sequencer);
+    auto ack = model::diff::advance::advance_t::create(*file, *sequencer);
     send<model::payload::model_update_t>(coordinator, std::move(ack), this);
     return diff.visit_next(*this, custom);
 }

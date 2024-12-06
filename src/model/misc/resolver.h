@@ -11,7 +11,7 @@ namespace syncspirit::model {
 enum class advance_action_t {
     ignore = 0,
     remote_copy,
-    resurrect_local,
+    resurrect_remote,
     resolve_remote_win,
     resolve_local_win,
 };

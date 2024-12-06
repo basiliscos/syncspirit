@@ -166,6 +166,10 @@ add_executable(054-updates_streamer 054-updates_streamer.cpp $<$<PLATFORM_ID:Win
 target_link_libraries(054-updates_streamer syncspirit_test_lib)
 add_test(054-updates_streamer "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/054-updates_streamer")
 
+add_executable(055-resolver 055-resolver.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(055-resolver syncspirit_test_lib)
+add_test(055-resolver "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/055-resolver")
+
 add_executable(060-bep 060-bep.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(060-bep syncspirit_test_lib)
 add_test(060-bep "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/060-bep")
