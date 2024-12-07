@@ -64,6 +64,7 @@ update_t::update_t(const model::cluster_t &cluster, sequencer_t &sequencer, std:
             assign_child(diff);
         }
     }
+    LOG_TRACE(log, "update_t::update_t(), folder: {}, file: {}", folder_id, file.name());
 }
 
 auto update_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
