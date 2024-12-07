@@ -200,7 +200,7 @@ TEST_CASE("resolver", "[model]") {
             folder_peer->add_strict(file_remote);
             folder_my->add_strict(file_local);
             auto action = resolve(*file_remote);
-            CHECK(action == A::resurrect_remote);
+            CHECK(action == A::remote_copy);
         }
         SECTION("locally version > remote version -> local_win") {
             auto c2_remote = pr_remote.mutable_version()->add_counters();
