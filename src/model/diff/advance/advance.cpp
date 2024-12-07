@@ -13,8 +13,6 @@ using namespace syncspirit::model::diff::advance;
 static std::string_view stringify(advance_action_t action) {
     if (action == advance_action_t::remote_copy) {
         return "remote_copy";
-    } else if (action == advance_action_t::resurrect_remote) {
-        return "resurrect_remote";
     } else if (action == advance_action_t::resolve_remote_win) {
         return "resolve_remote_win";
     } else if (action == advance_action_t::resolve_local_win) {
