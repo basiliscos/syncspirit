@@ -38,6 +38,7 @@ r::plugin::resource_id_t hash = 1;
 struct context_t {
     bool from_self;
     bool notify_cluster_change;
+    std::optional<proto::Index> folder_index;
 };
 
 } // namespace
@@ -375,6 +376,17 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
     }
     if (ctx.notify_cluster_change) {
         send_cluster_config();
+        if (ctx.folder_index) {
+            LOG_DEBUG(log, "sending new index");
+            fmt::memory_buffer data;
+            auto &index = *ctx.folder_index;
+            proto::serialize(data, *ctx.folder_index);
+            outgoing_buffer += static_cast<uint32_t>(data.size());
+            send<payload::transfer_data_t>(peer_addr, std::move(data));
+            if (updates_streamer) {
+                updates_streamer = model::updates_streamer_t(*cluster, *peer);
+            }
+        }
         if (updates_streamer) {
             updates_streamer = model::updates_streamer_t(*cluster, *peer);
         }
@@ -398,7 +410,7 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &d
             auto index_opt = folder_info->generate();
             if (index_opt) {
                 LOG_DEBUG(log, "sending new index");
-                auto index = *index_opt;
+                auto &index = *index_opt;
                 fmt::memory_buffer data;
                 proto::serialize(data, index);
                 outgoing_buffer += static_cast<uint32_t>(data.size());
@@ -450,11 +462,16 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
 
 auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    auto process = (diff.device_id == peer->device_id().get_sha256()) ||
-                   (diff.device_id == cluster->get_device()->device_id().get_sha256());
+    auto process = diff.device_id == peer->device_id().get_sha256();
     if (process) {
         auto ctx = reinterpret_cast<context_t *>(custom);
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto &folders = folder->get_folder_infos();
+        auto fi = folders.by_device(*peer);
         ctx->notify_cluster_change = true;
+        if (diff.index_id) {
+            ctx->folder_index = fi->generate();
+        }
         pull_ready();
     }
     return diff.visit_next(*this, custom);
