@@ -107,7 +107,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                 continue;
             }
             auto &device_id = *device_opt;
-            LOG_TRACE(log, "cluster_update_t, shared with device = '{}', index = {}, max seq. = {}", device_id,
+            LOG_TRACE(log, "cluster_update_t, shared with device = '{}', index = {:#x}, max seq. = {}", device_id,
                       d.index_id(), d.max_sequence());
 
             if (!device) {

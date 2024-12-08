@@ -43,7 +43,7 @@ auto upsert_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outc
             return opt.assume_error();
         }
         fi = std::move(opt.value());
-        folder->get_folder_infos().put(fi);
+        folder_infos.put(fi);
     }
 
     if (auto iterator = fi->get_device()->get_iterator(); iterator) {
