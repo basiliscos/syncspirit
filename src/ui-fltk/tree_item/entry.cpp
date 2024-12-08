@@ -74,7 +74,9 @@ void entry_t::remove_node(entry_t *child) {
         assert(dirs_count >= 0);
     }
     if (child->augmentation) {
-        if (entry && entry->is_deleted()) {
+        auto index = find_child(child);
+        auto has_been_shown = index >= 0;
+        if (entry && has_been_shown) {
             deleted_items.emplace(child);
         } else {
             auto it = deleted_items.find(child);
@@ -82,9 +84,17 @@ void entry_t::remove_node(entry_t *child) {
                 deleted_items.erase(it);
             }
         }
-        auto index = find_child(child);
-        deparent(index);
-        orphaned_items.emplace(child);
+        if (has_been_shown) {
+            deparent(index);
+        }
+        if (entry->is_deleted()) {
+            orphaned_items.emplace(child);
+        } else {
+            auto it = orphaned_items.find(child);
+            if (it != orphaned_items.end()) {
+                orphaned_items.erase(it);
+            }
+        }
         update_label();
         tree()->redraw();
     } else {

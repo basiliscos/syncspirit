@@ -368,9 +368,11 @@ auto app_supervisor_t::operator()(const model::diff::advance::remote_copy_t &dif
     auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
     auto folder_entry = static_cast<tree_item::folder_t *>(augmentation->get_owner());
     auto file_info = folder_info->get_file_infos().by_name(diff.proto_file.name());
-    auto path = bfs::path(file_info->get_name());
-    auto dir = folder_entry->locate_dir(path.parent_path());
-    dir->add_entry(*file_info);
+    if (!file_info->get_augmentation()) {
+        auto path = bfs::path(file_info->get_name());
+        auto dir = folder_entry->locate_dir(path.parent_path());
+        dir->add_entry(*file_info);
+    }
     return diff.visit_next(*this, custom);
 }
 
