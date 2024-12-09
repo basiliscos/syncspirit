@@ -13,6 +13,8 @@ using namespace syncspirit::model::diff::advance;
 static std::string_view stringify(advance_action_t action) {
     if (action == advance_action_t::remote_copy) {
         return "remote_copy";
+    } else if (action == advance_action_t::local_update) {
+        return "local_update";
     } else if (action == advance_action_t::resolve_remote_win) {
         return "resolve_remote_win";
     } else if (action == advance_action_t::resolve_local_win) {
@@ -22,51 +24,52 @@ static std::string_view stringify(advance_action_t action) {
 }
 
 auto advance_t::create(const model::file_info_t &source, sequencer_t &sequencer) noexcept -> cluster_diff_ptr_t {
+    auto &cluster = *source.get_folder_info()->get_folder()->get_cluster();
     auto proto_file = source.as_proto(false);
     auto peer_folder_info = source.get_folder_info();
     auto folder = peer_folder_info->get_folder();
     auto folder_id = folder->get_id();
-    auto device_id = folder->get_cluster()->get_device()->device_id().get_sha256();
     auto peer_id = peer_folder_info->get_device()->device_id().get_sha256();
+    return new remote_copy_t(cluster, sequencer, std::move(proto_file), folder_id, peer_id);
+}
+
+advance_t::advance_t(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_file_,
+                     std::string_view folder_id_, std::string_view peer_id_, advance_action_t action_) noexcept
+    : proto_file{std::move(proto_file_)}, folder_id{folder_id_}, peer_id{peer_id_}, action{action_} {
+    proto_file.set_sequence(0);
+
+    auto folder = cluster.get_folders().by_id(folder_id);
+    auto folder_id = folder->get_id();
+    auto device_id = cluster.get_device()->device_id().get_sha256();
     assert(peer_id != device_id);
 
-    auto &my_folder_infos = folder->get_folder_infos();
-    auto my_folder_info = my_folder_infos.by_device_id(device_id);
-    auto &my_files = my_folder_info->get_file_infos();
-    auto my_file = my_files.by_name(source.get_name());
-    bu::uuid uuid;
+    auto &local_folder_infos = folder->get_folder_infos();
+    auto local_folder_info = local_folder_infos.by_device_id(device_id);
+    auto &local_files = local_folder_info->get_file_infos();
+    auto local_file = local_files.by_name(proto_file.name());
 
     auto possibly_orphaned_blocks = orphaned_blocks_t::set_t();
 
-    if (!my_file) {
+    if (!local_file) {
         uuid = sequencer.next_uuid();
     } else {
-        assign(uuid, my_file->get_uuid());
+        assign(uuid, local_file->get_uuid());
         auto orphaned = orphaned_blocks_t();
-        orphaned.record(*my_file);
+        orphaned.record(*local_file);
         possibly_orphaned_blocks = orphaned.deduce();
-        for (auto &b : source.get_blocks()) {
-            auto it = possibly_orphaned_blocks.find(b->get_key());
+        for (int i = 0; i < proto_file.blocks_size(); ++i) {
+            auto &b = proto_file.blocks(i);
+            auto strict_hash = block_info_t::make_strict_hash(b.hash());
+            auto it = possibly_orphaned_blocks.find(strict_hash.get_key());
             if (it != possibly_orphaned_blocks.end()) {
                 possibly_orphaned_blocks.erase(it);
             }
         }
     }
 
-    auto diff = cluster_diff_ptr_t{};
-    diff.reset(new remote_copy_t(std::move(proto_file), folder_id, peer_id, uuid));
-
     if (!possibly_orphaned_blocks.empty()) {
-        diff->assign_child(new modify::remove_blocks_t(std::move(possibly_orphaned_blocks)));
+        assign_child(new modify::remove_blocks_t(std::move(possibly_orphaned_blocks)));
     }
-
-    return diff;
-}
-
-advance_t::advance_t(proto::FileInfo proto_file_, std::string_view folder_id_, std::string_view peer_id_,
-                     bu::uuid uuid_, advance_action_t action_) noexcept
-    : proto_file{std::move(proto_file_)}, folder_id{folder_id_}, peer_id{peer_id_}, uuid{uuid_}, action{action_} {
-    proto_file.set_sequence(0);
 }
 
 auto advance_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
