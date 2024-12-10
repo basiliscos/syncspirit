@@ -1138,6 +1138,20 @@ void test_download_from_scratch() {
             CHECK(f->get_blocks().size() == 1);
             CHECK(f->is_locally_available());
             CHECK(!f->is_locked());
+
+            REQUIRE(peer_actor->messages.size() == 3);
+            {
+                auto peer_msg = &peer_actor->messages.front()->payload;
+                REQUIRE(std::get_if<proto::message::ClusterConfig>(peer_msg));
+
+                peer_actor->messages.pop_front();
+                peer_msg = &peer_actor->messages.front()->payload;
+                REQUIRE(std::get_if<proto::message::Index>(peer_msg));
+
+                peer_actor->messages.pop_front();
+                peer_msg = &peer_actor->messages.front()->payload;
+                REQUIRE(std::get_if<proto::message::IndexUpdate>(peer_msg));
+            }
         }
     };
     F(false, 10, false).run();
