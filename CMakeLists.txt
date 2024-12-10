@@ -68,6 +68,7 @@ add_library(syncspirit_core
     src/model/diff/block_diff.cpp
     src/model/diff/cluster_visitor.cpp
     src/model/diff/advance/advance.cpp
+    src/model/diff/advance/local_update.cpp
     src/model/diff/advance/remote_copy.cpp
     src/model/diff/contact/connect_request.cpp
     src/model/diff/contact/dial_request.cpp

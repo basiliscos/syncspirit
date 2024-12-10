@@ -176,6 +176,8 @@ void test_meta_changes() {
             bi.set_offset(0);
 
             auto b = block_info_t::create(bi).value();
+            auto &blocks_map = cluster->get_blocks();
+            blocks_map.put(b);
             SECTION("a file does not physically exist") {
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
@@ -389,7 +391,6 @@ void test_meta_changes() {
                 file_my->assign_block(b, 1);
                 file_my->assign_block(b, 2);
                 file_my->lock();
-                cluster->get_blocks().put(b);
                 REQUIRE(folder_info->add_strict(file_my));
 
                 pr_fi.set_size(15ul);

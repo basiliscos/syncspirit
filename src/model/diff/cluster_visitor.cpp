@@ -3,6 +3,7 @@
 
 #include "cluster_diff.h"
 #include "cluster_visitor.h"
+#include "advance/local_update.h"
 #include "advance/remote_copy.h"
 #include "contact/connect_request.h"
 #include "contact/dial_request.h"
@@ -56,6 +57,12 @@
 using namespace syncspirit::model::diff;
 
 auto cluster_visitor_t::operator()(const advance::advance_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const advance::local_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    // no need to cast to advance_t
     return diff.visit_next(*this, custom);
 }
 
