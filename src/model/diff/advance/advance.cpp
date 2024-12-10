@@ -7,7 +7,6 @@
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/misc/orphaned_blocks.h"
-#include "model/misc/version_utils.h"
 
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff::advance;
@@ -63,13 +62,6 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer) noe
         auto orphaned = orphaned_blocks_t();
         orphaned.record(*local_file);
         orphans = orphaned.deduce();
-
-        if (action == advance_action_t::local_update) {
-            *version_ptr = local_file->get_version();
-        }
-    }
-    if (action == advance_action_t::local_update) {
-        record_update(*version_ptr, device);
     }
 
     auto new_blocks = modify::add_blocks_t::blocks_t{};
