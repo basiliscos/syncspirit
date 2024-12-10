@@ -3,7 +3,8 @@
 
 #include "diff-builder.h"
 #include "model/messages.h"
-#include "model/diff/local/update.h"
+#include "model/diff/advance/remote_copy.h"
+#include "model/diff/advance/local_update.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_request.h"
 #include "model/diff/local/scan_start.h"
@@ -14,7 +15,6 @@
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/clone_block.h"
-#include "model/diff/advance/remote_copy.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/share_folder.h"
@@ -189,7 +189,7 @@ diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &file) noex
 }
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
-    return assign(new diff::local::update_t(cluster, *sequencer, folder_id, file_));
+    return assign(new diff::advance::local_update_t(cluster, *sequencer, file_, folder_id));
 }
 
 diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcept {

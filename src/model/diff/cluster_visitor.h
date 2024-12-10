@@ -42,7 +42,6 @@ struct scan_request_t;
 struct scan_start_t;
 struct synchronization_start_t;
 struct synchronization_finish_t;
-struct update_t;
 } // namespace local
 
 namespace peer {
@@ -102,7 +101,6 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
 
     virtual outcome::result<void> operator()(const local::custom_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::file_availability_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const local::update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_finish_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_request_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_start_t &, void *custom) noexcept;

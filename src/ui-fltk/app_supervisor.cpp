@@ -12,12 +12,11 @@
 #include "tree_item/peer_folders.h"
 #include "net/names.h"
 #include "config/utils.h"
+#include "model/diff/advance/advance.h"
 #include "model/diff/load/load_cluster.h"
-#include "model/diff/local/update.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
-#include "model/diff/advance/remote_copy.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/modify/update_peer.h"
@@ -299,22 +298,6 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
     return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::local::update_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (!diff.already_exists) {
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-        auto generic_augmnetation = folder_info->get_augmentation();
-        auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
-        auto folder_entry = static_cast<tree_item::folder_t *>(augmentation->get_owner());
-        auto file_info = folder_info->get_file_infos().by_name(diff.file.name());
-        auto path = bfs::path(file_info->get_name());
-        auto dir = folder_entry->locate_dir(path.parent_path());
-        dir->add_entry(*file_info);
-    }
-    return diff.visit_next(*this, custom);
-}
-
 auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto device = cluster->get_devices().by_sha256(diff.peer_id);
@@ -360,7 +343,7 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
     return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
+auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());

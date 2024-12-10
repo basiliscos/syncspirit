@@ -23,8 +23,9 @@ struct SYNCSPIRIT_API advance_t : cluster_diff_t {
     advance_action_t action;
 
   protected:
-    advance_t(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_file, std::string_view folder_id,
-              std::string_view peer_id, advance_action_t action) noexcept;
+    advance_t(proto::FileInfo proto_file, std::string_view folder_id, std::string_view peer_id,
+              advance_action_t action) noexcept;
+    void initialize(const cluster_t &cluster, sequencer_t &sequencer) noexcept;
 };
 
 } // namespace syncspirit::model::diff::advance

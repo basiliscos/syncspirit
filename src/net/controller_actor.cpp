@@ -5,7 +5,6 @@
 #include "names.h"
 #include "constants.h"
 #include "model/diff/advance/advance.h"
-#include "model/diff/local/update.h"
 #include "model/diff/local/synchronization_finish.h"
 #include "model/diff/local/synchronization_start.h"
 #include "model/diff/modify/append_block.h"
@@ -442,19 +441,27 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
 
 auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    auto ctx = reinterpret_cast<context_t *>(custom);
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto &folder_infos = folder->get_folder_infos();
+    auto folder_info = folder_infos.by_device_id(diff.peer_id);
+    auto file = folder_info->get_file_infos().by_name(diff.proto_file.name());
+    auto local_file = model::file_info_ptr_t();
+    assert(file);
     if (diff.peer_id == peer->device_id().get_sha256()) {
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto folder_info = folder->get_folder_infos().by_device_id(diff.peer_id);
-        auto file = folder_info->get_file_infos().by_name(diff.proto_file.name());
-        assert(file);
-        updates_streamer.on_update(*file);
+        local_file = file->local_file();
         if (file->get_blocks().size()) {
             auto it = synchronizing_files.find(file.get());
             if (it != synchronizing_files.end()) {
                 synchronizing_files.erase(it);
             }
         }
+    }
+    if (diff.peer_id == cluster->get_device()->device_id().get_sha256()) {
+        local_file = file;
+    }
+    if (local_file) {
+        updates_streamer.on_update(*local_file);
+        push_pending();
         pull_ready();
     }
     return diff.visit_next(*this, custom);
@@ -489,18 +496,6 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_folder_inf
         }
     }
 
-    return diff.visit_next(*this, custom);
-}
-
-auto controller_actor_t::operator()(const model::diff::local::update_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto &folder_id = diff.folder_id;
-    auto &file_name = diff.file.name();
-    auto folder = cluster->get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file = folder_info->get_file_infos().by_name(file_name);
-    updates_streamer.on_update(*file);
-    push_pending();
     return diff.visit_next(*this, custom);
 }
 

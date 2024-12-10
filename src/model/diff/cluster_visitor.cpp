@@ -24,7 +24,6 @@
 #include "local/scan_start.h"
 #include "local/synchronization_finish.h"
 #include "local/synchronization_start.h"
-#include "local/update.h"
 #include "modify/add_blocks.h"
 #include "modify/add_ignored_device.h"
 #include "modify/add_pending_device.h"
@@ -62,8 +61,8 @@ auto cluster_visitor_t::operator()(const advance::advance_t &diff, void *custom)
 
 auto cluster_visitor_t::operator()(const advance::local_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    // no need to cast to advance_t
-    return diff.visit_next(*this, custom);
+    auto advance_diff = static_cast<const advance::advance_t &>(diff);
+    return (*this)(advance_diff, custom);
 }
 
 auto cluster_visitor_t::operator()(const advance::remote_copy_t &diff, void *custom) noexcept -> outcome::result<void> {
@@ -129,10 +128,6 @@ auto cluster_visitor_t::operator()(const local::custom_t &diff, void *custom) no
 
 auto cluster_visitor_t::operator()(const local::file_availability_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const local::update_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

@@ -35,17 +35,18 @@ auto advance_t::create(const model::file_info_t &source, sequencer_t &sequencer)
     return new remote_copy_t(cluster, sequencer, std::move(proto_file), folder_id, peer_id);
 }
 
-advance_t::advance_t(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_file_,
-                     std::string_view folder_id_, std::string_view peer_id_, advance_action_t action_) noexcept
-    : proto_file{std::move(proto_file_)}, folder_id{folder_id_}, peer_id{peer_id_}, action{action_} {
-    proto_file.set_sequence(0);
+advance_t::advance_t(proto::FileInfo proto_file_, std::string_view folder_id_, std::string_view peer_id_,
+                     advance_action_t action_) noexcept
+    : proto_file{std::move(proto_file_)}, folder_id{folder_id_}, peer_id{peer_id_}, action{action_} {}
+
+void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer) noexcept {
     assert(!(proto_file.blocks_size() && proto_file.deleted()));
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_id = folder->get_id();
     auto &device = *cluster.get_devices().by_sha256(peer_id);
     auto &self = *cluster.get_device();
     auto self_id = self.device_id().get_sha256();
-    assert(peer_id != self_id);
+    // assert(peer_id != self_id);
 
     auto &local_folder_infos = folder->get_folder_infos();
     auto local_folder_info = local_folder_infos.by_device_id(self_id);
@@ -118,10 +119,8 @@ auto advance_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result
     auto folder = cluster.get_folders().by_id(folder_id);
     auto local_folder = folder->get_folder_infos().by_device(*my_device);
     auto peer_folder = folder->get_folder_infos().by_device_id(peer_id);
-    auto peer_file = peer_folder->get_file_infos().by_name(proto_file.name());
-    assert(peer_file);
 
-    auto prev_file = local_folder->get_file_infos().by_name(peer_file->get_name());
+    auto prev_file = local_folder->get_file_infos().by_name(proto_file.name());
     auto local_file_opt = file_info_t::create(uuid, proto_file, local_folder);
     if (!local_file_opt) {
         return local_file_opt.assume_error();
