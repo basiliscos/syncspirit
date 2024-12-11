@@ -483,12 +483,14 @@ template <> SYNCSPIRIT_API std::int64_t get_index<2>(const file_info_ptr_t &item
     return item->get_sequence();
 }
 
+auto file_infos_map_t::sequence_projection() noexcept -> projection_t { return key2item.template get<2>(); }
+
 file_info_ptr_t file_infos_map_t::by_name(std::string_view name) noexcept { return get<1>(name); }
 
 file_info_ptr_t file_infos_map_t::by_sequence(std::int64_t value) noexcept { return get<2>(value); }
 
 auto file_infos_map_t::range(std::int64_t lower, std::int64_t upper) noexcept -> range_t {
-    auto &proj = key2item.template get<2>();
+    auto &proj = sequence_projection();
     auto begin = proj.lower_bound(lower);
     auto end = proj.upper_bound(upper);
     return std::make_pair(begin, end);

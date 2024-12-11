@@ -1,91 +1,97 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
 
 #include "updates_streamer.h"
 #include "model/remote_folder_info.h"
+#include <algorithm>
 
 using namespace syncspirit::model;
 
-updates_streamer_t::updates_streamer_t(cluster_t &cluster, device_t &device) noexcept : peer{&device} {
+updates_streamer_t::updates_streamer_t(cluster_t &cluster_, device_t &device) noexcept
+    : cluster{cluster_}, peer{&device}, self{cluster.get_device()} {
+    refresh_remote();
+}
+
+void updates_streamer_t::refresh_remote() noexcept {
     auto &folders = cluster.get_folders();
-    auto &remote_folders = device.get_remote_folder_infos();
+    auto &remote_folders = peer->get_remote_folder_infos();
+    auto streaming_folder = (model::folder_info_t *)(nullptr);
+    auto prev_seen = std::move(seen_info);
+    seen_info = {};
     for (auto &it : folders) {
         auto &folder = it.item;
-        auto folder_info = folder->is_shared_with(device);
-        if (folder_info) {
+        auto peer_folder = folder->is_shared_with(*peer);
+        if (peer_folder) {
+            auto local_folder = folder->get_folder_infos().by_device(*self);
+            if (streaming && streaming->folder_info == local_folder) {
+                streaming_folder = local_folder.get();
+            }
             auto remote_folder = remote_folders.by_folder(*folder);
-            if (remote_folder && remote_folder->needs_update()) {
-                folders_queue.insert(remote_folder);
+            if (remote_folder) {
+                auto seen_sequence = std::int64_t{0};
+                if (remote_folder->get_index() == local_folder->get_index()) {
+                    auto previously_seen = prev_seen[local_folder];
+                    seen_sequence = std::max(remote_folder->get_max_sequence(), previously_seen);
+                }
+                seen_info[local_folder] = seen_sequence;
             }
         }
     }
-    prepare();
-}
-
-updates_streamer_t &updates_streamer_t::operator=(updates_streamer_t &&other) noexcept {
-    peer = std::move(other.peer);
-    folders_queue = std::move(other.folders_queue);
-    files_queue = std::move(other.files_queue);
-    return *this;
-}
-
-updates_streamer_t::operator bool() const noexcept { return !files_queue.empty() || !folders_queue.empty(); }
-
-auto updates_streamer_t::next() noexcept -> file_info_ptr_t {
-    auto &by_sequence = files_queue.template get<1>();
-    auto it = by_sequence.begin();
-    auto r = *it;
-    by_sequence.erase(it);
-    prepare();
-    return r;
-}
-
-void updates_streamer_t::prepare() noexcept {
-    while (true) {
-        if (!files_queue.empty()) {
-            return;
-        }
-        if (folders_queue.empty()) {
-            return;
-        }
-        auto it = folders_queue.begin();
-        auto remote_folder = *it;
-        folders_queue.erase(it);
-
-        auto local_folder = remote_folder->get_local();
-        auto &files = local_folder->get_file_infos();
-        auto sequence_threshold =
-            remote_folder->get_index() == local_folder->get_index() ? remote_folder->get_max_sequence() : 0;
-
-        for (auto fi : files) {
-            auto &file = fi.item;
-            if (file->get_sequence() > sequence_threshold) {
-                files_queue.emplace(file);
-            }
+    if (streaming && !streaming_folder) {
+        streaming.reset();
+    } else if (streaming_folder) {
+        auto remote_folder = remote_folders.by_folder(*streaming_folder->get_folder());
+        if (!remote_folder) {
+            streaming.reset();
+        } else {
+            // TODO, refresh files?
         }
     }
 }
 
 void updates_streamer_t::on_update(file_info_t &file) noexcept {
-    if (!peer) {
-        return;
+    assert(file.get_folder_info()->get_device() == self);
+    if (streaming) {
+        auto &info = *streaming;
+        if (info.folder_info.get() == file.get_folder_info()) {
+            info.unseen_files.put(&file);
+        }
     }
+}
 
-    auto folder = file.get_folder_info()->get_folder();
-    auto remote_folder = peer->get_remote_folder_infos().by_folder(*folder);
-    if (!remote_folder) {
-        return;
+void updates_streamer_t::on_remote_refresh() noexcept { refresh_remote(); }
+
+file_info_ptr_t updates_streamer_t::next() noexcept {
+    if (streaming) {
+        auto &files = streaming->unseen_files;
+        auto &proj = files.sequence_projection();
+        if (!proj.empty()) {
+            auto it = proj.begin();
+            auto file = it->item;
+            files.remove(file);
+            seen_info[streaming->folder_info] = file->get_sequence();
+            return file;
+        }
+        streaming.reset();
     }
-
-    if (folders_queue.count(remote_folder)) {
-        return;
+    for (auto &[folder_info, seen_sequence] : seen_info) {
+        auto max = folder_info->get_max_sequence();
+        if (seen_sequence < max) {
+            auto [it, end] = folder_info->get_file_infos().range(seen_sequence + 1, max);
+            if (it != end) {
+                auto file = it->item;
+                seen_info[folder_info] = file->get_sequence();
+                ++it;
+                if (it != end) {
+                    auto unseen_files = file_infos_map_t();
+                    for (; it != end; ++it) {
+                        unseen_files.put(it->item);
+                    }
+                    streaming = streaming_info_t(folder_info, std::move(unseen_files));
+                }
+                return file;
+            }
+        }
     }
-
-    auto &by_uuid = files_queue.template get<0>();
-    auto it = by_uuid.find(file.get_uuid());
-    if (it != by_uuid.end()) {
-        by_uuid.erase(it);
-    }
-
-    files_queue.emplace(&file);
+    return {};
 }

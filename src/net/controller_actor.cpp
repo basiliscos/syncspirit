@@ -14,6 +14,7 @@
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/remove_peer.h"
+#include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/cluster_update.h"
@@ -88,7 +89,7 @@ controller_actor_t::controller_actor_t(config_t &config)
       peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, rx_blocks_requested{0},
       tx_blocks_requested{0}, outgoing_buffer{0}, outgoing_buffer_max{config.outgoing_buffer_max},
       request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested},
-      advances_per_iteration{config.advances_per_iteration} {
+      advances_per_iteration{config.advances_per_iteration}, updates_streamer(*cluster, *peer) {
     {
         assert(cluster);
         assert(sequencer);
@@ -210,12 +211,16 @@ void controller_actor_t::push_pending() noexcept {
     };
 
     auto expected_sz = 0;
-    while (updates_streamer && (expected_sz < outgoing_buffer_max - outgoing_buffer)) {
-        auto file_info = updates_streamer.next();
-        expected_sz += file_info->expected_meta_size();
-        auto &index = get_index(*file_info);
-        *index.add_files() = file_info->as_proto(true);
-        LOG_TRACE(log, "pushing index update for: {}, seq = {}", file_info->get_full_name(), file_info->get_sequence());
+    while (expected_sz < outgoing_buffer_max - outgoing_buffer) {
+        if (auto file_info = updates_streamer.next(); file_info) {
+            expected_sz += file_info->expected_meta_size();
+            auto &index = get_index(*file_info);
+            *index.add_files() = file_info->as_proto(true);
+            LOG_TRACE(log, "pushing index update for: {}, seq = {}", file_info->get_full_name(),
+                      file_info->get_sequence());
+        } else {
+            break;
+        }
     }
 
     fmt::memory_buffer data;
@@ -382,12 +387,6 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
             proto::serialize(data, *ctx.folder_index);
             outgoing_buffer += static_cast<uint32_t>(data.size());
             send<payload::transfer_data_t>(peer_addr, std::move(data));
-            if (updates_streamer) {
-                updates_streamer = model::updates_streamer_t(*cluster, *peer);
-            }
-        }
-        if (updates_streamer) {
-            updates_streamer = model::updates_streamer_t(*cluster, *peer);
         }
     }
     pull_next();
@@ -417,7 +416,7 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &d
             }
         }
     }
-    updates_streamer = model::updates_streamer_t(*cluster, *peer);
+    updates_streamer.on_remote_refresh();
     return diff.visit_next(*this, custom);
 }
 
@@ -480,6 +479,14 @@ auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_inf
             ctx->folder_index = fi->generate();
         }
         pull_ready();
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto controller_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (diff.peer_id == peer->device_id().get_sha256()) {
+        updates_streamer.on_remote_refresh();
     }
     return diff.visit_next(*this, custom);
 }

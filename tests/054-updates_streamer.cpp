@@ -37,14 +37,14 @@ TEST_CASE("updates_streamer", "[model]") {
     SECTION("trivial") {
         SECTION("no files") {
             auto streamer = model::updates_streamer_t(*cluster, *peer_device);
-            REQUIRE(!streamer);
+            REQUIRE(!streamer.next());
         }
 
         add_remote(0, 0);
 
         SECTION("no files (2)") {
             auto streamer = model::updates_streamer_t(*cluster, *peer_device);
-            REQUIRE(!streamer);
+            REQUIRE(!streamer.next());
         }
     }
 
@@ -69,13 +69,9 @@ TEST_CASE("updates_streamer", "[model]") {
         auto f2 = add_file("b.txt");
 
         auto streamer = model::updates_streamer_t(*cluster, *peer_device);
-        REQUIRE(streamer);
         CHECK(streamer.next() == f1);
-
-        REQUIRE(streamer);
         CHECK(streamer.next() == f2);
-
-        REQUIRE(!streamer);
+        CHECK(!streamer.next());
     }
 
     SECTION("2 files, index matches, sequence greater") {
@@ -85,7 +81,7 @@ TEST_CASE("updates_streamer", "[model]") {
         add_remote(my_folder->get_index(), f2->get_sequence());
 
         auto streamer = model::updates_streamer_t(*cluster, *peer_device);
-        REQUIRE(!streamer);
+        CHECK(!streamer.next());
     }
 
     SECTION("2 files, index matches, sequence greater") {
@@ -95,33 +91,33 @@ TEST_CASE("updates_streamer", "[model]") {
         add_remote(my_folder->get_index(), f1->get_sequence());
 
         auto streamer = model::updates_streamer_t(*cluster, *peer_device);
-        REQUIRE(streamer);
         CHECK(streamer.next() == f2);
-        REQUIRE(!streamer);
+        CHECK(!streamer.next());
     }
 
     SECTION("1 file, streamer is updated lazily") {
         add_remote(0, seq);
 
         auto streamer = model::updates_streamer_t(*cluster, *peer_device);
-        REQUIRE(!streamer);
+        REQUIRE(!streamer.next());
 
         auto f1 = add_file("a.txt");
         streamer.on_update(*f1);
         CHECK(streamer.next() == f1);
-
-        REQUIRE(!streamer);
+        CHECK(!streamer.next());
     }
 
     SECTION("empty streamer ignores updates") {
         add_remote(0, seq);
+        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
+        REQUIRE(builder.unshare_folder(*peer_folder).apply());
 
-        auto streamer = model::updates_streamer_t();
-        REQUIRE(!streamer);
+        auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+        REQUIRE(!streamer.next());
 
         auto f1 = add_file("a.txt");
         streamer.on_update(*f1);
-        REQUIRE(!streamer);
+        CHECK(!streamer.next());
     }
 
     SECTION("2 files, streamer is updated") {
@@ -131,14 +127,14 @@ TEST_CASE("updates_streamer", "[model]") {
         auto f2 = add_file("b.txt");
 
         auto streamer = model::updates_streamer_t(*cluster, *peer_device);
-        REQUIRE(streamer);
 
         f1->set_sequence(++seq);
         my_folder->add_strict(f1);
+
         streamer.on_update(*f1);
 
         REQUIRE(streamer.next() == f2);
         REQUIRE(streamer.next() == f1);
-        REQUIRE(!streamer);
+        REQUIRE(!streamer.next());
     }
 }

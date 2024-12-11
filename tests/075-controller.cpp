@@ -1096,10 +1096,18 @@ void test_download_from_scratch() {
             auto cc = proto::ClusterConfig{};
             auto folder = cc.add_folders();
             folder->set_id(std::string(folder_1->get_id()));
-            auto d_peer = folder->add_devices();
-            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(15);
-            d_peer->set_index_id(12345);
+            {
+                auto device = folder->add_devices();
+                device->set_id(std::string(peer_device->device_id().get_sha256()));
+                device->set_max_sequence(15);
+                device->set_index_id(12345);
+            }
+            {
+                auto device = folder->add_devices();
+                device->set_id(std::string(my_device->device_id().get_sha256()));
+                device->set_max_sequence(0);
+                device->set_index_id(0);
+            }
 
             peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
             sup->do_process();
@@ -1322,10 +1330,18 @@ void test_initiate_peer_sharing() {
             auto cc = proto::ClusterConfig{};
             auto folder = cc.add_folders();
             folder->set_id(std::string(folder_1->get_id()));
-            auto d_peer = folder->add_devices();
-            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(15);
-            d_peer->set_index_id(0x12345);
+            {
+                auto device = folder->add_devices();
+                device->set_id(std::string(peer_device->device_id().get_sha256()));
+                device->set_max_sequence(15);
+                device->set_index_id(0x12345);
+            }
+            {
+                auto device = folder->add_devices();
+                device->set_id(std::string(my_device->device_id().get_sha256()));
+                device->set_max_sequence(0);
+                device->set_index_id(0x0);
+            }
 
             peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
             sup->do_process();
@@ -1372,7 +1388,7 @@ void test_initiate_peer_sharing() {
                     }
                 }
                 REQUIRE(f_peer);
-                CHECK(f_peer->index_id() == d_peer->index_id());
+                CHECK(f_peer->index_id() == 0x12345);
                 CHECK(f_peer->max_sequence() == 0);
 
                 REQUIRE(f_my);

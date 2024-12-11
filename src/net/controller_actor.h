@@ -178,6 +178,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     outcome::result<void> operator()(const model::diff::modify::mark_reachable_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_folder_infos_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::share_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
@@ -207,11 +208,11 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     uint32_t blocks_max_kept;
     uint32_t blocks_max_requested;
     uint32_t advances_per_iteration;
+    model::updates_streamer_t updates_streamer;
     utils::logger_t log;
     unlink_requests_t unlink_requests;
     model::file_iterator_ptr_t file_iterator;
     model::block_iterator_ptr_t block_iterator;
-    model::updates_streamer_t updates_streamer;
     synchronizing_folders_t synchronizing_folders;
     synchronizing_files_t synchronizing_files;
     block_write_queue_t block_write_queue;

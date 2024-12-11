@@ -5,7 +5,6 @@
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
 #include "model/diff/cluster_visitor.h"
-#include "add_remote_folder_infos.h"
 #include "remove_pending_folders.h"
 #include "upsert_folder_info.h"
 
@@ -45,9 +44,6 @@ share_folder_t::share_folder_t(const bu::uuid &uuid, const model::device_t &peer
         auto diff = cluster_diff_ptr_t{};
         current = current->assign_sibling(new remove_pending_folders_t(std::move(keys)));
     }
-    auto remote_folders = add_remote_folder_infos_t::container_t{};
-    remote_folders.push_front({folder_id, index_id, 0});
-    current = current->assign_sibling(new add_remote_folder_infos_t(peer, std::move(remote_folders)));
 }
 
 auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
