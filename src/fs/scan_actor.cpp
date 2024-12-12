@@ -8,6 +8,7 @@
 #include "model/diff/local/file_availability.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_start.h"
+#include "model/misc/version_utils.h"
 #include "net/names.h"
 #include "utils.h"
 #include <algorithm>
@@ -339,6 +340,7 @@ void scan_actor_t::on_remove(const model::file_info_t &file) noexcept {
     auto folder_id = std::string(folder->get_id());
     auto fi = file.as_proto(false);
     fi.set_deleted(true);
+    model::record_update(*fi.mutable_version(), *cluster->get_device());
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new model::diff::advance::local_update_t(*cluster, *sequencer, std::move(fi), std::move(folder_id));
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);

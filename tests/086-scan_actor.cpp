@@ -594,6 +594,8 @@ void test_remove_file() {
             auto file = files->by_name("file.ext");
             REQUIRE(file);
             REQUIRE(blocks.size() == 1);
+            REQUIRE(file->get_version().counters_size() == 1);
+            auto counter = file->get_version().counters(0);
 
             auto prev_finish = folder->get_scan_finish();
             bfs::remove(file_path);
@@ -604,6 +606,9 @@ void test_remove_file() {
             CHECK(file->is_deleted() == 1);
             CHECK(file->is_local());
             CHECK(blocks.size() == 0);
+            CHECK(file->get_version().counters_size() == 1);
+            CHECK(file->get_version().counters(0).id() == counter.id());
+            CHECK(file->get_version().counters(0).value() > counter.value());
             REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             REQUIRE(folder->get_scan_finish() > prev_finish);
         }
