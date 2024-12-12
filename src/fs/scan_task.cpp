@@ -206,6 +206,15 @@ scan_result_t scan_task_t::advance_regular_file(const file_info_t &file) noexcep
         changed = true;
     }
 
+    auto status = bfs::status(path, ec);
+    if (ec) {
+        return file_error_t{path, ec};
+    }
+    meta.set_permissions(static_cast<uint32_t>(status.permissions()));
+    if (meta.permissions() != file->get_permissions()) {
+        changed = true;
+    }
+
     if (changed) {
         using FT = proto::FileInfoType;
         meta.set_name(std::string(file->get_name()));

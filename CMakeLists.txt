@@ -67,6 +67,9 @@ add_library(syncspirit_core
     src/model/diff/base_diff.cpp
     src/model/diff/block_diff.cpp
     src/model/diff/cluster_visitor.cpp
+    src/model/diff/advance/advance.cpp
+    src/model/diff/advance/local_update.cpp
+    src/model/diff/advance/remote_copy.cpp
     src/model/diff/contact/connect_request.cpp
     src/model/diff/contact/dial_request.cpp
     src/model/diff/contact/ignored_connected.cpp
@@ -88,7 +91,6 @@ add_library(syncspirit_core
     src/model/diff/local/blocks_availability.cpp
     src/model/diff/local/custom.cpp
     src/model/diff/local/file_availability.cpp
-    src/model/diff/local/update.cpp
     src/model/diff/local/scan_finish.cpp
     src/model/diff/local/scan_request.cpp
     src/model/diff/local/scan_start.cpp
@@ -104,7 +106,6 @@ add_library(syncspirit_core
     src/model/diff/modify/block_rej.cpp
     src/model/diff/modify/block_transaction.cpp
     src/model/diff/modify/clone_block.cpp
-    src/model/diff/modify/clone_file.cpp
     src/model/diff/modify/finish_file.cpp
     src/model/diff/modify/generic_remove.cpp
     src/model/diff/modify/lock_file.cpp
@@ -130,6 +131,7 @@ add_library(syncspirit_core
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/orphaned_blocks.cpp
+    src/model/misc/resolver.cpp
     src/model/misc/sequencer.cpp
     src/model/misc/updates_streamer.cpp
     src/model/misc/uuid.cpp

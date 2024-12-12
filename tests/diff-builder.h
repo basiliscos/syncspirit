@@ -53,7 +53,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     using blocks_t = std::vector<proto::BlockInfo>;
     using dispose_callback_t = model::diff::modify::block_transaction_t::dispose_callback_t;
 
-    diff_builder_t(model::cluster_t &) noexcept;
+    diff_builder_t(model::cluster_t &, r::address_ptr_t receiver = {}) noexcept;
     cluster_configurer_t configure_cluster(std::string_view sha256) noexcept;
     diff_builder_t &apply(r::supervisor_t &sup) noexcept;
     outcome::result<void> apply() noexcept;
@@ -66,7 +66,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
                                 std::string_view cert_name = "", bool auto_accept = true) noexcept;
     diff_builder_t &share_folder(std::string_view sha256, std::string_view folder_id) noexcept;
     diff_builder_t &unshare_folder(model::folder_info_t &fi) noexcept;
-    diff_builder_t &clone_file(const model::file_info_t &source) noexcept;
+    diff_builder_t &remote_copy(const model::file_info_t &source) noexcept;
     diff_builder_t &finish_file(const model::file_info_t &file) noexcept;
     diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
     diff_builder_t &append_block(const model::file_info_t &target, size_t block_index, std::string data,
@@ -97,6 +97,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     model::sequencer_ptr_t sequencer;
     model::cluster_t &cluster;
     model::diff::cluster_diff_ptr_t cluster_diff;
+    r::address_ptr_t receiver;
 
     friend struct cluster_configurer_t;
     friend struct index_maker_t;

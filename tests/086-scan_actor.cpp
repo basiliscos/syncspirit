@@ -176,12 +176,14 @@ void test_meta_changes() {
             bi.set_offset(0);
 
             auto b = block_info_t::create(bi).value();
+            auto &blocks_map = cluster->get_blocks();
+            blocks_map.put(b);
             SECTION("a file does not physically exist") {
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 REQUIRE(folder_info_peer->add_strict(file_peer));
-                builder->clone_file(*file_peer).scan_start(folder->get_id()).apply(*sup);
+                builder->remote_copy(*file_peer).scan_start(folder->get_id()).apply(*sup);
 
                 auto file = files->by_name(pr_fi.name());
                 CHECK(files->size() == 1);
@@ -194,7 +196,7 @@ void test_meta_changes() {
                 file_peer->assign_block(b, 0);
                 REQUIRE(folder_info_peer->add_strict(file_peer));
 
-                builder->clone_file(*file_peer).apply(*sup);
+                builder->remote_copy(*file_peer).apply(*sup);
                 auto file = files->by_name(pr_fi.name());
                 auto path = file->get_path();
 
@@ -389,7 +391,6 @@ void test_meta_changes() {
                 file_my->assign_block(b, 1);
                 file_my->assign_block(b, 2);
                 file_my->lock();
-                cluster->get_blocks().put(b);
                 REQUIRE(folder_info->add_strict(file_my));
 
                 pr_fi.set_size(15ul);
@@ -593,6 +594,8 @@ void test_remove_file() {
             auto file = files->by_name("file.ext");
             REQUIRE(file);
             REQUIRE(blocks.size() == 1);
+            REQUIRE(file->get_version().counters_size() == 1);
+            auto counter = file->get_version().counters(0);
 
             auto prev_finish = folder->get_scan_finish();
             bfs::remove(file_path);
@@ -603,6 +606,9 @@ void test_remove_file() {
             CHECK(file->is_deleted() == 1);
             CHECK(file->is_local());
             CHECK(blocks.size() == 0);
+            CHECK(file->get_version().counters_size() == 1);
+            CHECK(file->get_version().counters(0).id() == counter.id());
+            CHECK(file->get_version().counters(0).value() > counter.value());
             REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             REQUIRE(folder->get_scan_finish() > prev_finish);
         }

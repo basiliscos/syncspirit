@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "resolver.h"
 #include "model/device.h"
 #include "model/file_info.h"
 #include "model/folder_info.h"
@@ -11,19 +12,22 @@
 #include <vector>
 #include <set>
 #include <memory>
+#include <utility>
 
 namespace syncspirit::model {
 
 struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     using files_list_t = std::vector<file_info_ptr_t>;
+    using result_t = std::pair<file_info_t *, advance_action_t>;
 
     file_iterator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
     file_iterator_t(const file_iterator_t &) = delete;
 
-    file_info_t *next() noexcept;
+    result_t next() noexcept;
 
     void on_upsert(folder_info_ptr_t peer_folder) noexcept;
     void on_remove(folder_info_ptr_t peer_folder) noexcept;
+    void recheck(file_info_t &file) noexcept;
 
   private:
     struct file_comparator_t {
@@ -42,8 +46,6 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     };
     using folder_iterators_t = std::vector<folder_iterator_t>;
 
-    bool accept_file(const file_info_t &file) noexcept;
-    void commit_clone(file_info_ptr_t file) noexcept;
     folder_iterator_t &prepare_folder(folder_info_ptr_t peer_folder) noexcept;
     folder_iterator_t &find_folder(folder_t *folder) noexcept;
 

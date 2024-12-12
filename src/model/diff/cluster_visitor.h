@@ -10,6 +10,12 @@ namespace syncspirit::model::diff {
 
 struct cluster_diff_t;
 
+namespace advance {
+struct advance_t;
+struct local_update_t;
+struct remote_copy_t;
+} // namespace advance
+
 namespace contact {
 struct connect_request_t;
 struct dial_request_t;
@@ -36,7 +42,6 @@ struct scan_request_t;
 struct scan_start_t;
 struct synchronization_start_t;
 struct synchronization_finish_t;
-struct update_t;
 } // namespace local
 
 namespace peer {
@@ -55,7 +60,6 @@ struct block_ack_t;
 struct block_rej_t;
 struct block_transaction_t;
 struct clone_block_t;
-struct clone_file_t;
 struct finish_file_t;
 struct generic_remove_t;
 struct lock_file_t;
@@ -77,6 +81,10 @@ struct upsert_folder_t;
 } // namespace modify
 
 template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t> {
+    virtual outcome::result<void> operator()(const advance::advance_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const advance::local_update_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const advance::remote_copy_t &, void *custom) noexcept;
+
     virtual outcome::result<void> operator()(const contact::connect_request_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const contact::dial_request_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const contact::ignored_connected_t &, void *custom) noexcept;
@@ -93,7 +101,6 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
 
     virtual outcome::result<void> operator()(const local::custom_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::file_availability_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const local::update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_finish_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_request_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_start_t &, void *custom) noexcept;
@@ -112,7 +119,6 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const modify::block_ack_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::block_rej_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::clone_block_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const modify::clone_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::finish_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::lock_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::mark_reachable_t &, void *custom) noexcept;

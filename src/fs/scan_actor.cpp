@@ -2,14 +2,13 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "scan_actor.h"
+#include "model/diff/advance/local_update.h"
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/local/blocks_availability.h"
 #include "model/diff/local/file_availability.h"
-#include "model/diff/local/update.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_start.h"
-#include "model/diff/local/synchronization_start.h"
-#include "model/diff/local/synchronization_finish.h"
+#include "model/misc/version_utils.h"
 #include "net/names.h"
 #include "utils.h"
 #include <algorithm>
@@ -303,7 +302,7 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     }
 
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::local::update_t(*cluster, *sequencer, std::move(folder_id), std::move(file));
+    diff = new model::diff::advance::local_update_t(*cluster, *sequencer, std::move(file), std::move(folder_id));
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 }
 
@@ -341,7 +340,8 @@ void scan_actor_t::on_remove(const model::file_info_t &file) noexcept {
     auto folder_id = std::string(folder->get_id());
     auto fi = file.as_proto(false);
     fi.set_deleted(true);
+    model::record_update(*fi.mutable_version(), *cluster->get_device());
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::local::update_t(*cluster, *sequencer, std::move(folder_id), std::move(fi));
+    diff = new model::diff::advance::local_update_t(*cluster, *sequencer, std::move(fi), std::move(folder_id));
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
 }

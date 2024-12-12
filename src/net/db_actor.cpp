@@ -6,6 +6,7 @@
 #include "db/prefix.h"
 #include "db/utils.h"
 #include "db/error_code.h"
+#include "model/diff/advance/advance.h"
 #include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/contact/unknown_connected.h"
@@ -20,12 +21,10 @@
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/load/pending_devices.h"
 #include "model/diff/load/pending_folders.h"
-#include "model/diff/local/update.h"
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
-#include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_files.h"
 #include "model/diff/modify/remove_folder.h"
@@ -373,43 +372,6 @@ auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, voi
     return force_commit();
 }
 
-auto db_actor_t::operator()(const model::diff::local::update_t &diff, void *custom) noexcept -> outcome::result<void> {
-    if (cluster->is_tainted()) {
-        return outcome::success();
-    }
-
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file = folder_info->get_file_infos().by_name(diff.file.name());
-    auto &txn = *get_txn().assume_value();
-
-    {
-        auto key = folder_info->get_key();
-        auto data = folder_info->serialize();
-
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-
-    {
-        auto key = file->get_key();
-        auto data = file->serialize();
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-
-    auto r = diff.visit_next(*this, custom);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    return force_commit();
-}
-
 auto db_actor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
@@ -706,7 +668,7 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &dif
     return r;
 }
 
-auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -720,16 +682,6 @@ auto db_actor_t::operator()(const model::diff::modify::clone_file_t &diff, void 
     {
         auto key = file->get_key();
         auto data = file->serialize();
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-
-    {
-        auto key = folder_info->get_key();
-        auto data = folder_info->serialize();
-
         auto r = db::save({key, data}, txn);
         if (!r) {
             return r.assume_error();

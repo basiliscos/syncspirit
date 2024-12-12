@@ -581,7 +581,7 @@ void test_unshare_and_remove_folder() {
     F().run();
 }
 
-void test_clone_file() {
+void test_remote_copy() {
     struct F : fixture_t {
         void main() noexcept override {
 
@@ -616,7 +616,7 @@ void test_clone_file() {
 
                 auto file_peer = folder_peer->get_file_infos().by_name(file.name());
                 REQUIRE(file_peer);
-                builder.clone_file(*file_peer).apply(*sup);
+                builder.remote_copy(*file_peer).apply(*sup);
 
                 sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
                 sup->do_process();
@@ -654,7 +654,7 @@ void test_clone_file() {
                 auto file_peer = folder_peer->get_file_infos().by_name(file.name());
                 REQUIRE(file_peer);
 
-                builder.clone_file(*file_peer).apply(*sup);
+                builder.remote_copy(*file_peer).apply(*sup);
                 REQUIRE(folder_my->get_max_sequence() == 1);
 
                 {
@@ -681,7 +681,7 @@ void test_clone_file() {
                 file_peer->mark_local_available(0);
                 REQUIRE(file_peer->is_locally_available());
 
-                builder.clone_file(*file_peer).apply(*sup);
+                builder.remote_copy(*file_peer).apply(*sup);
 
                 {
                     sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
@@ -976,9 +976,9 @@ void test_peer_3_folders_6_files() {
 
                 // clang-format off
                 builder
-                    .clone_file(*file_11).clone_file(*file_12)
-                    .clone_file(*file_21).clone_file(*file_22)
-                    .clone_file(*file_31).clone_file(*file_32)
+                    .remote_copy(*file_11).remote_copy(*file_12)
+                    .remote_copy(*file_21).remote_copy(*file_22)
+                    .remote_copy(*file_31).remote_copy(*file_32)
                 .apply(*sup);
                 // clang-format on
             }
@@ -1026,7 +1026,7 @@ int _init() {
     REGISTER_TEST_CASE(test_folder_sharing, "test_folder_sharing", "[db]");
     REGISTER_TEST_CASE(test_cluster_update_and_remove, "test_cluster_update_and_remove", "[db]");
     REGISTER_TEST_CASE(test_unshare_and_remove_folder, "test_unshare_and_remove_folder", "[db]");
-    REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[db]");
+    REGISTER_TEST_CASE(test_remote_copy, "test_remote_copy", "[db]");
     REGISTER_TEST_CASE(test_local_update, "test_local_update", "[db]");
     REGISTER_TEST_CASE(test_peer_going_offline, "test_peer_going_offline", "[db]");
     REGISTER_TEST_CASE(test_remove_peer, "test_remove_peer", "[db]");

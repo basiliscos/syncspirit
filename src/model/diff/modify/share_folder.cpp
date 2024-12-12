@@ -5,8 +5,8 @@
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
 #include "model/diff/cluster_visitor.h"
-#include "upsert_folder_info.h"
 #include "remove_pending_folders.h"
+#include "upsert_folder_info.h"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -31,19 +31,18 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
         }
     }
 
-    return new share_folder_t(sequencer.next_uuid(), peer.device_id().get_sha256(), folder.get_id(), index,
-                              pending_folder);
+    return new share_folder_t(sequencer.next_uuid(), peer, folder.get_id(), index, pending_folder);
 }
 
-share_folder_t::share_folder_t(const bu::uuid &uuid, std::string_view device_id, std::string_view folder_id_,
+share_folder_t::share_folder_t(const bu::uuid &uuid, const model::device_t &peer, std::string_view folder_id_,
                                std::uint64_t index_id, model::pending_folder_ptr_t uf) noexcept
-    : peer_id(device_id), folder_id{folder_id_} {
-    auto current = assign_child(new upsert_folder_info_t(uuid, device_id, folder_id, index_id));
+    : peer_id(peer.device_id().get_sha256()), folder_id{folder_id_} {
+    auto current = assign_child(new upsert_folder_info_t(uuid, peer_id, folder_id, index_id));
     if (uf) {
         auto keys = remove_pending_folders_t::keys_t{};
         keys.emplace_back(std::string{uf->get_key()});
         auto diff = cluster_diff_ptr_t{};
-        current->assign_sibling(new remove_pending_folders_t(std::move(keys)));
+        current = current->assign_sibling(new remove_pending_folders_t(std::move(keys)));
     }
 }
 

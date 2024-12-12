@@ -105,14 +105,14 @@ void connect_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_
 
 const char *connect_timeout_t::explanation_ = "maximum time for connection, milliseconds";
 
-file_clones_per_iteration_t::file_clones_per_iteration_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("file_clones_per_iteration", explanation_, value, default_value) {}
+advances_per_iteration_t::advances_per_iteration_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("advances_per_iteration", explanation_, value, default_value) {}
 
-void file_clones_per_iteration_t::reflect_to(syncspirit::config::main_t &main) {
-    main.bep_config.file_clones_per_iteration = native_value;
+void advances_per_iteration_t::reflect_to(syncspirit::config::main_t &main) {
+    main.bep_config.advances_per_iteration = native_value;
 }
 
-const char *file_clones_per_iteration_t::explanation_ = "maximum amount of file metadata clones per iteration";
+const char *advances_per_iteration_t::explanation_ = "maximum amount of file metadata advances per iteration";
 
 request_timeout_t::request_timeout_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("request_timeout", explanation_, value, default_value) {}

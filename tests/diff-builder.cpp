@@ -3,7 +3,8 @@
 
 #include "diff-builder.h"
 #include "model/messages.h"
-#include "model/diff/local/update.h"
+#include "model/diff/advance/remote_copy.h"
+#include "model/diff/advance/local_update.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_request.h"
 #include "model/diff/local/scan_start.h"
@@ -14,7 +15,6 @@
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/clone_block.h"
-#include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/share_folder.h"
@@ -89,13 +89,19 @@ diff_builder_t &index_maker_t::finish() noexcept {
     return builder;
 }
 
-diff_builder_t::diff_builder_t(model::cluster_t &cluster_) noexcept : cluster{cluster_} {
+diff_builder_t::diff_builder_t(model::cluster_t &cluster_, r::address_ptr_t receiver_) noexcept
+    : cluster{cluster_}, receiver{receiver_} {
     sequencer = model::make_sequencer(0);
 }
 
 diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
     auto has_diffs = [&]() -> bool { return (bool)cluster_diff; };
     assert(has_diffs());
+
+    if (receiver) {
+        sup.send<model::payload::model_update_t>(receiver, std::move(cluster_diff), nullptr);
+        sup.do_process();
+    }
 
     auto &addr = sup.get_address();
     bool do_try = true;
@@ -173,8 +179,8 @@ diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcep
     return assign(new diff::modify::unshare_folder_t(cluster, fi));
 }
 
-diff_builder_t &diff_builder_t::clone_file(const model::file_info_t &source) noexcept {
-    auto diff = diff::modify::clone_file_t::create(source, *sequencer);
+diff_builder_t &diff_builder_t::remote_copy(const model::file_info_t &source) noexcept {
+    auto diff = diff::advance::remote_copy_t::create(source, *sequencer);
     return assign(diff.get());
 }
 
@@ -183,7 +189,7 @@ diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &file) noex
 }
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
-    return assign(new diff::local::update_t(cluster, *sequencer, folder_id, file_));
+    return assign(new diff::advance::local_update_t(cluster, *sequencer, file_, folder_id));
 }
 
 diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcept {

@@ -165,6 +165,8 @@ TEST_CASE("scan_task", "[fs]") {
             auto path = root_path / "a.txt";
             write_file(path, "12345");
             bfs::last_write_time(path, modified);
+            auto status = bfs::status(path);
+            pr_file.set_permissions(static_cast<uint32_t>(status.permissions()));
 
             auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             REQUIRE(folder_my->add_strict(file));
@@ -230,6 +232,8 @@ TEST_CASE("scan_task", "[fs]") {
             auto path = root_path / "a-dir-2" / "a.txt";
             write_file(path, "12345");
             bfs::last_write_time(path, modified);
+            auto status = bfs::status(path);
+            pr_file.set_permissions(static_cast<uint32_t>(status.permissions()));
 
             auto info_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             REQUIRE(folder_my->add_strict(info_file));
@@ -385,6 +389,8 @@ TEST_CASE("scan_task", "[fs]") {
                 auto path = root_path / "a.txt";
                 write_file(path, "12345");
                 bfs::last_write_time(path, modified);
+                auto status = bfs::status(path);
+                pr_file.set_permissions(static_cast<uint32_t>(status.permissions()));
 
                 file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 REQUIRE(folder_my->add_strict(file));
@@ -411,6 +417,8 @@ TEST_CASE("scan_task", "[fs]") {
                 auto path = root_path / "a.txt";
                 write_file(path, "12345");
                 bfs::last_write_time(path, modified);
+                auto status = bfs::status(path);
+                pr_file.set_permissions(static_cast<uint32_t>(status.permissions()));
 
                 file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 REQUIRE(folder_my->add_strict(file));
@@ -427,6 +435,31 @@ TEST_CASE("scan_task", "[fs]") {
                 CHECK(ref->file == file);
                 CHECK(ref->metadata.size() == 5);
                 CHECK(ref->metadata.modified_s() == modified);
+            }
+
+            SECTION("permissions differs") {
+                pr_file.set_block_size(5);
+                pr_file.set_size(5);
+                pr_file.set_modified_s(modified);
+                pr_file.set_permissions(static_cast<uint32_t>(-1));
+
+                auto path = root_path / "a.txt";
+                write_file(path, "12345");
+                bfs::last_write_time(path, modified);
+
+                file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+                REQUIRE(folder_my->add_strict(file));
+
+                task = new scan_task_t(cluster, folder->get_id(), config);
+
+                r = task->advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task->advance();
+                REQUIRE(std::get_if<changed_meta_t>(&r));
+                auto ref = std::get_if<changed_meta_t>(&r);
+                CHECK(ref->file == file);
             }
 
             r = task->advance();
@@ -536,17 +569,19 @@ TEST_CASE("scan_task", "[fs]") {
             pr_file.set_size(5);
             pr_file.set_modified_s(modified);
 
-            auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
-            counter->set_id(10);
-            auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
-            REQUIRE(folder_my->add_strict(file_my));
-            REQUIRE(folder_peer->add_strict(file_peer));
-
             auto path = root_path / "a.txt";
             auto path_tmp = root_path / "a.txt.syncspirit-tmp";
             write_file(path, "12345");
             write_file(path_tmp, "12345");
             bfs::last_write_time(path, modified);
+            auto status = bfs::status(path);
+            pr_file.set_permissions(static_cast<uint32_t>(status.permissions()));
+
+            auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            counter->set_id(10);
+            auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            REQUIRE(folder_my->add_strict(file_my));
+            REQUIRE(folder_peer->add_strict(file_peer));
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();

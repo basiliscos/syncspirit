@@ -74,7 +74,7 @@ auto cluster_supervisor_t::operator()(const model::diff::contact::peer_state_t &
                 .peer(peer)
                 .peer_addr(diff.peer_addr)
                 .blocks_max_requested(bep_config.blocks_max_requested)
-                .file_clones_per_iteration(bep_config.file_clones_per_iteration)
+                .advances_per_iteration(bep_config.advances_per_iteration)
                 .outgoing_buffer_max(bep_config.tx_buff_limit)
                 .request_pool(bep_config.rx_buff_size)
                 .request_timeout(pt::milliseconds(bep_config.request_timeout))

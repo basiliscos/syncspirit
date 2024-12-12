@@ -12,11 +12,11 @@
 #include "tree_item/peer_folders.h"
 #include "net/names.h"
 #include "config/utils.h"
+#include "model/diff/advance/advance.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
-#include "model/diff/modify/clone_file.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/modify/update_peer.h"
@@ -298,7 +298,7 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
     return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff, void *) noexcept
+auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto device = cluster->get_devices().by_sha256(diff.peer_id);
     auto augmentation = device->get_augmentation();
@@ -306,7 +306,7 @@ auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff
         auto devices_node = static_cast<tree_item::devices_t *>(devices);
         device->set_augmentation(devices_node->add_peer(*device));
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 auto app_supervisor_t::operator()(const model::diff::modify::add_pending_folders_t &diff, void *custom) noexcept
@@ -343,7 +343,7 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
     return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::clone_file_t &diff, void *custom) noexcept
+auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
@@ -351,9 +351,11 @@ auto app_supervisor_t::operator()(const model::diff::modify::clone_file_t &diff,
     auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
     auto folder_entry = static_cast<tree_item::folder_t *>(augmentation->get_owner());
     auto file_info = folder_info->get_file_infos().by_name(diff.proto_file.name());
-    auto path = bfs::path(file_info->get_name());
-    auto dir = folder_entry->locate_dir(path.parent_path());
-    dir->add_entry(*file_info);
+    if (!file_info->get_augmentation()) {
+        auto path = bfs::path(file_info->get_name());
+        auto dir = folder_entry->locate_dir(path.parent_path());
+        dir->add_entry(*file_info);
+    }
     return diff.visit_next(*this, custom);
 }
 

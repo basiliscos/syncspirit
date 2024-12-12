@@ -3,6 +3,8 @@
 
 #include "cluster_diff.h"
 #include "cluster_visitor.h"
+#include "advance/local_update.h"
+#include "advance/remote_copy.h"
 #include "contact/connect_request.h"
 #include "contact/dial_request.h"
 #include "contact/ignored_connected.h"
@@ -22,7 +24,6 @@
 #include "local/scan_start.h"
 #include "local/synchronization_finish.h"
 #include "local/synchronization_start.h"
-#include "local/update.h"
 #include "modify/add_blocks.h"
 #include "modify/add_ignored_device.h"
 #include "modify/add_pending_device.h"
@@ -32,7 +33,6 @@
 #include "modify/block_ack.h"
 #include "modify/block_rej.h"
 #include "modify/clone_block.h"
-#include "modify/clone_file.h"
 #include "modify/finish_file.h"
 #include "modify/lock_file.h"
 #include "modify/mark_reachable.h"
@@ -54,6 +54,21 @@
 #include "peer/update_folder.h"
 
 using namespace syncspirit::model::diff;
+
+auto cluster_visitor_t::operator()(const advance::advance_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const advance::local_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto advance_diff = static_cast<const advance::advance_t &>(diff);
+    return (*this)(advance_diff, custom);
+}
+
+auto cluster_visitor_t::operator()(const advance::remote_copy_t &diff, void *custom) noexcept -> outcome::result<void> {
+    auto advance_diff = static_cast<const advance::advance_t &>(diff);
+    return (*this)(advance_diff, custom);
+}
 
 auto cluster_visitor_t::operator()(const contact::connect_request_t &diff, void *custom) noexcept
     -> outcome::result<void> {
@@ -116,10 +131,6 @@ auto cluster_visitor_t::operator()(const local::file_availability_t &diff, void 
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const local::update_t &diff, void *custom) noexcept -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
 auto cluster_visitor_t::operator()(const local::scan_finish_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
@@ -173,10 +184,6 @@ auto cluster_visitor_t::operator()(const modify::clone_block_t &diff, void *cust
 
 auto cluster_visitor_t::operator()(const modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const modify::clone_file_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

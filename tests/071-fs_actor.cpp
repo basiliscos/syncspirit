@@ -119,7 +119,7 @@ struct fixture_t {
 };
 } // namespace
 
-void test_clone_file() {
+void test_remote_copy() {
     struct F : fixture_t {
         void main() noexcept override {
             proto::FileInfo pr_fi;
@@ -132,6 +132,8 @@ void test_clone_file() {
             counter->set_id(1);
             counter->set_value(peer_device->as_uint());
 
+            auto builder = diff_builder_t(*cluster, file_addr);
+
             auto make_file = [&]() {
                 auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
                 REQUIRE(folder_peer->add_strict(file));
@@ -140,7 +142,7 @@ void test_clone_file() {
 
             SECTION("empty regular file") {
                 auto peer_file = make_file();
-                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto my_file = folder_my->get_file_infos().by_name(peer_file->get_name());
                 auto &path = my_file->get_path();
@@ -152,7 +154,7 @@ void test_clone_file() {
             SECTION("empty regular file a subdir") {
                 pr_fi.set_name("a/b/c/d/e.txt");
                 auto peer_file = make_file();
-                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
                 auto &path = file->get_path();
@@ -174,7 +176,7 @@ void test_clone_file() {
 
                 auto peer_file = make_file();
                 peer_file->assign_block(bi, 0);
-                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
@@ -188,7 +190,7 @@ void test_clone_file() {
                 pr_fi.set_type(proto::FileInfoType::DIRECTORY);
 
                 auto peer_file = make_file();
-                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
@@ -206,7 +208,7 @@ void test_clone_file() {
                 pr_fi.set_symlink_target(target.string());
 
                 auto peer_file = make_file();
-                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
 
@@ -224,7 +226,7 @@ void test_clone_file() {
                 REQUIRE(bfs::exists(target));
 
                 auto peer_file = make_file();
-                diff_builder_t(*cluster).clone_file(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_fi.name());
                 CHECK(file->is_deleted());
@@ -278,7 +280,7 @@ void test_append_block() {
                 return file;
             };
 
-            auto builder = diff_builder_t(*cluster);
+            auto builder = diff_builder_t(*cluster, file_addr);
 
             auto callback = [&](diff::modify::block_transaction_t &diff) {
                 REQUIRE(diff.errors.load() == 0);
@@ -288,7 +290,7 @@ void test_append_block() {
             SECTION("file with 1 block") {
                 pr_source.set_size(5ul);
                 auto peer_file = make_file(1);
-                builder.clone_file(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_source.name());
 
@@ -305,7 +307,7 @@ void test_append_block() {
                 pr_source.set_size(10ul);
 
                 auto peer_file = make_file(2);
-                builder.clone_file(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(pr_source.name());
 
@@ -336,7 +338,7 @@ void test_append_block() {
 #ifndef SYNCSPIRIT_WIN
                 SECTION("remove folder (simulate err)") {
                     bfs::remove_all(root_path);
-                    diff_builder_t(*cluster).finish_file(*peer_file).apply(*sup);
+                    builder.finish_file(*peer_file).apply(*sup);
                     CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() ==
                           r::state_t::SHUT_DOWN);
                 }
@@ -391,7 +393,7 @@ void test_clone_block() {
                 return file;
             };
 
-            auto builder = diff_builder_t(*cluster);
+            auto builder = diff_builder_t(*cluster, file_addr);
 
             auto callback = [&](diff::modify::block_transaction_t &diff) {
                 REQUIRE(diff.errors.load() == 0);
@@ -412,7 +414,7 @@ void test_clone_block() {
                     auto source = make_file(pr_source, 1);
                     auto target = make_file(pr_target, 1);
 
-                    builder.clone_file(*source).clone_file(*target).apply(*sup);
+                    builder.remote_copy(*source).remote_copy(*target).apply(*sup);
 
                     auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
                     auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
@@ -440,7 +442,7 @@ void test_clone_block() {
                     auto source = make_file(pr_source, 2);
                     auto target = make_file(pr_target, 2);
 
-                    builder.clone_file(*source).clone_file(*target).apply(*sup);
+                    builder.remote_copy(*source).remote_copy(*target).apply(*sup);
 
                     auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
                     auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
@@ -476,7 +478,7 @@ void test_clone_block() {
                     source->assign_block(blocks[1], 0);
                     REQUIRE(folder_peer->add_strict(source));
 
-                    builder.clone_file(*source).clone_file(*target).apply(*sup);
+                    builder.remote_copy(*source).remote_copy(*target).apply(*sup);
 
                     auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
                     auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
@@ -507,7 +509,7 @@ void test_clone_block() {
                 source->assign_block(blocks[0], 1);
                 REQUIRE(folder_peer->add_strict(source));
 
-                builder.clone_file(*source).apply(*sup);
+                builder.remote_copy(*source).apply(*sup);
 
                 auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
                 auto target_file = source_file;
@@ -625,7 +627,7 @@ void test_requesting_block() {
 }
 
 int _init() {
-    REGISTER_TEST_CASE(test_clone_file, "test_clone_file", "[fs]");
+    REGISTER_TEST_CASE(test_remote_copy, "test_remote_copy", "[fs]");
     REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
     REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
     REGISTER_TEST_CASE(test_requesting_block, "test_requesting_block", "[fs]");

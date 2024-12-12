@@ -44,14 +44,26 @@ bool file_entry_t::on_select() {
 void file_entry_t::on_update() {
     parent_t::on_update();
     if (entry) {
-        if (entry->is_deleted()) {
-            auto host = static_cast<entry_t *>(parent());
-            bool show_deleted = supervisor.get_app_config().fltk_config.display_deleted;
-            if (!show_deleted) {
-                host->remove_child(this);
-            } else {
-                host->deleted_items.emplace(this);
+        auto host = static_cast<entry_t *>(parent());
+        bool to_be_displayed = supervisor.get_app_config().fltk_config.display_deleted;
+        if (host) {
+            if (entry->is_deleted()) {
+                if (!to_be_displayed) {
+                    host->remove_child(this);
+                } else {
+                    host->deleted_items.emplace(this);
+                }
             }
+        } else if (!host && !entry->is_deleted() || to_be_displayed) {
+            auto folder_info = entry->get_folder_info();
+            auto augmentation = static_cast<augmentation_base_t *>(folder_info->get_augmentation().get());
+            assert(augmentation);
+            auto owner = augmentation->get_owner();
+            auto folder_entry = dynamic_cast<tree_item::entry_t *>(owner);
+            auto path = bfs::path(entry->get_name());
+            auto parent_entry = folder_entry->locate_dir(path.parent_path());
+            parent_entry->remove_node(this);
+            parent_entry->insert_node(this);
         }
     }
 }

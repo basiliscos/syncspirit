@@ -3,7 +3,7 @@
 
 #include "test_supervisor.h"
 #include "model/diff/modify/finish_file.h"
-#include "model/diff/modify/clone_file.h"
+#include "model/diff/advance/remote_copy.h"
 #include "net/names.h"
 
 namespace to {
@@ -107,7 +107,7 @@ auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
         auto file = file_info->get_file_infos().by_name(diff.file_name);
-        auto ack = model::diff::modify::clone_file_t::create(*file, *sequencer);
+        auto ack = model::diff::advance::remote_copy_t::create(*file, *sequencer);
         send<model::payload::model_update_t>(get_address(), std::move(ack), this);
     }
     return outcome::success();
