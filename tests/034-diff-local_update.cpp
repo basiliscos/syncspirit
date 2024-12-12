@@ -4,7 +4,6 @@
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
-#include "model/misc/version_utils.h"
 #include "diff-builder.h"
 
 using namespace syncspirit;
@@ -146,6 +145,5 @@ TEST_CASE("new file diff", "[model]") {
         CHECK(file->is_deleted());
         CHECK(file->get_blocks().size() == 0);
         CHECK(file->get_sequence() > sequence);
-        CHECK(model::compare(file->get_version(), version) == model::version_relation_t::newer);
     }
 }

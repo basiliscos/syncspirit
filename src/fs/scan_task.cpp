@@ -258,6 +258,7 @@ scan_result_t scan_task_t::advance_unknown_file(const unknown_file_t &file) noex
 
     auto &path = file.path;
     auto peer_file = model::file_info_ptr_t{};
+    auto peer_counter = proto::Counter();
     auto relative_path = [&]() -> std::string {
         auto rp = relativize(path, root);
         auto name = path.filename();
@@ -276,11 +277,22 @@ scan_result_t scan_task_t::advance_unknown_file(const unknown_file_t &file) noex
         if (f) {
             if (!peer_file) {
                 peer_file = std::move(f);
+                auto &v = peer_file->get_version();
+                for (int i = 0; i < v.counters_size(); ++i) {
+                    auto &c = v.counters(i);
+                    if (peer_counter.value() < c.value()) {
+                        peer_counter = c;
+                    }
+                }
             } else {
-                using V = model::version_relation_t;
-                auto r = model::compare(peer_file->get_version(), f->get_version());
-                if (r == V::older) {
-                    peer_file = std::move(f);
+                auto &v = f->get_version();
+                for (int i = 0; i < v.counters_size(); ++i) {
+                    auto &c = v.counters(i);
+                    if (peer_counter.value() < c.value()) {
+                        peer_counter = c;
+                        peer_file = std::move(f);
+                        break;
+                    }
                 }
             }
         }

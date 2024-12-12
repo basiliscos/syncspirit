@@ -303,6 +303,7 @@ OUTER:
             }
         }
         if (auto [file, action] = file_iterator->next(); action != model::advance_action_t::ignore) {
+            auto _ = model::resolve(*file);
             auto in_sync = synchronizing_files.count(file);
             if (in_sync) {
                 continue;

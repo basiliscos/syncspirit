@@ -346,15 +346,29 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
 auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto generic_augmnetation = folder_info->get_augmentation();
+    auto &folder_infos = folder->get_folder_infos();
+    auto local_fi = folder_infos.by_device(*cluster->get_device());
+    auto generic_augmnetation = local_fi->get_augmentation();
     auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
     auto folder_entry = static_cast<tree_item::folder_t *>(augmentation->get_owner());
-    auto file_info = folder_info->get_file_infos().by_name(diff.proto_file.name());
-    if (!file_info->get_augmentation()) {
-        auto path = bfs::path(file_info->get_name());
+    auto local_file = local_fi->get_file_infos().by_name(diff.proto_file.name());
+    if (!local_file->get_augmentation()) {
+        auto path = bfs::path(local_file->get_name());
         auto dir = folder_entry->locate_dir(path.parent_path());
-        dir->add_entry(*file_info);
+        dir->add_entry(*local_file);
+    }
+    // displayed nodes "actuality" status might change
+    for (auto it : folder_infos) {
+        auto &remote_fi = it.item;
+        if (remote_fi->get_device() != local_fi->get_device()) {
+            auto remote_file = remote_fi->get_file_infos().by_name(local_file->get_name());
+            if (remote_file) {
+                auto aug = remote_file->get_augmentation();
+                if (aug) {
+                    aug->on_update();
+                }
+            }
+        }
     }
     return diff.visit_next(*this, custom);
 }

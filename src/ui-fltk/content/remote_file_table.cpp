@@ -117,7 +117,7 @@ void remote_file_table_t::refresh() {
                     modification_device = it.item->get_name();
                 }
             }
-            auto value = fmt::format("({}) {}", counter.value(), modification_device);
+            auto value = fmt::format("({}, {}) {}", counter.value(), i, modification_device);
             insert_row("modification", new static_string_provider_t(std::move(value)), 4);
         }
         top_modifitcation = v_from;

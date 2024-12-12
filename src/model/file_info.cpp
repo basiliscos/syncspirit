@@ -354,43 +354,6 @@ std::int64_t file_info_t::get_size() const noexcept {
     return 0;
 }
 
-bool file_info_t::need_download(const file_info_t &other) noexcept {
-    assert(folder_info->get_device() == folder_info->get_folder()->get_cluster()->get_device().get());
-    assert(other.folder_info->get_device() != folder_info->get_folder()->get_cluster()->get_device().get());
-    assert(name == other.name);
-    if (is_locked()) {
-        return false;
-    }
-    auto r = compare(version, other.version);
-    if (r == version_relation_t::identity) {
-        return !is_locally_available();
-    } else if (r == version_relation_t::older) {
-        return true;
-    } else if (r == version_relation_t::newer) {
-        return false;
-    } else {
-        assert(r == version_relation_t::conflict);
-        auto stringify = [](const proto::Vector &vector) -> std::string {
-            auto r = std::string();
-            for (int i = 0; i < vector.counters_size(); ++i) {
-                auto &c = vector.counters(i);
-                r += fmt::format("{:x}:{}", c.id(), c.value());
-                if (i + 1 < vector.counters_size()) {
-                    r += ", ";
-                }
-            }
-            return r;
-        };
-        auto my_version = stringify(version);
-        auto other_version = stringify(other.version);
-
-        auto log = utils::get_logger("model.file_info");
-        LOG_CRITICAL(log, "conflict handling is not available for = {}, '{}' vs '{}'", get_full_name(), my_version,
-                     other_version);
-        return false;
-    }
-}
-
 std::size_t file_info_t::expected_meta_size() const noexcept {
     auto r = name.size() + 1 + 8 + 4 + 8 + 4 + 8 + 3 + 8 + 4 + symlink_target.size();
     r += version.counters_size() * 16;
@@ -449,9 +412,16 @@ void file_info_t::update(const file_info_t &other) noexcept {
 }
 
 bool file_info_t::is_global() const noexcept {
-    using V = version_relation_t;
     auto self = folder_info->get_device();
     auto folder = folder_info->get_folder();
+    auto local_counter = proto::Counter();
+    for (int i = 0; i < version.counters_size(); ++i) {
+        auto &counter = version.counters(i);
+        if (counter.value() > local_counter.value()) {
+            local_counter = counter;
+        }
+    }
+    auto remote_counter = proto::Counter();
     for (auto &it : folder->get_folder_infos()) {
         if (it.item->get_device() == self) {
             continue;
@@ -462,12 +432,15 @@ bool file_info_t::is_global() const noexcept {
             continue;
         }
         auto &v_other = file->get_version();
-        auto v_result = compare(version, v_other);
-        if (v_result == V::older) {
-            return false;
+
+        for (int i = 0; i < v_other.counters_size(); ++i) {
+            auto &counter = v_other.counters(i);
+            if (counter.value() > local_counter.value()) {
+                remote_counter = counter;
+            }
         }
     }
-    return true;
+    return local_counter.value() >= remote_counter.value();
 }
 
 auto file_info_t::guard() noexcept -> guard_ptr_t { return new guard_t(*this); }

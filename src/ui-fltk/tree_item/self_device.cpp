@@ -44,7 +44,8 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         }
 
         auto openssl_version = fmt::format("{}.{}.{}{}", openssl_major, openssl_minor, openssl_patch, openssl_nibble_c);
-        auto mbdx_version = fmt::format("{}.{}.{}_{}", mdbx_version.major, mdbx_version.minor, mdbx_version.patch, mdbx_version.tweak);
+        auto mbdx_version =
+            fmt::format("{}.{}.{}_{}", mdbx_version.major, mdbx_version.minor, mdbx_version.patch, mdbx_version.tweak);
         auto app_version = fmt::format("{} {}", constants::client_name, constants::client_version);
         auto protobuf_version = google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION);
         auto fltk_version = fmt::format("{}", Fl::version());

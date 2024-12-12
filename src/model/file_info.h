@@ -118,7 +118,6 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
     const bfs::path &get_path() const noexcept;
-    bool need_download(const file_info_t &other) noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
     inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }

@@ -154,8 +154,8 @@ TEST_CASE("scan_task", "[fs]") {
         pr_file.set_sequence(4);
         auto version = pr_file.mutable_version();
         auto counter = version->add_counters();
-        counter->set_id(1);
-        counter->set_value(peer_device->as_uint());
+        counter->set_value(1);
+        counter->set_id(peer_device->as_uint());
 
         SECTION("meta is not changed (file)") {
             pr_file.set_block_size(5);

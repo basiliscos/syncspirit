@@ -3,7 +3,6 @@
 
 #include "file_availability.h"
 #include "../cluster_visitor.h"
-#include "model/misc/version_utils.h"
 
 using namespace syncspirit::model::diff::local;
 
@@ -17,7 +16,17 @@ auto file_availability_t::apply_impl(cluster_t &cluster) const noexcept -> outco
     if (folder) {
         auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
         auto f = folder_info->get_file_infos().by_name(file->get_name());
-        if (f && compare(version, f->get_version()) == version_relation_t::identity) {
+        auto &v_l = version;
+        auto &v_c = f->get_version();
+        auto version_equal = v_l.counters_size() == v_c.counters_size();
+        if (version_equal) {
+            for (int i = 0; i < v_l.counters_size() && version_equal; ++i) {
+                auto &c_l = v_l.counters(i);
+                auto &c_c = v_c.counters(i);
+                version_equal = c_l.id() == c_c.id() && c_l.value() == c_c.value();
+            }
+        }
+        if (version_equal) {
             f->mark_local();
             LOG_TRACE(log, "file_availability_t, mark local file = {}, folder = {}, ", file->get_name(), folder_id);
             auto &blocks = f->get_blocks();
