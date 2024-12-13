@@ -45,40 +45,48 @@ TEST_CASE("update folder (via Index)", "[model]") {
         b->set_hash("123");
         b->set_size(5ul);
 
-        REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
-
-        auto &peer_files = peer_folder_info->get_file_infos();
-        REQUIRE(peer_files.size() == 1);
-        auto f = peer_files.by_name("a.txt");
-        REQUIRE(f);
-
-        auto key = std::string(f->get_key());
-
-        SECTION("when a file with existing name is added, key & instance are kept") {
-            file.set_modified_s(2);
-            file.set_sequence(11ul);
-            REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
-
-            REQUIRE(peer_files.size() == 1);
-            auto same_f = peer_files.by_name(file.name());
-            CHECK(same_f.get() == f.get());
-            CHECK(same_f->get_key() == f->get_key());
+        SECTION("invalid cases") {
+            auto ec = builder.make_index(sha256, "1234-5678").add(file, peer_device, false).fail();
+            REQUIRE(ec);
+            CHECK(ec == model::make_error_code(model::error_code_t::missing_version));
         }
 
-        SECTION("file with new blocks is added, the preivous one is removed") {
-            auto &blocks_map = cluster->get_blocks();
-            REQUIRE(blocks_map.size() == 1);
-            auto prev_block = blocks_map.begin()->item;
-            file.set_modified_s(2);
-            file.set_sequence(11ul);
-            file.mutable_blocks(0)->set_hash("345");
+        SECTION("valid cases") {
             REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
 
+            auto &peer_files = peer_folder_info->get_file_infos();
             REQUIRE(peer_files.size() == 1);
-            REQUIRE(blocks_map.size() == 1);
-            auto new_block = blocks_map.begin()->item;
-            CHECK(new_block != prev_block);
-            CHECK(new_block->get_hash() != prev_block->get_hash());
+            auto f = peer_files.by_name("a.txt");
+            REQUIRE(f);
+
+            auto key = std::string(f->get_key());
+
+            SECTION("when a file with existing name is added, key & instance are kept") {
+                file.set_modified_s(2);
+                file.set_sequence(11ul);
+                REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
+
+                REQUIRE(peer_files.size() == 1);
+                auto same_f = peer_files.by_name(file.name());
+                CHECK(same_f.get() == f.get());
+                CHECK(same_f->get_key() == f->get_key());
+            }
+
+            SECTION("file with new blocks is added, the preivous one is removed") {
+                auto &blocks_map = cluster->get_blocks();
+                REQUIRE(blocks_map.size() == 1);
+                auto prev_block = blocks_map.begin()->item;
+                file.set_modified_s(2);
+                file.set_sequence(11ul);
+                file.mutable_blocks(0)->set_hash("345");
+                REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
+
+                REQUIRE(peer_files.size() == 1);
+                REQUIRE(blocks_map.size() == 1);
+                auto new_block = blocks_map.begin()->item;
+                CHECK(new_block != prev_block);
+                CHECK(new_block->get_hash() != prev_block->get_hash());
+            }
         }
     }
     SECTION("folder does not exists") {

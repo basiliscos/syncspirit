@@ -61,10 +61,11 @@ index_maker_t::index_maker_t(diff_builder_t &builder_, std::string_view sha256, 
     index.set_folder(std::string(folder_id));
 }
 
-index_maker_t &&index_maker_t::add(const proto::FileInfo &file, const model::device_ptr_t &peer) noexcept {
+index_maker_t &&index_maker_t::add(const proto::FileInfo &file, const model::device_ptr_t &peer,
+                                   bool add_version) noexcept {
     auto f = index.add_files();
     *f = file;
-    if (f->version().counters_size() == 0) {
+    if (add_version && f->version().counters_size() == 0) {
         auto v = f->mutable_version();
         auto c = v->add_counters();
         c->set_id(peer->as_uint());

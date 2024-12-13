@@ -39,7 +39,7 @@ struct SYNCSPIRIT_TEST_API cluster_configurer_t {
 
 struct SYNCSPIRIT_TEST_API index_maker_t {
     index_maker_t(diff_builder_t &builder, std::string_view peer_sha256, std::string_view folder_id) noexcept;
-    index_maker_t &&add(const proto::FileInfo &, const model::device_ptr_t &peer) noexcept;
+    index_maker_t &&add(const proto::FileInfo &, const model::device_ptr_t &peer, bool add_version = true) noexcept;
     diff_builder_t &finish() noexcept;
     std::error_code fail() noexcept;
 
