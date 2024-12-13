@@ -71,6 +71,7 @@ TEST_CASE("remove folder", "[model]") {
         pr_fi.set_name("a.txt");
         pr_fi.set_block_size(5);
         pr_fi.set_size(5);
+        pr_fi.mutable_version()->add_counters()->set_id(peer_device->as_uint());
         auto b_hash = utils::sha256_digest("1").value();
         auto b = pr_fi.add_blocks();
         b->set_hash(b_hash);
@@ -88,6 +89,7 @@ TEST_CASE("remove folder", "[model]") {
         pr_fi.set_name("b.txt");
         pr_fi.set_block_size(5);
         pr_fi.set_size(5);
+        pr_fi.mutable_version()->add_counters()->set_id(my_device->as_uint());
         auto b_hash = utils::sha256_digest("2").value();
         auto b = pr_fi.add_blocks();
         b->set_hash(b_hash);
@@ -105,6 +107,7 @@ TEST_CASE("remove folder", "[model]") {
         pr_fi.set_name("c.txt");
         pr_fi.set_block_size(5);
         pr_fi.set_size(5);
+        pr_fi.mutable_version()->add_counters()->set_id(my_device->as_uint());
         auto b_hash = utils::sha256_digest("3").value();
         auto b = pr_fi.add_blocks();
         b->set_hash(b_hash);

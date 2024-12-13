@@ -29,7 +29,7 @@ auto make_checkbox(Fl_Widget &container, bool value) -> widgetable_ptr_t { retur
 } // namespace
 
 remote_file_table_t::remote_file_table_t(tree_item_t &container_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), container{container_}, top_modifitcation{-1} {
+    : parent_t(x, y, w, h), container{container_}, displayed_versions{0} {
     auto host = static_cast<tree_item::entry_t *>(&container);
     auto &entry = *host->get_entry();
     auto data = table_rows_t();
@@ -92,8 +92,7 @@ void remote_file_table_t::refresh() {
     auto data = table_rows_t();
     auto modified_s = entry.get_modified_s();
     auto modified_date = model::pt::from_time_t(modified_s);
-    auto &version = entry.get_version();
-    auto v_from = version.counters_size() - 1;
+    auto version = entry.get_version();
 
     auto size_data = size_data_t{};
     host->apply(size_visitor_t{}, &size_data);
@@ -103,24 +102,20 @@ void remote_file_table_t::refresh() {
     sequence_cell->update(fmt::format("{}", entry.get_sequence()));
     size_cell->update(fmt::format("{}", entry.get_size()));
 
-    if (top_modifitcation != v_from) {
-        auto last_modifitcation = std::max(-1, top_modifitcation - max_history_records);
-        for (int i = top_modifitcation; i >= last_modifitcation && i >= 0; --i) {
-            remove_row(4);
-        }
-        auto v_to = std::max(0, v_from - max_history_records);
-        for (int i = v_from; i >= v_to; --i) {
-            auto &counter = version.counters(i);
-            auto modification_device = std::string_view("*unknown*");
-            for (auto &it : devices) {
-                if (it.item->matches(counter.id())) {
-                    modification_device = it.item->get_name();
-                }
+    for (int i = 0; i < static_cast<int>(displayed_versions); ++i) {
+        remove_row(4);
+    }
+    displayed_versions = version->counters_count();
+    for (size_t i = 0; i < displayed_versions; ++i) {
+        auto &counter = version->get_counter(i);
+        auto modification_device = std::string_view("*unknown*");
+        for (auto &it : devices) {
+            if (it.item->matches(counter.id())) {
+                modification_device = it.item->get_name();
             }
-            auto value = fmt::format("({}, {}) {}", counter.value(), i, modification_device);
-            insert_row("modification", new static_string_provider_t(std::move(value)), 4);
         }
-        top_modifitcation = v_from;
+        auto value = fmt::format("({}) {}", counter.value(), modification_device);
+        insert_row("modification", new static_string_provider_t(std::move(value)), 4);
     }
 
     block_size_cell->update(std::to_string(entry.get_block_size()));

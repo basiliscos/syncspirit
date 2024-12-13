@@ -125,6 +125,21 @@ TEST_CASE("resolver", "[model]") {
         CHECK(action == A::remote_copy);
     }
 
+    SECTION("has outdated local file, scanned & remote deleted -> copy remote (3)") {
+        auto pr_local = pr_remote;
+        auto c2 = pr_remote.mutable_version()->add_counters();
+        c2->set_id(2);
+        c2->set_value(3);
+        pr_remote.set_deleted(true);
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
+        file_local->mark_local();
+        folder_peer->add_strict(file_remote);
+        folder_my->add_strict(file_local);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::remote_copy);
+    }
+
     SECTION("has newer local file, scanned -> ignore (1)") {
         auto pr_local = pr_remote;
         pr_local.mutable_version()->mutable_counters(0)->set_value(2);
@@ -173,7 +188,7 @@ TEST_CASE("resolver", "[model]") {
 
             auto c2_local = pr_local.mutable_version()->add_counters();
             c2_local->set_id(3);
-            c2_local->set_value(1);
+            c2_local->set_value(3);
 
             pr_remote.set_deleted(true);
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();

@@ -18,7 +18,7 @@ struct SYNCSPIRIT_API file_availability_t final : cluster_diff_t {
 
     std::string folder_id;
     model::file_info_ptr_t file;
-    proto::Vector version;
+    model::version_ptr_t version;
 };
 
 } // namespace syncspirit::model::diff::local

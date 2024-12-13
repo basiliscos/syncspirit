@@ -21,15 +21,7 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local) no
     auto folder = remote_fi->get_folder();
     auto &self = *folder->get_cluster()->get_device();
     auto &folder_infos = folder->get_folder_infos();
-    auto &r_v = remote.get_version();
-    auto r_sz = r_v.counters_size();
-    auto r_best_counter = proto::Counter();
-    for (int i = 0; i < r_sz; ++i) {
-        auto &counter = r_v.counters(i);
-        if (counter.value() > r_best_counter.value()) {
-            r_best_counter = counter;
-        }
-    }
+    auto &r_v = *remote.get_version();
 
     for (auto it : folder_infos) {
         auto fi = it.item.get();
@@ -41,12 +33,9 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local) no
         }
         auto other_party_file = fi->get_file_infos().by_name(remote.get_name());
         if (other_party_file) {
-            auto &o_v = other_party_file->get_version();
-            for (int i = 0; i < o_v.counters_size(); ++i) {
-                auto &counter = o_v.counters(i);
-                if (counter.value() > r_best_counter.value()) {
-                    return advance_action_t::ignore;
-                }
+            auto o_v = other_party_file->get_version();
+            if (!r_v.contains(*o_v)) {
+                return advance_action_t::ignore;
             }
         }
     }
@@ -61,31 +50,15 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local) no
         return advance_action_t::ignore;
     }
 
-    auto &l_v = local->get_version();
-    auto l_sz = l_v.counters_size();
-    auto l_best_counter = proto::Counter();
-    for (int i = 0; i < l_sz; ++i) {
-        auto &counter = l_v.counters(i);
-        if (counter.value() > l_best_counter.value()) {
-            l_best_counter = counter;
-        }
-    }
+    auto &l_v = *local->get_version();
 
-    auto unpack = [&](auto &counter) -> std::pair<uint64_t, uint64_t> {
-        return std::make_pair(counter.id(), counter.value());
-    };
-    auto [r_id, rv] = unpack(r_best_counter);
-    auto [l_id, lv] = unpack(l_best_counter);
-
-    for (int i = 0; i < r_sz; ++i) {
-        auto &counter = r_v.counters(i);
-        if (counter.id() == l_id && counter.value() == lv) {
-            r_best_counter = counter;
-        }
-    }
+    auto &r_best = r_v.get_best();
+    auto &l_best = l_v.get_best();
+    auto rv = r_best.value();
+    auto lv = l_best.value();
 
     // check posssible conflict
-    if (r_id == l_id) {
+    if (r_best.id() == l_best.id()) {
         if (lv > rv) {
             return advance_action_t::ignore;
         } else if (lv < rv) {
@@ -94,48 +67,44 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local) no
             return advance_action_t::ignore;
         }
     } else {
-        if (remote.is_deleted()) {
-            return advance_action_t::ignore;
-        } else if (local->is_deleted()) {
-            return advance_action_t::remote_copy;
-        } else {
-            // remote version already covers local version
-            for (int i = 0; i < r_sz; ++i) {
-                auto &counter = r_v.counters(i);
-                if (counter.id() == l_id && counter.value() == lv) {
-                    return advance_action_t::remote_copy;
-                }
-            }
-
-            // local version already covers remove version
-            for (int i = 0; i < l_sz; ++i) {
-                auto &counter = l_v.counters(i);
-                if (counter.id() == r_id && counter.value() == rv) {
-                    return advance_action_t::ignore;
-                }
-            }
-
-            if (rv > lv) {
-                return advance_action_t::resolve_remote_win;
-            } else if (lv > rv) {
-                return advance_action_t::resolve_local_win;
-            }
-
-            auto remote_device = remote.get_folder_info()->get_device();
-            auto local_device = local->get_folder_info()->get_device();
-            auto remote_bytes = remote_device->device_id().get_sha256();
-            auto local_bytes = local_device->device_id().get_sha256();
-            assert(remote_bytes.size() == local_bytes.size());
-            for (size_t j = 0; j < remote_bytes.size(); ++j) {
-                auto rb = remote_bytes[j];
-                auto lb = local_bytes[j];
-                if (rb > lb) {
-                    return advance_action_t::resolve_remote_win;
-                } else if (lb > rb) {
-                    return advance_action_t::resolve_local_win;
-                }
+        auto r_superior = r_v.contains(l_v);
+        auto l_superior = l_v.contains(r_v);
+        auto concurrent = !r_superior && !l_superior;
+        if (concurrent) {
+            if (remote.is_deleted()) {
+                return advance_action_t::ignore;
+            } else if (local->is_deleted()) {
+                return advance_action_t::remote_copy;
             }
         }
+        if (r_superior) {
+            return advance_action_t::remote_copy;
+        }
+        if (l_superior) {
+            return advance_action_t::ignore;
+        }
+
+        if (rv > lv) {
+            return advance_action_t::resolve_remote_win;
+        } else if (lv > rv) {
+            return advance_action_t::resolve_local_win;
+        }
+
+        auto remote_device = remote.get_folder_info()->get_device();
+        auto local_device = local->get_folder_info()->get_device();
+        auto remote_bytes = remote_device->device_id().get_sha256();
+        auto local_bytes = local_device->device_id().get_sha256();
+        assert(remote_bytes.size() == local_bytes.size());
+        for (size_t j = 0; j < remote_bytes.size(); ++j) {
+            auto rb = remote_bytes[j];
+            auto lb = local_bytes[j];
+            if (rb > lb) {
+                return advance_action_t::resolve_remote_win;
+            } else if (lb > rb) {
+                return advance_action_t::resolve_local_win;
+            }
+        }
+        assert(0 && "should not happen");
     }
     return advance_action_t::ignore;
 }

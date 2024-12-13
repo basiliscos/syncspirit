@@ -8,7 +8,6 @@
 #include "db/prefix.h"
 #include "fs/utils.h"
 #include "misc/error_code.h"
-#include "misc/version_utils.h"
 #include "misc/file_iterator.h"
 #include "utils/log.h"
 #include "utils/string_comparator.hpp"
@@ -129,7 +128,7 @@ outcome::result<void> file_info_t::fields_update(const Source &s, size_t block_c
         flags |= flags_t::f_no_permissions;
     }
     symlink_target = s.symlink_target();
-    version = s.version();
+    version.reset(new version_t(s.version()));
     full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
     block_size = size ? s.block_size() : 0;
     return reserve_blocks(size ? block_count : 0);
@@ -157,7 +156,7 @@ template <typename T> T file_info_t::as() const noexcept {
     r.set_deleted(flags & f_deleted);
     r.set_invalid(flags & f_invalid);
     r.set_no_permissions(flags & f_no_permissions);
-    *r.mutable_version() = version;
+    *r.mutable_version() = version->as_proto();
     r.set_block_size(block_size);
     r.set_symlink_target(symlink_target);
     return r;
@@ -356,7 +355,7 @@ std::int64_t file_info_t::get_size() const noexcept {
 
 std::size_t file_info_t::expected_meta_size() const noexcept {
     auto r = name.size() + 1 + 8 + 4 + 8 + 4 + 8 + 3 + 8 + 4 + symlink_target.size();
-    r += version.counters_size() * 16;
+    r += version->counters_count() * 16;
     r += blocks.size() * (8 + 4 + 4 + 32);
     return r;
 }
@@ -414,14 +413,7 @@ void file_info_t::update(const file_info_t &other) noexcept {
 bool file_info_t::is_global() const noexcept {
     auto self = folder_info->get_device();
     auto folder = folder_info->get_folder();
-    auto local_counter = proto::Counter();
-    for (int i = 0; i < version.counters_size(); ++i) {
-        auto &counter = version.counters(i);
-        if (counter.value() > local_counter.value()) {
-            local_counter = counter;
-        }
-    }
-    auto remote_counter = proto::Counter();
+    auto &local_counter = version->get_best();
     for (auto &it : folder->get_folder_infos()) {
         if (it.item->get_device() == self) {
             continue;
@@ -431,16 +423,12 @@ bool file_info_t::is_global() const noexcept {
         if (!file) {
             continue;
         }
-        auto &v_other = file->get_version();
-
-        for (int i = 0; i < v_other.counters_size(); ++i) {
-            auto &counter = v_other.counters(i);
-            if (counter.value() > local_counter.value()) {
-                remote_counter = counter;
-            }
+        auto other = file->get_version();
+        if (!version->contains(*other)) {
+            return false;
         }
     }
-    return local_counter.value() >= remote_counter.value();
+    return true;
 }
 
 auto file_info_t::guard() noexcept -> guard_ptr_t { return new guard_t(*this); }

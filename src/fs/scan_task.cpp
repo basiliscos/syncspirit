@@ -277,22 +277,13 @@ scan_result_t scan_task_t::advance_unknown_file(const unknown_file_t &file) noex
         if (f) {
             if (!peer_file) {
                 peer_file = std::move(f);
-                auto &v = peer_file->get_version();
-                for (int i = 0; i < v.counters_size(); ++i) {
-                    auto &c = v.counters(i);
-                    if (peer_counter.value() < c.value()) {
-                        peer_counter = c;
-                    }
-                }
+                peer_counter = peer_file->get_version()->get_best();
             } else {
-                auto &v = f->get_version();
-                for (int i = 0; i < v.counters_size(); ++i) {
-                    auto &c = v.counters(i);
-                    if (peer_counter.value() < c.value()) {
-                        peer_counter = c;
-                        peer_file = std::move(f);
-                        break;
-                    }
+                auto &c = f->get_version()->get_best();
+                if (peer_counter.value() < c.value()) {
+                    peer_counter = c;
+                    peer_file = std::move(f);
+                    break;
                 }
             }
         }

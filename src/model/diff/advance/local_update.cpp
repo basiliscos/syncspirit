@@ -22,13 +22,16 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto local_folder_info = local_folder_infos.by_device_id(self_id);
     auto &local_files = local_folder_info->get_file_infos();
     auto local_file = local_files.by_name(proto_file.name());
+    auto &proto_version = *proto_file.mutable_version();
 
-    auto version_ptr = proto_file.mutable_version();
+    auto version = version_ptr_t();
     if (local_file) {
-        *version_ptr = local_file->get_version();
+        version = local_file->get_version();
+        version->update(device);
+    } else {
+        version.reset(new version_t(device));
     }
-
-    record_update(*version_ptr, device);
+    version->to_proto(proto_version);
     initialize(cluster, sequencer);
 }
 

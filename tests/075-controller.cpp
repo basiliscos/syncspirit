@@ -987,6 +987,7 @@ void test_downloading() {
                 pr_my.set_sequence(2ul);
                 pr_my.set_block_size(5);
                 pr_my.set_size(5);
+                pr_my.mutable_version()->add_counters()->set_id(my_device->as_uint());
 
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_my = model::file_info_t::create(uuid, pr_my, folder_my).value();

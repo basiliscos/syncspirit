@@ -32,6 +32,10 @@ TEST_CASE("file-info", "[model]") {
     pr_fi.set_size(55ul);
     pr_fi.set_block_size(5ul);
     pr_fi.set_sequence(6);
+    auto &c = *pr_fi.mutable_version()->add_counters();
+    c.set_id(my_device->as_uint());
+    c.set_value(0);
+
     auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
     auto map = file_infos_map_t{};
 
