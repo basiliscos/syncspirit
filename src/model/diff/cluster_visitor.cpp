@@ -61,7 +61,7 @@ auto cluster_visitor_t::operator()(const advance::advance_t &diff, void *custom)
 
 auto cluster_visitor_t::operator()(const advance::local_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    auto advance_diff = static_cast<const advance::advance_t &>(diff);
+    auto &advance_diff = static_cast<const advance::advance_t &>(diff);
     return (*this)(advance_diff, custom);
 }
 

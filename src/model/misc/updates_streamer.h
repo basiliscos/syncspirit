@@ -21,7 +21,7 @@ struct SYNCSPIRIT_API updates_streamer_t {
 
     file_info_ptr_t next() noexcept;
 
-    void on_update(file_info_t &) noexcept;
+    bool on_update(file_info_t &) noexcept;
     void on_remote_refresh() noexcept;
     void on_upsert(const folder_info_t &) noexcept;
 

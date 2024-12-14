@@ -27,6 +27,7 @@ namespace {
 
 struct sample_peer_config_t : public r::actor_config_t {
     model::device_id_t peer_device_id;
+    bool auto_share = false;
 };
 
 template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -36,6 +37,10 @@ template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_
 
     builder_t &&peer_device_id(const model::device_id_t &value) && noexcept {
         parent_t::config.peer_device_id = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&auto_share(bool value) && noexcept {
+        parent_t::config.auto_share = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -59,7 +64,8 @@ struct sample_peer_t : r::actor_base_t {
     using block_requests_t = std::list<block_request_t>;
     using uploaded_blocks_t = std::list<proto::message::Response>;
 
-    sample_peer_t(config_t &config) : r::actor_base_t{config}, peer_device{config.peer_device_id} {
+    sample_peer_t(config_t &config)
+        : r::actor_base_t{config}, peer_device{config.peer_device_id}, auto_share(config.auto_share) {
         log = utils::get_logger("test.sample_peer");
     }
 
@@ -138,7 +144,7 @@ struct sample_peer_t : r::actor_base_t {
             }
             if (auto m = std::get_if<proto::message::IndexUpdate>(&p); m) {
                 auto &folder_id = (*m)->folder();
-                if (allowed_index_updates.count(folder_id) == 0) {
+                if ((allowed_index_updates.count(folder_id) == 0) && !auto_share) {
                     LOG_WARN(log, "{}, IndexUpdate w/o previously recevied index", identity);
                     std::abort();
                 }
@@ -206,6 +212,7 @@ struct sample_peer_t : r::actor_base_t {
 
     size_t blocks_requested = 0;
     bool reading = false;
+    bool auto_share = false;
     remote_messages_t messages;
     r::address_ptr_t controller;
     model::device_id_t peer_device;
@@ -232,7 +239,7 @@ struct fixture_t {
     }
 
     void start_target() noexcept {
-        peer_actor = sup->create_actor<sample_peer_t>().timeout(timeout).finish();
+        peer_actor = sup->create_actor<sample_peer_t>().auto_share(auto_share).timeout(timeout).finish();
 
         target = sup->create_actor<controller_actor_t>()
                      .peer(peer_device)
@@ -504,13 +511,8 @@ void test_index_sending() {
                 sup->do_process();
 
                 auto &queue = peer_actor->messages;
-                REQUIRE(queue.size() == 2);
+                REQUIRE(queue.size() == 1);
                 auto msg = &(*queue.front()).payload;
-                auto &my_index = *std::get<proto::message::Index>(*msg);
-                REQUIRE(my_index.files_size() == 0);
-                queue.pop_front();
-
-                msg = &(*queue.front()).payload;
                 auto &my_index_update = *std::get<proto::message::IndexUpdate>(*msg);
                 REQUIRE(my_index_update.files_size() == 1);
             }
@@ -619,12 +621,8 @@ void test_downloading() {
 
                 auto &queue = peer_actor->messages;
                 REQUIRE(queue.size() > 0);
-                auto msg = &(*queue.front()).payload;
-                auto &my_index = *std::get<proto::message::Index>(*msg);
-                REQUIRE(my_index.files_size() == 0);
-                queue.pop_front();
 
-                msg = &(*queue.back()).payload;
+                auto msg = &(*queue.back()).payload;
                 auto &my_index_update = *std::get<proto::message::IndexUpdate>(*msg);
                 REQUIRE(my_index_update.files_size() == 1);
 

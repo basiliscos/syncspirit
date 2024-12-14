@@ -8,13 +8,13 @@
 #include "model/diff/local/synchronization_finish.h"
 #include "model/diff/local/synchronization_start.h"
 #include "model/diff/modify/append_block.h"
+#include "model/diff/modify/add_remote_folder_infos.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/block_rej.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/remove_peer.h"
-#include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/cluster_update.h"
@@ -37,8 +37,7 @@ r::plugin::resource_id_t hash = 1;
 
 struct context_t {
     bool from_self;
-    bool notify_cluster_change;
-    std::optional<proto::Index> folder_index;
+    bool cluster_config_sent;
 };
 
 } // namespace
@@ -89,7 +88,7 @@ controller_actor_t::controller_actor_t(config_t &config)
       peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, rx_blocks_requested{0},
       tx_blocks_requested{0}, outgoing_buffer{0}, outgoing_buffer_max{config.outgoing_buffer_max},
       request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested},
-      advances_per_iteration{config.advances_per_iteration}, updates_streamer(*cluster, *peer) {
+      advances_per_iteration{config.advances_per_iteration} {
     {
         assert(cluster);
         assert(sequencer);
@@ -166,6 +165,30 @@ void controller_actor_t::send_cluster_config() noexcept {
     proto::serialize(data, cluster_config);
     outgoing_buffer += static_cast<uint32_t>(data.size());
     send<payload::transfer_data_t>(peer_addr, std::move(data));
+    send_new_indices();
+}
+
+void controller_actor_t::send_new_indices() noexcept {
+    if (updates_streamer) {
+        auto &remote_folders = peer->get_remote_folder_infos();
+        for (auto it : cluster->get_folders()) {
+            auto &folder = *it.item;
+            auto peer_folder = folder.is_shared_with(*peer);
+            if (peer_folder) {
+                auto local_folder = folder.get_folder_infos().by_device(*cluster->get_device());
+                auto remote_folder = remote_folders.by_folder(folder);
+                if (remote_folder && remote_folder->get_index() != local_folder->get_index()) {
+                    LOG_DEBUG(log, "sending new index for folder '{}' ({})", folder.get_label(), folder.get_id());
+                    proto::Index index;
+                    index.set_folder(std::string(folder.get_id()));
+                    fmt::memory_buffer data;
+                    proto::serialize(data, index);
+                    outgoing_buffer += static_cast<uint32_t>(data.size());
+                    send<payload::transfer_data_t>(peer_addr, std::move(data));
+                }
+            }
+        }
+    }
 }
 
 void controller_actor_t::on_transfer_push(message::transfer_push_t &message) noexcept {
@@ -196,6 +219,10 @@ void controller_actor_t::push_pending() noexcept {
     using pair_t = std::pair<model::folder_info_t *, proto::IndexUpdate>;
     using indices_t = std::vector<pair_t>;
 
+    if (!updates_streamer) {
+        return;
+    }
+
     auto indices = indices_t{};
     auto get_index = [&](model::file_info_t &file) -> proto::IndexUpdate & {
         auto folder_info = file.get_folder_info();
@@ -212,7 +239,7 @@ void controller_actor_t::push_pending() noexcept {
 
     auto expected_sz = 0;
     while (expected_sz < outgoing_buffer_max - outgoing_buffer) {
-        if (auto file_info = updates_streamer.next(); file_info) {
+        if (auto file_info = updates_streamer->next(); file_info) {
             expected_sz += file_info->expected_meta_size();
             auto &index = get_index(*file_info);
             *index.add_files() = file_info->as_proto(true);
@@ -379,17 +406,6 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
         auto ee = make_error(r.assume_error());
         return do_shutdown(ee);
     }
-    if (ctx.notify_cluster_change) {
-        send_cluster_config();
-        if (ctx.folder_index) {
-            LOG_DEBUG(log, "sending new index");
-            fmt::memory_buffer data;
-            auto &index = *ctx.folder_index;
-            proto::serialize(data, *ctx.folder_index);
-            outgoing_buffer += static_cast<uint32_t>(data.size());
-            send<payload::transfer_data_t>(peer_addr, std::move(data));
-        }
-    }
     pull_next();
     push_pending();
     send_diff();
@@ -398,26 +414,10 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
 auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto ctx = reinterpret_cast<context_t *>(custom);
-    if (!ctx->from_self) {
-        return diff.visit_next(*this, custom);
+    if (ctx->from_self) {
+        updates_streamer.reset(new model::updates_streamer_t(*cluster, *peer));
+        send_new_indices();
     }
-
-    for (auto it : cluster->get_folders()) {
-        auto &folder = *it.item;
-        auto folder_info = folder.is_shared_with(*peer);
-        if (folder_info) {
-            auto index_opt = folder_info->generate();
-            if (index_opt) {
-                LOG_DEBUG(log, "sending new index");
-                auto &index = *index_opt;
-                fmt::memory_buffer data;
-                proto::serialize(data, index);
-                outgoing_buffer += static_cast<uint32_t>(data.size());
-                send<payload::transfer_data_t>(peer_addr, std::move(data));
-            }
-        }
-    }
-    updates_streamer.on_remote_refresh();
     return diff.visit_next(*this, custom);
 }
 
@@ -441,6 +441,7 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
 
 auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+    auto ctx = reinterpret_cast<context_t *>(custom);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto &folder_infos = folder->get_folder_infos();
     auto folder_info = folder_infos.by_device_id(diff.peer_id);
@@ -460,9 +461,21 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
         local_file = file;
     }
     if (local_file) {
-        updates_streamer.on_update(*local_file);
-        push_pending();
+        if (updates_streamer) {
+            updates_streamer->on_update(*local_file);
+        }
         pull_ready();
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto controller_actor_t::operator()(const model::diff::modify::add_remote_folder_infos_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (diff.device_id == peer->device_id().get_sha256()) {
+        if (updates_streamer) {
+            updates_streamer->on_remote_refresh();
+        }
+        push_pending();
     }
     return diff.visit_next(*this, custom);
 }
@@ -472,22 +485,11 @@ auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_inf
     auto process = diff.device_id == peer->device_id().get_sha256();
     if (process) {
         auto ctx = reinterpret_cast<context_t *>(custom);
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto &folders = folder->get_folder_infos();
-        auto fi = folders.by_device(*peer);
-        ctx->notify_cluster_change = true;
-        if (diff.index_id) {
-            ctx->folder_index = fi->generate();
+        if (!ctx->cluster_config_sent) {
+            ctx->cluster_config_sent = true;
+            send_cluster_config();
         }
         pull_ready();
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto controller_actor_t::operator()(const model::diff::modify::share_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (diff.peer_id == peer->device_id().get_sha256()) {
-        updates_streamer.on_remote_refresh();
     }
     return diff.visit_next(*this, custom);
 }
@@ -499,7 +501,10 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_folder_inf
         auto device_key = decomposed.device_key();
         if (device_key == peer->get_key() || device_key == cluster->get_device()->get_key()) {
             auto ctx = reinterpret_cast<context_t *>(custom);
-            ctx->notify_cluster_change = true;
+            if (!ctx->cluster_config_sent) {
+                ctx->cluster_config_sent = true;
+                send_cluster_config();
+            }
             break;
         }
     }
@@ -510,21 +515,23 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_folder_inf
 auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto ctx = reinterpret_cast<context_t *>(custom);
+    auto &folder_id = diff.folder_id;
+    auto &file_name = diff.file_name;
+    auto folder = cluster->get_folders().by_id(folder_id);
+    auto &folder_infos = folder->get_folder_infos();
+    auto device = cluster->get_devices().by_sha256(diff.device_id);
+    auto folder_info = folder_infos.by_device(*device);
+    auto file = folder_info->get_file_infos().by_name(file_name);
     if (ctx->from_self) {
-        auto &folder_id = diff.folder_id;
-        auto &file_name = diff.file_name;
-        auto folder = cluster->get_folders().by_id(folder_id);
-        auto &folder_infos = folder->get_folder_infos();
-        auto device = cluster->get_devices().by_sha256(diff.device_id);
-        auto folder_info = folder_infos.by_device(*device);
-        auto file = folder_info->get_file_infos().by_name(file_name);
         auto it = synchronizing_files.find(file.get());
         if (it != synchronizing_files.end()) {
             synchronizing_files.erase(it);
         }
         pull_ready();
     }
-    push_pending();
+    if (device == cluster->get_device() && updates_streamer) {
+        updates_streamer->on_update(*file);
+    }
     return diff.visit_next(*this, custom);
 }
 

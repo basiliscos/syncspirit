@@ -4,6 +4,7 @@
 #include "updates_streamer.h"
 #include "model/remote_folder_info.h"
 #include <algorithm>
+#include <spdlog/spdlog.h>
 
 using namespace syncspirit::model;
 
@@ -49,14 +50,33 @@ void updates_streamer_t::refresh_remote() noexcept {
     }
 }
 
-void updates_streamer_t::on_update(file_info_t &file) noexcept {
+bool updates_streamer_t::on_update(file_info_t &file) noexcept {
     assert(file.get_folder_info()->get_device() == self);
-    if (streaming) {
+    bool r = false;
+    auto fi = file.get_folder_info();
+    if (!streaming) {
+        for (auto &[folder_info, seen_sequence] : seen_info) {
+            if (folder_info.get() == fi) {
+                auto max = folder_info->get_max_sequence();
+                auto unseen_files = file_infos_map_t();
+                auto [it, end] = folder_info->get_file_infos().range(seen_sequence + 1, max);
+                for (; it != end; ++it) {
+                    auto &f = it->item;
+                    unseen_files.put(f.get());
+                }
+                streaming = streaming_info_t(folder_info, std::move(unseen_files));
+                r = true;
+                break;
+            }
+        }
+    } else if (streaming) {
         auto &info = *streaming;
         if (info.folder_info.get() == file.get_folder_info()) {
             info.unseen_files.put(&file);
+            r = true;
         }
     }
+    return r;
 }
 
 void updates_streamer_t::on_remote_refresh() noexcept { refresh_remote(); }
@@ -85,7 +105,8 @@ file_info_ptr_t updates_streamer_t::next() noexcept {
                 if (it != end) {
                     auto unseen_files = file_infos_map_t();
                     for (; it != end; ++it) {
-                        unseen_files.put(it->item);
+                        auto &f = it->item;
+                        unseen_files.put(f.get());
                     }
                     streaming = streaming_info_t(folder_info, std::move(unseen_files));
                 }
