@@ -44,6 +44,15 @@ static void auto_scroll_toggle(Fl_Widget *widget, void *data) {
     log_table->autoscroll(button->value());
 }
 
+static void clear_logs(Fl_Widget *widget, void *data) {
+    auto button = static_cast<Fl_Toggle_Button *>(widget);
+    auto panel = reinterpret_cast<log_panel_t *>(data);
+    panel->displayed_records.clear();
+    panel->records.clear();
+    panel->log_table->update();
+    panel->log_table->redraw();
+}
+
 static void set_min_display_level(Fl_Widget *widget, void *data) {
     auto log_panel = static_cast<log_panel_t *>(widget->parent()->parent());
     auto level_ptr = reinterpret_cast<intptr_t>(data);
@@ -133,6 +142,10 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     autoscroll_button->callback(auto_scroll_toggle, log_table);
 
     auto button_x = autoscroll_button->x() + autoscroll_button->w() + padding;
+
+    auto clear_button = new Fl_Button(button_x, common_y, 80, common_h, "clear");
+    clear_button->callback(clear_logs, this);
+    button_x += clear_button->w() + padding;
 
     auto export_button = new Fl_Button(button_x, common_y, 80, common_h, "export...");
     export_button->callback(export_log, this);
