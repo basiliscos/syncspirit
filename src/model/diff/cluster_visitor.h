@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "generic_diff.hpp"
 #include "syncspirit-export.h"
+#include <boost/outcome.hpp>
 
 namespace syncspirit::model::diff {
 
@@ -80,7 +80,9 @@ struct upsert_folder_info_t;
 struct upsert_folder_t;
 } // namespace modify
 
-template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t> {
+namespace outcome = boost::outcome_v2;
+
+struct SYNCSPIRIT_API cluster_visitor_t {
     virtual outcome::result<void> operator()(const advance::advance_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const advance::local_update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const advance::remote_copy_t &, void *custom) noexcept;
@@ -137,7 +139,5 @@ template <> struct SYNCSPIRIT_API generic_visitor_t<tag::cluster, cluster_diff_t
     virtual outcome::result<void> operator()(const modify::upsert_folder_info_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::upsert_folder_t &, void *custom) noexcept;
 };
-
-using cluster_visitor_t = generic_visitor_t<tag::cluster, cluster_diff_t>;
 
 } // namespace syncspirit::model::diff
