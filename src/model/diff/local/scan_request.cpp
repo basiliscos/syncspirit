@@ -6,7 +6,9 @@
 
 using namespace syncspirit::model::diff::local;
 
-scan_request_t::scan_request_t(std::string_view folder_id_) : folder_id{std::move(folder_id_)} {}
+scan_request_t::scan_request_t(std::string_view folder_id_) : folder_id{std::move(folder_id_)} {
+    LOG_DEBUG(log, "scan_request_t, folder = {}", folder_id);
+}
 
 auto scan_request_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting scan_request_t");

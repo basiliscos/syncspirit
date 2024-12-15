@@ -3,9 +3,9 @@
 
 #include "remove_files.h"
 #include "remove_blocks.h"
-
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -28,6 +28,7 @@ remove_files_t::remove_files_t(const device_t &device, const file_infos_map_t &f
             assign_child(new remove_blocks_t(std::move(block_keys)));
         }
     }
+    LOG_DEBUG(log, "remove_files_t, device = {}, files count = {}", device.device_id(), files.size());
 }
 
 auto remove_files_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {

@@ -15,6 +15,7 @@ update_folder_t::update_folder_t(std::string_view folder_id_, std::string_view p
                                  blocks_t blocks, orphaned_blocks_t::set_t removed_blocks) noexcept
     : folder_id{std::string(folder_id_)}, peer_id{std::string(peer_id_)}, files{std::move(files_)},
       uuids{std::move(uuids)} {
+    LOG_DEBUG(log, "update_folder_t, folder = {}", folder_id);
     auto current = (cluster_diff_t *)(nullptr);
     if (!blocks.empty()) {
         current = assign_child(new modify::add_blocks_t(std::move(blocks)));

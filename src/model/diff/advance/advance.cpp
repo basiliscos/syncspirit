@@ -82,7 +82,7 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer) noe
         }
     }
 
-    LOG_TRACE(log, "advance_t ({}), folder = {}, name = {}, blocks = {}, removed blocks = {}, new blocks = {}",
+    LOG_DEBUG(log, "advance_t ({}), folder = {}, name = {}, blocks = {}, removed blocks = {}, new blocks = {}",
               stringify(action), folder_id, proto_file.name(), proto_file.blocks_size(), orphans.size(),
               new_blocks.size());
 

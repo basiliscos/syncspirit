@@ -8,7 +8,9 @@
 using namespace syncspirit::model::diff::local;
 
 scan_finish_t::scan_finish_t(std::string_view folder_id_, const pt::ptime &at_)
-    : folder_id{std::move(folder_id_)}, at{at_} {}
+    : folder_id{std::move(folder_id_)}, at{at_} {
+    LOG_DEBUG(log, "scan_finish_t, folder = {}", folder_id);
+}
 
 auto scan_finish_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);

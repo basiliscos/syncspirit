@@ -22,6 +22,7 @@ remove_folder_infos_t::remove_folder_infos_t(const folder_infos_map_t &map, orph
     }
     std::copy(keys.begin(), keys.end(), std::back_inserter(this->keys));
     assign_child(new reset_folder_infos_t(map, orphaned_blocks_));
+    LOG_DEBUG(log, "remove_folder_infos_t, count = {}", map.size());
 }
 
 auto remove_folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {

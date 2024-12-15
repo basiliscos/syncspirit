@@ -8,6 +8,7 @@
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff;
@@ -17,6 +18,7 @@ using blocks_t = remove_blocks_t::unique_keys_t;
 
 remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept
     : parent_t(), peer_key{peer.get_key()} {
+    LOG_DEBUG(log, "remove_peer_t, device = {}", peer.device_id());
     orphaned_blocks_t orphaned_blocks;
 
     auto removed_pending_folders = remove_pending_folders_t::unique_keys_t{};

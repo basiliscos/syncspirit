@@ -7,7 +7,9 @@
 
 using namespace syncspirit::model::diff::modify;
 
-add_blocks_t::add_blocks_t(blocks_t blocks_) noexcept : blocks{std::move(blocks_)} {}
+add_blocks_t::add_blocks_t(blocks_t blocks_) noexcept : blocks{std::move(blocks_)} {
+    LOG_DEBUG(log, "add_blocks_t, count = {}", blocks.size());
+}
 
 auto add_blocks_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto &bm = cluster.get_blocks();

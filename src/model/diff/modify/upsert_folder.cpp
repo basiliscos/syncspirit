@@ -5,6 +5,7 @@
 #include "model/cluster.h"
 #include "model/diff//cluster_visitor.h"
 #include "upsert_folder_info.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -34,6 +35,7 @@ upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Fol
                                  model::folder_info_ptr_t folder_info, const model::device_t &device,
                                  std::uint64_t index_id) noexcept
     : db{std::move(db_)}, uuid{uuid_} {
+    LOG_DEBUG(log, "upsert_folder_t, folder_id = {}, device = {}",db.id(), device.device_id());
 
     if (!folder_info) {
         auto fi_uuid = sequencer.next_uuid();

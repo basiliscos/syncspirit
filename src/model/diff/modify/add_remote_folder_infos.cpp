@@ -9,7 +9,10 @@
 using namespace syncspirit::model::diff::modify;
 
 add_remote_folder_infos_t::add_remote_folder_infos_t(const model::device_t &peer, container_t items) noexcept
-    : device_id{peer.device_id().get_sha256()}, container{std::move(items)} {}
+    : device_id{peer.device_id().get_sha256()}, container{std::move(items)} {
+    LOG_DEBUG(log, "add_remote_folder_infos_t, device = {}, items = {}", peer.device_id().get_short(),
+              container.size());
+}
 
 auto add_remote_folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto &devices = cluster.get_devices();

@@ -27,6 +27,7 @@ update_contact_t::update_contact_t(const model::cluster_t &cluster, const model:
     if (known) {
         self = cluster.get_device()->device_id().get_sha256() == device.get_sha256();
     }
+    LOG_DEBUG(log, "update_contact_t, device = {}, known = {}", device.get_short(), known);
 
     set_t set;
     std::copy(begin(uris_), end(uris_), std::inserter(set, set.begin()));

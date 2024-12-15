@@ -7,7 +7,9 @@
 
 using namespace syncspirit::model::diff::modify;
 
-add_pending_folders_t::add_pending_folders_t(container_t items) noexcept : container(std::move(items)) {}
+add_pending_folders_t::add_pending_folders_t(container_t items) noexcept : container(std::move(items)) {
+    LOG_DEBUG(log, "add_pending_folders_t, count = {}", container.size());
+}
 
 auto add_pending_folders_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto &pending = cluster.get_pending_folders();

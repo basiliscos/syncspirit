@@ -8,7 +8,9 @@
 
 using namespace syncspirit::model::diff::modify;
 
-block_rej_t::block_rej_t(const block_transaction_t &txn) noexcept : parent_t(txn) {}
+block_rej_t::block_rej_t(const block_transaction_t &txn) noexcept : parent_t(txn) {
+    LOG_DEBUG(log, "block_rej_t, file = {}, folder = {}, block = {}", file_name, folder_id, block_index);
+}
 
 auto block_rej_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);

@@ -4,12 +4,12 @@
 #include "reset_folder_infos.h"
 #include "remove_files.h"
 #include "remove_blocks.h"
-#include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit::model::diff::modify;
 
 reset_folder_infos_t::reset_folder_infos_t(const folder_infos_map_t &map, orphaned_blocks_t *orphaned_blocks_) {
+    LOG_DEBUG(log, "reset_folder_infos_t, count = {}", map.size());
     auto local_orphaned_blocks = orphaned_blocks_t();
     auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
 

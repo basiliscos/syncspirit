@@ -15,6 +15,7 @@ add_ignored_device_t::add_ignored_device_t(const cluster_t &cluster, const devic
     if (peer) {
         assign_child(new remove_pending_device_t(*peer));
     }
+    LOG_DEBUG(log, "add_ignored_device_t, peer = {}, pending = {}", device_id.get_short(), (bool)(peer));
 }
 
 auto add_ignored_device_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {

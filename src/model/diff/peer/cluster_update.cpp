@@ -29,7 +29,7 @@ auto cluster_update_t::create(const cluster_t &cluster, sequencer_t &sequencer, 
 cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
                                    const message_t &message) noexcept
     : peer_id(source.device_id().get_sha256()) {
-    auto log = get_log();
+    LOG_DEBUG(log, "cluster_update_t, source = {}", source.device_id().get_short());
 
     auto &known_pending_folders = cluster.get_pending_folders();
     auto new_pending_folders = diff::modify::add_pending_folders_t::container_t{};
@@ -115,7 +115,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                 continue;
             }
             if (*device != source) {
-                remote_folders.emplace_front(f.id(), d.index_id(), d.max_sequence());
+                remote_folders.emplace_back(f.id(), d.index_id(), d.max_sequence());
                 LOG_TRACE(log, "cluster_update_t, remote folder = {}, device = {}, max seq. = {}", f.label(),
                           device_id.get_short(), d.max_sequence());
                 continue;

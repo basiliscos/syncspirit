@@ -10,7 +10,10 @@ using namespace syncspirit::model::diff::modify;
 mark_reachable_t::mark_reachable_t(const model::file_info_t &file, bool reachable_) noexcept
     : folder_id{file.get_folder_info()->get_folder()->get_id()},
       device_id{file.get_folder_info()->get_device()->device_id().get_sha256()}, file_name{file.get_name()},
-      reachable{reachable_} {}
+      reachable{reachable_} {
+    LOG_DEBUG(log, "mark_reachable_t, file = {}, folder = {}, device = {}, value = {}", file_name, folder_id, device_id,
+              reachable);
+}
 
 auto mark_reachable_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);

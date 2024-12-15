@@ -13,7 +13,9 @@ using namespace syncspirit::model::diff::modify;
 
 upsert_folder_info_t::upsert_folder_info_t(const bu::uuid &uuid_, std::string_view device_id_,
                                            std::string_view folder_id_, std::uint64_t index_id_) noexcept
-    : uuid{uuid_}, device_id{device_id_}, folder_id{folder_id_}, index_id{index_id_} {}
+    : uuid{uuid_}, device_id{device_id_}, folder_id{folder_id_}, index_id{index_id_} {
+    LOG_DEBUG(log, "upsert_folder_info_t, folder = {}, index = {}", folder_id, index_id);
+}
 
 auto upsert_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto device = cluster.get_devices().by_sha256(device_id);

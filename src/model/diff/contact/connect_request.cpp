@@ -2,12 +2,15 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "connect_request.h"
+#include "utils/format.hpp"
 #include "../cluster_visitor.h"
 
 using namespace syncspirit::model::diff::contact;
 
 connect_request_t::connect_request_t(tcp::socket sock_, const tcp::endpoint &remote_) noexcept
-    : sock{new tcp::socket(std::move(sock_))}, remote{remote_} {}
+    : sock{new tcp::socket(std::move(sock_))}, remote{remote_} {
+    LOG_DEBUG(log, "connect_request_t, sock = {}, endpoint = {}", sock->native_handle(), remote);
+}
 
 auto connect_request_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     return applicator_t::apply_sibling(cluster);

@@ -59,6 +59,8 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
     if (pending_folders.size()) {
         assign(new add_pending_folders_t(std::move(pending_folders)));
     }
+
+    LOG_DEBUG(log, "remove_folder_t, folder_id = {}", folder_id);
 }
 
 auto remove_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {

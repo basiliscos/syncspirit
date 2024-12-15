@@ -6,7 +6,9 @@
 
 using namespace syncspirit::model::diff::contact;
 
-dial_request_t::dial_request_t(model::device_t &peer) noexcept : peer_id{peer.device_id().get_sha256()} {}
+dial_request_t::dial_request_t(model::device_t &peer) noexcept : peer_id{peer.device_id().get_sha256()} {
+    LOG_DEBUG(log, "dial_request_t, peer = ", peer.device_id().get_short());
+}
 
 auto dial_request_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     return applicator_t::apply_sibling(cluster);

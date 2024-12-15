@@ -3,16 +3,17 @@
 
 #include "unshare_folder.h"
 #include "remove_blocks.h"
-#include "remove_files.h"
 #include "remove_folder_infos.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
 unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, model::folder_info_t &folder_info,
-                                   orphaned_blocks_t *orphaned_blocks_) noexcept
-    : parent_t() {
+                                   orphaned_blocks_t *orphaned_blocks_) noexcept {
+    LOG_DEBUG(log, "unshare_folder_t folder = {}, peer = {}", folder_info.get_folder()->get_id(),
+              folder_info.get_device()->device_id());
 
     auto &peer = *folder_info.get_device();
     peer_id = peer.device_id().get_sha256();

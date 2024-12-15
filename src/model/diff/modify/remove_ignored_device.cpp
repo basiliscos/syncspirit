@@ -4,11 +4,14 @@
 #include "remove_ignored_device.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
 remove_ignored_device_t::remove_ignored_device_t(const ignored_device_t &device) noexcept
-    : device_key{device.get_key()} {}
+    : device_key{device.get_key()} {
+    LOG_DEBUG(log, "remove_ignored_device_t, device = {}", device.get_device_id());
+}
 
 auto remove_ignored_device_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     auto &ignored_devices = cluster.get_ignored_devices();

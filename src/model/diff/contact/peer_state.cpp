@@ -4,6 +4,7 @@
 #include "peer_state.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::contact;
 
@@ -15,6 +16,8 @@ peer_state_t::peer_state_t(cluster_t &cluster, std::string_view peer_id_, const 
     auto peer = cluster.get_devices().by_sha256(peer_id);
     assert(peer);
     has_been_online = (state == device_state_t::offline) && (peer->get_state() == device_state_t::online);
+    LOG_DEBUG(log, "peer_state_t, device = {}, cert = {}, client ({})", peer->device_id().get_short(), cert_name,
+              client_name, client_version);
 }
 
 auto peer_state_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {

@@ -3,12 +3,15 @@
 
 #include "relay_connect_request.h"
 #include "../cluster_visitor.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::contact;
 
 relay_connect_request_t::relay_connect_request_t(model::device_id_t peer_, std::string session_key_,
                                                  tcp::endpoint relay_) noexcept
-    : peer{std::move(peer_)}, session_key{std::move(session_key_)}, relay{std::move(relay_)} {}
+    : peer{std::move(peer_)}, session_key{std::move(session_key_)}, relay{std::move(relay_)} {
+    LOG_DEBUG(log, "relay_connect_request_t, device = {}, relay = {}", peer.get_short(), relay);
+}
 
 auto relay_connect_request_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
     return applicator_t::apply_sibling(cluster);
