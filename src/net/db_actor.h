@@ -68,6 +68,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> force_commit() noexcept;
 
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
+    void on_model_load_release(model::message::model_update_t &) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
     void on_db_info(message::db_info_request_t &) noexcept;
     void extracted(const model::folder_info_t &folder_info);

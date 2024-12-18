@@ -78,7 +78,6 @@ add_library(syncspirit_core
     src/model/diff/contact/unknown_connected.cpp
     src/model/diff/contact/update_contact.cpp
     src/model/diff/load/blocks.cpp
-    src/model/diff/load/close_transaction.cpp
     src/model/diff/load/devices.cpp
     src/model/diff/load/file_infos.cpp
     src/model/diff/load/folder_infos.cpp

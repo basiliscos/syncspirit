@@ -46,7 +46,10 @@ struct fixture_t {
     virtual supervisor_t::configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                p.subscribe_actor(r::lambda<load_msg_t>([&](load_msg_t &msg) { reply = &msg; }));
+                p.subscribe_actor(r::lambda<load_msg_t>([&](load_msg_t &msg) {
+                    reply = &msg;
+                    sup->send<model::payload::model_update_t>(db_addr, msg.payload.res.diff, nullptr);
+                }));
                 p.subscribe_actor(r::lambda<stats_msg_t>([&](stats_msg_t &msg) { stats_reply = &msg; }));
             });
         };
@@ -242,6 +245,7 @@ void test_unknown_and_ignored_devices_1() {
                 sup->do_process();
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
+                auto &diff = reply->payload.res.diff;
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
                 CHECK(cluster_clone->get_pending_devices().by_sha256(d_id1.get_sha256()));
                 CHECK(cluster_clone->get_ignored_devices().by_sha256(d_id2.get_sha256()));

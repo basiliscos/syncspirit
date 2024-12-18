@@ -126,7 +126,9 @@ void net_supervisor_t::load_db() noexcept {
 }
 
 void net_supervisor_t::seed_model() noexcept {
-    send<model::payload::model_update_t>(address, std::move(load_diff), nullptr);
+    auto message =
+        r::make_routed_message<model::payload::model_update_t>(address, db_addr, std::move(load_diff), nullptr);
+    put(std::move(message));
 }
 
 void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message) noexcept {
@@ -136,7 +138,9 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
         return do_shutdown(ee);
     }
     LOG_TRACE(log, "on_load_cluster");
-    load_diff = std::move(message.payload.res.diff);
+    auto &res = message.payload.res;
+
+    load_diff = std::move(res.diff);
     if (cluster_copies == 0) {
         seed_model();
     }

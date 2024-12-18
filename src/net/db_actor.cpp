@@ -11,7 +11,6 @@
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/contact/unknown_connected.h"
 #include "model/diff/load/blocks.h"
-#include "model/diff/load/close_transaction.h"
 #include "model/diff/load/devices.h"
 #include "model/diff/load/file_infos.h"
 #include "model/diff/load/folder_infos.h"
@@ -95,6 +94,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&db_actor_t::on_model_load_release);
                 plugin->subscribe_actor(&db_actor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&db_actor_t::on_db_info, coordinator);
             }
@@ -284,6 +284,9 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff.reset(new load::load_cluster_t());
 
+    auto txn_ptr = new db::transaction_t(std::move(txn));
+    txn_holder.reset(txn_ptr);
+
     diff->assign_child(new load::devices_t(std::move(devices_opt.value())))
         ->assign_sibling(new load::blocks_t(std::move(blocks_opt.value())))
         ->assign_sibling(new load::ignored_devices_t(std::move(ignored_devices_opt.value())))
@@ -292,17 +295,26 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         ->assign_sibling(new load::folder_infos_t(std::move(folder_infos_opt.value())))
         ->assign_sibling(new load::file_infos_t(std::move(file_infos_opt.value())))
         ->assign_sibling(new load::pending_devices_t(std::move(pending_devices_opt.value())))
-        ->assign_sibling(new load::pending_folders_t(std::move(pending_folders_opt.value())))
-        ->assign_sibling(new load::close_transaction_t(std::move(txn)));
+        ->assign_sibling(new load::pending_folders_t(std::move(pending_folders_opt.value())));
 
     reply_to(request, diff);
+}
+
+void db_actor_t::on_model_load_release(model::message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "on_model_load_release", identity);
+    auto r = txn_holder->commit();
+    txn_holder.release();
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        LOG_ERROR(log, "on_model_update error: {}", r.assume_error().message());
+        do_shutdown(ee);
+    }
 }
 
 void db_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update", identity);
     auto &diff = *message.payload.diff;
     auto set = folder_infos_set_t{};
-
     auto r = diff.visit(*this, &set);
     while (r && !set.empty()) {
         r = save_folder_info(**set.begin(), &set);
