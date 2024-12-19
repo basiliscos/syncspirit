@@ -10,7 +10,7 @@ namespace syncspirit::model::diff::modify {
 
 struct SYNCSPIRIT_API append_block_t final : block_transaction_t {
 
-    append_block_t(const file_info_t &file, size_t block_index, std::string data, dispose_callback_t callback) noexcept;
+    append_block_t(const file_info_t &file, size_t block_index, std::string data) noexcept;
 
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 

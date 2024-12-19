@@ -19,6 +19,7 @@ struct supervisor_config_t : r::supervisor_config_t {
     using parent_t = r::supervisor_config_t;
     using parent_t::parent_t;
     bool auto_finish = true;
+    bool auto_ack_blocks = true;
 };
 
 template <typename Supervisor> struct supervisor_config_builder_t : r::supervisor_config_builder_t<Supervisor> {
@@ -33,6 +34,12 @@ template <typename Supervisor> struct supervisor_config_builder_t : r::superviso
     /** \brief defines actor's startup policy */
     builder_t &&auto_finish(bool value) && noexcept {
         parent_t::config.auto_finish = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    /** \brief defines actor's startup policy */
+    builder_t &&auto_ack_blocks(bool value) && noexcept {
+        parent_t::config.auto_ack_blocks = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -56,7 +63,9 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t, private model::diff::
     void do_invoke_timer(r::request_id_t timer_id) noexcept;
     void do_cancel_timer(r::request_id_t timer_id) noexcept override;
 
-    outcome::result<void> operator()(const model::diff::modify::finish_file_t &, void *custom) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::finish_file_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
 
     utils::logger_t log;
     model::cluster_ptr_t cluster;
@@ -64,6 +73,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t, private model::diff::
     configure_callback_t configure_callback;
     timers_t timers;
     bool auto_finish;
+    bool auto_ack_blocks;
 };
 
 }; // namespace syncspirit::test

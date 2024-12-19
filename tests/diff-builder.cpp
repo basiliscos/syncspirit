@@ -213,14 +213,13 @@ diff_builder_t &diff_builder_t::update_contact(const model::device_id_t &device,
     return assign(new model::diff::contact::update_contact_t(cluster, device, uris));
 }
 
-diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target, size_t block_index, std::string data,
-                                             dispose_callback_t callback) noexcept {
-    return assign(new diff::modify::append_block_t(target, block_index, std::move(data), std::move(callback)));
+diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target, size_t block_index,
+                                             std::string data) noexcept {
+    return assign(new diff::modify::append_block_t(target, block_index, std::move(data)));
 }
 
-diff_builder_t &diff_builder_t::clone_block(const model::file_block_t &file_block,
-                                            dispose_callback_t callback) noexcept {
-    return assign(new diff::modify::clone_block_t(file_block, std::move(callback)));
+diff_builder_t &diff_builder_t::clone_block(const model::file_block_t &file_block) noexcept {
+    return assign(new diff::modify::clone_block_t(file_block));
 }
 
 diff_builder_t &diff_builder_t::ack_block(const model::diff::modify::block_transaction_t &diff) noexcept {

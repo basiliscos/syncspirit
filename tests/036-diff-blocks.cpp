@@ -6,6 +6,8 @@
 #include "model/cluster.h"
 #include "diff-builder.h"
 
+#include "model/diff/modify/append_block.h"
+#include "model/diff/modify/clone_block.h"
 #include "model/diff/local/blocks_availability.h"
 
 using namespace syncspirit;
@@ -54,13 +56,11 @@ TEST_CASE("various block diffs", "[model]") {
     file->assign_block(bi2, 1);
     REQUIRE(!file->is_locally_available());
 
-    auto callback = [&](diff::modify::block_transaction_t &diff) {
-        REQUIRE(diff.errors.load() == 0);
-        builder.ack_block(diff);
-    };
-
     SECTION("append") {
-        REQUIRE(builder.append_block(*file, 0, "12345", callback).apply());
+        auto diff_raw = new model::diff::modify::append_block_t(*file, 0, "12345");
+        auto diff = diff::cluster_diff_ptr_t(diff_raw);
+        diff->assign_sibling(diff_raw->ack().get());
+        REQUIRE(builder.assign(diff.get()).apply());
         auto &blocks = file->get_blocks();
 
         auto lf1 = blocks[0]->local_file();
@@ -87,7 +87,10 @@ TEST_CASE("various block diffs", "[model]") {
         b2->mark_local_available(source.get());
 
         auto fb = model::file_block_t(bi2.get(), file.get(), 1);
-        REQUIRE(builder.clone_block(fb, callback).apply());
+        auto diff_raw = new model::diff::modify::clone_block_t(fb);
+        auto diff = diff::cluster_diff_ptr_t(diff_raw);
+        diff->assign_sibling(diff_raw->ack().get());
+        REQUIRE(builder.assign(diff.get()).apply());
 
         auto &blocks = file->get_blocks();
         auto lf1 = blocks[1]->local_file();

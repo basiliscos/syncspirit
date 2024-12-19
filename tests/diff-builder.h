@@ -51,7 +51,6 @@ struct SYNCSPIRIT_TEST_API index_maker_t {
 
 struct SYNCSPIRIT_TEST_API diff_builder_t {
     using blocks_t = std::vector<proto::BlockInfo>;
-    using dispose_callback_t = model::diff::modify::block_transaction_t::dispose_callback_t;
 
     diff_builder_t(model::cluster_t &, r::address_ptr_t receiver = {}) noexcept;
     cluster_configurer_t configure_cluster(std::string_view sha256) noexcept;
@@ -69,9 +68,8 @@ struct SYNCSPIRIT_TEST_API diff_builder_t {
     diff_builder_t &remote_copy(const model::file_info_t &source) noexcept;
     diff_builder_t &finish_file(const model::file_info_t &file) noexcept;
     diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
-    diff_builder_t &append_block(const model::file_info_t &target, size_t block_index, std::string data,
-                                 dispose_callback_t) noexcept;
-    diff_builder_t &clone_block(const model::file_block_t &, dispose_callback_t) noexcept;
+    diff_builder_t &append_block(const model::file_info_t &target, size_t block_index, std::string data) noexcept;
+    diff_builder_t &clone_block(const model::file_block_t &) noexcept;
     diff_builder_t &ack_block(const model::diff::modify::block_transaction_t &) noexcept;
     diff_builder_t &remove_folder(const model::folder_t &folder) noexcept;
     diff_builder_t &remove_peer(const model::device_t &peer) noexcept;

@@ -117,7 +117,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using unlink_request_ptr_t = r::intrusive_ptr_t<unlink_request_t>;
     using unlink_requests_t = std::vector<unlink_request_ptr_t>;
     using block_write_queue_t = std::deque<model::diff::cluster_diff_ptr_t>;
-    using dispose_callback_t = model::diff::modify::block_transaction_t::dispose_callback_t;
     using block_set_t = std::unordered_set<model::block_info_ptr_t>;
 
     struct folder_synchronization_t : model::arc_base_t<folder_synchronization_t> {
@@ -166,7 +165,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void send_new_indices() noexcept;
     void push_block_write(model::diff::cluster_diff_ptr_t block) noexcept;
     void process_block_write() noexcept;
-    dispose_callback_t make_callback() noexcept;
 
     void push(model::diff::cluster_diff_ptr_t diff) noexcept;
     void send_diff() noexcept;

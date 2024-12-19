@@ -282,10 +282,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     }
 
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff.reset(new load::load_cluster_t());
-
-    auto txn_ptr = new db::transaction_t(std::move(txn));
-    txn_holder.reset(txn_ptr);
+    diff.reset(new load::load_cluster_t(std::move(txn)));
 
     diff->assign_child(new load::devices_t(std::move(devices_opt.value())))
         ->assign_sibling(new load::blocks_t(std::move(blocks_opt.value())))
@@ -301,9 +298,19 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
 }
 
 void db_actor_t::on_model_load_release(model::message::model_update_t &message) noexcept {
+    struct custom_visitor_t : model::diff::cluster_visitor_t {
+        outcome::result<void> operator()(const model::diff::load::load_cluster_t &diff,
+                                         void *custom) noexcept override {
+            auto self = static_cast<db_actor_t *>(custom);
+            LOG_DEBUG(self->log, "closing load transaction");
+            auto &txn = const_cast<db::transaction_t &>(diff.txn);
+            return txn.commit();
+        }
+    };
+
+    auto visitor = custom_visitor_t();
     LOG_TRACE(log, "on_model_load_release", identity);
-    auto r = txn_holder->commit();
-    txn_holder.release();
+    auto r = message.payload.diff->visit(visitor, this);
     if (!r) {
         auto ee = make_error(r.assume_error());
         LOG_ERROR(log, "on_model_update error: {}", r.assume_error().message());

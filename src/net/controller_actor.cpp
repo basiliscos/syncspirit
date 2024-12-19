@@ -372,7 +372,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
     if (file_block.is_locally_available()) {
         LOG_TRACE(log, "cloning locally available block, file = {}, block index = {} / {}", file->get_full_name(),
                   file_block.block_index(), file->get_blocks().size() - 1);
-        auto diff = cluster_diff_ptr_t(new modify::clone_block_t(file_block, make_callback()));
+        auto diff = cluster_diff_ptr_t(new modify::clone_block_t(file_block));
         push_block_write(std::move(diff));
     } else {
         auto sz = block->get_size();
@@ -754,7 +754,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
 
             LOG_TRACE(log, "{}, got block {}, write requests left = {}", file->get_name(), index,
                       cluster->get_write_requests());
-            auto diff = cluster_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data), make_callback()));
+            auto diff = cluster_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
             push_block_write(std::move(diff));
         }
     }
@@ -803,24 +803,6 @@ void controller_actor_t::release_block(const model::file_block_t &file_block) no
     auto block = file_block.block();
     auto folder = file_block.file()->get_folder_info()->get_folder();
     get_sync_info(folder)->finish_fetching(block);
-}
-
-auto controller_actor_t::make_callback() noexcept -> dispose_callback_t {
-    using pointer_t = r::intrusive_ptr_t<controller_actor_t>;
-    auto address = coordinator;
-    auto sup = r::supervisor_ptr_t{supervisor};
-    return [sup = std::move(sup), address = std::move(address),
-            this](model::diff::modify::block_transaction_t &source_diff) {
-        bool ok = source_diff.errors.load() == 0;
-        auto diff = model::diff::cluster_diff_ptr_t{};
-        if (ok) {
-            diff = new model::diff::modify::block_ack_t(source_diff);
-        } else {
-            diff = new model::diff::modify::block_rej_t(source_diff);
-        }
-        auto msg = r::make_message<model::payload::model_update_t>(coordinator, std::move(diff), this);
-        sup->enqueue(std::move(msg));
-    };
 }
 
 controller_actor_t::pull_signal_t::pull_signal_t(void *controller_) noexcept : controller{controller_} {}

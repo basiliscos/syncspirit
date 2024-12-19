@@ -6,6 +6,8 @@
 
 using namespace syncspirit::model::diff::load;
 
+load_cluster_t::load_cluster_t(db::transaction_t txn_) noexcept : txn{std::move(txn_)} {}
+
 auto load_cluster_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     return visitor(*this, custom);
 }

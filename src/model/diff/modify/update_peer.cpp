@@ -15,9 +15,7 @@ using namespace syncspirit::model::diff::modify;
 update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
                              const model::cluster_t &cluster) noexcept
     : item{std::move(db)}, peer_id{device_id.get_sha256()} {
-    auto &devices = cluster.get_devices();
-    auto peer = devices.by_sha256(peer_id);
-    LOG_DEBUG(log, "update_peer_t, peer = {}", peer->device_id());
+    LOG_DEBUG(log, "update_peer_t, peer = {}", device_id.get_short());
 
     auto &ignored_devices = cluster.get_ignored_devices();
     auto &pending_devices = cluster.get_pending_devices();

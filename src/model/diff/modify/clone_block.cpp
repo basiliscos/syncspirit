@@ -7,8 +7,8 @@
 
 using namespace syncspirit::model::diff::modify;
 
-clone_block_t::clone_block_t(const file_block_t &file_block, dispose_callback_t callback) noexcept
-    : block_transaction_t{*file_block.file(), file_block.block_index(), std::move(callback)} {
+clone_block_t::clone_block_t(const file_block_t &file_block) noexcept
+    : block_transaction_t{*file_block.file(), file_block.block_index()} {
     const file_info_t *source_file = nullptr;
     auto &block_pieces = file_block.block()->get_file_blocks();
     for (auto &b : block_pieces) {

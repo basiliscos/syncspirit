@@ -75,6 +75,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> save_folder_info(const model::folder_info_t &, void *) noexcept;
 
     outcome::result<void> save(db::transaction_t &txn, model::folder_info_ptr_t &folder_info) noexcept;
+    outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::contact::ignored_connected_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::contact::unknown_connected_t &, void *) noexcept override;
@@ -82,7 +83,6 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> operator()(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_folders_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::generic_remove_t &) noexcept;
     outcome::result<void> operator()(const model::diff::modify::remove_blocks_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_files_t &, void *) noexcept override;

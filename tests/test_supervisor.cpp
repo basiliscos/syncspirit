@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test_supervisor.h"
+#include "model/diff/modify/clone_block.h"
+#include "model/diff/modify/append_block.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/advance/remote_copy.h"
 #include "net/names.h"
@@ -28,6 +30,7 @@ using namespace syncspirit::test;
 
 supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) {
     auto_finish = cfg.auto_finish;
+    auto_ack_blocks = cfg.auto_ack_blocks;
     sequencer = model::make_sequencer(1234);
 }
 
@@ -110,5 +113,21 @@ auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
         auto ack = model::diff::advance::remote_copy_t::create(*file, *sequencer);
         send<model::payload::model_update_t>(get_address(), std::move(ack), this);
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
+}
+
+auto supervisor_t::operator()(const model::diff::modify::append_block_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (auto_ack_blocks) {
+        send<model::payload::model_update_t>(address, diff.ack(), this);
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto supervisor_t::operator()(const model::diff::modify::clone_block_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (auto_ack_blocks) {
+        send<model::payload::model_update_t>(address, diff.ack(), this);
+    }
+    return diff.visit_next(*this, custom);
 }

@@ -70,12 +70,13 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
   private:
     using cache_t = model::mru_list_t<file_ptr_t>;
 
-    struct write_ack_t {
-        write_ack_t(const model::diff::modify::block_transaction_t &txn) noexcept;
-        ~write_ack_t();
+    struct write_guard_t {
+        write_guard_t(file_actor_t &actor, const model::diff::modify::block_transaction_t &txn) noexcept;
+        ~write_guard_t();
 
         outcome::result<void> operator()(outcome::result<void> result) noexcept;
 
+        file_actor_t &actor;
         const model::diff::modify::block_transaction_t &txn;
         bool success;
     };
