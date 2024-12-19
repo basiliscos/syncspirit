@@ -1,10 +1,13 @@
 #include "version.h"
 #include "device.h"
+#include "utils/time.h"
 #include <limits>
 
 static constexpr auto undef = std::numeric_limits<size_t>::max();
 
 using namespace syncspirit::model;
+
+// auto now = r::pt::second_clock::local_time();
 
 version_t::version_t(const proto::Vector &v) noexcept {
     assert(v.counters_size());
@@ -40,11 +43,12 @@ void version_t::to_proto(proto::Vector &v) const noexcept {
 }
 
 void version_t::update(const device_t &device) noexcept {
+    using clock_t = utils::pt::second_clock;
     auto id = device.as_uint();
-    auto v = std::uint64_t{0};
+    auto v = static_cast<std::uint64_t>(utils::as_seconds(clock_t::local_time()));
     auto counter = (proto::Counter *)(nullptr);
     if (best_index != undef) {
-        v = counters[best_index].value() + 1;
+        v = std::max(counters[best_index].value() + 1, v);
         best_index = undef;
         for (size_t i = 0; i < counters.size(); ++i) {
             if (counters[i].id() == id) {
