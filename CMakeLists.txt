@@ -134,7 +134,6 @@ add_library(syncspirit_core
     src/model/misc/sequencer.cpp
     src/model/misc/updates_streamer.cpp
     src/model/misc/uuid.cpp
-    src/model/misc/version_utils.cpp
     src/model/block_info.cpp
     src/model/cluster.cpp
     src/model/device.cpp

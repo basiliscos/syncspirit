@@ -3,7 +3,6 @@
 
 #include "scan_task.h"
 #include "utils.h"
-#include "model/misc/version_utils.h"
 
 using namespace syncspirit::fs;
 

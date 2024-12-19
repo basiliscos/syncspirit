@@ -3,7 +3,6 @@
 
 #include "local_update.h"
 #include "model/cluster.h"
-#include "model/misc/version_utils.h"
 #include "../cluster_visitor.h"
 
 using namespace syncspirit::model::diff::advance;
