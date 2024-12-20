@@ -17,6 +17,5 @@ enum class advance_action_t {
 };
 
 advance_action_t SYNCSPIRIT_API resolve(const file_info_t &remote) noexcept;
-advance_action_t SYNCSPIRIT_API resolve(const file_info_t &remote, const file_info_t *local) noexcept;
 
 } // namespace syncspirit::model

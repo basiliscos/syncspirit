@@ -286,5 +286,26 @@ TEST_CASE("resolver", "[model]") {
             auto action = resolve(*file_remote);
             CHECK(action == A::resolve_local_win);
         }
+        SECTION("no recursive conflicts are allowed -> ignore") {
+            auto name = std::string("a.txt..sync-conflict-20060102-150405-XBOWT");
+            pr_remote.set_name(name);
+            pr_local.set_name(name);
+
+            auto c2_remote = pr_remote.mutable_version()->add_counters();
+            c2_remote->set_id(2);
+            c2_remote->set_value(4);
+
+            auto c2_local = pr_local.mutable_version()->add_counters();
+            c2_local->set_id(3);
+            c2_local->set_value(4);
+
+            auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+            auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
+            file_local->mark_local();
+            folder_peer->add_strict(file_remote);
+            folder_my->add_strict(file_local);
+            auto action = resolve(*file_remote);
+            CHECK(action == A::ignore);
+        }
     }
 }

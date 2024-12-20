@@ -5,11 +5,9 @@
 #include "model/cluster.h"
 #include "model/folder_info.h"
 
-#include <algorithm>
-
 namespace syncspirit::model {
 
-advance_action_t resolve(const file_info_t &remote, const file_info_t *local) noexcept {
+static advance_action_t resolve(const file_info_t &remote, const file_info_t *local) noexcept {
     if (remote.is_unreachable()) {
         return advance_action_t::ignore;
     }
@@ -56,6 +54,8 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local) no
     auto &l_best = l_v.get_best();
     auto rv = r_best.value();
     auto lv = l_best.value();
+    auto r_id = r_best.id();
+    auto l_id = l_best.id();
 
     // check posssible conflict
     if (r_best.id() == l_best.id()) {
@@ -90,21 +90,7 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local) no
             return advance_action_t::resolve_local_win;
         }
 
-        auto remote_device = remote.get_folder_info()->get_device();
-        auto local_device = local->get_folder_info()->get_device();
-        auto remote_bytes = remote_device->device_id().get_sha256();
-        auto local_bytes = local_device->device_id().get_sha256();
-        assert(remote_bytes.size() == local_bytes.size());
-        for (size_t j = 0; j < remote_bytes.size(); ++j) {
-            auto rb = remote_bytes[j];
-            auto lb = local_bytes[j];
-            if (rb > lb) {
-                return advance_action_t::resolve_remote_win;
-            } else if (lb > rb) {
-                return advance_action_t::resolve_local_win;
-            }
-        }
-        assert(0 && "should not happen");
+        return r_id >= l_id ? advance_action_t::resolve_remote_win : advance_action_t::resolve_local_win;
     }
     return advance_action_t::ignore;
 }
@@ -114,7 +100,15 @@ advance_action_t resolve(const file_info_t &remote) noexcept {
     auto self = folder->get_cluster()->get_device();
     auto local_folder = folder->get_folder_infos().by_device(*self);
     auto local_file = local_folder->get_file_infos().by_name(remote.get_name());
-    return resolve(remote, local_file.get());
+    auto action = resolve(remote, local_file.get());
+    auto has_conflict = action == advance_action_t::resolve_local_win || action == advance_action_t::resolve_remote_win;
+    if (has_conflict) {
+        auto name = remote.get_path().filename().string();
+        if (name.find(".sync-conflict-") != std::string::npos) {
+            action = advance_action_t::ignore;
+        }
+    }
+    return action;
 }
 
 } // namespace syncspirit::model
