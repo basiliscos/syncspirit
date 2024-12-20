@@ -307,5 +307,61 @@ TEST_CASE("resolver", "[model]") {
             auto action = resolve(*file_remote);
             CHECK(action == A::ignore);
         }
+        SECTION("locally version < remote version, already resolved -> ignore") {
+            auto c2_remote = pr_remote.mutable_version()->add_counters();
+            c2_remote->set_id(2);
+            c2_remote->set_value(4);
+
+            auto c2_local = pr_local.mutable_version()->add_counters();
+            c2_local->set_id(3);
+            c2_local->set_value(3);
+
+            auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+            auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
+            file_local->mark_local();
+            folder_my->add_strict(file_local);
+            folder_peer->add_strict(file_remote);
+
+            pr_local.mutable_version()->clear_counters();
+            auto c2_local_r = pr_local.mutable_version()->add_counters();
+            c2_local->set_id(3);
+            c2_local->set_value(1);
+            pr_local.set_name(file_local->make_conflicting_name());
+            pr_local.set_sequence(folder_my->get_max_sequence() + 1);
+            auto file_resolved = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
+            file_resolved->mark_local();
+            REQUIRE(folder_my->add_strict(file_resolved));
+
+            auto action = resolve(*file_remote);
+            CHECK(action == A::ignore);
+        }
+        SECTION("locally version > remote version, already resolved -> ignore") {
+            auto c2_remote = pr_remote.mutable_version()->add_counters();
+            c2_remote->set_id(2);
+            c2_remote->set_value(3);
+
+            auto c2_local = pr_local.mutable_version()->add_counters();
+            c2_local->set_id(3);
+            c2_local->set_value(4);
+
+            auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+            auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
+            file_local->mark_local();
+            folder_my->add_strict(file_local);
+            folder_peer->add_strict(file_remote);
+
+            pr_local.mutable_version()->clear_counters();
+            auto c2_local_r = pr_local.mutable_version()->add_counters();
+            c2_local->set_id(3);
+            c2_local->set_value(1);
+            pr_local.set_name(file_remote->make_conflicting_name());
+            pr_local.set_sequence(folder_my->get_max_sequence() + 1);
+            auto file_resolved = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
+            file_resolved->mark_local();
+            REQUIRE(folder_my->add_strict(file_resolved));
+
+            auto action = resolve(*file_remote);
+            CHECK(action == A::ignore);
+        }
     }
 }
