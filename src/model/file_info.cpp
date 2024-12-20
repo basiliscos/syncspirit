@@ -9,7 +9,6 @@
 #include "fs/utils.h"
 #include "misc/error_code.h"
 #include "misc/file_iterator.h"
-#include "utils/log.h"
 #include "utils/string_comparator.hpp"
 #include <zlib.h>
 #include <spdlog/spdlog.h>
@@ -429,6 +428,21 @@ bool file_info_t::is_global() const noexcept {
         }
     }
     return true;
+}
+
+std::string file_info_t::make_conflicting_name() const noexcept {
+    auto path = bfs::path(name);
+    auto file_name = path.filename();
+    auto stem = file_name.stem().string();
+    auto ext = file_name.extension().string();
+    auto moment = pt::from_time_t(modified_s);
+    auto ymd = moment.date().year_month_day();
+    auto time = moment.time_of_day();
+    auto conflicted_name = fmt::format("{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year,
+                                       ymd.month.as_number(), ymd.day.as_number(), time.hours(), time.minutes(),
+                                       time.seconds(), folder_info->get_device()->device_id().get_short(), ext);
+    auto full_name = path.parent_path() / conflicted_name;
+    return full_name.string();
 }
 
 auto file_info_t::guard() noexcept -> guard_ptr_t { return new guard_t(*this); }

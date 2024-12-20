@@ -32,6 +32,7 @@ TEST_CASE("file-info", "[model]") {
     pr_fi.set_size(55ul);
     pr_fi.set_block_size(5ul);
     pr_fi.set_sequence(6);
+    pr_fi.set_modified_s(1734680712);
     auto &c = *pr_fi.mutable_version()->add_counters();
     c.set_id(my_device->as_uint());
     c.set_value(0);
@@ -54,4 +55,7 @@ TEST_CASE("file-info", "[model]") {
     CHECK(map.by_name(pr_fi.name()) == fi);
     CHECK(map.by_sequence(10) == fi);
     CHECK(!map.by_sequence(pr_fi.sequence()));
+
+    auto conflict_name = fi->make_conflicting_name();
+    CHECK(conflict_name == "a/b.sync-conflict-20241220-074512-KHQNO2S.txt");
 }
