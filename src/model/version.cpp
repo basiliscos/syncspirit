@@ -60,7 +60,7 @@ void version_t::update(const device_t &device) noexcept {
     }
     if (best_index == undef) {
         counters.emplace_back(proto::Counter());
-        counter = &counters[0];
+        counter = &counters.back();
         counter->set_id(id);
         best_index = &counters.back() - counters.data();
     }
@@ -106,7 +106,7 @@ bool version_t::identical_to(const version_t &other) noexcept {
     return false;
 }
 
-size_t version_t::counters_count() const { return counters.size(); }
+size_t version_t::counters_size() const { return counters.size(); }
 
 auto version_t::get_counter(size_t index) noexcept -> const proto::Counter & {
     assert(index <= counters.size());

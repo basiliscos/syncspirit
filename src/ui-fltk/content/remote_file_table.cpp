@@ -105,7 +105,7 @@ void remote_file_table_t::refresh() {
     for (int i = 0; i < static_cast<int>(displayed_versions); ++i) {
         remove_row(4);
     }
-    displayed_versions = version->counters_count();
+    displayed_versions = version->counters_size();
     for (size_t i = 0; i < displayed_versions; ++i) {
         auto &counter = version->get_counter(i);
         auto modification_device = std::string_view("*unknown*");

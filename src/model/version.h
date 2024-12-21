@@ -25,7 +25,7 @@ struct SYNCSPIRIT_API version_t final : arc_base_t<version_t> {
     const proto::Counter &get_counter(size_t) noexcept;
     bool contains(const version_t &other) noexcept;
     bool identical_to(const version_t &) noexcept;
-    size_t counters_count() const;
+    size_t counters_size() const;
 
   private:
     using counters_t = std::vector<proto::Counter>;

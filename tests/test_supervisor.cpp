@@ -110,7 +110,7 @@ auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
         auto file = file_info->get_file_infos().by_name(diff.file_name);
-        auto ack = model::diff::advance::remote_copy_t::create(*file, *sequencer);
+        auto ack = model::diff::advance::advance_t::create(diff.action, *file, *sequencer);
         send<model::payload::model_update_t>(get_address(), std::move(ack), this);
     }
     return diff.visit_next(*this, custom);

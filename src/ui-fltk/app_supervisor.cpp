@@ -351,7 +351,7 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
     auto generic_augmnetation = local_fi->get_augmentation();
     auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
     auto folder_entry = static_cast<tree_item::folder_t *>(augmentation->get_owner());
-    auto local_file = local_fi->get_file_infos().by_name(diff.proto_file.name());
+    auto local_file = local_fi->get_file_infos().by_name(diff.proto_local.name());
     if (!local_file->get_augmentation()) {
         auto path = bfs::path(local_file->get_name());
         auto dir = folder_entry->locate_dir(path.parent_path());

@@ -330,13 +330,12 @@ OUTER:
             }
         }
         if (auto [file, action] = file_iterator->next(); action != model::advance_action_t::ignore) {
-            auto _ = model::resolve(*file);
             auto in_sync = synchronizing_files.count(file);
             if (in_sync) {
                 continue;
             }
             if (file->is_locally_available()) {
-                auto diff = model::diff::advance::advance_t::create(*file, *sequencer);
+                auto diff = model::diff::advance::advance_t::create(action, *file, *sequencer);
                 if (diff) {
                     ++advances;
                     push(std::move(diff));
@@ -443,9 +442,10 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
     -> outcome::result<void> {
     auto ctx = reinterpret_cast<context_t *>(custom);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto &self = *cluster->get_device();
     auto &folder_infos = folder->get_folder_infos();
-    auto folder_info = folder_infos.by_device_id(diff.peer_id);
-    auto file = folder_info->get_file_infos().by_name(diff.proto_file.name());
+    auto peer_folder = folder_infos.by_device_id(diff.peer_id);
+    auto file = peer_folder->get_file_infos().by_name(diff.proto_source.name());
     auto local_file = model::file_info_ptr_t();
     assert(file);
     if (diff.peer_id == peer->device_id().get_sha256()) {
@@ -457,8 +457,10 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
             }
         }
     }
-    if (diff.peer_id == cluster->get_device()->device_id().get_sha256()) {
-        local_file = file;
+    if (diff.peer_id == self.device_id().get_sha256()) {
+        auto local_folder = folder_infos.by_device(self);
+        local_file = local_folder->get_file_infos().by_name(diff.proto_local.name());
+        assert(local_file);
     }
     if (local_file) {
         if (updates_streamer) {

@@ -67,7 +67,7 @@ TEST_CASE("with file", "[model]") {
     REQUIRE(file);
 
     auto v = file->get_version();
-    REQUIRE(v->counters_count() == 1);
+    REQUIRE(v->counters_size() == 1);
     REQUIRE(v->get_counter(0).id() == my_device->as_uint());
 
     SECTION("lock/unlock") {

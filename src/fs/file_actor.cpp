@@ -195,7 +195,7 @@ auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, v
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
-    auto file = file_info->get_file_infos().by_name(diff.proto_file.name());
+    auto file = file_info->get_file_infos().by_name(diff.proto_source.name());
     auto r = reflect(file);
     return r ? diff.visit_next(*this, custom) : r;
 }
@@ -230,7 +230,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
 
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
 
-    auto ack = model::diff::advance::advance_t::create(*file, *sequencer);
+    auto ack = model::diff::advance::advance_t::create(diff.action, *file, *sequencer);
     send<model::payload::model_update_t>(coordinator, std::move(ack), this);
     return diff.visit_next(*this, custom);
 }

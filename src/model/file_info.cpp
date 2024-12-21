@@ -354,7 +354,7 @@ std::int64_t file_info_t::get_size() const noexcept {
 
 std::size_t file_info_t::expected_meta_size() const noexcept {
     auto r = name.size() + 1 + 8 + 4 + 8 + 4 + 8 + 3 + 8 + 4 + symlink_target.size();
-    r += version->counters_count() * 16;
+    r += version->counters_size() * 16;
     r += blocks.size() * (8 + 4 + 4 + 32);
     return r;
 }

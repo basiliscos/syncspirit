@@ -594,7 +594,7 @@ void test_remove_file() {
             auto file = files->by_name("file.ext");
             REQUIRE(file);
             REQUIRE(blocks.size() == 1);
-            REQUIRE(file->get_version()->counters_count() == 1);
+            REQUIRE(file->get_version()->counters_size() == 1);
             auto counter = file->get_version()->get_best();
 
             auto prev_finish = folder->get_scan_finish();
@@ -606,7 +606,7 @@ void test_remove_file() {
             CHECK(file->is_deleted() == 1);
             CHECK(file->is_local());
             CHECK(blocks.size() == 0);
-            CHECK(file->get_version()->counters_count() == 1);
+            CHECK(file->get_version()->counters_size() == 1);
             CHECK(file->get_version()->get_best().id() == counter.id());
             CHECK(file->get_version()->get_best().value() > counter.value());
             REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());

@@ -6,6 +6,7 @@
 #include "../cluster_diff.h"
 #include "model/file_info.h"
 #include "model/device.h"
+#include "model/misc/resolver.h"
 
 namespace syncspirit::model::diff::modify {
 
@@ -17,6 +18,7 @@ struct SYNCSPIRIT_API finish_file_t final : cluster_diff_t {
     std::string folder_id;
     std::string peer_id;
     std::string file_name;
+    model::advance_action_t action;
 };
 
 } // namespace syncspirit::model::diff::modify

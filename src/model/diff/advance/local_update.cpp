@@ -20,9 +20,11 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &local_folder_infos = folder->get_folder_infos();
     auto local_folder_info = local_folder_infos.by_device_id(self_id);
     auto &local_files = local_folder_info->get_file_infos();
-    auto local_file = local_files.by_name(proto_file.name());
-    auto &proto_version = *proto_file.mutable_version();
+    auto local_file = local_files.by_name(proto_source.name());
 
+    initialize(cluster, sequencer, proto_source.name());
+
+    auto &proto_version = *proto_local.mutable_version();
     auto version = version_ptr_t();
     if (local_file) {
         version = local_file->get_version();
@@ -31,10 +33,9 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
         version.reset(new version_t(device));
     }
     version->to_proto(proto_version);
-    initialize(cluster, sequencer);
 }
 
 auto local_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "visiting local_update_t, folder = {}, file = {}", folder_id, proto_file.name());
+    LOG_TRACE(log, "visiting local_update_t, folder = {}, file = {}", folder_id, proto_local.name());
     return visitor(*this, custom);
 }

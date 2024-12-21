@@ -181,7 +181,8 @@ diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcep
 }
 
 diff_builder_t &diff_builder_t::remote_copy(const model::file_info_t &source) noexcept {
-    auto diff = diff::advance::remote_copy_t::create(source, *sequencer);
+    auto action = model::advance_action_t::remote_copy;
+    auto diff = diff::advance::remote_copy_t::create(action, source, *sequencer);
     return assign(diff.get());
 }
 

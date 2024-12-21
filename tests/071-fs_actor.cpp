@@ -275,10 +275,15 @@ void test_append_block() {
             cluster->get_blocks().put(b2);
             auto blocks = std::vector<block_info_ptr_t>{b, b2};
 
-            auto make_file = [&](size_t count) {
+            auto make_file = [&](size_t block_count) {
                 pr_source.set_sequence(++next_sequence);
-                auto file = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
-                for (size_t i = 0; i < count; ++i) {
+                auto copy = pr_source;
+                auto &v = *copy.mutable_version();
+                auto version = model::version_t(v);
+                version.update(*peer_device);
+                version.to_proto(v);
+                auto file = file_info_t::create(sequencer->next_uuid(), copy, folder_peer).value();
+                for (size_t i = 0; i < block_count; ++i) {
                     file->assign_block(blocks[i], i);
                 }
                 REQUIRE(folder_peer->add_strict(file));
@@ -290,12 +295,9 @@ void test_append_block() {
             SECTION("file with 1 block") {
                 pr_source.set_size(5ul);
                 auto peer_file = make_file(1);
-                builder.remote_copy(*peer_file).apply(*sup);
-
-                auto file = folder_my->get_file_infos().by_name(pr_source.name());
-
                 builder.append_block(*peer_file, 0, "12345").apply(*sup).finish_file(*peer_file).apply(*sup);
 
+                auto file = folder_my->get_file_infos().by_name(pr_source.name());
                 auto path = root_path / std::string(file->get_name());
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 5);
@@ -307,13 +309,10 @@ void test_append_block() {
                 pr_source.set_size(10ul);
 
                 auto peer_file = make_file(2);
-                builder.remote_copy(*peer_file).apply(*sup);
-
-                auto file = folder_my->get_file_infos().by_name(pr_source.name());
 
                 builder.append_block(*peer_file, 0, "12345").apply(*sup);
 
-                auto filename = std::string(file->get_name()) + ".syncspirit-tmp";
+                auto filename = std::string(peer_file->get_name()) + ".syncspirit-tmp";
                 auto path = root_path / filename;
 #ifndef SYNCSPIRIT_WIN
                 REQUIRE(bfs::exists(path));
@@ -326,7 +325,7 @@ void test_append_block() {
                 SECTION("add 2nd block") {
                     builder.finish_file(*peer_file).apply(*sup);
 
-                    filename = std::string(file->get_name());
+                    filename = std::string(peer_file->get_name());
                     path = root_path / filename;
                     REQUIRE(bfs::exists(path));
                     REQUIRE(bfs::file_size(path) == 10);
@@ -409,13 +408,10 @@ void test_clone_block() {
                     auto source = make_file(pr_source, 1);
                     auto target = make_file(pr_target, 1);
 
-                    builder.remote_copy(*source).remote_copy(*target).apply(*sup);
-
                     auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
-                    auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
-
                     builder.append_block(*source_file, 0, "12345").apply(*sup).finish_file(*source_file).apply(*sup);
 
+                    auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
                     auto block = source_file->get_blocks()[0];
                     auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
                     builder.clone_block(file_block).apply(*sup).finish_file(*target).apply(*sup);
@@ -434,13 +430,11 @@ void test_clone_block() {
                     auto source = make_file(pr_source, 2);
                     auto target = make_file(pr_target, 2);
 
-                    builder.remote_copy(*source).remote_copy(*target).apply(*sup);
-
                     auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
-                    auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
 
                     builder.append_block(*source_file, 0, "12345").append_block(*source_file, 1, "67890").apply(*sup);
 
+                    auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
                     auto blocks = source_file->get_blocks();
                     auto fb_1 = model::file_block_t(blocks[0].get(), target_file.get(), 0);
                     auto fb_2 = model::file_block_t(blocks[1].get(), target_file.get(), 1);
@@ -463,8 +457,6 @@ void test_clone_block() {
                     auto source = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
                     source->assign_block(blocks[1], 0);
                     REQUIRE(folder_peer->add_strict(source));
-
-                    builder.remote_copy(*source).remote_copy(*target).apply(*sup);
 
                     auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
                     auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
@@ -492,8 +484,6 @@ void test_clone_block() {
                 source->assign_block(blocks[0], 0);
                 source->assign_block(blocks[0], 1);
                 REQUIRE(folder_peer->add_strict(source));
-
-                builder.remote_copy(*source).apply(*sup);
 
                 auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
                 auto target_file = source_file;
