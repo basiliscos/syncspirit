@@ -612,66 +612,101 @@ void test_remote_win() {
             pr_fi.set_name("q.txt");
             pr_fi.set_modified_s(modified);
             pr_fi.set_sequence(folder_peer->get_max_sequence() + 1);
-            pr_fi.set_block_size(5);
-            pr_fi.set_size(5);
 
-            auto peer_block = []() {
-                auto block = proto::BlockInfo();
-                block.set_hash(utils::sha256_digest("12345").value());
-                block.set_offset(0);
-                block.set_size(5);
-                auto bi = block_info_t::create(block).value();
-                return bi;
-            }();
-            blocks_map.put(peer_block);
+            SECTION("file with blocks (via file_finish)") {
+                pr_fi.set_block_size(5);
+                pr_fi.set_size(5);
 
-            auto my_block = []() {
-                auto block = proto::BlockInfo();
-                block.set_hash(utils::sha256_digest("67890").value());
-                block.set_offset(0);
-                block.set_size(5);
-                auto bi = block_info_t::create(block).value();
-                return bi;
-            }();
-            blocks_map.put(my_block);
+                auto peer_block = []() {
+                    auto block = proto::BlockInfo();
+                    block.set_hash(utils::sha256_digest("12345").value());
+                    block.set_offset(0);
+                    block.set_size(5);
+                    auto bi = block_info_t::create(block).value();
+                    return bi;
+                }();
+                blocks_map.put(peer_block);
 
-            auto peer_file = [&]() {
-                auto counter = pr_fi.mutable_version()->add_counters();
-                counter->set_id(peer_device->as_uint());
-                counter->set_value(10);
-                *pr_fi.add_blocks() = peer_block->as_bep(0);
-                auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
-                REQUIRE(folder_peer->add_strict(file));
-                pr_fi.mutable_version()->clear_counters();
-                pr_fi.clear_blocks();
+                auto my_block = []() {
+                    auto block = proto::BlockInfo();
+                    block.set_hash(utils::sha256_digest("67890").value());
+                    block.set_offset(0);
+                    block.set_size(5);
+                    auto bi = block_info_t::create(block).value();
+                    return bi;
+                }();
+                blocks_map.put(my_block);
 
-                file->assign_block(peer_block, 0);
-                return file;
-            }();
+                auto peer_file = [&]() {
+                    auto counter = pr_fi.mutable_version()->add_counters();
+                    counter->set_id(peer_device->as_uint());
+                    counter->set_value(10);
+                    *pr_fi.add_blocks() = peer_block->as_bep(0);
+                    auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
+                    REQUIRE(folder_peer->add_strict(file));
+                    pr_fi.mutable_version()->clear_counters();
+                    pr_fi.clear_blocks();
 
-            auto my_file = [&]() {
-                auto counter = pr_fi.mutable_version()->add_counters();
-                counter->set_id(my_device->as_uint());
-                counter->set_value(5);
-                *pr_fi.add_blocks() = my_block->as_bep(0);
-                auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
-                REQUIRE(folder_my->add_strict(file));
-                file->mark_local();
+                    file->assign_block(peer_block, 0);
+                    return file;
+                }();
 
-                file->assign_block(my_block, 0);
-                return file;
-            }();
+                auto my_file = [&]() {
+                    auto counter = pr_fi.mutable_version()->add_counters();
+                    counter->set_id(my_device->as_uint());
+                    counter->set_value(5);
+                    *pr_fi.add_blocks() = my_block->as_bep(0);
+                    auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
+                    REQUIRE(folder_my->add_strict(file));
+                    file->mark_local();
 
-            bfs::path kept_file = root_path / pr_fi.name();
-            write_file(kept_file, "12345");
+                    file->assign_block(my_block, 0);
+                    return file;
+                }();
 
-            REQUIRE(model::resolve(*peer_file) == advance_action_t::resolve_remote_win);
-            builder.append_block(*peer_file, 0, "67890").apply(*sup).finish_file(*peer_file).apply(*sup);
+                bfs::path kept_file = root_path / pr_fi.name();
+                write_file(kept_file, "12345");
 
-            auto conflict_file = root_path / my_file->make_conflicting_name();
-            CHECK(read_file(kept_file) == "67890");
-            CHECK(bfs::exists(conflict_file));
-            CHECK(read_file(conflict_file) == "12345");
+                REQUIRE(model::resolve(*peer_file) == advance_action_t::resolve_remote_win);
+                builder.append_block(*peer_file, 0, "67890").apply(*sup).finish_file(*peer_file).apply(*sup);
+
+                auto conflict_file = root_path / my_file->make_conflicting_name();
+                CHECK(read_file(kept_file) == "67890");
+                CHECK(bfs::exists(conflict_file));
+                CHECK(read_file(conflict_file) == "12345");
+            }
+            SECTION("emtpy file vs directory") {
+                auto peer_file = [&]() {
+                    auto counter = pr_fi.mutable_version()->add_counters();
+                    counter->set_id(peer_device->as_uint());
+                    counter->set_value(10);
+                    auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
+                    REQUIRE(folder_peer->add_strict(file));
+                    pr_fi.mutable_version()->clear_counters();
+                    return file;
+                }();
+
+                auto my_file = [&]() {
+                    auto counter = pr_fi.mutable_version()->add_counters();
+                    counter->set_id(my_device->as_uint());
+                    counter->set_value(5);
+                    auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
+                    REQUIRE(folder_my->add_strict(file));
+                    file->mark_local();
+                    return file;
+                }();
+
+                bfs::path kept_file = root_path / pr_fi.name();
+                bfs::create_directories(kept_file);
+
+                builder.advance(*peer_file).apply(*sup);
+
+                auto conflict_file = root_path / my_file->make_conflicting_name();
+                CHECK(bfs::exists(conflict_file));
+                CHECK(bfs::exists(kept_file));
+                CHECK(bfs::is_directory(conflict_file));
+                CHECK(bfs::is_regular_file(kept_file));
+            }
         }
     };
     F().run();

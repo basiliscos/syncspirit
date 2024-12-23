@@ -186,6 +186,12 @@ diff_builder_t &diff_builder_t::remote_copy(const model::file_info_t &source) no
     return assign(diff.get());
 }
 
+diff_builder_t &diff_builder_t::advance(const model::file_info_t &source) noexcept {
+    auto action = model::resolve(source);
+    auto diff = diff::advance::remote_copy_t::create(action, source, *sequencer);
+    return assign(diff.get());
+}
+
 diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &file) noexcept {
     return assign(new diff::modify::finish_file_t(file));
 }

@@ -11,6 +11,7 @@
 #include "model/diff/advance/remote_win.h"
 #include "model/diff/modify/finish_file.h"
 #include "utils.h"
+#include "utils/format.hpp"
 #include <fstream>
 
 using namespace syncspirit::fs;
@@ -201,7 +202,6 @@ auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, v
     return r ? diff.visit_next(*this, custom) : r;
 }
 
-#if 0
 auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
@@ -210,11 +210,11 @@ auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, vo
     auto file = file_info->get_file_infos().by_name(diff.proto_source.name());
     auto &source_path = file->get_path();
     auto target_path = folder->get_path() / diff.proto_local.name();
+    LOG_DEBUG(log, "renaming {} -> {}", source_path, target_path);
     auto ec = sys::error_code{};
     bfs::rename(source_path, target_path);
     return !ec ? diff.visit_next(*this, custom) : ec;
 }
-#endif
 
 auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
