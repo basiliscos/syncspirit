@@ -8,6 +8,7 @@
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/advance/remote_copy.h"
+#include "model/diff/advance/remote_win.h"
 #include "model/diff/modify/finish_file.h"
 #include "utils.h"
 #include <fstream>
@@ -200,11 +201,27 @@ auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, v
     return r ? diff.visit_next(*this, custom) : r;
 }
 
+#if 0
+auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_info = folder->get_folder_infos();
+    auto file_info = folder_info.by_device_id(diff.peer_id);
+    auto file = file_info->get_file_infos().by_name(diff.proto_source.name());
+    auto &source_path = file->get_path();
+    auto target_path = folder->get_path() / diff.proto_local.name();
+    auto ec = sys::error_code{};
+    bfs::rename(source_path, target_path);
+    return !ec ? diff.visit_next(*this, custom) : ec;
+}
+#endif
+
 auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
     auto file = file_info->get_file_infos().by_name(diff.file_name);
+    auto action = diff.action;
 
     auto path = file->get_path().string();
     auto backend = rw_cache.get(path);
@@ -220,6 +237,21 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
         backend = std::move(result.assume_value());
     }
 
+    if (action == model::advance_action_t::resolve_remote_win) {
+        auto &self = *cluster->get_device();
+        auto local_fi = folder->get_folder_infos().by_device(self);
+        auto local_file = local_fi->get_file_infos().by_name(diff.file_name);
+        auto conflicting_name = local_file->make_conflicting_name();
+        auto target_path = folder->get_path() / conflicting_name;
+        auto ec = sys::error_code{};
+        LOG_DEBUG(log, "renaming {} -> {}", file->get_name(), conflicting_name);
+        bfs::rename(path, target_path);
+        if (ec) {
+            LOG_ERROR(log, "cannot rename file: {}: {}", path, ec.message());
+            return ec;
+        }
+    }
+
     rw_cache.remove(backend);
     auto ok = backend->close(true);
     if (!ok) {
@@ -230,7 +262,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
 
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
 
-    auto ack = model::diff::advance::advance_t::create(diff.action, *file, *sequencer);
+    auto ack = model::diff::advance::advance_t::create(action, *file, *sequencer);
     send<model::payload::model_update_t>(coordinator, std::move(ack), this);
     return diff.visit_next(*this, custom);
 }

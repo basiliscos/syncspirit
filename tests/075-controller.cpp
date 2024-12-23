@@ -1608,11 +1608,9 @@ void test_conflicts() {
             builder.local_update(folder_1->get_id(), pr_file);
             builder.apply(*sup);
 
-            auto c2 = version->add_counters();
-            c1->set_id(peer_device->as_uint());
-            c1->set_value(local_file->get_version()->get_best().value() - 1);
             file->clear_blocks();
             file->set_sequence(155);
+            c1->set_id(peer_device->as_uint());
 
             auto b3 = file->add_blocks();
             b3->set_hash(utils::sha256_digest("12346").value());
@@ -1621,24 +1619,57 @@ void test_conflicts() {
 
             auto index_update = proto::IndexUpdate{};
             index_update.set_folder(std::string(folder_1->get_id()));
-            *index_update.add_files() = *file;
-            peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
             peer_actor->push_block("12346", 0, file->name());
-            sup->do_process();
 
-            auto peer_folder = folder_infos.by_device(*peer_device);
-            auto peer_file = peer_folder->get_file_infos().by_name(local_file->get_name());
-            auto local_conflict = local_folder->get_file_infos().by_name(peer_file->make_conflicting_name());
-            REQUIRE(local_conflict);
-            CHECK(local_conflict->get_size() == 5);
-            REQUIRE(local_conflict->get_blocks().size() == 1);
-            CHECK(local_conflict->get_blocks()[0]->get_hash() == b3->hash());
-            CHECK(cluster->get_blocks().size() == 2);
+            SECTION("local win") {
+                c1->set_value(local_file->get_version()->get_best().value() - 1);
 
-            auto &msg = peer_actor->messages.back();
-            auto &index_update_sent = *std::get<proto::message::IndexUpdate>(msg->payload);
-            REQUIRE(index_update_sent.files_size() == 1);
-            CHECK(index_update_sent.files(0).name() == local_conflict->get_name());
+                *index_update.add_files() = *file;
+                peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
+                sup->do_process();
+
+                auto peer_folder = folder_infos.by_device(*peer_device);
+                auto peer_file = peer_folder->get_file_infos().by_name(local_file->get_name());
+                auto local_conflict = local_folder->get_file_infos().by_name(peer_file->make_conflicting_name());
+                REQUIRE(local_conflict);
+                CHECK(local_conflict->get_size() == 5);
+                REQUIRE(local_conflict->get_blocks().size() == 1);
+                CHECK(local_conflict->get_blocks()[0]->get_hash() == b3->hash());
+                CHECK(cluster->get_blocks().size() == 2);
+
+                auto &msg = peer_actor->messages.back();
+                auto &index_update_sent = *std::get<proto::message::IndexUpdate>(msg->payload);
+                REQUIRE(index_update_sent.files_size() == 1);
+                CHECK(index_update_sent.files(0).name() == local_conflict->get_name());
+            }
+            SECTION("remote win") {
+                c1->set_value(local_file->get_version()->get_best().value() + 1);
+
+                *index_update.add_files() = *file;
+                peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
+                sup->do_process();
+
+                auto local_folder = folder_infos.by_device(*my_device);
+                auto local_conflict = local_folder->get_file_infos().by_name(local_file->make_conflicting_name());
+                REQUIRE(local_conflict);
+                CHECK(local_conflict->get_size() == 5);
+                REQUIRE(local_conflict->get_blocks().size() == 1);
+                CHECK(local_conflict->get_blocks()[0]->get_hash() == bi_2->hash());
+
+                auto file = local_folder->get_file_infos().by_name(local_file->get_name());
+                REQUIRE(file);
+                CHECK(file->get_size() == 5);
+                REQUIRE(file->get_blocks().size() == 1);
+                CHECK(file->get_blocks()[0]->get_hash() == b3->hash());
+
+                CHECK(cluster->get_blocks().size() == 2);
+
+                auto &msg = peer_actor->messages.back();
+                auto &index_update_sent = *std::get<proto::message::IndexUpdate>(msg->payload);
+                REQUIRE(index_update_sent.files_size() == 2);
+                CHECK(index_update_sent.files(0).name() == local_conflict->get_name());
+                CHECK(index_update_sent.files(1).name() == file->get_name());
+            }
         }
     };
     F(false, 10, false).run();

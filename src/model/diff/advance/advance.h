@@ -23,11 +23,13 @@ struct SYNCSPIRIT_API advance_t : cluster_diff_t {
     std::string peer_id;
     bu::uuid uuid;
     advance_action_t action;
+    bool disable_blocks_removal;
 
   protected:
-    advance_t(proto::FileInfo proto_file, std::string_view folder_id, std::string_view peer_id,
-              advance_action_t action) noexcept;
-    void initialize(const cluster_t &cluster, sequencer_t &sequencer, std::string_view local_file_name) noexcept;
+    advance_t(std::string_view folder_id, std::string_view peer_id, advance_action_t action,
+              bool disable_blocks_removal = false) noexcept;
+    void initialize(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_source,
+                    std::string_view local_file_name) noexcept;
 };
 
 } // namespace syncspirit::model::diff::advance

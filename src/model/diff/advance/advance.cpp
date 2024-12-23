@@ -45,12 +45,13 @@ auto advance_t::create(advance_action_t action, const model::file_info_t &source
     }
 }
 
-advance_t::advance_t(proto::FileInfo proto_file_, std::string_view folder_id_, std::string_view peer_id_,
-                     advance_action_t action_) noexcept
-    : proto_source{std::move(proto_file_)}, folder_id{folder_id_}, peer_id{peer_id_}, action{action_} {}
+advance_t::advance_t(std::string_view folder_id_, std::string_view peer_id_, advance_action_t action_,
+                     bool disable_blocks_removal_) noexcept
+    : folder_id{folder_id_}, peer_id{peer_id_}, action{action_}, disable_blocks_removal{disable_blocks_removal_} {}
 
-void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer,
+void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_source_,
                            std::string_view local_file_name_) noexcept {
+    proto_source = std::move(proto_source_);
     assert(!(proto_source.blocks_size() && proto_source.deleted()));
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_id = folder->get_id();
@@ -72,7 +73,7 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer,
     auto version_ptr = proto_local.mutable_version();
     if (!local_file) {
         uuid = sequencer.next_uuid();
-    } else {
+    } else if (!disable_blocks_removal) {
         assign(uuid, local_file->get_uuid());
         auto orphaned = orphaned_blocks_t();
         orphaned.record(*local_file);

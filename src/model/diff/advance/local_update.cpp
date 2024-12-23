@@ -9,8 +9,8 @@ using namespace syncspirit::model::diff::advance;
 
 local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_file_,
                                std::string_view folder_id_) noexcept
-    : advance_t(std::move(proto_file_), folder_id_, cluster.get_device()->device_id().get_sha256(),
-                advance_action_t::local_update) {
+    : advance_t(folder_id_, cluster.get_device()->device_id().get_sha256(), advance_action_t::local_update) {
+
     auto &device = *cluster.get_devices().by_sha256(peer_id);
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_id = folder->get_id();
@@ -20,9 +20,10 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &local_folder_infos = folder->get_folder_infos();
     auto local_folder_info = local_folder_infos.by_device_id(self_id);
     auto &local_files = local_folder_info->get_file_infos();
-    auto local_file = local_files.by_name(proto_source.name());
+    auto name = proto_file_.name();
+    auto local_file = local_files.by_name(name);
 
-    initialize(cluster, sequencer, proto_source.name());
+    initialize(cluster, sequencer, std::move(proto_file_), name);
 
     auto &proto_version = *proto_local.mutable_version();
     auto version = version_ptr_t();
