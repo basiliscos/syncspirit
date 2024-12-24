@@ -106,7 +106,7 @@ std::string_view file_t::get_path_view() const noexcept { return path_str; }
 
 const bfs::path &file_t::get_path() const noexcept { return path; }
 
-auto file_t::close(bool remove_temporal) noexcept -> outcome::result<void> {
+auto file_t::close(bool remove_temporal, const bfs::path &local_name) noexcept -> outcome::result<void> {
     assert(backend && model && "close has sense for r/w mode");
     if (fflush(backend)) {
         return sys::error_code{errno, sys::system_category()};
@@ -119,7 +119,7 @@ auto file_t::close(bool remove_temporal) noexcept -> outcome::result<void> {
     backend = nullptr;
 
     sys::error_code ec;
-    auto orig_path = model->get_path();
+    auto orig_path = local_name.empty() ? model->get_path() : local_name;
     if (remove_temporal) {
         assert(temporal);
         bfs::rename(path, orig_path, ec);

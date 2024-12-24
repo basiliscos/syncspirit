@@ -33,7 +33,7 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     std::string_view get_path_view() const noexcept;
     const bfs::path &get_path() const noexcept;
 
-    outcome::result<void> close(bool remove_temporal) noexcept;
+    outcome::result<void> close(bool remove_temporal, const bfs::path &local_name = {}) noexcept;
     outcome::result<void> remove() noexcept;
     outcome::result<void> write(size_t offset, std::string_view data) noexcept;
     outcome::result<void> copy(size_t my_offset, const file_t &from, size_t source_offset, size_t size) noexcept;

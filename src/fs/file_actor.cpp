@@ -231,9 +231,27 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
     auto file = file_info->get_file_infos().by_name(diff.file_name);
+    auto local_path = file->get_path();
+    auto path = local_path.string();
     auto action = diff.action;
 
-    auto path = file->get_path().string();
+    if (action == model::advance_action_t::resolve_remote_win) {
+        auto &self = *cluster->get_device();
+        auto local_fi = folder->get_folder_infos().by_device(self);
+        auto local_file = local_fi->get_file_infos().by_name(diff.file_name);
+        auto conflicting_name = local_file->make_conflicting_name();
+        auto target_path = folder->get_path() / conflicting_name;
+        auto ec = sys::error_code{};
+        path = file->get_path().string();
+        LOG_DEBUG(log, "renaming {} -> {}", file->get_name(), conflicting_name);
+        bfs::rename(path, target_path);
+        if (ec) {
+            LOG_ERROR(log, "cannot rename file: {}: {}", path, ec.message());
+            return ec;
+        }
+    } else if (action == model::advance_action_t::resolve_local_win) {
+        local_path = local_path.parent_path() / file->make_conflicting_name();
+    }
     auto backend = rw_cache.get(path);
     if (!backend) {
         LOG_DEBUG(log, "attempt to flush non-opened file {}, re-open it as temporal", path);
@@ -247,23 +265,8 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
         backend = std::move(result.assume_value());
     }
 
-    if (action == model::advance_action_t::resolve_remote_win) {
-        auto &self = *cluster->get_device();
-        auto local_fi = folder->get_folder_infos().by_device(self);
-        auto local_file = local_fi->get_file_infos().by_name(diff.file_name);
-        auto conflicting_name = local_file->make_conflicting_name();
-        auto target_path = folder->get_path() / conflicting_name;
-        auto ec = sys::error_code{};
-        LOG_DEBUG(log, "renaming {} -> {}", file->get_name(), conflicting_name);
-        bfs::rename(path, target_path);
-        if (ec) {
-            LOG_ERROR(log, "cannot rename file: {}: {}", path, ec.message());
-            return ec;
-        }
-    }
-
     rw_cache.remove(backend);
-    auto ok = backend->close(true);
+    auto ok = backend->close(true, local_path);
     if (!ok) {
         auto &ec = ok.assume_error();
         LOG_ERROR(log, "cannot close file: {}: {}", path, ec.message());
