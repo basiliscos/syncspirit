@@ -82,7 +82,7 @@ bool version_t::contains(const version_t &other) noexcept {
     for (size_t i = 0; i < counters.size(); ++i) {
         auto &c = counters[i];
         if (c.id() == other_best.id()) {
-            return c.value() <= other_best.value();
+            return c.value() >= other_best.value();
         }
     }
     return false;

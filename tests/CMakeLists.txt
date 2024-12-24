@@ -90,6 +90,10 @@ add_executable(021-orphaned-blocks 021-orphaned-blocks.cpp $<$<PLATFORM_ID:Windo
 target_link_libraries(021-orphaned-blocks syncspirit_test_lib)
 add_test(021-orphaned-blocks "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/021-orphaned-blocks")
 
+add_executable(022-version 022-version.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
+target_link_libraries(022-version syncspirit_test_lib)
+add_test(022-version "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/022-version")
+
 add_executable(025-device_id 025-device_id.cpp $<$<PLATFORM_ID:Windows>:win32-resource.rc>)
 target_link_libraries(025-device_id syncspirit_test_lib)
 add_test(025-device_id "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/025-device_id")
