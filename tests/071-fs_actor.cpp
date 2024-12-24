@@ -601,7 +601,7 @@ void test_requesting_block() {
     F().run();
 }
 
-void test_remote_win() {
+void test_conflicts() {
     struct F : fixture_t {
         void main() noexcept override {
             auto builder = diff_builder_t(*cluster, file_addr);
@@ -613,7 +613,7 @@ void test_remote_win() {
             pr_fi.set_modified_s(modified);
             pr_fi.set_sequence(folder_peer->get_max_sequence() + 1);
 
-            SECTION("file with blocks (via file_finish)") {
+            SECTION("remote wins non-empty (via file_finish)") {
                 pr_fi.set_block_size(5);
                 pr_fi.set_size(5);
 
@@ -675,7 +675,7 @@ void test_remote_win() {
                 CHECK(bfs::exists(conflict_file));
                 CHECK(read_file(conflict_file) == "12345");
             }
-            SECTION("emtpy file vs directory") {
+            SECTION("remote win emtpy (file vs directory)") {
                 auto peer_file = [&]() {
                     auto counter = pr_fi.mutable_version()->add_counters();
                     counter->set_id(peer_device->as_uint());
@@ -707,6 +707,38 @@ void test_remote_win() {
                 CHECK(bfs::is_directory(conflict_file));
                 CHECK(bfs::is_regular_file(kept_file));
             }
+            SECTION("local win emtpy (file vs directory)") {
+                auto peer_file = [&]() {
+                    auto counter = pr_fi.mutable_version()->add_counters();
+                    counter->set_id(peer_device->as_uint());
+                    counter->set_value(5);
+                    auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
+                    REQUIRE(folder_peer->add_strict(file));
+                    pr_fi.mutable_version()->clear_counters();
+                    return file;
+                }();
+
+                auto my_file = [&]() {
+                    auto counter = pr_fi.mutable_version()->add_counters();
+                    counter->set_id(my_device->as_uint());
+                    counter->set_value(10);
+                    auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
+                    REQUIRE(folder_my->add_strict(file));
+                    file->mark_local();
+                    return file;
+                }();
+
+                bfs::path kept_file = root_path / pr_fi.name();
+                bfs::create_directories(kept_file);
+
+                builder.advance(*peer_file).apply(*sup);
+
+                auto conflict_file = root_path / peer_file->make_conflicting_name();
+                CHECK(bfs::exists(conflict_file));
+                CHECK(bfs::exists(kept_file));
+                CHECK(bfs::is_regular_file(conflict_file));
+                CHECK(bfs::is_directory(kept_file));
+            }
         }
     };
     F().run();
@@ -717,7 +749,7 @@ int _init() {
     REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
     REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
     REGISTER_TEST_CASE(test_requesting_block, "test_requesting_block", "[fs]");
-    REGISTER_TEST_CASE(test_remote_win, "test_remote_win", "[fs]");
+    REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[fs]");
     return 1;
 }
 

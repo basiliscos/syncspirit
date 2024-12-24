@@ -7,6 +7,7 @@
 #include "model/file_info.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
+#include "model/diff/advance/local_win.h"
 #include "model/diff/advance/remote_copy.h"
 #include "model/diff/advance/remote_win.h"
 #include "model/diff/modify/finish_file.h"
@@ -105,9 +106,8 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
     send<payload::block_response_t>(dest, std::move(req_ptr), ec, std::move(data));
 }
 
-auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr) noexcept -> outcome::result<void> {
+auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &path) noexcept -> outcome::result<void> {
     auto &file = *file_ptr;
-    auto &path = file.get_path();
     sys::error_code ec;
 
     if (file.is_deleted()) {
@@ -198,7 +198,7 @@ auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, v
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
     auto file = file_info->get_file_infos().by_name(diff.proto_source.name());
-    auto r = reflect(file);
+    auto r = reflect(file, file->get_path());
     return r ? diff.visit_next(*this, custom) : r;
 }
 
@@ -214,6 +214,16 @@ auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, vo
     auto ec = sys::error_code{};
     bfs::rename(source_path, target_path);
     return !ec ? diff.visit_next(*this, custom) : ec;
+}
+
+auto file_actor_t::operator()(const model::diff::advance::local_win_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
+    auto file = file_info->get_file_infos().by_name(diff.proto_source.name());
+    auto path = file->get_path().parent_path() / file->make_conflicting_name();
+    auto r = reflect(file, path);
+    return r ? diff.visit_next(*this, custom) : r;
 }
 
 auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept

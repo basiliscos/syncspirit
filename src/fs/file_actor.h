@@ -91,12 +91,13 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
     outcome::result<file_ptr_t> open_file_ro(const bfs::path &path, bool use_cache = false) noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::remote_copy_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::advance::local_win_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::advance::remote_win_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::finish_file_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
 
-    outcome::result<void> reflect(model::file_info_ptr_t &file) noexcept;
+    outcome::result<void> reflect(model::file_info_ptr_t &file, const bfs::path &path) noexcept;
 
     model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
