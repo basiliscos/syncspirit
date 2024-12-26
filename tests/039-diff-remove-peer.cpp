@@ -47,7 +47,7 @@ TEST_CASE("remove peer", "[model]") {
         pr_fi.set_name("a.txt");
         pr_fi.set_block_size(5);
         pr_fi.set_size(5);
-        pr_fi.mutable_version()->add_counters()->set_id(peer_device->as_uint());
+        pr_fi.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
 
         auto b1_hash = utils::sha256_digest("12345").value();
         auto b1 = pr_fi.add_blocks();
@@ -111,7 +111,7 @@ TEST_CASE("remove peer", "[model]") {
             pr_fi.set_name("a.txt");
             pr_fi.set_block_size(5);
             pr_fi.set_size(5);
-            pr_fi.mutable_version()->add_counters()->set_id(peer_device->as_uint());
+            pr_fi.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
             auto b_hash = utils::sha256_digest("1").value();
             auto b = pr_fi.add_blocks();
             b->set_hash(b_hash);
@@ -129,7 +129,7 @@ TEST_CASE("remove peer", "[model]") {
             pr_fi.set_name("b.txt");
             pr_fi.set_block_size(5);
             pr_fi.set_size(10);
-            pr_fi.mutable_version()->add_counters()->set_id(peer_device->as_uint());
+            pr_fi.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
             auto pr_b_1 = pr_fi.add_blocks();
             pr_b_1->set_hash(utils::sha256_digest("2").value());
             pr_b_1->set_offset(0);

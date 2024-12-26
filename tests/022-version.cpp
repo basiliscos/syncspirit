@@ -17,7 +17,7 @@ TEST_CASE("version ", "[model]") {
     c0->set_value(2);
 
     auto c1 = proto_v.mutable_counters()->Add();
-    c1->set_id(my_device->as_uint());
+    c1->set_id(my_device->device_id().get_uint());
     c1->set_value(10);
 
     auto v1 = version_ptr_t(new version_t(proto_v));

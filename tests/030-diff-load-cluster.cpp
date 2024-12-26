@@ -316,7 +316,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     pr_fi.set_name("a/b.txt");
     pr_fi.set_size(55ul);
     pr_fi.set_block_size(5ul);
-    pr_fi.mutable_version()->add_counters()->set_id(my_device->as_uint());
+    pr_fi.mutable_version()->add_counters()->set_id(my_device->device_id().get_uint());
     auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
     CHECK(fi);
     for (size_t i = 0; i < 11; ++i) {

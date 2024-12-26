@@ -136,7 +136,7 @@ void test_remote_copy() {
             auto version = pr_fi.mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1);
-            counter->set_value(peer_device->as_uint());
+            counter->set_value(peer_device->device_id().get_uint());
 
             auto builder = diff_builder_t(*cluster, file_addr);
 
@@ -256,7 +256,7 @@ void test_append_block() {
             auto version = pr_source.mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1);
-            counter->set_value(peer_device->as_uint());
+            counter->set_value(peer_device->device_id().get_uint());
 
             auto bi = proto::BlockInfo();
             bi.set_size(5);
@@ -379,7 +379,7 @@ void test_clone_block() {
             auto version = pr_source.mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1);
-            counter->set_value(peer_device->as_uint());
+            counter->set_value(peer_device->device_id().get_uint());
             auto next_sequence = 7ul;
 
             auto make_file = [&](const proto::FileInfo &fi, size_t count) {
@@ -539,7 +539,7 @@ void test_requesting_block() {
             auto version = pr_source.mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1);
-            counter->set_value(my_device->as_uint());
+            counter->set_value(my_device->device_id().get_uint());
             *pr_source.add_blocks() = bi;
             *pr_source.add_blocks() = bi2;
 
@@ -640,7 +640,7 @@ void test_conflicts() {
                 SECTION("remote win") {
                     auto peer_file = [&]() {
                         auto counter = pr_fi.mutable_version()->add_counters();
-                        counter->set_id(peer_device->as_uint());
+                        counter->set_id(peer_device->device_id().get_uint());
                         counter->set_value(10);
                         *pr_fi.add_blocks() = peer_block->as_bep(0);
                         auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
@@ -654,7 +654,7 @@ void test_conflicts() {
 
                     auto my_file = [&]() {
                         auto counter = pr_fi.mutable_version()->add_counters();
-                        counter->set_id(my_device->as_uint());
+                        counter->set_id(my_device->device_id().get_uint());
                         counter->set_value(5);
                         *pr_fi.add_blocks() = my_block->as_bep(0);
                         auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
@@ -679,7 +679,7 @@ void test_conflicts() {
                 SECTION("local win") {
                     auto peer_file = [&]() {
                         auto counter = pr_fi.mutable_version()->add_counters();
-                        counter->set_id(peer_device->as_uint());
+                        counter->set_id(peer_device->device_id().get_uint());
                         counter->set_value(5);
                         *pr_fi.add_blocks() = peer_block->as_bep(0);
                         auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
@@ -693,7 +693,7 @@ void test_conflicts() {
 
                     auto my_file = [&]() {
                         auto counter = pr_fi.mutable_version()->add_counters();
-                        counter->set_id(my_device->as_uint());
+                        counter->set_id(my_device->device_id().get_uint());
                         counter->set_value(10);
                         *pr_fi.add_blocks() = my_block->as_bep(0);
                         auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
@@ -719,7 +719,7 @@ void test_conflicts() {
             SECTION("remote win emtpy (file vs directory)") {
                 auto peer_file = [&]() {
                     auto counter = pr_fi.mutable_version()->add_counters();
-                    counter->set_id(peer_device->as_uint());
+                    counter->set_id(peer_device->device_id().get_uint());
                     counter->set_value(10);
                     auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
                     REQUIRE(folder_peer->add_strict(file));
@@ -729,7 +729,7 @@ void test_conflicts() {
 
                 auto my_file = [&]() {
                     auto counter = pr_fi.mutable_version()->add_counters();
-                    counter->set_id(my_device->as_uint());
+                    counter->set_id(my_device->device_id().get_uint());
                     counter->set_value(5);
                     auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
                     REQUIRE(folder_my->add_strict(file));
@@ -751,7 +751,7 @@ void test_conflicts() {
             SECTION("local win emtpy (file vs directory)") {
                 auto peer_file = [&]() {
                     auto counter = pr_fi.mutable_version()->add_counters();
-                    counter->set_id(peer_device->as_uint());
+                    counter->set_id(peer_device->device_id().get_uint());
                     counter->set_value(5);
                     auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
                     REQUIRE(folder_peer->add_strict(file));
@@ -761,7 +761,7 @@ void test_conflicts() {
 
                 auto my_file = [&]() {
                     auto counter = pr_fi.mutable_version()->add_counters();
-                    counter->set_id(my_device->as_uint());
+                    counter->set_id(my_device->device_id().get_uint());
                     counter->set_value(10);
                     auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
                     REQUIRE(folder_my->add_strict(file));

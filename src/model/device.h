@@ -72,8 +72,6 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     void assign_uris(const uris_t &uris) noexcept;
 
     void update(const db::Device &source) noexcept;
-    uint64_t as_uint() const noexcept;
-    bool matches(uint64_t) const noexcept;
 
     file_iterator_ptr_t create_iterator(cluster_t &) noexcept;
     void release_iterator(file_iterator_ptr_t &) noexcept;

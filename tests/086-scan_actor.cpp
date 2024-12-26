@@ -167,7 +167,7 @@ void test_meta_changes() {
             auto version = pr_fi.mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1);
-            counter->set_value(peer_device->as_uint());
+            counter->set_value(peer_device->device_id().get_uint());
 
             auto bi = proto::BlockInfo();
             bi.set_size(5);

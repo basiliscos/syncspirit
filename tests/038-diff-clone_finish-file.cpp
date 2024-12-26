@@ -37,7 +37,7 @@ TEST_CASE("new file diff", "[model]") {
     auto version = file_info.mutable_version();
     auto counter = version->add_counters();
     counter->set_value(1);
-    counter->set_id(peer_device->as_uint());
+    counter->set_id(peer_device->device_id().get_uint());
 
     SECTION("trivial cases") {
         SECTION("no file on my side, clone blockless file") {

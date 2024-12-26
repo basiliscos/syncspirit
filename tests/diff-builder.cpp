@@ -68,7 +68,7 @@ index_maker_t &&index_maker_t::add(const proto::FileInfo &file, const model::dev
     if (add_version && f->version().counters_size() == 0) {
         auto v = f->mutable_version();
         auto c = v->add_counters();
-        c->set_id(peer->as_uint());
+        c->set_id(peer->device_id().get_uint());
         c->set_value(1);
     }
     return std::move(*this);

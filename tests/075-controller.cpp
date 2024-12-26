@@ -420,7 +420,7 @@ void test_index_receiving() {
                 file->set_sequence(10);
                 auto v = file->mutable_version();
                 auto c = v->add_counters();
-                c->set_id(peer_device->as_uint());
+                c->set_id(peer_device->device_id().get_uint());
                 c->set_value(1);
 
                 peer_actor->forward(proto::message::Index(new proto::Index(index)));
@@ -452,7 +452,7 @@ void test_index_receiving() {
                     file->set_sequence(folder_1_peer->get_max_sequence() + 1);
                     auto v = file->mutable_version();
                     auto c = v->add_counters();
-                    c->set_id(peer_device->as_uint());
+                    c->set_id(peer_device->device_id().get_uint());
                     c->set_value(1);
 
                     peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
@@ -826,7 +826,7 @@ void test_downloading() {
                 file->set_size(0);
                 auto v = file->mutable_version();
                 auto c = v->add_counters();
-                c->set_id(peer_device->as_uint());
+                c->set_id(peer_device->device_id().get_uint());
                 c->set_value(1);
 
                 peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index)));
@@ -864,7 +864,7 @@ void test_downloading() {
                 auto version = file->mutable_version();
                 auto counter = version->add_counters();
                 counter->set_id(1);
-                counter->set_value(peer_device->as_uint());
+                counter->set_value(peer_device->device_id().get_uint());
 
                 auto b1 = file->add_blocks();
                 b1->set_hash(utils::sha256_digest("12345").value());
@@ -985,7 +985,7 @@ void test_downloading() {
                 pr_my.set_sequence(2ul);
                 pr_my.set_block_size(5);
                 pr_my.set_size(5);
-                pr_my.mutable_version()->add_counters()->set_id(my_device->as_uint());
+                pr_my.mutable_version()->add_counters()->set_id(my_device->device_id().get_uint());
 
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_my = model::file_info_t::create(uuid, pr_my, folder_my).value();
@@ -1493,7 +1493,7 @@ void test_uploading() {
             auto version = pr_fi.mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1);
-            counter->set_value(my_device->as_uint());
+            counter->set_value(my_device->device_id().get_uint());
             auto b1 = pr_fi.add_blocks();
             b1->set_hash(utils::sha256_digest("12345").value());
             b1->set_offset(0);
@@ -1610,7 +1610,7 @@ void test_conflicts() {
 
             file->clear_blocks();
             file->set_sequence(155);
-            c1->set_id(peer_device->as_uint());
+            c1->set_id(peer_device->device_id().get_uint());
 
             auto b3 = file->add_blocks();
             b3->set_hash(utils::sha256_digest("12346").value());

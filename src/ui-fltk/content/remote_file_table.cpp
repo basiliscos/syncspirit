@@ -106,16 +106,30 @@ void remote_file_table_t::refresh() {
         remove_row(4);
     }
     displayed_versions = version->counters_size();
+    auto modified_by_value = entry.get_modified_by();
+    auto modified_by_device = std::string_view();
+    auto modified_by_device_holder = std::string();
+
     for (size_t i = 0; i < displayed_versions; ++i) {
         auto &counter = version->get_counter(i);
         auto modification_device = std::string_view("*unknown*");
         for (auto &it : devices) {
-            if (it.item->matches(counter.id())) {
-                modification_device = it.item->get_name();
+            auto &device = *it.item;
+            auto &device_id = device.device_id();
+            if (device_id.matches(counter.id())) {
+                modification_device = device.get_name();
+            }
+            if (device_id.matches(modified_by_value)) {
+                modified_by_device = device.get_name();
             }
         }
         auto value = fmt::format("({}) {}", counter.value(), modification_device);
         insert_row("modification", new static_string_provider_t(std::move(value)), 4);
+    }
+
+    if (modified_by_device.empty()) {
+        modified_by_device_holder = model::device_id_t::make_short(modified_by_value);
+        modified_by_device = modified_by_device_holder;
     }
 
     block_size_cell->update(std::to_string(entry.get_block_size()));
@@ -123,7 +137,7 @@ void remote_file_table_t::refresh() {
     permissions_cell->update(fmt::format("0{:o}", entry.get_permissions()));
     modified_s_cell->update(fmt::format("{}", modified_s));
     modified_ns_cell->update(fmt::format("{}", entry.get_modified_ns()));
-    modified_by_cell->update(fmt::format("{}", entry.get_modified_by()));
+    modified_by_cell->update(fmt::format("{}", modified_by_device));
     symlink_target_cell->update(entry.get_link_target());
     entries_cell->update(fmt::format("{}", size_data.entries_count));
     entries_size_cell->update(fmt::format("{}", size_data.entries_size));

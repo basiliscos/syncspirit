@@ -51,5 +51,15 @@ TEST_CASE("device_id", "[model]") {
     REQUIRE((bool)opt);
     CHECK(opt.value() == device_id);
 
+    auto short_id = device_id.get_uint();
+    CHECK(short_id != 0);
+
     CHECK(opt.value() != local_device_id);
+}
+
+TEST_CASE("device_id, short", "[model]") {
+    auto device = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto d2 = device_id_t::from_sha256(device.get_sha256());
+    auto short_str = device_id_t::make_short(device.get_uint());
+    CHECK(short_str == device.get_short());
 }

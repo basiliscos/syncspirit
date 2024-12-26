@@ -32,7 +32,7 @@ TEST_CASE("file-info", "[model]") {
     pr_fi.set_sequence(6);
     pr_fi.set_modified_s(1734680712);
     auto &c = *pr_fi.mutable_version()->add_counters();
-    c.set_id(my_device->as_uint());
+    c.set_id(my_device->device_id().get_uint());
     c.set_value(0);
 
     auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();

@@ -8,6 +8,9 @@
 #include "../db/prefix.h"
 
 #include <openssl/sha.h>
+#include <boost/endian/conversion.hpp>
+
+namespace be = boost::endian;
 
 using namespace syncspirit::proto;
 using namespace syncspirit::model;
@@ -36,6 +39,15 @@ device_id_t &device_id_t::operator=(const device_id_t &other) noexcept {
 }
 
 std::string_view device_id_t::get_short() const noexcept { return std::string_view(value.data(), DASH_INT); }
+
+bool device_id_t::matches(uint64_t value) const noexcept { return get_uint() == value; }
+
+std::uint64_t device_id_t::get_uint() const noexcept {
+    uint64_t id;
+    auto ptr = hash + 1;
+    std::copy(ptr, ptr + sizeof(id), reinterpret_cast<char *>(&id));
+    return be::native_to_big(id);
+}
 
 std::optional<device_id_t> device_id_t::from_string(std::string_view value) noexcept {
     using result_t = std::optional<device_id_t>;
@@ -115,6 +127,13 @@ std::optional<device_id_t> device_id_t::from_sha256(std::string_view sha_256) no
     }
     auto str = std::string_view(dashed, DASHED_SIZE);
     return device_id_t{str, sha_256};
+}
+
+std::string device_id_t::make_short(std::uint64_t value) noexcept {
+    auto be = be::native_to_big(value);
+    auto view = std::string_view(reinterpret_cast<const char *>(&be), sizeof(value));
+    auto encoded = base32::encode(view.substr(0, 5)); // it is enought to encode just first 5 bytes
+    return encoded.substr(0, DASH_INT);
 }
 
 std::optional<device_id_t> device_id_t::from_cert(const cert_data_t &data) noexcept {

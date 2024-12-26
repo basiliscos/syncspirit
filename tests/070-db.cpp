@@ -598,7 +598,7 @@ void test_remote_copy() {
             auto version = file.mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1);
-            counter->set_value(peer_device->as_uint());
+            counter->set_value(peer_device->device_id().get_uint());
 
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(peer_device->device_id())
@@ -927,7 +927,7 @@ void test_peer_3_folders_6_files() {
                 auto version = file.mutable_version();
                 auto counter = version->add_counters();
                 counter->set_id(1);
-                counter->set_value(peer_device->as_uint());
+                counter->set_value(peer_device->device_id().get_uint());
                 return file;
             };
 

@@ -45,7 +45,7 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(file->get_sequence() == 1);
         REQUIRE(folder_info->get_max_sequence() == 1);
         REQUIRE(file->get_version()->counters_size() == 1);
-        REQUIRE(file->get_modified_by() == my_device->as_uint());
+        REQUIRE(file->get_modified_by() == my_device->device_id().get_uint());
         auto v1 = file->get_version()->get_best().value();
         CHECK(v1 > 0);
 
@@ -54,9 +54,9 @@ TEST_CASE("new file diff", "[model]") {
             auto p = file->get_version()->as_proto();
             REQUIRE(p.counters_size() == 2);
             CHECK(p.counters(0).value() == v1);
-            CHECK(p.counters(0).id() == my_device->as_uint());
+            CHECK(p.counters(0).id() == my_device->device_id().get_uint());
             CHECK(p.counters(1).value() > v1);
-            CHECK(p.counters(1).id() == peer_device->as_uint());
+            CHECK(p.counters(1).id() == peer_device->device_id().get_uint());
         }
 
         SECTION("update it") {

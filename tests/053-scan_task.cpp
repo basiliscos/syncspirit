@@ -155,7 +155,7 @@ TEST_CASE("scan_task", "[fs]") {
         auto version = pr_file.mutable_version();
         auto counter = version->add_counters();
         counter->set_value(1);
-        counter->set_id(peer_device->as_uint());
+        counter->set_id(peer_device->device_id().get_uint());
 
         SECTION("meta is not changed (file)") {
             pr_file.set_block_size(5);
@@ -525,7 +525,7 @@ TEST_CASE("scan_task", "[fs]") {
 
                 pr_file.set_size(file_peer->get_size() + 10);
                 auto c2 = version->add_counters();
-                c2->set_id(peer2_device->as_uint());
+                c2->set_id(peer2_device->device_id().get_uint());
                 c2->set_value(2);
 
                 auto file_peer2 = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer2).value();
@@ -688,7 +688,7 @@ TEST_CASE("scan_task", "[fs]") {
         auto version = pr_file.mutable_version();
         auto counter = version->add_counters();
         counter->set_id(1);
-        counter->set_value(peer_device->as_uint());
+        counter->set_value(peer_device->device_id().get_uint());
 
         SECTION("symlink does not exists") {
             pr_file.set_modified_s(modified);

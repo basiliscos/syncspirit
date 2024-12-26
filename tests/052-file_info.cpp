@@ -119,7 +119,7 @@ TEST_CASE("file_info_t::create, inconsistent source") {
     *pr_file.add_blocks() = pr_block;
     pr_file.set_block_size(131072);
     pr_file.set_size(0);
-    pr_file.mutable_version()->add_counters()->set_id(my_device->as_uint());
+    pr_file.mutable_version()->add_counters()->set_id(my_device->device_id().get_uint());
 
     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
     CHECK(my_file->get_block_size() == 0);

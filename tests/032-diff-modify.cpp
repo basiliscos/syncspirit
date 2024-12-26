@@ -93,7 +93,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             pr_file_1.set_name("a.txt");
             pr_file_1.set_sequence(1);
             pr_file_1.set_size(10);
-            pr_file_1.mutable_version()->add_counters()->set_id(peer_device->as_uint());
+            pr_file_1.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
 
             auto b1 = pr_file_1.add_blocks();
             b1->set_hash("12345");

@@ -206,7 +206,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             CHECK(r_a);
             auto pr_file = proto::FileInfo();
             pr_file.set_sequence(folder_info_peer->get_max_sequence());
-            pr_file.mutable_version()->add_counters()->set_id(peer_device->as_uint());
+            pr_file.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
             auto peer_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_info_peer).value();
             folder_info_peer->add_strict(peer_file);
 
@@ -346,7 +346,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     pr_fi_my.set_size(5ul);
     pr_fi_my.set_block_size(5ul);
     pr_fi_my.set_sequence(1);
-    pr_fi_my.mutable_version()->add_counters()->set_id(my_device->as_uint());
+    pr_fi_my.mutable_version()->add_counters()->set_id(my_device->device_id().get_uint());
     auto fi_my = file_info_t::create(sequencer->next_uuid(), pr_fi_my, folder_info_my).value();
     folder_info_my->add_strict(fi_my);
 
@@ -355,7 +355,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     pr_fi_peer1.set_size(5ul);
     pr_fi_peer1.set_block_size(5ul);
     pr_fi_peer1.set_sequence(1);
-    pr_fi_peer1.mutable_version()->add_counters()->set_id(peer_device->as_uint());
+    pr_fi_peer1.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
     auto fi_peer1 = file_info_t::create(sequencer->next_uuid(), pr_fi_peer1, folder_info_peer).value();
     REQUIRE(folder_info_peer->add_strict(fi_peer1));
     REQUIRE(folder_info_peer->get_file_infos().size() == 1);
@@ -365,7 +365,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     pr_fi_peer2.set_size(10ul);
     pr_fi_peer2.set_block_size(5ul);
     pr_fi_peer2.set_sequence(2);
-    pr_fi_peer2.mutable_version()->add_counters()->set_id(peer_device->as_uint());
+    pr_fi_peer2.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
     auto fi_peer2 = file_info_t::create(sequencer->next_uuid(), pr_fi_peer2, folder_info_peer).value();
     REQUIRE(folder_info_peer->add_strict(fi_peer2));
     REQUIRE(folder_info_peer->get_file_infos().size() == 2);
@@ -573,7 +573,7 @@ TEST_CASE("cluster update nothing shared", "[model]") {
         pr_fi_peer.set_size(5ul);
         pr_fi_peer.set_block_size(5ul);
         pr_fi_peer.set_sequence(5);
-        pr_fi_peer.mutable_version()->add_counters()->set_id(peer_device->as_uint());
+        pr_fi_peer.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
 
         auto fi_peer = file_info_t::create(sequencer->next_uuid(), pr_fi_peer, folder_info_peer).value();
         fi_peer->assign_block(b1, 0);
