@@ -7,7 +7,6 @@
 #include "model/file_info.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/clone_block.h"
-#include "model/diff/advance/local_win.h"
 #include "model/diff/advance/remote_copy.h"
 #include "model/diff/advance/remote_win.h"
 #include "model/diff/modify/finish_file.h"
@@ -216,16 +215,6 @@ auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, vo
     return !ec ? diff.visit_next(*this, custom) : ec;
 }
 
-auto file_actor_t::operator()(const model::diff::advance::local_win_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
-    auto file = file_info->get_file_infos().by_name(diff.proto_source.name());
-    auto path = file->get_path().parent_path() / file->make_conflicting_name();
-    auto r = reflect(file, path);
-    return r ? diff.visit_next(*this, custom) : r;
-}
-
 auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
@@ -249,8 +238,6 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
             LOG_ERROR(log, "cannot rename file: {}: {}", path, ec.message());
             return ec;
         }
-    } else if (action == model::advance_action_t::resolve_local_win) {
-        local_path = local_path.parent_path() / file->make_conflicting_name();
     }
     auto backend = rw_cache.get(path);
     if (!backend) {

@@ -4,7 +4,6 @@
 #include "cluster_diff.h"
 #include "cluster_visitor.h"
 #include "advance/local_update.h"
-#include "advance/local_win.h"
 #include "advance/remote_copy.h"
 #include "advance/remote_win.h"
 #include "contact/connect_request.h"
@@ -63,11 +62,6 @@ auto cluster_visitor_t::operator()(const advance::advance_t &diff, void *custom)
 
 auto cluster_visitor_t::operator()(const advance::local_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    auto &advance_diff = static_cast<const advance::advance_t &>(diff);
-    return (*this)(advance_diff, custom);
-}
-
-auto cluster_visitor_t::operator()(const advance::local_win_t &diff, void *custom) noexcept -> outcome::result<void> {
     auto &advance_diff = static_cast<const advance::advance_t &>(diff);
     return (*this)(advance_diff, custom);
 }

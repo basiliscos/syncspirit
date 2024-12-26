@@ -1584,6 +1584,7 @@ void test_conflicts() {
             file->set_sequence(154);
             file->set_block_size(5);
             file->set_size(5);
+
             auto version = file->mutable_version();
             auto c1 = version->add_counters();
             c1->set_id(1ul);
@@ -1605,6 +1606,7 @@ void test_conflicts() {
             auto bi_2 = pr_file.mutable_blocks()->Add();
             bi_2->set_hash(utils::sha256_digest("67890").value());
             bi_2->set_size(5);
+            pr_file.set_modified_s(1734680000);
             builder.local_update(folder_1->get_id(), pr_file);
             builder.apply(*sup);
 
@@ -1619,33 +1621,30 @@ void test_conflicts() {
 
             auto index_update = proto::IndexUpdate{};
             index_update.set_folder(std::string(folder_1->get_id()));
-            peer_actor->push_block("12346", 0, file->name());
 
             SECTION("local win") {
+                file->set_modified_s(1734670000);
                 c1->set_value(local_file->get_version()->get_best().value() - 1);
+                auto local_seq = local_file->get_sequence();
 
                 *index_update.add_files() = *file;
+                peer_actor->messages.clear();
                 peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
                 sup->do_process();
 
-                auto peer_folder = folder_infos.by_device(*peer_device);
-                auto peer_file = peer_folder->get_file_infos().by_name(local_file->get_name());
-                auto local_conflict = local_folder->get_file_infos().by_name(peer_file->make_conflicting_name());
-                REQUIRE(local_conflict);
-                CHECK(local_conflict->get_size() == 5);
-                REQUIRE(local_conflict->get_blocks().size() == 1);
-                CHECK(local_conflict->get_blocks()[0]->get_hash() == b3->hash());
+                REQUIRE(local_folder->get_file_infos().size() == 1);
+                auto lf = local_folder->get_file_infos().by_sequence(local_seq);
+                REQUIRE(local_seq == lf->get_sequence());
                 CHECK(cluster->get_blocks().size() == 2);
 
-                auto &msg = peer_actor->messages.back();
-                auto &index_update_sent = *std::get<proto::message::IndexUpdate>(msg->payload);
-                REQUIRE(index_update_sent.files_size() == 1);
-                CHECK(index_update_sent.files(0).name() == local_conflict->get_name());
+                CHECK(peer_actor->messages.size() == 0);
             }
             SECTION("remote win") {
+                file->set_modified_s(1734690000);
                 c1->set_value(local_file->get_version()->get_best().value() + 1);
 
                 *index_update.add_files() = *file;
+                peer_actor->push_block("12346", 0, file->name());
                 peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
                 sup->do_process();
 

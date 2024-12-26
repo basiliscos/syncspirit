@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "advance.h"
-#include "local_win.h"
 #include "remote_copy.h"
 #include "remote_win.h"
 #include "model/cluster.h"
@@ -20,8 +19,6 @@ static std::string_view stringify(advance_action_t action) {
         return "local_update";
     } else if (action == advance_action_t::resolve_remote_win) {
         return "resolve_remote_win";
-    } else if (action == advance_action_t::resolve_local_win) {
-        return "resolve_local_win";
     }
     return "ignore";
 }
@@ -37,8 +34,6 @@ auto advance_t::create(advance_action_t action, const model::file_info_t &source
 
     if (action == advance_action_t::remote_copy) {
         return new remote_copy_t(cluster, sequencer, std::move(proto_file), folder_id, peer_id);
-    } else if (action == advance_action_t::resolve_local_win) {
-        return new local_win_t(cluster, sequencer, std::move(proto_file), folder_id, peer_id);
     } else {
         assert(action == advance_action_t::resolve_remote_win);
         return new remote_win_t(cluster, sequencer, std::move(proto_file), folder_id, peer_id);

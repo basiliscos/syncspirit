@@ -84,13 +84,16 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
             return advance_action_t::ignore;
         }
 
-        if (rv > lv) {
+        auto rm = remote.get_modified_s();
+        auto lm = local->get_modified_s();
+
+        if (rm > lm) {
             return advance_action_t::resolve_remote_win;
-        } else if (lv > rv) {
-            return advance_action_t::resolve_local_win;
+        } else if (lm > rm) {
+            return advance_action_t::ignore;
         }
 
-        return r_id >= l_id ? advance_action_t::resolve_remote_win : advance_action_t::resolve_local_win;
+        return r_id >= l_id ? advance_action_t::resolve_remote_win : advance_action_t::ignore;
     }
     return advance_action_t::ignore;
 }
@@ -102,22 +105,14 @@ advance_action_t resolve(const file_info_t &remote) noexcept {
     auto &local_files = local_folder->get_file_infos();
     auto local_file = local_files.by_name(remote.get_name());
     auto action = resolve(remote, local_file.get());
-    auto has_conflict = action == advance_action_t::resolve_local_win || action == advance_action_t::resolve_remote_win;
-    if (has_conflict) {
+    if (action == advance_action_t::resolve_remote_win) {
         auto name = remote.get_path().filename().string();
         if (name.find(".sync-conflict-") != std::string::npos) {
             action = advance_action_t::ignore;
         } else {
-            if (action == advance_action_t::resolve_remote_win) {
-                auto resolved_name = local_file->make_conflicting_name();
-                if (auto resolved = local_files.by_name(resolved_name); resolved) {
-                    action = advance_action_t::ignore;
-                }
-            } else if (action == advance_action_t::resolve_local_win) {
-                auto resolved_name = remote.make_conflicting_name();
-                if (auto resolved = local_files.by_name(resolved_name); resolved) {
-                    action = advance_action_t::ignore;
-                }
+            auto resolved_name = local_file->make_conflicting_name();
+            if (auto resolved = local_files.by_name(resolved_name); resolved) {
+                action = advance_action_t::ignore;
             }
         }
     }

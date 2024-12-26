@@ -235,14 +235,16 @@ TEST_CASE("resolver", "[model]") {
             auto action = resolve(*file_remote);
             CHECK(action == A::remote_copy);
         }
-        SECTION("locally version > remote version -> local_win") {
+        SECTION("locally mod > remote mod -> ignore(local_win)") {
             auto c2_remote = pr_remote.mutable_version()->add_counters();
             c2_remote->set_id(2);
             c2_remote->set_value(3);
+            pr_remote.set_modified_s(1734680000);
 
             auto c2_local = pr_local.mutable_version()->add_counters();
             c2_local->set_id(3);
             c2_local->set_value(4);
+            pr_local.set_modified_s(1734690000);
 
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
@@ -250,16 +252,18 @@ TEST_CASE("resolver", "[model]") {
             folder_peer->add_strict(file_remote);
             folder_my->add_strict(file_local);
             auto action = resolve(*file_remote);
-            CHECK(action == A::resolve_local_win);
+            CHECK(action == A::ignore);
         }
-        SECTION("locally version < remote version -> remote_win") {
+        SECTION("locally mod < remote mod -> remote_win") {
             auto c2_remote = pr_remote.mutable_version()->add_counters();
             c2_remote->set_id(2);
             c2_remote->set_value(4);
+            pr_remote.set_modified_s(1734680000);
 
             auto c2_local = pr_local.mutable_version()->add_counters();
             c2_local->set_id(3);
             c2_local->set_value(3);
+            pr_local.set_modified_s(1734670000);
 
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
@@ -269,14 +273,16 @@ TEST_CASE("resolver", "[model]") {
             auto action = resolve(*file_remote);
             CHECK(action == A::resolve_remote_win);
         }
-        SECTION("locally version == remote version -> remote_win, by device") {
+        SECTION("locally version == remote version -> local_win(ignore), by device") {
             auto c2_remote = pr_remote.mutable_version()->add_counters();
             c2_remote->set_id(2);
             c2_remote->set_value(4);
+            pr_remote.set_modified_s(1734680000);
 
             auto c2_local = pr_local.mutable_version()->add_counters();
             c2_local->set_id(3);
             c2_local->set_value(4);
+            pr_local.set_modified_s(1734680000);
 
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
@@ -284,7 +290,7 @@ TEST_CASE("resolver", "[model]") {
             folder_peer->add_strict(file_remote);
             folder_my->add_strict(file_local);
             auto action = resolve(*file_remote);
-            CHECK(action == A::resolve_local_win);
+            CHECK(action == A::ignore);
         }
         SECTION("no recursive conflicts are allowed -> ignore") {
             auto name = std::string("a.txt..sync-conflict-20060102-150405-XBOWT");

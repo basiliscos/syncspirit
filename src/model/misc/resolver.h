@@ -13,7 +13,6 @@ enum class advance_action_t {
     remote_copy,
     local_update,
     resolve_remote_win,
-    resolve_local_win,
 };
 
 advance_action_t SYNCSPIRIT_API resolve(const file_info_t &remote) noexcept;

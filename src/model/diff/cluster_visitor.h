@@ -13,7 +13,6 @@ struct cluster_diff_t;
 namespace advance {
 struct advance_t;
 struct local_update_t;
-struct local_win_t;
 struct remote_copy_t;
 struct remote_win_t;
 } // namespace advance
@@ -87,7 +86,6 @@ namespace outcome = boost::outcome_v2;
 struct SYNCSPIRIT_API cluster_visitor_t {
     virtual outcome::result<void> operator()(const advance::advance_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const advance::local_update_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const advance::local_win_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const advance::remote_copy_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const advance::remote_win_t &, void *custom) noexcept;
 
