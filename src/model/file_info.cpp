@@ -14,6 +14,7 @@
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <set>
+#include <boost/date_time/c_local_time_adjustor.hpp>
 
 namespace syncspirit::model {
 
@@ -431,13 +432,15 @@ bool file_info_t::is_global() const noexcept {
 }
 
 std::string file_info_t::make_conflicting_name() const noexcept {
+    using adjustor_t = boost::date_time::c_local_adjustor<utils::pt::ptime>;
     auto path = bfs::path(name);
     auto file_name = path.filename();
     auto stem = file_name.stem().string();
     auto ext = file_name.extension().string();
-    auto moment = pt::from_time_t(modified_s);
-    auto ymd = moment.date().year_month_day();
-    auto time = moment.time_of_day();
+    auto utc = pt::from_time_t(modified_s);
+    auto local = adjustor_t::utc_to_local(utc);
+    auto ymd = local.date().year_month_day();
+    auto time = local.time_of_day();
     auto conflicted_name = fmt::format("{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year,
                                        ymd.month.as_number(), ymd.day.as_number(), time.hours(), time.minutes(),
                                        time.seconds(), folder_info->get_device()->device_id().get_short(), ext);

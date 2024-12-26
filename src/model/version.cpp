@@ -45,7 +45,7 @@ void version_t::to_proto(proto::Vector &v) const noexcept {
 void version_t::update(const device_t &device) noexcept {
     using clock_t = utils::pt::second_clock;
     auto id = device.as_uint();
-    auto v = static_cast<std::uint64_t>(utils::as_seconds(clock_t::local_time()));
+    auto v = static_cast<std::uint64_t>(utils::as_seconds(clock_t::universal_time()));
     auto counter = (proto::Counter *)(nullptr);
     if (best_index != undef) {
         v = std::max(counters[best_index].value() + 1, v);
