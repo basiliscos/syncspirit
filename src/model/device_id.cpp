@@ -130,6 +130,9 @@ std::optional<device_id_t> device_id_t::from_sha256(std::string_view sha_256) no
 }
 
 std::string device_id_t::make_short(std::uint64_t value) noexcept {
+    if (value == 0) {
+        return {};
+    }
     auto be = be::native_to_big(value);
     auto view = std::string_view(reinterpret_cast<const char *>(&be), sizeof(value));
     auto encoded = base32::encode(view.substr(0, 5)); // it is enought to encode just first 5 bytes

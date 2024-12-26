@@ -441,9 +441,11 @@ std::string file_info_t::make_conflicting_name() const noexcept {
     auto local = adjustor_t::utc_to_local(utc);
     auto ymd = local.date().year_month_day();
     auto time = local.time_of_day();
-    auto conflicted_name = fmt::format("{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year,
-                                       ymd.month.as_number(), ymd.day.as_number(), time.hours(), time.minutes(),
-                                       time.seconds(), folder_info->get_device()->device_id().get_short(), ext);
+    auto &counter = version->get_best();
+    auto device_short = device_id_t::make_short(counter.id());
+    auto conflicted_name =
+        fmt::format("{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year, ymd.month.as_number(),
+                    ymd.day.as_number(), time.hours(), time.minutes(), time.seconds(), device_short, ext);
     auto full_name = path.parent_path() / conflicted_name;
     return full_name.string();
 }
