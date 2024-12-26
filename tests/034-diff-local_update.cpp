@@ -45,6 +45,7 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(file->get_sequence() == 1);
         REQUIRE(folder_info->get_max_sequence() == 1);
         REQUIRE(file->get_version()->counters_size() == 1);
+        REQUIRE(file->get_modified_by() == my_device->as_uint());
         auto v1 = file->get_version()->get_best().value();
         CHECK(v1 > 0);
 

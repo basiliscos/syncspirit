@@ -22,6 +22,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &local_files = local_folder_info->get_file_infos();
     auto name = proto_file_.name();
     auto local_file = local_files.by_name(name);
+    proto_file_.set_modified_by(self.as_uint());
 
     initialize(cluster, sequencer, std::move(proto_file_), name);
 

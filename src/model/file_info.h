@@ -123,7 +123,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
     inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }
-    inline std::int32_t get_modified_by() const noexcept { return modified_by; }
+    inline std::uint64_t get_modified_by() const noexcept { return modified_by; }
 
     file_info_ptr_t local_file() const noexcept;
 
