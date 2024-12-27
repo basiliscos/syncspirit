@@ -5,6 +5,7 @@
 #include "model/diff/advance/local_update.h"
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/local/blocks_availability.h"
+#include "model/diff/local/io_failure.h"
 #include "model/diff/local/file_availability.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_start.h"
@@ -103,7 +104,9 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                         completed = true;
                     }
                 } else if constexpr (std::is_same_v<T, scan_errors_t>) {
-                    send<model::payload::io_error_t>(coordinator, std::move(r));
+                    auto diff = model::diff::cluster_diff_ptr_t{};
+                    diff = new model::diff::local::io_failure_t(std::move(r));
+                    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
                 } else if constexpr (std::is_same_v<T, unchanged_meta_t>) {
                     auto diff = model::diff::cluster_diff_ptr_t{};
                     diff = new model::diff::local::file_availability_t(r.file);
@@ -117,14 +120,18 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     if (errs.empty()) {
                         stop_processing = true;
                     } else {
-                        send<model::payload::io_error_t>(coordinator, std::move(errs));
+                        auto diff = model::diff::cluster_diff_ptr_t{};
+                        diff = new model::diff::local::io_failure_t(std::move(errs));
+                        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
                     }
                 } else if constexpr (std::is_same_v<T, unknown_file_t>) {
                     auto errs = initiate_hash(task, r.path, r.metadata);
                     if (errs.empty()) {
                         stop_processing = true;
                     } else {
-                        send<model::payload::io_error_t>(coordinator, std::move(errs));
+                        auto diff = model::diff::cluster_diff_ptr_t{};
+                        diff = new model::diff::local::io_failure_t(std::move(errs));
+                        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
                     }
                 } else if constexpr (std::is_same_v<T, incomplete_t>) {
                     auto &f = r.file;
@@ -168,7 +175,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
 }
 
 auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path, proto::FileInfo &metadata) noexcept
-    -> model::io_errors_t {
+    -> scan_errors_t {
     file_ptr_t file;
     LOG_DEBUG(log, "will try to initiate hashing of {}", path.string());
     if (metadata.type() == proto::FileInfoType::FILE) {
@@ -176,9 +183,7 @@ auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path, pr
         if (!opt) {
             auto &ec = opt.assume_error();
             LOG_WARN(log, "error opening file {}: {}", path.string(), ec.message());
-            model::io_errors_t errs;
-            errs.push_back(model::io_error_t{path, ec});
-            return errs;
+            return scan_errors_t{scan_error_t{path, ec}};
         }
         file = new file_t(std::move(opt.value()));
     }
@@ -215,10 +220,10 @@ void scan_actor_t::hash_next(Message &message, const r::address_ptr_t &reply_add
         while (condition()) {
             auto opt = info.read();
             if (!opt) {
-                auto ec = opt.assume_error();
-                model::io_errors_t errs;
-                errs.push_back(model::io_error_t{info.get_path(), ec});
-                send<model::payload::io_error_t>(coordinator, std::move(errs));
+                auto err = scan_error_t{info.get_path(), opt.assume_error()};
+                auto diff = model::diff::cluster_diff_ptr_t{};
+                diff = new model::diff::local::io_failure_t(std::move(err));
+                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
                 return;
             } else {
                 auto &chunk = opt.assume_value();
@@ -268,8 +273,10 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
             LOG_DEBUG(log, "removing temporal of '{}' as it corrupted", file.get_full_name());
             auto r = info.remove();
             if (r) {
-                model::io_errors_t errors{model::io_error_t{info.get_path(), r.assume_error()}};
-                send<model::payload::io_error_t>(coordinator, std::move(errors));
+                auto err = scan_error_t{info.get_path(), r.assume_error()};
+                auto diff = model::diff::cluster_diff_ptr_t{};
+                diff = new model::diff::local::io_failure_t(std::move(err));
+                send<model::payload::model_update_t>(coordinator, std::move(diff), this);
             }
         }
     }

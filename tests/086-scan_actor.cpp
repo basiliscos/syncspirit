@@ -7,6 +7,7 @@
 #include "diff-builder.h"
 
 #include "model/cluster.h"
+#include "model/diff/local/io_failure.h"
 #include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
 #include "fs/scan_actor.h"
@@ -21,9 +22,6 @@ using namespace syncspirit::hasher;
 
 struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::scan_actor_t>;
-    using error_msg_t = model::message::io_error_t;
-    using error_msg_ptr_t = r::intrusive_ptr_t<error_msg_t>;
-    using errors_container_t = std::vector<error_msg_ptr_t>;
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
 
     fixture_t() noexcept : root_path{bfs::unique_path()}, path_guard{root_path} {
@@ -49,12 +47,6 @@ struct fixture_t {
         sup->cluster = cluster;
 
         auto folder_id = "1234-5678";
-
-        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
-            plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                p.subscribe_actor(r::lambda<error_msg_t>([&](error_msg_t &msg) { errors.push_back(&msg); }));
-            });
-        };
 
         sup->start();
         sup->do_process();
@@ -117,7 +109,6 @@ struct fixture_t {
     model::folder_info_ptr_t folder_info_peer;
     model::file_infos_map_t *files;
     model::file_infos_map_t *files_peer;
-    errors_container_t errors;
     model::device_ptr_t peer_device;
 };
 
@@ -145,8 +136,8 @@ void test_meta_changes() {
                         CHECK(fi->is_dir());
                         CHECK(fi->get_name() == "abc");
                         bfs::permissions(subdir, bfs::perms::all_all);
-                        REQUIRE(errors.size() == 1);
-                        auto &errs = errors.at(0)->payload.errors;
+
+                        auto &errs = sup->io_errors;
                         REQUIRE(errs.size() == 1);
                         REQUIRE(errs.at(0).path == (subdir / "def"));
                         REQUIRE(errs.at(0).ec);
@@ -322,7 +313,8 @@ void test_meta_changes() {
                         CHECK(!file->is_locked());
                         CHECK(!bfs::exists(path));
 
-                        REQUIRE(errors.size() == 0);
+                        auto &errs = sup->io_errors;
+                        REQUIRE(errs.size() == 0);
                     }
                 }
 #endif

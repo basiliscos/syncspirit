@@ -6,6 +6,7 @@
 #include "rotor/supervisor.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/local/io_failure.h"
 #include "model/misc/sequencer.h"
 #include "utils/log.h"
 #include "syncspirit-test-export.h"
@@ -50,6 +51,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t, private model::diff::
 
     using timers_t = std::list<r::timer_handler_base_t *>;
     using parent_t = r::supervisor_t;
+    using io_errors_t = model::diff::local::io_errors_t;
     using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
 
     supervisor_t(config_t &cfg);
@@ -62,7 +64,9 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t, private model::diff::
     void do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept override;
     void do_invoke_timer(r::request_id_t timer_id) noexcept;
     void do_cancel_timer(r::request_id_t timer_id) noexcept override;
+    io_errors_t consume_errors() noexcept;
 
+    outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::finish_file_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
@@ -74,6 +78,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t, private model::diff::
     timers_t timers;
     bool auto_finish;
     bool auto_ack_blocks;
+    io_errors_t io_errors;
 };
 
 }; // namespace syncspirit::test

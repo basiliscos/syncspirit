@@ -13,6 +13,7 @@
 #include "net/names.h"
 #include "config/utils.h"
 #include "model/diff/advance/advance.h"
+#include "model/diff/local/io_failure.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
@@ -90,7 +91,6 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&app_supervisor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&app_supervisor_t::on_io_error, coordinator);
                 request<model::payload::model_request_t>(coordinator).send(init_timeout);
                 resources->acquire(resource::model);
             }
@@ -184,12 +184,6 @@ void app_supervisor_t::on_db_info_response(net::message::db_info_response_t &res
         } else {
             db_info_viewer->view(res.payload.res);
         }
-    }
-}
-
-void app_supervisor_t::on_io_error(model::message::io_error_t &message) noexcept {
-    for (auto &details : message.payload.errors) {
-        log->warn("I/O error on '{}': {}", details.path.string(), details.ec.message());
     }
 }
 
@@ -295,6 +289,14 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
         folder->set_augmentation(augmentation);
     }
 
+    return diff.visit_next(*this, custom);
+}
+
+auto app_supervisor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    for (auto &details : diff.errors) {
+        log->warn("I/O error on '{}': {}", details.path.string(), details.ec.message());
+    }
     return diff.visit_next(*this, custom);
 }
 

@@ -11,14 +11,6 @@
 namespace syncspirit::model {
 
 namespace r = rotor;
-namespace sys = boost::system;
-
-struct io_error_t {
-    bfs::path path;
-    sys::error_code ec;
-};
-
-using io_errors_t = std::vector<io_error_t>;
 
 namespace payload {
 
@@ -35,16 +27,11 @@ struct model_update_t {
     const void *custom;
 };
 
-struct io_error_t {
-    io_errors_t errors;
-};
-
 } // namespace payload
 
 namespace message {
 
 using model_update_t = r::message_t<payload::model_update_t>;
-using io_error_t = r::message_t<payload::io_error_t>;
 
 using model_request_t = r::request_traits_t<payload::model_request_t>::request::message_t;
 using model_response_t = r::request_traits_t<payload::model_request_t>::response::message_t;

@@ -91,6 +91,7 @@ add_library(syncspirit_core
     src/model/diff/local/blocks_availability.cpp
     src/model/diff/local/custom.cpp
     src/model/diff/local/file_availability.cpp
+    src/model/diff/local/io_failure.cpp
     src/model/diff/local/scan_finish.cpp
     src/model/diff/local/scan_request.cpp
     src/model/diff/local/scan_start.cpp

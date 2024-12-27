@@ -19,6 +19,7 @@
 #include "load/pending_devices.h"
 #include "local/blocks_availability.h"
 #include "local/custom.h"
+#include "local/io_failure.h"
 #include "local/file_availability.h"
 #include "local/scan_finish.h"
 #include "local/scan_request.h"
@@ -134,6 +135,10 @@ auto cluster_visitor_t::operator()(const local::custom_t &diff, void *custom) no
 
 auto cluster_visitor_t::operator()(const local::file_availability_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const local::io_failure_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

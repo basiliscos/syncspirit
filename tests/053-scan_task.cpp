@@ -60,9 +60,9 @@ TEST_CASE("scan_task", "[fs]") {
 
             auto task = scan_task_t(cluster, folder->get_id(), config);
             auto r = task.advance();
-            CHECK(std::get_if<io_errors_t>(&r));
+            CHECK(std::get_if<scan_errors_t>(&r));
 
-            auto errs = std::get_if<io_errors_t>(&r);
+            auto errs = std::get_if<scan_errors_t>(&r);
             REQUIRE(errs->size() == 1);
 
             auto &err = errs->at(0);

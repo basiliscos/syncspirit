@@ -65,16 +65,16 @@ struct governor_actor_t : public r::actor_base_t, private model::diff::cluster_v
     using callbacks_map_t = std::unordered_map<const void *, command_callback_t>;
 
     void on_model_update(model::message::model_update_t &message) noexcept;
-    void on_io_error(model::message::io_error_t &reply) noexcept;
     void on_inactivity_timer(r::request_id_t, bool cancelled) noexcept;
 
     void refresh_deadline() noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::remote_copy_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
     r::pt::ptime deadline;
     callbacks_map_t callbacks_map;

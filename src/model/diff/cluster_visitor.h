@@ -38,6 +38,7 @@ namespace local {
 struct blocks_availability_t;
 struct custom_t;
 struct file_availability_t;
+struct io_failure_t;
 struct scan_finish_t;
 struct scan_request_t;
 struct scan_start_t;
@@ -105,6 +106,7 @@ struct SYNCSPIRIT_API cluster_visitor_t {
 
     virtual outcome::result<void> operator()(const local::custom_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::file_availability_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const local::io_failure_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_finish_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_request_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_start_t &, void *custom) noexcept;

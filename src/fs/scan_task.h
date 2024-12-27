@@ -5,7 +5,7 @@
 
 #include "syncspirit-export.h"
 #include "model/cluster.h"
-#include "model/messages.h"
+#include "model/diff/local/io_failure.h"
 #include "config/fs.h"
 #include "utils/log.h"
 #include "file.h"
@@ -22,8 +22,8 @@ namespace r = rotor;
 namespace bfs = boost::filesystem;
 namespace sys = boost::system;
 
-using scan_error_t = model::io_error_t;
-using scan_errors_t = model::io_errors_t;
+using scan_error_t = model::diff::local::io_error_t;
+using scan_errors_t = model::diff::local::io_errors_t;
 
 struct unchanged_meta_t {
     model::file_info_ptr_t file;

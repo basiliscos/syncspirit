@@ -65,7 +65,7 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t, private model::diff
   private:
     using clock_t = r::pt::microsec_clock;
 
-    model::io_errors_t initiate_hash(scan_task_ptr_t task, const bfs::path &path, proto::FileInfo &metadata) noexcept;
+    scan_errors_t initiate_hash(scan_task_ptr_t task, const bfs::path &path, proto::FileInfo &metadata) noexcept;
     void commit_new_file(new_chunk_iterator_t &info) noexcept;
 
     void on_model_update(model::message::model_update_t &message) noexcept;
