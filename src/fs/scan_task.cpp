@@ -3,12 +3,13 @@
 
 #include "scan_task.h"
 #include "utils.h"
+#include "model/messages.h"
 
 using namespace syncspirit::fs;
 
 scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_id_,
                          const config::fs_config_t &config_) noexcept
-    : folder_id{folder_id_}, cluster{cluster_}, config{config_} {
+    : folder_id{folder_id_}, cluster{cluster_}, config{config_}, current_diff{nullptr} {
     auto &fm = cluster->get_folders();
     folder = fm.by_id(folder_id);
     if (!folder) {
@@ -29,6 +30,11 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
     for (auto &it : orig_files) {
         files.put(it.item);
     }
+
+    bytes_left = config.bytes_scan_iteration_limit;
+    files_left = config.files_scan_iteration_limit;
+    assert(bytes_left > 0);
+    assert(files_left > 0);
 
     log = utils::get_logger("fs.scan_task");
 }
@@ -337,3 +343,37 @@ scan_result_t scan_task_t::advance_unknown_file(const unknown_file_t &file) noex
     auto &opened_file = opt.assume_value();
     return incomplete_t{peer_file, file_ptr_t(new file_t(std::move(opened_file)))};
 }
+
+void scan_task_t::push(model::diff::cluster_diff_t *update, std::int64_t bytes_consumed) noexcept {
+    if (current_diff) {
+        current_diff = current_diff->assign_sibling(update);
+    } else {
+        update_diff.reset(update);
+        current_diff = update;
+    }
+    bytes_left -= bytes_consumed;
+    --files_left;
+}
+
+auto scan_task_t::guard(r::actor_base_t &actor, r::address_ptr_t coordinator) noexcept -> send_guard_t {
+    return send_guard_t(*this, actor, coordinator);
+}
+
+scan_task_t::send_guard_t::send_guard_t(scan_task_t &task_, r::actor_base_t &actor_,
+                                        r::address_ptr_t coordinator_) noexcept
+    : task{task_}, actor{actor_}, coordinator{coordinator_}, force_send{false} {}
+
+void scan_task_t::send_guard_t::send_by_force() noexcept { force_send = true; }
+
+scan_task_t::send_guard_t::~send_guard_t() {
+    auto consume = force_send || task.bytes_left <= 0 || task.files_left <= 0;
+    if (consume) {
+        auto diff = std::move(task.update_diff);
+        task.current_diff = nullptr;
+        task.bytes_left = task.config.bytes_scan_iteration_limit;
+        task.files_left = task.config.files_scan_iteration_limit;
+        actor.send<model::payload::model_update_t>(coordinator, std::move(diff), nullptr);
+    }
+}
+
+// ;

@@ -74,7 +74,7 @@ struct fixture_t {
 
         sup->do_process();
 
-        auto fs_config = config::fs_config_t{3600, 10};
+        auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024, 100};
 
         target = sup->create_actor<fs::scan_actor_t>()
                      .timeout(timeout)

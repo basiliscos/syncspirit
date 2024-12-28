@@ -18,7 +18,7 @@ TEST_CASE("scan_task", "[fs]") {
     bfs::create_directories(root_path);
     path_guard_t path_quard{root_path};
 
-    config::fs_config_t config{3600, 10};
+    config::fs_config_t config{3600, 10, 1024 * 1024, 100};
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();

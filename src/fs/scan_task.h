@@ -15,6 +15,7 @@
 #include <boost/filesystem.hpp>
 #include <list>
 #include <variant>
+#include <cstdint>
 
 namespace syncspirit::fs {
 
@@ -66,14 +67,27 @@ using scan_result_t = std::variant<bool, scan_errors_t, changed_meta_t, unchange
 
 struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, boost::thread_unsafe_counter> {
     using file_info_t = model::file_info_ptr_t;
-
     using path_queue_t = std::list<bfs::path>;
     using files_queue_t = std::list<file_info_t>;
     using unknown_files_queue_t = std::list<unknown_file_t>;
 
+    struct send_guard_t {
+        send_guard_t(scan_task_t &task, r::actor_base_t &actor, r::address_ptr_t coordinator) noexcept;
+        ~send_guard_t();
+
+        void send_by_force() noexcept;
+
+        scan_task_t &task;
+        r::actor_base_t &actor;
+        r::address_ptr_t coordinator;
+        bool force_send;
+    };
+
     scan_task_t(model::cluster_ptr_t cluster, std::string_view folder_id, const config::fs_config_t &config) noexcept;
     ~scan_task_t();
 
+    void push(model::diff::cluster_diff_t *model_update, std::int64_t bytes_consumed = 0) noexcept;
+    send_guard_t guard(r::actor_base_t &actor, r::address_ptr_t coordinator) noexcept;
     scan_result_t advance() noexcept;
     const std::string &get_folder_id() const noexcept;
 
@@ -90,11 +104,18 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
     model::file_infos_map_t files;
     utils::logger_t log;
     config::fs_config_t config;
+    std::int64_t bytes_left;
+    std::int64_t files_left;
 
     path_queue_t dirs_queue;
     files_queue_t files_queue;
     unknown_files_queue_t unknown_files_queue;
     bfs::path root;
+
+    model::diff::cluster_diff_ptr_t update_diff;
+    model::diff::cluster_diff_t *current_diff;
+
+    friend struct send_guard_t;
 };
 
 using scan_task_ptr_t = boost::intrusive_ptr<scan_task_t>;
