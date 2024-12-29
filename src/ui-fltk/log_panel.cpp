@@ -11,6 +11,8 @@
 
 #include <fstream>
 
+using fmt::format_to;
+
 using namespace syncspirit::fltk;
 
 struct syncspirit::fltk::fltk_sink_t final : base_sink_t {
@@ -29,11 +31,9 @@ static void pull_in_logs(void *data) {
     auto lock = std::unique_lock(widget->incoming_mutex);
     auto &source = widget->incoming_records;
     if (source.size()) {
-        auto &dest = widget->records;
-        std::move(begin(source), end(source), std::back_insert_iterator(dest));
-        source.clear();
+        auto copy = std::move(widget->incoming_records);
         lock.unlock();
-        widget->update();
+        widget->update(std::move(copy));
     }
     Fl::add_timeout(0.05, pull_in_logs, data);
 }
@@ -47,8 +47,8 @@ static void auto_scroll_toggle(Fl_Widget *widget, void *data) {
 static void clear_logs(Fl_Widget *widget, void *data) {
     auto button = static_cast<Fl_Toggle_Button *>(widget);
     auto panel = reinterpret_cast<log_panel_t *>(data);
-    panel->displayed_records.clear();
-    panel->records.clear();
+    panel->displayed_records->clear();
+    panel->records->clear();
     panel->log_table->update();
     panel->log_table->redraw();
 }
@@ -74,6 +74,20 @@ static void on_input_filter(Fl_Widget *widget, void *data) {
 }
 
 static void export_log(Fl_Widget *widget, void *data) {
+    struct it_t final : logs_iterator_t {
+        it_t(log_buffer_t *buff_) : buff{buff_}, i{0} {}
+
+        log_record_t *next() override {
+            if (i < buff->size()) {
+                return (*buff)[i++].get();
+            }
+            return {};
+        }
+
+        log_buffer_t *buff;
+        size_t i;
+    };
+
     auto input = reinterpret_cast<Fl_Input *>(widget);
     auto log_panel = reinterpret_cast<log_panel_t *>(data);
 
@@ -82,8 +96,10 @@ static void export_log(Fl_Widget *widget, void *data) {
     file_chooser.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
     file_chooser.filter("CSV files\t*.csv");
 
-    auto selected_records = log_panel->log_table->get_selected();
-    auto log_source = selected_records.empty() ? &log_panel->records : &selected_records;
+    auto it_selected = log_panel->log_table->get_selected();
+    if (!it_selected) {
+        it_selected.reset(new it_t(log_panel->displayed_records.get()));
+    }
 
     auto r = file_chooser.show();
     auto &log = log_panel->supervisor.get_logger();
@@ -104,10 +120,9 @@ static void export_log(Fl_Widget *widget, void *data) {
         return fmt::format("\"{}\"", copy);
     };
 
-    for (size_t i = 0; i < log_source->size(); ++i) {
-        auto &record = *log_source->at(i);
-        out << record.level << ", " << record.date << ", " << record.source << ", " << escape_message(record.message)
-            << eol;
+    while (auto record = it_selected->next()) {
+        out << record->level << ", " << record->date << ", " << record->source << ", "
+            << escape_message(record->message) << eol;
     }
     log->info("logs wrote to {}", filename);
 }
@@ -126,6 +141,9 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     : parent_t{x, y, w, h}, supervisor{supervisor_} {
     int padding = 5;
     bool auto_scroll = true;
+    auto &cfg = supervisor.get_app_config().fltk_config;
+    records = std::make_unique<log_buffer_t>(cfg.log_records_buffer);
+    displayed_records = std::make_unique<log_buffer_t>(cfg.log_records_buffer);
 
     auto bottom_row = 30;
     auto log_table_h = h - (padding * 2 + bottom_row);
@@ -227,7 +245,9 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
         auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
         if (in_memory_sink) {
             std::lock_guard lock(in_memory_sink->mutex);
-            records = std::move(in_memory_sink->records);
+            auto &src = in_memory_sink->records;
+            std::move(src.begin(), src.end(), std::back_inserter(*records));
+            src.clear();
             dist_sink->remove_sink(sink);
             break;
         }
@@ -244,23 +264,44 @@ log_panel_t::~log_panel_t() {
     bridge_sink.reset();
 }
 
-void log_panel_t::update() {
-    displayed_records.clear();
+void log_panel_t::update(log_queue_t new_records) {
     auto display_level = supervisor.get_app_config().fltk_config.level;
-    for (auto &r : records) {
+    for (auto &r : new_records) {
         bool display_record = (r->level >= display_level);
         if (display_record && !filter.empty()) {
             display_record =
                 (r->source.find(filter) != std::string::npos) || (r->message.find(filter) != std::string::npos);
         }
         if (display_record) {
-            displayed_records.push_back(r.get());
+            displayed_records->push_back(r.get());
+        }
+        records->push_back(r);
+    }
+    log_table->update();
+    update_counter();
+}
+
+void log_panel_t::update() {
+    displayed_records->clear();
+
+    auto display_level = supervisor.get_app_config().fltk_config.level;
+    for (auto &r : *records) {
+        bool display_record = (r->level >= display_level);
+        if (display_record && !filter.empty()) {
+            display_record =
+                (r->source.find(filter) != std::string::npos) || (r->message.find(filter) != std::string::npos);
+        }
+        if (display_record) {
+            displayed_records->push_back(r.get());
         }
     }
     log_table->update();
+    update_counter();
+}
 
+void log_panel_t::update_counter() {
     char buff[64] = {0};
-    auto message = fmt::format_to(buff, "{}/{}", displayed_records.size(), records.size());
+    auto message = format_to(buff, "{}/{}", displayed_records->size(), records->size());
     records_counter->copy_label(buff);
 }
 

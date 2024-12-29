@@ -454,6 +454,15 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
             return "fltk/bottom_panel_share is incorrect or missing";
         }
         c.bottom_panel_share = bottom_panel_share.value();
+
+        auto log_records_buffer = t["log_records_buffer"].value<std::uint32_t>();
+        if (!log_records_buffer) {
+            return "fltk/log_records_buffer is incorrect or missing";
+        }
+        if (log_records_buffer.value() < 100) {
+            return "fltk/log_records_buffer should be >= 0";
+        }
+        c.log_records_buffer = log_records_buffer.value();
     }
 
     return cfg;
@@ -567,6 +576,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                      {"main_window_height", cfg.fltk_config.main_window_height},
                      {"left_panel_share", cfg.fltk_config.left_panel_share},
                      {"bottom_panel_share", cfg.fltk_config.bottom_panel_share},
+                     {"log_records_buffer", cfg.fltk_config.log_records_buffer},
                  }}},
     }};
     // clang-format on
@@ -684,6 +694,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         480,                                /* main_window_height */
         0.5,                                /* left_panel_share */
         0.3,                                /* bottom_panel_share */
+        99'999,                             /* log_records_buffer */
     };
     return cfg;
 }

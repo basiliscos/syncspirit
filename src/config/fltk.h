@@ -14,6 +14,7 @@ struct fltk_config_t {
     int main_window_height;
     double left_panel_share;
     double bottom_panel_share;
+    std::uint32_t log_records_buffer;
 };
 
 } // namespace syncspirit::config

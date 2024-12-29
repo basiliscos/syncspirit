@@ -24,6 +24,8 @@ struct log_panel_t : Fl_Group {
     void min_display_level(spdlog::level::level_enum level);
     void set_display_level(spdlog::level::level_enum level);
     void update();
+    void update(log_queue_t new_records);
+    void update_counter();
     void on_filter(std::string_view filter);
 
     app_supervisor_t &supervisor;
@@ -32,9 +34,9 @@ struct log_panel_t : Fl_Group {
     Fl_Box *records_counter;
     level_buttons_t level_buttons;
     mutex_t incoming_mutex;
-    log_records_t incoming_records;
-    log_records_t records;
-    log_records_t displayed_records;
+    log_queue_t incoming_records;
+    log_buffer_ptr_t records;
+    log_buffer_ptr_t displayed_records;
     std::string filter;
 };
 

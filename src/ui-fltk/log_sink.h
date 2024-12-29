@@ -26,7 +26,7 @@ struct im_memory_sink_t final : base_sink_t {
     void forward(log_record_ptr_t) override;
 
     mutex_t mutex;
-    log_records_t records;
+    log_queue_t records;
 };
 
 } // namespace syncspirit::fltk

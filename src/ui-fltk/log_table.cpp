@@ -14,7 +14,7 @@ namespace syncspirit::fltk {
 
 static constexpr int col_min_size = 60;
 
-log_table_t::log_table_t(log_records_t &displayed_records_, int x, int y, int w, int h)
+log_table_t::log_table_t(log_buffer_ptr_t &displayed_records_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), displayed_records{displayed_records_}, auto_scrolling(true) {
     rows(0);            // how many rows
     row_header(0);      // enable row headers (along left)
@@ -40,9 +40,9 @@ log_table_t::log_table_t(log_records_t &displayed_records_, int x, int y, int w,
 }
 
 void log_table_t::update() {
-    rows(displayed_records.size());
+    rows(displayed_records->size());
     if (auto_scrolling) {
-        row_position(static_cast<int>(displayed_records.size()));
+        row_position(static_cast<int>(displayed_records->size()));
     }
 }
 
@@ -83,7 +83,7 @@ void log_table_t::draw_header(int col, int x, int y, int w, int h) {
 }
 
 void log_table_t::draw_data(int row, int col, int x, int y, int w, int h) {
-    auto &record = *displayed_records.at(static_cast<size_t>(row));
+    auto &record = *displayed_records->at(static_cast<size_t>(row));
     std::string *content;
     fl_push_clip(x, y, w, h);
     {
@@ -125,20 +125,20 @@ void log_table_t::draw_data(int row, int col, int x, int y, int w, int h) {
 void log_table_t::autoscroll(bool value) {
     auto_scrolling = value;
     if (auto_scrolling) {
-        row_position(static_cast<int>(displayed_records.size()));
+        row_position(static_cast<int>(displayed_records->size()));
     }
 }
 
 std::string log_table_t::gather_selected() {
     std::stringstream buff;
     size_t count = 0;
-    for (size_t i = 0; i < displayed_records.size(); ++i) {
+    for (size_t i = 0; i < displayed_records->size(); ++i) {
         if (row_selected(static_cast<int>(i))) {
             if (count) {
                 buff << eol;
             };
             ++count;
-            auto &row = displayed_records.at(i);
+            auto &row = displayed_records->at(i);
             buff << "(" << static_cast<int>(row->level) << ")"
                  << "\t" << row->date << "\t" << row->thread_id << "\t" << row->source << "\t" << row->message;
             ;
@@ -165,9 +165,9 @@ int log_table_t::handle(int event) {
         }
     } else if (event == FL_UNFOCUS) {
         selected_records.clear();
-        for (size_t i = 0; i < displayed_records.size(); ++i) {
+        for (size_t i = 0; i < displayed_records->size(); ++i) {
             if (row_selected((int)i)) {
-                selected_records.push_back(displayed_records[i]);
+                selected_records.push_back(i);
             }
         }
         select_all_rows(0);
@@ -177,10 +177,28 @@ int log_table_t::handle(int event) {
     return r;
 }
 
-log_records_t log_table_t::get_selected() {
-    auto copy = selected_records;
-    selected_records.clear();
-    return copy;
+log_iterator_ptr_t log_table_t::get_selected() {
+    struct it_t final : logs_iterator_t {
+        it_t(selected_indices_t selected_records_, log_buffer_ptr_t &displayed_records_)
+            : selected_records{std::move(selected_records_)}, displayed_records{displayed_records_}, i{0} {}
+
+        log_record_t *next() override {
+            if (i < selected_records.size()) {
+                auto idx = selected_records[i++];
+                return (*displayed_records)[idx].get();
+            }
+            return {};
+        }
+
+        selected_indices_t selected_records;
+        log_buffer_ptr_t &displayed_records;
+        size_t i;
+    };
+
+    if (selected_records.size()) {
+        return log_iterator_ptr_t(new it_t(std::move(selected_records), displayed_records));
+    }
+    return {};
 }
 
 } // namespace syncspirit::fltk
