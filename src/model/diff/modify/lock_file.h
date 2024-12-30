@@ -13,7 +13,7 @@ struct SYNCSPIRIT_API lock_file_t final : cluster_diff_t {
 
     lock_file_t(const model::file_info_t &file, bool locked) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string folder_id;

@@ -20,14 +20,15 @@ peer_state_t::peer_state_t(cluster_t &cluster, std::string_view peer_id_, const 
               client_name, client_version);
 }
 
-auto peer_state_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto peer_state_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     auto peer = cluster.get_devices().by_sha256(peer_id);
     peer->update_state(state);
     if (state == device_state_t::online) {
         peer->update_contact(endpoint, client_name, client_version);
     }
     peer->notify_update();
-    return applicator_t::apply_impl(cluster);
+    return applicator_t::apply_impl(cluster, controller);
 }
 
 auto peer_state_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

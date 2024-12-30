@@ -17,7 +17,8 @@ upsert_folder_info_t::upsert_folder_info_t(const bu::uuid &uuid_, std::string_vi
     LOG_DEBUG(log, "upsert_folder_info_t, folder = {}, index = {}", folder_id, index_id);
 }
 
-auto upsert_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto upsert_folder_info_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     auto device = cluster.get_devices().by_sha256(device_id);
     if (!device) {
         return make_error_code(error_code_t::no_such_device);
@@ -52,7 +53,7 @@ auto upsert_folder_info_t::apply_impl(cluster_t &cluster) const noexcept -> outc
         iterator->on_upsert(fi);
     }
 
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto upsert_folder_info_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

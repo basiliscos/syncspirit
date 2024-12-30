@@ -19,7 +19,7 @@ struct SYNCSPIRIT_API connect_request_t final : cluster_diff_t {
 
     connect_request_t(tcp::socket sock, const tcp::endpoint &remote) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     mutable socket_ptr_t sock;

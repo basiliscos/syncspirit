@@ -77,4 +77,8 @@ std::string hash_string(const std::string_view &hash) noexcept {
     return r;
 }
 
+static model::diff::apply_controller_t apply_controller;
+
+model::diff::apply_controller_t &get_apply_controller() { return apply_controller; }
+
 } // namespace syncspirit::test

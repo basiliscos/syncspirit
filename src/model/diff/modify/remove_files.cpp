@@ -31,8 +31,9 @@ remove_files_t::remove_files_t(const device_t &device, const file_infos_map_t &f
     LOG_DEBUG(log, "remove_files_t, device = {}, files count = {}", device.device_id(), files.size());
 }
 
-auto remove_files_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster);
+auto remove_files_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    auto r = applicator_t::apply_child(cluster, controller);
     if (!r) {
         return r;
     }
@@ -46,7 +47,7 @@ auto remove_files_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
         auto file = file_infos.get(decomposed.file_id);
         file_infos.remove(file);
     }
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto remove_files_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

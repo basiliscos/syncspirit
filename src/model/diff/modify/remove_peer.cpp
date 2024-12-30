@@ -54,8 +54,9 @@ remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noe
     }
 }
 
-auto remove_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster);
+auto remove_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    auto r = applicator_t::apply_child(cluster, controller);
     if (!r) {
         return r;
     }
@@ -72,7 +73,7 @@ auto remove_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
     LOG_TRACE(log, "applyging remove_peer_t (start), for device '{}' ({})", peer->device_id().get_short(),
               peer->get_name());
     cluster.get_devices().remove(peer);
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 std::string_view remove_peer_t::get_peer_sha256() const noexcept { return std::string_view(peer_key).substr(1); }

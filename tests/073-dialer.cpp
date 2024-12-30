@@ -46,7 +46,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<msg_t>([&](msg_t &msg) {
-                    std::ignore = msg.payload.diff->apply(*cluster);
+                    std::ignore = msg.payload.diff->apply(*cluster, get_apply_controller());
                     messages.emplace_back(&msg);
                 }));
             });

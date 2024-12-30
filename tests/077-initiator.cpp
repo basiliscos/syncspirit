@@ -274,9 +274,9 @@ void test_handshake_timeout() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
             REQUIRE(diff_msgs.size() == 2);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
             CHECK(peer_device->get_state() == device_state_t::connecting);
-            CHECK(diff_msgs[1]->payload.diff->apply(*cluster));
+            CHECK(diff_msgs[1]->payload.diff->apply(*cluster, get_apply_controller()));
             CHECK(peer_device->get_state() == device_state_t::offline);
         }
     };
@@ -297,9 +297,9 @@ void test_handshake_garbage() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
             REQUIRE(diff_msgs.size() == 2);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
             CHECK(peer_device->get_state() == device_state_t::connecting);
-            CHECK(diff_msgs[1]->payload.diff->apply(*cluster));
+            CHECK(diff_msgs[1]->payload.diff->apply(*cluster, get_apply_controller()));
             CHECK(peer_device->get_state() == device_state_t::offline);
         }
     };
@@ -370,7 +370,7 @@ void test_success() {
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             REQUIRE(diff_msgs.size() == 1);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
             CHECK(peer_device->get_state() == device_state_t::connecting);
         }
     };
@@ -768,7 +768,7 @@ void test_relay_active_success() {
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             REQUIRE(diff_msgs.size() == 1);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
             CHECK(peer_device->get_state() == device_state_t::connecting);
         }
     };

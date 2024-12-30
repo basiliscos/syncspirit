@@ -63,9 +63,10 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
     LOG_DEBUG(log, "remove_folder_t, folder_id = {}", folder_id);
 }
 
-auto remove_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto remove_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     LOG_TRACE(log, "applyging remove_folder_t (folder id = {})", folder_id);
-    auto r = applicator_t::apply_child(cluster);
+    auto r = applicator_t::apply_child(cluster, controller);
     if (!r) {
         return r;
     }
@@ -74,7 +75,7 @@ auto remove_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
     auto folder = folders.by_id(folder_id);
     folders.remove(folder);
 
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto remove_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

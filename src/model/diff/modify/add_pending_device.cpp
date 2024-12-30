@@ -12,14 +12,15 @@ add_pending_device_t::add_pending_device_t(const device_id_t &id_, db::SomeDevic
     LOG_DEBUG(log, "add_pending_device_t, peer = {}", device_id.get_short());
 }
 
-auto add_pending_device_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto add_pending_device_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     auto opt = pending_device_t::create(device_id, db_device);
     if (!opt) {
         return opt.assume_error();
     }
     auto &pending_device = opt.assume_value();
     cluster.get_pending_devices().put(std::move(pending_device));
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto add_pending_device_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

@@ -273,6 +273,7 @@ int main(int argc, char **argv) {
         auto main_window = fltk::main_window_t(*sup_fltk, app_w, app_h);
         Fl::visual(FL_DOUBLE | FL_INDEX);
         main_window.show(argc, argv);
+        main_window.wait_for_expose();
 
         auto net_thread = std::thread([&]() {
             io_context.run();

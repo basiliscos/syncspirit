@@ -15,7 +15,7 @@ struct SYNCSPIRIT_API remove_folder_t final : cluster_diff_t {
     remove_folder_t(const model::cluster_t &cluster, model::sequencer_t &sequencer,
                     const model::folder_t &folder) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string folder_id;

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "cluster_diff.h"
+#include "apply_controller.h"
 #include "model/cluster.h"
 
 using namespace syncspirit::model::diff;
@@ -27,31 +28,39 @@ cluster_diff_t *cluster_diff_t::assign_child(cluster_diff_ptr_t child_) noexcept
     return child.get();
 }
 
-auto cluster_diff_t::apply(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto r = apply_impl(cluster);
+auto cluster_diff_t::apply(cluster_t &cluster, apply_controller_t &controller) const noexcept -> outcome::result<void> {
+    auto r = apply_forward(cluster, controller);
     if (!r) {
         cluster.mark_tainted();
     }
     return r;
 }
 
-auto cluster_diff_t::cluster_diff_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto cluster_diff_t::apply_forward(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    return controller.apply(*this, cluster);
+}
+
+auto cluster_diff_t::cluster_diff_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     auto r = outcome::result<void>{outcome::success()};
     if (this->child) {
-        r = this->child->apply(cluster);
+        r = this->child->apply(cluster, controller);
     }
     if (r && this->sibling) {
-        r = this->sibling->apply(cluster);
+        r = this->sibling->apply(cluster, controller);
     }
     return r;
 }
 
-auto cluster_diff_t::apply_child(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    return child ? child->apply(cluster) : outcome::success();
+auto cluster_diff_t::apply_child(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    return child ? child->apply(cluster, controller) : outcome::success();
 }
 
-auto cluster_diff_t::apply_sibling(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    return sibling ? sibling->apply(cluster) : outcome::success();
+auto cluster_diff_t::apply_sibling(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    return sibling ? sibling->apply(cluster, controller) : outcome::success();
 }
 
 auto cluster_diff_t::visit_next(visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

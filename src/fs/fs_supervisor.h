@@ -7,6 +7,7 @@
 #include "config/main.h"
 #include "utils/log.h"
 #include "model/messages.h"
+#include "model/diff/apply_controller.h"
 #include "model/misc/sequencer.h"
 #include "syncspirit-export.h"
 #include <rotor/thread.hpp>
@@ -42,7 +43,7 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
     }
 };
 
-struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
+struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t, private model::diff::apply_controller_t {
     using launcher_t = std::function<void(model::cluster_ptr_t &)>;
     using parent_t = rth::supervisor_thread_t;
     using config_t = fs_supervisor_config_t;

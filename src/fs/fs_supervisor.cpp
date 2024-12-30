@@ -108,7 +108,7 @@ void fs_supervisor_t::on_start() noexcept {
 void fs_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;
-    auto r = diff.apply(*cluster);
+    auto r = diff.apply(*cluster, *this);
     if (!r) {
         LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
         auto ee = make_error(r.assume_error());

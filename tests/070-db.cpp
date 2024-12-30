@@ -89,7 +89,7 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        auto db_config = config::db_config_t{1024 * 1024, 0};
+        auto db_config = config::db_config_t{1024 * 1024, 0, 64, 32};
         db_actor = sup->create_actor<db_actor_t>()
                        .cluster(cluster)
                        .db_dir(root_path.string())
@@ -152,7 +152,7 @@ void test_loading_empty_db() {
             REQUIRE(reply);
 
             auto diff = reply->payload.res.diff;
-            REQUIRE(diff->apply(*cluster));
+            REQUIRE(diff->apply(*cluster, get_apply_controller()));
 
             auto devices = cluster->get_devices();
             REQUIRE(devices.size() == 2);
@@ -188,7 +188,7 @@ void test_folder_upserting() {
                 sup->do_process();
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
 
                 auto folder_clone = cluster_clone->get_folders().by_id(folder->get_id());
                 REQUIRE(folder_clone);
@@ -208,7 +208,7 @@ void test_folder_upserting() {
                 REQUIRE(reply);
 
                 auto cluster_clone = make_cluster();
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 auto folder_clone = cluster_clone->get_folders().by_id(folder->get_id());
                 REQUIRE(folder_clone->get_label() == "my-label-2");
             }
@@ -246,7 +246,7 @@ void test_unknown_and_ignored_devices_1() {
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
                 auto &diff = reply->payload.res.diff;
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 CHECK(cluster_clone->get_pending_devices().by_sha256(d_id1.get_sha256()));
                 CHECK(cluster_clone->get_ignored_devices().by_sha256(d_id2.get_sha256()));
             }
@@ -265,7 +265,7 @@ void test_unknown_and_ignored_devices_1() {
                 sup->do_process();
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 REQUIRE(cluster_clone->get_pending_devices().size() == 1);
                 REQUIRE(cluster_clone->get_ignored_devices().size() == 1);
                 auto unknown = cluster_clone->get_pending_devices().by_sha256(d_id1.get_sha256());
@@ -285,7 +285,7 @@ void test_unknown_and_ignored_devices_1() {
                 sup->do_process();
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 REQUIRE(cluster_clone->get_pending_devices().size() == 0);
                 REQUIRE(cluster_clone->get_ignored_devices().size() == 0);
             }
@@ -310,7 +310,7 @@ void test_unknown_and_ignored_devices_2() {
                 sup->do_process();
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 CHECK(cluster_clone->get_pending_devices().by_sha256(d_id.get_sha256()));
                 CHECK(!cluster_clone->get_ignored_devices().by_sha256(d_id.get_sha256()));
             }
@@ -321,7 +321,7 @@ void test_unknown_and_ignored_devices_2() {
                 sup->do_process();
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 CHECK(!cluster_clone->get_pending_devices().by_sha256(d_id.get_sha256()));
                 CHECK(cluster_clone->get_ignored_devices().by_sha256(d_id.get_sha256()));
             }
@@ -347,7 +347,7 @@ void test_peer_updating() {
             sup->do_process();
             REQUIRE(reply);
             auto cluster_clone = make_cluster();
-            REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+            REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
 
             REQUIRE(cluster_clone->get_devices().size() == 2);
             auto device_clone = cluster_clone->get_devices().by_sha256(sha256);
@@ -386,7 +386,7 @@ void test_folder_sharing() {
             sup->do_process();
             REQUIRE(reply);
             auto cluster_clone = make_cluster();
-            REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+            REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
 
             auto peer_device = cluster_clone->get_devices().by_sha256(sha256);
             REQUIRE(peer_device);
@@ -459,7 +459,7 @@ void test_cluster_update_and_remove() {
 
             auto cluster_clone = make_cluster();
             {
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 REQUIRE(cluster_clone->get_blocks().size() == 1);
                 CHECK(cluster_clone->get_blocks().get(b->hash()));
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
@@ -489,7 +489,7 @@ void test_cluster_update_and_remove() {
 
             cluster_clone = make_cluster();
             {
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 REQUIRE(cluster_clone->get_blocks().size() == 0);
                 auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                 REQUIRE(fis.size() == 2);
@@ -556,7 +556,7 @@ void test_unshare_and_remove_folder() {
 
                 auto cluster_clone = make_cluster();
                 {
-                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 1);
                     REQUIRE(!fis.by_device(*peer_device));
@@ -575,7 +575,7 @@ void test_unshare_and_remove_folder() {
 
                 auto cluster_clone = make_cluster();
                 {
-                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                     REQUIRE(cluster_clone->get_folders().size() == 0);
                     REQUIRE(cluster_clone->get_blocks().size() == 0);
                 }
@@ -629,7 +629,7 @@ void test_remote_copy() {
 
                 auto cluster_clone = make_cluster();
                 {
-                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                     REQUIRE(cluster_clone->get_blocks().size() == 0);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
@@ -668,7 +668,7 @@ void test_remote_copy() {
                     REQUIRE(!reply->payload.ee);
 
                     auto cluster_clone = make_cluster();
-                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
@@ -694,7 +694,7 @@ void test_remote_copy() {
                     REQUIRE(!reply->payload.ee);
 
                     auto cluster_clone = make_cluster();
-                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                    REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
@@ -738,7 +738,7 @@ void test_local_update() {
                 REQUIRE(reply);
                 REQUIRE(!reply->payload.ee);
                 auto cluster_clone = make_cluster();
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
 
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_infos().by_device(*my_device);
@@ -759,7 +759,7 @@ void test_local_update() {
                 REQUIRE(reply);
                 REQUIRE(!reply->payload.ee);
                 auto cluster_clone = make_cluster();
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
 
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_infos().by_device(*my_device);
@@ -793,7 +793,7 @@ void test_peer_going_offline() {
             REQUIRE(reply);
 
             auto cluster_clone = make_cluster();
-            REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+            REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
             auto peer_clone = cluster_clone->get_devices().by_sha256(sha256);
             db::Device db_peer_clone;
             peer_clone->serialize(db_peer_clone);
@@ -860,7 +860,7 @@ void test_remove_peer() {
 
             auto cluster_clone = make_cluster(false);
             {
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 CHECK(cluster_clone->get_pending_folders().size() == 0);
                 CHECK(cluster_clone->get_devices().size() == 1);
                 REQUIRE(cluster_clone->get_blocks().size() == 0);
@@ -898,7 +898,7 @@ void test_update_peer() {
                 REQUIRE(reply);
                 REQUIRE(!reply->payload.ee);
                 auto cluster_clone = make_cluster();
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 CHECK(cluster_clone->get_pending_devices().size() == 0);
                 CHECK(cluster_clone->get_ignored_devices().size() == 0);
                 CHECK(cluster_clone->get_devices().size() == 2);
@@ -993,7 +993,7 @@ void test_peer_3_folders_6_files() {
                 REQUIRE(reply);
                 REQUIRE(!reply->payload.ee);
                 auto cluster_clone = make_cluster();
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone));
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
 
                 auto get_my_file = [&](std::string_view folder_id, std::string_view name) {
                     auto folder = cluster->get_folders().by_id(folder_id);

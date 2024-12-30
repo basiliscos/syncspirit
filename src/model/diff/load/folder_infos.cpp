@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "folder_infos.h"
 #include "../../misc/error_code.h"
@@ -8,7 +8,8 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     static const constexpr char folder_prefix = (char)(db::prefix::folder);
     static const constexpr char device_prefix = (char)(db::prefix::device);
 
@@ -44,5 +45,5 @@ auto folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::r
         auto &fi = option.assume_value();
         map.put(fi);
     }
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }

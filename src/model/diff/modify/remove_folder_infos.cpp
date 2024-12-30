@@ -25,8 +25,9 @@ remove_folder_infos_t::remove_folder_infos_t(const folder_infos_map_t &map, orph
     LOG_DEBUG(log, "remove_folder_infos_t, count = {}", map.size());
 }
 
-auto remove_folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster);
+auto remove_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    auto r = applicator_t::apply_child(cluster, controller);
     if (!r) {
         return r;
     }
@@ -44,7 +45,7 @@ auto remove_folder_infos_t::apply_impl(cluster_t &cluster) const noexcept -> out
 
         folder_infos.remove(folder_info);
     }
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto remove_folder_infos_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

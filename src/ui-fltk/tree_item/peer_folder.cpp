@@ -44,7 +44,7 @@ struct my_table_t : static_table_t {
         };
         auto &fi = container.folder_info;
         std::size_t entries_size = 0;
-        container.apply(size_visitor_t{}, &entries_size);
+        // container.apply(size_visitor_t{}, &entries_size);
 
         index_cell->update(fmt::format("0x{:x}", fi.get_index()));
         max_sequence_cell->update(fmt::format("{}", fi.get_max_sequence()));

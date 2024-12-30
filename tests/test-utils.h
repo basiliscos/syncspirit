@@ -7,6 +7,7 @@
 #include <boost/filesystem.hpp>
 
 #include "model/device.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_diff.h"
 #include "syncspirit-test-export.h"
 
@@ -40,6 +41,8 @@ struct SYNCSPIRIT_TEST_API path_guard_t {
         }
     }
 };
+
+SYNCSPIRIT_TEST_API model::diff::apply_controller_t &get_apply_controller();
 
 SYNCSPIRIT_TEST_API bfs::path locate_path(const char *test_file);
 SYNCSPIRIT_TEST_API std::string read_file(const bfs::path &path);

@@ -5,6 +5,7 @@
 
 #include "rotor/supervisor.h"
 #include "model/messages.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/local/io_failure.h"
 #include "model/misc/sequencer.h"
@@ -45,7 +46,9 @@ template <typename Supervisor> struct supervisor_config_builder_t : r::superviso
     }
 };
 
-struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t, private model::diff::cluster_visitor_t {
+struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
+                                          private model::diff::cluster_visitor_t,
+                                          private model::diff::apply_controller_t {
     using config_t = supervisor_config_t;
     template <typename Actor> using config_builder_t = supervisor_config_builder_t<Actor>;
 

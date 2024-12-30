@@ -12,6 +12,7 @@
 #include "model/ignored_device.h"
 #include "model/pending_device.h"
 #include "model/file_info.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_diff.h"
 #include "model/diff/block_diff.h"
 #include "model/diff/modify/block_transaction.h"
@@ -49,7 +50,7 @@ struct SYNCSPIRIT_TEST_API index_maker_t {
     std::string_view peer_sha256;
 };
 
-struct SYNCSPIRIT_TEST_API diff_builder_t {
+struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controller_t {
     using blocks_t = std::vector<proto::BlockInfo>;
 
     diff_builder_t(model::cluster_t &, r::address_ptr_t receiver = {}) noexcept;

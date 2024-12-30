@@ -5,6 +5,7 @@
 #include "utils/log.h"
 #include "net/messages.h"
 #include "model/messages.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/misc/sequencer.h"
@@ -81,7 +82,9 @@ struct callback_t : model::arc_base_t<callback_t> {
 };
 using callback_ptr_t = model::intrusive_ptr_t<callback_t>;
 
-struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_visitor_t {
+struct app_supervisor_t : rf::supervisor_fltk_t,
+                          private model::diff::cluster_visitor_t,
+                          private model::diff::apply_controller_t {
     using parent_t = rf::supervisor_fltk_t;
     using config_t = app_supervisor_config_t;
     template <typename Actor> using config_builder_t = app_supervisor_config_builder_t<Actor>;
@@ -138,6 +141,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_vi
     callback_ptr_t call_select_folder(std::string_view folder_id);
     callback_ptr_t call_share_folders(std::string folder_id, std::vector<std::string> devices);
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
+    void request_load_model();
 
   private:
     using clock_t = std::chrono::high_resolution_clock;
@@ -159,6 +163,10 @@ struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_vi
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
+    outcome::result<void> apply(const model::diff::load::blocks_t &, model::cluster_t &cluster) noexcept override;
+    outcome::result<void> apply(const model::diff::load::file_infos_t &, model::cluster_t &cluster) noexcept override;
+    outcome::result<void> apply(const model::diff::load::load_cluster_t &, model::cluster_t &cluster) noexcept override;
+
     model::sequencer_ptr_t sequencer;
     time_point_t started_at;
     r::address_ptr_t coordinator;
@@ -176,6 +184,9 @@ struct app_supervisor_t : rf::supervisor_fltk_t, private model::diff::cluster_vi
     db_info_viewer_t *db_info_viewer;
     callbacks_t callbacks;
     main_window_t *main_window;
+    std::size_t loaded_blocks;
+    std::size_t loaded_files;
+    const model::diff::load::load_cluster_t *load_cluster;
 
     friend struct db_info_viewer_guard_t;
 };

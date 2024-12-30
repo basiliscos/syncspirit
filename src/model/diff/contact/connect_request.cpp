@@ -12,8 +12,9 @@ connect_request_t::connect_request_t(tcp::socket sock_, const tcp::endpoint &rem
     LOG_DEBUG(log, "connect_request_t, sock = {}, endpoint = {}", sock->native_handle(), remote);
 }
 
-auto connect_request_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    return applicator_t::apply_sibling(cluster);
+auto connect_request_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto connect_request_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

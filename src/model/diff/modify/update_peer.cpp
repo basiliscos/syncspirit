@@ -32,8 +32,9 @@ update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
     }
 }
 
-auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster);
+auto update_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    auto r = applicator_t::apply_child(cluster, controller);
     if (!r) {
         return r;
     }
@@ -57,7 +58,7 @@ auto update_peer_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::re
         peer->notify_update();
     }
     LOG_TRACE(log, "applyging update_peer_t, device {}", peer->device_id());
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto update_peer_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

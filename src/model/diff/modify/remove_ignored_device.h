@@ -10,7 +10,7 @@ namespace syncspirit::model::diff::modify {
 
 struct SYNCSPIRIT_API remove_ignored_device_t final : cluster_diff_t {
     remove_ignored_device_t(const ignored_device_t &device) noexcept;
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string_view get_device_sha256() const noexcept;

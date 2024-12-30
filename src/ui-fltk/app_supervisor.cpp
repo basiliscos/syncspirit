@@ -14,6 +14,8 @@
 #include "config/utils.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/local/io_failure.h"
+#include "model/diff/load/blocks.h"
+#include "model/diff/load/file_infos.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
@@ -67,7 +69,7 @@ app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
       app_config(std::move(config.app_config)), app_config_original{app_config}, content{nullptr}, devices{nullptr},
       folders{nullptr}, pending_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr},
-      main_window{nullptr} {
+      main_window{nullptr}, loaded_blocks{0}, loaded_files{0} {
     started_at = clock_t::now();
     sequencer = model::make_sequencer(started_at.time_since_epoch().count());
 }
@@ -91,8 +93,7 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&app_supervisor_t::on_model_update, coordinator);
-                request<model::payload::model_request_t>(coordinator).send(init_timeout);
-                resources->acquire(resource::model);
+                request_load_model();
             }
         });
     });
@@ -122,6 +123,11 @@ void app_supervisor_t::shutdown_finish() noexcept {
     }
 }
 
+void app_supervisor_t::request_load_model() {
+    request<model::payload::model_request_t>(coordinator).send(init_timeout);
+    resources->acquire(resource::model);
+}
+
 void app_supervisor_t::on_model_response(model::message::model_response_t &res) noexcept {
     LOG_TRACE(log, "on_model_response");
     resources->release(resource::model);
@@ -136,7 +142,7 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
 void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;
-    auto r = diff.apply(*cluster);
+    auto r = diff.apply(*cluster, *this);
     if (!r) {
         LOG_ERROR(log, "error applying cluster diff: {}", r.assume_error().message());
     }
@@ -289,7 +295,9 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
         folder->set_augmentation(augmentation);
     }
 
-    return diff.visit_next(*this, custom);
+    auto r = diff.visit_next(*this, custom);
+    main_window->on_loading_done();
+    return r;
 }
 
 auto app_supervisor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
@@ -347,6 +355,7 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
 
 auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+#if 0
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto &folder_infos = folder->get_folder_infos();
     auto local_fi = folder_infos.by_device(*cluster->get_device());
@@ -372,6 +381,7 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
             }
         }
     }
+#endif
     return diff.visit_next(*this, custom);
 }
 
@@ -424,6 +434,36 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
         }
     }
     return diff.visit_next(*this, custom);
+}
+
+auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, model::cluster_t &cluster) noexcept
+    -> outcome::result<void> {
+    loaded_blocks += diff.blocks.size();
+    auto share = (100. * loaded_blocks) / load_cluster->blocks_count;
+    auto msg = fmt::format("({:.03}%) loaded {} of {} blocks", share, loaded_blocks, load_cluster->blocks_count);
+    log->debug(msg);
+    main_window->set_splash_text(msg);
+    auto r = apply_controller_t::apply(diff, cluster);
+    return r;
+}
+
+auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, model::cluster_t &cluster) noexcept
+    -> outcome::result<void> {
+    loaded_files += diff.container.size();
+    auto share = (100. * loaded_files) / load_cluster->files_count;
+    auto msg = fmt::format("({:.03}%) loaded {} of {} files", share, loaded_files, load_cluster->files_count);
+    log->debug(msg);
+    main_window->set_splash_text(msg);
+    auto r = apply_controller_t::apply(diff, cluster);
+    return r;
+}
+
+auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, model::cluster_t &cluster) noexcept
+    -> outcome::result<void> {
+    load_cluster = &diff;
+    auto r = apply_controller_t::apply(diff, cluster);
+    load_cluster = nullptr;
+    return r;
 }
 
 void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {

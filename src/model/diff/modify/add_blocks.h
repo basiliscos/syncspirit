@@ -13,7 +13,7 @@ struct SYNCSPIRIT_API add_blocks_t : cluster_diff_t {
     using blocks_t = std::vector<proto::BlockInfo>;
 
     add_blocks_t(blocks_t blocks) noexcept;
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     blocks_t blocks;

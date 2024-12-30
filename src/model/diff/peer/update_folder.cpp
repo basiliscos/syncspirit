@@ -30,8 +30,9 @@ update_folder_t::update_folder_t(std::string_view folder_id_, std::string_view p
     }
 }
 
-auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster);
+auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    auto r = applicator_t::apply_child(cluster, controller);
     if (!r) {
         return r;
     }
@@ -75,7 +76,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
 
-    r = applicator_t::apply_sibling(cluster);
+    r = applicator_t::apply_sibling(cluster, controller);
 
     if (auto iterator = folder_info->get_device()->get_iterator(); iterator) {
         iterator->on_upsert(folder_info);

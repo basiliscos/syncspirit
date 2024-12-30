@@ -18,7 +18,7 @@ struct SYNCSPIRIT_API peer_state_t final : cluster_diff_t {
                  model::device_state_t state, std::string cert_name_ = {}, tcp::endpoint endpoint_ = {},
                  std::string_view client_name_ = {}, std::string_view client_version_ = {}) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *custom) const noexcept override;
 
     std::string peer_id;

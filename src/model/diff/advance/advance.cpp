@@ -113,8 +113,8 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     }
 }
 
-auto advance_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster);
+auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(cluster, controller);
     if (!r) {
         return r;
     }
@@ -158,5 +158,5 @@ auto advance_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result
     local_file->notify_update();
     local_folder->notify_update();
 
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }

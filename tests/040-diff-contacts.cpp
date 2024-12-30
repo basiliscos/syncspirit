@@ -31,7 +31,7 @@ TEST_CASE("unknown device connected", "[model]") {
     db_device.set_name("a name-2");
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new model::diff::contact::unknown_connected_t(*cluster, peer_id, db_device);
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(diff->apply(*cluster, get_apply_controller()));
 
     REQUIRE(cluster->get_pending_devices().size() == 1);
     auto unknown = cluster->get_pending_devices().by_sha256(peer_id.get_sha256());
@@ -79,7 +79,7 @@ TEST_CASE("ignored device connected", "[model]") {
 
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new model::diff::contact::ignored_connected_t(*cluster, peer_id, db_device);
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(diff->apply(*cluster, get_apply_controller()));
 }
 
 TEST_CASE("ignored device is removed when connecting to it ", "[model]") {

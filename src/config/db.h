@@ -11,6 +11,8 @@ namespace syncspirit::config {
 struct db_config_t {
     std::int64_t upper_limit;
     std::uint32_t uncommitted_threshold;
+    std::uint32_t max_blocks_per_diff;
+    std::uint32_t max_files_per_diff;
 };
 
 } // namespace syncspirit::config

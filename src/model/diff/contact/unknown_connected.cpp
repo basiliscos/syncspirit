@@ -14,7 +14,8 @@ unknown_connected_t::unknown_connected_t(cluster_t &cluster, const model::device
     LOG_DEBUG(log, "unknown_connected_t, device = {}", device_id.get_short());
 }
 
-auto unknown_connected_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto unknown_connected_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     auto &pending_devices = cluster.get_pending_devices();
     auto prev = pending_devices.by_sha256(device_id.get_sha256());
     if (!prev) {
@@ -22,7 +23,7 @@ auto unknown_connected_t::apply_impl(cluster_t &cluster) const noexcept -> outco
     }
     prev->assign(db_device);
     prev->notify_update();
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto unknown_connected_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

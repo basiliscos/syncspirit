@@ -12,7 +12,7 @@ struct SYNCSPIRIT_API block_transaction_t : block_diff_t {
 
     block_transaction_t(const file_info_t &file, size_t block_index);
 
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
 
     cluster_diff_ptr_t ack() const;
     cluster_diff_ptr_t rej() const;

@@ -54,9 +54,10 @@ share_folder_t::share_folder_t(const bu::uuid &uuid, const model::device_t &peer
     }
 }
 
-auto share_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto share_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     LOG_TRACE(log, "applyging share_folder_t");
-    return applicator_t::apply_impl(cluster);
+    return applicator_t::apply_impl(cluster, controller);
 }
 
 auto share_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

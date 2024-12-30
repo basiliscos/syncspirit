@@ -13,14 +13,15 @@ remove_pending_device_t::remove_pending_device_t(const pending_device_t &device)
     LOG_DEBUG(log, "remove_pending_device_t, device = {}", device.get_device_id());
 }
 
-auto remove_pending_device_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto remove_pending_device_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     auto &pending_devices = cluster.get_pending_devices();
     auto pending_device = pending_devices.by_sha256(get_device_sha256());
     if (!pending_device) {
         return make_error_code(error_code_t::no_such_device);
     }
     pending_devices.remove(pending_device);
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 std::string_view remove_pending_device_t::get_device_sha256() const noexcept {

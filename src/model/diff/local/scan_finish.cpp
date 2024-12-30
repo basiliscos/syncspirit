@@ -12,10 +12,11 @@ scan_finish_t::scan_finish_t(std::string_view folder_id_, const pt::ptime &at_)
     LOG_DEBUG(log, "scan_finish_t, folder = {}", folder_id);
 }
 
-auto scan_finish_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto scan_finish_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
     folder->set_scan_finish(at);
-    auto r = applicator_t::apply_sibling(cluster);
+    auto r = applicator_t::apply_sibling(cluster, controller);
     folder->notify_update();
     return r;
 }

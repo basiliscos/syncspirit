@@ -10,7 +10,7 @@ namespace syncspirit::model::diff::load {
 struct SYNCSPIRIT_API folders_t final : cluster_diff_t {
     template <typename T> folders_t(T &&folders_) noexcept : folders{std::forward<T>(folders_)} {}
 
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
 
     container_t folders;
 };

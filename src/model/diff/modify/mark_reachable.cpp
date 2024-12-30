@@ -15,7 +15,8 @@ mark_reachable_t::mark_reachable_t(const model::file_info_t &file, bool reachabl
               reachable);
 }
 
-auto mark_reachable_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto mark_reachable_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
     auto device = cluster.get_devices().by_sha256(device_id);
     auto folder_info = folder->get_folder_infos().by_device(*device);
@@ -24,7 +25,7 @@ auto mark_reachable_t::apply_impl(cluster_t &cluster) const noexcept -> outcome:
     LOG_TRACE(log, "applyging reachable ({}) for '{}'", reachable, file->get_full_name());
     file->mark_unreachable(!reachable);
 
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto mark_reachable_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

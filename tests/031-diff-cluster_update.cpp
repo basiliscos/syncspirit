@@ -91,7 +91,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         REQUIRE(diff_opt);
 
         auto &diff = diff_opt.value();
-        auto r_a = diff->apply(*cluster);
+        auto r_a = diff->apply(*cluster, get_apply_controller());
         CHECK(r_a);
 
         auto visitor = my_cluster_update_visitor_t([&](auto &diff) {});
@@ -116,7 +116,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
         diff = diff_opt.value();
-        r_a = diff->apply(*cluster);
+        r_a = diff->apply(*cluster, get_apply_controller());
         CHECK(r_a);
         REQUIRE(cluster->get_pending_folders().size() == 1);
         std::ignore = diff->visit(visitor, nullptr);
@@ -127,7 +127,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
         diff = diff_opt.value();
-        r_a = diff->apply(*cluster);
+        r_a = diff->apply(*cluster, get_apply_controller());
         CHECK(r_a);
         (void)diff->visit(visitor, nullptr);
         REQUIRE(visitor.add_pending_folders == 2);
@@ -153,7 +153,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
 
-        r_a = diff_opt.value()->apply(*cluster);
+        r_a = diff_opt.value()->apply(*cluster, get_apply_controller());
         CHECK(r_a);
 
         CHECK(std::distance(cluster->get_pending_folders().begin(), cluster->get_pending_folders().end()) == 1);
@@ -202,7 +202,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             REQUIRE(diff_opt);
 
             auto &diff = diff_opt.value();
-            auto r_a = diff->apply(*cluster);
+            auto r_a = diff->apply(*cluster, get_apply_controller());
             CHECK(r_a);
             auto pr_file = proto::FileInfo();
             pr_file.set_sequence(folder_info_peer->get_max_sequence());
@@ -262,7 +262,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             REQUIRE(diff_opt);
 
             auto &diff = diff_opt.value();
-            auto r_a = diff->apply(*cluster);
+            auto r_a = diff->apply(*cluster, get_apply_controller());
             REQUIRE(r_a);
             auto fi = folder_infos.by_device(*peer_device);
             REQUIRE(fi->get_index() == 1234ul);
@@ -389,7 +389,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     REQUIRE(diff_opt);
 
     auto &diff = diff_opt.value();
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(diff->apply(*cluster, get_apply_controller()));
 
     auto folder_info_peer_new = folder->get_folder_infos().by_device(*peer_device);
     REQUIRE(folder_info_peer_new);
@@ -459,7 +459,7 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
     auto &diff = diff_opt.value();
-    REQUIRE(diff->apply(*cluster));
+    REQUIRE(diff->apply(*cluster, get_apply_controller()));
 }
 
 TEST_CASE("cluster update with unknown devices", "[model]") {
@@ -585,7 +585,7 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     auto cc = std::make_unique<proto::ClusterConfig>();
     auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
-    auto opt = diff_opt.value()->apply(*cluster);
+    auto opt = diff_opt.value()->apply(*cluster, get_apply_controller());
     REQUIRE(opt);
 
     CHECK(blocks_map.size() == 0);
@@ -678,7 +678,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
     auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
 
-    auto opt = diff_opt.value()->apply(*cluster);
+    auto opt = diff_opt.value()->apply(*cluster, get_apply_controller());
     REQUIRE(opt);
 
     auto remote_folder = peer_device->get_remote_folder_infos().by_folder(*folder);
@@ -692,7 +692,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
         REQUIRE(diff_opt);
 
         auto &diff = diff_opt.value();
-        REQUIRE(diff->apply(*cluster));
+        REQUIRE(diff->apply(*cluster, get_apply_controller()));
 
         CHECK(peer_device->get_remote_folder_infos().size() == 0);
         auto fi = folder->get_folder_infos().by_device(*peer_device);

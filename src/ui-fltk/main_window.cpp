@@ -71,3 +71,10 @@ main_window_t::~main_window_t() {
     supervisor.set_main_window(nullptr);
     delete log_panel;
 }
+
+void main_window_t::set_splash_text(std::string text) {
+    log_panel->set_splash_text(std::move(text));
+    Fl::flush();
+}
+
+void main_window_t::on_loading_done() { log_panel->on_loading_done(); }

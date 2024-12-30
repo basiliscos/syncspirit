@@ -16,7 +16,7 @@ struct SYNCSPIRIT_API share_folder_t final : cluster_diff_t {
     static outcome::result<cluster_diff_ptr_t> create(cluster_t &, sequencer_t &sequencer, const model::device_t &,
                                                       const model::folder_t &folder) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string peer_id;

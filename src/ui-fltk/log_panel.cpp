@@ -15,6 +15,8 @@ using fmt::format_to;
 
 using namespace syncspirit::fltk;
 
+static constexpr int padding = 5;
+
 struct syncspirit::fltk::fltk_sink_t final : base_sink_t {
     fltk_sink_t(log_panel_t *widget_) : widget{widget_} {}
 
@@ -138,9 +140,7 @@ struct counter_label_t : Fl_Box {
 };
 
 log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
-    : parent_t{x, y, w, h}, supervisor{supervisor_} {
-    int padding = 5;
-    bool auto_scroll = true;
+    : parent_t{x, y, w, h}, supervisor{supervisor_}, records_counter{nullptr} {
     auto &cfg = supervisor.get_app_config().fltk_config;
     records = std::make_unique<log_buffer_t>(cfg.log_records_buffer);
     displayed_records = std::make_unique<log_buffer_t>(cfg.log_records_buffer);
@@ -148,13 +148,56 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     auto bottom_row = 30;
     auto log_table_h = h - (padding * 2 + bottom_row);
     auto log_table = new log_table_t(displayed_records, padding, padding, w - padding * 2, log_table_h);
-    log_table->autoscroll(auto_scroll);
+    log_table->autoscroll(true);
     this->log_table = log_table;
 
     auto common_y = log_table->h() + padding * 2;
     auto common_h = bottom_row - padding;
-    auto group = new Fl_Group(0, common_y, log_table->w(), common_h);
 
+    control_group = new Fl_Group(0, common_y, log_table->w(), common_h);
+    splash_text = new Fl_Box(padding, common_y, log_table->w(), common_h);
+    splash_text->label("splash text");
+
+    control_group->end();
+
+    end();
+
+    resizable(log_table);
+
+    bridge_sink = sink_ptr_t(new fltk_sink_t(this));
+
+    auto &dist_sink = supervisor.get_dist_sink();
+    for (auto sink : dist_sink->sinks()) {
+        auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
+        if (in_memory_sink) {
+            std::lock_guard lock(in_memory_sink->mutex);
+            auto &src = in_memory_sink->records;
+            std::move(src.begin(), src.end(), std::back_inserter(*records));
+            src.clear();
+            dist_sink->remove_sink(sink);
+            break;
+        }
+    }
+
+    Fl::add_timeout(0.05, pull_in_logs, this);
+
+    dist_sink->add_sink(bridge_sink);
+}
+
+void log_panel_t::on_loading_done() {
+    bool auto_scroll = true;
+
+    auto bottom_row = 30;
+    // auto common_y = log_table->h() + padding * 2;
+    auto common_h = bottom_row - padding;
+    auto common_y = control_group->y();
+
+    remove(control_group);
+    begin();
+    auto x = this->x();
+    control_group = new Fl_Group(0, common_y, log_table->w(), common_h);
+
+    control_group->begin();
     auto autoscroll_button = new Fl_Toggle_Button(padding, common_y, 100, common_h, "auto scroll");
     autoscroll_button->value(auto_scroll);
     autoscroll_button->callback(auto_scroll_toggle, log_table);
@@ -227,35 +270,15 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     filter_input->when(FL_WHEN_CHANGED);
     button_x += filter_input->w() + padding;
 
-    auto counter = new counter_label_t(padding + group->w() - 200, common_y, 200, common_h);
+    auto counter = new counter_label_t(padding + control_group->w() - 200, common_y, 200, common_h);
     counter->tooltip("displayed number of records / total number of records");
     records_counter = counter;
 
-    group->end();
-    group->resizable(counter);
-
+    control_group->end();
+    control_group->resizable(counter);
     end();
 
-    resizable(log_table);
-
-    bridge_sink = sink_ptr_t(new fltk_sink_t(this));
-
-    auto &dist_sink = supervisor.get_dist_sink();
-    for (auto sink : dist_sink->sinks()) {
-        auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
-        if (in_memory_sink) {
-            std::lock_guard lock(in_memory_sink->mutex);
-            auto &src = in_memory_sink->records;
-            std::move(src.begin(), src.end(), std::back_inserter(*records));
-            src.clear();
-            dist_sink->remove_sink(sink);
-            break;
-        }
-    }
-
-    Fl::add_timeout(0.05, pull_in_logs, this);
-
-    dist_sink->add_sink(bridge_sink);
+    redraw();
 }
 
 log_panel_t::~log_panel_t() {
@@ -300,9 +323,11 @@ void log_panel_t::update() {
 }
 
 void log_panel_t::update_counter() {
-    char buff[64] = {0};
-    auto message = format_to(buff, "{}/{}", displayed_records->size(), records->size());
-    records_counter->copy_label(buff);
+    if (records_counter) {
+        char buff[64] = {0};
+        auto message = format_to(buff, "{}/{}", displayed_records->size(), records->size());
+        records_counter->copy_label(buff);
+    }
 }
 
 void log_panel_t::min_display_level(spdlog::level::level_enum level) {
@@ -314,3 +339,5 @@ void log_panel_t::on_filter(std::string_view filter_) {
     filter = filter_;
     update();
 }
+
+void log_panel_t::set_splash_text(std::string text) { splash_text->copy_label(text.data()); }

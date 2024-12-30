@@ -95,7 +95,7 @@ void remote_file_table_t::refresh() {
     auto version = entry.get_version();
 
     auto size_data = size_data_t{};
-    host->apply(size_visitor_t{}, &size_data);
+    // host->apply(size_visitor_t{}, &size_data);
 
     name_cell->update(entry.get_name());
     modified_cell->update(model::pt::to_simple_string(modified_date));

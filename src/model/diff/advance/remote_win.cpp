@@ -20,14 +20,15 @@ remote_win_t::remote_win_t(const cluster_t &cluster, sequencer_t &sequencer, pro
     assign_sibling(new remote_copy_t(cluster, sequencer, std::move(proto_file_), folder_id_, peer_id_, true));
 }
 
-auto remote_win_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto remote_win_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     auto &self = *cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto &local_files = folder->get_folder_infos().by_device(self)->get_file_infos();
     auto prev_file = local_files.by_name(proto_source.name());
     assert(prev_file);
     local_files.remove(prev_file);
-    return parent_t::apply_impl(cluster);
+    return parent_t::apply_impl(cluster, controller);
 }
 
 auto remote_win_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

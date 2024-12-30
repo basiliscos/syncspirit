@@ -3,13 +3,20 @@
 
 #include "file_infos.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/misc/error_code.h"
 #include "db/prefix.h"
 #include <unordered_map>
 
 using namespace syncspirit::model::diff::load;
 
-auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto file_infos_t::apply_forward(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    return controller.apply(*this, cluster);
+}
+
+auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     using folder_info_by_id_t = std::unordered_map<std::string_view, folder_info_ptr_t>;
 
     auto all_fi = folder_info_by_id_t{};
@@ -50,5 +57,5 @@ auto file_infos_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::res
             fi->assign_block(block, (size_t)i);
         }
     }
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }

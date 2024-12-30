@@ -280,7 +280,6 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
             return "bep/rx_buff_size is incorrect or missing";
         }
         c.rx_buff_size = rx_buff_size.value();
-
         auto tx_buff_limit = t["tx_buff_limit"].value<std::uint32_t>();
         if (!tx_buff_limit) {
             return "bep/tx_buff_limit is incorrect or missing";
@@ -406,6 +405,24 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
             return "db/uncommitted_threshold is incorrect or missing";
         }
         c.uncommitted_threshold = uncommitted_threshold.value();
+
+        auto max_blocks_per_diff = t["max_blocks_per_diff"].value<std::uint32_t>();
+        if (!max_blocks_per_diff) {
+            return "db/max_blocks_per_diff is incorrect or missing";
+        }
+        if (max_blocks_per_diff.value() <= 10) {
+            return "db/max_blocks_per_diff should be > 10";
+        }
+        c.max_blocks_per_diff = max_blocks_per_diff.value();
+
+        auto max_files_per_diff = t["max_files_per_diff"].value<std::uint32_t>();
+        if (!max_files_per_diff) {
+            return "db/max_files_per_diff is incorrect or missing";
+        }
+        if (max_files_per_diff.value() <= 10) {
+            return "db/max_files_per_diff should be > 10";
+        }
+        c.max_files_per_diff = max_files_per_diff.value();
     }
 
     // fltk
@@ -561,6 +578,8 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"db", toml::table{{
                    {"upper_limit", cfg.db_config.upper_limit},
                    {"uncommitted_threshold", cfg.db_config.uncommitted_threshold},
+                   {"max_blocks_per_diff", cfg.db_config.max_blocks_per_diff},
+                   {"max_files_per_diff", cfg.db_config.max_files_per_diff},
                }}},
         {"relay", toml::table{{
                       {"enabled", cfg.relay_config.enabled},
@@ -677,6 +696,8 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     cfg.db_config = db_config_t {
         0x400000000,   /* upper_limit, 16Gb */
         150,           /* uncommitted_threshold */
+        8192,          /* max blocks per diff */
+        1024,          /* max files per diff */
     };
 
     cfg.relay_config = relay_config_t {

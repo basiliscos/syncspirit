@@ -8,7 +8,8 @@
 
 using namespace syncspirit::model::diff::modify;
 
-auto remove_blocks_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto remove_blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     if (!keys.empty()) {
         LOG_TRACE(log, "applyging remove_blocks_t, blocks = {}", keys.size());
         auto &blocks = cluster.get_blocks();
@@ -18,7 +19,7 @@ auto remove_blocks_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::
             blocks.remove(b);
         }
     }
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto remove_blocks_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

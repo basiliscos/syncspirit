@@ -13,7 +13,7 @@ using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
 struct fail_diff_t : diff::cluster_diff_t {
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override {
+    outcome::result<void> apply_impl(cluster_t &, diff::apply_controller_t &) const noexcept override {
         auto ec = make_error_code(error_code_t::source_device_not_exists);
         return outcome::failure(ec);
     }
@@ -25,6 +25,6 @@ TEST_CASE("generic cluster diff", "[model]") {
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto diff = diff::cluster_diff_ptr_t(new fail_diff_t());
     CHECK(!cluster->is_tainted());
-    CHECK(!diff->apply(*cluster));
+    CHECK(!diff->apply(*cluster, get_apply_controller()));
     CHECK(cluster->is_tainted());
 }

@@ -57,13 +57,14 @@ update_contact_t::update_contact_t(const model::cluster_t &cluster, const ip_add
     std::copy(set.begin(), set.end(), std::back_insert_iterator(this->uris));
 }
 
-auto update_contact_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto update_contact_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
     if (known) {
         auto &devices = cluster.get_devices();
         auto device = devices.by_sha256(this->device.get_sha256());
         device->assign_uris(uris);
     }
-    return applicator_t::apply_sibling(cluster);
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto update_contact_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

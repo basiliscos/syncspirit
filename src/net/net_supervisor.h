@@ -6,6 +6,7 @@
 #include "model/messages.h"
 #include "model/cluster.h"
 #include "model/misc/sequencer.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "utils/log.h"
 #include "messages.h"
@@ -46,7 +47,9 @@ struct net_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<Su
     }
 };
 
-struct SYNCSPIRIT_API net_supervisor_t : public ra::supervisor_asio_t, private model::diff::cluster_visitor_t {
+struct SYNCSPIRIT_API net_supervisor_t : public ra::supervisor_asio_t,
+                                         private model::diff::cluster_visitor_t,
+                                         private model::diff::apply_controller_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = net_supervisor_config_t;
 

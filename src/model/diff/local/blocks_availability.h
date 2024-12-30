@@ -14,7 +14,7 @@ struct SYNCSPIRIT_API blocks_availability_t final : block_diff_t {
 
     blocks_availability_t(const file_info_t &file, valid_blocks_map_t valid_blocks_map) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     valid_blocks_map_t valid_blocks_map;

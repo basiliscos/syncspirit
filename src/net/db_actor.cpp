@@ -245,6 +245,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     if (!blocks_opt) {
         return reply_with_error(request, make_error(blocks_opt.error()));
     }
+    auto blocks = std::move(blocks_opt.value());
 
     auto ignored_devices_opt = db::load(db::prefix::ignored_device, txn);
     if (!ignored_devices_opt) {
@@ -270,6 +271,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     if (!file_infos_opt) {
         return reply_with_error(request, make_error(file_infos_opt.error()));
     }
+    auto files = std::move(file_infos_opt.value());
 
     auto pending_devices_opt = db::load(db::prefix::pending_device, txn);
     if (!pending_devices_opt) {
@@ -282,16 +284,39 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     }
 
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff.reset(new load::load_cluster_t(std::move(txn)));
+    diff.reset(new load::load_cluster_t(std::move(txn), blocks.size(), files.size()));
 
-    diff->assign_child(new load::devices_t(std::move(devices_opt.value())))
-        ->assign_sibling(new load::blocks_t(std::move(blocks_opt.value())))
-        ->assign_sibling(new load::ignored_devices_t(std::move(ignored_devices_opt.value())))
-        ->assign_sibling(new load::ignored_folders_t(std::move(ignored_folders_opt.value())))
-        ->assign_sibling(new load::folders_t(std::move(folders_opt.value())))
-        ->assign_sibling(new load::folder_infos_t(std::move(folder_infos_opt.value())))
-        ->assign_sibling(new load::file_infos_t(std::move(file_infos_opt.value())))
-        ->assign_sibling(new load::pending_devices_t(std::move(pending_devices_opt.value())))
+    auto current = diff->assign_child(new load::devices_t(std::move(devices_opt.value())));
+    if (blocks.size()) {
+        auto max_blocks = db_config.max_blocks_per_diff;
+        auto ptr = blocks.data();
+        auto end = ptr + blocks.size();
+        while (ptr < end) {
+            auto chunk_end = std::min(ptr + max_blocks, end);
+            auto slice = decltype(blocks)(ptr, chunk_end);
+            ptr = chunk_end;
+            current = current->assign_sibling(new load::blocks_t(std::move(slice)));
+        }
+    }
+
+    current = current->assign_sibling(new load::ignored_devices_t(std::move(ignored_devices_opt.value())))
+                  ->assign_sibling(new load::ignored_folders_t(std::move(ignored_folders_opt.value())))
+                  ->assign_sibling(new load::folders_t(std::move(folders_opt.value())))
+                  ->assign_sibling(new load::folder_infos_t(std::move(folder_infos_opt.value())));
+
+    if (files.size()) {
+        auto max_files = db_config.max_files_per_diff;
+        auto ptr = files.data();
+        auto end = ptr + files.size();
+        while (ptr < end) {
+            auto chunk_end = std::min(ptr + max_files, end);
+            auto slice = decltype(files)(ptr, chunk_end);
+            ptr = chunk_end;
+            current = current->assign_sibling(new load::file_infos_t(std::move(slice)));
+        }
+    }
+
+    current->assign_sibling(new load::pending_devices_t(std::move(pending_devices_opt.value())))
         ->assign_sibling(new load::pending_folders_t(std::move(pending_folders_opt.value())));
 
     reply_to(request, diff);
