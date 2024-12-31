@@ -338,10 +338,11 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     }
 
     SECTION("via diff") {
-        diff::load::container_t container;
-        auto data = fi->serialize(true);
-        container.emplace_back(diff::load::pair_t{fi->get_key(), data});
-        auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(container));
+        diff::load::file_infos_t::container_t container;
+        using item_t = decltype(container)::value_type;
+        auto db = fi->as_db(true);
+        container.emplace_back(item_t{fi->get_key(), std::move(db)});
+        auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(std::move(container)));
         REQUIRE(diff->apply(*cluster, get_apply_controller()));
         auto &map = folder_info->get_file_infos();
         REQUIRE(map.size() == 1);

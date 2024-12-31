@@ -37,8 +37,8 @@
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/diff/peer/cluster_update.h"
-
 #include "model/diff/cluster_visitor.h"
+#include "model/misc/error_code.h"
 #include <string_view>
 
 #ifdef WIN32_LEAN_AND_MEAN
@@ -310,9 +310,23 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         auto end = ptr + files.size();
         while (ptr < end) {
             auto chunk_end = std::min(ptr + max_files, end);
-            auto slice = decltype(files)(ptr, chunk_end);
-            ptr = chunk_end;
-            current = current->assign_sibling(new load::file_infos_t(std::move(slice)));
+            auto count = chunk_end - ptr;
+            auto items = load::file_infos_t::container_t();
+            items.reserve(count);
+            while (ptr != chunk_end) {
+                using item_t = decltype(items)::value_type;
+                auto key = ptr->key;
+                auto data = ptr->value;
+                db::FileInfo db;
+                auto ok = db.ParseFromArray(data.data(), data.size());
+                if (!ok) {
+                    auto ec = make_error_code(model::error_code_t::file_info_deserialization_failure);
+                    return reply_with_error(request, make_error(ec));
+                }
+                items.emplace_back(item_t{key, std::move(db)});
+                ++ptr;
+            }
+            current = current->assign_sibling(new load::file_infos_t(std::move(items)));
         }
     }
 
