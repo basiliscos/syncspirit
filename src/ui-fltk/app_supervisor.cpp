@@ -288,14 +288,12 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
         device.set_augmentation(ignored_devices_node->add_device(device));
     }
 
-#if 0
     auto folders_node = static_cast<tree_item::folders_t *>(folders);
     for (auto &it : cluster->get_folders()) {
         auto &folder = it.item;
         auto augmentation = folders_node->add_folder(*folder);
         folder->set_augmentation(augmentation);
     }
-#endif
 
     auto r = diff.visit_next(*this, custom);
     main_window->on_loading_done();
@@ -357,18 +355,22 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
 
 auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-#if 0
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto &folder_infos = folder->get_folder_infos();
     auto local_fi = folder_infos.by_device(*cluster->get_device());
     auto generic_augmnetation = local_fi->get_augmentation();
-    auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
+    auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmnetation.get());
     auto folder_entry = static_cast<tree_item::folder_t *>(augmentation->get_owner());
     auto local_file = local_fi->get_file_infos().by_name(diff.proto_local.name());
     if (!local_file->get_augmentation()) {
-        auto path = bfs::path(local_file->get_name());
-        auto dir = folder_entry->locate_dir(path.parent_path());
-        dir->add_entry(*local_file);
+        augmentation->track(*local_file);
+        augmentation->augment_pending();
+        // if (auto local_aug = local_file->get_augmentation(); local_aug) {
+        //     auto parent_aug = static_cast<augmentation_entry_t*>(local_aug.get())->get_parent();
+        //     if (auto parent = static_cast<dynamic_item_t*>(parent_aug->get_owner()); parent) {
+        //         parent->refresh_children();
+        //     }
+        // }
     }
     // displayed nodes "actuality" status might change
     for (auto it : folder_infos) {
@@ -383,7 +385,6 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
             }
         }
     }
-#endif
     return diff.visit_next(*this, custom);
 }
 
@@ -417,26 +418,21 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_
 
 auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-#if 0
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto peer = cluster->get_devices().by_sha256(diff.peer_id);
     auto folder_info = folder->get_folder_infos().by_device(*peer);
     if (auto generic_augmnetation = folder_info->get_augmentation(); generic_augmnetation) {
-        auto augmentation = static_cast<augmentation_t *>(generic_augmnetation.get());
-        auto folder_entry = static_cast<tree_item::peer_folder_t *>(augmentation->get_owner());
-        if (folder_entry->expandend) {
-            auto &files_map = folder_info->get_file_infos();
-            for (auto &file : diff.files) {
-                auto file_info = files_map.by_name(file.name());
-                if (!file_info->get_augmentation()) {
-                    auto path = bfs::path(file_info->get_name());
-                    auto dir = folder_entry->locate_dir(path.parent_path());
-                    dir->add_entry(*file_info);
-                }
+        auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmnetation.get());
+        auto &files_map = folder_info->get_file_infos();
+        for (auto &file : diff.files) {
+            auto file_info = files_map.by_name(file.name());
+            if (!file_info->get_augmentation()) {
+                augmentation->track(*file_info);
             }
         }
+        augmentation->augment_pending();
+        augmentation->on_update();
     }
-#endif
     return diff.visit_next(*this, custom);
 }
 

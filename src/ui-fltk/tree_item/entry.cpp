@@ -1,6 +1,5 @@
 #include "entry.h"
 #include "../utils.hpp"
-#include "peer_entry.h"
 
 using namespace syncspirit::fltk::tree_item;
 
@@ -53,12 +52,17 @@ void entry_t::on_open() {
     }
 }
 
+void entry_t::on_update() {
+    parent_t::on_update();
+    refresh_children();
+}
+
 auto entry_t::create(augmentation_entry_t& entry) -> dynamic_item_t* {
     bool display_deleted = supervisor.get_app_config().fltk_config.display_deleted;
     bool create_node = display_deleted || !entry.get_file()->is_deleted();
     if (create_node) {
         return within_tree([&]() -> dynamic_item_t* {
-            auto child_node = new peer_entry_t(supervisor, tree(), &entry, this);
+            auto child_node = create_child(entry);
             auto position = entry.get_position(display_deleted);
             auto tmp_node = insert(prefs(), "", position);
             replace_child(tmp_node, child_node);
@@ -105,6 +109,21 @@ void entry_t::show_deleted(bool value) {
         }
     }
     tree()->redraw();
+}
+
+void entry_t::refresh_children() {
+    auto entry = static_cast<augmentation_entry_base_t*>(augmentation.get());
+    if (expanded) {
+        for (auto& child_aug : entry->get_children()) {
+            child_aug->display();
+        }
+    } else if (children() == 0 && entry->get_children().size()) {
+        within_tree([&]() -> void {
+            auto t = tree();
+            add(prefs(), "[dummy]", new tree_item_t(supervisor, t, false));
+            t->close(this, 0);
+        });
+    }
 }
 
 #if 0

@@ -159,15 +159,12 @@ void folders_t::update_label() {
 }
 
 augmentation_ptr_t folders_t::add_folder(model::folder_t &folder_info) {
-#if 0
     auto augmentation = within_tree([&]() {
         auto item = new folder_t(folder_info, supervisor, tree());
         return insert_by_label(item)->get_proxy();
     });
     update_label();
     return augmentation;
-#endif
-    std::abort();
 }
 
 void folders_t::remove_child(tree_item_t *child) {
@@ -176,11 +173,11 @@ void folders_t::remove_child(tree_item_t *child) {
 }
 
 void folders_t::select_folder(std::string_view folder_id) {
-#if 0
     auto t = tree();
     for (int i = 0; i < children(); ++i) {
         auto node = static_cast<folder_t *>(child(i));
-        if (node->folder.get_id() == folder_id) {
+        auto aug = static_cast<augmentation_entry_base_t*>(node->get_proxy().get());
+        if (aug->get_folder()->get_folder()->get_id() == folder_id) {
             while (auto selected = t->first_selected_item()) {
                 t->deselect(selected);
             }
@@ -189,8 +186,6 @@ void folders_t::select_folder(std::string_view folder_id) {
             break;
         }
     }
-#endif
-    std::abort();
 }
 
 bool folders_t::on_select() {

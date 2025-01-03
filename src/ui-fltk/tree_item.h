@@ -69,6 +69,7 @@ struct dynamic_item_t : tree_item_t {
     using parent_t::parent_t;
     virtual dynamic_item_t* create(augmentation_entry_t&) = 0;
     virtual void show_deleted(bool value) = 0;
+    virtual void refresh_children() = 0;
 };
 
 struct node_visitor_t {

@@ -35,6 +35,7 @@ void augmentation_proxy_t::release_onwer() noexcept {
 tree_item_t *augmentation_proxy_t::get_owner() noexcept { return backend->get_owner(); }
 
 using nc_t = augmentation_entry_base_t::name_comparator_t;
+using fc_t = augmentation_entry_base_t::file_comparator_t;
 
 bool nc_t::operator()(const ptr_t& lhs, const ptr_t& rhs) const {
     auto ld = lhs->file.is_dir();
@@ -63,6 +64,18 @@ bool nc_t::operator()(const std::string_view lhs, const ptr_t& rhs) const {
     return lhs < rhs->get_own_name();
 }
 
+bool fc_t::operator()(const file_t* lhs, const file_t* rhs) const {
+    auto ld = lhs->is_dir();
+    auto rd = rhs->is_dir();
+    if (ld && !rd) {
+        return true;
+    } else if (rd && !ld) {
+        return false;
+    }
+    return lhs->get_name() < rhs->get_name();
+}
+
+
 augmentation_entry_base_t::augmentation_entry_base_t(self_t* parent_, dynamic_item_t *owner_, std::string own_name_):
 parent_t(owner_), parent{parent_}, own_name{std::move(own_name_)} {}
 
@@ -85,24 +98,14 @@ auto augmentation_entry_base_t::get_children() noexcept -> children_t& {
 
 void augmentation_entry_base_t::display() noexcept {}
 
+auto augmentation_entry_base_t::get_parent() -> self_t* {
+    return parent;
+}
+
 std::string_view augmentation_entry_base_t::get_own_name() { return own_name; }
 
 augmentation_entry_root_t::augmentation_entry_root_t(model::folder_info_t& folder_, dynamic_item_t* owner_):
     parent_t(nullptr, owner_, {}), folder{folder_} {
-    struct file_comparator_t {
-        using file_t = model::file_info_t;
-        bool operator()(const file_t* lhs, const file_t* rhs ) const {
-            auto ld = lhs->is_dir();
-            auto rd = rhs->is_dir();
-            if (ld && !rd) {
-                return true;
-            } else if (rd && !ld) {
-                return false;
-            }
-            return lhs->get_name() < rhs->get_name();
-        }
-    };
-    using files_t = std::set<model::file_info_t*, file_comparator_t>;
 
     auto files = files_t();
     for (auto& it: folder.get_file_infos()) {
@@ -126,8 +129,49 @@ augmentation_entry_root_t::augmentation_entry_root_t(model::folder_info_t& folde
     }
 }
 
-model::folder_info_t& augmentation_entry_root_t::get_folder() {
-    return folder;
+void augmentation_entry_root_t::track(model::file_info_t& file) {
+    assert(!file.get_augmentation());
+    pending_augmentation.emplace(&file);
+}
+
+void augmentation_entry_root_t::augment_pending() {
+    using nodes_t = std::set<augmentation_entry_base_t*>;
+    auto updated_parents = nodes_t{};
+    for (auto it = pending_augmentation.begin(); it != pending_augmentation.end(); ) {
+        auto& file = **it;
+        auto path = bfs::path(file.get_name());
+        auto host = (self_t*)(this);
+        auto p_it = path.begin();
+        auto count = std::distance(p_it, path.end());
+        for (decltype(count) i = 0; i + 1 < count; ++i, ++p_it) {
+            auto name = p_it->string();
+            auto name_view = std::string_view(name);
+            auto c_it = host->children.find(name_view);
+            if (c_it == host->children.end()) {
+                host = {};
+                break;
+            }
+            host = c_it->get();
+        }
+        if (host) {
+            auto own_name = p_it->string();
+            auto child = augmentation_entry_ptr_t(new augmentation_entry_t(host, file, own_name));
+            host->children.emplace(child);
+            updated_parents.emplace(host);
+            it = pending_augmentation.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for (auto item: updated_parents) {
+        if (auto owner = item->get_owner(); owner) {
+            static_cast<dynamic_item_t*>(owner)->refresh_children();
+        }
+    }
+}
+
+model::folder_info_t* augmentation_entry_root_t::get_folder() {
+    return &folder;
 }
 
 auto augmentation_entry_root_t::get_file() -> model::file_info_t* {
@@ -140,6 +184,7 @@ int augmentation_entry_root_t::get_position(bool)  {
 
 augmentation_entry_t::augmentation_entry_t(self_t* parent, model::file_info_t& file_, std::string own_name_):
     parent_t(parent, nullptr, std::move(own_name_)), file{file_} {
+    file.set_augmentation(this);
 }
 
 
@@ -171,5 +216,8 @@ auto augmentation_entry_t::get_file() -> model::file_info_t* {
     return &file;
 }
 
+auto augmentation_entry_t::get_folder() -> model::folder_info_t* {
+    return file.get_folder_info();
+}
 
 } // namespace syncspirit::fltk

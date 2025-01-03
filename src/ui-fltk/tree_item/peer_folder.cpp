@@ -76,22 +76,10 @@ peer_folder_t::peer_folder_t(model::folder_info_t &folder_info, app_supervisor_t
 
 void peer_folder_t::update_label() {
     auto entry = static_cast<augmentation_entry_root_t*>(augmentation.get());
-    auto &folder_info = entry->get_folder();
-    auto &folder = *folder_info.get_folder();
+    auto folder_info = entry->get_folder();
+    auto &folder = *folder_info->get_folder();
     auto value = fmt::format("{}, {}", folder.get_label(), folder.get_id());
     label(value.data());
-}
-
-void peer_folder_t::on_update() {
-    std::abort();
-#if 0
-    parent_t::on_update();
-    if (!expandend && children() == 0 && folder_info.get_file_infos().size()) {
-        auto t = tree();
-        add(prefs(), "[dummy]", new Fl_Tree_Item(t));
-        t->close(this, 0);
-    }
-#endif
 }
 
 bool peer_folder_t::on_select() {

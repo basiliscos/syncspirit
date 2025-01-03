@@ -56,6 +56,11 @@ struct augmentation_entry_base_t : augmentation_t {
         bool operator()(const ptr_t& lhs, const std::string_view rhs) const;
         bool operator()(const std::string_view lhs, const ptr_t& rhs) const;
     };
+    struct file_comparator_t {
+        using file_t = model::file_info_t;
+        bool operator()(const file_t* lhs, const file_t* rhs ) const;
+    };
+
     using children_t = std::set<augmentation_entry_ptr_t, name_comparator_t>;
 
     ~augmentation_entry_base_t();
@@ -63,8 +68,10 @@ struct augmentation_entry_base_t : augmentation_t {
     virtual void display() noexcept;
     children_t& get_children() noexcept;
     std::string_view get_own_name() ;
+    self_t* get_parent();
 
     virtual model::file_info_t* get_file() = 0;
+    virtual model::folder_info_t* get_folder() = 0;
     virtual int get_position(bool include_deleted) = 0;
 
     protected:
@@ -73,19 +80,24 @@ struct augmentation_entry_base_t : augmentation_t {
     std::string own_name;
     self_t* parent;
     children_t children;
+
     friend struct augmentation_entry_root_t;
     friend struct augmentation_entry_t;
 };
 
 struct augmentation_entry_root_t final: augmentation_entry_base_t {
     using parent_t = augmentation_entry_base_t;
+    using files_t = std::set<model::file_info_t*, file_comparator_t>;
     augmentation_entry_root_t(model::folder_info_t& folder, dynamic_item_t* owner);
 
-    model::folder_info_t& get_folder();
+    void track(model::file_info_t& file);
+    void augment_pending();
+    model::folder_info_t* get_folder() override;
     model::file_info_t* get_file() override;
     int get_position(bool include_deleted) override;
 
     model::folder_info_t& folder;
+    files_t pending_augmentation;
 };
 
 struct  augmentation_entry_t final: augmentation_entry_base_t {
@@ -93,6 +105,7 @@ struct  augmentation_entry_t final: augmentation_entry_base_t {
     augmentation_entry_t(self_t* parent, model::file_info_t& file, std::string own_name);
 
     void display() noexcept override;
+    model::folder_info_t* get_folder() override;
     model::file_info_t* get_file() override;
     int get_position(bool include_deleted) override;
 

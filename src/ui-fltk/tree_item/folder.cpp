@@ -1,21 +1,54 @@
-#if 0
 #include "folder.h"
 
-#include "local_entry.h"
+#include "../symbols.h"
+#if 0
+
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
 #include "../table_widget/label.h"
 #include "../content/folder_table.h"
-#include "../symbols.h"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
+#endif
 
 using namespace syncspirit;
 using namespace model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
+
+folder_t::folder_t(model::folder_t &folder, app_supervisor_t &supervisor, Fl_Tree *tree)
+    : parent_t(supervisor, tree, {}) {
+
+    auto cluster = supervisor.get_cluster();
+    auto local_folder = folder.get_folder_infos().by_device(*cluster->get_device()).get();
+    augmentation = new augmentation_entry_root_t(*local_folder, this);
+    local_folder->set_augmentation(get_proxy());
+
+    update_label();
+
+    add(prefs(), "[dummy]", new tree_item_t(supervisor, tree, false));
+    tree->close(this, 0);
+}
+
+void folder_t::update_label() {
+    auto entry = static_cast<augmentation_entry_root_t*>(augmentation.get());
+    auto folder_info = entry->get_folder();
+    auto &folder = *folder_info->get_folder();
+    auto symbol = std::string_view();
+    if (folder.is_scanning()) {
+        symbol = symbols::scaning;
+    }
+    if (folder.is_synchronizing()) {
+        symbol = symbols::syncrhonizing;
+    }
+    auto value = fmt::format("{}, {} {}", folder.get_label(), folder.get_id(), symbol);
+    label(value.data());
+}
+
+
+#if 0
 static constexpr int padding = 2;
 
 namespace {

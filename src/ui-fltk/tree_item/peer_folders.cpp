@@ -36,15 +36,12 @@ void peer_folders_t::update_label() {
 }
 
 augmentation_ptr_t peer_folders_t::add_folder(model::folder_info_t &folder_info) {
-#if 0
     auto augmentation = within_tree([&]() -> augmentation_ptr_t {
         auto item = new peer_folder_t(folder_info, supervisor, tree());
         return insert_by_label(item)->get_proxy();
     });
     update_label();
     return augmentation;
-#endif
-    std::abort();
 }
 
 void peer_folders_t::remove_child(tree_item_t *item) {
