@@ -187,7 +187,6 @@ augmentation_entry_t::augmentation_entry_t(self_t* parent, model::file_info_t& f
     file.set_augmentation(this);
 }
 
-
 void augmentation_entry_t::display() noexcept {
     if (!owner) {
         if (!parent->owner) {
