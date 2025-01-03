@@ -4,20 +4,21 @@
 
 namespace syncspirit::fltk::tree_item {
 
+
 struct file_entry_t : entry_t {
     using parent_t = entry_t;
-    file_entry_t(app_supervisor_t &supervisor, Fl_Tree *tree, model::file_info_t *entry, std::string filename);
+    using parent_t::parent_t;
+#if 0
+    file_entry_t(app_supervisor_t &supervisor, Fl_Tree *tree, augmentation_entry_t& augmentation);
 
-    bool on_select() override;
     void update_label() override;
     void on_update() override;
+    void on_open() override;
+    bool on_select() override;
 
-    model::file_info_t *get_entry() override;
-    entry_t *make_entry(model::file_info_t *file, std::string) override;
-    void assign(entry_t &) override;
-
-    model::file_info_t *entry;
-    std::string filename;
+    dynamic_item_t* create(augmentation_entry_t&) override;
+    bool expanded;
+#endif
 };
 
 }; // namespace syncspirit::fltk::tree_item

@@ -8,6 +8,7 @@ using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 namespace bfs = boost::filesystem;
 
+#if 0
 namespace {
 
 struct my_table_t;
@@ -61,50 +62,40 @@ struct my_table_t : static_table_t {
     static_string_provider_ptr_t entries_size_cell;
 };
 } // namespace
+#endif
 
-peer_folder_t::peer_folder_t(model::folder_info_t &folder_info_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree, true), folder_info{folder_info_}, expandend{false} {
-    update_label();
+peer_folder_t::peer_folder_t(model::folder_info_t &folder_info, app_supervisor_t &supervisor, Fl_Tree *tree)
+    : parent_t(supervisor, tree, {}) {
+    augmentation = new augmentation_entry_root_t(folder_info, this);
     folder_info.set_augmentation(get_proxy());
+    update_label();
 
-    if (folder_info.get_file_infos().size()) {
-        add(prefs(), "[dummy]", new Fl_Tree_Item(tree));
-        tree->close(this, 0);
-    }
+    add(prefs(), "[dummy]", new tree_item_t(supervisor, tree, false));
+    tree->close(this, 0);
 }
 
 void peer_folder_t::update_label() {
+    auto entry = static_cast<augmentation_entry_root_t*>(augmentation.get());
+    auto &folder_info = entry->get_folder();
     auto &folder = *folder_info.get_folder();
     auto value = fmt::format("{}, {}", folder.get_label(), folder.get_id());
     label(value.data());
 }
 
 void peer_folder_t::on_update() {
+    std::abort();
+#if 0
     parent_t::on_update();
     if (!expandend && children() == 0 && folder_info.get_file_infos().size()) {
         auto t = tree();
         add(prefs(), "[dummy]", new Fl_Tree_Item(t));
         t->close(this, 0);
     }
-}
-
-void peer_folder_t::on_open() {
-    if (expandend || !children()) {
-        return;
-    }
-
-    auto dummy = child(0);
-    Fl_Tree_Item::remove_child(dummy);
-    expandend = true;
-
-    auto &files_map = folder_info.get_file_infos();
-    make_hierarchy(files_map);
-
-    supervisor.get_logger()->debug("{} (peer), expanded {} file records", folder_info.get_folder()->get_label(),
-                                   files_map.size());
+#endif
 }
 
 bool peer_folder_t::on_select() {
+#if 0
     if (!expandend) {
         on_open();
     }
@@ -114,10 +105,14 @@ bool peer_folder_t::on_select() {
     });
 
     return true;
+#endif
+    std::abort();
 }
 
+#if 0
 auto peer_folder_t::get_entry() -> model::file_info_t * { return nullptr; }
 
 auto peer_folder_t::make_entry(model::file_info_t *file, std::string filename) -> entry_t * {
     return new peer_entry_t(supervisor, tree(), file, std::move(filename));
 }
+#endif

@@ -7,16 +7,12 @@
 
 namespace syncspirit::fltk::tree_item {
 
+#if 0
 struct entry_t;
 
 struct file_visitor_t {
     virtual ~file_visitor_t() = default;
     virtual void visit(const model::file_info_t &file, void *) const = 0;
-};
-
-struct node_visitor_t {
-    virtual ~node_visitor_t() = default;
-    virtual void visit(entry_t &node, void *) const = 0;
 };
 
 struct entry_t : tree_item_t {
@@ -50,6 +46,24 @@ struct entry_t : tree_item_t {
     dirs_map_t dirs_map;
     items_t orphaned_items;
     items_t deleted_items;
+};
+#endif
+
+struct entry_t : dynamic_item_t {
+    using parent_t = dynamic_item_t;
+    entry_t(app_supervisor_t &supervisor, Fl_Tree *tree, augmentation_entry_t* augmentation, tree_item_t* parent = nullptr);
+
+    void update_label() override;
+    void on_open() override;
+    void show_deleted(bool value) override;
+
+    void hide();
+    void show();
+
+    dynamic_item_t* create(augmentation_entry_t&) override;
+
+    tree_item_t* parent;
+    bool expanded;
 };
 
 } // namespace syncspirit::fltk::tree_item

@@ -288,12 +288,14 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
         device.set_augmentation(ignored_devices_node->add_device(device));
     }
 
+#if 0
     auto folders_node = static_cast<tree_item::folders_t *>(folders);
     for (auto &it : cluster->get_folders()) {
         auto &folder = it.item;
         auto augmentation = folders_node->add_folder(*folder);
         folder->set_augmentation(augmentation);
     }
+#endif
 
     auto r = diff.visit_next(*this, custom);
     main_window->on_loading_done();
@@ -415,6 +417,7 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_
 
 auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+#if 0
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto peer = cluster->get_devices().by_sha256(diff.peer_id);
     auto folder_info = folder->get_folder_infos().by_device(*peer);
@@ -433,6 +436,7 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
             }
         }
     }
+#endif
     return diff.visit_next(*this, custom);
 }
 
@@ -500,8 +504,8 @@ void app_supervisor_t::set_show_deleted(bool value) {
 }
 
 void app_supervisor_t::set_show_colorized(bool value) {
-    struct refresher_t final : tree_item::node_visitor_t {
-        void visit(tree_item::entry_t &node, void *) const override { node.update_label(); }
+    struct refresher_t final : node_visitor_t {
+        void visit(tree_item_t &node, void *) const override { node.update_label(); }
     };
 
     log->debug("display colorized = {}", value);

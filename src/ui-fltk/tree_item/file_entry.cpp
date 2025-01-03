@@ -1,9 +1,13 @@
 #include "file_entry.h"
+
+#if 0
 #include "../content/remote_file_table.h"
+#endif
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
+#if 0
 file_entry_t::file_entry_t(app_supervisor_t &supervisor, Fl_Tree *tree, model::file_info_t *entry_,
                            std::string filename_)
     : parent_t(supervisor, tree, true), entry{entry_}, filename{std::move(filename_)} {
@@ -81,3 +85,4 @@ void file_entry_t::assign(entry_t &new_entry) {
     e.get_proxy()->release_onwer();
     on_update();
 }
+#endif

@@ -4,6 +4,7 @@
 
 namespace syncspirit::fltk::tree_item {
 
+#if 0
 struct folder_t final : entry_t {
     using parent_t = entry_t;
 
@@ -18,5 +19,6 @@ struct folder_t final : entry_t {
     model::folder_t &folder;
     model::folder_info_t *folder_info;
 };
+#endif
 
 } // namespace syncspirit::fltk::tree_item
