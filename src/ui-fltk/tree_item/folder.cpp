@@ -1,12 +1,11 @@
 #include "folder.h"
 
-#include "local_entry.h"
+#include "../symbols.h"
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
 #include "../table_widget/label.h"
 #include "../content/folder_table.h"
-#include "../symbols.h"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
 
@@ -14,6 +13,35 @@ using namespace syncspirit;
 using namespace model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
+
+folder_t::folder_t(model::folder_t &folder, app_supervisor_t &supervisor, Fl_Tree *tree)
+    : parent_t(supervisor, tree, {}) {
+
+    auto cluster = supervisor.get_cluster();
+    auto local_folder = folder.get_folder_infos().by_device(*cluster->get_device()).get();
+    augmentation = new augmentation_entry_root_t(*local_folder, this);
+    local_folder->set_augmentation(get_proxy());
+
+    update_label();
+
+    add(prefs(), "[dummy]", new tree_item_t(supervisor, tree, false));
+    tree->close(this, 0);
+}
+
+void folder_t::update_label() {
+    auto entry = static_cast<augmentation_entry_root_t *>(augmentation.get());
+    auto folder_info = entry->get_folder();
+    auto &folder = *folder_info->get_folder();
+    auto symbol = std::string_view();
+    if (folder.is_scanning()) {
+        symbol = symbols::scaning;
+    }
+    if (folder.is_synchronizing()) {
+        symbol = symbols::syncrhonizing;
+    }
+    auto value = fmt::format("{}, {} {}", folder.get_label(), folder.get_id(), symbol);
+    label(value.data());
+}
 
 static constexpr int padding = 2;
 
@@ -144,6 +172,9 @@ struct table_t : content::folder_table_t {
     }
 
     void refresh() override {
+        auto aug = static_cast<augmentation_entry_base_t *>(container.get_proxy().get());
+        auto &stats = aug->get_stats();
+        auto folder_info = aug->get_folder();
         serialiazation_context_t ctx;
         description.get_folder()->serialize(ctx.folder);
 
@@ -180,14 +211,9 @@ struct table_t : content::folder_table_t {
         scan_start_cell->update(scan_start);
         scan_finish_cell->update(scan_finish);
 
-        auto entries_size = std::size_t{0};
-        for (auto &it : static_cast<folder_t &>(container).folder_info->get_file_infos()) {
-            entries_size += it.item->get_size();
-        }
-        auto entries_count = description.get_file_infos().size();
         auto max_sequence = description.get_max_sequence();
-        entries_cell->update(fmt::format("{}", entries_count));
-        entries_size_cell->update(fmt::format("{}", entries_size));
+        entries_cell->update(fmt::format("{}", stats.entries));
+        entries_size_cell->update(fmt::format("{}", stats.entries_size));
         max_sequence_cell->update(fmt::format("{}", max_sequence));
 
         notice->reset();
@@ -197,31 +223,6 @@ struct table_t : content::folder_table_t {
 
 } // namespace
 
-folder_t::folder_t(model::folder_t &folder_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree, true), folder{folder_} {
-    update_label();
-
-    auto cluster = supervisor.get_cluster();
-    folder_info = folder.get_folder_infos().by_device(*cluster->get_device()).get();
-    auto augmentation = augmentation_ptr_t(new augmentation_proxy_t(get_proxy()));
-    folder_info->set_augmentation(augmentation);
-
-    tree->close(this, 0);
-
-    make_hierarchy(folder_info->get_file_infos());
-}
-
-void folder_t::update_label() {
-    auto value = fmt::format("{}, {}", folder.get_label(), folder.get_id());
-    if (folder.is_scanning()) {
-        value += fmt::format(" {}", symbols::scaning);
-    }
-    if (folder.is_synchronizing()) {
-        value += fmt::format(" {}", symbols::syncrhonizing);
-    }
-    label(value.data());
-}
-
 bool folder_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
         using devices_ptr_t = table_t::shared_devices_t;
@@ -230,18 +231,11 @@ bool folder_t::on_select() {
         auto shared_with = devices_ptr_t(new model::devices_map_t{});
         auto non_shared_with = devices_ptr_t(new model::devices_map_t{});
 
-        auto cluster = supervisor.get_cluster();
-        auto &folder_infos = folder.get_folder_infos();
-        auto &folder_info = *folder_infos.by_device(*cluster->get_device());
+        auto aug = static_cast<augmentation_entry_base_t *>(get_proxy().get());
+        auto &folder_info = *aug->get_folder();
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         return new table_t(*this, folder_info, x, y, w, h);
     });
     return true;
-}
-
-auto folder_t::get_entry() -> model::file_info_t * { return nullptr; }
-
-auto folder_t::make_entry(model::file_info_t *file, std::string filename) -> entry_t * {
-    return new file_entry_t(supervisor, tree(), file, std::move(filename));
 }

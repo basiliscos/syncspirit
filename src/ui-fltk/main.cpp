@@ -276,6 +276,10 @@ int main(int argc, char **argv) {
         main_window.wait_for_expose();
 
         auto net_thread = std::thread([&]() {
+#if defined(__linux__)
+            std::string name = "ss/net";
+            pthread_setname_np(pthread_self(), name.c_str());
+#endif
             io_context.run();
             shutdown_flag = true;
             spdlog::trace("net thread has been terminated");
