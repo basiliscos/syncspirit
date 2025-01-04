@@ -8,7 +8,6 @@ using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 namespace bfs = boost::filesystem;
 
-#if 0
 namespace {
 
 struct my_table_t;
@@ -17,8 +16,9 @@ struct my_table_t : static_table_t {
     using parent_t = static_table_t;
 
     my_table_t(peer_folder_t &container_, int x, int y, int w, int h) : parent_t(x, y, w, h), container{container_} {
-        auto &fi = container.folder_info;
-        auto &folder = *fi.get_folder();
+        auto augmentation = static_cast<augmentation_entry_base_t*>(container.get_proxy().get());
+        auto fi = augmentation->get_folder();
+        auto &folder = *fi->get_folder();
         auto data = table_rows_t();
 
         index_cell = new static_string_provider_t();
@@ -37,19 +37,14 @@ struct my_table_t : static_table_t {
     }
 
     void refresh() override {
-        struct size_visitor_t final : tree_item::file_visitor_t {
-            void visit(const model::file_info_t &file, void *data) const override {
-                auto sz = reinterpret_cast<size_t *>(data);
-                *sz += file.get_size();
-            }
-        };
-        auto &fi = container.folder_info;
+        auto augmentation = static_cast<augmentation_entry_base_t*>(container.get_proxy().get());
+        auto fi = augmentation->get_folder();
         std::size_t entries_size = 0;
-        // container.apply(size_visitor_t{}, &entries_size);
+        container.supervisor.get_logger()->warn("TODO: zzz, update entries size");
 
-        index_cell->update(fmt::format("0x{:x}", fi.get_index()));
-        max_sequence_cell->update(fmt::format("{}", fi.get_max_sequence()));
-        entries_cell->update(fmt::format("{}", fi.get_file_infos().size()));
+        index_cell->update(fmt::format("0x{:x}", fi->get_index()));
+        max_sequence_cell->update(fmt::format("{}", fi->get_max_sequence()));
+        entries_cell->update(fmt::format("{}", fi->get_file_infos().size()));
         entries_size_cell->update(fmt::format("{}", entries_size));
 
         redraw();
@@ -62,7 +57,6 @@ struct my_table_t : static_table_t {
     static_string_provider_ptr_t entries_size_cell;
 };
 } // namespace
-#endif
 
 peer_folder_t::peer_folder_t(model::folder_info_t &folder_info, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree, {}) {
@@ -83,8 +77,7 @@ void peer_folder_t::update_label() {
 }
 
 bool peer_folder_t::on_select() {
-#if 0
-    if (!expandend) {
+    if (!expanded) {
         on_open();
     }
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
@@ -93,14 +86,4 @@ bool peer_folder_t::on_select() {
     });
 
     return true;
-#endif
-    std::abort();
 }
-
-#if 0
-auto peer_folder_t::get_entry() -> model::file_info_t * { return nullptr; }
-
-auto peer_folder_t::make_entry(model::file_info_t *file, std::string filename) -> entry_t * {
-    return new peer_entry_t(supervisor, tree(), file, std::move(filename));
-}
-#endif
