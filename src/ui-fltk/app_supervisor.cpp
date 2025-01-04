@@ -440,7 +440,7 @@ auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, model::clu
     -> outcome::result<void> {
     loaded_blocks += diff.blocks.size();
     auto share = (100. * loaded_blocks) / load_cluster->blocks_count;
-    auto msg = fmt::format("({:5.03}%) loaded {} of {} blocks", share, loaded_blocks, load_cluster->blocks_count);
+    auto msg = fmt::format("({}%) loaded {} of {} blocks", (int)share, loaded_blocks, load_cluster->blocks_count);
     log->debug(msg);
     main_window->set_splash_text(msg);
     auto r = apply_controller_t::apply(diff, cluster);
@@ -451,7 +451,7 @@ auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, model:
     -> outcome::result<void> {
     loaded_files += diff.container.size();
     auto share = (100. * loaded_files) / load_cluster->files_count;
-    auto msg = fmt::format("({:5.03}%) loaded {} of {} files", share, loaded_files, load_cluster->files_count);
+    auto msg = fmt::format("({}%) loaded {} of {} files", (int)share, loaded_files, load_cluster->files_count);
     log->debug(msg);
     main_window->set_splash_text(msg);
     auto r = apply_controller_t::apply(diff, cluster);

@@ -16,7 +16,7 @@ struct my_table_t : static_table_t {
     using parent_t = static_table_t;
 
     my_table_t(peer_folder_t &container_, int x, int y, int w, int h) : parent_t(x, y, w, h), container{container_} {
-        auto augmentation = static_cast<augmentation_entry_base_t*>(container.get_proxy().get());
+        auto augmentation = static_cast<augmentation_entry_base_t *>(container.get_proxy().get());
         auto fi = augmentation->get_folder();
         auto &folder = *fi->get_folder();
         auto data = table_rows_t();
@@ -37,7 +37,7 @@ struct my_table_t : static_table_t {
     }
 
     void refresh() override {
-        auto augmentation = static_cast<augmentation_entry_base_t*>(container.get_proxy().get());
+        auto augmentation = static_cast<augmentation_entry_base_t *>(container.get_proxy().get());
         auto fi = augmentation->get_folder();
         std::size_t entries_size = 0;
         container.supervisor.get_logger()->warn("TODO: zzz, update entries size");
@@ -69,7 +69,7 @@ peer_folder_t::peer_folder_t(model::folder_info_t &folder_info, app_supervisor_t
 }
 
 void peer_folder_t::update_label() {
-    auto entry = static_cast<augmentation_entry_root_t*>(augmentation.get());
+    auto entry = static_cast<augmentation_entry_root_t *>(augmentation.get());
     auto folder_info = entry->get_folder();
     auto &folder = *folder_info->get_folder();
     auto value = fmt::format("{}, {}", folder.get_label(), folder.get_id());

@@ -90,7 +90,7 @@ void tree_item_t::apply(const node_visitor_t &visitor, void *data) {
     visitor.visit(*this, data);
     auto children_count = children();
     for (int i = 0; i < children_count; ++i) {
-        auto node  = static_cast<tree_item_t*>(child(i));
+        auto node = static_cast<tree_item_t *>(child(i));
         node->apply(visitor, data);
     }
 }

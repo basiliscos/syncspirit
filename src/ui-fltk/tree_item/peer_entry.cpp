@@ -4,6 +4,6 @@
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-entry_t* peer_entry_t::create_child(augmentation_entry_t& entry) {
+entry_t *peer_entry_t::create_child(augmentation_entry_t &entry) {
     return new peer_entry_t(supervisor, tree(), &entry, this);
 }

@@ -14,7 +14,6 @@ using namespace model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-
 folder_t::folder_t(model::folder_t &folder, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree, {}) {
 
@@ -30,7 +29,7 @@ folder_t::folder_t(model::folder_t &folder, app_supervisor_t &supervisor, Fl_Tre
 }
 
 void folder_t::update_label() {
-    auto entry = static_cast<augmentation_entry_root_t*>(augmentation.get());
+    auto entry = static_cast<augmentation_entry_root_t *>(augmentation.get());
     auto folder_info = entry->get_folder();
     auto &folder = *folder_info->get_folder();
     auto symbol = std::string_view();
@@ -173,7 +172,7 @@ struct table_t : content::folder_table_t {
     }
 
     void refresh() override {
-        auto aug = static_cast<augmentation_entry_base_t*>(container.get_proxy().get());
+        auto aug = static_cast<augmentation_entry_base_t *>(container.get_proxy().get());
         auto folder_info = aug->get_folder();
         serialiazation_context_t ctx;
         description.get_folder()->serialize(ctx.folder);
@@ -236,8 +235,8 @@ bool folder_t::on_select() {
         auto shared_with = devices_ptr_t(new model::devices_map_t{});
         auto non_shared_with = devices_ptr_t(new model::devices_map_t{});
 
-        auto aug = static_cast<augmentation_entry_base_t*>(get_proxy().get());
-        auto& folder_info = *aug->get_folder();
+        auto aug = static_cast<augmentation_entry_base_t *>(get_proxy().get());
+        auto &folder_info = *aug->get_folder();
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         return new table_t(*this, folder_info, x, y, w, h);
