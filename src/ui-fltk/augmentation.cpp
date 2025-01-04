@@ -100,7 +100,47 @@ void augmentation_entry_base_t::display() noexcept {}
 
 auto augmentation_entry_base_t::get_parent() -> self_t * { return parent; }
 
+void augmentation_entry_base_t::on_update() noexcept {
+    record_diff();
+    auto node = this;
+    while (node && !node->owner) {
+        node = node->parent;
+    }
+    auto &sup = node->owner->supervisor;
+    node = this;
+    while (node) {
+        sup.postpone_update(*node);
+        node = node->parent;
+    }
+}
+
+void augmentation_entry_base_t::apply_update() {
+    if (stats_diff.entries || stats_diff.entries_size || stats_diff.scanned_entries) {
+        push_diff_up();
+    }
+    parent_t::on_update();
+}
+
+void augmentation_entry_base_t::push_diff_up() {
+    auto seq = stats_diff.sequence;
+    stats.sequence = stats_diff.sequence;
+    stats.entries += stats_diff.entries;
+    stats.scanned_entries += stats_diff.scanned_entries;
+    stats.entries_size += stats_diff.entries_size;
+    stats_diff.sequence = stats.sequence;
+
+    if (parent) {
+        parent->stats_diff.entries += stats_diff.entries;
+        parent->stats_diff.scanned_entries += stats_diff.scanned_entries;
+        parent->stats_diff.entries_size += stats_diff.entries_size;
+    }
+
+    stats_diff = {};
+}
+
 std::string_view augmentation_entry_base_t::get_own_name() { return own_name; }
+
+const entry_stats_t &augmentation_entry_base_t::get_stats() const { return stats; }
 
 augmentation_entry_root_t::augmentation_entry_root_t(model::folder_info_t &folder_, dynamic_item_t *owner_)
     : parent_t(nullptr, owner_, {}), folder{folder_} {
@@ -125,6 +165,7 @@ augmentation_entry_root_t::augmentation_entry_root_t(model::folder_info_t &folde
         auto child = augmentation_entry_ptr_t(new augmentation_entry_t(parent, *file, own_name));
         parent->children.emplace(std::move(child));
     }
+    on_update();
 }
 
 void augmentation_entry_root_t::track(model::file_info_t &file) {
@@ -168,15 +209,18 @@ void augmentation_entry_root_t::augment_pending() {
     }
 }
 
-model::folder_info_t *augmentation_entry_root_t::get_folder() { return &folder; }
+model::folder_info_t *augmentation_entry_root_t::get_folder() const { return &folder; }
 
-auto augmentation_entry_root_t::get_file() -> model::file_info_t * { return nullptr; }
+auto augmentation_entry_root_t::get_file() const -> model::file_info_t * { return nullptr; }
 
 int augmentation_entry_root_t::get_position(bool) { return 0; }
+
+bool augmentation_entry_root_t::record_diff() { return false; }
 
 augmentation_entry_t::augmentation_entry_t(self_t *parent, model::file_info_t &file_, std::string own_name_)
     : parent_t(parent, nullptr, std::move(own_name_)), file{file_} {
     file.set_augmentation(this);
+    on_update();
 }
 
 void augmentation_entry_t::display() noexcept {
@@ -203,8 +247,21 @@ int augmentation_entry_t::get_position(bool include_deleted) {
     return position;
 }
 
-auto augmentation_entry_t::get_file() -> model::file_info_t * { return &file; }
+auto augmentation_entry_t::get_file() const -> model::file_info_t * { return &file; }
 
-auto augmentation_entry_t::get_folder() -> model::folder_info_t * { return file.get_folder_info(); }
+auto augmentation_entry_t::get_folder() const -> model::folder_info_t * { return file.get_folder_info(); }
+
+bool augmentation_entry_t::record_diff() {
+    bool r = false;
+    if (stats.sequence != file.get_sequence()) {
+        auto scanned = file.is_locally_available() ? 1 : 0;
+        stats_diff.scanned_entries += scanned - stats.scanned_entries;
+        stats_diff.entries_size += file.get_size() - stats.entries_size;
+        stats_diff.entries += (!stats.sequence ? 1 : 0);
+        stats_diff.sequence = stats.sequence = file.get_sequence();
+        r = true;
+    }
+    return r;
+}
 
 } // namespace syncspirit::fltk

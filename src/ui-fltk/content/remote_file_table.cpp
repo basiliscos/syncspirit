@@ -76,21 +76,14 @@ remote_file_table_t::remote_file_table_t(tree_item_t &container_, int x, int y, 
 }
 
 void remote_file_table_t::refresh() {
-    struct size_data_t {
-        std::size_t entries_count = 0;
-        std::size_t entries_size = 0;
-    };
-
     auto aug = static_cast<augmentation_entry_base_t *>(container.augmentation.get());
+    auto &stats = aug->get_stats();
     auto &entry = *aug->get_file();
     auto &devices = container.supervisor.get_cluster()->get_devices();
     auto data = table_rows_t();
     auto modified_s = entry.get_modified_s();
     auto modified_date = model::pt::from_time_t(modified_s);
     auto version = entry.get_version();
-
-    auto size_data = size_data_t{};
-    // host->apply(size_visitor_t{}, &size_data);
 
     name_cell->update(entry.get_name());
     modified_cell->update(model::pt::to_simple_string(modified_date));
@@ -134,8 +127,8 @@ void remote_file_table_t::refresh() {
     modified_ns_cell->update(fmt::format("{}", entry.get_modified_ns()));
     modified_by_cell->update(fmt::format("{}", modified_by_device));
     symlink_target_cell->update(entry.get_link_target());
-    entries_cell->update(fmt::format("{}", size_data.entries_count));
-    entries_size_cell->update(fmt::format("{}", size_data.entries_size));
+    entries_cell->update(fmt::format("{}", stats.entries));
+    entries_size_cell->update(fmt::format("{}", stats.entries_size));
 
     redraw();
 }

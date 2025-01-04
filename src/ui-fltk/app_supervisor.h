@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+
 #pragma once
 
 #include "content.h"
@@ -10,11 +13,12 @@
 #include "model/diff/load/load_cluster.h"
 #include "model/misc/sequencer.h"
 
-#include <chrono>
 #include <rotor/fltk.hpp>
 #include <FL/Fl_Widget.H>
 #include <FL/Fl_Group.H>
 #include <boost/filesystem.hpp>
+#include <chrono>
+#include <set>
 
 namespace syncspirit::fltk {
 
@@ -27,6 +31,7 @@ namespace outcome = boost::outcome_v2;
 struct app_supervisor_t;
 struct main_window_t;
 struct tree_item_t;
+struct augmentation_entry_base_t;
 
 enum class color_context_t { unknown, deleted, link, actualized, outdated, conflicted };
 
@@ -89,6 +94,12 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     using config_t = app_supervisor_config_t;
     template <typename Actor> using config_builder_t = app_supervisor_config_builder_t<Actor>;
 
+    struct entries_comparator_t {
+        using aug_t = augmentation_entry_base_t;
+        bool operator()(const aug_t *lhs, const aug_t *rhs) const;
+    };
+    using updated_entries_t = std::set<augmentation_entry_base_t *, entries_comparator_t>;
+
     explicit app_supervisor_t(config_t &config);
     app_supervisor_t(const app_supervisor_t &) = delete;
 
@@ -137,6 +148,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void set_ignored_devices(tree_item_t *node);
     void set_show_deleted(bool value);
     void set_show_colorized(bool value);
+    void postpone_update(augmentation_entry_base_t &);
 
     callback_ptr_t call_select_folder(std::string_view folder_id);
     callback_ptr_t call_share_folders(std::string folder_id, std::vector<std::string> devices);
@@ -186,6 +198,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     main_window_t *main_window;
     std::size_t loaded_blocks;
     std::size_t loaded_files;
+    updated_entries_t *updated_entries;
     const model::diff::load::load_cluster_t *load_cluster;
 
     friend struct db_info_viewer_guard_t;

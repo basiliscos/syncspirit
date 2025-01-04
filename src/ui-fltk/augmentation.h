@@ -5,8 +5,7 @@
 
 #include "model/misc/augmentation.hpp"
 #include "model/file_info.h"
-
-#include <map>
+#include "entry_stats.h"
 
 namespace syncspirit::fltk {
 
@@ -68,21 +67,28 @@ struct augmentation_entry_base_t : augmentation_t {
 
     ~augmentation_entry_base_t();
 
+    void apply_update();
+    void on_update() noexcept override;
     virtual void display() noexcept;
     children_t &get_children() noexcept;
     std::string_view get_own_name();
     self_t *get_parent();
+    const entry_stats_t &get_stats() const;
 
-    virtual model::file_info_t *get_file() = 0;
-    virtual model::folder_info_t *get_folder() = 0;
+    virtual bool record_diff() = 0;
+    virtual model::file_info_t *get_file() const = 0;
+    virtual model::folder_info_t *get_folder() const = 0;
     virtual int get_position(bool include_deleted) = 0;
 
   protected:
     augmentation_entry_base_t(self_t *parent, dynamic_item_t *owner, std::string own_name);
+    void push_diff_up();
 
     std::string own_name;
     self_t *parent;
     children_t children;
+    entry_stats_t stats;
+    entry_stats_t stats_diff;
 
     friend struct augmentation_entry_root_t;
     friend struct augmentation_entry_t;
@@ -95,9 +101,10 @@ struct augmentation_entry_root_t final : augmentation_entry_base_t {
 
     void track(model::file_info_t &file);
     void augment_pending();
-    model::folder_info_t *get_folder() override;
-    model::file_info_t *get_file() override;
+    model::folder_info_t *get_folder() const override;
+    model::file_info_t *get_file() const override;
     int get_position(bool include_deleted) override;
+    bool record_diff() override;
 
     model::folder_info_t &folder;
     files_t pending_augmentation;
@@ -108,9 +115,10 @@ struct augmentation_entry_t final : augmentation_entry_base_t {
     augmentation_entry_t(self_t *parent, model::file_info_t &file, std::string own_name);
 
     void display() noexcept override;
-    model::folder_info_t *get_folder() override;
-    model::file_info_t *get_file() override;
+    model::folder_info_t *get_folder() const override;
+    model::file_info_t *get_file() const override;
     int get_position(bool include_deleted) override;
+    bool record_diff() override;
 
   private:
     model::file_info_t &file;

@@ -173,6 +173,7 @@ struct table_t : content::folder_table_t {
 
     void refresh() override {
         auto aug = static_cast<augmentation_entry_base_t *>(container.get_proxy().get());
+        auto &stats = aug->get_stats();
         auto folder_info = aug->get_folder();
         serialiazation_context_t ctx;
         description.get_folder()->serialize(ctx.folder);
@@ -210,14 +211,9 @@ struct table_t : content::folder_table_t {
         scan_start_cell->update(scan_start);
         scan_finish_cell->update(scan_finish);
 
-        auto entries_size = std::size_t{0};
-        for (auto &it : folder_info->get_file_infos()) {
-            entries_size += it.item->get_size();
-        }
-        auto entries_count = description.get_file_infos().size();
         auto max_sequence = description.get_max_sequence();
-        entries_cell->update(fmt::format("{}", entries_count));
-        entries_size_cell->update(fmt::format("{}", entries_size));
+        entries_cell->update(fmt::format("{}", stats.entries));
+        entries_size_cell->update(fmt::format("{}", stats.entries_size));
         max_sequence_cell->update(fmt::format("{}", max_sequence));
 
         notice->reset();

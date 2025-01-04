@@ -1,4 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+
 #include "app_supervisor.h"
+#include "augmentation.h"
 #include "main_window.h"
 #include "tree_item/devices.h"
 #include "tree_item/folder.h"
@@ -64,6 +68,38 @@ struct callback_impl_t final : callback_t {
 
     callback_fn_t fn;
 };
+
+using aec_t = app_supervisor_t::entries_comparator_t;
+bool aec_t::operator()(const aug_t *lhs, const aug_t *rhs) const {
+    if (lhs == rhs) {
+        return false;
+    }
+
+    auto lf = lhs->get_folder();
+    auto rf = rhs->get_folder();
+    auto lid = lf->get_folder()->get_id();
+    auto rid = rf->get_folder()->get_id();
+    if (lid != rid) {
+        return lid > rid;
+    }
+
+    auto ld = lf->get_device();
+    auto rd = rf->get_device();
+    if (ld != rd) {
+        return ld > rd;
+    }
+
+    auto l_file = lhs->get_file();
+    auto r_file = rhs->get_file();
+    if (!l_file && r_file) {
+        return false;
+    }
+    if (l_file && !r_file) {
+        return true;
+    }
+
+    return l_file->get_name() > r_file->get_name();
+}
 
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
@@ -141,6 +177,8 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
 
 void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
+    auto updated = updated_entries_t();
+    this->updated_entries = &updated;
     auto &diff = *message.payload.diff;
     auto r = diff.apply(*cluster, *this);
     if (!r) {
@@ -151,6 +189,7 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     if (!r) {
         LOG_ERROR(log, "error visiting cluster diff: {}", r.assume_error().message());
     }
+
     auto custom = message.payload.custom;
     if (custom) {
         for (auto it = begin(callbacks); it != end(callbacks); ++it) {
@@ -162,6 +201,11 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
             }
         }
     }
+
+    for (auto &entry : updated) {
+        entry->apply_update();
+    }
+    this->updated_entries = nullptr;
 }
 
 std::string app_supervisor_t::get_uptime() noexcept {
@@ -199,6 +243,11 @@ void app_supervisor_t::set_folders(tree_item_t *node) { folders = node; }
 void app_supervisor_t::set_pending_devices(tree_item_t *node) { pending_devices = node; }
 void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices = node; }
 void app_supervisor_t::set_main_window(main_window_t *window) { main_window = window; }
+
+void app_supervisor_t::postpone_update(augmentation_entry_base_t &entry) {
+    assert(updated_entries);
+    updated_entries->emplace(&entry);
+}
 
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
     request<net::payload::db_info_request_t>(coordinator).send(init_timeout * 5 / 6);
