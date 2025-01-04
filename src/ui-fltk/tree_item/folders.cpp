@@ -152,9 +152,7 @@ folders_t::folders_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(sup
 }
 
 void folders_t::update_label() {
-    auto cluster = supervisor.get_cluster();
-    auto count = cluster ? cluster->get_folders().size() : 0;
-    auto l = fmt::format("folders ({})", count);
+    auto l = fmt::format("folders ({})", children());
     this->label(l.data());
 }
 
