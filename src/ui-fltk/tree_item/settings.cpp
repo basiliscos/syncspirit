@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+
 #include "settings.h"
 #include "../config/control.h"
 #include <spdlog/fmt/fmt.h>

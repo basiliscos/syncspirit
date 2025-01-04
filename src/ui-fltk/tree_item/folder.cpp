@@ -1,8 +1,6 @@
 #include "folder.h"
 
 #include "../symbols.h"
-#if 0
-
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
 #include "../table_widget/input.h"
@@ -10,7 +8,6 @@
 #include "../content/folder_table.h"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
-#endif
 
 using namespace syncspirit;
 using namespace model::diff;
@@ -47,8 +44,6 @@ void folder_t::update_label() {
     label(value.data());
 }
 
-
-#if 0
 static constexpr int padding = 2;
 
 namespace {
@@ -178,6 +173,8 @@ struct table_t : content::folder_table_t {
     }
 
     void refresh() override {
+        auto aug = static_cast<augmentation_entry_base_t*>(container.get_proxy().get());
+        auto folder_info = aug->get_folder();
         serialiazation_context_t ctx;
         description.get_folder()->serialize(ctx.folder);
 
@@ -215,7 +212,7 @@ struct table_t : content::folder_table_t {
         scan_finish_cell->update(scan_finish);
 
         auto entries_size = std::size_t{0};
-        for (auto &it : static_cast<folder_t &>(container).folder_info->get_file_infos()) {
+        for (auto &it : folder_info->get_file_infos()) {
             entries_size += it.item->get_size();
         }
         auto entries_count = description.get_file_infos().size();
@@ -231,31 +228,6 @@ struct table_t : content::folder_table_t {
 
 } // namespace
 
-folder_t::folder_t(model::folder_t &folder_, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(supervisor, tree, true), folder{folder_} {
-    update_label();
-
-    auto cluster = supervisor.get_cluster();
-    folder_info = folder.get_folder_infos().by_device(*cluster->get_device()).get();
-    auto augmentation = augmentation_ptr_t(new augmentation_proxy_t(get_proxy()));
-    folder_info->set_augmentation(augmentation);
-
-    tree->close(this, 0);
-
-    make_hierarchy(folder_info->get_file_infos());
-}
-
-void folder_t::update_label() {
-    auto value = fmt::format("{}, {}", folder.get_label(), folder.get_id());
-    if (folder.is_scanning()) {
-        value += fmt::format(" {}", symbols::scaning);
-    }
-    if (folder.is_synchronizing()) {
-        value += fmt::format(" {}", symbols::syncrhonizing);
-    }
-    label(value.data());
-}
-
 bool folder_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
         using devices_ptr_t = table_t::shared_devices_t;
@@ -264,20 +236,11 @@ bool folder_t::on_select() {
         auto shared_with = devices_ptr_t(new model::devices_map_t{});
         auto non_shared_with = devices_ptr_t(new model::devices_map_t{});
 
-        auto cluster = supervisor.get_cluster();
-        auto &folder_infos = folder.get_folder_infos();
-        auto &folder_info = *folder_infos.by_device(*cluster->get_device());
+        auto aug = static_cast<augmentation_entry_base_t*>(get_proxy().get());
+        auto& folder_info = *aug->get_folder();
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         return new table_t(*this, folder_info, x, y, w, h);
     });
     return true;
 }
-
-auto folder_t::get_entry() -> model::file_info_t * { return nullptr; }
-
-auto folder_t::make_entry(model::file_info_t *file, std::string filename) -> entry_t * {
-    std::abort();
-    // return new file_entry_t(supervisor, tree(), file, std::move(filename));
-}
-#endif
