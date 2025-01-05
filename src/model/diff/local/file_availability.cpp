@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "file_availability.h"
 #include "../cluster_visitor.h"
@@ -27,6 +27,7 @@ auto file_availability_t::apply_impl(cluster_t &cluster, apply_controller_t &con
                     f->mark_local_available(i);
                 }
             }
+            f->notify_update();
         }
     }
     return applicator_t::apply_sibling(cluster, controller);

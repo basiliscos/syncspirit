@@ -49,6 +49,7 @@ remote_file_table_t::remote_file_table_t(tree_item_t &container_, int x, int y, 
     symlink_target_cell = new static_string_provider_t("");
     entries_cell = new static_string_provider_t("");
     entries_size_cell = new static_string_provider_t("");
+    local_entries_cell = new static_string_provider_t("");
 
     data.push_back({"name", name_cell});
     data.push_back({"modified", modified_cell});
@@ -69,6 +70,7 @@ remote_file_table_t::remote_file_table_t(tree_item_t &container_, int x, int y, 
     data.push_back({"symlink_target", symlink_target_cell});
     data.push_back({"entries", entries_cell});
     data.push_back({"entries size", entries_size_cell});
+    data.push_back({"local entries", local_entries_cell});
 
     assign_rows(std::move(data));
 
@@ -129,6 +131,7 @@ void remote_file_table_t::refresh() {
     symlink_target_cell->update(entry.get_link_target());
     entries_cell->update(fmt::format("{}", stats.entries));
     entries_size_cell->update(fmt::format("{}", stats.entries_size));
+    local_entries_cell->update(fmt::format("{}", stats.scanned_entries));
 
     redraw();
 }

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+
 #include "folder.h"
 
 #include "../symbols.h"
@@ -8,6 +11,7 @@
 #include "../content/folder_table.h"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
+#include <alloca.h>
 
 using namespace syncspirit;
 using namespace model::diff;
@@ -30,17 +34,29 @@ folder_t::folder_t(model::folder_t &folder, app_supervisor_t &supervisor, Fl_Tre
 
 void folder_t::update_label() {
     auto entry = static_cast<augmentation_entry_root_t *>(augmentation.get());
+    auto &stats = entry->get_stats();
     auto folder_info = entry->get_folder();
     auto &folder = *folder_info->get_folder();
-    auto symbol = std::string_view();
+    auto id = folder.get_id();
+    auto folder_label = folder.get_label();
+    char scanning_buff[32];
+    char synchronizing_buff[32];
+    auto scaning = std::string_view();
+    auto synchronizing = std::string_view();
     if (folder.is_scanning()) {
-        symbol = symbols::scaning;
+        auto share = (stats.entries) ? 100.0 * stats.scanned_entries / stats.entries : 0;
+        auto eob = fmt::format_to(scanning_buff, " ({} {}%)", symbols::scaning, (int)share);
+        scaning = std::string_view(scanning_buff, eob);
     }
     if (folder.is_synchronizing()) {
-        symbol = symbols::syncrhonizing;
+        auto eob = fmt::format_to(synchronizing_buff, " {}", symbols::syncrhonizing);
+        synchronizing = std::string_view(synchronizing_buff, eob);
     }
-    auto value = fmt::format("{}, {} {}", folder.get_label(), folder.get_id(), symbol);
-    label(value.data());
+    auto sz = folder_label.size() + id.size() + synchronizing.size() + scaning.size() + 1;
+    auto buff = (char *)alloca(sz);
+    auto eob = fmt::format_to(buff, "{}{}{}{}", folder_label, id, synchronizing, scaning);
+    *eob = 0;
+    label(buff);
 }
 
 static constexpr int padding = 2;

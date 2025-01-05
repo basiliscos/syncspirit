@@ -30,6 +30,7 @@ struct remote_file_table_t : static_table_t {
     static_string_provider_ptr_t symlink_target_cell;
     static_string_provider_ptr_t entries_cell;
     static_string_provider_ptr_t entries_size_cell;
+    static_string_provider_ptr_t local_entries_cell;
     size_t displayed_versions;
 };
 

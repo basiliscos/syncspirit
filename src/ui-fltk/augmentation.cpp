@@ -253,9 +253,11 @@ auto augmentation_entry_t::get_folder() const -> model::folder_info_t * { return
 
 bool augmentation_entry_t::record_diff() {
     bool r = false;
+    if (!stats.local_mark && file.is_local()) {
+        stats_diff.scanned_entries++;
+        stats.local_mark = true;
+    }
     if (stats.sequence != file.get_sequence()) {
-        auto scanned = file.is_locally_available() ? 1 : 0;
-        stats_diff.scanned_entries += scanned - stats.scanned_entries;
         stats_diff.entries_size += file.get_size() - stats.entries_size;
         stats_diff.entries += (!stats.sequence ? 1 : 0);
         stats_diff.sequence = stats.sequence = file.get_sequence();
