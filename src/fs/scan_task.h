@@ -76,11 +76,13 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
         ~send_guard_t();
 
         void send_by_force() noexcept;
+        void send_progress() noexcept;
 
         scan_task_t &task;
         r::actor_base_t &actor;
         r::address_ptr_t coordinator;
         bool force_send;
+        bool manage_progress;
     };
 
     scan_task_t(model::cluster_ptr_t cluster, std::string_view folder_id, const config::fs_config_t &config) noexcept;

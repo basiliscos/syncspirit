@@ -1,5 +1,5 @@
 ﻿// SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "scan_actor.h"
 #include "model/diff/advance/local_update.h"
@@ -160,9 +160,8 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
             r);
     }
 
-    bool send_diff_by_force = false;
     if (!stop_processing) {
-        send<payload::scan_progress_t>(address, task);
+        guard.send_progress();
     } else if (completed) {
         LOG_DEBUG(log, "completed scanning of {}", folder_id);
         auto now = clock_t::local_time();

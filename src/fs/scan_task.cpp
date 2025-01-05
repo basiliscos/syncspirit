@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "scan_task.h"
 #include "utils.h"
 #include "model/messages.h"
+#include "fs/messages.h"
 
 using namespace syncspirit::fs;
 
@@ -361,9 +362,11 @@ auto scan_task_t::guard(r::actor_base_t &actor, r::address_ptr_t coordinator) no
 
 scan_task_t::send_guard_t::send_guard_t(scan_task_t &task_, r::actor_base_t &actor_,
                                         r::address_ptr_t coordinator_) noexcept
-    : task{task_}, actor{actor_}, coordinator{coordinator_}, force_send{false} {}
+    : task{task_}, actor{actor_}, coordinator{coordinator_}, force_send{false}, manage_progress{false} {}
 
 void scan_task_t::send_guard_t::send_by_force() noexcept { force_send = true; }
+
+void scan_task_t::send_guard_t::send_progress() noexcept { manage_progress = true; }
 
 scan_task_t::send_guard_t::~send_guard_t() {
     auto consume = force_send || task.bytes_left <= 0 || task.files_left <= 0;
@@ -373,6 +376,14 @@ scan_task_t::send_guard_t::~send_guard_t() {
         task.bytes_left = task.config.bytes_scan_iteration_limit;
         task.files_left = task.config.files_scan_iteration_limit;
         actor.send<model::payload::model_update_t>(coordinator, std::move(diff), nullptr);
+        if (manage_progress) {
+            auto &sup = actor.get_supervisor();
+            auto address = actor.get_address();
+            auto message = rotor::make_routed_message<payload::scan_progress_t>(coordinator, address, &task);
+            sup.put(message);
+        }
+    } else if (manage_progress) {
+        actor.send<payload::scan_progress_t>(actor.get_address(), &task);
     }
 }
 
