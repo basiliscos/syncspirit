@@ -154,6 +154,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     callback_ptr_t call_share_folders(std::string folder_id, std::vector<std::string> devices);
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
     void request_load_model();
+    r::address_ptr_t &get_coordinator_address();
 
   private:
     using clock_t = std::chrono::high_resolution_clock;

@@ -101,6 +101,12 @@ bool aec_t::operator()(const aug_t *lhs, const aug_t *rhs) const {
     return l_file->get_name() > r_file->get_name();
 }
 
+static void ui_idle_means_ready(void *data) {
+    auto sup = reinterpret_cast<app_supervisor_t *>(data);
+    sup->send<syncspirit::model::payload::ui_ready_t>(sup->get_coordinator_address());
+    Fl::remove_idle(ui_idle_means_ready, data);
+}
+
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
       app_config(std::move(config.app_config)), app_config_original{app_config}, content{nullptr}, devices{nullptr},
@@ -164,6 +170,8 @@ void app_supervisor_t::request_load_model() {
     resources->acquire(resource::model);
 }
 
+auto app_supervisor_t::get_coordinator_address() -> r::address_ptr_t & { return coordinator; }
+
 void app_supervisor_t::on_model_response(model::message::model_response_t &res) noexcept {
     LOG_TRACE(log, "on_model_response");
     resources->release(resource::model);
@@ -177,14 +185,22 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
 
 void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
+    bool has_been_loaded = cluster->get_devices().size();
     auto updated = updated_entries_t();
     this->updated_entries = &updated;
     auto &diff = *message.payload.diff;
+
+    if (!has_been_loaded) {
+        main_window->set_splash_text("populating model (1/3)...");
+    }
     auto r = diff.apply(*cluster, *this);
     if (!r) {
         LOG_ERROR(log, "error applying cluster diff: {}", r.assume_error().message());
     }
 
+    if (!has_been_loaded) {
+        main_window->set_splash_text("populating model (2/3)...");
+    }
     r = diff.visit(*this, nullptr);
     if (!r) {
         LOG_ERROR(log, "error visiting cluster diff: {}", r.assume_error().message());
@@ -202,8 +218,16 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
         }
     }
 
+    if (!has_been_loaded) {
+        main_window->set_splash_text("populating model (3/3)...");
+    }
     for (auto &entry : updated) {
         entry->apply_update();
+    }
+    if (!has_been_loaded && cluster->get_devices().size()) {
+        main_window->on_loading_done();
+        main_window->set_splash_text("UI has been initialized");
+        Fl::add_idle(ui_idle_means_ready, this);
     }
     this->updated_entries = nullptr;
 }
@@ -317,10 +341,11 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
     auto tree = self_node->get_owner()->tree();
     tree->select(self_node->get_owner());
     self_device->set_augmentation(*self_node);
-
     for (auto &it : cluster->get_devices()) {
         auto &device = *it.item;
         if (device.device_id() != cluster->get_device()->device_id()) {
+            auto text = fmt::format("populating device '{}'({})...", device.get_name(), device.device_id().get_short());
+            main_window->set_splash_text(text);
             device.set_augmentation(devices_node->add_peer(device));
         }
     }
@@ -340,12 +365,13 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
     auto folders_node = static_cast<tree_item::folders_t *>(folders);
     for (auto &it : cluster->get_folders()) {
         auto &folder = it.item;
+        auto text = fmt::format("populating local folder '{}'({})...", folder->get_label(), folder->get_id());
+        main_window->set_splash_text(text);
         auto augmentation = folders_node->add_folder(*folder);
         folder->set_augmentation(augmentation);
     }
 
     auto r = diff.visit_next(*this, custom);
-    main_window->on_loading_done();
     return r;
 }
 
@@ -414,12 +440,6 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
     if (!local_file->get_augmentation()) {
         augmentation->track(*local_file);
         augmentation->augment_pending();
-        // if (auto local_aug = local_file->get_augmentation(); local_aug) {
-        //     auto parent_aug = static_cast<augmentation_entry_t*>(local_aug.get())->get_parent();
-        //     if (auto parent = static_cast<dynamic_item_t*>(parent_aug->get_owner()); parent) {
-        //         parent->refresh_children();
-        //     }
-        // }
     }
     // displayed nodes "actuality" status might change
     for (auto it : folder_infos) {

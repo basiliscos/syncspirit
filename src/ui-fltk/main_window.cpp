@@ -57,6 +57,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
 
     resizable(this);
     supervisor.set_main_window(this);
+    deactivate();
 }
 
 void main_window_t::on_shutdown() {
@@ -77,4 +78,7 @@ void main_window_t::set_splash_text(std::string text) {
     Fl::flush();
 }
 
-void main_window_t::on_loading_done() { log_panel->on_loading_done(); }
+void main_window_t::on_loading_done() {
+    log_panel->on_loading_done();
+    activate();
+}

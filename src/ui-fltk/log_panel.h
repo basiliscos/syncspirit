@@ -26,6 +26,7 @@ struct log_panel_t : Fl_Group {
     void update();
     void update(log_queue_t new_records);
     void update_counter();
+    void pull_in_logs();
     void on_filter(std::string_view filter);
     void set_splash_text(std::string text);
     void on_loading_done();
@@ -35,7 +36,6 @@ struct log_panel_t : Fl_Group {
     Fl_Group *control_group;
     log_table_t *log_table;
     Fl_Box *records_counter;
-    Fl_Box *splash_text;
     level_buttons_t level_buttons;
     mutex_t incoming_mutex;
     log_queue_t incoming_records;

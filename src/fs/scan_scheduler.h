@@ -39,7 +39,7 @@ struct SYNCSPIRIT_API scan_scheduler_t : public r::actor_base_t, private model::
     explicit scan_scheduler_t(config_t &cfg);
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
-    void on_start() noexcept override;
+    void on_ui_ready(model::message::ui_ready_t &) noexcept;
 
   private:
     struct next_schedule_t {

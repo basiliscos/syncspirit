@@ -28,16 +28,9 @@ struct syncspirit::fltk::fltk_sink_t final : base_sink_t {
     log_panel_t *widget;
 };
 
-static void pull_in_logs(void *data) {
-    auto widget = reinterpret_cast<log_panel_t *>(data);
-    auto lock = std::unique_lock(widget->incoming_mutex);
-    auto &source = widget->incoming_records;
-    if (source.size()) {
-        auto copy = std::move(widget->incoming_records);
-        lock.unlock();
-        widget->update(std::move(copy));
-    }
-    Fl::add_timeout(0.05, pull_in_logs, data);
+static void _pull_in_logs(void *data) {
+    reinterpret_cast<log_panel_t *>(data)->pull_in_logs();
+    Fl::add_timeout(0.05, _pull_in_logs, data);
 }
 
 static void auto_scroll_toggle(Fl_Widget *widget, void *data) {
@@ -154,49 +147,8 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     auto common_y = log_table->h() + padding * 2;
     auto common_h = bottom_row - padding;
 
-    control_group = new Fl_Group(0, common_y, log_table->w(), common_h);
-    splash_text = new Fl_Box(padding, common_y, log_table->w(), common_h);
-    splash_text->label("splash text");
-
-    control_group->end();
-
-    end();
-
-    resizable(log_table);
-
-    bridge_sink = sink_ptr_t(new fltk_sink_t(this));
-
-    auto &dist_sink = supervisor.get_dist_sink();
-    for (auto sink : dist_sink->sinks()) {
-        auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
-        if (in_memory_sink) {
-            std::lock_guard lock(in_memory_sink->mutex);
-            auto &src = in_memory_sink->records;
-            std::move(src.begin(), src.end(), std::back_inserter(*records));
-            src.clear();
-            dist_sink->remove_sink(sink);
-            break;
-        }
-    }
-
-    Fl::add_timeout(0.05, pull_in_logs, this);
-
-    dist_sink->add_sink(bridge_sink);
-}
-
-void log_panel_t::on_loading_done() {
     bool auto_scroll = true;
-
-    auto bottom_row = 30;
-    // auto common_y = log_table->h() + padding * 2;
-    auto common_h = bottom_row - padding;
-    auto common_y = control_group->y();
-
-    remove(control_group);
-    begin();
-    auto x = this->x();
     control_group = new Fl_Group(0, common_y, log_table->w(), common_h);
-
     control_group->begin();
     auto autoscroll_button = new Fl_Toggle_Button(padding, common_y, 100, common_h, "auto scroll");
     autoscroll_button->value(auto_scroll);
@@ -276,13 +228,38 @@ void log_panel_t::on_loading_done() {
 
     control_group->end();
     control_group->resizable(counter);
+
+    control_group->end();
+
     end();
 
-    redraw();
+    resizable(log_table);
+
+    bridge_sink = sink_ptr_t(new fltk_sink_t(this));
+
+    auto &dist_sink = supervisor.get_dist_sink();
+    for (auto sink : dist_sink->sinks()) {
+        auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
+        if (in_memory_sink) {
+            std::lock_guard lock(in_memory_sink->mutex);
+            auto &src = in_memory_sink->records;
+            std::move(src.begin(), src.end(), std::back_inserter(*records));
+            src.clear();
+            dist_sink->remove_sink(sink);
+            break;
+        }
+    }
+
+    dist_sink->add_sink(bridge_sink);
+}
+
+void log_panel_t::on_loading_done() {
+    pull_in_logs();
+    Fl::add_timeout(0.05, _pull_in_logs, this);
 }
 
 log_panel_t::~log_panel_t() {
-    Fl::remove_timeout(pull_in_logs, this);
+    Fl::remove_timeout(_pull_in_logs, this);
     supervisor.get_dist_sink()->remove_sink(bridge_sink);
     bridge_sink.reset();
 }
@@ -340,4 +317,17 @@ void log_panel_t::on_filter(std::string_view filter_) {
     update();
 }
 
-void log_panel_t::set_splash_text(std::string text) { splash_text->copy_label(text.data()); }
+void log_panel_t::set_splash_text(std::string text) {
+    supervisor.get_logger()->info(text);
+    pull_in_logs();
+}
+
+void log_panel_t::pull_in_logs() {
+    auto lock = std::unique_lock(incoming_mutex);
+    auto &source = incoming_records;
+    if (source.size()) {
+        auto copy = std::move(incoming_records);
+        lock.unlock();
+        update(std::move(copy));
+    }
+}
