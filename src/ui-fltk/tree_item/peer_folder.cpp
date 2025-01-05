@@ -40,7 +40,6 @@ struct my_table_t : static_table_t {
         auto augmentation = static_cast<augmentation_entry_base_t *>(container.get_proxy().get());
         auto fi = augmentation->get_folder();
         std::size_t entries_size = 0;
-        container.supervisor.get_logger()->warn("TODO: zzz, update entries size");
 
         index_cell->update(fmt::format("0x{:x}", fi->get_index()));
         max_sequence_cell->update(fmt::format("{}", fi->get_max_sequence()));
