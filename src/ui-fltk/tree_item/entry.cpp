@@ -1,5 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+
 #include "entry.h"
 #include "../utils.hpp"
+#include "../symbols.h"
+#include <alloca.h>
 
 using namespace syncspirit::fltk::tree_item;
 
@@ -19,9 +24,22 @@ entry_t::entry_t(app_supervisor_t &supervisor, Fl_Tree *tree, augmentation_entry
 
 void entry_t::update_label() {
     auto aug = static_cast<augmentation_entry_t *>(augmentation.get());
+    auto &stats = aug->get_stats();
     auto context = color_context_t::unknown;
+
+    auto sz = aug->get_own_name().size() + 16;
+    auto buff = (char *)alloca(sz);
+    auto eob = fmt::format_to(buff, "{}", aug->get_own_name());
+    *eob = 0;
+
     if (auto file = aug->get_file(); file) {
-        if (file->is_deleted()) {
+        auto local = file->get_folder_info()->get_device() == supervisor.get_cluster()->get_device();
+        if (local && stats.entries > stats.scanned_entries) {
+            auto share = 100.0 * stats.scanned_entries / stats.entries;
+            eob = fmt::format_to(eob, " ({} {}%)", symbols::scaning, (int)share);
+            *eob = 0;
+            context = color_context_t::outdated;
+        } else if (file->is_deleted()) {
             context = color_context_t::deleted;
         } else if (file->is_link()) {
             context = color_context_t::link;
@@ -31,7 +49,7 @@ void entry_t::update_label() {
     }
     auto color = supervisor.get_color(context);
     labelfgcolor(color);
-    label(aug->get_own_name().data());
+    label(buff);
     tree()->redraw();
 }
 

@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "folder.h"
-
 #include "../symbols.h"
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
@@ -43,10 +42,12 @@ void folder_t::update_label() {
     char synchronizing_buff[32];
     auto scaning = std::string_view();
     auto synchronizing = std::string_view();
+    auto color_context = color_context_t::unknown;
     if (folder.is_scanning()) {
         auto share = (stats.entries) ? 100.0 * stats.scanned_entries / stats.entries : 0;
         auto eob = fmt::format_to(scanning_buff, " ({} {}%)", symbols::scaning, (int)share);
         scaning = std::string_view(scanning_buff, eob);
+        color_context = color_context_t::outdated;
     }
     if (folder.is_synchronizing()) {
         auto eob = fmt::format_to(synchronizing_buff, " {}", symbols::syncrhonizing);
@@ -54,8 +55,9 @@ void folder_t::update_label() {
     }
     auto sz = folder_label.size() + id.size() + synchronizing.size() + scaning.size() + 1;
     auto buff = (char *)alloca(sz);
-    auto eob = fmt::format_to(buff, "{}{}{}{}", folder_label, id, synchronizing, scaning);
+    auto eob = fmt::format_to(buff, "{}, {}{}{}", folder_label, id, synchronizing, scaning);
     *eob = 0;
+    labelfgcolor(supervisor.get_color(color_context));
     label(buff);
 }
 
