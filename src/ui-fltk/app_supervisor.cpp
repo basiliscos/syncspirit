@@ -245,7 +245,7 @@ std::string app_supervisor_t::get_uptime() noexcept {
 
     std::stringstream out;
     out.fill('0');
-    out << setw(2) << h << ":" << setw(2) << m << ":" << setw(2) << s;
+    out << setw(2) << h.count() << ":" << setw(2) << m.count() << ":" << setw(2) << s.count();
 
     return out.str();
 }

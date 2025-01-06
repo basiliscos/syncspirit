@@ -8,6 +8,10 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 cmake_policy(SET CMP0063 NEW)
 cmake_policy(SET CMP0077 NEW)
 
+if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/image CACHE PATH "installation path" FORCE)
+endif()
+
 include(GenerateExportHeader)
 set(CMAKE_POSITION_INDEPENDENT_CODE True)
 
@@ -233,7 +237,10 @@ target_link_libraries(syncspirit_core
     $<IF:$<PLATFORM_ID:Windows>,mdbx,mdbx-static>
     $<$<PLATFORM_ID:Windows>:iphlpapi>
     $<$<PLATFORM_ID:Windows>:ws2_32>
+    $<$<PLATFORM_ID:Windows>:wsock32>
 )
+
+install(TARGETS syncspirit_core DESTINATION bin)
 
 enable_testing()
 add_subdirectory("tests")

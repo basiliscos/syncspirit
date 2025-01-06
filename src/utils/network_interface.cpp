@@ -117,7 +117,7 @@ static uri_container_t _local_interfaces(logger_t &log, std::uint16_t port) noex
 
                 auto host = inet_ntoa(ipv4->sin_addr);
                 auto full = fmt::format("tcp://{}:{}/", host, port);
-                auto uri = utils::parse(full).value();
+                auto uri = utils::parse(full);
                 r.emplace_back(std::move(uri));
             }
         }

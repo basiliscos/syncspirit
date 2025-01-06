@@ -14,6 +14,7 @@
 #include "../table_widget/path.h"
 
 #include <FL/fl_ask.H>
+#include <charconv>
 
 using namespace syncspirit;
 using namespace model::diff;

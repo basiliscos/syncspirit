@@ -1,6 +1,7 @@
 #include "properties.h"
 #include "utils/log.h"
 #include "model/device_id.h"
+#include <charconv>
 
 namespace syncspirit::fltk::config {
 

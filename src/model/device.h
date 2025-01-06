@@ -12,9 +12,9 @@
 #include "syncspirit-export.h"
 #include "bep.pb.h"
 #include "structs.pb.h"
+#include <boost/asio.hpp>
 #include <boost/outcome.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/asio/ip/tcp.hpp>
 
 namespace syncspirit::model {
 

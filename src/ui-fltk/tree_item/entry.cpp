@@ -4,7 +4,12 @@
 #include "entry.h"
 #include "../utils.hpp"
 #include "../symbols.h"
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include <malloc.h>
+#else
 #include <alloca.h>
+#endif
 
 using namespace syncspirit::fltk::tree_item;
 

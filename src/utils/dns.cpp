@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "dns.h"
 
 #include <cctype>
+#include <charconv>
 #include <boost/asio/ip/address.hpp>
 
 namespace syncspirit::utils {

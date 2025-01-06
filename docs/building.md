@@ -15,8 +15,9 @@
  - [json](https://github.com/nlohmann/json)
  - [pugixml](https://github.com/zeux/pugixml)
  - [tomlplusplus](https://github.com/marzer/tomlplusplus)
- - [uriparser](https://github.com/uriparser/uriparser)
- 
+ - [c-ares](https://c-ares.org/)
+ - [fltk](https://www.fltk.org/) (for fltk-ui)
+
 The [conan](https://conan.io/) package manager (v2.0+) is used with 
 [cmake](https://cmake.org/) build system.
 

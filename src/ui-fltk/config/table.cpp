@@ -459,6 +459,7 @@ void table_t::create_cells() {
                     return new log_cell_t(this, p, row);
                 }
                 assert(0 && "should not happen");
+                return nullptr;
             }();
             ++row;
             cells.push_back(cell_ptr_t(cell_ptr));

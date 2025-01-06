@@ -48,7 +48,8 @@ void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
 
     auto status = ares_init_options(&channel, &opts, opts_mask);
     if (status != ARES_SUCCESS) {
-        LOG_ERROR(log, "cannot do ares_init, code = {}", static_cast<int>(status));
+        auto details = ares_strerror(status);
+        LOG_ERROR(log, "cannot do ares_init, code: {}, details: {}", static_cast<int>(status), details);
         auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
         return do_shutdown(make_error(ec));
     }

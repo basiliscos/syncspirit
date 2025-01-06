@@ -3,12 +3,11 @@
 
 #pragma once
 
+#include <boost/asio.hpp>
 #include "model/device.h"
 #include "model/device_id.h"
 #include "utils/platform.h"
 
-#include <boost/asio.hpp>
-#include <boost/asio/ip/basic_endpoint.hpp>
 #include <boost/filesystem/path.hpp>
 
 #include <fmt/format.h>

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <boost/asio.hpp>
 #include "misc/augmentation.hpp"
 #include "misc/map.hpp"
 #include "misc/error_code.h"

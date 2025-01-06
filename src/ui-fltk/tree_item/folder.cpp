@@ -10,7 +10,12 @@
 #include "../content/folder_table.h"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include <malloc.h>
+#else
 #include <alloca.h>
+#endif
 
 using namespace syncspirit;
 using namespace model::diff;

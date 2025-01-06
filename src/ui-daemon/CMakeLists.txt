@@ -19,6 +19,7 @@ target_link_libraries(syncspirit-daemon
     $<$<PLATFORM_ID:Windows>:wsock32>
 )
 target_include_directories(syncspirit-daemon PUBLIC ${syncspirit_SOURCE_DIR}/src)
+install(TARGETS syncspirit-daemon DESTINATION bin)
 
 if (("${CMAKE_BUILD_TYPE}" STREQUAL "Release") AND (NOT WIN32))
     include(CheckIPOSupported)

@@ -1,6 +1,11 @@
 #include "path.h"
 
 #include "FL/Fl_Button.H"
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include <windows.h>
+#endif
+
 #include <FL/Fl_Native_File_Chooser.H>
 
 static constexpr int padding = 2;

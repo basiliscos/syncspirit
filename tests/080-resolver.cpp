@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include <catch2/catch_all.hpp>
 #include <rotor.hpp>
@@ -66,6 +66,7 @@ struct fixture_t {
         sup->do_process();
 
         hosts_path = root_path / "hosts";
+        hosts_path_str = hosts_path.string();
 
         auto ep = asio::ip::udp::endpoint(asio::ip::make_address("127.0.0.1"), 0);
         remote_resolver.open(ep.protocol());
@@ -85,6 +86,7 @@ struct fixture_t {
     ra::system_context_asio_t ctx;
     bfs::path root_path;
     bfs::path hosts_path;
+    std::string hosts_path_str;
     path_guard_t path_quard;
     utils::logger_t log;
     supervisor_ptr_t sup;
@@ -102,7 +104,7 @@ void test_local_resolver() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path.c_str())
+                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses("127.0.0.1:1234")
                            .timeout(timeout)
                            .finish();
@@ -152,7 +154,7 @@ void test_success_resolver() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path.c_str())
+                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -179,7 +181,7 @@ void test_success_ip() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path.c_str())
+                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -207,7 +209,7 @@ void test_success_ipv6() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path.c_str())
+                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -248,7 +250,7 @@ void test_garbage() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path.c_str())
+                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -292,7 +294,7 @@ void test_multi_replies() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path.c_str())
+                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -334,7 +336,7 @@ void test_wrong() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path.c_str())
+                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -361,7 +363,7 @@ void test_timeout() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path.c_str())
+                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -388,7 +390,7 @@ void test_cancellation() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path.c_str())
+                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
