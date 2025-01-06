@@ -13,6 +13,7 @@
 #include <FL/Fl_Tile.H>
 
 #include <lz4.h>
+#include <ares.h>
 #include <openssl/crypto.h>
 #include <openssl/opensslv.h>
 #include "mdbx.h"
@@ -52,6 +53,7 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         auto app_version = fmt::format("{} {}", constants::client_name, constants::client_version);
         auto protobuf_version = google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION);
         auto fltk_version = fmt::format("{}", Fl::version());
+        auto ares_version = std::string(::ares_version(nullptr));
 
         device_id_short_cell = new static_string_provider_t();
         device_id_cell = new static_string_provider_t();
@@ -73,6 +75,7 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         data.push_back({"lz4 version", new static_string_provider_t(LZ4_versionString())});
         data.push_back({"openssl version", new static_string_provider_t(openssl_version)});
         data.push_back({"fltk version", new static_string_provider_t(fltk_version)});
+        data.push_back({"ares version", new static_string_provider_t(ares_version)});
 
         assign_rows(std::move(data));
 
