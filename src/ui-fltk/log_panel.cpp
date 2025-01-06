@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+
 #include "log_panel.h"
 
 #include "log_table.h"
@@ -251,6 +254,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     }
 
     dist_sink->add_sink(bridge_sink);
+    update();
 }
 
 void log_panel_t::on_loading_done() {

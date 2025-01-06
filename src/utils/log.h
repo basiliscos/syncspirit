@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -28,6 +28,8 @@ SYNCSPIRIT_API outcome::result<dist_sink_t> init_loggers(const config::log_confi
                                                          bool overwrite_default) noexcept;
 
 SYNCSPIRIT_API logger_t get_logger(std::string_view name) noexcept;
+
+SYNCSPIRIT_API void bootstrap_log(spdlog::sink_ptr sink) noexcept;
 
 #define LOG_GENERIC(LOGGER, LEVEL, ...)                                                                                \
     if (LEVEL >= LOGGER->level())                                                                                      \

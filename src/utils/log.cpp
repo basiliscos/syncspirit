@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "log.h"
 #include "error_code.h"
@@ -11,6 +11,8 @@
 #include <vector>
 
 namespace syncspirit::utils {
+
+static const char *log_pattern = "[%Y-%m-%d %H:%M:%S.%e] [%^%L/%t%$] {%n} %v";
 
 spdlog::level::level_enum get_log_level(const std::string &log_level) noexcept {
     using namespace spdlog::level;
@@ -156,7 +158,7 @@ outcome::result<dist_sink_t> init_loggers(const config::log_configs_t &configs, 
             spdlog::register_logger(logger);
         }
     }
-    spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%L/%t%$] {%n} %v");
+    spdlog::set_pattern(log_pattern);
 
     guard.release();
     return dist_sink;
@@ -186,6 +188,20 @@ logger_t get_logger(std::string_view initial_name) noexcept {
     result->set_level(parent->level());
     spdlog::register_logger(result);
     return result;
+}
+
+void bootstrap_log(spdlog::sink_ptr sink) noexcept {
+    auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+    auto dist_sink = std::make_shared<spdlog::sinks::dist_sink_mt>();
+    dist_sink->add_sink(console_sink);
+    dist_sink->add_sink(sink);
+    auto logger = std::make_shared<spdlog::logger>("", dist_sink);
+    logger->set_level(spdlog::level::trace);
+    spdlog::drop_all();
+    spdlog::set_default_logger(logger);
+    spdlog::set_pattern(log_pattern);
+    spdlog::set_level(spdlog::level::trace);
+    logger->trace("bootstrap logger has been initialized");
 }
 
 } // namespace syncspirit::utils

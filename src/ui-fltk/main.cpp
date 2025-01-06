@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include <google/protobuf/stubs/common.h>
 #include <lz4.h>
@@ -112,6 +112,8 @@ int main(int argc, char **argv) {
 #endif
     try {
         utils::platform_t::startup();
+        auto inmem_sink = spdlog::sink_ptr(new fltk::im_memory_sink_t());
+        utils::bootstrap_log(inmem_sink);
 
         Fl::args(1, argv);
 
@@ -191,7 +193,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         auto &dist_sink = init_result.value();
-        dist_sink->add_sink(spdlog::sink_ptr(new fltk::im_memory_sink_t()));
+        dist_sink->add_sink(inmem_sink);
 
         if (populate) {
             spdlog::info("Generating cryptographic keys...");
