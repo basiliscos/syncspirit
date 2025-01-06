@@ -46,7 +46,15 @@ void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
         opts_mask |= ARES_OPT_HOSTS_FILE;
     }
 
-    auto status = ares_init_options(&channel, &opts, opts_mask);
+    auto status = ares_library_init(ARES_LIB_INIT_ALL);
+    if (status != ARES_SUCCESS) {
+        auto details = ares_strerror(status);
+        LOG_ERROR(log, "cannot init ares library, code: {}, details: {}", static_cast<int>(status), details);
+        auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
+        return do_shutdown(make_error(ec));
+    }
+
+    status = ares_init_options(&channel, &opts, opts_mask);
     if (status != ARES_SUCCESS) {
         auto details = ares_strerror(status);
         LOG_ERROR(log, "cannot do ares_init, code: {}, details: {}", static_cast<int>(status), details);
@@ -123,6 +131,7 @@ void resolver_actor_t::on_start() noexcept {
 void resolver_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
     ares_destroy(channel);
+    ares_library_cleanup();
 }
 
 void resolver_actor_t::on_request(message::resolve_request_t &req) noexcept {
