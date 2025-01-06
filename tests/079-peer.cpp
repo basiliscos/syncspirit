@@ -77,6 +77,8 @@ using actor_ptr_t = r::intrusive_ptr_t<peer_actor_t>;
 
 struct fixture_t : private model::diff::cluster_visitor_t {
     using acceptor_t = asio::ip::tcp::acceptor;
+    using timer_t = asio::deadline_timer;
+    using timer_ptr_t = std::unique_ptr<timer_t>;
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx), pre_main_counter{2} {
         utils::set_default("trace");
@@ -204,8 +206,18 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         LOG_INFO(log, "client received {} bytes", bytes);
         auto result = proto::parse_bep(asio::buffer(rx_buff, bytes)).value();
         auto hello = std::get_if<proto::message::Hello>(&result.message);
+        // On some platforms 'on_client_read' triggers before 'on_server_send', but as we
+        // check server code here, there might be problems. So, give server-side
+        // some time via timer.
         if (hello) {
-            return on_hello(std::move(*hello));
+            assert(!hello_timer);
+            hello_timer.reset(new timer_t(ctx.get_io_context()));
+            hello_timer->expires_from_now(r::pt::milliseconds{1});
+            hello_timer->async_wait([hello = std::move(*hello), this](const sys::error_code &ec) mutable {
+                LOG_INFO(log, "on hello timer, ec: {}", ec.value());
+                on_hello(std::move(hello));
+                hello_timer.reset();
+            });
         }
     }
 
@@ -239,6 +251,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     transport::stream_sp_t peer_trans;
     transport::stream_sp_t client_trans;
     fmt::memory_buffer tx_buff;
+    timer_ptr_t hello_timer;
     char rx_buff[2000];
     bool known_peer = false;
     int pre_main_counter;

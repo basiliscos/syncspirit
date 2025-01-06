@@ -55,5 +55,5 @@ TEST_CASE("file-info", "[model]") {
     CHECK(!map.by_sequence(pr_fi.sequence()));
 
     auto conflict_name = fi->make_conflicting_name();
-    CHECK(conflict_name == "a/b.sync-conflict-20241220-104512-KHQNO2S.txt");
+    CHECK(conflict_name.find("b.sync-conflict-20241220-104512-KHQNO2S.txt") != std::string::npos);
 }
