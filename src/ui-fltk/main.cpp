@@ -277,6 +277,7 @@ int main(int argc, char **argv) {
         main_window.show(argc, argv);
         main_window.wait_for_expose();
 
+        // launch
         auto net_thread = std::thread([&]() {
 #if defined(__linux__)
             std::string name = "ss/net";
@@ -291,15 +292,13 @@ int main(int argc, char **argv) {
         for (uint32_t i = 0; i < hasher_count; ++i) {
             auto &ctx = hasher_ctxs.at(i);
             auto thread = std::thread([ctx = ctx, i = i]() {
-#if defined(__linux__)
                 std::string name = "ss/hasher-" + std::to_string(i + 1);
+#if defined(__linux__)
                 pthread_setname_np(pthread_self(), name.c_str());
 #endif
                 ctx->run();
                 shutdown_flag = true;
-#if defined(__linux__)
                 spdlog::trace("{} thread has been terminated", name);
-#endif
             });
             hasher_threads.emplace_back(std::move(thread));
         }
