@@ -81,7 +81,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     using timer_ptr_t = std::unique_ptr<timer_t>;
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx), pre_main_counter{2} {
-        utils::set_default("trace");
+        test::init_logging();
         log = utils::get_logger("fixture");
     }
 

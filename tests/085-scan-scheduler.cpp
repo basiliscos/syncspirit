@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -17,7 +17,7 @@ struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::scan_scheduler_t>;
 
     fixture_t() noexcept {
-        utils::set_default("trace");
+        test::init_logging();
         log = utils::get_logger("fixture");
     }
 

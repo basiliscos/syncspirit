@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
     try {
         utils::platform_t::startup();
         auto inmem_sink = spdlog::sink_ptr(new fltk::im_memory_sink_t());
-        utils::bootstrap_log(inmem_sink);
+        auto boostrap_guard = utils::bootstrap(inmem_sink);
 
         Fl::args(1, argv);
 
@@ -192,8 +192,6 @@ int main(int argc, char **argv) {
             spdlog::error("Loggers initialization failed :: {}", init_result.error().message());
             return 1;
         }
-        auto &dist_sink = init_result.value();
-        dist_sink->add_sink(inmem_sink);
 
         if (populate) {
             spdlog::info("Generating cryptographic keys...");
@@ -250,7 +248,7 @@ int main(int argc, char **argv) {
 
         auto fltk_ctx = rf::system_context_fltk_t();
         auto sup_fltk = fltk_ctx.create_supervisor<fltk::app_supervisor_t>()
-                            .dist_sink(dist_sink)
+                            .dist_sink(boostrap_guard->get_dist_sink())
                             .config_path(config_file_path)
                             .app_config(cfg)
                             .timeout(timeout)
@@ -278,6 +276,7 @@ int main(int argc, char **argv) {
         main_window.wait_for_expose();
 
         // launch
+
         auto net_thread = std::thread([&]() {
 #if defined(__linux__)
             std::string name = "ss/net";
@@ -314,6 +313,8 @@ int main(int argc, char **argv) {
 
         spdlog::debug("utf8 local support: {}", fl_utf8locale());
 
+        boostrap_guard->discard();
+        boostrap_guard.reset();
         while (!shutdown_flag) {
             sup_fltk->do_process();
             if (!Fl::wait()) {

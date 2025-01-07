@@ -702,7 +702,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
 }
 
 int _init() {
-    utils::set_default("trace");
+    test::init_logging();
     return 1;
 }
 

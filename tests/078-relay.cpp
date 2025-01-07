@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -77,7 +77,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     using acceptor_t = asio::ip::tcp::acceptor;
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
-        utils::set_default("trace");
+        test::init_logging();
         log = utils::get_logger("fixture");
         relay_config = config::relay_config_t{
             true,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include <google/protobuf/stubs/common.h>
 #include <lz4.h>
@@ -101,6 +101,8 @@ int main(int argc, char **argv) {
 #if defined(__linux__)
         pthread_setname_np(pthread_self(), "ss/main");
 #endif
+        auto boostrap_guard = utils::bootstrap();
+
         // clang-format off
         /* parse command-line & config options */
         po::options_description cmdline_descr("Allowed options");
@@ -290,6 +292,7 @@ int main(int argc, char **argv) {
                 .finish();
         }
 
+        boostrap_guard->discard();
         /* launch actors */
         auto fs_thread = std::thread([&]() {
 #if defined(__linux__)

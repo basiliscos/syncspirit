@@ -16,7 +16,7 @@ using namespace syncspirit::test;
 namespace bfs = boost::filesystem;
 
 TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
-    utils::set_default("trace");
+    test::init_logging();
 
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();

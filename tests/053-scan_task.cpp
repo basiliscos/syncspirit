@@ -12,7 +12,7 @@ using namespace syncspirit::model;
 using namespace syncspirit::fs;
 
 TEST_CASE("scan_task", "[fs]") {
-    utils::set_default("trace");
+    test::init_logging();
 
     auto root_path = bfs::unique_path();
     bfs::create_directories(root_path);

@@ -132,7 +132,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
 }
 
 int _init() {
-    utils::set_default("trace");
+    test::init_logging();
     return 1;
 }
 

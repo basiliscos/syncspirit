@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include <catch2/catch_all.hpp>
 #include "test-utils.h"
@@ -41,7 +41,7 @@ struct fixture_t {
     using stats_msg_t = net::message::db_info_response_t;
     using stats_msg_ptr_t = r::intrusive_ptr_t<stats_msg_t>;
 
-    fixture_t() noexcept : root_path{bfs::unique_path()}, path_quard{root_path} { utils::set_default("trace"); }
+    fixture_t() noexcept : root_path{bfs::unique_path()}, path_quard{root_path} { test::init_logging(); }
 
     virtual supervisor_t::configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {

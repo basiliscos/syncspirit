@@ -14,7 +14,7 @@ using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
 
-Fixture::Fixture() { utils::set_default("trace"); }
+Fixture::Fixture() { test::init_logging() }
 
 void Fixture::run() {
     root_path = bfs::unique_path();

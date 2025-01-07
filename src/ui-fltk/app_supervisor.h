@@ -65,7 +65,7 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
     using parent_t = rf::supervisor_config_fltk_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&dist_sink(utils::dist_sink_t &value) && noexcept {
+    builder_t &&dist_sink(utils::dist_sink_t value) && noexcept {
         parent_t::config.dist_sink = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

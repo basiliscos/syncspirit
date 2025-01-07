@@ -66,7 +66,7 @@ struct fixture_t {
     using diff_msgs_t = std::vector<diff_ptr_t>;
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
-        utils::set_default("trace");
+        test::init_logging();
         log = utils::get_logger("fixture");
     }
 

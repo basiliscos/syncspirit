@@ -9,8 +9,12 @@
 #include <unordered_map>
 #include <string_view>
 #include <vector>
+#include <boost/filesystem.hpp>
 
 namespace syncspirit::utils {
+
+namespace bfs = boost::filesystem;
+namespace sys = boost::system;
 
 static const char *log_pattern = "[%Y-%m-%d %H:%M:%S.%e] [%^%L/%t%$] {%n} %v";
 
@@ -68,25 +72,36 @@ static sink_option_t make_sink(std::string_view name) noexcept {
     return utils::make_error_code(error_code_t::unknown_sink);
 }
 
-void set_default(const std::string &level) noexcept {
-    auto sink = make_sink("stdout");
-    auto logger = std::make_shared<spdlog::logger>("", sink.value());
-    logger->set_level(get_log_level(level));
-    spdlog::set_default_logger(logger);
-}
+void set_default(const std::string &level) noexcept { spdlog::default_logger_raw()->set_level(get_log_level(level)); }
 
-outcome::result<dist_sink_t> init_loggers(const config::log_configs_t &configs, bool overwrite_default) noexcept {
+outcome::result<void> init_loggers(const config::log_configs_t &configs, bool overwrite_default) noexcept {
     using sink_map_t = std::unordered_map<std::string, spdlog::sink_ptr>;
     using logger_map_t = std::unordered_map<std::string, std::shared_ptr<spdlog::logger>>;
 
     // init sinks
     auto prev = spdlog::default_logger();
     using log_t = decltype(prev);
-    using guard_t = std::unique_ptr<log_t, std::function<void(log_t *)>>;
-    guard_t guard(&prev, [](log_t *logger) { spdlog::set_default_logger(*logger); });
-    auto dist_sink = std::make_shared<spdlog::sinks::dist_sink_mt>();
+    if (prev->sinks().size() != 1) {
+        return utils::make_error_code(error_code_t::misconfigured_default_logger);
+    }
+    auto prev_sink = prev->sinks().front();
+    auto dist_sink = dynamic_cast<spdlog::sinks::dist_sink_mt *>(prev_sink.get());
+    if (!dist_sink) {
+        return utils::make_error_code(error_code_t::misconfigured_default_logger);
+    }
+
+    // drop colorized stderr sink
+    for (auto &s : dist_sink->sinks()) {
+        auto sink = dynamic_cast<spdlog::sinks::stderr_color_sink_mt *>(s.get());
+        if (sink) {
+            dist_sink->remove_sink(s);
+            break;
+        }
+    }
 
     spdlog::drop_all();
+    spdlog::set_default_logger(prev);
+
     sink_map_t sink_map;
     for (auto &cfg : configs) {
         for (auto &sink : cfg.sinks) {
@@ -99,7 +114,6 @@ outcome::result<dist_sink_t> init_loggers(const config::log_configs_t &configs, 
     }
 
     logger_map_t logger_map;
-
     // init default
     std::vector<spdlog::sink_ptr> default_sinks;
     auto root_level = spdlog::level::debug;
@@ -109,16 +123,15 @@ outcome::result<dist_sink_t> init_loggers(const config::log_configs_t &configs, 
             continue;
         }
         for (auto &sink_name : cfg.sinks) {
-            default_sinks.push_back(sink_map.at(sink_name));
+            auto &sink = sink_map.at(sink_name);
+            dist_sink->add_sink(sink);
         }
-        default_sinks.push_back(dist_sink);
-        auto logger = std::make_shared<spdlog::logger>("", default_sinks.begin(), default_sinks.end());
-        logger->set_level(cfg.level);
+        prev->set_level(cfg.level);
         root_level = cfg.level;
-        logger_map[name] = logger;
+        logger_map[name] = prev;
     }
 
-    if (default_sinks.empty()) {
+    if (dist_sink->sinks().size() == 1) {
         return utils::make_error_code(error_code_t::misconfigured_default_logger);
     }
 
@@ -141,7 +154,6 @@ outcome::result<dist_sink_t> init_loggers(const config::log_configs_t &configs, 
         auto logger = std::make_shared<spdlog::logger>(log_name, sinks.begin(), sinks.end());
         auto level = std::max(cfg.level, root_level);
         logger->set_level(level);
-
         logger_map[name] = logger;
     }
 
@@ -153,15 +165,12 @@ outcome::result<dist_sink_t> init_loggers(const config::log_configs_t &configs, 
             if (overwrite_default && prev) {
                 logger->set_level(prev->level());
             }
-            spdlog::set_default_logger(logger);
         } else {
             spdlog::register_logger(logger);
         }
     }
     spdlog::set_pattern(log_pattern);
-
-    guard.release();
-    return dist_sink;
+    return outcome::success();
 }
 
 logger_t get_logger(std::string_view initial_name) noexcept {
@@ -190,18 +199,58 @@ logger_t get_logger(std::string_view initial_name) noexcept {
     return result;
 }
 
-void bootstrap_log(spdlog::sink_ptr sink) noexcept {
-    auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+static const char *bootstrap_sink = "syncspirit-bootstrap.log";
+
+boostrap_guard_t::boostrap_guard_t(dist_sink_t dist_sink_, file_sink_t *sink_)
+    : dist_sink{dist_sink_}, sink{sink_}, discarded{false} {}
+
+boostrap_guard_t::~boostrap_guard_t() {
+    auto logger = spdlog::default_logger_raw();
+    auto sinks = logger->sinks();
+    if (sinks.size() == 1) {
+        auto dist_sink = dynamic_cast<spdlog::sinks::dist_sink_mt *>(sinks.at(0).get());
+        if (dist_sink) {
+            for (auto &s : dist_sink->sinks()) {
+                if (s.get() == sink) {
+                    auto filename = sink->filename();
+                    auto path = bfs::path(filename);
+                    dist_sink->flush();
+                    sink->flush();
+                    dist_sink->remove_sink(s);
+
+                    if (discarded) {
+                        auto ec = sys::error_code{};
+                        bfs::remove(path, ec); // ignore error, can't do much
+                    }
+                }
+            }
+        }
+    }
+}
+
+void boostrap_guard_t::discard() { discarded = true; }
+auto boostrap_guard_t::get_dist_sink() -> dist_sink_t { return dist_sink; }
+
+dist_sink_t create_root_logger() noexcept {
     auto dist_sink = std::make_shared<spdlog::sinks::dist_sink_mt>();
-    dist_sink->add_sink(console_sink);
-    dist_sink->add_sink(sink);
     auto logger = std::make_shared<spdlog::logger>("", dist_sink);
     logger->set_level(spdlog::level::trace);
     spdlog::drop_all();
     spdlog::set_default_logger(logger);
     spdlog::set_pattern(log_pattern);
     spdlog::set_level(spdlog::level::trace);
-    logger->trace("bootstrap logger has been initialized");
+    return dist_sink;
+}
+
+auto bootstrap(spdlog::sink_ptr sink) noexcept -> boostrap_guard_ptr_t {
+    auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(bootstrap_sink, true);
+    auto dist_sink = create_root_logger();
+    dist_sink->add_sink(console_sink);
+    dist_sink->add_sink(file_sink);
+    dist_sink->add_sink(sink);
+    spdlog::trace("bootstrap logger has been initialized");
+    return std::make_unique<boostrap_guard_t>(dist_sink, file_sink.get());
 }
 
 } // namespace syncspirit::utils

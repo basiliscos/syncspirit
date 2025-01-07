@@ -507,7 +507,7 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
 }
 
 int _init() {
-    utils::set_default("trace");
+    test::init_logging();
     return 1;
 }
 

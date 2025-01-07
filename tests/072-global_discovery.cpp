@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "diff-builder.h"
@@ -69,7 +69,7 @@ struct fixture_t {
     using announce_msg_t = net::message::announce_notification_t;
     using announce_ptr_t = r::intrusive_ptr_t<announce_msg_t>;
 
-    fixture_t() noexcept { utils::set_default("trace"); }
+    fixture_t() noexcept { test::init_logging(); }
 
     virtual void run() noexcept {
         auto peer_id =

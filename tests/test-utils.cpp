@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/device_id.h"
 #include "structs.pb.h"
 #include "db/prefix.h"
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 int main(int argc, char *argv[]) { return Catch::Session().run(argc, argv); }
 
@@ -80,5 +81,11 @@ std::string hash_string(const std::string_view &hash) noexcept {
 static model::diff::apply_controller_t apply_controller;
 
 model::diff::apply_controller_t &get_apply_controller() { return apply_controller; }
+
+void init_logging() {
+    auto dist_sink = utils::create_root_logger();
+    auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+    dist_sink->add_sink(console_sink);
+}
 
 } // namespace syncspirit::test

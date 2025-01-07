@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "fs/file_actor.h"
@@ -30,7 +30,7 @@ struct fixture_t {
     using blk_res_ptr_t = r::intrusive_ptr_t<blk_res_t>;
 
     fixture_t() noexcept : root_path{bfs::unique_path()}, path_guard{root_path} {
-        utils::set_default("trace");
+        test::init_logging();
         bfs::create_directory(root_path);
         sequencer = make_sequencer(67);
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -235,7 +235,7 @@ struct fixture_t {
 
     fixture_t(bool auto_start_, int64_t max_sequence_, bool auto_share_ = true) noexcept
         : auto_start{auto_start_}, max_sequence{max_sequence_}, auto_share{auto_share_} {
-        utils::set_default("trace");
+        test::init_logging();
     }
 
     void start_target() noexcept {

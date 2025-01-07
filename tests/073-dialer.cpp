@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -25,7 +25,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
     using messages_t = std::vector<msg_ptr_t>;
 
-    fixture_t(bool start_dialer_) noexcept : start_dialer{start_dialer_} { utils::set_default("trace"); }
+    fixture_t(bool start_dialer_) noexcept : start_dialer{start_dialer_} { test::init_logging(); }
 
     virtual void run() noexcept {
         auto peer_id =

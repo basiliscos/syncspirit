@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "utils/log.h"
+#include <spdlog/sinks/dist_sink.h>
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace st = syncspirit::test;
 namespace bfs = boost::filesystem;
@@ -10,6 +13,14 @@ namespace bfs = boost::filesystem;
 using namespace syncspirit;
 
 using L = spdlog::level::level_enum;
+
+static bool _init = []() {
+    auto dist_sink = utils::create_root_logger();
+    auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+    dist_sink->add_sink(console_sink);
+    dist_sink->add_sink(std::make_shared<spdlog::sinks::null_sink_mt>());
+    return true;
+}();
 
 bool overwrite = false;
 
