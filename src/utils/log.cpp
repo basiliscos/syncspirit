@@ -248,7 +248,9 @@ auto bootstrap(spdlog::sink_ptr sink) noexcept -> boostrap_guard_ptr_t {
     auto dist_sink = create_root_logger();
     dist_sink->add_sink(console_sink);
     dist_sink->add_sink(file_sink);
-    dist_sink->add_sink(sink);
+    if (sink) {
+        dist_sink->add_sink(sink);
+    }
     spdlog::trace("bootstrap logger has been initialized");
     return std::make_unique<boostrap_guard_t>(dist_sink, file_sink.get());
 }
