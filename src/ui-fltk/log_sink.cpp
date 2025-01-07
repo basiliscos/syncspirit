@@ -1,4 +1,5 @@
 #include "log_sink.h"
+#include <ctype.h>
 
 using namespace syncspirit::fltk;
 
@@ -13,7 +14,12 @@ void base_sink_t::set_formatter(std::unique_ptr<spdlog::formatter>) {}
 void base_sink_t::log(const spdlog::details::log_msg &msg) {
     spdlog::memory_buf_t formatted;
     date_formatter.format(msg, formatted);
-    auto date = std::string(formatted.begin(), formatted.end() - 1);
+    auto eob = formatted.end() - 1;
+    while (!std::isdigit(*eob) && eob > formatted.begin()) {
+        --eob;
+    }
+    ++eob;
+    auto date = std::string(formatted.begin(), eob);
     auto source = [&]() { return std::string(msg.logger_name.begin(), msg.logger_name.end()); }();
     auto message = msg.payload;
     auto message_view = std::string_view(message.begin(), message.end());
