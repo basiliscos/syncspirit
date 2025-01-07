@@ -38,6 +38,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <winnls.h>
 #endif
 
 namespace bfs = boost::filesystem;
@@ -111,6 +112,13 @@ int main(int argc, char **argv) {
     }
 #endif
     try {
+#ifdef _WIN32
+        auto lang_count = DWORD{0};
+        auto ok = ::SetProcessPreferredUILanguages(MUI_LANGUAGE_NAME, L"en-US", &lang_count);
+        if (!ok || !lang_count) {
+            spdlog::error("unable to set process UI language to 'en-US'");
+        }
+#endif
         utils::platform_t::startup();
         auto inmem_sink = spdlog::sink_ptr(new fltk::im_memory_sink_t());
         auto boostrap_guard = utils::bootstrap(inmem_sink);
