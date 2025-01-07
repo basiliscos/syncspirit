@@ -20,8 +20,8 @@ control_t::control_t(tree_item_t &tree_item_, int x, int y, int w, int h)
         auto ec = defaults_opt.assume_error();
         sup.get_logger()->error("cannot generate default config at {}: {}", config_path.string(), ec.message());
     } else {
-        auto &defaults = defaults_opt.assume_value();
-        categories = reflect(sup.get_app_config(), defaults);
+        default_cfg = std::move(defaults_opt.assume_value());
+        categories = reflect(sup.get_app_config(), default_cfg);
     }
 
     auto bottom_h = 40;
@@ -77,7 +77,7 @@ void control_t::on_save() {
         return;
     }
 
-    auto cfg = reflect(categories);
+    auto cfg = reflect(categories, default_cfg);
     cfg.config_path = sup.get_config_path();
     cfg.fltk_config = sup.get_app_config().fltk_config;
 

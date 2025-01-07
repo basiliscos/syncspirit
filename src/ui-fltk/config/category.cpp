@@ -38,6 +38,8 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
         auto &db_def = default_config.db_config;
         auto props = properties_t{
             // clang-format off
+            property_ptr_t(new db::max_blocks_per_diff_t(db.max_blocks_per_diff, db_def.max_blocks_per_diff)),
+            property_ptr_t(new db::max_files_per_diff_t(db.max_files_per_diff, db_def.max_files_per_diff)),
             property_ptr_t(new db::uncommited_threshold_t(db.uncommitted_threshold, db_def.uncommitted_threshold)),
             property_ptr_t(new db::upper_limit_t(db.upper_limit, db_def.upper_limit)),
             // clang-format on
@@ -167,8 +169,8 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
     return r;
 }
 
-auto reflect(const categories_t &categories) -> main_cfg_t {
-    main_cfg_t cfg;
+auto reflect(const categories_t &categories, const main_cfg_t &default_config) -> main_cfg_t {
+    main_cfg_t cfg = default_config;
     for (auto &c : categories) {
         for (auto &p : c->get_properties()) {
             p->reflect_to(cfg);

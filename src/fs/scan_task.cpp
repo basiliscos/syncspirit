@@ -372,15 +372,17 @@ scan_task_t::send_guard_t::~send_guard_t() {
     auto consume = force_send || task.bytes_left <= 0 || task.files_left <= 0;
     if (consume) {
         auto diff = std::move(task.update_diff);
-        task.current_diff = nullptr;
-        task.bytes_left = task.config.bytes_scan_iteration_limit;
-        task.files_left = task.config.files_scan_iteration_limit;
-        actor.send<model::payload::model_update_t>(coordinator, std::move(diff), nullptr);
-        if (manage_progress) {
-            auto &sup = actor.get_supervisor();
-            auto address = actor.get_address();
-            auto message = rotor::make_routed_message<payload::scan_progress_t>(coordinator, address, &task);
-            sup.put(message);
+        if (diff) {
+            task.current_diff = nullptr;
+            task.bytes_left = task.config.bytes_scan_iteration_limit;
+            task.files_left = task.config.files_scan_iteration_limit;
+            actor.send<model::payload::model_update_t>(coordinator, std::move(diff), nullptr);
+            if (manage_progress) {
+                auto &sup = actor.get_supervisor();
+                auto address = actor.get_address();
+                auto message = rotor::make_routed_message<payload::scan_progress_t>(coordinator, address, &task);
+                sup.put(message);
+            }
         }
     } else if (manage_progress) {
         actor.send<payload::scan_progress_t>(actor.get_address(), &task);

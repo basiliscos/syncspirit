@@ -133,6 +133,24 @@ struct tx_timeout_t final : impl::positive_integer_t {
 
 namespace db {
 
+struct max_blocks_per_diff_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    max_blocks_per_diff_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct max_files_per_diff_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    max_files_per_diff_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
 struct uncommited_threshold_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 
@@ -183,6 +201,24 @@ struct skip_discovers_t final : impl::positive_integer_t {
 } // namespace dialer
 
 namespace fs {
+
+struct bytes_scan_iteration_limit_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    bytes_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct files_scan_iteration_limit_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    files_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
 
 struct mru_size_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;

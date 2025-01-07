@@ -370,20 +370,20 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         }
         c.mru_size = mru_size.value();
 
-        auto bytes_scan_iteration_limit = t["bytes_scan_iteration_limit"].value<std::uint64_t>();
+        auto bytes_scan_iteration_limit = t["bytes_scan_iteration_limit"].value<std::int64_t>();
         if (!bytes_scan_iteration_limit) {
             return "fs/bytes_scan_iteration_limit is incorrect or missing";
         }
-        if (bytes_scan_iteration_limit.value() < 0) {
+        if (bytes_scan_iteration_limit.value() <= 0) {
             return "fs/bytes_scan_iteration_limit should be >= 0";
         }
         c.bytes_scan_iteration_limit = bytes_scan_iteration_limit.value();
 
-        auto files_scan_iteration_limit = t["files_scan_iteration_limit"].value<std::uint64_t>();
+        auto files_scan_iteration_limit = t["files_scan_iteration_limit"].value<std::int64_t>();
         if (!files_scan_iteration_limit) {
             return "fs/files_scan_iteration_limit is incorrect or missing";
         }
-        if (files_scan_iteration_limit.value() < 0) {
+        if (files_scan_iteration_limit.value() <= 0) {
             return "fs/files_scan_iteration_limit should be >= 0";
         }
         c.files_scan_iteration_limit = files_scan_iteration_limit.value();

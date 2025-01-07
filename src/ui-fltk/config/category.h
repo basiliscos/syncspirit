@@ -26,7 +26,7 @@ using category_ptr_t = boost::intrusive_ptr<category_t>;
 using categories_t = std::vector<category_ptr_t>;
 
 auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> categories_t;
-auto reflect(const categories_t &) -> main_cfg_t;
+auto reflect(const categories_t &, const main_cfg_t &default_config) -> main_cfg_t;
 bool is_valid(const categories_t &);
 
 } // namespace syncspirit::fltk::config

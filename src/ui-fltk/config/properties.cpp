@@ -154,6 +154,25 @@ const char *tx_timeout_t::explanation_ = "tx max time, milliseconds";
 
 namespace db {
 
+max_blocks_per_diff_t::max_blocks_per_diff_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("max_blocks_per_diff", explanation_, value, default_value) {}
+
+void max_blocks_per_diff_t::reflect_to(syncspirit::config::main_t &main) {
+    main.db_config.max_blocks_per_diff = native_value;
+}
+
+const char *max_blocks_per_diff_t::explanation_ =
+    "maximum number of blocks per single diff (to display progress in UI)";
+
+max_files_per_diff_t::max_files_per_diff_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("max_files_per_diff", explanation_, value, default_value) {}
+
+void max_files_per_diff_t::reflect_to(syncspirit::config::main_t &main) {
+    main.db_config.max_files_per_diff = native_value;
+}
+
+const char *max_files_per_diff_t::explanation_ = "maximum number of files per single diff (to display progress in UI)";
+
 uncommited_threshold_t::uncommited_threshold_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("uncommited_threshold", explanation_, value, default_value) {}
 

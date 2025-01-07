@@ -17,6 +17,7 @@ struct control_t : contentable_t<Fl_Group> {
 
     tree_item_t &tree_item;
     categories_t categories;
+    main_cfg_t default_cfg;
 };
 
 } // namespace syncspirit::fltk::config

@@ -58,7 +58,7 @@ void folder_t::update_label() {
         auto eob = fmt::format_to(synchronizing_buff, " {}", symbols::syncrhonizing);
         synchronizing = std::string_view(synchronizing_buff, eob);
     }
-    auto sz = folder_label.size() + id.size() + synchronizing.size() + scaning.size() + 1;
+    auto sz = folder_label.size() + id.size() + synchronizing.size() + scaning.size() + 16;
     auto buff = (char *)alloca(sz);
     auto eob = fmt::format_to(buff, "{}, {}{}{}", folder_label, id, synchronizing, scaning);
     *eob = 0;

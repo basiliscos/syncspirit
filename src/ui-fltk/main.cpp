@@ -313,8 +313,6 @@ int main(int argc, char **argv) {
 
         spdlog::debug("utf8 local support: {}", fl_utf8locale());
 
-        boostrap_guard->discard();
-        boostrap_guard.reset();
         while (!shutdown_flag) {
             sup_fltk->do_process();
             if (!Fl::wait()) {
@@ -333,6 +331,14 @@ int main(int argc, char **argv) {
         spdlog::trace("waiting hasher threads termination");
         for (auto &thread : hasher_threads) {
             thread.join();
+        }
+
+        if (auto reason = sup_net->get_shutdown_reason(); reason) {
+            if (reason->ec) {
+                spdlog::debug("it seems some error occured, keeping boostrap log for investigation");
+            } else {
+                spdlog::trace("removing bootstrap log");
+            }
         }
 
         spdlog::trace("everything has been terminated");
