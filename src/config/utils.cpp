@@ -645,7 +645,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     cfg.hasher_threads = 3;
     cfg.log_configs = {
         log_config_t {
-            "default", spdlog::level::level_enum::debug, {"stdout"}
+            "default", spdlog::level::level_enum::trace, {"stdout"}
         }
     };
     cfg.local_announce_config = local_announce_config_t {
