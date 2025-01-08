@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "device_id.h"
 #include <cassert>
-#include "../utils/base32.h"
-#include "../proto/luhn32.h"
-#include "../db/prefix.h"
+#include "utils/base32.h"
+#include "proto/luhn32.h"
+#include "db/prefix.h"
 
 #include <openssl/sha.h>
 #include <boost/endian/conversion.hpp>

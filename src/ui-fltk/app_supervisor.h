@@ -16,7 +16,7 @@
 #include <rotor/fltk.hpp>
 #include <FL/Fl_Widget.H>
 #include <FL/Fl_Group.H>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <chrono>
 #include <set>
 
@@ -24,7 +24,7 @@ namespace syncspirit::fltk {
 
 namespace r = rotor;
 namespace rf = r::fltk;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
 

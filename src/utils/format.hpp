@@ -7,13 +7,12 @@
 #include "model/device.h"
 #include "model/device_id.h"
 #include "utils/platform.h"
-
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 
 #include <fmt/format.h>
 
-template <> struct fmt::formatter<boost::filesystem::path> {
-    using Path = boost::filesystem::path;
+template <> struct fmt::formatter<std::filesystem::path> {
+    using Path = std::filesystem::path;
 
     constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) { return ctx.end(); }
 

@@ -5,6 +5,9 @@
 #include "model/device_id.h"
 #include "structs.pb.h"
 #include "db/prefix.h"
+#include "utils/base32.h"
+#include <random>
+#include <cstdint>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 int main(int argc, char *argv[]) { return Catch::Session().run(argc, argv); }
@@ -86,6 +89,19 @@ void init_logging() {
     auto dist_sink = utils::create_root_logger();
     auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     dist_sink->add_sink(console_sink);
+}
+
+static std::random_device rd;
+static std::uniform_int_distribution<std::uint64_t> dist;
+
+bfs::path unique_path() {
+    auto n = dist(rd);
+    auto view = std::string_view(reinterpret_cast<const char *>(&n), sizeof(n));
+    auto random_name = utils::base32::encode(view);
+    std::transform(random_name.begin(), random_name.end(), random_name.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    auto name = std::string("tmp-") + random_name;
+    return bfs::path(name);
 }
 
 } // namespace syncspirit::test

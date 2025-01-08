@@ -5,14 +5,14 @@
 
 #include <string>
 #include <boost/outcome.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include "syncspirit-export.h"
 
 namespace syncspirit {
 namespace utils {
 
 namespace outcome = boost::outcome_v2;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 using home_option_t = outcome::result<bfs::path>;
 

@@ -159,9 +159,7 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
                 return sys::errc::make_error_code(sys::errc::io_error);
             }
             out.close();
-
-            std::time_t modified = file.get_modified_s();
-            bfs::last_write_time(path, modified, ec);
+            bfs::last_write_time(path, from_unix(file.get_modified_s()), ec);
             if (ec) {
                 return ec;
             }
@@ -345,7 +343,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     return r ? diff.visit_next(*this, custom) : r;
 }
 
-auto file_actor_t::open_file_rw(const boost::filesystem::path &path, model::file_info_ptr_t info) noexcept
+auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_info_ptr_t info) noexcept
     -> outcome::result<file_ptr_t> {
     auto item = rw_cache.get(path.string());
     if (item) {

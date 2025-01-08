@@ -13,7 +13,7 @@ using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
     test::init_logging();

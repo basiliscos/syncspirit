@@ -4,10 +4,10 @@
 #include "test-utils.h"
 #include "proto/discovery_support.h"
 #include "utils/error_code.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace sys = boost::system;
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 using namespace syncspirit::proto;
 using namespace syncspirit::utils;

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-db.h"
+#include "test-utils.h"
 
 namespace syncspirit::test {
 
@@ -14,7 +15,7 @@ env_t::~env_t() {
 }
 
 env_t mk_env() {
-    auto path = bfs::unique_path();
+    auto path = unique_path();
     MDBX_env *env;
     auto r = mdbx_env_create(&env);
     assert(r == MDBX_SUCCESS);

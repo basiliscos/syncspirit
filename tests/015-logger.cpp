@@ -8,7 +8,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace st = syncspirit::test;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 using namespace syncspirit;
 
@@ -58,7 +58,7 @@ TEST_CASE("hierarchy", "[log]") {
 }
 
 TEST_CASE("file sink", "[log]") {
-    auto dir = bfs::path{bfs::unique_path()};
+    auto dir = st::unique_path();
     auto path_guard = st::path_guard_t{dir};
     bfs::create_directory(dir);
 

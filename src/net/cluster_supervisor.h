@@ -18,7 +18,7 @@ namespace net {
 
 namespace r = rotor;
 namespace ra = r::asio;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct cluster_supervisor_config_t : ra::supervisor_config_asio_t {

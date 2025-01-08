@@ -12,7 +12,7 @@
 #include <rotor.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <list>
 #include <variant>
 #include <cstdint>
@@ -20,7 +20,7 @@
 namespace syncspirit::fs {
 
 namespace r = rotor;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
 using scan_error_t = model::diff::local::io_error_t;

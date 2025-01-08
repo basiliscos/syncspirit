@@ -11,15 +11,16 @@
 #include "model/cluster.h"
 #include "model/misc/resolver.h"
 #include "access.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 using namespace syncspirit;
 using namespace syncspirit::db;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
+using namespace syncspirit::fs;
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 namespace {
 
@@ -29,7 +30,7 @@ struct fixture_t {
     using blk_res_t = fs::message::block_response_t;
     using blk_res_ptr_t = r::intrusive_ptr_t<blk_res_t>;
 
-    fixture_t() noexcept : root_path{bfs::unique_path()}, path_guard{root_path} {
+    fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} {
         test::init_logging();
         bfs::create_directory(root_path);
         sequencer = make_sequencer(67);
@@ -154,7 +155,7 @@ void test_remote_copy() {
                 auto &path = my_file->get_path();
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
-                REQUIRE(bfs::last_write_time(path) == 1641828421);
+                REQUIRE(to_unix(bfs::last_write_time(path)) == 1641828421);
             }
 
             SECTION("empty regular file a subdir") {
@@ -304,7 +305,7 @@ void test_append_block() {
                 REQUIRE(bfs::file_size(path) == 5);
                 auto data = read_file(path);
                 CHECK(data == "12345");
-                CHECK(bfs::last_write_time(path) == 1641828421);
+                CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
             }
             SECTION("file with 2 different blocks") {
                 pr_source.set_size(10ul);
@@ -332,7 +333,7 @@ void test_append_block() {
                     REQUIRE(bfs::file_size(path) == 10);
                     auto data = read_file(path);
                     CHECK(data == "1234567890");
-                    CHECK(bfs::last_write_time(path) == 1641828421);
+                    CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
                 }
 
 #ifndef SYNCSPIRIT_WIN
@@ -422,7 +423,7 @@ void test_clone_block() {
                     REQUIRE(bfs::file_size(path) == 5);
                     auto data = read_file(path);
                     CHECK(data == "12345");
-                    CHECK(bfs::last_write_time(path) == 1641828421);
+                    CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
                 }
 
                 SECTION("multi block target file") {
@@ -500,7 +501,7 @@ void test_clone_block() {
                 REQUIRE(bfs::file_size(path) == 10);
                 auto data = read_file(path);
                 CHECK(data == "1234512345");
-                CHECK(bfs::last_write_time(path) == 1641828421);
+                CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
             }
         }
     };

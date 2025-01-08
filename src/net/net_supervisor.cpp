@@ -16,10 +16,10 @@
 #include "relay_actor.h"
 #include "names.h"
 #include "model/diff/load/load_cluster.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <ctime>
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)

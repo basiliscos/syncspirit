@@ -4,7 +4,7 @@
 #pragma once
 
 #include <catch2/catch_all.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 #include "model/device.h"
 #include "model/diff/apply_controller.h"
@@ -17,7 +17,7 @@
 
 namespace syncspirit::test {
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
 struct SYNCSPIRIT_TEST_API path_guard_t {
@@ -42,6 +42,7 @@ struct SYNCSPIRIT_TEST_API path_guard_t {
     }
 };
 
+SYNCSPIRIT_TEST_API bfs::path unique_path();
 SYNCSPIRIT_TEST_API model::diff::apply_controller_t &get_apply_controller();
 SYNCSPIRIT_TEST_API void init_logging();
 SYNCSPIRIT_TEST_API bfs::path locate_path(const char *test_file);

@@ -1,12 +1,12 @@
 #include "peer_folder.h"
 #include "peer_entry.h"
 #include "../static_table.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 using namespace syncspirit;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 namespace {
 

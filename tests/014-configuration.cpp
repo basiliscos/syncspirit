@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "config/utils.h"
 #include "utils/uri.h"
 #include "utils/location.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <sstream>
 
 namespace syncspirit::config {
@@ -70,7 +70,7 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
 } // namespace syncspirit::config
 
 namespace sys = boost::system;
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 namespace st = syncspirit::test;
 
 using namespace syncspirit;
@@ -91,7 +91,7 @@ TEST_CASE("expand_home", "[config]") {
 }
 
 TEST_CASE("default config is OK", "[config]") {
-    auto dir = fs::current_path() / fs::unique_path();
+    auto dir = st::unique_path();
     fs::create_directory(dir);
     auto dir_guard = st::path_guard_t(dir);
     auto cfg_path = dir / "syncspirit.toml";

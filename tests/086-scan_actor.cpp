@@ -11,6 +11,7 @@
 #include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
 #include "fs/scan_actor.h"
+#include "fs/utils.h"
 #include "net/names.h"
 #include "utils/error_code.h"
 
@@ -18,13 +19,16 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
+using namespace syncspirit::fs;
 using namespace syncspirit::hasher;
+
+using fs_time_t = std::filesystem::file_time_type;
 
 struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::scan_actor_t>;
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
 
-    fixture_t() noexcept : root_path{bfs::unique_path()}, path_guard{root_path} {
+    fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} {
         test::init_logging();
         bfs::create_directory(root_path);
     }
@@ -127,7 +131,7 @@ void test_meta_changes() {
                     auto subdir = root_path / "abc";
                     CHECK(bfs::create_directories(subdir / "def", ec));
                     auto guard = test::path_guard_t(subdir);
-                    bfs::permissions(subdir, bfs::perms::no_perms);
+                    bfs::permissions(subdir, bfs::perms::none);
                     bfs::permissions(subdir, bfs::perms::owner_read, ec);
                     if (!ec) {
                         builder->scan_start(folder->get_id()).apply(*sup);
@@ -135,7 +139,7 @@ void test_meta_changes() {
                         auto fi = folder_info->get_file_infos().begin()->item;
                         CHECK(fi->is_dir());
                         CHECK(fi->get_name() == "abc");
-                        bfs::permissions(subdir, bfs::perms::all_all);
+                        bfs::permissions(subdir, bfs::perms::all);
 
                         auto &errs = sup->io_errors;
                         REQUIRE(errs.size() == 1);
@@ -148,7 +152,7 @@ void test_meta_changes() {
             }
 
             proto::FileInfo pr_fi;
-            std::int64_t modified = 1641828421;
+            auto modified = 1641828421;
             pr_fi.set_name("q.txt");
             pr_fi.set_modified_s(modified);
             pr_fi.set_block_size(5ul);
@@ -193,7 +197,7 @@ void test_meta_changes() {
 
                 SECTION("meta is not changed") {
                     write_file(path, "12345");
-                    bfs::last_write_time(path, modified);
+                    bfs::last_write_time(path, from_unix(modified));
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(files->size() == 1);
                     CHECK(file->is_locally_available());
@@ -214,7 +218,7 @@ void test_meta_changes() {
 
                 SECTION("meta is changed (size)") {
                     write_file(path, "123456");
-                    bfs::last_write_time(path, modified);
+                    bfs::last_write_time(path, from_unix(modified));
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(files->size() == 1);
                     auto new_file = files->by_name(pr_fi.name());
@@ -263,7 +267,8 @@ void test_meta_changes() {
                 write_file(path, std::string(content, 10));
 
                 SECTION("outdated -> just remove") {
-                    bfs::last_write_time(path, modified - 24 * 3600);
+                    auto new_time = modified - 24 * 3600;
+                    bfs::last_write_time(path, from_unix(new_time));
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available());
                     CHECK(!file->is_locked());
@@ -306,7 +311,7 @@ void test_meta_changes() {
 
 #ifndef SYNCSPIRIT_WIN
                 SECTION("error on reading -> remove") {
-                    bfs::permissions(path, bfs::perms::no_perms);
+                    bfs::permissions(path, bfs::perms::none);
                     if (!ec) {
                         builder->scan_start(folder->get_id()).apply(*sup);
                         CHECK(!file->is_locally_available());
@@ -360,7 +365,7 @@ void test_meta_changes() {
                 auto path_my = file->get_path().string();
                 auto path_peer = file->get_path().string() + ".syncspirit-tmp";
                 write_file(path_my, "12345");
-                bfs::last_write_time(path_my, modified);
+                bfs::last_write_time(path_my, from_unix(modified));
 
                 auto content = "1234567890\0\0\0\0\0";
                 write_file(path_peer, std::string(content, 15));
@@ -391,7 +396,7 @@ void test_meta_changes() {
                 auto file = files->by_name(pr_fi.name());
                 auto path_my = file->get_path().string();
                 write_file(path_my, "12345");
-                bfs::last_write_time(path_my, modified);
+                bfs::last_write_time(path_my, from_unix(modified));
 
                 builder->scan_start(folder->get_id()).apply(*sup);
 
