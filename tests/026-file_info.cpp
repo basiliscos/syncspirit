@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
+#include <catch2/catch_all.hpp>
 #include "test-utils.h"
 #include "model/cluster.h"
 #include "model/file_info.h"
@@ -8,6 +9,8 @@
 
 using namespace syncspirit;
 using namespace syncspirit::model;
+
+using Catch::Matchers::Matches;
 
 TEST_CASE("file-info", "[model]") {
     auto sequencer = make_sequencer(4);
@@ -55,5 +58,5 @@ TEST_CASE("file-info", "[model]") {
     CHECK(!map.by_sequence(pr_fi.sequence()));
 
     auto conflict_name = fi->make_conflicting_name();
-    CHECK(conflict_name.find("b.sync-conflict-20241220-104512-KHQNO2S.txt") != std::string::npos);
+    REQUIRE_THAT(conflict_name, Matches("a[\\/]b.sync-conflict-202412(\\d){2}-(\\d){6}-KHQNO2S.txt"));
 }
