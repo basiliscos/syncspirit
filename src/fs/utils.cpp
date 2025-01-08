@@ -93,7 +93,10 @@ bfs::path relativize(const bfs::path &path, const bfs::path &root) noexcept {
 using seconds_t = std::chrono::seconds;
 using sys_clock_t = std::chrono::system_clock;
 
-std::int64_t to_unix(const fs_time_t &at) { return sys_clock_t::to_time_t(fs_time_t::clock::to_sys(at)); }
+std::int64_t to_unix(const fs_time_t &at) {
+    auto sys_at = fs_time_t::clock::to_sys(at);
+    return std::chrono::duration_cast<seconds_t>(sys_at.time_since_epoch()).count();
+}
 
 fs_time_t from_unix(std::int64_t at) {
     auto sys_time = sys_clock_t::from_time_t(at);
