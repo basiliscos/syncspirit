@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "update_contact.h"
 #include "model/diff/cluster_visitor.h"
@@ -31,29 +31,6 @@ update_contact_t::update_contact_t(const model::cluster_t &cluster, const model:
 
     set_t set;
     std::copy(begin(uris_), end(uris_), std::inserter(set, set.begin()));
-    std::copy(set.begin(), set.end(), std::back_insert_iterator(this->uris));
-}
-
-update_contact_t::update_contact_t(const model::cluster_t &cluster, const ip_addresses_t &addresses) noexcept
-    : device{cluster.get_device()->device_id()}, known{true}, self{true} {
-
-    auto port = 0;
-    auto my_device = cluster.get_device();
-    for (auto &uri : my_device->get_uris()) {
-        if (uri->port_number() != 0) {
-            port = uri->port_number();
-            break;
-        }
-    }
-    auto uris = my_device->get_uris();
-
-    for (auto &addr : addresses) {
-        auto uri_str = fmt::format("tcp://{0}:{1}/", addr, port);
-        auto uri = utils::parse(uri_str);
-        uris.push_back(uri);
-    }
-    set_t set;
-    std::copy(begin(uris), end(uris), std::inserter(set, set.begin()));
     std::copy(set.begin(), set.end(), std::back_insert_iterator(this->uris));
 }
 

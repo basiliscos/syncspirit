@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -13,7 +13,6 @@ struct SYNCSPIRIT_API update_contact_t final : cluster_diff_t {
 
     update_contact_t(const model::cluster_t &cluster, const model::device_id_t &device,
                      const utils::uri_container_t &uris) noexcept;
-    update_contact_t(const model::cluster_t &cluster, const ip_addresses_t &addresses) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;

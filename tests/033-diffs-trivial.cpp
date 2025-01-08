@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -101,16 +101,6 @@ TEST_CASE("update_contact_t", "[model]") {
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
-
-    {
-        auto update_my =
-            diff::cluster_diff_ptr_t(new diff::contact::update_contact_t(*cluster, {"127.0.0.1", "127.0.0.1"}));
-        REQUIRE(update_my->apply(*cluster, get_apply_controller()));
-
-        auto got_uris = my_device->get_uris();
-        REQUIRE(got_uris.size() == 1u);
-        REQUIRE(*got_uris.front() == *utils::parse("tcp://127.0.0.1:0/"));
-    }
 
     {
         auto url_1 = utils::parse("tcp://192.168.100.6:22000");

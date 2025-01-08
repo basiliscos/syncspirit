@@ -247,7 +247,9 @@ void test_late_announcement() {
         void main() noexcept override {
 
             auto diff = model::diff::cluster_diff_ptr_t{};
-            diff = new model::diff::contact::update_contact_t(*cluster, {"127.0.0.3"});
+            auto url_1 = utils::parse("tcp://127.0.0.3:22000");
+            auto &self = cluster->get_device()->device_id();
+            diff = new model::diff::contact::update_contact_t(*cluster, self, {url_1});
             sup->send<model::payload::model_update_t>(sup->get_address(), diff);
 
             http::response<http::string_body> res;

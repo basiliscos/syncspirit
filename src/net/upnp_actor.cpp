@@ -307,7 +307,12 @@ void upnp_actor_t::on_validate(message::http_response_t &msg) noexcept {
         resources->acquire(resource::external_port);
         using namespace model::diff;
         auto diff = model::diff::cluster_diff_ptr_t{};
-        diff = new contact::update_contact_t(*cluster, {external_addr.to_string(), local_address.to_string()});
+        auto external_uri = utils::parse(fmt::format("tcp://{}:{}", external_addr, external_port));
+        auto &self = *cluster->get_device();
+        auto uris = self.get_uris();
+        uris.emplace_back(std::move(external_uri));
+
+        diff = new contact::update_contact_t(*cluster, self.device_id(), std::move(uris));
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
 }
