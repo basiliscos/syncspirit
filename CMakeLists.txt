@@ -38,6 +38,31 @@ find_package(c-ares REQUIRED)
 
 set(SYNCSPIRIT_VERSION "v0.4.0")
 
+set(dist_dir "${syncspirit_BINARY_DIR}/dist")
+add_custom_target("deploy")
+add_custom_target("deploy_deps"
+    COMMAND
+        python ${syncspirit_SOURCE_DIR}/misc/post-install-win32.py
+            --binaries ${dist_dir}/*
+            --dirs
+                `conan config home`
+                ${syncspirit_BINARY_DIR}/lib/mbdx/
+                `dirname ${CMAKE_CXX_COMPILER}`/../../
+    DEPENDS deploy
+)
+
+function(install_executable target)
+    install(TARGETS ${target} DESTINATION bin)
+    add_custom_target("deploy_${target}")
+    add_custom_command(TARGET deploy_${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E
+            copy
+                $<TARGET_FILE:${target}>
+                "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
+    )
+    add_dependencies("deploy" "deploy_${target}")
+endfunction()
+
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
 set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src/protobuf)
 protobuf_generate_cpp(
@@ -237,8 +262,7 @@ target_link_libraries(syncspirit_core
     $<$<PLATFORM_ID:Windows>:ws2_32>
     $<$<PLATFORM_ID:Windows>:wsock32>
 )
-
-install(TARGETS syncspirit_core DESTINATION bin)
+install_executable("syncspirit_core")
 
 enable_testing()
 add_subdirectory("tests")
