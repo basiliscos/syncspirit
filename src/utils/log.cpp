@@ -9,11 +9,11 @@
 #include <unordered_map>
 #include <string_view>
 #include <vector>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace syncspirit::utils {
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
 static const char *log_pattern = "[%Y-%m-%d %H:%M:%S.%e] [%^%L/%t%$] {%n} %v";

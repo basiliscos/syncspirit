@@ -6,13 +6,13 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Native_File_Chooser.H>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <spdlog/fmt/fmt.h>
 
 #include <cassert>
 
 using namespace syncspirit::fltk::config;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 static constexpr int col_min_size = 60;
 

@@ -3,13 +3,14 @@
 
 #pragma once
 #include <boost/outcome.hpp>
+#include <filesystem>
 #include "main.h"
 #include "syncspirit-export.h"
 
 namespace syncspirit::config {
 
 namespace outcome = boost::outcome_v2;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 // comparators
 

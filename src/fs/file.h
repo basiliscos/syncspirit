@@ -6,14 +6,14 @@
 #include <cstdio>
 #include <string>
 #include <boost/outcome.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include "model/file_info.h"
 #include "syncspirit-export.h"
 
 namespace syncspirit::fs {
 
 namespace outcome = boost::outcome_v2;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 namespace details {
 struct chunk_t {

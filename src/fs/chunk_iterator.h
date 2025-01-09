@@ -16,7 +16,7 @@
 namespace syncspirit::fs {
 
 namespace outcome = boost::outcome_v2;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API chunk_iterator_t {
     using valid_blocks_map_t = std::vector<bool>;

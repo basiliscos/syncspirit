@@ -51,7 +51,7 @@ using actor_ptr_t = r::intrusive_ptr_t<resolver_actor_t>;
 
 struct fixture_t {
 
-    fixture_t() : ctx(io_ctx), root_path{bfs::unique_path()}, path_quard{root_path}, remote_resolver{io_ctx} {
+    fixture_t() : ctx(io_ctx), root_path{unique_path()}, path_quard{root_path}, remote_resolver{io_ctx} {
         test::init_logging();
         log = utils::get_logger("fixture");
         rx_buff.resize(1500);

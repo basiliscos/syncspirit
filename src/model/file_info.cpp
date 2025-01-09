@@ -275,7 +275,7 @@ bool file_info_t::is_locally_available() const noexcept { return missing_blocks 
 
 bool file_info_t::is_partly_available() const noexcept { return missing_blocks < blocks.size(); }
 
-const boost::filesystem::path &file_info_t::get_path() const noexcept {
+const std::filesystem::path &file_info_t::get_path() const noexcept {
     if (!path) {
         path = folder_info->get_folder()->get_path() / std::string(get_name());
     }

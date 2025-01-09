@@ -13,7 +13,7 @@
 #include "db/utils.h"
 #include "net/db_actor.h"
 #include "access.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 using namespace syncspirit;
 using namespace syncspirit::db;
@@ -21,7 +21,7 @@ using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 namespace {
 struct env {};
@@ -41,7 +41,10 @@ struct fixture_t {
     using stats_msg_t = net::message::db_info_response_t;
     using stats_msg_ptr_t = r::intrusive_ptr_t<stats_msg_t>;
 
-    fixture_t() noexcept : root_path{bfs::unique_path()}, path_quard{root_path} { test::init_logging(); }
+    fixture_t() noexcept : root_path{unique_path()}, path_quard{root_path} {
+        test::init_logging();
+        bfs::create_directory(root_path);
+    }
 
     virtual supervisor_t::configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
@@ -75,10 +78,6 @@ struct fixture_t {
 
     virtual void run() noexcept {
         cluster = make_cluster();
-
-        auto root_path = bfs::unique_path();
-        bfs::create_directory(root_path);
-        auto root_path_guard = path_guard_t(root_path);
 
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();

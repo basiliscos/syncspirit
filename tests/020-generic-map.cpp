@@ -11,7 +11,7 @@ using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 TEST_CASE("generic map", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();

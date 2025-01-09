@@ -4,7 +4,6 @@ include(GenerateExportHeader)
 find_package(
     Boost
     COMPONENTS
-        filesystem
         program_options
         system
     REQUIRED

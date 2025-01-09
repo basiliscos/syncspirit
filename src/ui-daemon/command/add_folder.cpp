@@ -10,7 +10,7 @@
 #include "pair_iterator.h"
 #include <random>
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 namespace syncspirit::daemon::command {
 

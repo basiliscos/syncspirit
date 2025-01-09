@@ -6,12 +6,12 @@
 #include "../cluster_diff.h"
 #include <vector>
 #include <boost/system/errc.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace syncspirit::model::diff::local {
 
 namespace sys = boost::system;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 struct io_error_t {
     bfs::path path;

@@ -24,7 +24,7 @@
 namespace syncspirit {
 namespace net {
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct controller_actor_config_t : r::actor_config_t {

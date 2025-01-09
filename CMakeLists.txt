@@ -19,7 +19,6 @@ find_package(
     Boost
     COMPONENTS
         iostreams
-        filesystem
         program_options
         system
         url
@@ -223,7 +222,6 @@ target_link_libraries(syncspirit_core
     rotor::thread
     pugixml::pugixml
     Boost::iostreams
-    Boost::filesystem
     Boost::program_options
     Boost::system
     Boost::url

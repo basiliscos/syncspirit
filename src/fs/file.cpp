@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "file.h"
 #include "utils.h"
@@ -130,7 +130,7 @@ auto file_t::close(bool remove_temporal, const bfs::path &local_name) noexcept -
         orig_path = path;
     }
 
-    std::time_t modified = model->get_modified_s();
+    auto modified = from_unix(model->get_modified_s());
     bfs::last_write_time(orig_path, modified, ec);
     if (ec) {
         return ec;

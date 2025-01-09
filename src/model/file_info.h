@@ -7,7 +7,7 @@
 #include <vector>
 #include <optional>
 #include <unordered_set>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/outcome.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include "misc/augmentation.hpp"
@@ -20,7 +20,7 @@
 
 namespace syncspirit::model {
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct folder_info_t;

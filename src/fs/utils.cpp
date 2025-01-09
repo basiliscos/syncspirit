@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "utils.h"
 #include "utils/tls.h"
 #include <zlib.h>
+#include <chrono>
 
 namespace syncspirit::fs {
 
@@ -87,6 +88,19 @@ bfs::path relativize(const bfs::path &path, const bfs::path &root) noexcept {
     }
 
     return sub;
+}
+
+using seconds_t = std::chrono::seconds;
+using sys_clock_t = std::chrono::system_clock;
+
+std::int64_t to_unix(const fs_time_t &at) {
+    auto sys_at = fs_time_t::clock::to_sys(at);
+    return std::chrono::duration_cast<seconds_t>(sys_at.time_since_epoch()).count();
+}
+
+fs_time_t from_unix(std::int64_t at) {
+    auto sys_time = sys_clock_t::from_time_t(at);
+    return fs_time_t::clock::from_sys(sys_time);
 }
 
 } // namespace syncspirit::fs

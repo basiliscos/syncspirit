@@ -4,13 +4,13 @@
 #pragma once
 
 #include <string>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include "syncspirit-export.h"
 #include "structs.pb.h"
 
 namespace syncspirit::model {
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API folder_data_t {
     enum class folder_type_t { send = 0, receive, send_and_receive };

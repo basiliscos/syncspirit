@@ -27,7 +27,7 @@
 
 using namespace syncspirit;
 using namespace syncspirit::net;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 namespace {
 namespace resource {

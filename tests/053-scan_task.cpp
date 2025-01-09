@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "fs/scan_task.h"
+#include "fs/utils.h"
 #include "model/misc/sequencer.h"
 
 using namespace syncspirit;
@@ -14,7 +15,7 @@ using namespace syncspirit::fs;
 TEST_CASE("scan_task", "[fs]") {
     test::init_logging();
 
-    auto root_path = bfs::unique_path();
+    auto root_path = unique_path();
     bfs::create_directories(root_path);
     path_guard_t path_quard{root_path};
 
@@ -53,7 +54,7 @@ TEST_CASE("scan_task", "[fs]") {
 
 #ifndef SYNCSPIRIT_WIN
         SECTION("no permissions to read dir => err") {
-            bfs::permissions(root_path, bfs::perms::no_perms);
+            bfs::permissions(root_path, bfs::perms::none);
 
             auto folder_info = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
             folder->get_folder_infos().put(folder_info);
@@ -148,7 +149,7 @@ TEST_CASE("scan_task", "[fs]") {
     }
 
     SECTION("regular files") {
-        auto modified = std::time_t{1642007468};
+        auto modified = std::int64_t{1642007468};
         auto pr_file = proto::FileInfo{};
         pr_file.set_name("a.txt");
         pr_file.set_sequence(4);
@@ -164,7 +165,7 @@ TEST_CASE("scan_task", "[fs]") {
 
             auto path = root_path / "a.txt";
             write_file(path, "12345");
-            bfs::last_write_time(path, modified);
+            bfs::last_write_time(path, from_unix(modified));
             auto status = bfs::status(path);
             pr_file.set_permissions(static_cast<uint32_t>(status.permissions()));
 
@@ -231,7 +232,7 @@ TEST_CASE("scan_task", "[fs]") {
 
             auto path = root_path / "a-dir-2" / "a.txt";
             write_file(path, "12345");
-            bfs::last_write_time(path, modified);
+            bfs::last_write_time(path, from_unix(modified));
             auto status = bfs::status(path);
             pr_file.set_permissions(static_cast<uint32_t>(status.permissions()));
 
@@ -388,7 +389,7 @@ TEST_CASE("scan_task", "[fs]") {
 
                 auto path = root_path / "a.txt";
                 write_file(path, "12345");
-                bfs::last_write_time(path, modified);
+                bfs::last_write_time(path, from_unix(modified));
                 auto status = bfs::status(path);
                 pr_file.set_permissions(static_cast<uint32_t>(status.permissions()));
 
@@ -416,7 +417,7 @@ TEST_CASE("scan_task", "[fs]") {
 
                 auto path = root_path / "a.txt";
                 write_file(path, "12345");
-                bfs::last_write_time(path, modified);
+                bfs::last_write_time(path, from_unix(modified));
                 auto status = bfs::status(path);
                 pr_file.set_permissions(static_cast<uint32_t>(status.permissions()));
 
@@ -445,7 +446,7 @@ TEST_CASE("scan_task", "[fs]") {
 
                 auto path = root_path / "a.txt";
                 write_file(path, "12345");
-                bfs::last_write_time(path, modified);
+                bfs::last_write_time(path, from_unix(modified));
 
                 file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
                 REQUIRE(folder_my->add_strict(file));
@@ -573,7 +574,7 @@ TEST_CASE("scan_task", "[fs]") {
             auto path_tmp = root_path / "a.txt.syncspirit-tmp";
             write_file(path, "12345");
             write_file(path_tmp, "12345");
-            bfs::last_write_time(path, modified);
+            bfs::last_write_time(path, from_unix(modified));
             auto status = bfs::status(path);
             pr_file.set_permissions(static_cast<uint32_t>(status.permissions()));
 
@@ -644,7 +645,7 @@ TEST_CASE("scan_task", "[fs]") {
             auto parent = path.parent_path();
             write_file(path, "12345");
             sys::error_code ec;
-            bfs::permissions(parent, bfs::perms::no_perms, ec);
+            bfs::permissions(parent, bfs::perms::none, ec);
             bfs::permissions(path, bfs::perms::owner_read, ec);
             if (ec) {
                 auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
@@ -673,7 +674,7 @@ TEST_CASE("scan_task", "[fs]") {
                 r = task.advance();
                 REQUIRE(std::get_if<bool>(&r));
                 CHECK(*std::get_if<bool>(&r) == false);
-                bfs::permissions(parent, bfs::perms::all_all);
+                bfs::permissions(parent, bfs::perms::all);
             }
         }
     }

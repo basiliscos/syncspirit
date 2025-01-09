@@ -5,7 +5,7 @@
 
 #include <cstdint>
 #include <optional>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/outcome.hpp>
 #include "misc/augmentation.hpp"
 #include "device.h"
@@ -17,7 +17,7 @@
 
 namespace syncspirit::model {
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct cluster_t;

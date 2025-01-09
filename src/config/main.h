@@ -13,11 +13,11 @@
 #include "relay.h"
 #include "upnp.h"
 #include "fltk.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace syncspirit::config {
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 struct main_t {
     bfs::path config_path;

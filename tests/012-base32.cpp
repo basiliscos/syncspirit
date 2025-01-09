@@ -6,7 +6,7 @@
 
 using namespace syncspirit::test;
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 using b32 = syncspirit::utils::base32;
 
 TEST_CASE("base32 encode/decode", "[support]") {

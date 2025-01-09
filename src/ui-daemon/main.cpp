@@ -4,7 +4,7 @@
 #include <google/protobuf/stubs/common.h>
 #include <lz4.h>
 #include <openssl/crypto.h>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/program_options.hpp>
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
@@ -34,7 +34,7 @@
 #include <winnls.h>
 #endif
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 namespace r = rotor;
@@ -98,11 +98,6 @@ int main(int argc, char **argv) {
 #endif
     try {
 #ifdef _WIN32
-        auto lang_count = DWORD{0};
-        auto ok = ::SetProcessPreferredUILanguages(MUI_LANGUAGE_NAME, L"en-US", &lang_count);
-        if (!ok || !lang_count) {
-            spdlog::error("unable to set process UI language to 'en-US'");
-        }
 #endif
         utils::platform_t::startup();
 

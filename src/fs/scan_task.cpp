@@ -82,12 +82,11 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
     sys::error_code ec;
 
     bool exists = bfs::exists(dir, ec);
-    if (ec || !exists) {
-        if (ec == sys::errc::no_such_file_or_directory) {
-            return true;
-        } else {
-            return scan_errors_t{scan_error_t{dir, ec}};
-        }
+    if (ec) {
+        return scan_errors_t{scan_error_t{dir, ec}};
+    }
+    if (!exists) {
+        return true;
     }
 
     scan_errors_t errors;
@@ -111,7 +110,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             auto &child = *it;
             sys::error_code ec;
             auto status = bfs::symlink_status(child, ec);
-            if (ec && (status.type() != bfs::file_type::symlink_file)) {
+            if (ec && (status.type() != bfs::file_type::symlink)) {
                 errors.push_back(scan_error_t{child, ec});
                 continue;
             }
@@ -120,7 +119,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             if (file) {
                 files_queue.push_back(file);
                 removed.put(file);
-                if (status.type() == bfs::file_type::directory_file) {
+                if (status.type() == bfs::file_type::directory) {
                     dirs_queue.push_back(child);
                 }
                 continue;
@@ -128,7 +127,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
 
             proto::FileInfo metadata;
             metadata.set_name(rp);
-            if (status.type() == bfs::file_type::regular_file) {
+            if (status.type() == bfs::file_type::regular) {
                 metadata.set_type(proto::FileInfoType::FILE);
                 auto sz = bfs::file_size(child, ec);
                 if (ec) {
@@ -142,12 +141,12 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                     errors.push_back(scan_error_t{dir, ec});
                     continue;
                 }
-                metadata.set_modified_s(modification_time);
-
-            } else if (status.type() == bfs::file_type::directory_file) {
+                auto modified_s = to_unix(modification_time);
+                metadata.set_modified_s(modified_s);
+            } else if (status.type() == bfs::file_type::directory) {
                 metadata.set_type(proto::FileInfoType::DIRECTORY);
                 dirs_queue.push_back(child);
-            } else if (status.type() == bfs::file_type::symlink_file) {
+            } else if (status.type() == bfs::file_type::symlink) {
                 auto target = bfs::read_symlink(child, ec);
                 if (ec) {
                     errors.push_back(scan_error_t{dir, ec});
@@ -206,9 +205,9 @@ scan_result_t scan_task_t::advance_regular_file(const file_info_t &file) noexcep
     if (ec) {
         return file_error_t{path, ec};
     }
-
-    meta.set_modified_s(modified);
-    if (modified != file->get_modified_s()) {
+    auto modified_s = to_unix(modified);
+    meta.set_modified_s(modified_s);
+    if (modified_s != file->get_modified_s()) {
         changed = true;
     }
 
@@ -269,7 +268,7 @@ scan_result_t scan_task_t::advance_unknown_file(const unknown_file_t &file) noex
         auto rp = relativize(path, root);
         auto name = path.filename();
         auto name_str = name.string();
-        auto new_name = name_str.substr(0, name.size() - tmp_suffix.size());
+        auto new_name = name_str.substr(0, name_str.size() - tmp_suffix.size());
         auto new_path = rp.parent_path() / new_name;
         return new_path.generic_string();
     }();
@@ -302,14 +301,14 @@ scan_result_t scan_task_t::advance_unknown_file(const unknown_file_t &file) noex
         return orphaned_removed_t{path};
     }
 
-    auto modified_at = bfs::last_write_time(path, ec);
+    auto modified_time = bfs::last_write_time(path, ec);
     if (ec) {
         LOG_DEBUG(log, "removing outdated temporally {}, cannot get last modification: {}", path.string(),
                   ec.message());
         bfs::remove(path, ec);
         return file_error_t{path, ec};
     }
-
+    auto modified_at = to_unix(modified_time);
     auto now = std::time(nullptr);
     if (modified_at + config.temporally_timeout <= now) {
         LOG_DEBUG(log, "removing outdated temporally {}", path.string());
@@ -389,4 +388,4 @@ scan_task_t::send_guard_t::~send_guard_t() {
     }
 }
 
-// ;
+//

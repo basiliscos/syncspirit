@@ -4,7 +4,7 @@
 #include <google/protobuf/stubs/common.h>
 #include <lz4.h>
 #include <openssl/crypto.h>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/program_options.hpp>
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
@@ -41,7 +41,7 @@
 #include <winnls.h>
 #endif
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 namespace r = rotor;
