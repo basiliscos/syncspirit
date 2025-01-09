@@ -70,6 +70,7 @@ log_sink_t::log_sink_t(std::string name, std::vector<std::string> sinks_, spdlog
       sinks(std::move(sinks_)), level{level_} {}
 
 void log_sink_t::reflect_to(syncspirit::config::main_t &main) {
+    main.log_configs.clear();
     main.log_configs.push_back(syncspirit::config::log_config_t{
         label,
         level,
