@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "local_discovery_actor.h"
 #include "names.h"
@@ -49,7 +49,7 @@ void local_discovery_actor_t::init() noexcept {
 
     sys::error_code ec;
 
-    auto bc_endpoint = udp::endpoint(asio::ip::address_v4::broadcast(), port);
+    auto bc_endpoint = udp::endpoint(asio::ip::address_v4::any(), port);
     broadcast_sock.open(bc_endpoint.protocol(), ec);
     if (ec) {
         LOG_WARN(log, "init, can't open broadcast socket :: {}", ec.message());
@@ -105,8 +105,7 @@ void local_discovery_actor_t::shutdown_start() noexcept {
 }
 
 void local_discovery_actor_t::announce() noexcept {
-    static const constexpr std::uint64_t instance = 0;
-    // LOG_TRACE(log, "local_discovery_actor_t::announce", (void *)address.get());
+    auto instance = std::uint64_t{reinterpret_cast<std::uint64_t>(this)};
 
     auto device = cluster->get_device();
     auto &uris = device->get_uris();
@@ -119,7 +118,7 @@ void local_discovery_actor_t::announce() noexcept {
         auto bc_endpoint = udp::endpoint(asio::ip::address_v4::broadcast(), port);
         broadcast_sock.async_send_to(buff, bc_endpoint, std::move(fwd_send));
         resources->acquire(resource::send);
-        LOG_TRACE(log, "announce has been sent");
+        LOG_TRACE(log, "announce has been sent (to = {}, instance = {:x})", bc_endpoint, instance);
     } else {
         LOG_TRACE(log, "announce() skipping");
     }
