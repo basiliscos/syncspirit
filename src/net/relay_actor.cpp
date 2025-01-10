@@ -16,6 +16,7 @@
 #include "messages.h"
 #include <cstdlib>
 #include <type_traits>
+#include <boost/core/demangle.hpp>
 
 using namespace syncspirit::net;
 
@@ -296,12 +297,15 @@ void relay_actor_t::on_read(std::size_t bytes) noexcept {
 bool relay_actor_t::on(proto::relay::message_t &msg) noexcept {
     return std::visit(
         [&](auto &it) -> bool {
+            using boost::core::demangle;
             using T = std::decay_t<decltype(it)>;
+            auto message_name = demangle(typeid(T).name());
+            LOG_TRACE(log, "received message: {}", message_name);
             bool err = false;
             bool cancel_rx_timer = false;
             if constexpr (std::is_same_v<T, proto::relay::pong_t>) {
                 if (rx_state & rx_state_t::pong) {
-                    rx_state = ~rx_state & rx_state_t::pong;
+                    rx_state = rx_state & ~rx_state_t::pong;
                     cancel_rx_timer = true;
                 } else {
                     err = true;
@@ -313,7 +317,7 @@ bool relay_actor_t::on(proto::relay::message_t &msg) noexcept {
             } else if constexpr (std::is_same_v<T, proto::relay::response_t>) {
                 if (rx_state & rx_state_t::response) {
                     cancel_rx_timer = true;
-                    rx_state = ~rx_state & rx_state_t::response;
+                    rx_state = rx_state & ~rx_state_t::response;
                     err = !on(it);
                 } else {
                     err = true;
@@ -328,7 +332,7 @@ bool relay_actor_t::on(proto::relay::message_t &msg) noexcept {
                 err = true;
             }
             if (err) {
-                LOG_ERROR(log, "protocol error (master, unexpected message)");
+                LOG_ERROR(log, "protocol error (master, unexpected message): {}", message_name);
                 auto ec = utils::make_error_code(utils::error_code_t::protocol_error);
                 do_shutdown(make_error(ec));
             }

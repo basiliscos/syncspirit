@@ -152,7 +152,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     {
       "relays": [
         {
-          "url": "##URL##&pingInterval=0m5s&networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=ina",
+          "url": "##URL##&pingInterval=0m1s&networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=ina",
           "location": {
             "latitude": 50.1049,
             "longitude": 8.6295,
@@ -217,29 +217,21 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         relay_trans->async_send(asio::buffer(relay_tx), on_write, on_error);
     }
 
-    void on(proto::relay::ping_t &) noexcept {
-
+    virtual void on_relay(proto::relay::ping_t &) noexcept {
     };
-
-    void on(proto::relay::pong_t &) noexcept {
-
+    virtual void on_relay(proto::relay::pong_t &) noexcept {
     };
-    void on(proto::relay::join_relay_request_t &) noexcept {
+    virtual void on_relay(proto::relay::join_relay_request_t &) noexcept {
         LOG_INFO(log, "join_relay_request_t");
         send_relay(proto::relay::response_t{0, "ok"});
     };
-
-    void on(proto::relay::join_session_request_t &) noexcept {
-
+    virtual void on_relay(proto::relay::join_session_request_t &) noexcept {
     };
-    void on(proto::relay::response_t &) noexcept {
-
+    virtual void on_relay(proto::relay::response_t &) noexcept {
     };
-    void on(proto::relay::connect_request_t &) noexcept {
-
+    virtual void on_relay(proto::relay::connect_request_t &) noexcept {
     };
-    void on(proto::relay::session_invitation_t &) noexcept {
-
+    virtual void on_relay(proto::relay::session_invitation_t &) noexcept {
     };
     virtual void on(model::message::model_update_t &update) noexcept {
         auto &diff = *update.payload.diff;
@@ -263,7 +255,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
                 LOG_ERROR(log, "relay/read non-message?");
                 return;
             }
-            std::visit([&](auto &it) { on(it); }, wrapped->message);
+            std::visit([&](auto &it) { on_relay(it); }, wrapped->message);
         };
         relay_rx.resize(1500);
         auto buff = asio::buffer(relay_rx.data(), relay_rx.size());
@@ -369,6 +361,52 @@ void test_passive() {
     F().run();
 }
 
+void test_passive_ping_pong() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto act = create_actor();
+            io_ctx.run();
+            CHECK(received);
+            CHECK(sup->get_state() == r::state_t::OPERATIONAL);
+
+            sup->shutdown();
+            io_ctx.restart();
+            io_ctx.run();
+
+            CHECK(my_device->get_uris().size() == 0);
+            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+        }
+
+        void on_relay(proto::relay::join_relay_request_t &request) noexcept override {
+            fixture_t::on_relay(request);
+            relay_read();
+        };
+
+        void on_relay(proto::relay::ping_t &message) noexcept override {
+            fixture_t::on_relay(message);
+            send_relay(proto::relay::pong_t{});
+
+            auto msg = proto::relay::session_invitation_t{
+                std::string(peer_device->device_id().get_sha256()), session_key, {}, 12345, true};
+            send_relay(msg);
+        };
+
+        outcome::result<void> operator()(const model::diff::contact::relay_connect_request_t &diff,
+                                         void *) noexcept override {
+            CHECK(diff.peer == peer_device->device_id());
+            CHECK(diff.session_key == session_key);
+            CHECK(diff.relay.port() == 12345);
+            CHECK(diff.relay.address().to_string() == "127.0.0.1");
+            received = true;
+            io_ctx.stop();
+            return outcome::success();
+        }
+
+        bool received = false;
+    };
+    F().run();
+}
+
 void test_passive_unknown() {
     struct F : fixture_t {
         void main() noexcept override {
@@ -415,6 +453,7 @@ void test_passive_unknown() {
 int _init() {
     REGISTER_TEST_CASE(test_master_connect, "test_master_connect", "[relay]");
     REGISTER_TEST_CASE(test_passive, "test_passive", "[relay]");
+    REGISTER_TEST_CASE(test_passive_ping_pong, "test_passive_ping_pong", "[relay]");
     REGISTER_TEST_CASE(test_passive_unknown, "test_passive_unknown", "[relay]");
 
     return 1;
