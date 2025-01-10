@@ -694,7 +694,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         128,        /* files_scan_iteration_limit max number processed files before emitting scan events */
     };
     cfg.db_config = db_config_t {
-        0x400000000,   /* upper_limit, 16Gb */
+        0x80000000,    /* upper_limit, 2Gb */
         150,           /* uncommitted_threshold */
         8192,          /* max blocks per diff */
         1024,          /* max files per diff */
