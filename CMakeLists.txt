@@ -8,10 +8,6 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 cmake_policy(SET CMP0063 NEW)
 cmake_policy(SET CMP0077 NEW)
 
-if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/image CACHE PATH "installation path" FORCE)
-endif()
-
 include(GenerateExportHeader)
 set(CMAKE_POSITION_INDEPENDENT_CODE True)
 
@@ -40,27 +36,43 @@ set(SYNCSPIRIT_VERSION "v0.4.0")
 
 set(dist_dir "${syncspirit_BINARY_DIR}/dist")
 add_custom_target("deploy")
-add_custom_target("deploy_deps"
-    COMMAND
-        python ${syncspirit_SOURCE_DIR}/misc/post-install-win32.py
-            --binaries ${dist_dir}/*
-            --dirs
-                `conan config home`
-                ${syncspirit_BINARY_DIR}/lib/mbdx/
-                `dirname ${CMAKE_CXX_COMPILER}`/../../
-    DEPENDS deploy
-)
+if (WIN32)
+    add_custom_target("deploy_deps"
+        COMMAND
+            python ${syncspirit_SOURCE_DIR}/misc/post-install-win32.py
+                --binaries ${dist_dir}/*
+                --dirs
+                    `conan config home`
+                    ${syncspirit_BINARY_DIR}/lib/mbdx/
+                    `dirname ${CMAKE_CXX_COMPILER}`/../../
+        DEPENDS deploy
+    )
+endif()
 
 function(install_executable target)
     install(TARGETS ${target} DESTINATION bin)
-    add_custom_target("deploy_${target}")
-    add_custom_command(TARGET deploy_${target} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E
-            copy
-                $<TARGET_FILE:${target}>
-                "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
-    )
-    add_dependencies("deploy" "deploy_${target}")
+        add_custom_target("deploy_${target}")
+        add_dependencies("deploy" "deploy_${target}")
+        if (WIN32)
+            add_custom_command(TARGET deploy_${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E
+                    copy
+                        $<TARGET_FILE:${target}>
+                        "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
+            )
+        else()
+            add_custom_command(TARGET deploy_${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E
+                    copy
+                        "${CMAKE_INSTALL_PREFIX}/bin/$<TARGET_FILE_NAME:${target}>"
+                        "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
+                COMMAND
+                    perl ${syncspirit_SOURCE_DIR}/misc/post-install-nix.pl
+                        $<TARGET_FILE:${target}>
+                        "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
+            )
+            install(CODE "execute_process(COMMAND make deploy_${target})")
+        endif()
 endfunction()
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
