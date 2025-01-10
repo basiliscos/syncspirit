@@ -1,6 +1,6 @@
 
 [requires]
-openssl/1.1.1s
+openssl/1.1.1w
 boost/1.84.0
 lz4/1.9.4
 nlohmann_json/3.11.2
@@ -18,7 +18,7 @@ c-ares/1.28.1
 catch2/3.3.1
 
 [tool_requires]
-protobuf/3.21.9
+protobuf/3.21.12
 
 [options]
 pugixml/*:no_exceptions=True
