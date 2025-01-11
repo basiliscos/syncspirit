@@ -238,7 +238,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
 
     resizable(log_table);
 
-    bridge_sink = sink_ptr_t(new fltk_sink_t(this));
+    auto bridge_sink = sink_ptr_t(new fltk_sink_t(this));
 
     auto &dist_sink = supervisor.get_dist_sink();
     for (auto sink : dist_sink->sinks()) {
@@ -252,8 +252,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
             break;
         }
     }
-
-    dist_sink->add_sink(bridge_sink);
+    supervisor.add_sink(bridge_sink);
     update();
 }
 
@@ -262,11 +261,7 @@ void log_panel_t::on_loading_done() {
     Fl::add_timeout(0.05, _pull_in_logs, this);
 }
 
-log_panel_t::~log_panel_t() {
-    Fl::remove_timeout(_pull_in_logs, this);
-    supervisor.get_dist_sink()->remove_sink(bridge_sink);
-    bridge_sink.reset();
-}
+log_panel_t::~log_panel_t() { Fl::remove_timeout(_pull_in_logs, this); }
 
 void log_panel_t::update(log_queue_t new_records) {
     auto display_level = supervisor.get_app_config().fltk_config.level;

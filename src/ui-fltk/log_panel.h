@@ -32,7 +32,6 @@ struct log_panel_t : Fl_Group {
     void on_loading_done();
 
     app_supervisor_t &supervisor;
-    sink_ptr_t bridge_sink;
     Fl_Group *control_group;
     log_table_t *log_table;
     Fl_Box *records_counter;

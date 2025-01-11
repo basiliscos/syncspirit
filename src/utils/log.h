@@ -20,6 +20,7 @@ namespace outcome = boost::outcome_v2;
 using logger_t = std::shared_ptr<spdlog::logger>;
 using file_sink_t = spdlog::sinks::basic_file_sink_mt;
 using dist_sink_t = std::shared_ptr<spdlog::sinks::dist_sink_mt>;
+using sink_t = spdlog::sink_ptr;
 
 struct SYNCSPIRIT_API boostrap_guard_t {
     boostrap_guard_t(dist_sink_t dist_sink, file_sink_t *);

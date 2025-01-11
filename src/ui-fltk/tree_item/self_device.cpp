@@ -114,6 +114,7 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
     }
 
     ~self_table_t() {
+        db_info_guard.reset();
         Fl::remove_timeout(on_uptime_timeout, this);
         Fl::remove_timeout(on_db_refresh_timeout, this);
     }

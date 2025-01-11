@@ -68,7 +68,7 @@ struct my_table_t : static_table_t {
 
         if (!ctx.device_id.empty() && error.empty()) {
             auto &peer = *device_opt;
-            auto &cluster = container.supervisor.get_cluster();
+            auto cluster = container.supervisor.get_cluster();
             auto &devices = cluster->get_devices();
             auto found = devices.by_sha256(peer.get_sha256());
             if (found) {

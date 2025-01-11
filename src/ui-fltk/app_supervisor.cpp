@@ -9,7 +9,6 @@
 #include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
 #include "tree_item/peer_device.h"
-#include "tree_item/peer_folder.h"
 #include "tree_item/entry.h"
 #include "tree_item/pending_devices.h"
 #include "tree_item/pending_folders.h"
@@ -58,6 +57,8 @@ db_info_viewer_guard_t::~db_info_viewer_guard_t() {
         supervisor->db_info_viewer = nullptr;
     }
 }
+
+void db_info_viewer_guard_t::reset() { supervisor = nullptr; }
 
 using callback_fn_t = std::function<void()>;
 
@@ -116,11 +117,19 @@ app_supervisor_t::app_supervisor_t(config_t &config)
     sequencer = model::make_sequencer(started_at.time_since_epoch().count());
 }
 
-auto app_supervisor_t::get_dist_sink() -> utils::dist_sink_t & { return dist_sink; }
+app_supervisor_t::~app_supervisor_t() {
+    cluster.reset();
+    if (ui_sink) {
+        dist_sink->remove_sink(ui_sink);
+        ui_sink.reset();
+    }
+    spdlog::debug("~app_supervisor_t()");
+}
 
+auto app_supervisor_t::get_dist_sink() -> utils::dist_sink_t & { return dist_sink; }
 auto app_supervisor_t::get_config_path() -> const bfs::path & { return config_path; }
 auto app_supervisor_t::get_app_config() -> config::main_t & { return app_config; }
-auto app_supervisor_t::get_cluster() -> model::cluster_ptr_t & { return cluster; }
+auto app_supervisor_t::get_cluster() -> model::cluster_t * { return cluster.get(); }
 auto app_supervisor_t::get_sequencer() -> model::sequencer_t & { return *sequencer; }
 
 void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -267,6 +276,11 @@ void app_supervisor_t::set_folders(tree_item_t *node) { folders = node; }
 void app_supervisor_t::set_pending_devices(tree_item_t *node) { pending_devices = node; }
 void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices = node; }
 void app_supervisor_t::set_main_window(main_window_t *window) { main_window = window; }
+
+void app_supervisor_t::add_sink(utils::sink_t ui_sink_) {
+    ui_sink = ui_sink_;
+    dist_sink->add_sink(ui_sink);
+}
 
 void app_supervisor_t::postpone_update(augmentation_entry_base_t &entry) {
     assert(updated_entries);

@@ -160,12 +160,12 @@ struct transfer_pop_t {
 };
 
 struct db_info_response_t {
-    uint32_t page_size;
-    uint32_t tree_depth;
-    uint64_t leaf_pages;
-    uint64_t overflow_pages;
-    uint64_t ms_branch_pages;
-    uint64_t entries;
+    uint32_t page_size = 0;
+    uint32_t tree_depth = 0;
+    uint64_t leaf_pages = 0;
+    uint64_t overflow_pages = 0;
+    uint64_t ms_branch_pages = 0;
+    uint64_t entries = 0;
 };
 
 struct db_info_request_t {

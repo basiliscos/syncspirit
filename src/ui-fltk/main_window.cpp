@@ -68,11 +68,6 @@ void main_window_t::on_shutdown() {
     cfg.bottom_panel_share = (log_panel->h() + 0.) / h();
 }
 
-main_window_t::~main_window_t() {
-    supervisor.set_main_window(nullptr);
-    delete log_panel;
-}
-
 void main_window_t::set_splash_text(std::string text) {
     log_panel->set_splash_text(std::move(text));
     Fl::flush();

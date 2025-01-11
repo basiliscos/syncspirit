@@ -17,6 +17,7 @@ namespace syncspirit::model {
 struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
 
     cluster_t(device_ptr_t device_, int32_t write_requests) noexcept;
+    cluster_t(const cluster_t &) = delete;
 
     proto::ClusterConfig generate(const model::device_t &target) const noexcept;
     inline const device_ptr_t &get_device() const noexcept { return device; }

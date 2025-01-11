@@ -46,6 +46,7 @@ struct db_info_viewer_guard_t {
 
     db_info_viewer_guard_t &operator=(db_info_viewer_guard_t &&);
     ~db_info_viewer_guard_t();
+    void reset();
 
   private:
     app_supervisor_t *supervisor;
@@ -102,6 +103,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
 
     explicit app_supervisor_t(config_t &config);
     app_supervisor_t(const app_supervisor_t &) = delete;
+    ~app_supervisor_t();
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void shutdown_finish() noexcept override;
@@ -109,12 +111,13 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     utils::dist_sink_t &get_dist_sink();
     const bfs::path &get_config_path();
     config::main_t &get_app_config();
-    model::cluster_ptr_t &get_cluster();
+    model::cluster_t *get_cluster();
     model::sequencer_t &get_sequencer();
     void write_config(const config::main_t &) noexcept;
 
     std::string get_uptime() noexcept;
     utils::logger_t &get_logger() noexcept;
+    void add_sink(utils::sink_t ui_sink);
 
     template <typename Fn> auto replace_content(Fn constructor) noexcept -> content_t * {
         if (!content) {
@@ -137,6 +140,12 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
 
     template <typename Payload, typename... Args> void send_model(Args &&...args) {
         send<Payload>(coordinator, std::forward<Args>(args)...);
+    }
+
+    template <typename Fn> void with_cluster(Fn &&fn) {
+        if (cluster) {
+            fn();
+        }
     }
 
     Fl_Color get_color(color_context_t context) const;
@@ -185,6 +194,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     r::address_ptr_t coordinator;
     utils::logger_t log;
     utils::dist_sink_t dist_sink;
+    utils::sink_t ui_sink;
     bfs::path config_path;
     config::main_t app_config;
     config::main_t app_config_original;

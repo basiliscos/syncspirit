@@ -254,8 +254,11 @@ int main(int argc, char **argv) {
             sup->do_process();
         }
 
-        auto fltk_ctx = rf::system_context_fltk_t();
-        auto sup_fltk = fltk_ctx.create_supervisor<fltk::app_supervisor_t>()
+        // window should outive fltk ctx, as in ctx d-tor model augmentations
+        // invoke fltk-things..
+        auto main_window = std::unique_ptr<fltk::main_window_t>();
+        auto fltk_ctx = rf::system_context_ptr_t(new rf::system_context_fltk_t());
+        auto sup_fltk = fltk_ctx->create_supervisor<fltk::app_supervisor_t>()
                             .dist_sink(boostrap_guard->get_dist_sink())
                             .config_path(config_file_path)
                             .app_config(cfg)
@@ -278,10 +281,10 @@ int main(int argc, char **argv) {
 
         auto app_w = cfg.fltk_config.main_window_width;
         auto app_h = cfg.fltk_config.main_window_height;
-        auto main_window = fltk::main_window_t(*sup_fltk, app_w, app_h);
+        main_window.reset(new fltk::main_window_t(*sup_fltk, app_w, app_h));
         Fl::visual(FL_DOUBLE | FL_INDEX);
-        main_window.show(argc, argv);
-        main_window.wait_for_expose();
+        main_window->show(argc, argv);
+        main_window->wait_for_expose();
 
         // launch
 
@@ -350,6 +353,10 @@ int main(int argc, char **argv) {
         }
 
         spdlog::trace("everything has been terminated");
+        sup_fltk.reset();
+        fltk_ctx.reset();
+        main_window.reset();
+        spdlog::trace("fltk context has been destroyed");
     } catch (...) {
         spdlog::critical("unknown exception");
         // spdlog::critical("Starting failure : {}", ex.what());

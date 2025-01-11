@@ -12,7 +12,6 @@ struct main_window_t : Fl_Double_Window {
     using parent_t = Fl_Double_Window;
 
     main_window_t(app_supervisor_t &supervisor, int w, int h);
-    ~main_window_t();
 
     void on_shutdown();
     void set_splash_text(std::string text);

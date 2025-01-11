@@ -217,22 +217,16 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         relay_trans->async_send(asio::buffer(relay_tx), on_write, on_error);
     }
 
-    virtual void on_relay(proto::relay::ping_t &) noexcept {
-    };
-    virtual void on_relay(proto::relay::pong_t &) noexcept {
-    };
+    virtual void on_relay(proto::relay::ping_t &) noexcept {};
+    virtual void on_relay(proto::relay::pong_t &) noexcept {};
     virtual void on_relay(proto::relay::join_relay_request_t &) noexcept {
         LOG_INFO(log, "join_relay_request_t");
         send_relay(proto::relay::response_t{0, "ok"});
     };
-    virtual void on_relay(proto::relay::join_session_request_t &) noexcept {
-    };
-    virtual void on_relay(proto::relay::response_t &) noexcept {
-    };
-    virtual void on_relay(proto::relay::connect_request_t &) noexcept {
-    };
-    virtual void on_relay(proto::relay::session_invitation_t &) noexcept {
-    };
+    virtual void on_relay(proto::relay::join_session_request_t &) noexcept {};
+    virtual void on_relay(proto::relay::response_t &) noexcept {};
+    virtual void on_relay(proto::relay::connect_request_t &) noexcept {};
+    virtual void on_relay(proto::relay::session_invitation_t &) noexcept {};
     virtual void on(model::message::model_update_t &update) noexcept {
         auto &diff = *update.payload.diff;
         auto r = diff.apply(*cluster, get_apply_controller());

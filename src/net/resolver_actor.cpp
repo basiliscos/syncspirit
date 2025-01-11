@@ -151,12 +151,15 @@ void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
     for (auto it = queue.begin(); it != queue.end(); ++it) {
         if (matches(*it)) {
             if (current_query->payload.id == request_id && current_query->payload.origin == source) {
-                assert(timer_id);
-                cancel_timer();
+                if (timer_id) {
+                    cancel_timer();
+                } else {
+                    auto ec = r::make_error_code(r::error_code_t::cancelled);
+                    reply_with_error(**it, make_error(ec));
+                    queue.erase(it);
+                }
             } else {
-                auto ec = r::make_error_code(r::error_code_t::cancelled);
-                reply_with_error(**it, make_error(ec));
-                queue.erase(it);
+                cancel_timer();
             }
             return;
         }

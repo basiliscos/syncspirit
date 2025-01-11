@@ -28,14 +28,16 @@ void tree_item_t::update_label() {}
 
 void tree_item_t::refresh_content() {
     if (content) {
-        content->refresh();
+        supervisor.with_cluster([&]() { content->refresh(); });
     }
 }
 
 void tree_item_t::on_update() {
-    update_label();
-    tree()->redraw();
-    refresh_content();
+    supervisor.with_cluster([&]() {
+        update_label();
+        tree()->redraw();
+        refresh_content();
+    });
 }
 
 void tree_item_t::on_delete() {
@@ -51,22 +53,24 @@ void tree_item_t::on_delete() {
 
 void tree_item_t::select_other() {
     auto t = tree();
-    bool unselect = tree()->first_selected_item() == this;
-    if (unselect) {
-        Fl_Tree_Item *current = this;
-        while (true) {
-            auto prev = t->next_item(current, FL_Up, true);
-            auto item = dynamic_cast<tree_item_t *>(prev);
-            current = prev;
-            if (item) {
-                if (item->on_select()) {
-                    t->select(prev, 0);
-                    t->redraw();
-                    break;
+    supervisor.with_cluster([&]() {
+        bool unselect = tree()->first_selected_item() == this;
+        if (unselect) {
+            Fl_Tree_Item *current = this;
+            while (true) {
+                auto prev = t->next_item(current, FL_Up, true);
+                auto item = dynamic_cast<tree_item_t *>(prev);
+                current = prev;
+                if (item) {
+                    if (item->on_select()) {
+                        t->select(prev, 0);
+                        t->redraw();
+                        break;
+                    }
                 }
             }
         }
-    }
+    });
 }
 
 auto tree_item_t::get_proxy() -> augmentation_ptr_t { return augmentation; }
@@ -82,8 +86,10 @@ auto tree_item_t::insert_by_label(tree_item_t *child_node, int start_index, int 
 
 void tree_item_t::remove_child(tree_item_t *child) {
     parent_t::remove_child(child);
-    update_label();
-    tree()->redraw();
+    supervisor.with_cluster([&]() {
+        update_label();
+        tree()->redraw();
+    });
 }
 
 void tree_item_t::apply(const node_visitor_t &visitor, void *data) {

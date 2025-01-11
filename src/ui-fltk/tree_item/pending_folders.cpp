@@ -39,17 +39,19 @@ void pending_folders_t::remove_folder(tree_item_t *item) {
 
 void pending_folders_t::remove_child(tree_item_t *child) {
     parent_t::remove_child(child);
-    auto &folders = supervisor.get_cluster()->get_pending_folders();
-    auto count = 0;
-    for (auto &it : folders) {
-        auto &f = *it.item;
-        if (f.device_id() == peer.device_id()) {
-            ++count;
-            break;
+    supervisor.with_cluster([&]() {
+        auto &folders = supervisor.get_cluster()->get_pending_folders();
+        auto count = 0;
+        for (auto &it : folders) {
+            auto &f = *it.item;
+            if (f.device_id() == peer.device_id()) {
+                ++count;
+                break;
+            }
         }
-    }
-    if (!count) {
-        auto upper = static_cast<tree_item_t *>(parent());
-        upper->remove_child(this);
-    }
+        if (!count) {
+            auto upper = static_cast<tree_item_t *>(parent());
+            upper->remove_child(this);
+        }
+    });
 }
