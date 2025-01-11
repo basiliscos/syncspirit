@@ -58,5 +58,5 @@ TEST_CASE("file-info", "[model]") {
     CHECK(!map.by_sequence(pr_fi.sequence()));
 
     auto conflict_name = fi->make_conflicting_name();
-    REQUIRE_THAT(conflict_name, Matches("a[\\/]b.sync-conflict-202412(\\d){2}-(\\d){6}-KHQNO2S.txt"));
+    REQUIRE_THAT(conflict_name, Matches("a.b.sync-conflict-202412(\\d){2}-(\\d){6}-KHQNO2S.txt"));
 }

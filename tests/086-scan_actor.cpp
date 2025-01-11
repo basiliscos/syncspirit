@@ -414,6 +414,7 @@ void test_new_files() {
             sys::error_code ec;
             auto &blocks = cluster->get_blocks();
 
+#ifndef SYNCSPIRIT_WIN
             SECTION("new symlink") {
                 auto file_path = root_path / "symlink";
                 bfs::create_symlink(bfs::path("/some/where"), file_path, ec);
@@ -430,6 +431,7 @@ void test_new_files() {
                 CHECK(blocks.size() == 0);
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
+#endif
 
             SECTION("new dir") {
                 auto dir_path = root_path / "some-dir";

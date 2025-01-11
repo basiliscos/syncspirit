@@ -2,29 +2,35 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "utils.h"
-#include "utils/tls.h"
-#include <zlib.h>
-#include <chrono>
+#include <cstdint>
 
 namespace syncspirit::fs {
 
 const std::string_view tmp_suffix = ".syncspirit-tmp";
 
-static const std::size_t _block_sizes[] = {
-    (1 << 7) * 1024,  (1 << 8) * 1024,  (1 << 9) * 1024,  (1 << 10) * 1024,
-    (1 << 11) * 1024, (1 << 12) * 1024, (1 << 13) * 1024, (1 << 14) * 1024,
+static const std::int64_t _block_sizes[] = {
+    // clang-format off
+    (1 << 7) * 1024ull,
+    (1 << 8) * 1024ull,
+    (1 << 9) * 1024ull,
+    (1 << 10) * 1024ull,
+    (1 << 11) * 1024ull,
+    (1 << 12) * 1024ull,
+    (1 << 13) * 1024ull,
+    (1 << 14) * 1024ull,
+    // clang-format on
 };
 
 const std::size_t block_sizes_sz = 8;
-const std::size_t *block_sizes = _block_sizes;
+const std::int64_t *block_sizes = _block_sizes;
 
 static const constexpr size_t max_blocks_count = 2000;
 
-block_division_t get_block_size(size_t sz, int32_t prev_size) noexcept {
-    size_t bs = 0;
+block_division_t get_block_size(int64_t sz, int32_t prev_size) noexcept {
+    auto bs = std::int64_t{0};
     if (block_sizes[0] <= sz) {
         for (size_t i = 0; i < block_sizes_sz; ++i) {
-            if (block_sizes[i] == (size_t)prev_size) {
+            if (block_sizes[i] == prev_size) {
                 bs = prev_size;
                 break;
             }
@@ -46,7 +52,7 @@ block_division_t get_block_size(size_t sz, int32_t prev_size) noexcept {
         bs = block_sizes[block_sizes_sz - 1];
     }
 
-    size_t count = 0;
+    auto count = std::int64_t{0};
     if (bs != 0) {
         count = sz / bs;
         if (count * bs < sz) {
@@ -54,7 +60,7 @@ block_division_t get_block_size(size_t sz, int32_t prev_size) noexcept {
         }
     }
 
-    return {count, (int32_t)bs};
+    return {static_cast<size_t>(count), (int32_t)bs};
 }
 
 bfs::path make_temporal(const bfs::path &path) noexcept {

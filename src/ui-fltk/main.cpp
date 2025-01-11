@@ -92,6 +92,12 @@ BOOL WINAPI consoleHandler(DWORD signal) {
 }
 #endif
 
+#ifdef _WIN32
+#define SET_THREAD_EN_LANGUAGE() SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US))
+#else
+#define SET_THREAD_EN_LANGUAGE()
+#endif
+
 int main(int argc, char **argv) {
     Fl::lock();
     GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -112,13 +118,7 @@ int main(int argc, char **argv) {
     }
 #endif
     try {
-#ifdef _WIN32
-        auto lang_count = DWORD{0};
-        auto ok = ::SetProcessPreferredUILanguages(MUI_LANGUAGE_NAME, L"en-US", &lang_count);
-        if (!ok || !lang_count) {
-            spdlog::error("unable to set process UI language to 'en-US'");
-        }
-#endif
+        SET_THREAD_EN_LANGUAGE();
         utils::platform_t::startup();
         auto inmem_sink = spdlog::sink_ptr(new fltk::im_memory_sink_t());
         auto boostrap_guard = utils::bootstrap(inmem_sink);
@@ -287,8 +287,8 @@ int main(int argc, char **argv) {
         main_window->wait_for_expose();
 
         // launch
-
         auto net_thread = std::thread([&]() {
+            SET_THREAD_EN_LANGUAGE();
 #if defined(__linux__)
             std::string name = "ss/net";
             pthread_setname_np(pthread_self(), name.c_str());
@@ -302,6 +302,7 @@ int main(int argc, char **argv) {
         for (uint32_t i = 0; i < hasher_count; ++i) {
             auto &ctx = hasher_ctxs.at(i);
             auto thread = std::thread([ctx = ctx, i = i]() {
+                SET_THREAD_EN_LANGUAGE();
                 std::string name = "ss/hasher-" + std::to_string(i + 1);
 #if defined(__linux__)
                 pthread_setname_np(pthread_self(), name.c_str());
@@ -314,6 +315,7 @@ int main(int argc, char **argv) {
         }
 
         auto fs_thread = std::thread([&]() {
+            SET_THREAD_EN_LANGUAGE();
 #if defined(__linux__)
             pthread_setname_np(pthread_self(), "ss/fs");
 #endif

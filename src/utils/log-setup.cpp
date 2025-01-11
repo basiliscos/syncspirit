@@ -51,12 +51,23 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, bool ov
         return utils::make_error_code(error_code_t::misconfigured_default_logger);
     }
 
-    // drop colorized stderr sink
-    for (auto &s : dist_sink->sinks()) {
-        auto sink = dynamic_cast<spdlog::sinks::stderr_color_sink_mt *>(s.get());
-        if (sink) {
-            dist_sink->remove_sink(s);
-            break;
+    // drop colorized stderr/stdout sinks
+    bool do_scan = true;
+    while (do_scan) {
+        do_scan = false;
+        for (auto &s : dist_sink->sinks()) {
+            auto sink_stderr = dynamic_cast<spdlog::sinks::stderr_color_sink_mt *>(s.get());
+            if (sink_stderr) {
+                dist_sink->remove_sink(s);
+                do_scan = true;
+                break;
+            }
+            auto sink_stdout = dynamic_cast<spdlog::sinks::stdout_color_sink_mt *>(s.get());
+            if (sink_stdout) {
+                dist_sink->remove_sink(s);
+                do_scan = true;
+                break;
+            }
         }
     }
 

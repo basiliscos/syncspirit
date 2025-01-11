@@ -9,6 +9,7 @@
 #include <spdlog/sinks/sink.h>
 #include <spdlog/pattern_formatter.h>
 #include <spdlog/fmt/fmt.h>
+#include <sstream>
 
 namespace syncspirit::fltk {
 
