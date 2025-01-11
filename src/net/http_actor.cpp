@@ -243,8 +243,8 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     auto &req = *queue.front();
     if (req.payload.request_payload->debug) {
         auto &rx_buff = *queue.front()->payload.request_payload->rx_buff;
-        std::string_view data{(const char *)rx_buff.data().data(), bytes};
-        LOG_DEBUG(log, "response ({}):\n{}", bytes, data);
+        auto &body = http_response.body();
+        LOG_DEBUG(log, "response ({}):\n{}", bytes, body);
     }
     if (keep_alive && http_response.keep_alive()) {
         kept_alive = true;
