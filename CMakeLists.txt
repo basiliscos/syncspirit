@@ -222,6 +222,7 @@ add_library(syncspirit_core
     src/utils/error_code.cpp
     src/utils/location.cpp
     src/utils/log.cpp
+    src/utils/log-setup.cpp
     src/utils/network_interface.cpp
     src/utils/platform.cpp
     src/utils/time.cpp

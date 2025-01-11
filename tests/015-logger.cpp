@@ -3,6 +3,7 @@
 
 #include "test-utils.h"
 #include "utils/log.h"
+#include "utils/log-setup.h"
 #include <spdlog/sinks/dist_sink.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>

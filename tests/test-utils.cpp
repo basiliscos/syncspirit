@@ -3,9 +3,8 @@
 
 #include "test-utils.h"
 #include "model/device_id.h"
-#include "structs.pb.h"
-#include "db/prefix.h"
 #include "utils/base32.h"
+#include "utils/log-setup.h"
 #include <random>
 #include <cstdint>
 #include <spdlog/sinks/stdout_color_sinks.h>

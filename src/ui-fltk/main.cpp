@@ -15,7 +15,7 @@
 #include "syncspirit-config.h"
 #include "config/utils.h"
 #include "utils/location.h"
-#include "utils/log.h"
+#include "utils/log-setup.h"
 #include "utils/platform.h"
 #include "constants.h"
 #include "net/net_supervisor.h"

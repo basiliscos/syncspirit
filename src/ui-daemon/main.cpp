@@ -16,7 +16,7 @@
 #include "constants.h"
 #include "config/utils.h"
 #include "utils/location.h"
-#include "utils/log.h"
+#include "utils/log-setup.h"
 #include "utils/platform.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"

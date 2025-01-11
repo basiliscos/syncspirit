@@ -126,7 +126,7 @@ app_supervisor_t::~app_supervisor_t() {
     spdlog::debug("~app_supervisor_t()");
 }
 
-auto app_supervisor_t::get_dist_sink() -> utils::dist_sink_t & { return dist_sink; }
+auto app_supervisor_t::get_dist_sink() -> dist_sink_t & { return dist_sink; }
 auto app_supervisor_t::get_config_path() -> const bfs::path & { return config_path; }
 auto app_supervisor_t::get_app_config() -> config::main_t & { return app_config; }
 auto app_supervisor_t::get_cluster() -> model::cluster_t * { return cluster.get(); }
@@ -277,7 +277,7 @@ void app_supervisor_t::set_pending_devices(tree_item_t *node) { pending_devices 
 void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices = node; }
 void app_supervisor_t::set_main_window(main_window_t *window) { main_window = window; }
 
-void app_supervisor_t::add_sink(utils::sink_t ui_sink_) {
+void app_supervisor_t::add_sink(spdlog::sink_ptr ui_sink_) {
     ui_sink = ui_sink_;
     dist_sink->add_sink(ui_sink);
 }
