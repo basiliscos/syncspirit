@@ -50,6 +50,11 @@ struct fixture_t {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<load_msg_t>([&](load_msg_t &msg) {
+                    auto& ee = msg.payload.ee;
+                    if (ee) {
+                        spdlog::error("cannot load cluster: {}", ee->message());
+                        std::abort();
+                    }
                     reply = &msg;
                     sup->send<model::payload::model_update_t>(db_addr, msg.payload.res.diff, nullptr);
                 }));
