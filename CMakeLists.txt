@@ -59,6 +59,8 @@ function(install_executable target)
                     copy
                         $<TARGET_FILE:${target}>
                         "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
+               COMMAND ${CMAKE_COMMAND} -E copy -t ${dist_dir} $<TARGET_RUNTIME_DLLS:${target}>
+                  COMMAND_EXPAND_LISTS
             )
         else()
             add_custom_command(TARGET deploy_${target} POST_BUILD
@@ -66,10 +68,10 @@ function(install_executable target)
                     copy
                         "${CMAKE_INSTALL_PREFIX}/bin/$<TARGET_FILE_NAME:${target}>"
                         "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
-                COMMAND
-                    perl ${syncspirit_SOURCE_DIR}/misc/post-install-nix.pl
-                        $<TARGET_FILE:${target}>
-                        "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
+               COMMAND
+                   perl ${syncspirit_SOURCE_DIR}/misc/post-install-nix.pl
+                       $<TARGET_FILE:${target}>
+                       "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
             )
             install(CODE "execute_process(COMMAND make deploy_${target})")
         endif()
