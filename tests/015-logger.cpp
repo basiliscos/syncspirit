@@ -59,12 +59,13 @@ TEST_CASE("hierarchy", "[log]") {
 }
 
 TEST_CASE("file sink", "[log]") {
-    auto dir = st::unique_path();
+    auto dir = bfs::absolute(bfs::current_path() / st::unique_path());
     auto path_guard = st::path_guard_t{dir};
     bfs::create_directory(dir);
+    auto log_file = dir / "log.txt";
+    auto log_file_str = log_file.string();
 
-    auto file_path = fmt::format("{}/log.txt", dir.string());
-    auto sink_config = fmt::format("file:{}", file_path);
+    auto sink_config = fmt::format("file:{}", log_file_str);
     config::log_configs_t cfg{{"default", L::trace, {sink_config}}};
     REQUIRE(utils::init_loggers(cfg, overwrite));
     auto l = utils::get_logger("default");
@@ -72,7 +73,8 @@ TEST_CASE("file sink", "[log]") {
     l->flush();
 
     spdlog::drop_all(); // to cleanup on win32
-    auto data = st::read_file(bfs::path(file_path));
+    auto data = st::read_file(log_file);
+    CHECK(log_file_str != "");
     CHECK(!data.empty());
     CHECK(data.find("lorem ipsum dolor") != std::string::npos);
 }

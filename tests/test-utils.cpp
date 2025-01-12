@@ -29,7 +29,6 @@ bfs::path locate_path(const char *test_file) {
 
 std::string read_file(const bfs::path &path) {
     sys::error_code ec;
-    auto filesize = bfs::file_size(path, ec);
     auto file_path = path.string();
     auto file_path_c = file_path.c_str();
     auto in = fopen(file_path_c, "rb");
@@ -38,7 +37,10 @@ std::string read_file(const bfs::path &path) {
         std::cout << "can't open " << file_path_c << " : " << ec.message() << "\n";
         return "";
     }
-    assert(in);
+
+    fseek(in, 0L, SEEK_END);
+    auto filesize = ftell(in);
+    fseek(in, 0L, SEEK_SET);
     std::vector<char> buffer(filesize, 0);
     auto r = fread(buffer.data(), filesize, 1, in);
     assert(r == 1);
