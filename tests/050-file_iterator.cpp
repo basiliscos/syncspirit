@@ -59,22 +59,42 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 auto file = proto::FileInfo();
                 file.set_name("a.txt");
                 file.set_sequence(10ul);
-                auto ec =
-                    builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply();
-                REQUIRE(ec);
+                auto index_builder = builder.make_index(peer_id.get_sha256(), folder->get_id());
 
-                auto [f, action] = file_iterator->next();
-                REQUIRE(f);
-                CHECK(f->get_name() == "a.txt");
-                CHECK(!f->is_locked());
-                CHECK(action == A::remote_copy);
+                SECTION("regular file") {
+                    auto ec = index_builder.add(file, peer_device).finish().apply();
+                    REQUIRE(ec);
 
-                REQUIRE(builder.apply());
-                CHECK(file_iterator->next() == R{nullptr, A::ignore});
+                    auto [f, action] = file_iterator->next();
+                    REQUIRE(f);
+                    CHECK(f->get_name() == "a.txt");
+                    CHECK(!f->is_locked());
+                    CHECK(action == A::remote_copy);
 
-                REQUIRE(builder.remote_copy(*f).apply());
-                CHECK(file_iterator->next() == R{nullptr, A::ignore});
-                CHECK(!f->is_locked());
+                    REQUIRE(builder.apply());
+                    CHECK(file_iterator->next() == R{nullptr, A::ignore});
+
+                    REQUIRE(builder.remote_copy(*f).apply());
+                    CHECK(file_iterator->next() == R{nullptr, A::ignore});
+                    CHECK(!f->is_locked());
+                }
+                SECTION("symblink") {
+                    file.set_symlink_target("b.txt");
+                    file.set_type(proto::FileInfoType::SYMLINK);
+                    auto ec = index_builder.add(file, peer_device).finish().apply();
+                    REQUIRE(ec);
+
+                    auto [f, action] = file_iterator->next();
+#ifdef SYNCSPIRIT_WIN
+                    CHECK(!f);
+                    CHECK(action == A::ignore);
+#else
+                    REQUIRE(f);
+                    CHECK(f->get_name() == "a.txt");
+                    CHECK(!f->is_locked());
+                    CHECK(action == A::remote_copy);
+#endif
+                }
             }
             SECTION("invalid file is ignored") {
                 auto file = proto::FileInfo();
