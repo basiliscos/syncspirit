@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "platform.h"
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #include <stdexcept>
-
+#endif
 using namespace syncspirit::utils;
 
 void platform_t::startup() {
@@ -21,3 +22,11 @@ void platform_t::startup() {
 }
 
 void platform_t::shutdown() noexcept {}
+
+bool platform_t::symlinks_supported() noexcept {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    return false;
+#else
+    return true;
+#endif
+}
