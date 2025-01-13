@@ -40,8 +40,8 @@ static void resize_value(widgetable_ptr_t &widget, int x, int y, int w, int h) {
 static void reset_widget(string_provider_ptr_t &) {}
 static void reset_widget(widgetable_ptr_t &widget) { widget->reset(); }
 
-static bool store_widget(string_provider_ptr_t &, void *) { return true; }
-static bool store_widget(widgetable_ptr_t &widget, void *data) { return widget->store(data); }
+static bool store_widget(string_provider_t *&, void *) { return true; }
+static bool store_widget(widgetable_t *widget, void *data) { return widget->store(data); }
 
 static int handle_value(const string_provider_t &, int) { return 0; }
 static int handle_value(widgetable_ptr_t &widget, int event) {
@@ -288,8 +288,13 @@ void static_table_t::reset() {
 bool static_table_t::store(void *data) {
     bool ok = true;
     for (int i = 0; ok && i < static_cast<int>(table_rows.size()); ++i) {
-        auto &row = table_rows[i];
-        ok = std::visit([&](auto &arg) { return store_widget(arg, data); }, row.value);
+        auto &value = table_rows[i].value;
+        // unknown crash on win32/release if for string_provider, std::visit
+        // is not used
+        auto widget = std::get_if<widgetable_ptr_t>(&value);
+        if (widget) {
+            ok = store_widget(widget->get(), data);
+        }
     }
     return ok;
 }

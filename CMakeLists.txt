@@ -59,8 +59,8 @@ function(install_executable target)
                     copy
                         $<TARGET_FILE:${target}>
                         "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
-               COMMAND ${CMAKE_COMMAND} -E copy -t ${dist_dir} $<TARGET_RUNTIME_DLLS:${target}>
-                  COMMAND_EXPAND_LISTS
+#                COMMAND ${CMAKE_COMMAND} -E copy -t ${dist_dir} $<TARGET_RUNTIME_DLLS:${target}>
+#                    COMMAND_EXPAND_LISTS
             )
         else()
             add_custom_command(TARGET deploy_${target} POST_BUILD
