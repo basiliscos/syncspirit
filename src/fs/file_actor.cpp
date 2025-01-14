@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "file_actor.h"
 #include "net/names.h"
@@ -12,6 +12,7 @@
 #include "model/diff/modify/finish_file.h"
 #include "utils.h"
 #include "utils/format.hpp"
+#include "utils/platform.h"
 #include <fstream>
 
 using namespace syncspirit::fs;
@@ -22,6 +23,9 @@ file_actor_t::write_guard_t::write_guard_t(file_actor_t &actor_,
 
 auto file_actor_t::write_guard_t::operator()(outcome::result<void> result) noexcept -> outcome::result<void> {
     success = (bool)result;
+    if (!success) {
+        actor.log->debug("I/O failure on {}: {}", txn.file_name, result.assume_error().message());
+    }
     return result;
 }
 
@@ -171,19 +175,23 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
             return ec;
         }
     } else if (file.is_link()) {
-        auto target = bfs::path(file.get_link_target());
-        LOG_DEBUG(log, "creating symlink {} -> {}", path.string(), target.string());
+        if (utils::platform_t::symlinks_supported()) {
+            auto target = bfs::path(file.get_link_target());
+            LOG_DEBUG(log, "creating symlink {} -> {}", path.string(), target.string());
 
-        bool attempt_create =
-            !bfs::exists(path, ec) || !bfs::is_symlink(path, ec) || (bfs::read_symlink(path, ec) != target);
-        if (attempt_create) {
-            bfs::create_symlink(target, path, ec);
-            if (ec) {
-                LOG_WARN(log, "error symlinking {} -> {} : {}", path.string(), target.string(), ec.message());
-                return ec;
+            bool attempt_create =
+                !bfs::exists(path, ec) || !bfs::is_symlink(path, ec) || (bfs::read_symlink(path, ec) != target);
+            if (attempt_create) {
+                bfs::create_symlink(target, path, ec);
+                if (ec) {
+                    LOG_WARN(log, "error symlinking {} -> {} : {}", path.string(), target.string(), ec.message());
+                    return ec;
+                }
+            } else {
+                LOG_TRACE(log, "no need to create symlink {} -> {}", path.string(), target.string());
             }
         } else {
-            LOG_TRACE(log, "no need to create symlink {} -> {}", path.string(), target.string());
+            LOG_TRACE(log, "symlinks are not supported by platform, no I/O for {}", path.string());
         }
     }
 

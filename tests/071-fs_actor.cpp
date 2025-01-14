@@ -206,7 +206,6 @@ void test_remote_copy() {
                 REQUIRE(bfs::is_directory(path));
             }
 
-#ifndef SYNCSPIRIT_WIN
             SECTION("symlink") {
                 bfs::path target = root_path / "some-existing-file";
                 write_file(target, "zzz");
@@ -221,10 +220,11 @@ void test_remote_copy() {
 
                 auto &path = file->get_path();
                 CHECK(!bfs::exists(path));
+#ifndef SYNCSPIRIT_WIN
                 CHECK(bfs::is_symlink(path));
                 CHECK(bfs::read_symlink(path) == target);
-            }
 #endif
+            }
 
             SECTION("deleted file") {
                 pr_fi.set_deleted(true);

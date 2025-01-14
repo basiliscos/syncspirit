@@ -85,15 +85,10 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     REQUIRE(ec);
 
                     auto [f, action] = file_iterator->next();
-#ifdef SYNCSPIRIT_WIN
-                    CHECK(!f);
-                    CHECK(action == A::ignore);
-#else
                     REQUIRE(f);
                     CHECK(f->get_name() == "a.txt");
                     CHECK(!f->is_locked());
                     CHECK(action == A::remote_copy);
-#endif
                 }
             }
             SECTION("invalid file is ignored") {

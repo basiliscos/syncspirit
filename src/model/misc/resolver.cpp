@@ -4,7 +4,6 @@
 #include "resolver.h"
 #include "model/cluster.h"
 #include "model/folder_info.h"
-#include "utils/platform.h"
 
 namespace syncspirit::model {
 
@@ -13,9 +12,6 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
         return advance_action_t::ignore;
     }
     if (remote.is_invalid()) {
-        return advance_action_t::ignore;
-    }
-    if (remote.is_link() && !utils::platform_t::symlinks_supported()) {
         return advance_action_t::ignore;
     }
 

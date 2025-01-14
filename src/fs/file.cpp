@@ -6,54 +6,65 @@
 #include "utils/log.h"
 #include <errno.h>
 #include <cassert>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 using namespace syncspirit::fs;
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#define SS_STAT_FN(PATH, BUFF) _stat((PATH), (BUFF))
+#define SS_STAT_BUFF struct _stat
+#define SS_TRUNCATE(FD, SIZE) _chsize_s((FD), (SIZE))
+#else
+#define SS_STAT_FN(PATH, BUFF) stat((PATH), (BUFF))
+#define SS_STAT_BUFF struct stat
+#define SS_TRUNCATE(FD, SIZE) ftruncate((FD), (SIZE))
+#endif
+
 auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::result<file_t> {
+    using file_guard_t = std::unique_ptr<FILE, std::function<void(FILE *)>>;
     auto tmp = model->get_size() > 0;
     auto path = tmp ? make_temporal(model->get_path()) : model->get_path();
+    path.make_preferred();
     auto path_str = path.string();
 
-    auto mode = "r+b";
     auto ec = sys::error_code{};
     bool need_resize = true;
     auto exptected_size = (uint64_t)model->get_size();
-    if (bfs::exists(path, ec)) {
-        auto file_size = bfs::file_size(path, ec);
-        if (ec) {
-            return ec;
-        }
-        if (file_size == exptected_size) {
-            need_resize = false;
-        }
-        if (file_size != exptected_size) {
-        }
+    auto file = (FILE *){nullptr};
+
+    SS_STAT_BUFF stat_info;
+    auto r = SS_STAT_FN(path_str.c_str(), &stat_info);
+    auto mode = "r+b";
+    if (r == 0) {
+        need_resize = stat_info.st_size == exptected_size;
     } else {
-        auto file = fopen(path_str.c_str(), "w");
-        if (!file) {
-            return sys::error_code{errno, sys::system_category()};
-        }
-        if (fclose(file)) {
-            return sys::error_code{errno, sys::system_category()};
-        }
+        mode = "w+b";
     }
 
-    if (need_resize) {
-        bfs::resize_file(path, exptected_size, ec);
-        if (ec) {
-            return ec;
-        }
-    }
-
-    auto file = fopen(path_str.c_str(), mode);
+    file = fopen(path_str.c_str(), mode);
     if (!file) {
         return sys::error_code{errno, sys::system_category()};
     }
-    /*    auto r = fseek(file, 0L, SEEK_SET);
-        if (r != 0) {
-            return sys::error_code{errno, sys::system_category()};
-        } */
+    auto guard = file_guard_t(file, [](FILE *f) { fclose(f); });
+
+    auto fd = fileno(file);
+    if (fd == -1) {
+        return sys::error_code{errno, sys::system_category()};
+    }
+
+    if (need_resize && (SS_TRUNCATE(fd, exptected_size) != 0)) {
+        return sys::error_code{errno, sys::system_category()};
+    }
+
     rewind(file);
+    guard.release();
     return file_t(file, std::move(model), std::move(path), tmp);
 }
 
