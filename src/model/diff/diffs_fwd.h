@@ -75,6 +75,7 @@ struct remove_pending_device_t;
 struct remove_pending_folders_t;
 struct reset_folder_infos_t;
 struct share_folder_t;
+struct suspend_folder_t;
 struct unshare_folder_t;
 struct update_peer_t;
 struct upsert_folder_info_t;

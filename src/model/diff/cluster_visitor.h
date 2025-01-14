@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -65,6 +65,7 @@ struct SYNCSPIRIT_API cluster_visitor_t {
     virtual outcome::result<void> operator()(const modify::remove_pending_folders_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::reset_folder_infos_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::share_folder_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const modify::suspend_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::unshare_folder_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::update_peer_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::upsert_folder_info_t &, void *custom) noexcept;

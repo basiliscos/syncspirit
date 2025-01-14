@@ -78,7 +78,7 @@ struct fixture_t {
 
         sup->do_process();
 
-        auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024, 100};
+        auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024, files_scan_iteration_limit};
 
         target = sup->create_actor<fs::scan_actor_t>()
                      .timeout(timeout)
@@ -100,6 +100,7 @@ struct fixture_t {
 
     virtual void main() noexcept {}
 
+    std::int64_t files_scan_iteration_limit = 100;
     builder_ptr_t builder;
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::intrusive_ptr_t<supervisor_t> sup;
@@ -632,11 +633,28 @@ void test_synchronization() {
     F().run();
 };
 
+void test_suspending() {
+    struct F : fixture_t {
+        F() { files_scan_iteration_limit = 1; }
+        void main() noexcept override {
+            sys::error_code ec;
+            write_file(root_path / "f-1.ext", "123");
+            write_file(root_path / "f-2.ext", "456");
+            write_file(root_path / "f-3.ext", "789");
+            builder->scan_start(folder->get_id()).suspend(*folder).apply(*sup);
+            REQUIRE(!folder->get_scan_finish().is_not_a_date_time());
+            REQUIRE(!folder->is_scanning());
+        }
+    };
+    F().run();
+};
+
 int _init() {
     REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");
     REGISTER_TEST_CASE(test_new_files, "test_new_files", "[fs]");
     REGISTER_TEST_CASE(test_remove_file, "test_remove_file", "[fs]");
     REGISTER_TEST_CASE(test_synchronization, "test_synchronization", "[fs]");
+    REGISTER_TEST_CASE(test_suspending, "test_suspending", "[fs]");
     return 1;
 }
 

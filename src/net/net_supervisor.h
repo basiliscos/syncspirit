@@ -86,10 +86,6 @@ struct SYNCSPIRIT_API net_supervisor_t : public ra::supervisor_asio_t,
     r::address_ptr_t db_addr;
     model::cluster_ptr_t cluster;
     utils::key_pair_t ssl_pair;
-
-    // for debug
-    r::supervisor_ptr_t cluster_sup;
-    r::supervisor_ptr_t peers_sup;
 };
 
 } // namespace net

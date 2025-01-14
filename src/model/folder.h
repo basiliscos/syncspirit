@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -28,7 +28,6 @@ struct folder_t;
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
 struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
-
     static outcome::result<folder_ptr_t> create(std::string_view key, const db::Folder &folder) noexcept;
     static outcome::result<folder_ptr_t> create(const bu::uuid &uuid, const db::Folder &folder) noexcept;
 
@@ -56,6 +55,8 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     const bool is_scanning() const noexcept;
     const bool is_synchronizing() const noexcept;
     void adjust_synchronization(std::int_fast32_t delta) noexcept;
+    void mark_suspended(bool value) noexcept;
+    bool is_suspended() const noexcept;
 
     using folder_data_t::get_path;
     using folder_data_t::set_path;
@@ -77,6 +78,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     cluster_t *cluster = nullptr;
     char key[data_length];
     std::int_fast32_t synchronizing = 0;
+    bool suspended;
 };
 
 struct SYNCSPIRIT_API folders_map_t : generic_map_t<folder_ptr_t, 2> {

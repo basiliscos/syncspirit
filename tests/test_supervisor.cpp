@@ -39,11 +39,16 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(std::string(names::coordinator) + ".test", false);
         log = utils::get_logger(identity);
+        sink = p.create_address();
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.register_name(names::coordinator, get_address()); });
-    plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) { p.subscribe_actor(&supervisor_t::on_model_update); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.register_name(names::coordinator, get_address());
+        p.register_name(names::sink, get_address());
+    });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&supervisor_t::on_model_update);
+        p.subscribe_actor(&supervisor_t::on_model_sink, sink);
+    });
     if (configure_callback) {
         configure_callback(plugin);
     }
@@ -101,6 +106,16 @@ void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept
     if (!r) {
         LOG_ERROR(log, "{}, error visiting model: {}", identity, r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
+    }
+}
+
+void supervisor_t::on_model_sink(model::message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "on_model_sink");
+    auto custom = const_cast<void *>(message.payload.custom);
+    auto diff_ptr = reinterpret_cast<model::diff::cluster_diff_t *>(custom);
+    if (diff_ptr) {
+        auto diff = model::diff::cluster_diff_ptr_t(diff_ptr, false);
+        send<model::payload::model_update_t>(get_address(), std::move(diff));
     }
 }
 

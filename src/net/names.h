@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -11,6 +11,7 @@ namespace net {
 struct SYNCSPIRIT_API names {
     static const char *peer_supervisor;
     static const char *coordinator;
+    static const char *sink;
     static const char *resolver;
     static const char *http10;
     static const char *http11_gda;

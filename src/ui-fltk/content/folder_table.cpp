@@ -2,6 +2,7 @@
 
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/remove_blocks.h"
+#include "model/diff/modify/suspend_folder.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/local/scan_request.h"
@@ -753,9 +754,13 @@ void folder_table_t::on_remove() {
     auto &sup = container.supervisor;
     auto &cluster = *sup.get_cluster();
     auto &sequencer = sup.get_sequencer();
+    auto &folder = *description.get_folder();
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::modify::remove_folder_t(cluster, sequencer, *description.get_folder());
-    sup.send_model<model::payload::model_update_t>(std::move(diff), this);
+    diff = new model::diff::modify::suspend_folder_t(folder);
+
+    auto postponed = model::diff::cluster_diff_ptr_t{};
+    postponed = new model::diff::modify::remove_folder_t(cluster, sequencer, *description.get_folder());
+    sup.send_sink<model::payload::model_update_t>(std::move(diff), postponed.detach());
 }
 
 void folder_table_t::on_rescan() {

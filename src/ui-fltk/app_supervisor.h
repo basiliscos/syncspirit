@@ -145,6 +145,11 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
         send<Payload>(coordinator, std::forward<Args>(args)...);
     }
 
+    template <typename Payload, typename... Args> void send_sink(Args &&...args) {
+        auto message = r::make_routed_message<Payload>(coordinator, sink, std::forward<Args>(args)...);
+        put(std::move(message));
+    }
+
     template <typename Fn> void with_cluster(Fn &&fn) {
         if (cluster) {
             fn();
@@ -195,6 +200,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     model::sequencer_ptr_t sequencer;
     time_point_t started_at;
     r::address_ptr_t coordinator;
+    r::address_ptr_t sink;
     utils::logger_t log;
     dist_sink_t dist_sink;
     spdlog::sink_ptr ui_sink;

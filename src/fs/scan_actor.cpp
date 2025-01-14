@@ -86,11 +86,10 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
     LOG_TRACE(log, "on_scan, folder = {}", folder_id);
 
     auto folder = cluster->get_folders().by_id(folder_id);
-
     bool stop_processing = false;
     bool completed = false;
-    if (folder->is_synchronizing()) {
-        LOG_DEBUG(log, "folder = {} synchronization in progress, cancel scanning", folder_id);
+    if (folder->is_synchronizing() || folder->is_suspended()) {
+        LOG_DEBUG(log, "cancelling folder '{}' scanning", folder_id);
         stop_processing = true;
         completed = true;
     } else {

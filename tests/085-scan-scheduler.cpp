@@ -114,6 +114,16 @@ void test_1_folder() {
                     REQUIRE(folder->is_scanning());
                 }
             }
+
+            SECTION("suspending") {
+                db_folder.set_rescan_interval(3600);
+                builder.upsert_folder(db_folder).apply(*sup);
+
+                auto folder = cluster->get_folders().by_id(folder_id);
+                CHECK(folder->is_scanning());
+                builder.suspend(*folder).scan_finish(folder_id).apply(*sup);
+                REQUIRE(sup->timers.size() == 0);
+            }
         }
     };
     F().run();

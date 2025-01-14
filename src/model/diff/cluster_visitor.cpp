@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "cluster_diff.h"
 #include "cluster_visitor.h"
@@ -48,6 +48,7 @@
 #include "modify/remove_pending_folders.h"
 #include "modify/reset_folder_infos.h"
 #include "modify/share_folder.h"
+#include "modify/suspend_folder.h"
 #include "modify/unshare_folder.h"
 #include "modify/update_peer.h"
 #include "modify/upsert_folder.h"
@@ -223,6 +224,11 @@ auto cluster_visitor_t::operator()(const modify::add_pending_folders_t &diff, vo
 }
 
 auto cluster_visitor_t::operator()(const modify::share_folder_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const modify::suspend_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

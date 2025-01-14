@@ -34,9 +34,11 @@ outcome::result<folder_ptr_t> folder_t::create(const bu::uuid &uuid, const db::F
     return outcome::success(std::move(ptr));
 }
 
-folder_t::folder_t(std::string_view key_) noexcept : synchronizing{false} { std::copy(key_.begin(), key_.end(), key); }
+folder_t::folder_t(std::string_view key_) noexcept : synchronizing{false}, suspended{false} {
+    std::copy(key_.begin(), key_.end(), key);
+}
 
-folder_t::folder_t(const bu::uuid &uuid) noexcept : synchronizing{false} {
+folder_t::folder_t(const bu::uuid &uuid) noexcept : synchronizing{false}, suspended{false} {
     key[0] = prefix;
     std::copy(uuid.begin(), uuid.end(), key + 1);
 }
@@ -116,6 +118,9 @@ void folder_t::adjust_synchronization(std::int_fast32_t delta) noexcept {
     synchronizing += delta;
     assert(synchronizing >= 0);
 }
+
+void folder_t::mark_suspended(bool value) noexcept { suspended = value; }
+bool folder_t::is_suspended() const noexcept { return suspended; }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_ptr_t &item) noexcept { return item->get_key(); }
 template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_ptr_t &item) noexcept { return item->get_id(); }

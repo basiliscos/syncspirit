@@ -147,6 +147,7 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 request_load_model();
             }
         });
+        p.discover_name(net::names::sink, sink, false).link(true);
     });
 
     plugin.with_casted<r::plugin::starter_plugin_t>(

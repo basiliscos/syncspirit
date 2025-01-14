@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "config/utils.h"
 #include "net_supervisor.h"
@@ -14,6 +14,7 @@
 #include "dialer_actor.h"
 #include "db_actor.h"
 #include "relay_actor.h"
+#include "sink_actor.h"
 #include "names.h"
 #include "model/diff/load/load_cluster.h"
 #include <filesystem>
@@ -101,8 +102,6 @@ void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_erro
 
 void net_supervisor_t::shutdown_finish() noexcept {
     db_addr.reset();
-    cluster_sup.reset();
-    peers_sup.reset();
     ra::supervisor_asio_t::shutdown_finish();
 }
 
@@ -118,6 +117,7 @@ void net_supervisor_t::launch_early() noexcept {
                   .escalate_failure()
                   .finish()
                   ->get_address();
+    create_actor<sink_actor_t>().timeout(timeout).escalate_failure().finish();
 }
 
 void net_supervisor_t::load_db() noexcept {
@@ -202,15 +202,15 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
                   devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
                   ignored_folders.size(), pending_folders_sz, pending_devices.size());
 
-        cluster_sup = create_actor<cluster_supervisor_t>()
-                          .timeout(shutdown_timeout * 9 / 10)
-                          .strand(strand)
-                          .cluster(cluster)
-                          .sequencer(sequencer)
-                          .bep_config(app_config.bep_config)
-                          .hasher_threads(app_config.hasher_threads)
-                          .escalate_failure()
-                          .finish();
+        create_actor<cluster_supervisor_t>()
+            .timeout(shutdown_timeout * 9 / 10)
+            .strand(strand)
+            .cluster(cluster)
+            .sequencer(sequencer)
+            .bep_config(app_config.bep_config)
+            .hasher_threads(app_config.hasher_threads)
+            .escalate_failure()
+            .finish();
         launch_net();
     }
     return diff.visit_next(*this, custom);

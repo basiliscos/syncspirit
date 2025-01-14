@@ -64,6 +64,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     void enqueue(r::message_ptr_t message) noexcept override;
 
     void on_model_update(model::message::model_update_t &) noexcept;
+    void on_model_sink(model::message::model_update_t &) noexcept;
     void do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept override;
     void do_invoke_timer(r::request_id_t timer_id) noexcept;
     void do_cancel_timer(r::request_id_t timer_id) noexcept override;
@@ -82,6 +83,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     bool auto_finish;
     bool auto_ack_blocks;
     io_errors_t io_errors;
+    r::address_ptr_t sink;
 };
 
 }; // namespace syncspirit::test

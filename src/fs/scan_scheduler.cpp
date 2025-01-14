@@ -108,7 +108,7 @@ auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
         auto folder_id = scan_queue.front();
         scan_queue.pop_front();
         auto folder = cluster->get_folders().by_id(folder_id);
-        if (!folder || folder->is_synchronizing()) {
+        if (!folder || folder->is_synchronizing() || folder->is_suspended()) {
             continue;
         }
         for (auto it = scan_queue.begin(); it != scan_queue.end();) {
@@ -128,7 +128,7 @@ auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
     for (auto it : cluster->get_folders()) {
         auto &f = it.item;
         auto interval = f->get_rescan_interval();
-        if (!interval || f->is_scanning() || f->is_synchronizing()) {
+        if (!interval || f->is_scanning() || f->is_synchronizing() || f->is_suspended()) {
             continue;
         }
         auto interval_s = r::pt::seconds{interval};

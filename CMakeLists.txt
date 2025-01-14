@@ -164,6 +164,7 @@ add_library(syncspirit_core
     src/model/diff/modify/remove_pending_folders.cpp
     src/model/diff/modify/reset_folder_infos.cpp
     src/model/diff/modify/share_folder.cpp
+    src/model/diff/modify/suspend_folder.cpp
     src/model/diff/modify/unshare_folder.cpp
     src/model/diff/modify/update_peer.cpp
     src/model/diff/modify/upsert_folder.cpp
@@ -209,6 +210,7 @@ add_library(syncspirit_core
     src/net/relay_actor.cpp
     src/net/resolver_actor.cpp
     src/net/names.cpp
+    src/net/sink_actor.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
     src/proto/bep_support.cpp
