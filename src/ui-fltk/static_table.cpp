@@ -218,7 +218,7 @@ int static_table_t::handle(int event) {
     // unselect rows with custom widgets
     for (size_t i = 0; i < rows(); ++i) {
         auto custom = std::get_if<widgetable_ptr_t>(&table_rows[i].value);
-        if (custom && row_selected(i)) {
+        if (custom && row_selected(i) > 1) {
             select_row(i, 0);
         }
     }
