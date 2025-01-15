@@ -1830,6 +1830,14 @@ void test_download_interrupting() {
                     auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
                     CHECK(folder_my->get_file_infos().size() == 0);
                 }
+                SECTION("remove folder") {
+                    builder.remove_folder(*folder_1).apply(*sup);
+                    peer_actor->push_block("12345", 0, file->name());
+                    peer_actor->process_block_requests();
+                    hasher->process_requests();
+                    sup->do_process();
+                    CHECK(!cluster->get_folders().by_id(folder->id()));
+                }
             }
         }
 

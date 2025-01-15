@@ -51,8 +51,8 @@ C::folder_synchronization_t::folder_synchronization_t(controller_actor_t &contro
 C::folder_synchronization_t::~folder_synchronization_t() {
     if (blocks.size() && folder && !folder->is_suspended()) {
         controller.push(new model::diff::local::synchronization_finish_t(folder->get_id()));
-        for (auto &b : blocks) {
-            b->unlock();
+        for (auto &it : blocks) {
+            it.second->unlock();
         }
     }
 }
@@ -64,12 +64,13 @@ void C::folder_synchronization_t::start_fetching(model::block_info_t *block) noe
     if (blocks.empty() && !synchronizing) {
         start_sync();
     }
-    blocks.emplace(block);
+    blocks[block->get_hash()] = model::block_info_ptr_t(block);
 }
 
-void C::folder_synchronization_t::finish_fetching(model::block_info_t *block) noexcept {
-    block->unlock();
-    blocks.erase(block);
+void C::folder_synchronization_t::finish_fetching(std::string_view hash) noexcept {
+    auto it = blocks.find(hash);
+    it->second->unlock();
+    blocks.erase(it);
     if (blocks.size() == 0 && synchronizing) {
         finish_sync();
     }
@@ -546,7 +547,7 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
     auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = folder_info->get_file_infos().by_name(diff.file_name);
     auto block = file->get_blocks().at(diff.block_index);
-    release_block({block.get(), file.get(), diff.block_index});
+    release_block(diff.folder_id, block->get_hash());
     if (file->is_locally_available()) {
         LOG_TRACE(log, "on_block_update, finalizing {}", file->get_name());
         push(new model::diff::modify::finish_file_t(*file));
@@ -709,7 +710,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     } else {
         auto &block = *file_block.block();
         if (ee) {
-            release_block(file_block);
+            do_release_block = true;
             auto &ec = ee->root()->ec;
             if (ec.category() == utils::request_error_code_category()) {
                 auto file = file_block.file();
@@ -739,6 +740,9 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     if (try_next) {
         pull_ready();
     }
+    if (do_release_block) {
+        release_block(payload.folder_id, payload.block_hash);
+    }
     send_diff();
 }
 
@@ -754,35 +758,39 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     if (!file) {
         LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", payload.file_name, payload.folder_id);
         do_release_block = true;
-        return;
-    }
-    auto folder = file->get_folder_info()->get_folder();
-    auto &path = file->get_path();
-    if (ee) {
-        LOG_WARN(log, "on_validation failed : {}", ee->message());
-        do_shutdown(ee);
     } else {
-        if (!res.payload.res.valid) {
-            if (!file->is_unreachable()) {
-                auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-                LOG_WARN(log, "digest mismatch for '{}'; marking reachable", file->get_full_name(), ec.message());
-                file->mark_unreachable(true);
-                push(new model::diff::modify::mark_reachable_t(*file, false));
-            }
-            release_block(file_block);
-            pull_ready();
-            send_diff();
-        } else if (folder->is_suspended()) {
-            LOG_WARN(log, "folder '{}' is suspended, no further processing of '{}'", folder->get_id(),
-                     file->get_name());
+        auto folder = file->get_folder_info()->get_folder();
+        auto &path = file->get_path();
+        if (ee) {
+            do_release_block = true;
+            LOG_WARN(log, "on_validation failed : {}", ee->message());
+            do_shutdown(ee);
         } else {
-            auto &data = block_res->payload.res.data;
-            auto index = payload.block_index;
-            LOG_TRACE(log, "{}, got block {}, write requests left = {}", file->get_name(), index,
-                      cluster->get_write_requests());
-            auto diff = cluster_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
-            push_block_write(std::move(diff));
+            if (!res.payload.res.valid) {
+                if (!file->is_unreachable()) {
+                    auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
+                    LOG_WARN(log, "digest mismatch for '{}'; marking reachable", file->get_full_name(), ec.message());
+                    file->mark_unreachable(true);
+                    push(new model::diff::modify::mark_reachable_t(*file, false));
+                }
+                do_release_block = true;
+                pull_ready();
+                send_diff();
+            } else if (folder->is_suspended()) {
+                LOG_WARN(log, "folder '{}' is suspended, no further processing of '{}'", folder->get_id(),
+                         file->get_name());
+            } else {
+                auto &data = block_res->payload.res.data;
+                auto index = payload.block_index;
+                LOG_TRACE(log, "{}, got block {}, write requests left = {}", file->get_name(), index,
+                          cluster->get_write_requests());
+                auto diff = cluster_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
+                push_block_write(std::move(diff));
+            }
         }
+    }
+    if (do_release_block) {
+        release_block(payload.folder_id, payload.block_hash);
     }
 }
 
@@ -818,6 +826,13 @@ auto controller_actor_t::get_sync_info(model::folder_t *folder) noexcept -> fold
     return it->second;
 }
 
+auto controller_actor_t::get_sync_info(std::string_view folder_id) noexcept -> folder_synchronization_ptr_t {
+    auto predicate = [folder_id](const auto &it) -> bool { return it.first->get_id() == folder_id; };
+    auto it = std::find_if(synchronizing_folders.begin(), synchronizing_folders.end(), predicate);
+    assert(it != synchronizing_folders.end());
+    return it->second;
+}
+
 void controller_actor_t::acquire_block(const model::file_block_t &file_block) noexcept {
     auto block = file_block.block();
     auto folder = file_block.file()->get_folder_info()->get_folder();
@@ -825,10 +840,8 @@ void controller_actor_t::acquire_block(const model::file_block_t &file_block) no
     get_sync_info(folder)->start_fetching(block);
 }
 
-void controller_actor_t::release_block(const model::file_block_t &file_block) noexcept {
-    auto block = file_block.block();
-    auto folder = file_block.file()->get_folder_info()->get_folder();
-    get_sync_info(folder)->finish_fetching(block);
+void controller_actor_t::release_block(std::string_view folder_id, std::string_view hash) noexcept {
+    get_sync_info(folder_id)->finish_fetching(hash);
 }
 
 controller_actor_t::pull_signal_t::pull_signal_t(void *controller_) noexcept : controller{controller_} {}

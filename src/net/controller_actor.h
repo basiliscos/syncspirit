@@ -119,13 +119,13 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using block_write_queue_t = std::deque<model::diff::cluster_diff_ptr_t>;
 
     struct folder_synchronization_t : model::arc_base_t<folder_synchronization_t> {
-        using block_set_t = std::unordered_set<model::block_info_ptr_t>;
+        using block_set_t = std::unordered_map<std::string_view, model::block_info_ptr_t>;
         folder_synchronization_t(controller_actor_t &controller, model::folder_t &folder) noexcept;
         ~folder_synchronization_t();
         void reset() noexcept;
 
         void start_fetching(model::block_info_t *) noexcept;
-        void finish_fetching(model::block_info_t *) noexcept;
+        void finish_fetching(std::string_view hash) noexcept;
 
         void start_sync() noexcept;
         void finish_sync() noexcept;
@@ -171,8 +171,9 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void push(model::diff::cluster_diff_ptr_t diff) noexcept;
     void send_diff() noexcept;
     void acquire_block(const model::file_block_t &block) noexcept;
-    void release_block(const model::file_block_t &block) noexcept;
+    void release_block(std::string_view folder_id, std::string_view hash) noexcept;
     folder_synchronization_ptr_t get_sync_info(model::folder_t *folder) noexcept;
+    folder_synchronization_ptr_t get_sync_info(std::string_view folder_id) noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_remote_folder_infos_t &, void *) noexcept override;

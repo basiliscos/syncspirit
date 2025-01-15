@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "synchronization_start.h"
 #include "model/cluster.h"
@@ -14,9 +14,11 @@ synchronization_start_t::synchronization_start_t(std::string_view folder_id_) : 
 auto synchronization_start_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
-    folder->adjust_synchronization(1);
+    if (folder) {
+        folder->adjust_synchronization(1);
+        folder->notify_update();
+    }
     auto r = applicator_t::apply_sibling(cluster, controller);
-    folder->notify_update();
     return r;
 }
 
