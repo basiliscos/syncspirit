@@ -13,6 +13,7 @@
 #include "net/names.h"
 #include "fs/messages.h"
 #include "utils/error_code.h"
+#include "utils/tls.h"
 #include "proto/bep_support.h"
 #include <boost/core/demangle.hpp>
 #include <type_traits>
@@ -222,6 +223,72 @@ struct sample_peer_t : r::actor_base_t {
     allowed_index_updates_t allowed_index_updates;
 };
 
+struct hasher_config_t : hasher::hasher_actor_config_t {
+    uint32_t index;
+    bool auto_reply = true;
+};
+
+template <typename Actor> struct hasher_config_builder_t : hasher::hasher_actor_config_builder_t<Actor> {
+    using builder_t = typename Actor::template config_builder_t<Actor>;
+    using parent_t = ::hasher_actor_config_builder_t<Actor>;
+    using parent_t::parent_t;
+
+    builder_t &&auto_reply(uint32_t value) && noexcept {
+        parent_t::config.auto_reply = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+};
+
+struct managed_hasher_t : r::actor_base_t {
+    using config_t = hasher_config_t;
+    template <typename Actor> using config_builder_t = hasher_config_builder_t<Actor>;
+
+    using validation_request_t = hasher::message::validation_request_t;
+    using validation_request_ptr_t = model::intrusive_ptr_t<validation_request_t>;
+    using queue_t = std::deque<validation_request_ptr_t>;
+
+    managed_hasher_t(config_t &cfg) : r::actor_base_t{cfg}, index{cfg.index}, auto_reply{cfg.auto_reply} {}
+
+    void configure(r::plugin::plugin_base_t &plugin) noexcept override {
+        r::actor_base_t::configure(plugin);
+        plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+            p.set_identity(fmt::format("hasher-{}", 1), false);
+            log = utils::get_logger(fmt::format("test-hasher-{}", 1));
+        });
+        plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(identity, get_address()); });
+        plugin.with_casted<r::plugin::starter_plugin_t>(
+            [&](auto &p) { p.subscribe_actor(&managed_hasher_t::on_validation); });
+    }
+    void on_validation(validation_request_t &req) noexcept {
+        queue.emplace_back(&req);
+        if (auto_reply) {
+            process_requests();
+        }
+    }
+    void process_requests() noexcept {
+        static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
+
+        LOG_TRACE(log, "{}, process_requests", identity);
+        while (!queue.empty()) {
+            auto req = queue.front();
+            queue.pop_front();
+            auto &payload = *req->payload.request_payload;
+
+            char digest[SZ];
+            auto &data = payload.data;
+
+            utils::digest(data.data(), data.length(), digest);
+            bool eq = payload.hash == std::string_view(digest, SZ);
+            reply_to(*req, eq);
+        }
+    }
+
+    uint32_t index;
+    bool auto_reply;
+    utils::logger_t log;
+    queue_t queue;
+};
+
 struct fixture_t {
     using peer_ptr_t = r::intrusive_ptr_t<sample_peer_t>;
     using target_ptr_t = r::intrusive_ptr_t<net::controller_actor_t>;
@@ -306,7 +373,7 @@ struct fixture_t {
         sup->do_process();
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
-        sup->create_actor<hasher_actor_t>().index(1).timeout(timeout).finish();
+        create_hasher();
         sup->create_actor<hasher::hasher_proxy_actor_t>()
             .timeout(timeout)
             .hasher_threads(1)
@@ -335,6 +402,8 @@ struct fixture_t {
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
+
+    virtual void create_hasher() noexcept { sup->create_actor<hasher_actor_t>().index(1).timeout(timeout).finish(); }
 
     virtual void main(diff_builder_t &) noexcept {}
 
@@ -1675,6 +1744,16 @@ void test_conflicts() {
 
 void test_download_interrupting() {
     struct F : fixture_t {
+
+        void create_hasher() noexcept override {
+            hasher = sup->create_actor<managed_hasher_t>()
+                         .index(1)
+                         .auto_reply(hasher_auto_reply)
+                         .timeout(timeout)
+                         .finish()
+                         .get();
+        }
+
         using fixture_t::fixture_t;
         void main(diff_builder_t &) noexcept override {
             sup->do_process();
@@ -1737,7 +1816,25 @@ void test_download_interrupting() {
                     CHECK(!cluster->get_folders().by_id(folder->id()));
                 }
             }
+
+            SECTION("hash validation replies") {
+                SECTION("folder is kept") {
+                    peer_actor->push_block("12345", 0, file->name());
+                    peer_actor->process_block_requests();
+                    sup->do_process();
+
+                    SECTION("suspend folder") { builder.suspend(*folder_1).apply(*sup); }
+                    SECTION("unshare folder") { builder.unshare_folder(*folder_peer).apply(*sup); }
+
+                    hasher->process_requests();
+                    auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
+                    CHECK(folder_my->get_file_infos().size() == 0);
+                }
+            }
         }
+
+        bool hasher_auto_reply = false;
+        managed_hasher_t *hasher;
     };
     F(false, 10, false).run();
 }

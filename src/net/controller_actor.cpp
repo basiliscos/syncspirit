@@ -754,10 +754,10 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     if (!file) {
         LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", payload.file_name, payload.folder_id);
         do_release_block = true;
+        return;
     }
     auto folder = file->get_folder_info()->get_folder();
     auto &path = file->get_path();
-
     if (ee) {
         LOG_WARN(log, "on_validation failed : {}", ee->message());
         do_shutdown(ee);
