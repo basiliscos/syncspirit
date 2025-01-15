@@ -158,9 +158,9 @@ struct sample_peer_t : r::actor_base_t {
                 auto &req = block_requests.front();
                 auto &res = block_responses.front();
                 auto &req_payload = req->payload.request_payload;
-                if (req_payload.block.block_index() == res.block_index) {
+                if (req_payload.block_index == res.block_index) {
                     auto &name = res.name;
-                    return name.empty() || name == req_payload.file->get_name();
+                    return name.empty() || name == req_payload.file_name;
                 }
             }
             return false;
@@ -182,8 +182,7 @@ struct sample_peer_t : r::actor_base_t {
     void on_block_request(net::message::block_request_t &req) noexcept {
         block_requests.push_front(&req);
         ++blocks_requested;
-        log->debug("{}, requesting block # {}", identity,
-                   block_requests.front()->payload.request_payload.block.block_index());
+        log->debug("{}, requesting block # {}", identity, block_requests.front()->payload.request_payload.block_index);
         if (block_responses.size()) {
             log->debug("{}, top response block # {}", identity, block_responses.front().block_index);
         }

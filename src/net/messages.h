@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -16,6 +16,7 @@
 #include <fmt/core.h>
 #include "model/diff/cluster_diff.h"
 #include "model/file_info.h"
+#include "model/folder_info.h"
 #include "transport/base.h"
 #include "proto/bep_support.h"
 #include "utils/dns.h"
@@ -130,9 +131,16 @@ struct block_response_t {
 
 struct block_request_t {
     using response_t = block_response_t;
-    model::file_info_ptr_t file;
-    model::file_block_t block;
-    block_request_t(const model::file_info_ptr_t &file, const model::file_block_t &block) noexcept;
+    std::string folder_id;
+    std::string file_name;
+    std::int64_t sequence;
+    size_t block_index;
+    std::int64_t block_offset;
+    std::uint32_t block_size;
+    std::string block_hash;
+    block_request_t(const model::file_info_ptr_t &file, size_t block_index) noexcept;
+
+    model::file_block_t get_block(model::cluster_t &, model::device_t &peer) noexcept;
 };
 
 struct connect_response_t {

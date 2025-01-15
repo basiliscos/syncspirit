@@ -377,7 +377,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
         auto sz = block->get_size();
         LOG_TRACE(log, "request_block on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}",
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
-        request<payload::block_request_t>(peer_addr, file, file_block).send(request_timeout);
+        request<payload::block_request_t>(peer_addr, file, file_block.block_index()).send(request_timeout);
         ++rx_blocks_requested;
         request_pool -= (int64_t)sz;
     }
@@ -637,18 +637,23 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
             code = proto::ErrorCode::NO_SUCH_FILE;
         } else {
             auto &folder_infos = folder->get_folder_infos();
-            auto peer_folder = folder_infos.by_device(*peer);
-            if (!peer_folder) {
-                code = proto::ErrorCode::NO_SUCH_FILE;
+            if (folder->is_suspended()) {
+                LOG_WARN(log, "folder '{}' is suspended for requests", folder->get_label());
+                code = proto::ErrorCode::GENERIC;
             } else {
-                auto my_folder = folder_infos.by_device(*cluster->get_device());
-                auto file = my_folder->get_file_infos().by_name(req->name());
-                if (!file) {
+                auto peer_folder = folder_infos.by_device(*peer);
+                if (!peer_folder) {
                     code = proto::ErrorCode::NO_SUCH_FILE;
                 } else {
-                    if (!file->is_file()) {
-                        LOG_WARN(log, "attempt to request non-regular file: {}", file->get_name());
-                        code = proto::ErrorCode::GENERIC;
+                    auto my_folder = folder_infos.by_device(*cluster->get_device());
+                    auto file = my_folder->get_file_infos().by_name(req->name());
+                    if (!file) {
+                        code = proto::ErrorCode::NO_SUCH_FILE;
+                    } else {
+                        if (!file->is_file()) {
+                            LOG_WARN(log, "attempt to request non-regular file: {}", file->get_name());
+                            code = proto::ErrorCode::GENERIC;
+                        }
                     }
                 }
             }
@@ -667,7 +672,9 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
     }
 }
 
-void controller_actor_t::on_message(proto::message::DownloadProgress &) noexcept { std::abort(); }
+void controller_actor_t::on_message(proto::message::DownloadProgress &) noexcept {
+    LOG_ERROR(log, "on_message, not implemented");
+}
 
 void controller_actor_t::on_block_response(fs::message::block_response_t &message) noexcept {
     --tx_blocks_requested;
@@ -690,35 +697,41 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     --rx_blocks_requested;
     auto ee = message.payload.ee;
     auto &payload = message.payload.req->payload.request_payload;
-    auto &file_block = payload.block;
-    auto &block = *file_block.block();
+    auto file_block = payload.get_block(*cluster, *peer);
+    auto file = file_block.file();
+    bool do_release_block = false;
     bool try_next = true;
-
-    if (ee) {
-        release_block(file_block);
-        auto &ec = ee->root()->ec;
-        if (ec.category() == utils::request_error_code_category()) {
-            auto file = file_block.file();
-            if (!file->is_unreachable()) {
-                LOG_WARN(log, "can't receive block from file '{}': {}; marking unreachable", file->get_full_name(),
-                         ec.message());
-                file->mark_unreachable(true);
-                push(new model::diff::modify::mark_reachable_t(*file, false));
-                auto it = synchronizing_files.find(file);
-                synchronizing_files.erase(it);
+    if (!file) {
+        LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", payload.file_name, payload.folder_id);
+        do_release_block = true;
+    } else {
+        auto &block = *file_block.block();
+        if (ee) {
+            release_block(file_block);
+            auto &ec = ee->root()->ec;
+            if (ec.category() == utils::request_error_code_category()) {
+                auto file = file_block.file();
+                if (!file->is_unreachable()) {
+                    LOG_WARN(log, "can't receive block from file '{}': {}; marking unreachable", file->get_full_name(),
+                             ec.message());
+                    file->mark_unreachable(true);
+                    push(new model::diff::modify::mark_reachable_t(*file, false));
+                    auto it = synchronizing_files.find(file);
+                    synchronizing_files.erase(it);
+                }
+            } else {
+                LOG_WARN(log, "can't receive block : {}", ee->message());
+                do_shutdown(ee);
+                try_next = false;
             }
         } else {
-            LOG_WARN(log, "can't receive block : {}", ee->message());
-            do_shutdown(ee);
-            try_next = false;
-        }
-    } else {
-        auto &data = message.payload.res.data;
-        auto hash = std::string(file_block.block()->get_hash());
-        request_pool += block.get_size();
+            auto &data = message.payload.res.data;
+            auto hash = std::string(file_block.block()->get_hash());
+            request_pool += block.get_size();
 
-        request<hasher::payload::validation_request_t>(hasher_proxy, data, hash, &message).send(init_timeout);
-        resources->acquire(resource::hash);
+            request<hasher::payload::validation_request_t>(hasher_proxy, data, hash, &message).send(init_timeout);
+            resources->acquire(resource::hash);
+        }
     }
 
     if (try_next) {
@@ -733,8 +746,14 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     auto &ee = res.payload.ee;
     auto block_res = (message::block_response_t *)res.payload.req->payload.request_payload->custom.get();
     auto &payload = block_res->payload.req->payload.request_payload;
-    auto index = payload.block.block_index();
-    auto &file = payload.file;
+    auto file_block = payload.get_block(*cluster, *peer);
+    auto file = file_block.file();
+    bool do_release_block = false;
+    if (!file) {
+        LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", payload.file_name, payload.folder_id);
+        do_release_block = true;
+    }
+    auto folder = file->get_folder_info()->get_folder();
     auto &path = file->get_path();
 
     if (ee) {
@@ -748,12 +767,15 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
                 file->mark_unreachable(true);
                 push(new model::diff::modify::mark_reachable_t(*file, false));
             }
-            release_block({file->get_blocks()[index].get(), file.get(), index});
+            release_block(file_block);
             pull_ready();
             send_diff();
+        } else if (folder->is_suspended()) {
+            LOG_WARN(log, "folder '{}' is suspended, no further processing of '{}'", folder->get_id(),
+                     file->get_name());
         } else {
             auto &data = block_res->payload.res.data;
-
+            auto index = payload.block_index;
             LOG_TRACE(log, "{}, got block {}, write requests left = {}", file->get_name(), index,
                       cluster->get_write_requests());
             auto diff = cluster_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));

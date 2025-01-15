@@ -280,12 +280,21 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
             REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
 
-            auto [f, action] = file_iterator->next();
-            REQUIRE(f);
-            CHECK(action == A::remote_copy);
-            CHECK(f->get_name() == "a.txt");
-            CHECK(!f->is_locked());
-            CHECK(file_iterator->next() == R{nullptr, A::ignore});
+            SECTION("folder is suspended") {
+                REQUIRE(builder.suspend(*folder).apply());
+                auto [f, action] = file_iterator->next();
+                CHECK(!f);
+                CHECK(action == A::ignore);
+            }
+
+            SECTION("folder is not suspended") {
+                auto [f, action] = file_iterator->next();
+                REQUIRE(f);
+                CHECK(action == A::remote_copy);
+                CHECK(f->get_name() == "a.txt");
+                CHECK(!f->is_locked());
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
+            }
         }
 
         SECTION("have local, but outdated") {

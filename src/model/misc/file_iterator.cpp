@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "file_iterator.h"
 #include "resolver.h"
@@ -77,7 +77,7 @@ auto file_iterator_t::next() noexcept -> result_t {
 
         auto &queue = fi.files_queue;
         auto folder = local_folder->get_folder();
-        auto do_scan = !folder->is_paused() && !folder->is_scheduled() && !queue->empty();
+        auto do_scan = !folder->is_paused() && !folder->is_scheduled() && !folder->is_suspended() && !queue->empty();
 
         // check other files
         if (do_scan) {

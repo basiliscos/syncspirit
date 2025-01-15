@@ -295,16 +295,13 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     auto req_id = (std::int32_t)message.payload.id;
     proto::Request req;
     auto &p = message.payload.request_payload;
-    auto &file = p.file;
-    auto &file_block = p.block;
-    auto &block = *file_block.block();
     req.set_id(req_id);
-    *req.mutable_folder() = file->get_folder_info()->get_folder()->get_id();
-    *req.mutable_name() = file->get_name();
+    *req.mutable_folder() = p.folder_id;
+    *req.mutable_name() = p.file_name;
 
-    req.set_offset(file_block.get_offset());
-    req.set_size(block.get_size());
-    *req.mutable_hash() = block.get_hash();
+    req.set_offset(p.block_offset);
+    req.set_size(p.block_size);
+    *req.mutable_hash() = p.block_hash;
 
     fmt::memory_buffer buff;
     proto::serialize(buff, req);
@@ -448,7 +445,7 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
             reply_with_error(*block_request, make_error(ec));
         } else {
             auto &data = message->data();
-            auto request_sz = block_request->payload.request_payload.block.block()->get_size();
+            auto request_sz = block_request->payload.request_payload.block_size;
             if (data.size() != request_sz) {
                 LOG_WARN(log, "got {} bytes, but requested {}", data.size(), request_sz);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::response_missize);
