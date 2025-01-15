@@ -1673,6 +1673,75 @@ void test_conflicts() {
     F(false, 10, false).run();
 }
 
+void test_download_interrupting() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            sup->do_process();
+
+            auto builder = diff_builder_t(*cluster);
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            auto cc = proto::ClusterConfig{};
+            auto folder = cc.add_folders();
+            folder->set_id(std::string(folder_1->get_id()));
+            auto d_peer = folder->add_devices();
+            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
+            d_peer->set_max_sequence(15);
+            d_peer->set_index_id(12345);
+
+            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            sup->do_process();
+
+            builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
+            auto folder_peer = folder_1->get_folder_infos().by_device(*peer_device);
+            REQUIRE(folder_peer->get_index() == d_peer->index_id());
+
+            auto index = proto::Index{};
+            index.set_folder(std::string(folder_1->get_id()));
+            auto file = index.add_files();
+            file->set_name("some-file");
+            file->set_type(proto::FileInfoType::FILE);
+            file->set_sequence(154);
+            file->set_block_size(5);
+            file->set_size(5);
+            auto version = file->mutable_version();
+            auto counter = version->add_counters();
+            counter->set_id(1ul);
+            counter->set_value(1ul);
+
+            auto b1 = file->add_blocks();
+            b1->set_hash(utils::sha256_digest("12345").value());
+            b1->set_offset(0);
+            b1->set_size(5);
+
+            peer_actor->forward(proto::message::Index(new proto::Index(index)));
+            sup->do_process();
+
+            SECTION("block from peer") {
+                SECTION("folder is kept") {
+                    SECTION("suspend folder") { builder.suspend(*folder_1).apply(*sup); }
+                    SECTION("unshare folder") { builder.unshare_folder(*folder_peer).apply(*sup); }
+                    peer_actor->push_block("12345", 0, file->name());
+                    peer_actor->process_block_requests();
+                    sup->do_process();
+                    auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
+                    CHECK(folder_my->get_file_infos().size() == 0);
+                }
+
+                SECTION("remove folder") {
+                    builder.remove_folder(*folder_1).apply(*sup);
+                    peer_actor->push_block("12345", 0, file->name());
+                    peer_actor->process_block_requests();
+                    sup->do_process();
+                    CHECK(!cluster->get_folders().by_id(folder->id()));
+                }
+            }
+        }
+    };
+    F(false, 10, false).run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
@@ -1687,6 +1756,7 @@ int _init() {
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
     REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
+    REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
     return 1;
 }
 

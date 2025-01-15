@@ -122,6 +122,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         using block_set_t = std::unordered_set<model::block_info_ptr_t>;
         folder_synchronization_t(controller_actor_t &controller, model::folder_t &folder) noexcept;
         ~folder_synchronization_t();
+        void reset() noexcept;
 
         void start_fetching(model::block_info_t *) noexcept;
         void finish_fetching(model::block_info_t *) noexcept;
@@ -131,7 +132,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
 
       private:
         controller_actor_t &controller;
-        model::folder_t *folder;
+        model::folder_ptr_t folder;
         block_set_t blocks;
         bool synchronizing;
     };

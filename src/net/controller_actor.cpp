@@ -49,13 +49,15 @@ C::folder_synchronization_t::folder_synchronization_t(controller_actor_t &contro
     : controller{controller_}, folder{&folder_}, synchronizing{false} {}
 
 C::folder_synchronization_t::~folder_synchronization_t() {
-    if (blocks.size()) {
+    if (blocks.size() && folder && !folder->is_suspended()) {
         controller.push(new model::diff::local::synchronization_finish_t(folder->get_id()));
         for (auto &b : blocks) {
             b->unlock();
         }
     }
 }
+
+void C::folder_synchronization_t::reset() noexcept { folder.reset(); }
 
 void C::folder_synchronization_t::start_fetching(model::block_info_t *block) noexcept {
     block->lock();

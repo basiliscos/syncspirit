@@ -73,6 +73,7 @@ auto remove_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
 
     auto &folders = cluster.get_folders();
     auto folder = folders.by_id(folder_id);
+    folder->mark_suspended(true); // aka deleted object marker
     folders.remove(folder);
 
     return applicator_t::apply_sibling(cluster, controller);
