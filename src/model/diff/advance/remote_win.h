@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -15,7 +15,6 @@ struct SYNCSPIRIT_API remote_win_t final : advance_t {
                  std::string_view folder_id, std::string_view peer_id) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
-
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 };
 

@@ -542,7 +542,6 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
 
 auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = folder_info->get_file_infos().by_name(diff.file_name);

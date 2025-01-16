@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "remote_win.h"
 #include "remote_copy.h"
@@ -24,11 +24,23 @@ auto remote_win_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
     -> outcome::result<void> {
     auto &self = *cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto &local_files = folder->get_folder_infos().by_device(self)->get_file_infos();
-    auto prev_file = local_files.by_name(proto_source.name());
-    assert(prev_file);
-    local_files.remove(prev_file);
-    return parent_t::apply_impl(cluster, controller);
+    if (!folder) {
+        LOG_DEBUG(log, "remote_win_t, folder = {}, name = {}, folder is not available, ignoring", folder_id,
+                  proto_source.name());
+    } else if (folder->is_suspended()) {
+        LOG_DEBUG(log, "remote_win_t, folder = {}, name = {}, folder is suspended, ignoring", folder_id,
+                  proto_source.name());
+    } else if (auto peer_folder = folder->get_folder_infos().by_device_id(peer_id); !peer_folder) {
+        LOG_DEBUG(log, "remote_win_t, folder = {}, name = {}, peer folder is not available, ignoring", folder_id,
+                  proto_source.name());
+    } else {
+        auto &local_files = folder->get_folder_infos().by_device(self)->get_file_infos();
+        auto prev_file = local_files.by_name(proto_source.name());
+        assert(prev_file);
+        local_files.remove(prev_file);
+        return parent_t::apply_impl(cluster, controller);
+    }
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto remote_win_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

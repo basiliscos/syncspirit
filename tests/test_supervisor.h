@@ -79,6 +79,8 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
     configure_callback_t configure_callback;
+    model::diff::cluster_diff_ptr_t delayed_ack_holder;
+    model::diff::cluster_diff_t *delayed_ack_current;
     timers_t timers;
     bool auto_finish;
     bool auto_ack_blocks;

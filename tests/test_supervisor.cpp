@@ -142,8 +142,16 @@ auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
 
 auto supervisor_t::operator()(const model::diff::modify::append_block_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+    auto ack_diff = diff.ack();
     if (auto_ack_blocks) {
         send<model::payload::model_update_t>(address, diff.ack(), this);
+    } else {
+        if (delayed_ack_holder) {
+            delayed_ack_current = delayed_ack_current->assign_sibling(ack_diff.get());
+        } else {
+            delayed_ack_holder = ack_diff;
+            delayed_ack_current = ack_diff.get();
+        }
     }
     return diff.visit_next(*this, custom);
 }

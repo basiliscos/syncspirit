@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "local_update.h"
 #include "model/cluster.h"
@@ -35,6 +35,21 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
         version.reset(new version_t(device));
     }
     version->to_proto(proto_version);
+}
+
+auto local_update_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    auto folder = cluster.get_folders().by_id(folder_id);
+    if (!folder) {
+        LOG_DEBUG(log, "remote_copy_t, folder = {}, name = {}, folder is not available, ignoring", folder_id,
+                  proto_source.name());
+    } else if (folder->is_suspended()) {
+        LOG_DEBUG(log, "remote_copy_t, folder = {}, name = {}, folder is suspended, ignoring", folder_id,
+                  proto_source.name());
+    } else {
+        return advance_t::apply_impl(cluster, controller);
+    }
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto local_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
