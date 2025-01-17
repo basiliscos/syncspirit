@@ -445,31 +445,35 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
     -> outcome::result<void> {
     auto ctx = reinterpret_cast<context_t *>(custom);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto &self = *cluster->get_device();
-    auto &folder_infos = folder->get_folder_infos();
-    auto peer_folder = folder_infos.by_device_id(diff.peer_id);
-    auto file = peer_folder->get_file_infos().by_name(diff.proto_source.name());
-    auto local_file = model::file_info_ptr_t();
-    assert(file);
-    if (diff.peer_id == peer->device_id().get_sha256()) {
-        local_file = file->local_file();
-        if (file->get_blocks().size()) {
-            auto it = synchronizing_files.find(file.get());
-            if (it != synchronizing_files.end()) {
-                synchronizing_files.erase(it);
+    if (folder && !folder->is_suspended()) {
+        auto &self = *cluster->get_device();
+        auto &folder_infos = folder->get_folder_infos();
+        auto peer_folder = folder_infos.by_device_id(diff.peer_id);
+        auto local_file = model::file_info_ptr_t();
+        if (peer_folder) {
+            auto file = peer_folder->get_file_infos().by_name(diff.proto_source.name());
+            assert(file);
+            if (diff.peer_id == peer->device_id().get_sha256()) {
+                local_file = file->local_file();
+                if (file->get_blocks().size()) {
+                    auto it = synchronizing_files.find(file.get());
+                    if (it != synchronizing_files.end()) {
+                        synchronizing_files.erase(it);
+                    }
+                }
             }
         }
-    }
-    if (diff.peer_id == self.device_id().get_sha256()) {
-        auto local_folder = folder_infos.by_device(self);
-        local_file = local_folder->get_file_infos().by_name(diff.proto_local.name());
-        assert(local_file);
-    }
-    if (local_file) {
-        if (updates_streamer) {
-            updates_streamer->on_update(*local_file);
+        if (diff.peer_id == self.device_id().get_sha256()) {
+            auto local_folder = folder_infos.by_device(self);
+            local_file = local_folder->get_file_infos().by_name(diff.proto_local.name());
+            assert(local_file);
         }
-        pull_ready();
+        if (local_file) {
+            if (updates_streamer) {
+                updates_streamer->on_update(*local_file);
+            }
+            pull_ready();
+        }
     }
     return diff.visit_next(*this, custom);
 }

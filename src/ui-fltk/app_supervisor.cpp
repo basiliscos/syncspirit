@@ -446,25 +446,29 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
 auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto &folder_infos = folder->get_folder_infos();
-    auto local_fi = folder_infos.by_device(*cluster->get_device());
-    auto generic_augmnetation = local_fi->get_augmentation();
-    auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmnetation.get());
-    auto folder_entry = static_cast<tree_item::folder_t *>(augmentation->get_owner());
-    auto local_file = local_fi->get_file_infos().by_name(diff.proto_local.name());
-    if (!local_file->get_augmentation()) {
-        augmentation->track(*local_file);
-        augmentation->augment_pending();
-    }
-    // displayed nodes "actuality" status might change
-    for (auto it : folder_infos) {
-        auto &remote_fi = it.item;
-        if (remote_fi->get_device() != local_fi->get_device()) {
-            auto remote_file = remote_fi->get_file_infos().by_name(local_file->get_name());
-            if (remote_file) {
-                auto aug = remote_file->get_augmentation();
-                if (aug) {
-                    aug->on_update();
+    if (folder && !folder->is_suspended()) {
+        auto &folder_infos = folder->get_folder_infos();
+        auto local_fi = folder_infos.by_device(*cluster->get_device());
+        auto local_file = local_fi->get_file_infos().by_name(diff.proto_local.name());
+        if (local_file) {
+            auto generic_augmnetation = local_fi->get_augmentation();
+            auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmnetation.get());
+            auto folder_entry = static_cast<tree_item::folder_t *>(augmentation->get_owner());
+            if (!local_file->get_augmentation()) {
+                augmentation->track(*local_file);
+                augmentation->augment_pending();
+            }
+            // displayed nodes "actuality" status might change
+            for (auto it : folder_infos) {
+                auto &remote_fi = it.item;
+                if (remote_fi->get_device() != local_fi->get_device()) {
+                    auto remote_file = remote_fi->get_file_infos().by_name(local_file->get_name());
+                    if (remote_file) {
+                        auto aug = remote_file->get_augmentation();
+                        if (aug) {
+                            aug->on_update();
+                        }
+                    }
                 }
             }
         }

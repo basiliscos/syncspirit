@@ -733,25 +733,29 @@ auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *c
     }
 
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file = folder_info->get_file_infos().by_name(diff.proto_local.name());
-    auto &txn = *get_txn().assume_value();
+    if (folder && !folder->is_suspended()) {
+        auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
+        if (folder_info) {
+            auto file = folder_info->get_file_infos().by_name(diff.proto_local.name());
+            auto &txn = *get_txn().assume_value();
 
-    {
-        auto key = file->get_key();
-        auto data = file->serialize();
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
+            {
+                auto key = file->get_key();
+                auto data = file->serialize();
+                auto r = db::save({key, data}, txn);
+                if (!r) {
+                    return r.assume_error();
+                }
+            }
+
+            auto folder_infos = reinterpret_cast<folder_infos_set_t *>(custom);
+            folder_infos->emplace(folder_info.get());
+
+            auto r = diff.visit_next(*this, custom);
+            if (!r) {
+                return r.assume_error();
+            }
         }
-    }
-
-    auto folder_infos = reinterpret_cast<folder_infos_set_t *>(custom);
-    folder_infos->emplace(folder_info.get());
-
-    auto r = diff.visit_next(*this, custom);
-    if (!r) {
-        return r.assume_error();
     }
 
     return force_commit();
