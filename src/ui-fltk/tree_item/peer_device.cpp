@@ -135,7 +135,10 @@ struct my_table_t : static_table_t {
 
         last_seen_cell->update(std::move(last_seen));
         endpoint_cell->update(std::move(endpoint));
-        state_cell->update(std::move(container.get_state()));
+
+        auto state_symbol = container.get_state();
+        auto state = fmt::format("{} ({})", state_symbol, symbols::get_description(state_symbol));
+        state_cell->update(std::move(state));
         certname_cell->update(peer.get_cert_name().value_or(""));
         client_name_cell->update(peer.get_client_name());
         client_version_cell->update(peer.get_client_version());
@@ -511,8 +514,8 @@ bool peer_device_t::on_select() {
     return true;
 }
 
-std::string peer_device_t::get_state() {
-    auto symbol = [this]() -> std::string_view {
+std::string_view peer_device_t::get_state() {
+    return [this]() -> std::string_view {
         switch (peer.get_state()) {
         case model::device_state_t::online:
             return symbols::online;
@@ -523,7 +526,6 @@ std::string peer_device_t::get_state() {
         }
         return symbols::offline;
     }();
-    return fmt::format("{} ({})", symbol, symbols::get_description(symbol));
 }
 
 tree_item_t *peer_device_t::get_folders() {

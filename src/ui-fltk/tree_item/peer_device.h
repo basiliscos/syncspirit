@@ -14,7 +14,7 @@ struct peer_device_t : tree_item_t {
     peer_device_t(model::device_t &peer, app_supervisor_t &supervisor, Fl_Tree *tree);
 
     const model::device_t &get_device() const;
-    std::string get_state();
+    std::string_view get_state();
 
     void update_label() override;
     bool on_select() override;
