@@ -188,10 +188,7 @@ auto static make_actions(my_table_t &container) -> widgetable_ptr_t {
             add->callback([](auto, void *data) { static_cast<my_table_t *>(data)->add_new_device(); }, &container);
             add->deactivate();
 
-            auto xx = add->x() + ww + padding * 2;
-            auto invisible = new Fl_Box(xx, yy, w - (xx - group->x() + padding * 2), hh);
-            invisible->hide();
-            group->resizable(invisible);
+            group->resizable(nullptr);
 
             group->end();
             widget = group;

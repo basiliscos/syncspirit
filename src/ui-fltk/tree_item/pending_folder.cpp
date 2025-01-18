@@ -45,9 +45,7 @@ static auto make_actions(folder_table_t &container) -> widgetable_ptr_t {
             container.reset_button = reset;
             xx = reset->x() + ww + padding * 2;
 
-            auto invisible = new Fl_Box(xx, yy, w - (xx - group->x() + padding * 2), hh);
-            invisible->hide();
-            group->resizable(invisible);
+            group->resizable(nullptr);
             group->end();
             widget = group;
 

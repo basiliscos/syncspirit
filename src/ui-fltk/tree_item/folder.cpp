@@ -101,15 +101,14 @@ static auto make_actions(folder_table_t &container) -> widgetable_ptr_t {
             rescan->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_rescan(); }, &container);
             rescan->deactivate();
             container.rescan_button = rescan;
+            xx = rescan->x() + ww + padding * 2;
 
-            auto remove = new Fl_Button(rescan->x() + ww + padding * 2, yy, ww, hh, "remove");
+            auto remove = new Fl_Button(xx, yy, ww, hh, "remove");
             remove->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_remove(); }, &container);
             remove->color(FL_RED);
             xx = remove->x() + ww + padding * 2;
 
-            auto invisible = new Fl_Box(xx, yy, w - (xx - group->x() + padding * 2), hh);
-            invisible->hide();
-            group->resizable(invisible);
+            group->resizable(nullptr);
             group->end();
             widget = group;
 
