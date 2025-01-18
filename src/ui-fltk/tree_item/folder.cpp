@@ -45,22 +45,22 @@ void folder_t::update_label() {
     auto folder_label = folder.get_label();
     char scanning_buff[32];
     char synchronizing_buff[32];
-    auto scaning = std::string_view();
+    auto scanning = std::string_view();
     auto synchronizing = std::string_view();
     auto color_context = color_context_t::unknown;
     if (folder.is_scanning()) {
         auto share = (stats.entries) ? 100.0 * stats.scanned_entries / stats.entries : 0;
-        auto eob = fmt::format_to(scanning_buff, " ({} {}%)", symbols::scaning, (int)share);
-        scaning = std::string_view(scanning_buff, eob);
+        auto eob = fmt::format_to(scanning_buff, " ({} {}%)", symbols::scanning, (int)share);
+        scanning = std::string_view(scanning_buff, eob);
         color_context = color_context_t::outdated;
     }
     if (folder.is_synchronizing()) {
         auto eob = fmt::format_to(synchronizing_buff, " {}", symbols::syncrhonizing);
         synchronizing = std::string_view(synchronizing_buff, eob);
     }
-    auto sz = folder_label.size() + id.size() + synchronizing.size() + scaning.size() + 16;
+    auto sz = folder_label.size() + id.size() + synchronizing.size() + scanning.size() + 16;
     auto buff = (char *)alloca(sz);
-    auto eob = fmt::format_to(buff, "{}, {}{}{}", folder_label, id, synchronizing, scaning);
+    auto eob = fmt::format_to(buff, "{}, {}{}{}", folder_label, id, synchronizing, scanning);
     *eob = 0;
     labelfgcolor(supervisor.get_color(color_context));
     label(buff);

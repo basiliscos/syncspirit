@@ -41,7 +41,7 @@ void entry_t::update_label() {
         auto local = file->get_folder_info()->get_device() == supervisor.get_cluster()->get_device();
         if (local && stats.entries > stats.scanned_entries) {
             auto share = 100.0 * stats.scanned_entries / stats.entries;
-            eob = fmt::format_to(eob, " ({} {}%)", symbols::scaning, (int)share);
+            eob = fmt::format_to(eob, " ({} {}%)", symbols::scanning, (int)share);
             *eob = 0;
             context = color_context_t::outdated;
         } else if (file->is_deleted()) {

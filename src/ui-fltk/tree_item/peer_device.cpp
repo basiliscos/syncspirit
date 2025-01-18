@@ -515,16 +515,18 @@ bool peer_device_t::on_select() {
 }
 
 std::string peer_device_t::get_state() {
-    switch (peer.get_state()) {
-    case model::device_state_t::online:
-        return std::string(symbols::online);
-    case model::device_state_t::discovering:
-        return std::string(symbols::discovering);
-    case model::device_state_t::connecting:
-        return std::string(symbols::connecting);
-    default:
-        return std::string(symbols::offline);
-    }
+    auto symbol = [this]() -> std::string_view {
+        switch (peer.get_state()) {
+        case model::device_state_t::online:
+            return symbols::online;
+        case model::device_state_t::discovering:
+            return symbols::discovering;
+        case model::device_state_t::connecting:
+            return symbols::connecting;
+        }
+        return symbols::offline;
+    }();
+    return fmt::format("{} ({})", symbol, symbols::get_description(symbol));
 }
 
 tree_item_t *peer_device_t::get_folders() {

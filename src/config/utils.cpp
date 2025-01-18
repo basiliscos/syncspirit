@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "utils.h"
 
@@ -694,7 +694,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         128,        /* files_scan_iteration_limit max number processed files before emitting scan events */
     };
     cfg.db_config = db_config_t {
-        0x80000000,    /* upper_limit, 2Gb */
+        0x0,           /* upper_limit, auto-adjust */
         150,           /* uncommitted_threshold */
         8192,          /* max blocks per diff */
         1024,          /* max files per diff */

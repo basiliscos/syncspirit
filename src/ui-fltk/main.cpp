@@ -346,12 +346,8 @@ int main(int argc, char **argv) {
             thread.join();
         }
 
-        if (auto reason = sup_net->get_shutdown_reason(); reason) {
-            if (reason->ec) {
-                spdlog::debug("it seems some error occured, keeping boostrap log for investigation");
-            } else {
-                spdlog::trace("removing bootstrap log");
-            }
+        if (auto reason = sup_net->get_shutdown_reason(); reason && reason->ec) {
+            spdlog::info("app shut down reason: {}", reason->message());
         }
 
         spdlog::trace("everything has been terminated");
