@@ -7,6 +7,7 @@
 namespace syncspirit::fltk {
 
 struct log_panel_t;
+struct tree_view_t;
 
 struct main_window_t : Fl_Double_Window {
     using parent_t = Fl_Double_Window;
@@ -20,6 +21,7 @@ struct main_window_t : Fl_Double_Window {
   private:
     app_supervisor_t &supervisor;
     Fl_Group *content_left;
+    tree_view_t *tree;
     log_panel_t *log_panel;
 };
 

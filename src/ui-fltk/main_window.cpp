@@ -1,7 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+
 #include "main_window.h"
 
 #include "log_panel.h"
 #include "tree_view.h"
+#include "tree_item.h"
 #include "toolbar.h"
 
 #include <FL/Fl_Box.H>
@@ -30,7 +34,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     auto toolbar = new toolbar_t(supervisor, 0, 0, left_w, 0);
     toolbar->end();
     auto toolbar_h = toolbar->h();
-    auto tree = new tree_view_t(supervisor, 0, toolbar_h, left_w, top_h - toolbar_h);
+    tree = new tree_view_t(supervisor, 0, toolbar_h, left_w, top_h - toolbar_h);
     content_left->end();
     content_left->resizable(tree);
 
@@ -41,7 +45,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
             void refresh() override {}
         };
 
-        auto box = new my_box_t(left_w, 0, right_w, top_h, "to be loaded...");
+        auto box = new my_box_t(left_w, 0, right_w, top_h, "...");
         box->box(FL_ENGRAVED_BOX);
         return box;
     });
@@ -66,6 +70,17 @@ void main_window_t::on_shutdown() {
     cfg.main_window_width = w();
     cfg.left_panel_share = (content_left->w() + 0.) / w();
     cfg.bottom_panel_share = (log_panel->h() + 0.) / h();
+
+    for (auto *item = tree->first(); item; item = tree->next(item)) {
+        if (auto tree_item = dynamic_cast<tree_item_t *>(item); tree_item) {
+            if (auto augmentation = tree_item->get_proxy(); augmentation) {
+                auto aug = dynamic_cast<augmentation_base_t *>(augmentation.get());
+                if (aug) {
+                    aug->release_onwer();
+                }
+            }
+        }
+    }
 }
 
 void main_window_t::set_splash_text(std::string text) {
