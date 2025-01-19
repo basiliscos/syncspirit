@@ -17,6 +17,7 @@
 #include "config/utils.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/local/io_failure.h"
+#include "model/diff/local/scan_start.h"
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/file_infos.h"
 #include "model/diff/load/load_cluster.h"
@@ -395,6 +396,15 @@ auto app_supervisor_t::operator()(const model::diff::local::io_failure_t &diff, 
     for (auto &details : diff.errors) {
         log->warn("I/O error on '{}': {}", details.path.string(), details.ec.message());
     }
+    return diff.visit_next(*this, custom);
+}
+
+auto app_supervisor_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto augmentation = static_cast<augmentation_t *>(folder->get_augmentation().get());
+    auto folder_node = static_cast<tree_item::folder_t *>(augmentation->get_owner());
+    folder_node->reset_stats();
     return diff.visit_next(*this, custom);
 }
 

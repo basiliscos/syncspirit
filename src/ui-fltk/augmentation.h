@@ -69,13 +69,14 @@ struct augmentation_entry_base_t : augmentation_t {
 
     void apply_update();
     void on_update() noexcept override;
+    void reset_stats();
     virtual void display() noexcept;
     children_t &get_children() noexcept;
     std::string_view get_own_name();
     self_t *get_parent();
     const entry_stats_t &get_stats() const;
 
-    virtual bool record_diff() = 0;
+    virtual void record_diff() = 0;
     virtual model::file_info_t *get_file() const = 0;
     virtual model::folder_info_t *get_folder() const = 0;
     virtual int get_position(bool include_deleted) = 0;
@@ -104,7 +105,7 @@ struct augmentation_entry_root_t final : augmentation_entry_base_t {
     model::folder_info_t *get_folder() const override;
     model::file_info_t *get_file() const override;
     int get_position(bool include_deleted) override;
-    bool record_diff() override;
+    void record_diff() override;
 
     model::folder_info_t &folder;
     files_t pending_augmentation;
@@ -118,7 +119,7 @@ struct augmentation_entry_t final : augmentation_entry_base_t {
     model::folder_info_t *get_folder() const override;
     model::file_info_t *get_file() const override;
     int get_position(bool include_deleted) override;
-    bool record_diff() override;
+    void record_diff() override;
 
   private:
     model::file_info_t &file;

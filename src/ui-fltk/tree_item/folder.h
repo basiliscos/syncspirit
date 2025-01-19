@@ -13,6 +13,8 @@ struct folder_t final : local_entry_t {
     folder_t(model::folder_t &folder, app_supervisor_t &supervisor, Fl_Tree *tree);
     void update_label() override;
     bool on_select() override;
+
+    void reset_stats();
 };
 
 } // namespace syncspirit::fltk::tree_item

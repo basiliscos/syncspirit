@@ -10,6 +10,7 @@
 #include "../content/folder_table.h"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
+#include <deque>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #include <malloc.h>
@@ -260,4 +261,19 @@ bool folder_t::on_select() {
         return new table_t(*this, folder_info, x, y, w, h);
     });
     return true;
+}
+
+void folder_t::reset_stats() {
+    using queue_t = std::deque<augmentation_entry_base_t *>;
+    auto queue = queue_t();
+    auto root = static_cast<augmentation_entry_base_t *>(get_proxy().get());
+    queue.push_back(root);
+    while (!queue.empty()) {
+        auto it = queue.front();
+        queue.pop_front();
+        it->reset_stats();
+        for (auto &c : it->get_children()) {
+            queue.emplace_back(c.get());
+        }
+    }
 }

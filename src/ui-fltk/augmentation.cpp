@@ -121,13 +121,20 @@ void augmentation_entry_base_t::apply_update() {
     parent_t::on_update();
 }
 
+void augmentation_entry_base_t::reset_stats() {
+    stats.scanned_entries = 0;
+    stats.local_mark = false;
+
+    stats_diff.scanned_entries = 0;
+    stats_diff.local_mark = false;
+}
+
 void augmentation_entry_base_t::push_diff_up() {
     auto seq = stats_diff.sequence;
-    stats.sequence = stats_diff.sequence;
+    stats.sequence = seq;
     stats.entries += stats_diff.entries;
     stats.scanned_entries += stats_diff.scanned_entries;
     stats.entries_size += stats_diff.entries_size;
-    stats_diff.sequence = stats.sequence;
 
     if (parent) {
         parent->stats_diff.entries += stats_diff.entries;
@@ -136,6 +143,7 @@ void augmentation_entry_base_t::push_diff_up() {
     }
 
     stats_diff = {};
+    stats_diff.sequence = seq;
 }
 
 std::string_view augmentation_entry_base_t::get_own_name() { return own_name; }
@@ -215,7 +223,7 @@ auto augmentation_entry_root_t::get_file() const -> model::file_info_t * { retur
 
 int augmentation_entry_root_t::get_position(bool) { return 0; }
 
-bool augmentation_entry_root_t::record_diff() { return false; }
+void augmentation_entry_root_t::record_diff() {}
 
 augmentation_entry_t::augmentation_entry_t(self_t *parent, model::file_info_t &file_, std::string own_name_)
     : parent_t(parent, nullptr, std::move(own_name_)), file{file_} {
@@ -251,19 +259,16 @@ auto augmentation_entry_t::get_file() const -> model::file_info_t * { return &fi
 
 auto augmentation_entry_t::get_folder() const -> model::folder_info_t * { return file.get_folder_info(); }
 
-bool augmentation_entry_t::record_diff() {
-    bool r = false;
+void augmentation_entry_t::record_diff() {
     if (!stats.local_mark && file.is_local()) {
-        stats_diff.scanned_entries++;
+        ++stats_diff.scanned_entries;
         stats.local_mark = true;
     }
     if (stats.sequence != file.get_sequence()) {
         stats_diff.entries_size += file.get_size() - stats.entries_size;
         stats_diff.entries += (!stats.sequence ? 1 : 0);
         stats_diff.sequence = stats.sequence = file.get_sequence();
-        r = true;
     }
-    return r;
 }
 
 } // namespace syncspirit::fltk
