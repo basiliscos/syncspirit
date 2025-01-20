@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -33,6 +33,7 @@ struct controller_actor_config_t : r::actor_config_t {
     model::sequencer_ptr_t sequencer;
     model::device_ptr_t peer;
     r::address_ptr_t peer_addr;
+    std::string connection_id;
     pt::time_duration request_timeout;
     uint32_t blocks_max_requested = 8;
     uint32_t outgoing_buffer_max = 0;
@@ -61,6 +62,11 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
 
     builder_t &&peer_addr(const r::address_ptr_t &value) && noexcept {
         parent_t::config.peer_addr = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&connection_id(const std::string &value) && noexcept {
+        parent_t::config.connection_id = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -167,6 +173,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void send_new_indices() noexcept;
     void push_block_write(model::diff::cluster_diff_ptr_t block) noexcept;
     void process_block_write() noexcept;
+    bool owns_best_connection() noexcept;
 
     void push(model::diff::cluster_diff_ptr_t diff) noexcept;
     void send_diff() noexcept;
@@ -176,6 +183,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     folder_synchronization_ptr_t get_sync_info(std::string_view folder_id) noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_remote_folder_infos_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_rej_t &, void *) noexcept override;
@@ -189,6 +197,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     model::sequencer_ptr_t sequencer;
     model::cluster_ptr_t cluster;
     model::device_ptr_t peer;
+    std::string connection_id;
     r::address_ptr_t coordinator;
     r::address_ptr_t peer_addr;
     r::address_ptr_t hasher_proxy;

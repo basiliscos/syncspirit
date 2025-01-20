@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "peer_actor.h"
 #include "names.h"
@@ -15,7 +15,6 @@
 #include "model/diff/contact/unknown_connected.h"
 #include "model/diff/modify/add_pending_device.h"
 #include <boost/core/demangle.hpp>
-#include <sstream>
 
 using namespace syncspirit::net;
 using namespace syncspirit;
@@ -42,9 +41,8 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
 
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        std::stringstream ss;
-        ss << "net.peer." << peer_device_id.get_short() << "/" << peer_proto << "/" << peer_endpoint;
-        p.set_identity(ss.str(), false);
+        auto id = fmt::format("{}/{}/{}", peer_device_id.get_short(), peer_proto, peer_endpoint);
+        p.set_identity(id, false);
         log = utils::get_logger(identity);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -391,8 +389,9 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
             return do_shutdown(make_error(ec));
         }
         auto state = model::device_state_t::online;
-        diff = new contact::peer_state_t(*cluster, sha_s256, get_address(), state, cert_name, peer_endpoint,
-                                         client_name, client_version);
+        auto connection_id = fmt::format("{}://{}", peer_proto, peer_endpoint);
+        diff = new contact::peer_state_t(*cluster, sha_s256, get_address(), state, std::move(connection_id), cert_name,
+                                         peer_endpoint, client_name, client_version);
     } else if (auto peer = cluster->get_ignored_devices().by_sha256(sha_s256)) {
         fill_db_and_shutdown();
         diff = new model::diff::contact::ignored_connected_t(*cluster, peer_device_id, std::move(db));

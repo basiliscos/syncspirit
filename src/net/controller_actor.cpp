@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "controller_actor.h"
 #include "names.h"
 #include "constants.h"
 #include "model/diff/advance/advance.h"
+#include "model/diff/contact/peer_state.h"
 #include "model/diff/local/synchronization_finish.h"
 #include "model/diff/local/synchronization_start.h"
 #include "model/diff/modify/append_block.h"
@@ -88,16 +89,15 @@ void C::folder_synchronization_t::finish_sync() noexcept {
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
-      peer_addr{config.peer_addr}, request_timeout{config.request_timeout}, rx_blocks_requested{0},
-      tx_blocks_requested{0}, outgoing_buffer{0}, outgoing_buffer_max{config.outgoing_buffer_max},
-      request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested},
-      advances_per_iteration{config.advances_per_iteration} {
+      peer_addr{config.peer_addr}, connection_id{config.connection_id}, request_timeout{config.request_timeout},
+      rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer{0},
+      outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
+      blocks_max_requested{config.blocks_max_requested}, advances_per_iteration{config.advances_per_iteration} {
     {
         assert(cluster);
         assert(sequencer);
         current_diff = nullptr;
         planned_pulls = 0;
-        file_iterator = peer->create_iterator(*cluster);
     }
 }
 
@@ -136,12 +136,16 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void controller_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     LOG_TRACE(log, "on_start");
+    if (!owns_best_connection()) {
+        LOG_DEBUG(log, "there is a better connection to peer than me ({}), shut self down", connection_id);
+        return do_shutdown();
+    }
+
     send<payload::start_reading_t>(peer_addr, get_address(), true);
-
     send_cluster_config();
-
     resources->acquire(resource::peer);
-    LOG_INFO(log, "is online");
+    LOG_INFO(log, "is online (connection: {})", connection_id);
+    file_iterator = peer->create_iterator(*cluster);
 }
 
 void controller_actor_t::shutdown_start() noexcept {
@@ -473,6 +477,17 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
                 updates_streamer->on_update(*local_file);
             }
             pull_ready();
+        }
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto controller_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (diff.state == model::device_state_t::online && diff.peer_id == peer->device_id().get_sha256()) {
+        if (!owns_best_connection()) {
+            LOG_DEBUG(log, "there is a better connection to peer than me ({}), shut self down", connection_id);
+            do_shutdown();
         }
     }
     return diff.visit_next(*this, custom);
@@ -859,3 +874,5 @@ auto controller_actor_t::pull_signal_t::visit(model::diff::cluster_visitor_t &vi
     }
     return r;
 }
+
+bool controller_actor_t::owns_best_connection() noexcept { return peer->get_connection_id() == connection_id; }

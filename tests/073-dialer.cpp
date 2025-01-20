@@ -108,7 +108,8 @@ void test_dialer() {
 
             SECTION("peer online & offline") {
                 messages.clear();
-                builder.update_state(*peer_device, {}, model::device_state_t::online).apply(*sup);
+                builder.update_state(*peer_device, {}, model::device_state_t::online, "tcp://127.0.0.1:1234")
+                    .apply(*sup);
                 CHECK(messages.size() == 1);
 
                 builder.update_state(*peer_device, {}, model::device_state_t::offline).apply(*sup);

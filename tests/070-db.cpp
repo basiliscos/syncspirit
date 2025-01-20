@@ -788,7 +788,7 @@ void test_peer_going_offline() {
             db::Device db_peer;
             auto peer = cluster->get_devices().by_sha256(sha256);
             REQUIRE(db_peer.last_seen() == 0);
-            peer->update_state(device_state_t::online);
+            peer->update_state(device_state_t::online, "tcp://1.1.1.1:1");
 
             builder.update_state(*peer, {}, device_state_t::offline).apply(*sup);
 

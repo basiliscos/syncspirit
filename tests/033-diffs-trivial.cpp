@@ -30,7 +30,7 @@ TEST_CASE("peer state update", "[model]") {
     auto builder = diff_builder_t(*cluster);
     REQUIRE(peer_device->get_state() == model::device_state_t::offline);
 
-    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::online).apply());
+    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::online, "tcp://1.1.1.1:1").apply());
     CHECK(peer_device->get_state() == model::device_state_t::online);
 
     REQUIRE(builder.update_state(*peer_device, addr, device_state_t::offline).apply());

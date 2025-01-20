@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "device.h"
 #include "structs.pb.h"
@@ -7,6 +7,7 @@
 #include "misc/error_code.h"
 #include "utils/time.h"
 #include "misc/file_iterator.h"
+#include <cassert>
 
 namespace syncspirit::model {
 
@@ -87,9 +88,17 @@ std::string device_t::serialize() const noexcept {
     return serialize(r);
 }
 
-void device_t::update_state(device_state_t new_state) noexcept {
+void device_t::update_state(device_state_t new_state, std::string_view connection_id_) noexcept {
     if (state == device_state_t::online | new_state == device_state_t::online) {
         last_seen = pt::microsec_clock::local_time();
+        if (new_state == device_state_t::online) {
+            assert(!connection_id_.empty());
+            bool new_wins = (connection_id.empty()) || (connection_id_.size() < connection_id.size()) ||
+                            (connection_id_ < connection_id);
+            if (new_wins) {
+                connection_id = connection_id_;
+            }
+        }
     }
     state = new_state;
 }
@@ -120,8 +129,7 @@ void device_t::release_iterator(file_iterator_ptr_t &it) noexcept {
 
 file_iterator_t *device_t::get_iterator() noexcept { return iterator.get(); }
 
-void release_iterator(file_iterator_ptr_t &) noexcept;
-file_iterator_t *get_iterator() noexcept;
+std::string_view device_t::get_connection_id() noexcept { return connection_id; }
 
 local_device_t::local_device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept
     : device_t(device_id, name, cert_name) {

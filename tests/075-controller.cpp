@@ -6,6 +6,7 @@
 #include "test_supervisor.h"
 
 #include "model/cluster.h"
+#include "model/diff/contact/peer_state.h"
 #include "diff-builder.h"
 #include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
@@ -304,12 +305,18 @@ struct fixture_t {
         test::init_logging();
     }
 
-    void start_target() noexcept {
+    void _start_target(std::string connection_id) {
         peer_actor = sup->create_actor<sample_peer_t>().auto_share(auto_share).timeout(timeout).finish();
+
+        auto diff = model::diff::cluster_diff_ptr_t{};
+        diff = new model::diff::contact::peer_state_t(*cluster, peer_device->device_id().get_sha256(),
+                                                      peer_actor->get_address(), device_state_t::online, connection_id);
+        sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
 
         target = sup->create_actor<controller_actor_t>()
                      .peer(peer_device)
                      .peer_addr(peer_actor->get_address())
+                     .connection_id(connection_id)
                      .request_pool(1024)
                      .outgoing_buffer_max(1024'000)
                      .cluster(cluster)
@@ -323,6 +330,8 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
         target_addr = target->get_address();
     }
+
+    virtual void start_target() noexcept { _start_target("test-common://1.2.3.4:5"); }
 
     virtual void run() noexcept {
         auto peer_id =
@@ -446,6 +455,52 @@ void test_startup() {
             sup->do_process();
 
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            CHECK(peer_actor->messages.empty());
+        }
+    };
+    F(false, 10, false).run();
+}
+
+void test_overwhelm() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+
+        void main(diff_builder_t &) noexcept override {
+            auto msg = &(*peer_actor->messages.front()).payload;
+            REQUIRE(std::get_if<proto::message::ClusterConfig>(msg));
+
+            peer_actor->messages.pop_front();
+            CHECK(peer_actor->messages.empty());
+
+            auto cc = proto::ClusterConfig{};
+            auto payload = proto::message::ClusterConfig(new proto::ClusterConfig(cc));
+            peer_actor->forward(std::move(payload));
+            sup->do_process();
+
+            CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            CHECK(peer_actor->messages.empty());
+
+            auto ex_peer = peer_actor;
+            auto ex_target = target;
+
+            _start_target("best://1.2.3.4:5");
+            sup->do_process();
+
+            REQUIRE(ex_peer != peer_actor);
+            REQUIRE(ex_target != target);
+            CHECK(static_cast<r::actor_base_t *>(ex_peer.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+            CHECK(static_cast<r::actor_base_t *>(ex_target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+
+            msg = &(*peer_actor->messages.front()).payload;
+            REQUIRE(std::get_if<proto::message::ClusterConfig>(msg));
+            peer_actor->messages.pop_front();
+
+            payload = proto::message::ClusterConfig(new proto::ClusterConfig(cc));
+            peer_actor->forward(std::move(payload));
+            sup->do_process();
+
+            CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
             CHECK(peer_actor->messages.empty());
         }
     };
@@ -1865,6 +1920,7 @@ void test_download_interrupting() {
 
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
+    REGISTER_TEST_CASE(test_overwhelm, "test_overwhelm", "[net]");
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");

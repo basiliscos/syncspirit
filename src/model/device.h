@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -47,7 +47,7 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     std::string serialize() const noexcept;
     inline bool is_dynamic() const noexcept { return static_uris.empty(); }
     inline device_state_t get_state() const noexcept { return state; }
-    void update_state(device_state_t new_state) noexcept;
+    void update_state(device_state_t new_state, std::string_view connection_id) noexcept;
     void update_contact(const tcp::endpoint &endpoint, std::string_view client_name,
                         std::string_view client_version) noexcept;
     inline device_id_t &device_id() noexcept { return id; }
@@ -68,8 +68,9 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     inline const uris_t &get_uris() const noexcept { return uris; }
     inline const uris_t &get_static_uris() const noexcept { return static_uris; }
     void set_static_uris(uris_t) noexcept;
-
     void assign_uris(const uris_t &uris) noexcept;
+
+    std::string_view get_connection_id() noexcept;
 
     void update(const db::Device &source) noexcept;
 
@@ -95,6 +96,7 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     tcp::endpoint endpoint;
     std::string client_name;
     std::string client_version;
+    std::string connection_id;
 
     file_iterator_ptr_t iterator;
 

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "diff-builder.h"
 #include "model/messages.h"
 #include "model/diff/advance/remote_copy.h"
 #include "model/diff/advance/local_update.h"
+#include "model/diff/contact/peer_state.h"
+#include "model/diff/contact/update_contact.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_request.h"
 #include "model/diff/local/scan_start.h"
@@ -26,8 +28,6 @@
 #include "model/diff/modify/remove_ignored_device.h"
 #include "model/diff/modify/remove_pending_device.h"
 #include "model/diff/modify/upsert_folder.h"
-#include "model/diff/contact/update_contact.h"
-#include "model/diff/contact/peer_state.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 
@@ -212,8 +212,10 @@ diff_builder_t &diff_builder_t::remove_folder(const model::folder_t &folder) noe
 }
 
 diff_builder_t &diff_builder_t::update_state(const model::device_t &peer, const r::address_ptr_t &peer_addr,
-                                             model::device_state_t state) noexcept {
-    return assign(new model::diff::contact::peer_state_t(cluster, peer.device_id().get_sha256(), peer_addr, state));
+                                             model::device_state_t state, std::string_view connection_id) noexcept {
+    assert(!(state == model::device_state_t::online && connection_id.empty()));
+    return assign(new model::diff::contact::peer_state_t(cluster, peer.device_id().get_sha256(), peer_addr, state,
+                                                         std::string(connection_id)));
 }
 
 diff_builder_t &diff_builder_t::update_contact(const model::device_id_t &device,
