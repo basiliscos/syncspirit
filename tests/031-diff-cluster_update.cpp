@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -244,6 +244,14 @@ TEST_CASE("cluster update, new folder", "[model]") {
             db_fi.set_max_sequence(10l);
             folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
             folder_infos.put(folder_info_peer);
+
+            auto pr_file = proto::FileInfo();
+            pr_file.set_name("a.txt");
+            pr_file.set_sequence(10l);
+            pr_file.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
+
+            auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_info_peer).value();
+            folder_info_peer->get_file_infos().put(file);
         }
 
         auto cc = std::make_unique<proto::ClusterConfig>();
@@ -255,26 +263,54 @@ TEST_CASE("cluster update, new folder", "[model]") {
         p_peer->set_name(std::string(peer_device->get_name()));
 
         SECTION("peer index has changed") {
-            p_peer->set_max_sequence(123456u);
-            p_peer->set_index_id(1234ul);
+            SECTION("non-zero index") {
+                p_peer->set_index_id(1234ul);
+                p_peer->set_max_sequence(123456u);
 
-            auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
-            REQUIRE(diff_opt);
+                auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+                REQUIRE(diff_opt);
 
-            auto &diff = diff_opt.value();
-            auto r_a = diff->apply(*cluster, get_apply_controller());
-            REQUIRE(r_a);
-            auto fi = folder_infos.by_device(*peer_device);
-            REQUIRE(fi->get_index() == 1234ul);
-            REQUIRE(fi->get_max_sequence() == 0);
-            REQUIRE(fi.get() == folder_info_peer.get());
+                auto &diff = diff_opt.value();
+                auto r_a = diff->apply(*cluster, get_apply_controller());
+                REQUIRE(r_a);
+                auto fi = folder_infos.by_device(*peer_device);
+                CHECK(fi->get_index() == 1234ul);
+                CHECK(fi->get_max_sequence() == 0);
+                CHECK(fi.get() == folder_info_peer.get());
 
-            bool visited = false;
-            auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
-            auto r_v = diff->visit(visitor, nullptr);
-            REQUIRE(r_v);
-            REQUIRE(visited);
-            REQUIRE(visitor.updated_folders == 1);
+                bool visited = false;
+                auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
+                auto r_v = diff->visit(visitor, nullptr);
+                REQUIRE(r_v);
+                REQUIRE(visited);
+                CHECK(visitor.remove_files == 1);
+                CHECK(visitor.updated_folders == 1);
+                CHECK(visitor.remove_folders == 0);
+            }
+            SECTION("zero index") {
+                p_peer->set_index_id(0ul);
+                p_peer->set_max_sequence(123456u);
+
+                auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+                REQUIRE(diff_opt);
+
+                auto &diff = diff_opt.value();
+                auto r_a = diff->apply(*cluster, get_apply_controller());
+                REQUIRE(r_a);
+                auto fi = folder_infos.by_device(*peer_device);
+                CHECK(fi->get_index() == 0);
+                CHECK(fi->get_max_sequence() == 0);
+                CHECK(fi.get() == folder_info_peer.get());
+
+                bool visited = false;
+                auto visitor = my_cluster_update_visitor_t([&](auto &diff) { visited = true; });
+                auto r_v = diff->visit(visitor, nullptr);
+                REQUIRE(r_v);
+                CHECK(visited);
+                CHECK(visitor.remove_files == 1);
+                CHECK(visitor.updated_folders == 1);
+                CHECK(visitor.remove_folders == 0);
+            }
         }
     }
 }

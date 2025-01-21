@@ -561,7 +561,8 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_device_t &dif
     return force_commit();
 }
 
-auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) noexcept -> outcome::result<void> {
+auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
     }
@@ -574,30 +575,31 @@ auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff) n
         }
     }
 
-    auto r = diff.visit_next(*this, nullptr);
+    auto r = diff.visit_next(*this, custom);
     if (!r) {
         return r.assume_error();
     }
 
     return force_commit();
 }
-auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return (*this)(diff);
+    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::remove_files_t &diff, void *) noexcept -> outcome::result<void> {
-    return (*this)(diff);
+auto db_actor_t::operator()(const model::diff::modify::remove_files_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::remove_folder_infos_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::modify::remove_folder_infos_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return (*this)(diff);
+    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
 }
 
-auto db_actor_t::operator()(const model::diff::modify::remove_pending_folders_t &diff, void *) noexcept
+auto db_actor_t::operator()(const model::diff::modify::remove_pending_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return (*this)(diff);
+    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_folder_t &diff, void *custom) noexcept

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "cluster_update.h"
 #include "model/diff/modify/add_remote_folder_infos.h"
@@ -132,10 +132,10 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
 
             bool do_update = false;
             if (d.index_id() != folder_info->get_index()) {
+                do_update = true;
                 LOG_TRACE(log, "cluster_update_t, reseting folder: {}, new index = {:#x}, max_seq = {}", f.label(),
                           d.index_id(), d.max_sequence());
                 reset_folders.put(folder_info);
-                do_update = true;
             } else if (d.max_sequence() > folder_info->get_max_sequence()) {
                 LOG_TRACE(log, "cluster_update_t, updating folder = {}, index = {:#x}, max seq = {} -> {}",
                           folder->get_label(), folder_info->get_index(), folder_info->get_max_sequence(),
