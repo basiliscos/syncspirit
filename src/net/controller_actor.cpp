@@ -868,8 +868,8 @@ auto controller_actor_t::pull_signal_t::visit(model::diff::cluster_visitor_t &vi
     -> outcome::result<void> {
     auto r = visitor(*this, custom);
     auto ctx = reinterpret_cast<context_t *>(custom);
-    auto self = static_cast<controller_actor_t *>(&visitor);
-    if (r && self == controller && ctx->from_self) {
+    if (r && &visitor == controller && ctx->from_self) {
+        auto self = static_cast<controller_actor_t *>(&visitor);
         self->on_custom(*this);
     }
     return r;
