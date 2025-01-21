@@ -67,7 +67,7 @@ void entry_t::on_open() {
     Fl_Tree_Item::remove_child(dummy);
     expanded = true;
 
-    auto entry = static_cast<augmentation_entry_root_t *>(augmentation.get());
+    auto entry = static_cast<augmentation_entry_base_t *>(augmentation.get());
 
     for (auto &it : entry->get_children()) {
         it->display();
