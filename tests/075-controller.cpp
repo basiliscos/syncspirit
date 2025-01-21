@@ -1818,6 +1818,7 @@ void test_conflicts() {
 
 void test_download_interrupting() {
     struct F : fixture_t {
+        using fixture_t::fixture_t;
 
         void create_hasher() noexcept override {
             hasher = sup->create_actor<managed_hasher_t>()
@@ -1828,7 +1829,8 @@ void test_download_interrupting() {
                          .get();
         }
 
-        using fixture_t::fixture_t;
+        std::uint32_t get_blocks_max_requested() override { return 1; }
+
         void main(diff_builder_t &) noexcept override {
             sup->do_process();
 
@@ -1857,7 +1859,7 @@ void test_download_interrupting() {
             file->set_type(proto::FileInfoType::FILE);
             file->set_sequence(154);
             file->set_block_size(5);
-            file->set_size(5);
+            file->set_size(10);
             auto version = file->mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1ul);
@@ -1867,6 +1869,11 @@ void test_download_interrupting() {
             b1->set_hash(utils::sha256_digest("12345").value());
             b1->set_offset(0);
             b1->set_size(5);
+
+            auto b2 = file->add_blocks();
+            b2->set_hash(utils::sha256_digest("67890").value());
+            b2->set_offset(5);
+            b2->set_size(5);
 
             peer_actor->forward(proto::message::Index(new proto::Index(index)));
             sup->do_process();
@@ -1923,11 +1930,20 @@ void test_download_interrupting() {
                 auto diff = sup->delayed_ack_holder;
                 REQUIRE(diff);
 
-                builder.suspend(*folder_1);
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
-                builder.apply(*sup);
-                auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
-                CHECK(folder_my->get_file_infos().size() == 0);
+                SECTION("suspend") {
+                    builder.suspend(*folder_1);
+                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
+                    builder.apply(*sup);
+                    auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
+                    CHECK(folder_my->get_file_infos().size() == 0);
+                }
+
+                SECTION("remove") {
+                    builder.remove_folder(*folder_1).apply(*sup);
+                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
+                    sup->do_process();
+                    CHECK(!cluster->get_folders().by_id(folder->id()));
+                }
             }
         }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -18,6 +18,7 @@ struct SYNCSPIRIT_API block_diff_t : cluster_diff_t {
     std::string file_name;
     std::string folder_id;
     std::string device_id;
+    std::string block_hash;
     size_t block_index;
 };
 

@@ -553,15 +553,19 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
 auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
-    auto file = folder_info->get_file_infos().by_name(diff.file_name);
-    auto block = file->get_blocks().at(diff.block_index);
-    release_block(diff.folder_id, block->get_hash());
-    if (file->is_locally_available()) {
-        LOG_TRACE(log, "on_block_update, finalizing {}", file->get_name());
-        push(new model::diff::modify::finish_file_t(*file));
+    if (folder) {
+        auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
+        if (folder_info) {
+            auto file = folder_info->get_file_infos().by_name(diff.file_name);
+            if (file) {
+                if (file->is_locally_available()) {
+                    LOG_TRACE(log, "on_block_update, finalizing {}", file->get_name());
+                    push(new model::diff::modify::finish_file_t(*file));
+                }
+            }
+        }
     }
-
+    release_block(diff.folder_id, diff.block_hash);
     cluster->modify_write_requests(1);
     pull_ready();
     process_block_write();
