@@ -81,24 +81,18 @@ bool fc_t::operator()(const file_t *lhs, const file_t *rhs) const {
 augmentation_entry_base_t::augmentation_entry_base_t(self_t *parent_, dynamic_item_t *owner_, std::string own_name_)
     : parent_t(owner_), parent{parent_}, own_name{std::move(own_name_)} {}
 
-augmentation_entry_base_t::~augmentation_entry_base_t() {
-    if (parent) {
-        auto self = static_cast<augmentation_entry_t *>(this);
-        auto ref = augmentation_entry_ptr_t(self, false);
-        parent->children.erase(ref);
-        ref.detach();
-    }
-    for (auto &it : children) {
-        it->parent = nullptr;
-    }
-    children.clear();
-}
+augmentation_entry_base_t::~augmentation_entry_base_t() { safe_delete(); }
 
 auto augmentation_entry_base_t::get_children() noexcept -> children_t & { return children; }
 
 void augmentation_entry_base_t::display() noexcept {}
 
 auto augmentation_entry_base_t::get_parent() -> self_t * { return parent; }
+
+void augmentation_entry_base_t::on_delete() noexcept {
+    safe_delete();
+    parent_t::on_delete();
+}
 
 void augmentation_entry_base_t::on_update() noexcept {
     record_diff();
@@ -149,6 +143,20 @@ void augmentation_entry_base_t::push_diff_up() {
 std::string_view augmentation_entry_base_t::get_own_name() { return own_name; }
 
 const entry_stats_t &augmentation_entry_base_t::get_stats() const { return stats; }
+
+void augmentation_entry_base_t::safe_delete() {
+    if (parent) {
+        auto self = static_cast<augmentation_entry_t *>(this);
+        auto ref = augmentation_entry_ptr_t(self, false);
+        parent->children.erase(ref);
+        ref.detach();
+        parent = nullptr;
+    }
+    for (auto &it : children) {
+        it->parent = nullptr;
+    }
+    children.clear();
+}
 
 augmentation_entry_root_t::augmentation_entry_root_t(model::folder_info_t &folder_, dynamic_item_t *owner_)
     : parent_t(nullptr, owner_, {}), folder{folder_} {

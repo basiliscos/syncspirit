@@ -68,6 +68,7 @@ struct augmentation_entry_base_t : augmentation_t {
     ~augmentation_entry_base_t();
 
     void apply_update();
+    void on_delete() noexcept override;
     void on_update() noexcept override;
     void reset_stats();
     virtual void display() noexcept;
@@ -84,6 +85,7 @@ struct augmentation_entry_base_t : augmentation_t {
   protected:
     augmentation_entry_base_t(self_t *parent, dynamic_item_t *owner, std::string own_name);
     void push_diff_up();
+    void safe_delete();
 
     std::string own_name;
     self_t *parent;
