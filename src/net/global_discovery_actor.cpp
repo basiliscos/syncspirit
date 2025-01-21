@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "global_discovery_actor.h"
 #include "names.h"
@@ -181,9 +181,10 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     }
     if (!found) {
         using state_t = model::device_state_t;
-        auto diff = model::diff::cluster_diff_ptr_t();
-        diff = new model::diff::contact::peer_state_t(*cluster, sha256, nullptr, state_t::offline);
-        send<model::payload::model_update_t>(coordinator, std::move(diff));
+        auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, nullptr, state_t::offline);
+        if (diff) {
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
+        }
     }
 }
 

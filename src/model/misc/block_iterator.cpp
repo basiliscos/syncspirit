@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "model/file_info.h"
 #include "block_iterator.h"
@@ -21,7 +21,7 @@ blocks_iterator_t::blocks_iterator_t(file_info_t &source_) noexcept : i{0}, sour
 
 blocks_iterator_t::operator bool() const noexcept { return (i != wrong_index) && (source->get_sequence() == sequence); }
 
-file_info_ptr_t blocks_iterator_t::get_source() noexcept { return source; }
+file_info_t *blocks_iterator_t::get_source() noexcept { return source.get(); }
 
 void blocks_iterator_t::advance() noexcept {
     auto &sb = source->get_blocks();

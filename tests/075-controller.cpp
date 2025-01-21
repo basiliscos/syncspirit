@@ -308,9 +308,9 @@ struct fixture_t {
     void _start_target(std::string connection_id) {
         peer_actor = sup->create_actor<sample_peer_t>().auto_share(auto_share).timeout(timeout).finish();
 
-        auto diff = model::diff::cluster_diff_ptr_t{};
-        diff = new model::diff::contact::peer_state_t(*cluster, peer_device->device_id().get_sha256(),
-                                                      peer_actor->get_address(), device_state_t::online, connection_id);
+        auto diff = model::diff::contact::peer_state_t::create(*cluster, peer_device->device_id().get_sha256(),
+                                                               peer_actor->get_address(), device_state_t::online,
+                                                               connection_id);
         sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
 
         target = sup->create_actor<controller_actor_t>()
@@ -323,6 +323,7 @@ struct fixture_t {
                      .sequencer(sup->sequencer)
                      .timeout(timeout)
                      .request_timeout(timeout)
+                     .blocks_max_requested(get_blocks_max_requested())
                      .finish();
 
         sup->do_process();
@@ -415,6 +416,8 @@ struct fixture_t {
     virtual void create_hasher() noexcept { sup->create_actor<hasher_actor_t>().index(1).timeout(timeout).finish(); }
 
     virtual void main(diff_builder_t &) noexcept {}
+
+    virtual std::uint32_t get_blocks_max_requested() { return 8; }
 
     bool auto_start;
     bool auto_share;
@@ -1138,6 +1141,9 @@ void test_downloading() {
 void test_downloading_errors() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
+
+        std::uint32_t get_blocks_max_requested() override { return 1; }
+
         void main(diff_builder_t &) noexcept override {
             auto &folder_infos = folder_1->get_folder_infos();
             auto folder_my = folder_infos.by_device(*my_device);
@@ -1163,7 +1169,7 @@ void test_downloading_errors() {
             file->set_type(proto::FileInfoType::FILE);
             file->set_sequence(folder_1_peer->get_max_sequence() + 1);
             file->set_block_size(5);
-            file->set_size(5);
+            file->set_size(15);
             auto version = file->mutable_version();
             auto counter = version->add_counters();
             counter->set_id(1ul);
@@ -1174,6 +1180,16 @@ void test_downloading_errors() {
             b1->set_offset(0);
             b1->set_size(5);
 
+            auto b2 = file->add_blocks();
+            b2->set_hash(utils::sha256_digest("67890").value());
+            b2->set_offset(5);
+            b2->set_size(5);
+
+            auto b3 = file->add_blocks();
+            b3->set_hash(utils::sha256_digest("11111").value());
+            b3->set_offset(10);
+            b3->set_size(5);
+
             CHECK(folder_my->get_max_sequence() == 0ul);
             peer_actor->forward(proto::message::Index(new proto::Index(index)));
 
@@ -1181,11 +1197,14 @@ void test_downloading_errors() {
                 auto ec = utils::make_error_code(utils::request_error_code_t::generic);
                 peer_actor->push_block(ec, 0);
             }
-            SECTION("hash mismatch, do not shutdown") { peer_actor->push_block("zzz", 0); }
+            SECTION("hash mismatch, do not shutdown") {
+                peer_actor->push_block("zzz", 0);
+                peer_actor->push_block("67890", 1); // needed to terminate/shutdown controller
+            }
 
             sup->do_process();
 
-            CHECK(peer_actor->blocks_requested == 1);
+            CHECK(peer_actor->blocks_requested <= 2);
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
             auto folder_peer = folder_infos.by_device(*peer_device);

@@ -108,11 +108,11 @@ void test_dialer() {
 
             SECTION("peer online & offline") {
                 messages.clear();
-                builder.update_state(*peer_device, {}, model::device_state_t::online, "tcp://127.0.0.1:1234")
-                    .apply(*sup);
+                auto connection_id = std::string("tcp://127.0.0.1:1234");
+                builder.update_state(*peer_device, {}, model::device_state_t::online, connection_id).apply(*sup);
                 CHECK(messages.size() == 1);
 
-                builder.update_state(*peer_device, {}, model::device_state_t::offline).apply(*sup);
+                builder.update_state(*peer_device, {}, model::device_state_t::offline, connection_id).apply(*sup);
                 CHECK(messages.size() == 2);
                 CHECK(sup->timers.size() == 1);
 

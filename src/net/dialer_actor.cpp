@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "dialer_actor.h"
 #include "model/diff/modify/remove_peer.h"
@@ -117,9 +117,11 @@ void dialer_actor_t::discover_or_dial(const model::device_ptr_t &peer_device) no
     }
 
     if (do_discover) {
-        auto diff = model::diff::cluster_diff_ptr_t();
-        diff = new model::diff::contact::peer_state_t(*cluster, device_id.get_sha256(), nullptr, state_t::discovering);
-        send<model::payload::model_update_t>(coordinator, std::move(diff));
+        auto diff =
+            model::diff::contact::peer_state_t::create(*cluster, device_id.get_sha256(), nullptr, state_t::discovering);
+        if (diff) {
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
+        }
     }
     if (do_dial) {
         auto diff = new model::diff::contact::dial_request_t(*peer_device);

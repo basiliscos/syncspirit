@@ -243,10 +243,12 @@ void peer_actor_t::shutdown_finish() noexcept {
     auto sha256 = peer_device_id.get_sha256();
     auto device = cluster->get_devices().by_sha256(sha256);
     if (device && device->get_state() != model::device_state_t::offline) {
-        auto diff = model::diff::cluster_diff_ptr_t();
         auto state = model::device_state_t::offline;
-        diff = new model::diff::contact::peer_state_t(*cluster, sha256, address, state);
-        send<model::payload::model_update_t>(coordinator, std::move(diff));
+        auto connection_id = fmt::format("{}://{}", peer_proto, peer_endpoint);
+        auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, address, state, connection_id);
+        if (diff) {
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
+        }
     }
 }
 
@@ -390,8 +392,8 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
         }
         auto state = model::device_state_t::online;
         auto connection_id = fmt::format("{}://{}", peer_proto, peer_endpoint);
-        diff = new contact::peer_state_t(*cluster, sha_s256, get_address(), state, std::move(connection_id), cert_name,
-                                         peer_endpoint, client_name, client_version);
+        diff = contact::peer_state_t::create(*cluster, sha_s256, get_address(), state, std::move(connection_id),
+                                             cert_name, peer_endpoint, client_name, client_version);
     } else if (auto peer = cluster->get_ignored_devices().by_sha256(sha_s256)) {
         fill_db_and_shutdown();
         diff = new model::diff::contact::ignored_connected_t(*cluster, peer_device_id, std::move(db));
@@ -406,7 +408,9 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
         diff = new model::diff::contact::unknown_connected_t(*cluster, peer_device_id, std::move(db));
     }
 
-    send<model::payload::model_update_t>(coordinator, std::move(diff));
+    if (diff) {
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
+    }
 }
 
 void peer_actor_t::handle_ping(proto::message::Ping &&) noexcept { log->trace("handle_ping"); }

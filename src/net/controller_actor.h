@@ -181,6 +181,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void release_block(std::string_view folder_id, std::string_view hash) noexcept;
     folder_synchronization_ptr_t get_sync_info(model::folder_t *folder) noexcept;
     folder_synchronization_ptr_t get_sync_info(std::string_view folder_id) noexcept;
+    void cancel_sync(model::file_info_t *) noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;

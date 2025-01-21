@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "initiator_actor.h"
 #include "constants.h"
@@ -112,8 +112,10 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto sha256 = peer_device_id.get_sha256();
                 auto peer = cluster && cluster->get_devices().by_sha256(sha256);
                 if (peer) {
-                    diff = new model::diff::contact::peer_state_t(*cluster, sha256, nullptr, state);
-                    send<model::payload::model_update_t>(coordinator, std::move(diff));
+                    diff = model::diff::contact::peer_state_t::create(*cluster, sha256, nullptr, state);
+                    if (diff) {
+                        send<model::payload::model_update_t>(coordinator, std::move(diff));
+                    }
                 }
             }
         });
@@ -204,9 +206,10 @@ void initiator_actor_t::shutdown_finish() noexcept {
         auto state = model::device_state_t::offline;
         auto sha256 = peer_device_id.get_sha256();
         if (auto peer = cluster->get_devices().by_sha256(sha256); peer) {
-            auto diff = model::diff::cluster_diff_ptr_t();
-            diff = new model::diff::contact::peer_state_t(*cluster, sha256, nullptr, state);
-            send<model::payload::model_update_t>(coordinator, std::move(diff));
+            auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, nullptr, state);
+            if (diff) {
+                send<model::payload::model_update_t>(coordinator, std::move(diff));
+            }
         }
     }
     r::actor_base_t::shutdown_finish();

@@ -299,7 +299,7 @@ void controller_actor_t::pull_next() noexcept {
     LOG_TRACE(log, "pull_next (pull_signal_t), blocks requested = {}", rx_blocks_requested);
     auto advances = std::uint_fast32_t{0};
     auto can_pull_more = [&]() -> bool {
-        bool ignore = (rx_blocks_requested > blocks_max_requested || request_pool < 0) // rx buff is going to be full
+        bool ignore = (rx_blocks_requested >= blocks_max_requested || request_pool < 0) // rx buff is going to be full
                       || (state != r::state_t::OPERATIONAL) // request pool sz = 32505856e are shutting down
                       || !cluster->get_write_requests() || advances > advances_per_iteration;
         return !ignore;
@@ -310,7 +310,7 @@ void controller_actor_t::pull_next() noexcept {
 OUTER:
     while (can_pull_more()) {
         if (block_iterator) {
-            seen_files.emplace(block_iterator->get_source().get());
+            seen_files.emplace(block_iterator->get_source());
             if (*block_iterator) {
                 auto file_block = block_iterator->next();
                 if (!file_block.block()->is_locked()) {
@@ -435,10 +435,7 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
         auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
         for (auto &f : diff.files) {
             auto file = files_map.by_name(f.name());
-            auto it = synchronizing_files.find(file.get());
-            if (it != synchronizing_files.end()) {
-                synchronizing_files.erase(it);
-            }
+            cancel_sync(file.get());
         }
         pull_ready();
     }
@@ -460,10 +457,7 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
             if (diff.peer_id == peer->device_id().get_sha256()) {
                 local_file = file->local_file();
                 if (file->get_blocks().size()) {
-                    auto it = synchronizing_files.find(file.get());
-                    if (it != synchronizing_files.end()) {
-                        synchronizing_files.erase(it);
-                    }
+                    cancel_sync(file.get());
                 }
             }
         }
@@ -547,10 +541,7 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
     auto folder_info = folder_infos.by_device(*device);
     auto file = folder_info->get_file_infos().by_name(file_name);
     if (ctx->from_self) {
-        auto it = synchronizing_files.find(file.get());
-        if (it != synchronizing_files.end()) {
-            synchronizing_files.erase(it);
-        }
+        cancel_sync(file.get());
         pull_ready();
     }
     if (device == cluster->get_device() && updates_streamer) {
@@ -737,8 +728,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
                              ec.message());
                     file->mark_unreachable(true);
                     push(new model::diff::modify::mark_reachable_t(*file, false));
-                    auto it = synchronizing_files.find(file);
-                    synchronizing_files.erase(it);
+                    cancel_sync(file);
                 }
             } else {
                 LOG_WARN(log, "can't receive block : {}", ee->message());
@@ -773,6 +763,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     auto file_block = payload.get_block(*cluster, *peer);
     auto file = file_block.file();
     bool do_release_block = false;
+    bool try_next = false;
     if (!file) {
         LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", payload.file_name, payload.folder_id);
         do_release_block = true;
@@ -792,8 +783,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
                     push(new model::diff::modify::mark_reachable_t(*file, false));
                 }
                 do_release_block = true;
-                pull_ready();
-                send_diff();
+                try_next = true;
             } else if (folder->is_suspended()) {
                 LOG_WARN(log, "folder '{}' is suspended, no further processing of '{}'", folder->get_id(),
                          file->get_name());
@@ -809,6 +799,13 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     }
     if (do_release_block) {
         release_block(payload.folder_id, payload.block_hash);
+        if (file) {
+            cancel_sync(file);
+        }
+    }
+    if (try_next) {
+        pull_ready();
+        send_diff();
     }
 }
 
@@ -876,3 +873,13 @@ auto controller_actor_t::pull_signal_t::visit(model::diff::cluster_visitor_t &vi
 }
 
 bool controller_actor_t::owns_best_connection() noexcept { return peer->get_connection_id() == connection_id; }
+
+void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
+    auto it = synchronizing_files.find(file);
+    if (block_iterator && block_iterator->get_source() == file) {
+        block_iterator.reset();
+    }
+    if (it != synchronizing_files.end()) {
+        synchronizing_files.erase(it);
+    }
+}

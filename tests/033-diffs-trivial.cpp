@@ -8,8 +8,6 @@
 #include "model/diff/modify/lock_file.h"
 #include "model/diff/local/file_availability.h"
 #include "model/diff/contact/update_contact.h"
-#include "model/diff/cluster_visitor.h"
-#include <cstring>
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -30,10 +28,11 @@ TEST_CASE("peer state update", "[model]") {
     auto builder = diff_builder_t(*cluster);
     REQUIRE(peer_device->get_state() == model::device_state_t::offline);
 
-    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::online, "tcp://1.1.1.1:1").apply());
+    auto connection_id = std::string("tcp://1.1.1.1:1");
+    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::online, connection_id).apply());
     CHECK(peer_device->get_state() == model::device_state_t::online);
 
-    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::offline).apply());
+    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::offline, connection_id).apply());
     CHECK(peer_device->get_state() == model::device_state_t::offline);
 }
 
