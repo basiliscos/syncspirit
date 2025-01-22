@@ -521,7 +521,7 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_files_t &d
             if (requesting_file) {
                 if (requesting_file->get_key() == key) {
                     block_iterator.reset();
-                    break;
+                    requesting_file = nullptr;
                 }
             }
             for (auto it = synchronizing_files.begin(); it != synchronizing_files.end(); ++it) {
