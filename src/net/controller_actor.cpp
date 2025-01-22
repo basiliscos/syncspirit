@@ -325,8 +325,9 @@ OUTER:
             continue;
         }
         if (!block_iterator && !synchronizing_files.empty()) {
-            for (auto &[file, _] : synchronizing_files) {
-                if (seen_files.contains(file)) {
+            for (auto &[key, guard] : synchronizing_files) {
+                auto file = guard->file.get();
+                if (seen_files.count(file)) {
                     continue;
                 }
                 auto bi = model::block_iterator_ptr_t();
@@ -338,7 +339,7 @@ OUTER:
             }
         }
         if (auto [file, action] = file_iterator->next(); action != model::advance_action_t::ignore) {
-            auto in_sync = synchronizing_files.count(file);
+            auto in_sync = synchronizing_files.count(file->get_key());
             if (in_sync) {
                 continue;
             }
@@ -355,7 +356,7 @@ OUTER:
                 bi = new model::blocks_iterator_t(*file);
                 if (*bi) {
                     block_iterator = bi;
-                    synchronizing_files[file] = file->guard();
+                    synchronizing_files[file->get_key()] = file->guard();
                 }
             }
 
@@ -524,11 +525,9 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_files_t &d
                     requesting_file = nullptr;
                 }
             }
-            for (auto it = synchronizing_files.begin(); it != synchronizing_files.end(); ++it) {
-                if (it->first->get_key() == key) {
-                    synchronizing_files.erase(it);
-                    break;
-                }
+            auto it = synchronizing_files.find(key);
+            if (it != synchronizing_files.end()) {
+                synchronizing_files.erase(it);
             }
         }
     }
@@ -902,10 +901,10 @@ auto controller_actor_t::pull_signal_t::visit(model::diff::cluster_visitor_t &vi
 bool controller_actor_t::owns_best_connection() noexcept { return peer->get_connection_id() == connection_id; }
 
 void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
-    auto it = synchronizing_files.find(file);
     if (block_iterator && block_iterator->get_source() == file) {
         block_iterator.reset();
     }
+    auto it = synchronizing_files.find(file->get_key());
     if (it != synchronizing_files.end()) {
         synchronizing_files.erase(it);
     }
