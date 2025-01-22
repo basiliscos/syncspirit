@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "fs_supervisor.h"
 #include "net/names.h"
@@ -88,7 +88,7 @@ void fs_supervisor_t::on_model_request(model::message::model_request_t &req) noe
 void fs_supervisor_t::on_model_response(model::message::model_response_t &res) noexcept {
     LOG_TRACE(log, "on_model_response");
     resources->release(resource::model);
-    auto ee = res.payload.ee;
+    auto &ee = res.payload.ee;
     if (ee) {
         LOG_ERROR(log, "cannot get model: {}", ee->message());
         return do_shutdown(ee);

@@ -186,7 +186,7 @@ auto app_supervisor_t::get_coordinator_address() -> r::address_ptr_t & { return 
 void app_supervisor_t::on_model_response(model::message::model_response_t &res) noexcept {
     LOG_TRACE(log, "on_model_response");
     resources->release(resource::model);
-    auto ee = res.payload.ee;
+    auto &ee = res.payload.ee;
     if (ee) {
         LOG_ERROR(log, "cannot get model: {}", ee->message());
         return do_shutdown(ee);

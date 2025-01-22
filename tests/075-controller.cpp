@@ -1829,8 +1829,6 @@ void test_download_interrupting() {
                          .get();
         }
 
-        std::uint32_t get_blocks_max_requested() override { return 1; }
-
         void main(diff_builder_t &) noexcept override {
             sup->do_process();
 
@@ -1883,21 +1881,32 @@ void test_download_interrupting() {
                     SECTION("suspend folder") { builder.suspend(*folder_1).apply(*sup); }
                     SECTION("unshare folder") { builder.unshare_folder(*folder_peer).apply(*sup); }
                     peer_actor->push_block("12345", 0, file->name());
+                    peer_actor->push_block("67890", 1, file->name());
                     peer_actor->process_block_requests();
                     sup->do_process();
                     auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
                     CHECK(folder_my->get_file_infos().size() == 0);
                 }
-
                 SECTION("remove folder") {
+                    sup->auto_ack_blocks = false;
+
+                    peer_actor->push_block("67890", 1, file->name());
+                    peer_actor->process_block_requests();
+                    sup->do_process();
+
                     builder.remove_folder(*folder_1).apply(*sup);
+                    sup->do_process();
+
+                    hasher->process_requests();
+                    sup->do_process();
+
                     peer_actor->push_block("12345", 0, file->name());
                     peer_actor->process_block_requests();
                     sup->do_process();
+                    CHECK(peer_actor->blocks_requested == file->blocks_size());
                     CHECK(!cluster->get_folders().by_id(folder->id()));
                 }
             }
-
             SECTION("hash validation replies") {
                 SECTION("folder is kept") {
                     peer_actor->push_block("12345", 0, file->name());
@@ -1924,6 +1933,7 @@ void test_download_interrupting() {
             SECTION("block acks from fs") {
                 sup->auto_ack_blocks = false;
                 hasher->auto_reply = true;
+                peer_actor->push_block("67890", 1, file->name());
                 peer_actor->push_block("12345", 0, file->name());
                 peer_actor->process_block_requests();
                 sup->do_process();

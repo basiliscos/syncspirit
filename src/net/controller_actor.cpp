@@ -16,6 +16,7 @@
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/remove_peer.h"
+#include "model/diff/modify/remove_files.h"
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/cluster_update.h"
@@ -512,6 +513,28 @@ auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_inf
     return diff.visit_next(*this, custom);
 }
 
+auto controller_actor_t::operator()(const model::diff::modify::remove_files_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (diff.device_id == peer->device_id().get_sha256()) {
+        auto requesting_file = block_iterator ? block_iterator->get_source() : nullptr;
+        for (auto &key : diff.keys) {
+            if (requesting_file) {
+                if (requesting_file->get_key() == key) {
+                    block_iterator.reset();
+                    break;
+                }
+            }
+            for (auto it = synchronizing_files.begin(); it != synchronizing_files.end(); ++it) {
+                if (it->first->get_key() == key) {
+                    synchronizing_files.erase(it);
+                    break;
+                }
+            }
+        }
+    }
+
+    return diff.visit_next(*this, custom);
+}
 auto controller_actor_t::operator()(const model::diff::modify::remove_folder_infos_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     for (auto &key : diff.keys) {
@@ -711,7 +734,7 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     --rx_blocks_requested;
-    auto ee = message.payload.ee;
+    auto &ee = message.payload.ee;
     auto &payload = message.payload.req->payload.request_payload;
     auto file_block = payload.get_block(*cluster, *peer);
     auto file = file_block.file();

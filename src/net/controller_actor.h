@@ -17,7 +17,6 @@
 #include "utils/log.h"
 #include "fs/messages.h"
 
-#include <unordered_set>
 #include <unordered_map>
 #include <deque>
 
@@ -190,6 +189,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     outcome::result<void> operator()(const model::diff::modify::block_rej_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::mark_reachable_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::remove_files_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_folder_infos_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
