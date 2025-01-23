@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "ignored_device.h"
 #include "model/diff/modify/remove_ignored_device.h"

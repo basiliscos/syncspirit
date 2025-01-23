@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+
 #include "tree_item.h"
 #include "utils.hpp"
 

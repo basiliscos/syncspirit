@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+
 #include "local_entry.h"
 
 using namespace syncspirit::fltk;

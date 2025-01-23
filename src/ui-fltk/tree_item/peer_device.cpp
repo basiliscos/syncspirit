@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+
 #include "peer_device.h"
 #include "peer_folders.h"
 #include "pending_folders.h"

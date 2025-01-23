@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+
 #include "tree_view.h"
 #include "tree_item/devices.h"
 #include "tree_item/folders.h"

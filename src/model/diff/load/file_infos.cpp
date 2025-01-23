@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "file_infos.h"
 #include "model/cluster.h"
@@ -30,10 +30,13 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
 
     for (auto &pair : container) {
         auto key = pair.first;
+        auto &db = pair.second;
         auto folder_info_uuid = key.substr(1, uuid_length);
         auto folder_info = all_fi[folder_info_uuid];
-        assert(folder_info);
-        auto &db = pair.second;
+        if (!folder_info) {
+            LOG_WARN(log, "cannot restore file '{}', missing folder, currupted db?", db.name());
+            continue;
+        }
 
         auto option = file_info_t::create(key, db, folder_info);
         if (!option) {
