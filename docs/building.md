@@ -2,15 +2,15 @@
 
 ## requirements
 
- - C++ 17 compatile compiler (tested with gcc-8.5 and clang-17)
+ - C++ 20 compatile compiler (tested with gcc-13.2 and clang-17)
  
- - [boost](https://www.boost.org/) (at least `v1.70`)
+ - [boost](https://www.boost.org/) (at least `v1.84.0`)
  - [openssl](https://www.openssl.org/)
  - [protobuf](https://github.com/protocolbuffers/protobuf), (at least `v3.0`)
  - [zlib](https://www.zlib.net/)
- - [rotor](https://github.com/basiliscos/cpp-rotor)
+ - [rotor](https://github.com/basiliscos/cpp-rotor), (at least `v0.32`)
  - [lz4](https://github.com/lz4/lz4)
- - [libmbdx](https://github.com/erthink/libmdbx)
+ - [libmbdx](https://github.com/erthink/libmdbx), (at least `v0.13.3`)
  - [spdlog](https://github.com/gabime/spdlog)
  - [json](https://github.com/nlohmann/json)
  - [pugixml](https://github.com/zeux/pugixml)
@@ -21,28 +21,30 @@
 The [conan](https://conan.io/) package manager (v2.0+) is used with 
 [cmake](https://cmake.org/) build system.
 
-## building linux (shared libraries)
+`syncspririt` can be build with [conan](https://conan.io/) or just with bare
+[cmake](https://cmake.org/) build system. [conan](https://conan.io/) is 
+responsible for installing and building dependecies, whith bare [cmake](https://cmake.org/)
+it should be done manually (e.g. use system-provided libraries).
+
+## generic build 
 
 ```
 mkdir build.release && cd build.release
-conan install --build=missing -o '*:shared=True' -o shared=True --output-folder . -s build_type=Release .. 
+conan install --build=missing -o '*:shared=True' -o '&:shared=True' --output-folder . -s build_type=Release .. 
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=on
 make -j`nproc`
 ```
 
-## building linux (static libraries, single executable)
+Please note, that [fltk](https://www.fltk.org/) library should be build as 
+shared library; otherwise applications will not work correctly.
 
-```
-mkdir build.release && cd build.release
-conan install --build=missing -o '*:shared=false' -o shared=False --output-folder . -s build_type=Release .. 
-cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=off
-make -j`nproc`
-```
+## cross building on linux for windows
 
+Generally it the process is the same as above, with the addition, that 
+cross-compiler should be installed and conan profiles should be activated
 
-## cross building on linux for windows (single executable, simple way) 
+### mingw
 
 Install mingw on linux (something like `cross-x86_64-w64-mingw32`)
 
@@ -77,22 +79,22 @@ Then make a build
 
 ```
 mkdir build.release && cd build.release
-conan install --build=missing -o '*:shared=False' -o shared=False --output-folder . \
+conan install --build=missing -o -o '*:shared=True' -o '&:shared=True' --output-folder . \
     -s build_type=Release --profile:build=default --profile:host=mingw
 source ./conanbuild.sh 
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=off
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=on
 make -j`nproc`
 ```
 
-## cross building on linux for modern windows (single executable, more reliable way) 
+### mxe
 
 Download [mxe](https://mxe.cc); make sure all requirements are met.
 
 Your `settings.mk` should contain something like:
 
 ```
-MXE_TARGETS := x86_64-w64-mingw32.static
+MXE_TARGETS := x86_64-w64-mingw32.shared
 ```
 
 
@@ -107,8 +109,8 @@ Add $mxe_dir/uer/bin to your `PATH`, and make sure something like that works:
 
 ```
 export PATH=`pwd`/usr/bin:$PATH
-x86_64-w64-mingw32.static-g++ --version
-x86_64-w64-mingw32.static-g++ (GCC) 11.2.0
+x86_64-w64-mingw32.shared-g++ --version
+x86_64-w64-mingw32.shared-g++ (GCC) 11.2.0
 ```
 
 Make a conan profile for mingw:
@@ -124,10 +126,10 @@ compiler.cppstd=gnu17
 compiler.libcxx=libstdc++11
 compiler.version=11
 [buildenv]
-CC=x86_64-w64-mingw32.static-gcc
-CXX=x86_64-w64-mingw32.static-g++
-LD=x86_64-w64-mingw32.static-ld
-RC=x86_64-w64-mingw32.static-windres
+CC=x86_64-w64-mingw32.shared-gcc
+CXX=x86_64-w64-mingw32.shared-g++
+LD=x86_64-w64-mingw32.shared-ld
+RC=x86_64-w64-mingw32.shared-windres
 
 [options]
 boost/*:without_fiber=True
@@ -144,22 +146,22 @@ Go to `syncspirit` dir and then make a build
 ```
 cd syncspirit
 mkdir build.release && cd build.release
-conan install --build=missing -o '*:shared=False' -o shared=False --output-folder . \
+conan install --build=missing -o '*:shared=True' -o '&:shared=True' --output-folder . \
     -s build_type=Release --profile:build=default --profile:host=mxe ..
 source ./conanbuild.sh 
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=off
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=on
 make -j`nproc`
 ```
 
-## cross building on linux for windows xp 
+### mxe & windows xp 
 
 Download [mxe](https://mxe.cc); make sure all requirements are met.
 
 Your `settings.mk` should contain something like:
 
 ```
-MXE_TARGETS := i686-w64-mingw32.static
+MXE_TARGETS := i686-w64-mingw32.shared
 MXE_PLUGIN_DIRS=plugins/windows-xp
 ```
 
@@ -178,8 +180,8 @@ Add $mxe_dir/uer/bin to your `PATH`, and make sure something like that works:
 
 ```
 export PATH=`pwd`/usr/bin:$PATH
-i686-w64-mingw32.static-g++ --version
-i686-w64-mingw32.static-g++ (GCC) 11.2.0
+i686-w64-mingw32.shared-g++ --version
+i686-w64-mingw32.shared-g++ (GCC) 11.2.0
 ```
 
 Make a conan profile for mingw:
@@ -195,10 +197,10 @@ compiler.cppstd=gnu17
 compiler.libcxx=libstdc++11
 compiler.version=12
 [buildenv]
-CC=i686-w64-mingw32.static-gcc
-CXX=i686-w64-mingw32.static-g++
-LD=i686-w64-mingw32.static-ld
-RC=i686-w64-mingw32.static-windres
+CC=i686-w64-mingw32.shared-gcc
+CXX=i686-w64-mingw32.shared-g++
+LD=i686-w64-mingw32.shared-ld
+RC=i686-w64-mingw32.shared-windres
 
 [options]
 boost/*:without_fiber=True
@@ -217,7 +219,7 @@ The supped libmbdx should be patched for windows xp support:
 
 ```
 cd syncspirit/lib/mbdx
- patch -p1 < ../windows-xp.patch
+ patch -p1 < ../mdbx-xp-patch.diff
 ```
 
 Go to `syncspirit` dir and then make a build
@@ -225,11 +227,11 @@ Go to `syncspirit` dir and then make a build
 ```
 cd syncspirit
 mkdir build.release && cd build.release
-conan install --build=missing -o '*:shared=False' -o shared=False --output-folder . \
+conan install --build=missing -o -o '*:shared=True' -o '&:shared=True' --output-folder . \
     -s build_type=Release --profile:build=default --profile:host=xp ..
 source ./conanbuild.sh 
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=off \
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=on \
   -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0501 -DBOOST_ASIO_ENABLE_CANCELIO=1"
 make -j`nproc`
 ```
@@ -285,18 +287,4 @@ cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=off
 make -j`nproc`
 
-```
-
-## termux
-
-```
-pkg install git cmake boost-headers protobuf
-git clone https://github.com/basiliscos/syncspirit.git 
-cd syncspirit
-git checkout v0.2.0
-git submodule update --init
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j1 (or -j2 or -j3)
 ```
