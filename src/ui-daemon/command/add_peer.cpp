@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "add_peer.h"
 #include "../governor_actor.h"
@@ -38,8 +38,7 @@ bool add_peer_t::execute(governor_actor_t &actor) noexcept {
     db_dev.set_name(label);
 
     auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(db_dev), peer, cluster));
-    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(diff), &actor);
-
+    actor.send_command(std::move(diff), *this);
     return true;
 }
 

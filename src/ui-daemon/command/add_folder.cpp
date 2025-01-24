@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "add_folder.h"
 #include "../governor_actor.h"
@@ -104,12 +104,8 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
 
     log->debug("{}, going to add folder '{}' on '{}'", actor.get_identity(), folder.label(), folder.path());
 
-    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(opt.value()), this);
-    actor.add_callback(this, [&actor, folder_id = folder.id()]() -> bool {
-        actor.process();
-        return true;
-    });
-    return false;
+    actor.send_command(std::move(opt.value()), *this);
+    return true;
 }
 
 } // namespace syncspirit::daemon::command

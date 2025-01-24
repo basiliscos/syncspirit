@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "governor_actor.h"
 #include "net/names.h"
@@ -16,13 +16,8 @@
 using namespace syncspirit::daemon;
 
 governor_actor_t::governor_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, commands{std::move(cfg.commands)}, cluster{std::move(cfg.cluster)} {
-
-    add_callback(this, [&]() {
-        process();
-        return false;
-    });
-}
+    : r::actor_base_t{cfg}, commands{std::move(cfg.commands)}, sequencer{std::move(cfg.sequencer)},
+      cluster{std::move(cfg.cluster)} {}
 
 void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -36,6 +31,7 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&governor_actor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&governor_actor_t::on_command);
             }
         });
     });
@@ -61,12 +57,23 @@ void governor_actor_t::on_model_update(model::message::model_update_t &message) 
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
+}
 
-    auto it = callbacks_map.find(custom);
-    if (it != callbacks_map.end()) {
-        auto remove = it->second();
-        if (remove) {
-            callbacks_map.erase(it);
+void governor_actor_t::send_command(model::diff::cluster_diff_ptr_t diff, command_t &source) noexcept {
+    auto message =
+        r::make_routed_message<model::payload::model_update_t>(coordinator, address, std::move(diff), &source);
+    get_supervisor().put(std::move(message));
+}
+
+void governor_actor_t::on_command(model::message::model_update_t &message) noexcept {
+    auto custom = message.payload.custom;
+    LOG_TRACE(log, "on_command, this = {}, payload = {}", (void *)this, custom);
+    for (auto it = commands.begin(); it != commands.end(); ++it) {
+        if (it->get() == custom) {
+            (*it)->finish();
+            commands.erase(it);
+            process();
+            break;
         }
     }
 }
@@ -79,9 +86,9 @@ NEXT:
         return;
     }
     auto &cmd = commands.front();
-    bool ok = cmd->execute(*this);
-    commands.pop_front();
-    if (!ok) {
+    bool keep = cmd->execute(*this);
+    if (!keep) {
+        commands.pop_front();
         goto NEXT;
     }
 }
@@ -116,10 +123,6 @@ void governor_actor_t::refresh_deadline() noexcept {
     auto timeout = r::pt::seconds(inactivity_seconds);
     auto now = clock_t::local_time();
     deadline = now + timeout;
-}
-
-void governor_actor_t::add_callback(const void *pointer, command_callback_t &&callback) noexcept {
-    callbacks_map.emplace(pointer, callback);
 }
 
 auto governor_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept

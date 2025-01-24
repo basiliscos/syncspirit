@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -21,6 +21,7 @@ using command_ptr_t = std::unique_ptr<command_t>;
 struct command_t {
     virtual ~command_t() = default;
     virtual bool execute(governor_actor_t &) noexcept = 0;
+    virtual void finish() noexcept;
 
     static outcome::result<command_ptr_t> parse(std::string_view) noexcept;
     utils::logger_t log;

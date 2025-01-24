@@ -89,8 +89,8 @@ bool share_folder_t::execute(governor_actor_t &actor) noexcept {
         log->warn("{}, cannot share: ", actor.get_identity(), opt.assume_error().message());
         return false;
     }
-    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(opt.value()), &actor);
-    return false;
+    actor.send_command(std::move(opt.value()), *this);
+    return true;
 }
 
 } // namespace syncspirit::daemon::command
