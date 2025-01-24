@@ -149,7 +149,7 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        utils::set_default(vm["log_level"].as<std::string>());
+        auto log_level = utils::get_log_level(vm["log_level"].as<std::string>());
 
         bfs::path config_file_path;
         if (vm.count("config_dir")) {
@@ -197,8 +197,18 @@ int main(int argc, char **argv) {
         auto &cfg = cfg_option.value();
         spdlog::trace("configuration seems OK");
 
-        bool overwrite_default = vm.count("log_level");
-        auto init_result = utils::init_loggers(cfg.log_configs, overwrite_default);
+        // override default
+        if (log_level) {
+            if (cfg.log_configs.size()) {
+                auto &first_cfg = cfg.log_configs.front();
+                if (first_cfg.name == "default") {
+                    auto level = log_level.value();
+                    first_cfg.level = level;
+                    spdlog::trace("overriding default log levet to {}", int(level));
+                }
+            }
+        }
+        auto init_result = utils::init_loggers(cfg.log_configs);
         if (!init_result) {
             spdlog::error("Loggers initialization failed :: {}", init_result.error().message());
             return 1;
@@ -277,6 +287,7 @@ int main(int argc, char **argv) {
             fs_sup->create_actor<governor_actor_t>()
                 .commands(std::move(commands))
                 .cluster(cluster)
+                .sequencer(sequencer)
                 .timeout(timeout)
                 .autoshutdown_supervisor()
                 .finish();
