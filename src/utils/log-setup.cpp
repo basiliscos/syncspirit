@@ -33,9 +33,7 @@ static sink_option_t make_sink(std::string_view name) noexcept {
     return utils::make_error_code(error_code_t::unknown_sink);
 }
 
-void set_default(const std::string &level) noexcept { spdlog::default_logger_raw()->set_level(get_log_level(level)); }
-
-outcome::result<void> init_loggers(const config::log_configs_t &configs, bool overwrite_default) noexcept {
+outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcept {
     using sink_map_t = std::unordered_map<std::string, spdlog::sink_ptr>;
     using logger_map_t = std::unordered_map<std::string, std::shared_ptr<spdlog::logger>>;
 
@@ -132,11 +130,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, bool ov
     for (auto &it : logger_map) {
         auto &name = it.first;
         auto &logger = it.second;
-        if (name == "default") {
-            if (overwrite_default && prev) {
-                logger->set_level(prev->level());
-            }
-        } else {
+        if (name != "default") {
             spdlog::register_logger(logger);
         }
     }

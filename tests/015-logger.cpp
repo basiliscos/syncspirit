@@ -23,11 +23,9 @@ static bool _init = []() {
     return true;
 }();
 
-bool overwrite = false;
-
 TEST_CASE("default logger", "[log]") {
     config::log_configs_t cfg{{"default", L::trace, {"stdout"}}};
-    REQUIRE(utils::init_loggers(cfg, overwrite));
+    REQUIRE(utils::init_loggers(cfg));
     auto l = utils::get_logger("default");
     CHECK(l);
     CHECK(l->level() == L::trace);
@@ -35,7 +33,7 @@ TEST_CASE("default logger", "[log]") {
 
 TEST_CASE("hierarchy", "[log]") {
     config::log_configs_t cfg{{"default", L::trace, {"stdout"}}, {"a", L::info, {}}, {"a.b.c", L::warn, {}}};
-    REQUIRE(utils::init_loggers(cfg, overwrite));
+    REQUIRE(utils::init_loggers(cfg));
     SECTION("custom") {
         auto l = utils::get_logger("a");
         REQUIRE(l);
@@ -67,7 +65,7 @@ TEST_CASE("file sink", "[log]") {
 
     auto sink_config = fmt::format("file:{}", log_file_str);
     config::log_configs_t cfg{{"default", L::trace, {sink_config}}};
-    REQUIRE(utils::init_loggers(cfg, overwrite));
+    REQUIRE(utils::init_loggers(cfg));
     auto l = utils::get_logger("default");
     l->info("lorem ipsum dolor");
     l->flush();

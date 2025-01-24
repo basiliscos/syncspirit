@@ -31,10 +31,7 @@ struct SYNCSPIRIT_API boostrap_guard_t {
 };
 using boostrap_guard_ptr_t = std::unique_ptr<boostrap_guard_t>;
 
-SYNCSPIRIT_API void set_default(const std::string &level) noexcept;
-
-SYNCSPIRIT_API outcome::result<void> init_loggers(const config::log_configs_t &configs,
-                                                  bool overwrite_default) noexcept;
+SYNCSPIRIT_API outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcept;
 
 SYNCSPIRIT_API dist_sink_t create_root_logger() noexcept;
 SYNCSPIRIT_API boostrap_guard_ptr_t bootstrap(const spdlog::sink_ptr sink = {}) noexcept;

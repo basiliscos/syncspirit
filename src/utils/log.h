@@ -6,14 +6,16 @@
 #include <memory>
 #include <string_view>
 #include <spdlog/spdlog.h>
+#include <optional>
 #include "syncspirit-export.h"
 
 namespace syncspirit::utils {
 
 using logger_t = std::shared_ptr<spdlog::logger>;
+using level_opt_t = std::optional<spdlog::level::level_enum>;
 
 SYNCSPIRIT_API logger_t get_logger(std::string_view name) noexcept;
-SYNCSPIRIT_API spdlog::level::level_enum get_log_level(const std::string &log_level) noexcept;
+SYNCSPIRIT_API level_opt_t get_log_level(const std::string &log_level) noexcept;
 SYNCSPIRIT_API std::string_view get_level_string(spdlog::level::level_enum) noexcept;
 
 #define LOG_GENERIC(LOGGER, LEVEL, ...)                                                                                \

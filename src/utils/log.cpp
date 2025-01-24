@@ -5,24 +5,24 @@
 
 namespace syncspirit::utils {
 
-spdlog::level::level_enum get_log_level(const std::string &log_level) noexcept {
+auto get_log_level(const std::string &log_level) noexcept -> level_opt_t {
     using namespace spdlog::level;
-    level_enum value = info;
+    level_enum value = debug;
     if (log_level == "trace")
-        value = trace;
+        return trace;
     if (log_level == "debug")
-        value = debug;
+        return debug;
     if (log_level == "info")
-        value = info;
+        return info;
     if (log_level == "warn")
-        value = warn;
+        return warn;
     if (log_level == "error")
-        value = err;
+        return err;
     if (log_level == "crit")
-        value = critical;
+        return critical;
     if (log_level == "off")
-        value = off;
-    return value;
+        return off;
+    return {};
 }
 
 std::string_view get_level_string(spdlog::level::level_enum level) noexcept {

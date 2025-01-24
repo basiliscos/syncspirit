@@ -24,6 +24,8 @@ static const std::string home_path = "~/syncspirit";
 
 namespace syncspirit::config {
 
+using level_t = spdlog::level::level_enum;
+
 using device_name_t = outcome::result<std::string>;
 using home_option_t = outcome::result<bfs::path>;
 
@@ -98,7 +100,7 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
                         return "log/name is incorrect or missing (" + std::to_string(i + 1) + ")";
                     }
                     log_config_t log_config;
-                    log_config.level = utils::get_log_level(level.value());
+                    log_config.level = utils::get_log_level(level.value()).value_or(level_t::debug);
                     log_config.name = name.value();
 
                     auto sinks = t["sinks"];
@@ -434,7 +436,7 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         if (!level) {
             return "fltk/level is incorrect or missing";
         }
-        c.level = utils::get_log_level(level.value());
+        c.level = utils::get_log_level(level.value()).value_or(level_t::debug);
 
         auto display_deleted = t["display_deleted"].value<bool>();
         if (!display_deleted) {
