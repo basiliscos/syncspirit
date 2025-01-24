@@ -26,18 +26,44 @@ The [conan](https://conan.io/) package manager (v2.0+) is used with
 responsible for installing and building dependecies, whith bare [cmake](https://cmake.org/)
 it should be done manually (e.g. use system-provided libraries).
 
+Please note, that [fltk](https://www.fltk.org/) library should be build as 
+shared library; otherwise applications will not work correctly.
+
 ## generic build 
 
 ```
 mkdir build.release && cd build.release
 conan install --build=missing -o '*:shared=True' -o '&:shared=True' --output-folder . -s build_type=Release .. 
-cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=on
+cmake .. -G "Unix Makefiles" \
+  -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_SHARED_LIBS=on
 make -j`nproc`
 ```
 
-Please note, that [fltk](https://www.fltk.org/) library should be build as 
-shared library; otherwise applications will not work correctly.
+To have locally installed binaries with all dependencies `cmake` command
+should be:
+
+```
+cmake .. -G "Unix Makefiles" \
+  -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_SHARED_LIBS=on \
+  -DCMAKE_INSTALL_RPATH='$ORIGIN/' \
+ - DCMAKE_INSTALL_PREFIX=`pwd`/image
+```
+
+```
+make -j`nproc` install deploy
+```
+
+For win32 to gater `dll`s it should be
+
+```
+make -j`nproc` install deploy_deps
+```
 
 ## cross building on linux for windows
 
