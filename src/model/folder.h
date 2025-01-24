@@ -52,8 +52,8 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     void set_scan_start(const pt::ptime &value) noexcept;
     const pt::ptime &get_scan_finish() noexcept;
     void set_scan_finish(const pt::ptime &value) noexcept;
-    const bool is_scanning() const noexcept;
-    const bool is_synchronizing() const noexcept;
+    bool is_scanning() const noexcept;
+    bool is_synchronizing() const noexcept;
     void adjust_synchronization(std::int_fast32_t delta) noexcept;
     void mark_suspended(bool value) noexcept;
     bool is_suspended() const noexcept;

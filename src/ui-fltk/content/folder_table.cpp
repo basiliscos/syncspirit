@@ -181,7 +181,6 @@ auto folder_table_t::make_path(folder_table_t &container, bool disabled) -> widg
             auto r = parent_t::create_widget(x, y, w, h);
             input->when(input->when() | FL_WHEN_CHANGED);
             input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
-            auto &container = static_cast<folder_table_t &>(this->container);
             if (disabled) {
                 widget->deactivate();
             }
@@ -215,7 +214,6 @@ auto folder_table_t::make_id(folder_table_t &container, bool disabled) -> widget
             auto r = parent_t::create_widget(x, y, w, h);
             input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
             input->when(input->when() | FL_WHEN_CHANGED);
-            auto &container = static_cast<folder_table_t &>(this->container);
             if (disabled) {
                 widget->deactivate();
             }
@@ -351,7 +349,6 @@ auto folder_table_t::make_index(folder_table_t &container, bool disabled) -> wid
             auto r = parent_t::create_widget(x, y, w, h);
             input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
             input->when(input->when() | FL_WHEN_CHANGED);
-            auto &container = static_cast<folder_table_t &>(this->container);
             if (disabled) {
                 widget->deactivate();
             }
@@ -608,7 +605,8 @@ void folder_table_t::on_select(model::device_ptr_t device, model::device_ptr_t p
 
 void folder_table_t::on_add_share(widgetable_t &widget) {
     auto [from_index, count] = scan(widget);
-    if (count < container.supervisor.get_cluster()->get_devices().size() - 1) {
+    auto devices_amount = static_cast<int>(container.supervisor.get_cluster()->get_devices().size());
+    if (count < devices_amount - 1) {
         assert(from_index);
         auto w = widgetable_ptr_t{};
         w.reset(new device_share_widget_t(*this, {}, false));
@@ -621,7 +619,7 @@ std::pair<int, int> folder_table_t::scan(widgetable_t &widget) {
     auto &rows = get_rows();
     auto from_index = int{-1};
     int count = 0;
-    for (int i = 0; i < rows.size(); ++i) {
+    for (int i = 0; i < static_cast<int>(rows.size()); ++i) {
         auto item = std::get_if<widgetable_ptr_t>(&rows[i].value);
         if (!item) {
             continue;
@@ -715,8 +713,8 @@ void folder_table_t::on_apply() {
     }
 
     auto &folder_id = folder_db.id();
-    auto cb = devices.empty() ? sup.call_select_folder(std::move(folder_id))
-                              : sup.call_share_folders(std::move(folder_id), std::move(devices));
+    auto cb =
+        devices.empty() ? sup.call_select_folder(folder_id) : sup.call_share_folders(folder_id, std::move(devices));
     sup.send_model<model::payload::model_update_t>(diff, cb.get());
 }
 
@@ -768,7 +766,6 @@ void folder_table_t::on_remove() {
 
 void folder_table_t::on_rescan() {
     auto &sup = container.supervisor;
-    auto &cluster = *sup.get_cluster();
     auto diff = model::diff::cluster_diff_ptr_t{};
     auto folder_id = description.get_folder()->get_id();
     diff = new model::diff::local::scan_request_t(folder_id);

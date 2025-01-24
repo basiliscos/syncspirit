@@ -21,7 +21,6 @@ auto orphaned_blocks_t::deduce() const -> set_t {
             auto &file_blocks = b->get_file_blocks();
             auto usages = file_blocks.size();
             for (auto &fb : file_blocks) {
-                auto uuid = fb.file()->get_uuid();
                 auto target_file = file_info_ptr_t(fb.file());
                 auto it = file_for_removal.find(target_file);
                 if (it != file_for_removal.end()) {

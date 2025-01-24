@@ -40,6 +40,7 @@
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
 #include <string_view>
+#include <cstring>
 
 #ifdef WIN32_LEAN_AND_MEAN
 #include <malloc.h>
@@ -211,7 +212,8 @@ void db_actor_t::shutdown_finish() noexcept {
 
 void db_actor_t::on_db_info(message::db_info_request_t &request) noexcept {
     LOG_TRACE(log, "on_db_info");
-    MDBX_stat stat = {0};
+    MDBX_stat stat;
+    std::memset(&stat, 0, sizeof(stat));
     auto r = mdbx_env_stat_ex(env, nullptr, &stat, sizeof(stat));
     if (r != MDBX_SUCCESS) {
         LOG_ERROR(log, "mdbx_env_stat_ex, mbdx error ({}): {}", r, mdbx_strerror(r));
@@ -400,6 +402,28 @@ auto db_actor_t::save_folder_info(const model::folder_info_t &folder_info, void 
     return force_commit();
 }
 
+auto db_actor_t::remove(const model::diff::modify::generic_remove_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (cluster->is_tainted()) {
+        return outcome::success();
+    }
+    auto &txn = *get_txn().assume_value();
+
+    for (auto &key : diff.keys) {
+        auto r = db::remove(key, txn);
+        if (!r) {
+            return r.assume_error();
+        }
+    }
+
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
+    }
+
+    return force_commit();
+}
+
 auto db_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
@@ -464,7 +488,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_blocks_t &diff, void 
     auto &txn = *get_txn().assume_value();
 
     auto &blocks_map = cluster->get_blocks();
-    for (const auto it : diff.blocks) {
+    for (const auto &it : diff.blocks) {
         auto block = blocks_map.get(it.hash());
         auto key = block->get_key();
         auto data = block->serialize();
@@ -561,45 +585,24 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_device_t &dif
     return force_commit();
 }
 
-auto db_actor_t::operator()(const model::diff::modify::generic_remove_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (cluster->is_tainted()) {
-        return outcome::success();
-    }
-    auto &txn = *get_txn().assume_value();
-
-    for (auto &key : diff.keys) {
-        auto r = db::remove(key, txn);
-        if (!r) {
-            return r.assume_error();
-        }
-    }
-
-    auto r = diff.visit_next(*this, custom);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    return force_commit();
-}
 auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
+    return remove(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_files_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
+    return remove(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_folder_infos_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
+    return remove(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_pending_folders_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return (*this)(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
+    return remove(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_folder_t &diff, void *custom) noexcept

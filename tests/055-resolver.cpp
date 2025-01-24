@@ -330,6 +330,8 @@ TEST_CASE("resolver", "[model]") {
 
             pr_local.mutable_version()->clear_counters();
             auto c2_local_r = pr_local.mutable_version()->add_counters();
+            (void)c2_local_r;
+
             c2_local->set_id(3);
             c2_local->set_value(1);
             pr_local.set_name(file_local->make_conflicting_name());
@@ -358,6 +360,7 @@ TEST_CASE("resolver", "[model]") {
 
             pr_local.mutable_version()->clear_counters();
             auto c2_local_r = pr_local.mutable_version()->add_counters();
+            (void)c2_local_r;
             c2_local->set_id(3);
             c2_local->set_value(1);
             pr_local.set_name(file_remote->make_conflicting_name());

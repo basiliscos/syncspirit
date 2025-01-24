@@ -67,7 +67,7 @@ struct sample_peer_t : r::actor_base_t {
     using uploaded_blocks_t = std::list<proto::message::Response>;
 
     sample_peer_t(config_t &config)
-        : r::actor_base_t{config}, peer_device{config.peer_device_id}, auto_share(config.auto_share) {
+        : r::actor_base_t{config}, auto_share(config.auto_share), peer_device{config.peer_device_id} {
         log = utils::get_logger("test.sample_peer");
     }
 
@@ -211,7 +211,7 @@ struct sample_peer_t : r::actor_base_t {
         block_responses.push_back(block_response_t{std::string{}, index, std::string{}, ec});
     }
 
-    size_t blocks_requested = 0;
+    int blocks_requested = 0;
     bool reading = false;
     bool auto_share = false;
     remote_messages_t messages;
@@ -301,7 +301,7 @@ struct fixture_t {
     using block_responses_t = std::deque<r::message_ptr_t>;
 
     fixture_t(bool auto_start_, int64_t max_sequence_, bool auto_share_ = true) noexcept
-        : auto_start{auto_start_}, max_sequence{max_sequence_}, auto_share{auto_share_} {
+        : auto_start{auto_start_}, auto_share{auto_share_}, max_sequence{max_sequence_} {
         test::init_logging();
     }
 

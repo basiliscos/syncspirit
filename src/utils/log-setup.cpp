@@ -41,7 +41,6 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs, bool ov
 
     // init sinks
     auto prev = spdlog::default_logger();
-    using log_t = decltype(prev);
     if (prev->sinks().size() != 1) {
         return utils::make_error_code(error_code_t::misconfigured_default_logger);
     }

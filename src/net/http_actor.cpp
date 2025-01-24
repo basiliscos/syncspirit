@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "http_actor.h"
 #include "utils/error_code.h"
@@ -242,7 +242,6 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
 
     auto &req = *queue.front();
     if (req.payload.request_payload->debug) {
-        auto &rx_buff = *queue.front()->payload.request_payload->rx_buff;
         auto &body = http_response.body();
         LOG_DEBUG(log, "response ({}):\n{}", bytes, body);
     }

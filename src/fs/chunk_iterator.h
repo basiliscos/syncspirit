@@ -44,7 +44,6 @@ struct SYNCSPIRIT_API chunk_iterator_t {
     model::file_info_ptr_t peer_file;
     file_ptr_t backend;
     int64_t last_queued_block;
-    // size_t queue_size;
     size_t unhashed_blocks;
     valid_blocks_map_t valid_blocks_map;
     std::uint_fast32_t valid_blocks_count;

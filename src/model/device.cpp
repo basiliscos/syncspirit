@@ -89,7 +89,7 @@ std::string device_t::serialize() const noexcept {
 }
 
 void device_t::update_state(device_state_t new_state, std::string_view connection_id_) noexcept {
-    if (state == device_state_t::online | new_state == device_state_t::online) {
+    if (state == device_state_t::online || new_state == device_state_t::online) {
         last_seen = pt::microsec_clock::local_time();
         if (new_state == device_state_t::online) {
             assert(!connection_id_.empty());
@@ -126,6 +126,7 @@ auto device_t::create_iterator(cluster_t &cluster) noexcept -> file_iterator_ptr
 
 void device_t::release_iterator(file_iterator_ptr_t &it) noexcept {
     assert(it == iterator);
+    (void)it;
     iterator.reset();
 }
 

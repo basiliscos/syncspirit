@@ -463,7 +463,6 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
         if (local_file) {
             auto generic_augmnetation = local_fi->get_augmentation();
             auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmnetation.get());
-            auto folder_entry = static_cast<tree_item::folder_t *>(augmentation->get_owner());
             if (!local_file->get_augmentation()) {
                 augmentation->track(*local_file);
                 augmentation->augment_pending();
@@ -582,7 +581,6 @@ void app_supervisor_t::set_show_deleted(bool value) {
     log->debug("display deleted = {}", value);
     app_config.fltk_config.display_deleted = value;
 
-    auto &self = cluster->get_device();
     for (auto &it_f : cluster->get_folders()) {
         for (auto &it : it_f.item->get_folder_infos()) {
             auto generic_augmnetation = it.item->get_augmentation();
@@ -605,7 +603,6 @@ void app_supervisor_t::set_show_colorized(bool value) {
     log->debug("display colorized = {}", value);
     app_config.fltk_config.display_colorized = value;
 
-    auto &self = cluster->get_device();
     auto refresher = refresher_t{};
     for (auto &it_f : cluster->get_folders()) {
         for (auto &it : it_f.item->get_folder_infos()) {
@@ -625,16 +622,18 @@ Fl_Color app_supervisor_t::get_color(color_context_t context) const {
     if (app_config.fltk_config.display_colorized) {
         using C = color_context_t;
         switch (context) {
-        case color_context_t::deleted:
+        case C::deleted:
             return FL_DARK1;
-        case color_context_t::link:
+        case C::link:
             return FL_DARK_BLUE;
-        case color_context_t::actualized:
+        case C::actualized:
             return FL_DARK_GREEN;
-        case color_context_t::outdated:
+        case C::outdated:
             return FL_DARK_YELLOW;
-        case color_context_t::conflicted:
+        case C::conflicted:
             return FL_RED;
+        default:
+            return FL_BLACK;
         }
     }
     return FL_BLACK;

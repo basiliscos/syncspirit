@@ -7,7 +7,7 @@ using namespace syncspirit::fs;
 
 chunk_iterator_t::chunk_iterator_t(scan_task_ptr_t task_, model::file_info_ptr_t file_, file_ptr_t backend_) noexcept
     : task{std::move(task_)}, peer_file{std::move(file_)}, backend{std::move(backend_)}, last_queued_block{0},
-      abandoned{false}, valid_blocks_count{0} {
+      valid_blocks_count{0}, abandoned{false} {
     unhashed_blocks = peer_file->get_blocks().size();
     valid_blocks_map.resize(unhashed_blocks);
 }

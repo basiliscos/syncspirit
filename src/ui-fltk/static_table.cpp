@@ -43,14 +43,8 @@ static void resize_value(widgetable_ptr_t &widget, int x, int y, int w, int h) {
 static void reset_widget(string_provider_ptr_t &) {}
 static void reset_widget(widgetable_ptr_t &widget) { widget->reset(); }
 
-static bool store_widget(string_provider_t *&, void *) { return true; }
+// static bool store_widget(string_provider_t *&, void *) { return true; }
 static bool store_widget(widgetable_t *widget, void *data) { return widget->store(data); }
-
-static int handle_value(const string_provider_t &, int) { return 0; }
-static int handle_value(widgetable_ptr_t &widget, int event) {
-    auto impl = widget->get_widget();
-    return impl ? impl->handle(event) : 0;
-}
 
 static_string_provider_t::static_string_provider_t(std::string_view value) : str{std::move(value)} {}
 void static_string_provider_t::update(std::string value) { str = value; }
@@ -145,7 +139,7 @@ auto static_table_t::calc_col_widths() -> col_sizes_t {
         return {w2, w2, w2, w2, true};
     }
 
-    col_sizes_t r = {0, 0, 0, 0};
+    col_sizes_t r = {0, 0, 0, 0, true};
     for (auto &row : table_rows) {
         int x, y, w, h;
         fl_text_extents(row.label.data(), x, y, w, h);
@@ -219,7 +213,7 @@ int static_table_t::handle(int event) {
     }
 
     // unselect rows with custom widgets
-    for (size_t i = 0; i < rows(); ++i) {
+    for (int i = 0; i < rows(); ++i) {
         auto custom = std::get_if<widgetable_ptr_t>(&table_rows[i].value);
         if (custom && row_selected(i) > 1) {
             select_row(i, 0);
@@ -336,7 +330,6 @@ void static_table_t::remove_row(int index) {
             }
         }
         table_rows.resize(table_rows.size() - 1);
-        auto it = table_rows.cbegin() + table_rows.size() - 1;
         rows(table_rows.size());
         resize_widgets();
     }

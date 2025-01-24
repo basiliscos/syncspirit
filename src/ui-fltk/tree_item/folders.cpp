@@ -190,10 +190,8 @@ void folders_t::select_folder(std::string_view folder_id) {
 bool folders_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
         auto cluster = supervisor.get_cluster();
-        auto &devices = cluster->get_devices();
         auto &self = *cluster->get_device();
         auto &sequencer = supervisor.get_sequencer();
-        auto &cfg = supervisor.get_app_config();
 
         auto random_id = sequencer.next_uint64();
         auto random_id_ptr = reinterpret_cast<const char *>(&random_id);

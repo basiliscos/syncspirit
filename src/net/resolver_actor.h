@@ -61,7 +61,7 @@ struct SYNCSPIRIT_API resolver_actor_t : public r::actor_base_t {
 
     void on_request(message::resolve_request_t &req) noexcept;
     void on_cancel(message::resolve_cancel_t &message) noexcept;
-    void mass_reply(const utils::dns_query_t &query, const resolve_results_t &results, bool update_cache) noexcept;
+    void mass_reply(const utils::dns_query_t &query, const resolve_results_t &results) noexcept;
     void mass_reply(const utils::dns_query_t &query, const std::error_code &ec) noexcept;
     void process() noexcept;
     void resolve_start(request_ptr_t &req) noexcept;

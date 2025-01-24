@@ -64,7 +64,6 @@ void log_table_t::draw_cell(TableContext context, int row, int col, int x, int y
     case CONTEXT_RC_RESIZE: {
         auto until_last = col_width(0) + col_width(1) + col_width(2);
         auto last_sz = this->tiw - until_last;
-        auto delta = col_min_size - last_sz;
         if (last_sz >= col_min_size) {
             col_width(3, last_sz);
         }

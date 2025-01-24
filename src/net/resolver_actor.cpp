@@ -166,8 +166,7 @@ void resolver_actor_t::on_cancel(message::resolve_cancel_t &message) noexcept {
     }
 }
 
-void resolver_actor_t::mass_reply(const utils::dns_query_t &query, const resolve_results_t &results,
-                                  bool update_cache) noexcept {
+void resolver_actor_t::mass_reply(const utils::dns_query_t &query, const resolve_results_t &results) noexcept {
     reply(query, [&](auto &message) { reply_to(message, results); });
     current_query.reset();
     cache[query] = results;
@@ -188,7 +187,7 @@ void resolver_actor_t::process() noexcept {
     auto &query = *payload;
     auto cache_it = cache.find(query);
     if (cache_it != cache.end()) {
-        mass_reply(query, cache_it->second, false);
+        mass_reply(query, cache_it->second);
         LOG_TRACE(log, "cache hit for '{}'", query.host);
         return process();
     }
@@ -225,7 +224,7 @@ bool resolver_actor_t::resolve_locally(const utils::dns_query_t &query) noexcept
         }
 
         if (results.size()) {
-            mass_reply(query, std::move(results), true);
+            mass_reply(query, std::move(results));
             return true;
         }
     }
@@ -246,7 +245,7 @@ bool resolver_actor_t::resolve_as_ip(const utils::dns_query_t &query) noexcept {
         auto results = payload::address_response_t::resolve_results_t();
         LOG_DEBUG(log, "{} resolved as ip address", query.host);
         results.emplace_back(std::move(ip));
-        mass_reply(query, std::move(results), false);
+        mass_reply(query, std::move(results));
         return true;
     }
 
@@ -348,7 +347,7 @@ void resolver_actor_t::cancel_timer() noexcept {
     }
 }
 
-void resolver_actor_t::on_write(size_t bytes) noexcept {
+void resolver_actor_t::on_write(size_t) noexcept {
     resources->release(resource::send);
     ares_free_string(tx_buff);
     tx_buff = nullptr;
@@ -455,7 +454,7 @@ void resolver_actor_t::on_read(size_t bytes) noexcept {
         }
     }
 
-    mass_reply(*current_query->payload.request_payload, results, true);
+    mass_reply(*current_query->payload.request_payload, results);
     cancel_timer();
     process();
 }

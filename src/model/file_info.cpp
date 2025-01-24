@@ -287,6 +287,7 @@ auto file_info_t::local_file() const noexcept -> file_info_ptr_t {
     auto cluster = folder_info->get_folder()->get_cluster();
     auto &my_device = *cluster->get_device();
     assert(*device != my_device);
+    (void)device;
     auto my_folder_info = folder_info->get_folder()->get_folder_infos().by_device(my_device);
     if (!my_folder_info) {
         return {};
@@ -413,7 +414,6 @@ void file_info_t::update(const file_info_t &other) noexcept {
 bool file_info_t::is_global() const noexcept {
     auto self = folder_info->get_device();
     auto folder = folder_info->get_folder();
-    auto &local_counter = version->get_best();
     for (auto &it : folder->get_folder_infos()) {
         if (it.item->get_device() == self) {
             continue;

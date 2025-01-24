@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "peer_device.h"
 #include "peer_folders.h"
@@ -51,7 +51,6 @@ struct my_table_t : static_table_t {
         : parent_t(x, y, w, h), container{container_}, apply_button{nullptr}, reset_button{nullptr} {
         auto data = table_rows_t();
         auto &peer = container.peer;
-        auto &ep = peer.get_endpoint();
 
         auto device_id = peer.device_id().get_value();
         auto device_id_short = peer.device_id().get_short();
@@ -99,6 +98,8 @@ struct my_table_t : static_table_t {
         auto device = db::Device();
         auto ok = device.ParseFromArray(data.data(), data.size());
         assert(ok);
+        (void)ok;
+
         auto valid = store(&device);
         if (valid) {
             auto &supervisor = container.supervisor;
@@ -120,6 +121,7 @@ struct my_table_t : static_table_t {
         auto current = db::Device();
         auto ok = current.ParseFromArray(initial_data.data(), initial_data.size());
         assert(ok);
+        (void)ok;
         auto valid = store(&current);
 
         auto current_data = current.SerializeAsString();
@@ -389,7 +391,6 @@ static widgetable_ptr_t make_addresses(my_table_t &container) {
             input->clear();
             menu->add("dynamic", 0, 0, 0, (uris.empty() ? FL_MENU_INACTIVE : 0));
             menu->add("static", 0, 0, 0, (uris.empty() ? 0 : FL_MENU_INACTIVE));
-            auto items = menu->menu();
 
             if (uris.empty()) {
                 menu->value(0);
@@ -526,8 +527,9 @@ std::string_view peer_device_t::get_state() {
             return symbols::discovering;
         case model::device_state_t::connecting:
             return symbols::connecting;
+        default:
+            return symbols::offline;
         }
-        return symbols::offline;
     }();
 }
 

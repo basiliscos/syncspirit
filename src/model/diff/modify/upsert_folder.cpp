@@ -34,7 +34,7 @@ auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, d
 upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Folder db_,
                                  model::folder_info_ptr_t folder_info, const model::device_t &device,
                                  std::uint64_t index_id) noexcept
-    : db{std::move(db_)}, uuid{uuid_} {
+    : uuid{uuid_}, db{std::move(db_)} {
     LOG_DEBUG(log, "upsert_folder_t, folder_id = {}, device = {}", db.id(), device.device_id());
 
     if (!folder_info) {

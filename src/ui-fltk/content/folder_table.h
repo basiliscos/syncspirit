@@ -52,12 +52,12 @@ struct folder_table_t : static_table_t {
     void on_reset();
     void on_rescan();
 
+    tree_item_t &container;
     const model::folder_info_t &description;
     model::devices_map_t initially_shared_with;
     model::devices_map_t initially_non_shared_with;
     shared_devices_t shared_with;
     shared_devices_t non_shared_with;
-    tree_item_t &container;
     std::string error;
     widgetable_ptr_t notice;
     static_string_provider_ptr_t entries_cell;

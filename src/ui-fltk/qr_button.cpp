@@ -106,7 +106,6 @@ struct button_t : Fl_Button {
         int w = parent()->w();
         int h = parent()->h();
         regen_image(w, h);
-        auto img = image();
         int xx, yy, ww, hh;
         recalc_dimensions(x, y, w, h, xx, yy, ww, hh);
         parent_t::resize(xx, yy, ww, hh);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/cluster.h"
@@ -28,7 +28,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
     auto builder = diff_builder_t(*cluster);
 
-    auto &blocks_map = cluster->get_blocks();
     auto &folders = cluster->get_folders();
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
@@ -384,7 +383,6 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
 
     auto builder = diff_builder_t(*cluster);
 
-    auto &blocks_map = cluster->get_blocks();
     auto &folders = cluster->get_folders();
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
@@ -393,13 +391,8 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     REQUIRE(folder_infos.size() == 2u);
 
     auto peer_folder = folder_infos.by_device(*peer_device);
-    auto &peer_files = peer_folder->get_file_infos();
-
     auto my_folder = folder_infos.by_device(*my_device);
-    auto &my_files = my_folder->get_file_infos();
-
     auto file_iterator = peer_device->create_iterator(*cluster);
-
     auto sha256 = peer_id.get_sha256();
 
     REQUIRE(builder.upsert_folder("1234", "/", "my-label-1").upsert_folder("5678", "/", "my-label-2").apply());

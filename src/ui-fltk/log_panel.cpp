@@ -42,8 +42,7 @@ static void auto_scroll_toggle(Fl_Widget *widget, void *data) {
     log_table->autoscroll(button->value());
 }
 
-static void clear_logs(Fl_Widget *widget, void *data) {
-    auto button = static_cast<Fl_Toggle_Button *>(widget);
+static void clear_logs(Fl_Widget *, void *data) {
     auto panel = reinterpret_cast<log_panel_t *>(data);
     panel->displayed_records->clear();
     panel->records->clear();
@@ -71,7 +70,7 @@ static void on_input_filter(Fl_Widget *widget, void *data) {
     log_panel->on_filter(input->value());
 }
 
-static void export_log(Fl_Widget *widget, void *data) {
+static void export_log(Fl_Widget *, void *data) {
     struct it_t final : logs_iterator_t {
         it_t(log_buffer_t *buff_) : buff{buff_}, i{0} {}
 
@@ -86,14 +85,12 @@ static void export_log(Fl_Widget *widget, void *data) {
         size_t i;
     };
 
-    auto input = reinterpret_cast<Fl_Input *>(widget);
-    auto log_panel = reinterpret_cast<log_panel_t *>(data);
-
     Fl_Native_File_Chooser file_chooser;
     file_chooser.title("Save synspirit log");
     file_chooser.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
     file_chooser.filter("CSV files\t*.csv");
 
+    auto log_panel = reinterpret_cast<log_panel_t *>(data);
     auto it_selected = log_panel->log_table->get_selected();
     if (!it_selected) {
         it_selected.reset(new it_t(log_panel->displayed_records.get()));
@@ -301,7 +298,7 @@ void log_panel_t::update() {
 void log_panel_t::update_counter() {
     if (records_counter) {
         char buff[64] = {0};
-        auto message = format_to(buff, "{}/{}", displayed_records->size(), records->size());
+        format_to(buff, "{}/{}", displayed_records->size(), records->size());
         records_counter->copy_label(buff);
     }
 }

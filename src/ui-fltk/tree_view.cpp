@@ -11,7 +11,7 @@
 
 using namespace syncspirit::fltk;
 
-static void tree_view_callback(Fl_Widget *w, void *data) {
+static void tree_view_callback(Fl_Widget *w, void *) {
     auto tree = reinterpret_cast<tree_view_t *>(w);
     auto item = static_cast<tree_item_t *>(tree->callback_item());
     switch (tree->callback_reason()) {
@@ -34,6 +34,8 @@ static void tree_view_callback(Fl_Widget *w, void *data) {
     case FL_TREE_REASON_CLOSED:
         item->on_close();
         break;
+    default:
+        /* NO-OP */;
     }
 }
 

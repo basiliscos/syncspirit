@@ -11,11 +11,7 @@
 using namespace syncspirit::model::diff::modify;
 
 remove_folder_infos_t::remove_folder_infos_t(const folder_infos_map_t &map, orphaned_blocks_t *orphaned_blocks_) {
-    auto local_orphaned_blocks = orphaned_blocks_t();
-    auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
-
     auto keys = unique_keys_t();
-    auto current = (cluster_diff_t *){nullptr};
     for (auto &it : map) {
         auto &folder_info = *it.item;
         keys.emplace(folder_info.get_key());

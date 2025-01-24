@@ -8,7 +8,7 @@
 
 using namespace syncspirit::model::diff::contact;
 
-unknown_connected_t::unknown_connected_t(cluster_t &cluster, const model::device_id_t &device_id_,
+unknown_connected_t::unknown_connected_t(cluster_t &, const model::device_id_t &device_id_,
                                          db::SomeDevice db_device_) noexcept
     : device_id{device_id_}, db_device{std::move(db_device_)} {
     LOG_DEBUG(log, "unknown_connected_t, device = {}", device_id.get_short());

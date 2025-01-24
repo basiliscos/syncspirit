@@ -35,7 +35,7 @@ using namespace syncspirit::test;
 using namespace syncspirit::model;
 
 cluster_configurer_t::cluster_configurer_t(diff_builder_t &builder_, std::string_view peer_sha256_) noexcept
-    : builder{builder_}, peer_sha256{peer_sha256_}, folder{nullptr} {}
+    : folder{nullptr}, builder{builder_}, peer_sha256{peer_sha256_} {}
 
 cluster_configurer_t &&cluster_configurer_t::add(std::string_view sha256, std::string_view folder_id, uint64_t index,
                                                  int64_t max_sequence) noexcept {
@@ -97,14 +97,11 @@ diff_builder_t::diff_builder_t(model::cluster_t &cluster_, r::address_ptr_t rece
 }
 
 diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
-    auto has_diffs = [&]() -> bool { return (bool)cluster_diff; };
-    assert(has_diffs());
-
+    assert(cluster_diff);
     if (receiver) {
         sup.send<model::payload::model_update_t>(receiver, std::move(cluster_diff), nullptr);
         sup.do_process();
     }
-
     auto &addr = sup.get_address();
     bool do_try = true;
     while (do_try) {

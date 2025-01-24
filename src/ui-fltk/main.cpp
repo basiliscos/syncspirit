@@ -131,7 +131,6 @@ int main(int argc, char **argv) {
         // clang-format off
         /* parse command-line & config options */
         po::options_description cmdline_descr("Allowed options");
-        using CommandStrings = std::vector<std::string>;
         cmdline_descr.add_options()
             ("help", "show this help message")
             ("log_level", po::value<std::string>()->default_value("info"), "initial log level")

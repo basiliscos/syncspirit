@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "relay_actor.h"
 #include "names.h"
@@ -99,7 +99,6 @@ void relay_actor_t::connect_to_relay() noexcept {
             continue;
         }
         auto &l = relay->location;
-        auto &u = relay->uri;
         auto relay_host = relay->uri->host();
         auto relay_port = std::string_view(relay->uri->port());
         LOG_INFO(log, "chosen relay({}) {}:{}, city: {}, country: {}, continent: {}", relay_index, relay_host,

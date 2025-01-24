@@ -24,7 +24,7 @@ namespace bfs = std::filesystem;
 using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
-    : parent_t{cfg}, app_config{cfg.app_config}, cluster_copies{cfg.cluster_copies}, sequencer{cfg.sequencer} {
+    : parent_t{cfg}, sequencer{cfg.sequencer}, app_config{cfg.app_config}, cluster_copies{cfg.cluster_copies} {
     auto log = utils::get_logger(names::coordinator);
     auto &files_cfg = app_config.global_announce_config;
     auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());

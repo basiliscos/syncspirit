@@ -19,7 +19,7 @@ namespace bfs = std::filesystem;
 
 static constexpr int col_min_size = 60;
 
-table_t::clip_guart_t::clip_guart_t(int col, int x, int y, int w_, int h) : w{w_} {
+table_t::clip_guart_t::clip_guart_t(int, int x, int y, int w_, int h) : w{w_} {
     if (w) {
         fl_push_clip(x, y, w, h);
     }
@@ -35,7 +35,7 @@ auto table_t::cell_t::clip(int col, int x, int y, int w, int h) -> clip_guart_t 
     return clip_guart_t(col, x, y, w, h);
 }
 
-void table_t::cell_t::resize(int x, int y, int w, int h) {}
+void table_t::cell_t::resize(int, int, int, int) {}
 void table_t::cell_t::load_value() {}
 
 struct category_cell_t final : table_t::cell_t {
@@ -184,7 +184,7 @@ struct property_cell_t : table_t::cell_t {
         fl_draw(text, x, y, w, h, FL_ALIGN_LEFT);
     }
 
-    void resize(int x, int y, int w, int h) override {
+    void resize(int, int, int, int) override {
         [&]() -> void {
             int xx, yy, ww, hh;
             table->find_cell(table_t::CONTEXT_TABLE, row, 2, xx, yy, ww, hh);
@@ -404,7 +404,6 @@ void table_t::draw_cell(TableContext context, int row, int col, int x, int y, in
     case CONTEXT_RC_RESIZE: {
         auto until_last = col_width(0) + col_width(1) + col_width(2);
         auto last_sz = this->tiw - until_last;
-        auto delta = col_min_size - last_sz;
         if (last_sz >= col_min_size) {
             col_width(3, last_sz);
         }
@@ -420,7 +419,7 @@ void table_t::draw_cell(TableContext context, int row, int col, int x, int y, in
     }
 }
 
-void table_t::draw_header(int col, int x, int y, int w, int h) {
+void table_t::draw_header(int, int x, int y, int w, int h) {
     fl_push_clip(x, y, w, h);
     fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, row_header_color());
     fl_pop_clip();
@@ -436,7 +435,8 @@ void table_t::create_cells() {
     int total_rows = 0;
     for (auto &c : categories) {
         ++total_rows;
-        for (auto &p : c->get_properties()) {
+        for (auto &_ : c->get_properties()) {
+            (void)_;
             ++total_rows;
         }
     }

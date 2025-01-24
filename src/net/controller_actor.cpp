@@ -90,7 +90,7 @@ void C::folder_synchronization_t::finish_sync() noexcept {
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
-      peer_addr{config.peer_addr}, connection_id{config.connection_id}, request_timeout{config.request_timeout},
+      connection_id{config.connection_id}, peer_addr{config.peer_addr}, request_timeout{config.request_timeout},
       rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer{0},
       outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
       blocks_max_requested{config.blocks_max_requested}, advances_per_iteration{config.advances_per_iteration} {
@@ -245,7 +245,7 @@ void controller_actor_t::push_pending() noexcept {
         return index;
     };
 
-    auto expected_sz = 0;
+    auto expected_sz = decltype(outgoing_buffer){0};
     while (expected_sz < outgoing_buffer_max - outgoing_buffer) {
         if (auto file_info = updates_streamer->next(); file_info) {
             expected_sz += file_info->expected_meta_size();
@@ -446,7 +446,6 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
 
 auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    auto ctx = reinterpret_cast<context_t *>(custom);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     if (folder && !folder->is_suspended()) {
         auto &self = *cluster->get_device();
@@ -795,7 +794,6 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
         do_release_block = true;
     } else {
         auto folder = file->get_folder_info()->get_folder();
-        auto &path = file->get_path();
         if (ee) {
             do_release_block = true;
             LOG_WARN(log, "on_validation failed : {}", ee->message());
@@ -877,7 +875,6 @@ auto controller_actor_t::get_sync_info(std::string_view folder_id) noexcept -> f
 void controller_actor_t::acquire_block(const model::file_block_t &file_block) noexcept {
     auto block = file_block.block();
     auto folder = file_block.file()->get_folder_info()->get_folder();
-    auto it = synchronizing_folders.find(folder);
     get_sync_info(folder)->start_fetching(block);
 }
 

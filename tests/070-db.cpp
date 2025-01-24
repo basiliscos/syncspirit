@@ -249,7 +249,6 @@ void test_unknown_and_ignored_devices_1() {
                 sup->do_process();
                 REQUIRE(reply);
                 auto cluster_clone = make_cluster();
-                auto &diff = reply->payload.res.diff;
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 CHECK(cluster_clone->get_pending_devices().by_sha256(d_id1.get_sha256()));
                 CHECK(cluster_clone->get_ignored_devices().by_sha256(d_id2.get_sha256()));

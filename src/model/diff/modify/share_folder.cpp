@@ -18,11 +18,8 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
     if (folder_info) {
         return make_error_code(error_code_t::folder_is_already_shared);
     }
-
     auto &pending = cluster.get_pending_folders();
     auto index = uint64_t{0};
-    auto max_sequence = int64_t{0};
-
     auto pending_folder = model::pending_folder_ptr_t{};
     for (auto it = pending.begin(); it != pending.end(); ++it) {
         auto &uf = *it->item;

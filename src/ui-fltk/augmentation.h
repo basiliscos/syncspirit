@@ -87,8 +87,8 @@ struct augmentation_entry_base_t : augmentation_t {
     void push_diff_up();
     void safe_delete();
 
-    std::string own_name;
     self_t *parent;
+    std::string own_name;
     children_t children;
     entry_stats_t stats;
     entry_stats_t stats_diff;

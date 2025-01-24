@@ -121,21 +121,6 @@ static auto make_actions(folder_table_t &container) -> widgetable_ptr_t {
     return new widget_t(container);
 }
 
-static auto make_title(folder_table_t &container) -> widgetable_ptr_t {
-    struct widget_t final : table_widget::label_t {
-        using parent_t = table_widget::label_t;
-        using parent_t::parent_t;
-
-        void reset() override {
-            auto text = std::string_view("");
-            auto &container = static_cast<folder_table_t &>(this->container);
-            text = "editing existing folder";
-            input->label(text.data());
-        }
-    };
-    return new widget_t(container);
-}
-
 struct table_t : content::folder_table_t {
     using parent_t = content::folder_table_t;
     using parent_t::parent_t;
@@ -143,8 +128,6 @@ struct table_t : content::folder_table_t {
     table_t(tree_item_t &container_, const model::folder_info_t &description, int x, int y, int w, int h)
         : parent_t(container_, description, x, y, w, h) {
 
-        auto entries = description.get_file_infos().size();
-        auto max_sequence = description.get_max_sequence();
         entries_cell = new static_string_provider_t();
         entries_size_cell = new static_string_provider_t();
         max_sequence_cell = new static_string_provider_t();
@@ -172,7 +155,6 @@ struct table_t : content::folder_table_t {
         data.push_back({"scheduled", make_scheduled(*this)});
         data.push_back({"paused", make_paused(*this)});
 
-        auto cluster = container.supervisor.get_cluster();
         int shared_count = 0;
         for (auto it : *shared_with) {
             auto &device = it.item;
@@ -197,7 +179,6 @@ struct table_t : content::folder_table_t {
     void refresh() override {
         auto aug = static_cast<augmentation_entry_base_t *>(container.get_proxy().get());
         auto &stats = aug->get_stats();
-        auto folder_info = aug->get_folder();
         serialiazation_context_t ctx;
         description.get_folder()->serialize(ctx.folder);
 
@@ -225,7 +206,6 @@ struct table_t : content::folder_table_t {
             reset_button->deactivate();
         }
 
-        auto cluster = container.supervisor.get_cluster();
         auto folder = description.get_folder();
         auto &date_start = folder->get_scan_start();
         auto &date_finish = folder->get_scan_finish();

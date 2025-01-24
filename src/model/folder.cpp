@@ -102,7 +102,7 @@ void folder_t::set_scan_finish(const pt::ptime &value) noexcept {
     scan_finish = value;
 }
 
-const bool folder_t::is_scanning() const noexcept {
+bool folder_t::is_scanning() const noexcept {
     if (scan_start.is_not_a_date_time()) {
         return false;
     }
@@ -112,7 +112,7 @@ const bool folder_t::is_scanning() const noexcept {
     return scan_start > scan_finish;
 }
 
-const bool folder_t::is_synchronizing() const noexcept { return synchronizing > 0; }
+bool folder_t::is_synchronizing() const noexcept { return synchronizing > 0; }
 
 void folder_t::adjust_synchronization(std::int_fast32_t delta) noexcept {
     synchronizing += delta;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -78,11 +78,9 @@ template <> struct base_impl_t<tcp_socket_t> {
 
     static tcp_socket_t mk_sock(transport_config_t &config, strand_t &strand) noexcept {
         if (config.sock) {
-            tcp::socket sock(std::move(config.sock.value()));
-            return {std::move(sock)};
+            return tcp::socket(std::move(config.sock.value()));
         } else {
-            tcp::socket sock(strand.context());
-            return {std::move(sock)};
+            return tcp::socket(strand.context());
         }
     }
 

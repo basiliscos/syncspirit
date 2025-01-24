@@ -10,15 +10,13 @@
 
 using namespace syncspirit::model::diff::modify;
 
-unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, model::folder_info_t &folder_info,
+unshare_folder_t::unshare_folder_t(const model::cluster_t &, model::folder_info_t &folder_info,
                                    orphaned_blocks_t *orphaned_blocks_) noexcept {
     LOG_DEBUG(log, "unshare_folder_t folder = {}, peer = {}", folder_info.get_folder()->get_id(),
               folder_info.get_device()->device_id());
 
     auto &peer = *folder_info.get_device();
     peer_id = peer.device_id().get_sha256();
-    auto &blocks = cluster.get_blocks();
-
     auto local_orphaned_blocks = orphaned_blocks_t();
     auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
 

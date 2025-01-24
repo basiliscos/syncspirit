@@ -134,7 +134,6 @@ auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
         auto interval_s = r::pt::seconds{interval};
         auto prev_scan = f->get_scan_finish();
         auto it_deadline = prev_scan.is_not_a_date_time() ? now : prev_scan + interval_s;
-        auto eq = it_deadline == deadline;
         auto select_it = !folder || it_deadline < deadline ||
                          ((it_deadline == deadline) && (folder->get_rescan_interval() > interval));
         if (select_it) {

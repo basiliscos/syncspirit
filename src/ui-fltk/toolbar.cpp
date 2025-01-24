@@ -25,7 +25,7 @@ static void set_show_colorized(Fl_Widget *widget, void *data) {
     toolbar->supervisor.set_show_colorized(value);
 }
 
-toolbar_t::toolbar_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
+toolbar_t::toolbar_t(app_supervisor_t &supervisor_, int x, int y, int w, int)
     : parent_t(x, y, w, button_h + padding * 2), supervisor{supervisor_} {
     auto ww = 40 - padding * 2;
     auto xx = x + padding;

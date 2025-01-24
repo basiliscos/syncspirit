@@ -485,7 +485,7 @@ void test_new_files() {
 
             SECTION("non-empty file (2 blocks)") {
                 auto file_path = root_path / "file.ext";
-                auto sz = size_t{128 * 1024 * 2};
+                auto sz = int64_t{128 * 1024 * 2};
                 std::string data(sz, 'x');
                 write_file(file_path, data);
                 builder->scan_start(folder->get_id()).apply(*sup);
@@ -503,7 +503,7 @@ void test_new_files() {
 
             SECTION("non-empty file (3 blocks)") {
                 auto file_path = root_path / "file.ext";
-                auto sz = size_t{128 * 1024 * 3};
+                auto sz = std::int64_t{128 * 1024 * 3};
                 std::string data(sz, 'x');
                 write_file(file_path, data);
                 builder->scan_start(folder->get_id()).apply(*sup);
@@ -620,8 +620,6 @@ void test_synchronization() {
     struct F : fixture_t {
         void main() noexcept override {
             sys::error_code ec;
-            auto &blocks = cluster->get_blocks();
-
             auto file_path = root_path / "file.ext";
             write_file(file_path, "12345");
             builder->scan_start(folder->get_id()).synchronization_start(folder->get_id()).apply(*sup);

@@ -44,6 +44,7 @@ std::string read_file(const bfs::path &path) {
     std::vector<char> buffer(filesize, 0);
     auto r = fread(buffer.data(), filesize, 1, in);
     assert(r == 1);
+    (void)r;
     fclose(in);
     return std::string(buffer.data(), filesize);
 }
@@ -60,6 +61,7 @@ void write_file(const bfs::path &path, std::string_view content) {
     if (content.size()) {
         auto r = fwrite(content.data(), content.size(), 1, out);
         assert(r);
+        (void)r;
     }
     fclose(out);
 }

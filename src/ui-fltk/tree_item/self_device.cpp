@@ -37,10 +37,10 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         auto v = OPENSSL_VERSION_NUMBER;
         // clang-format off
         //                     0x1010113fL
-        auto openssl_major  = (0xF0000000L & OPENSSL_VERSION_NUMBER) >> 7 * 4;
-        auto openssl_minor  = (0x0FF00000L & OPENSSL_VERSION_NUMBER) >> 5 * 4;
-        auto openssl_patch  = (0x000FF000L & OPENSSL_VERSION_NUMBER) >> 3 * 4;
-        auto openssl_nibble = (0x00000FF0L & OPENSSL_VERSION_NUMBER) >> 1 * 4;
+        auto openssl_major  = (0xF0000000L & v) >> 7 * 4;
+        auto openssl_minor  = (0x0FF00000L & v) >> 5 * 4;
+        auto openssl_patch  = (0x000FF000L & v) >> 3 * 4;
+        auto openssl_nibble = (0x00000FF0L & v) >> 1 * 4;
         // clang-format on
         auto openssl_nibble_c = static_cast<char>(openssl_nibble);
         if (openssl_nibble) {
@@ -145,7 +145,7 @@ static void on_db_refresh_timeout(void *data) {
 
 } // namespace
 
-self_device_t::self_device_t(model::device_t &self_, app_supervisor_t &supervisor, Fl_Tree *tree)
+self_device_t::self_device_t(model::device_t &, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree) {
     add(prefs(), "settings", new settings_t(supervisor, tree));
     update_label();

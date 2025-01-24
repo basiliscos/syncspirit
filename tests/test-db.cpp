@@ -19,6 +19,7 @@ env_t mk_env() {
     MDBX_env *env;
     auto r = mdbx_env_create(&env);
     assert(r == MDBX_SUCCESS);
+    (void)r;
     MDBX_env_flags_t flags =
         MDBX_EXCLUSIVE | MDBX_SAFE_NOSYNC | MDBX_WRITEMAP | MDBX_NOSTICKYTHREADS | MDBX_LIFORECLAIM;
     r = mdbx_env_open(env, path.string().c_str(), flags, 0664);

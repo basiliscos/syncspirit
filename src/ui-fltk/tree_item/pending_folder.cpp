@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "pending_folder.h"
 #include "pending_folders.h"
@@ -103,11 +103,6 @@ struct table_t : content::folder_table_t {
         error = {};
         auto valid = store(&ctx);
 
-        // clang-format off
-        auto is_same = (copy_data == ctx.folder.SerializeAsString())
-                    && (initially_shared_with == ctx.shared_with);
-        // clang-format on
-
         if (valid) {
             if (ctx.folder.path().empty()) {
                 error = "path should be defined";
@@ -150,7 +145,6 @@ bool pending_folder_t::on_select() {
         auto prev = content->get_widget();
         auto cluster = supervisor.get_cluster();
         auto &sequencer = supervisor.get_sequencer();
-        auto &devices = cluster->get_devices();
         auto &peer = static_cast<pending_folders_t *>(parent())->peer;
         auto &path = supervisor.get_app_config().default_location;
 

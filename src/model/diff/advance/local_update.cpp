@@ -13,7 +13,6 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
 
     auto &device = *cluster.get_devices().by_sha256(peer_id);
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto folder_id = folder->get_id();
     auto &self = *cluster.get_device();
     auto self_id = self.device_id().get_sha256();
 

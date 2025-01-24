@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "folder_infos.h"
-#include "../../misc/error_code.h"
-#include "../../cluster.h"
-#include "../../../db/prefix.h"
+#include "model/misc/error_code.h"
+#include "model/cluster.h"
 
 using namespace syncspirit::model::diff::load;
 
 auto folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
-    static const constexpr char folder_prefix = (char)(db::prefix::folder);
-    static const constexpr char device_prefix = (char)(db::prefix::device);
-
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
     for (auto &pair : container) {

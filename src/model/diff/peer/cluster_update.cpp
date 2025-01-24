@@ -232,7 +232,6 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
 auto cluster_update_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
     LOG_TRACE(log, "applying cluster_update_t (self)");
-    auto &folders = cluster.get_folders();
     auto peer = cluster.get_devices().by_sha256(peer_id);
     peer->get_remote_folder_infos().clear();
 

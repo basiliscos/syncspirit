@@ -319,7 +319,7 @@ scan_result_t scan_task_t::advance_unknown_file(const unknown_file_t &file) noex
         return incomplete_removed_t{peer_file};
     }
 
-    bool size_matches = static_cast<size_t>(peer_file->get_size()) == file.metadata.size();
+    bool size_matches = static_cast<std::int64_t>(peer_file->get_size()) == file.metadata.size();
 
     if (!size_matches) {
         LOG_DEBUG(log, "removing temporally '{}' because of size-mismatch or outdated source", path.string());

@@ -34,7 +34,6 @@ auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::resul
     path.make_preferred();
     auto path_str = path.string();
 
-    auto ec = sys::error_code{};
     bool need_resize = true;
     auto exptected_size = (uint64_t)model->get_size();
     auto file = (FILE *){nullptr};
@@ -43,7 +42,7 @@ auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::resul
     auto r = SS_STAT_FN(path_str.c_str(), &stat_info);
     auto mode = "r+b";
     if (r == 0) {
-        need_resize = stat_info.st_size == exptected_size;
+        need_resize = static_cast<uint64_t>(stat_info.st_size) == exptected_size;
     } else {
         mode = "w+b";
     }

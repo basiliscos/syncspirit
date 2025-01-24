@@ -140,7 +140,7 @@ void test_success_resolver() {
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
             remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
-                log->info("received {} bytes from resolver", bytes);
+                log->info("received {} bytes from resolver, ec = {}", bytes, ec.value());
                 const unsigned char reply[] = {0x0e, 0x51, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,
                                                0x00, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f,
                                                0x6d, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00, 0x01, 0x00,
@@ -148,7 +148,7 @@ void test_success_resolver() {
                 auto reply_str = std::string_view(reinterpret_cast<const char *>(reply), sizeof(reply));
                 auto buff = asio::buffer(reply_str.data(), reply_str.size());
                 remote_resolver.async_send_to(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) {
-                    log->info("sent {} bytes to resolver", bytes);
+                    log->info("sent {} bytes to resolver, ec = {}", bytes, ec.value());
                 });
             });
 
@@ -239,12 +239,12 @@ void test_garbage() {
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
             remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
-                log->info("received {} bytes from resolver", bytes);
+                log->info("received {} bytes from resolver, ec = {}", bytes, ec.value());
                 const unsigned char reply[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
                 auto reply_str = std::string_view(reinterpret_cast<const char *>(reply), sizeof(reply));
                 auto buff = asio::buffer(reply_str.data(), reply_str.size());
                 remote_resolver.async_send_to(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) {
-                    log->info("sent {} bytes to resolver", bytes);
+                    log->info("sent {} bytes to resolver, ec = {}", bytes, ec.value());
                 });
             });
 
@@ -277,7 +277,7 @@ void test_multi_replies() {
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
             remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
-                log->info("received {} bytes from resolver", bytes);
+                log->info("received {} bytes from resolver, ec = {}", bytes, ec.value());
                 const unsigned char reply[] = {
                     0x5e, 0x60, 0x81, 0x80, 0x00, 0x01, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x06, 0x72, 0x65, 0x6c,
                     0x61, 0x79, 0x73, 0x09, 0x73, 0x79, 0x6e, 0x63, 0x74, 0x68, 0x69, 0x6e, 0x67, 0x03, 0x6e, 0x65,
@@ -288,7 +288,7 @@ void test_multi_replies() {
                 auto reply_str = std::string_view(reinterpret_cast<const char *>(reply), sizeof(reply));
                 auto buff = asio::buffer(reply_str.data(), reply_str.size());
                 remote_resolver.async_send_to(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) {
-                    log->info("sent {} bytes to resolver", bytes);
+                    log->info("sent {} bytes to resolver, ec = {}", bytes, ec.value());
                 });
             });
 
@@ -322,7 +322,7 @@ void test_wrong() {
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
             remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
-                log->info("received {} bytes from resolver", bytes);
+                log->info("received {} bytes from resolver, ec = {}", bytes, ec.value());
                 const unsigned char reply[] = {0x0e, 0x51, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,
                                                0x00, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x61,
                                                0x6d, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00, 0x01, 0x00,
@@ -330,7 +330,7 @@ void test_wrong() {
                 auto reply_str = std::string_view(reinterpret_cast<const char *>(reply), sizeof(reply));
                 auto buff = asio::buffer(reply_str.data(), reply_str.size());
                 remote_resolver.async_send_to(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) {
-                    log->info("sent {} bytes to resolver", bytes);
+                    log->info("sent {} bytes to resolver", bytes, ec.value());
                 });
             });
 

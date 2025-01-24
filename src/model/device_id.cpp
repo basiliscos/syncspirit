@@ -26,6 +26,11 @@ device_id_t::device_id_t(std::string_view value_, std::string_view sha256_) noex
 
 device_id_t::device_id_t(device_id_t &&other) noexcept { *this = std::move(other); }
 
+device_id_t::device_id_t(const device_id_t &other) noexcept {
+    value = other.value;
+    std::copy(other.hash, other.hash + data_length, hash);
+}
+
 device_id_t &device_id_t::operator=(device_id_t &&other) noexcept {
     value = std::move(other.value);
     std::copy(other.hash, other.hash + data_length, hash);

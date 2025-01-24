@@ -39,7 +39,7 @@ auto remove_files_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
     }
     auto &folders = cluster.get_folders();
     for (size_t i = 0; i < folder_ids.size(); ++i) {
-        auto folder = cluster.get_folders().by_id(folder_ids[i]);
+        auto folder = folders.by_id(folder_ids[i]);
         auto &folder_infos = folder->get_folder_infos();
         auto folder_info = folder_infos.by_device_id(device_id);
         auto &file_infos = folder_info->get_file_infos();

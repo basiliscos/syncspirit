@@ -39,7 +39,7 @@ block_division_t get_block_size(int64_t sz, int32_t prev_size) noexcept {
 
     if (!bs) {
         for (size_t i = 0; i < block_sizes_sz; ++i) {
-            if (block_sizes[i] * max_blocks_count >= sz) {
+            if (block_sizes[i] * static_cast<std::int64_t>(max_blocks_count) >= sz) {
                 bs = block_sizes[i];
                 if (bs > sz) {
                     bs = sz;

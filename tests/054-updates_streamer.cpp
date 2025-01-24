@@ -49,7 +49,6 @@ TEST_CASE("updates_streamer", "[model]") {
     }
 
     auto my_folder = folder->get_folder_infos().by_device(*my_device);
-    auto &my_files = my_folder->get_file_infos();
 
     int seq = 1;
     auto add_file = [&](const char *name) {

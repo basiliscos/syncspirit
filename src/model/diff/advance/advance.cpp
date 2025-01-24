@@ -50,10 +50,8 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     assert(!(proto_source.blocks_size() && proto_source.deleted()));
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_id = folder->get_id();
-    auto &device = *cluster.get_devices().by_sha256(peer_id);
     auto &self = *cluster.get_device();
     auto self_id = self.device_id().get_sha256();
-    // assert(peer_id != self_id);
 
     auto &local_folder_infos = folder->get_folder_infos();
     auto local_folder_info = local_folder_infos.by_device_id(self_id);
@@ -65,7 +63,6 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     proto_local.set_sequence(0);
     proto_local.set_name(std::string(local_file_name_));
 
-    auto version_ptr = proto_local.mutable_version();
     if (!local_file) {
         uuid = sequencer.next_uuid();
     } else if (!disable_blocks_removal) {

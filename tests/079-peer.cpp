@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -144,7 +144,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
 
         transport::error_fn_t on_error = [&](auto &ec) { on_client_error(ec); };
-        transport::connect_fn_t on_connect = [addresses_ptr, this](const tcp::endpoint &ep) {
+        transport::connect_fn_t on_connect = [addresses_ptr, this](const tcp::endpoint &) {
             LOG_INFO(log, "active/connected");
             try_main();
         };
@@ -276,7 +276,7 @@ void test_online_on_hello() {
             send_hello();
         }
 
-        void on_hello(proto::message::Hello msg) noexcept override {
+        void on_hello(proto::message::Hello) noexcept override {
             auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
             CHECK(peer->get_state() == device_state_t::online);
         }
@@ -291,7 +291,7 @@ void test_hello_from_unknown() {
             send_hello();
         }
 
-        void on_hello(proto::message::Hello msg) noexcept override {
+        void on_hello(proto::message::Hello) noexcept override {
             CHECK(cluster->get_devices().size() == 1);
             auto &unknown_devices = cluster->get_pending_devices();
             CHECK(unknown_devices.size() == 1);
@@ -318,7 +318,7 @@ void test_hello_from_known_unknown() {
             send_hello();
         }
 
-        void on_hello(proto::message::Hello msg) noexcept override {
+        void on_hello(proto::message::Hello) noexcept override {
             CHECK(cluster->get_devices().size() == 1);
             auto &unknown_devices = cluster->get_pending_devices();
             CHECK(unknown_devices.size() == 1);
@@ -345,7 +345,7 @@ void test_hello_from_ignored() {
             send_hello();
         }
 
-        void on_hello(proto::message::Hello msg) noexcept override {
+        void on_hello(proto::message::Hello) noexcept override {
             CHECK(cluster->get_devices().size() == 1);
             auto &ignored_devices = cluster->get_ignored_devices();
             CHECK(ignored_devices.size() == 1);

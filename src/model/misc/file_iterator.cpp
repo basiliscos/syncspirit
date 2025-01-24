@@ -99,11 +99,10 @@ auto file_iterator_t::next() noexcept -> result_t {
 
 void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
     auto folder = peer_folder->get_folder();
-    auto &files = peer_folder->get_file_infos();
+    auto &files_map = peer_folder->get_file_infos();
     for (auto &it : folders_list) {
         if (it.peer_folder->get_folder() == folder) {
             auto &peer_folder = *it.peer_folder;
-            auto &files_map = peer_folder.get_file_infos();
             auto seen_sequence = it.seen_sequence;
             auto max_sequence = peer_folder.get_max_sequence();
             auto [from, to] = files_map.range(seen_sequence + 1, max_sequence);
