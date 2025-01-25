@@ -70,6 +70,8 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             // clang-format off
             property_ptr_t(new fs::mru_size_t(f.mru_size, f_def.mru_size)),
             property_ptr_t(new fs::temporally_timeout_t(f.temporally_timeout, f_def.temporally_timeout)),
+            property_ptr_t(new fs::bytes_scan_iteration_limit_t(f.bytes_scan_iteration_limit, f_def.bytes_scan_iteration_limit)),
+            property_ptr_t(new fs::files_scan_iteration_limit_t(f.files_scan_iteration_limit, f_def.files_scan_iteration_limit)),
             // clang-format on
         };
         return new category_t("fs", "filesystem settings", std::move(props));

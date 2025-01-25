@@ -237,6 +237,24 @@ void temporally_timeout_t::reflect_to(syncspirit::config::main_t &main) {
 
 const char *temporally_timeout_t::explanation_ = "remove incomplete file after this amount of seconds";
 
+bytes_scan_iteration_limit_t::bytes_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("bytes_scan_iteration_limit", explanation_, value, default_value) {}
+
+void bytes_scan_iteration_limit_t::reflect_to(syncspirit::config::main_t &main) {
+    main.fs_config.bytes_scan_iteration_limit = native_value;
+}
+
+const char *bytes_scan_iteration_limit_t::explanation_ = "max number of bytes before emitting scan events";
+
+files_scan_iteration_limit_t::files_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("files_scan_iteration_limit", explanation_, value, default_value) {}
+
+void files_scan_iteration_limit_t::reflect_to(syncspirit::config::main_t &main) {
+    main.fs_config.files_scan_iteration_limit = native_value;
+}
+
+const char *files_scan_iteration_limit_t::explanation_ = "max number processed files before emitting scan events";
+
 } // namespace fs
 
 namespace global_discovery {
