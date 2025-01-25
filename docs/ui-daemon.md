@@ -5,6 +5,9 @@ and downloads files to local disk. The program stays always "online"
 (similar to [syncthing](https://syncthing.net)), unless `inactivate` 
 command is defined. 
 
+`syncspirit-daemon` shares the same database, config folder and files with
+other `syncspirit` programs, so it is possible to "setup" configuration
+in one program and sync in other.
 
 ## generic command line options
 
@@ -37,7 +40,7 @@ short device id or via device label.
 inactivity (i.e. no traffic between peers).
 
 
-# Launch example
+# launch example
  
 ```
 syncspirit-daemon --log_level info \

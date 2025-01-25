@@ -389,7 +389,7 @@ void discovery_url_t::reflect_to(syncspirit::config::main_t &main) {
     main.relay_config.discovery_url = utils::parse(value);
 }
 
-const char *discovery_url_t::explanation_ = "here pick the list of relay servers pool";
+const char *discovery_url_t::explanation_ = "where pick the list of relay servers pool";
 
 rx_buff_size_t::rx_buff_size_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("rx_buff_size", explanation_, value, default_value) {}
