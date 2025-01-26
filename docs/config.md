@@ -79,4 +79,3 @@ max_wait = 1            # router response max wait time, seconds
 rx_buff_size = 65536    # preallocated receive buffer size, bytes
 
 ```
-

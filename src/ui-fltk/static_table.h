@@ -65,8 +65,8 @@ struct table_row_t {
 
 using table_rows_t = std::vector<table_row_t>;
 
-struct static_table_t : contentable_t<Fl_Table_Row> {
-    using parent_t = contentable_t<Fl_Table_Row>;
+struct static_table_t : contentable_t<Fl_Table> {
+    using parent_t = contentable_t<Fl_Table>;
 
     struct col_sizes_t {
         int w1;
@@ -80,7 +80,6 @@ struct static_table_t : contentable_t<Fl_Table_Row> {
 
     void assign_rows(table_rows_t rows);
     void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
-    int handle(int event) override;
     void resize(int x, int y, int w, int h) override;
     table_rows_t &get_rows();
     void remove_row(widgetable_t &);
@@ -94,17 +93,16 @@ struct static_table_t : contentable_t<Fl_Table_Row> {
   private:
     void create_widgets();
     void draw_data(int row, int col, int x, int y, int w, int h);
-    void draw_label(const std::string &, bool selected, int x, int y, int w, int h);
-    void draw_value(const string_provider_ptr_t &, bool selected, int x, int y, int w, int h);
-    void draw_value(const widgetable_ptr_t &, bool selected, int x, int y, int w, int h);
+    void draw_label(const std::string &, int x, int y, int w, int h);
+    void draw_value(const string_provider_ptr_t &, int x, int y, int w, int h);
+    void draw_value(const widgetable_ptr_t &, int x, int y, int w, int h);
     void calc_dimensions(const string_provider_ptr_t &, int &x, int &y, int &w, int &h);
     void calc_dimensions(const widgetable_ptr_t &, int &x, int &y, int &w, int &h);
-    void draw_text(const std::string_view &, bool selected, int x, int y, int w, int h);
+    void draw_text(const std::string_view &, int x, int y, int w, int h);
     void make_widget(const string_provider_ptr_t &, int row);
     void make_widget(const widgetable_ptr_t &, int row);
     void resize_widgets();
 
-    std::string gather_selected();
     col_sizes_t calc_col_widths();
 
     table_rows_t table_rows;

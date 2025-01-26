@@ -162,68 +162,16 @@ auto static_table_t::calc_col_widths() -> col_sizes_t {
 
 void static_table_t::draw_data(int r, int col, int x, int y, int w, int h) {
     auto &row = table_rows.at(static_cast<size_t>(r));
-    bool selected = row_selected(r);
     if (col == 0) {
-        draw_label(row.label, selected, x, y, w, h);
+        draw_label(row.label, x, y, w, h);
     } else {
-        std::visit([&](auto &&arg) { draw_value(arg, selected, x, y, w, h); }, row.value);
+        std::visit([&](auto &&arg) { draw_value(arg, x, y, w, h); }, row.value);
     }
 }
 
 auto static_table_t::get_rows() -> table_rows_t & { return table_rows; }
 
-std::string static_table_t::gather_selected() {
-    std::stringstream buff;
-    size_t count = 0;
-    for (size_t i = 0; i < table_rows.size(); ++i) {
-        if (row_selected(static_cast<int>(i))) {
-            auto &row = table_rows.at(i);
-            auto provider = std::get_if<string_provider_ptr_t>(&row.value);
-            if (provider) {
-                if (count) {
-                    buff << eol;
-                };
-                ++count;
-                buff << row.label << "\t" << (**provider).value();
-            }
-        }
-    }
-    return buff.str();
-}
-
-int static_table_t::handle(int event) {
-    auto r = parent_t::handle(event);
-    if (event == FL_RELEASE && r) {
-        auto buff = gather_selected();
-        if (buff.size()) {
-            Fl::copy(buff.data(), buff.size(), 0);
-        }
-        take_focus();
-    } else if (event == FL_KEYBOARD) {
-        if ((Fl::event_state() & (FL_CTRL | FL_COMMAND)) && Fl::event_key() == 'c') {
-            auto buff = gather_selected();
-            if (buff.size()) {
-                Fl::copy(buff.data(), buff.size(), 1);
-            }
-            r = 1;
-        }
-    } else if (event == FL_UNFOCUS) {
-        select_all_rows(0);
-        r = 1;
-    }
-
-    // unselect rows with custom widgets
-    for (int i = 0; i < rows(); ++i) {
-        auto custom = std::get_if<widgetable_ptr_t>(&table_rows[i].value);
-        if (custom && row_selected(i) > 1) {
-            select_row(i, 0);
-        }
-    }
-
-    return r;
-}
-
-void static_table_t::draw_text(const std::string_view &text, bool selected, int x, int y, int w, int h) {
+void static_table_t::draw_text(const std::string_view &text, int x, int y, int w, int h) {
     fl_push_clip(x, y, w, h);
     {
         fl_font(FL_HELVETICA, 16);
@@ -231,7 +179,7 @@ void static_table_t::draw_text(const std::string_view &text, bool selected, int 
         int dx = PADDING;
         int dw = 0;
 
-        fl_color(selected ? table_selection_color : FL_WHITE);
+        fl_color(FL_WHITE);
         fl_rectf(x, y, w, h);
         fl_color(FL_GRAY0);
         fl_draw(text.data(), x + dx, y, w + dw, h, align);
@@ -248,16 +196,14 @@ void static_table_t::calc_dimensions(const string_provider_ptr_t &provider, int 
 
 void static_table_t::calc_dimensions(const widgetable_ptr_t &, int &, int &, int &, int &) {}
 
-void static_table_t::draw_label(const std::string &value, bool selected, int x, int y, int w, int h) {
-    draw_text(value, selected, x, y, w, h);
-}
+void static_table_t::draw_label(const std::string &value, int x, int y, int w, int h) { draw_text(value, x, y, w, h); }
 
-void static_table_t::draw_value(const string_provider_ptr_t &provider, bool selected, int x, int y, int w, int h) {
+void static_table_t::draw_value(const string_provider_ptr_t &provider, int x, int y, int w, int h) {
     auto value = provider->value();
-    draw_text(value, selected, x, y, w, h);
+    draw_text(value, x, y, w, h);
 }
 
-void static_table_t::draw_value(const widgetable_ptr_t &, bool, int, int, int, int) {}
+void static_table_t::draw_value(const widgetable_ptr_t &, int, int, int, int) {}
 
 void static_table_t::create_widgets() {
     for (int i = 0; i < static_cast<int>(table_rows.size()); ++i) {
