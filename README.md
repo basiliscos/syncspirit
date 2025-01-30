@@ -20,7 +20,7 @@ and is still in heavy development
 
 ![different UIs](docs/different-uis.gif)
 
-- [fltk](https://www.fltk.org/)-based gui [app](docs/fltk-app.md)
+- [fltk](https://www.fltk.org/)-based gui [app](docs/ui-fltk.md)
 
 - headless [daemon](docs/ui-daemon.md)
 
@@ -45,6 +45,8 @@ All front-ends share the same configuration and database when running on same ho
 # missing features
 
 This list is probably incomplete. Here are the most important changes:
+
+- [ ] inotify support (aka realtime files watching)
 
 - [ ] ignoring pattern files
 
