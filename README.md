@@ -13,14 +13,18 @@ program at protocol level, which uses the [syncthing](https://syncthing.net) inf
 and relaying).
 
 Despite being functional, `syncspirit` is much less feature-rich than [syncthing](https://syncthing.net)
-and is still in heavy development.
+and is still in heavy development
 
 
 # front-ends (aka UIs)
 
-- [fltk](https://www.fltk.org/)-based (docs/fltk-app.md)
+![different UIs](docs/different-uis.gif)
 
-- headless[daemon](docs/ui-daemon.md)
+- [fltk](https://www.fltk.org/)-based gui [app](docs/fltk-app.md)
+
+- headless [daemon](docs/ui-daemon.md)
+
+All front-ends share the same configuration and database when running on same host.
 
 # status
 
@@ -51,6 +55,8 @@ This list is probably incomplete. Here are the most important changes:
 - [ ] outgoing messages compression
 
 - [ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
+
+- [ ] send only/receive only dirs
 
 - [ ] ...
 
@@ -109,11 +115,6 @@ flash-sticks, user-defined files ordering and filtering for synchronization, may
 sync, like in [resilio](https://www.resilio.com/). This, however, still needs to be researched,
 after the core completion.
 
-# UI
-
-- [wx-widgets](https://www.wxwidgets.org/) (planned)
-- ...
-
 # platforms
 
 - linux
@@ -125,9 +126,7 @@ distributions on it)
 
 ## 0.4.0 (xx-xxx-2025)
 
--
-
-- major app refactoring
+ - major app refactoring
 
  
 ## 0.3.3 (12-May-2024)
