@@ -13,14 +13,15 @@
 #include <exception>
 
 #include "syncspirit-config.h"
+#include "constants.h"
 #include "config/utils.h"
+#include "utils/io.h"
 #include "utils/location.h"
 #include "utils/log-setup.h"
 #include "utils/platform.h"
-#include "constants.h"
+#include "hasher/hasher_supervisor.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"
-#include "hasher/hasher_supervisor.h"
 
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
@@ -99,6 +100,8 @@ BOOL WINAPI consoleHandler(DWORD signal) {
 #endif
 
 int main(int argc, char **argv) {
+    auto boostrap_guard = utils::boostrap_guard_ptr_t();
+
     Fl::lock();
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
@@ -121,7 +124,7 @@ int main(int argc, char **argv) {
         SET_THREAD_EN_LANGUAGE();
         utils::platform_t::startup();
         auto inmem_sink = spdlog::sink_ptr(new fltk::im_memory_sink_t());
-        auto boostrap_guard = utils::bootstrap(inmem_sink);
+        boostrap_guard = utils::bootstrap(inmem_sink);
 
         Fl::args(1, argv);
 
@@ -179,7 +182,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
-        std::ifstream config_file(config_file_path);
+        auto config_file = utils::ifstream_t(config_file_path);
         if (!config_file) {
             spdlog::error("Cannot open config file {}", config_file_path.string());
             return 1;
@@ -375,6 +378,7 @@ int main(int argc, char **argv) {
     /* exit */
 
     spdlog::info("normal exit");
+    boostrap_guard.reset();
     spdlog::drop_all();
     return 0;
 }
