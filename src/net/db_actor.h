@@ -16,9 +16,10 @@ namespace syncspirit {
 namespace net {
 
 namespace outcome = boost::outcome_v2;
+namespace bfs = std::filesystem;
 
 struct db_actor_config_t : r::actor_config_t {
-    std::string db_dir;
+    bfs::path db_dir;
     config::db_config_t db_config;
     model::cluster_ptr_t cluster;
     size_t uncommitted_threshold = {100};
@@ -29,7 +30,7 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&db_dir(const std::string &value) && noexcept {
+    builder_t &&db_dir(const bfs::path &value) && noexcept {
         parent_t::config.db_dir = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -100,7 +101,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     r::address_ptr_t coordinator;
     utils::logger_t log;
     MDBX_env *env;
-    std::string db_dir;
+    bfs::path db_dir;
     config::db_config_t db_config;
     model::cluster_ptr_t cluster;
     transaction_ptr_t txn_holder;

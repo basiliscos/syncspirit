@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.9)
 
 find_package(libqrencode REQUIRED)
 
+if(MINGW)
+    enable_language(RC)
+endif()
+
 add_executable(syncspirit-fltk WIN32
     app_supervisor.cpp
     augmentation.cpp
@@ -50,6 +54,7 @@ add_executable(syncspirit-fltk WIN32
     tree_item/pending_folders.cpp
     tree_item/self_device.cpp
     tree_item/settings.cpp
+    $<$<PLATFORM_ID:Windows>:app.rc>
 )
 
 target_link_libraries(syncspirit-fltk

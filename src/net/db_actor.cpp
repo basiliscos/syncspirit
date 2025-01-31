@@ -121,9 +121,14 @@ void db_actor_t::open() noexcept {
     }
 
     auto flags = MDBX_WRITEMAP | MDBX_LIFORECLAIM | MDBX_EXCLUSIVE | MDBX_NOSTICKYTHREADS | MDBX_SAFE_NOSYNC;
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    auto db_dir_w = db_dir.wstring();
+    r = mdbx_env_openW(env, db_dir_w.c_str(), flags, 0664);
+#else
     r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
+#endif
     if (r != MDBX_SUCCESS) {
-        LOG_ERROR(log, "open, mbdx open environment error ({}): {}", r, mdbx_strerror(r));
+        LOG_ERROR(log, "open, mbdx open environment error ({}): {}, path: {}", r, mdbx_strerror(r), db_dir.string());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }

@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "tls.h"
 #include "error_code.h"
+#include "io.h"
 #include <random>
-#include <cstdio>
 #include <boost/system/error_code.hpp>
 #include <openssl/pem.h>
 #include <openssl/sha.h>
 #include <openssl/err.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+#include <openssl/bio.h>
 
 #ifdef OSSL_DEPRECATEDIN_3_0
 #include <openssl/encoder.h>
@@ -184,81 +185,92 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
                       cert_data_t{std::move(key_container.value())}};
 }
 
+static bool write_mem_to(const char *path, BIO *mem) {
+    auto file = ofstream_t(path, ifstream_t::out | ifstream_t::binary);
+    char *ptr;
+    auto size = BIO_get_mem_data(mem, &ptr);
+    if (size < 0) {
+        return false;
+    }
+    if (size == 0) {
+        return true;
+    }
+    file.write(ptr, size);
+    return (bool)file;
+}
+
 outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_key_path) const noexcept {
     do {
-        auto cert_file = fopen(cert_path, "wb");
-        if (!cert_file) {
-            return sys::error_code{errno, sys::generic_category()};
+        BIO *bio = BIO_new(BIO_s_mem());
+        auto bio_guard = make_guard(bio, [](auto ptr) { BIO_free(ptr); });
+        if (1 != PEM_write_bio_X509(bio, cert.get())) {
+            return error_code_t::tls_cert_save_failure;
         }
-        auto cert_file_guard = make_guard(cert_file, [](auto *ptr) { fclose(ptr); });
-
-        if (1 != PEM_write_X509(cert_file, cert.get())) {
+        if (!write_mem_to(cert_path, bio)) {
             return error_code_t::tls_cert_save_failure;
         }
     } while (0);
 
     do {
-        auto pk_file = fopen(priv_key_path, "wb");
-        if (!pk_file) {
-            return sys::error_code{errno, sys::generic_category()};
-        }
-        auto pk_file_guard = make_guard(pk_file, [](auto *ptr) { fclose(ptr); });
-
-#ifndef OSSL_DEPRECATEDIN_3_0
-        auto ec_key = EVP_PKEY_get1_EC_KEY(private_key.get());
-        auto ec_key_guard = make_guard(ec_key, [](auto *ptr) { EC_KEY_free(ptr); });
-        if (1 != PEM_write_ECPrivateKey(pk_file, ec_key, nullptr, nullptr, 0, nullptr, nullptr)) {
+        BIO *bio = BIO_new(BIO_s_mem());
+        auto bio_guard = make_guard(bio, [](auto ptr) { BIO_free(ptr); });
+        if (1 != PEM_write_bio_PrivateKey(bio, private_key.get(), nullptr, nullptr, 0, nullptr, nullptr)) {
             return error_code_t::tls_key_save_failure;
         }
-#else
-        const char *format = "PEM";
-        const char *structure = "PrivateKeyInfo"; /* PKCS#8 structure */
-
-        auto flags = OSSL_KEYMGMT_SELECT_KEYPAIR | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS;
-        auto ectx = OSSL_ENCODER_CTX_new_for_pkey(private_key.get(), flags, format, structure, NULL);
-        if (!ectx) {
-            return error_code_t::tls_cert_save_failure;
-        }
-        auto ectx_guard = make_guard(ectx, [](auto *ptr) { OSSL_ENCODER_CTX_free(ptr); });
-        if (1 != OSSL_ENCODER_to_fp(ectx, pk_file)) {
+        if (!write_mem_to(priv_key_path, bio)) {
             return error_code_t::tls_key_save_failure;
         }
-#endif
     } while (0);
 
     return outcome::success();
 }
 
-outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_key_path) {
-    /* read certificate in memory, then load it va openssl */
-    auto cert_file = fopen(cert_path, "rb");
-    if (!cert_file) {
+static outcome::result<guard_t<BIO>> read_to_mem_bio(const char *cert_path) {
+    auto file = ifstream_t(cert_path, ifstream_t::in | ifstream_t::binary);
+    if (!file) {
         return sys::error_code{errno, sys::system_category()};
     }
-    auto cert_file_guard = make_guard(cert_file, [](auto *ptr) { fclose(ptr); });
 
-    if (0 != fseek(cert_file, 0L, SEEK_END)) {
+    auto begin = file.tellg();
+    if (!file.seekg(0, ifstream_t::end)) {
         return sys::error_code{errno, sys::generic_category()};
     }
-    auto cert_sz = ftell(cert_file);
-    if (cert_sz < 0) {
+    auto end = file.tellg();
+    if (end < 0) {
         return sys::error_code{errno, sys::generic_category()};
     }
-    rewind(cert_file);
+    auto cert_sz = end - begin;
+    if (!file.seekg(ifstream_t::beg)) {
+        return sys::error_code{errno, sys::generic_category()};
+    }
+    auto data = std::vector<char>(cert_sz);
+    auto ptr = data.data();
+    file.read(ptr, cert_sz);
 
+    auto cert_bio = BIO_new_mem_buf(ptr, static_cast<int>(cert_sz));
+    return make_guard(cert_bio, [data = std::move(data)](auto *ptr) { BIO_free(ptr); });
+}
+
+outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_key_path) {
+    /* read certificate in memory, then load it va openssl */
+    auto cert_mem_result = read_to_mem_bio(cert_path);
+    if (!cert_mem_result) {
+        return cert_mem_result.assume_error();
+    }
+    auto cert_bio = cert_mem_result.assume_value().get();
     X509 *cert = X509_new();
     auto cert_guard = make_guard(cert, [](auto *ptr) { X509_free(ptr); });
-    if (!PEM_read_X509(cert_file, &cert, nullptr, nullptr)) {
+    if (!PEM_read_bio_X509(cert_bio, &cert, nullptr, nullptr)) {
         return error_code_t::tls_cert_load_failure;
     }
 
     /* read private key */
-    auto pk_file = fopen(priv_key_path, "rb");
-    if (!pk_file) {
-        return sys::error_code{errno, sys::generic_category()};
+    auto pk_mem_result = read_to_mem_bio(priv_key_path);
+    if (!pk_mem_result) {
+        return pk_mem_result.assume_error();
     }
-    auto pk_file_guard = make_guard(pk_file, [](auto *ptr) { fclose(ptr); });
-    auto pkey = PEM_read_PrivateKey(pk_file, nullptr, nullptr, nullptr);
+    auto pk_bio = pk_mem_result.assume_value().get();
+    auto pkey = PEM_read_bio_PrivateKey(pk_bio, nullptr, nullptr, nullptr);
     if (!pkey) {
         return error_code_t::tls_key_load_failure;
     }
@@ -280,19 +292,6 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
 
 outcome::result<std::string> sha256_digest(const std::string &data) noexcept {
     unsigned char buff[SHA256_DIGEST_LENGTH];
-#if 0
-    SHA256_CTX sha256;
-    if (1 != SHA256_Init(&sha256)) {
-        return error_code_t::tls_sha256_init_failure;
-    }
-
-    if (1 != SHA256_Update(&sha256, data.c_str(), data.size())) {
-        return error_code_t::tls_sha256_failure;
-    }
-
-    SHA256_Final(buff, &sha256);
-    return std::string(buff, buff + SHA256_DIGEST_LENGTH);
-#endif
     auto ctx = EVP_MD_CTX_create();
     auto ctx_guard = make_guard(ctx, [](auto *ptr) { EVP_MD_CTX_free(ptr); });
 

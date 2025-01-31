@@ -267,6 +267,7 @@ target_link_libraries(syncspirit_core
     Boost::program_options
     Boost::system
     Boost::url
+    Boost::nowide
     OpenSSL::SSL
     fmt::fmt
     spdlog::spdlog

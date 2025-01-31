@@ -165,30 +165,29 @@ int main(int argc, char **argv) {
         config_file_path.append("syncspirit.toml");
         bool populate = !bfs::exists(config_file_path);
         if (populate) {
-            spdlog::info("Config {} seems does not exit, creating default one...", config_file_path.string());
+            spdlog::info("config {} seems does not exit, creating default one...", config_file_path.string());
             auto cfg_opt = config::generate_config(config_file_path);
             if (!cfg_opt) {
                 spdlog::error("cannot generate default config: {}", cfg_opt.error().message());
                 return 1;
             }
             auto &cfg = cfg_opt.value();
-            std::fstream f_cfg(config_file_path.string(), f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
+            std::fstream f_cfg(config_file_path, f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
             auto r = config::serialize(cfg, f_cfg);
             if (!r) {
                 spdlog::error("cannot save default config at :: {}", r.error().message());
                 return 1;
             }
         }
-        auto config_file_path_str = config_file_path.string();
-        std::ifstream config_file(config_file_path_str);
+        std::ifstream config_file(config_file_path);
         if (!config_file) {
-            spdlog::error("Cannot open config file {}", config_file_path_str);
+            spdlog::error("Cannot open config file {}", config_file_path.string());
             return 1;
         }
 
         config::config_result_t cfg_option = config::get_config(config_file, config_file_path.parent_path());
         if (!cfg_option) {
-            spdlog::error("Config file {} is incorrect :: {}", config_file_path_str, cfg_option.error());
+            spdlog::error("Config file {} is incorrect: {}", config_file_path.string(), cfg_option.error());
             return 1;
         }
         auto &cfg = cfg_option.value();
@@ -207,12 +206,12 @@ int main(int argc, char **argv) {
         }
         auto init_result = utils::init_loggers(cfg.log_configs);
         if (!init_result) {
-            spdlog::error("Loggers initialization failed :: {}", init_result.error().message());
+            spdlog::error("loggers initialization failed :: {}", init_result.error().message());
             return 1;
         }
 
         if (populate) {
-            spdlog::info("Generating cryptographic keys...");
+            spdlog::info("generating cryptographic keys...");
             auto pair = utils::generate_pair(constants::issuer_name);
             if (!pair) {
                 spdlog::error("cannot generate cryptographic keys :: {}", pair.error().message());

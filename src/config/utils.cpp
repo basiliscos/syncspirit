@@ -7,6 +7,7 @@
 #include <boost/tokenizer.hpp>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/nowide/convert.hpp>
 #include <spdlog/spdlog.h>
 #include "utils/log.h"
 #include "utils/location.h"
@@ -26,16 +27,23 @@ namespace syncspirit::config {
 
 using level_t = spdlog::level::level_enum;
 
-using device_name_t = outcome::result<std::string>;
 using home_option_t = outcome::result<bfs::path>;
 
-static device_name_t get_device_name() noexcept {
+static std::string get_device_name() noexcept {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    wchar_t device_name[MAX_COMPUTERNAME_LENGTH + 1] = {0};
+    DWORD device_name_sz = sizeof(device_name) / sizeof(wchar_t);
+    if (GetComputerNameW(device_name, &device_name_sz)) {
+        return boost::nowide::narrow(device_name, static_cast<size_t>(device_name_sz));
+#else
     sys::error_code ec;
     auto device_name = boost::asio::ip::host_name(ec);
-    if (ec) {
-        return ec;
+    if (!ec) {
+        return device_name;
+#endif
+    } else {
+        return "localhost";
     }
-    return device_name;
 }
 
 config_result_t get_config(std::istream &config, const bfs::path &config_path) {
@@ -61,10 +69,7 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
 
         auto device_name = t["device_name"].value<std::string>();
         if (!device_name) {
-            auto option = get_device_name();
-            if (!option)
-                return option.error().message();
-            device_name = option.value();
+            device_name = get_device_name();
         }
         c.device_name = device_name.value();
 
@@ -635,8 +640,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         key_file = replace_all_copy(key_file, home_path, dir.string());
     }
 
-    auto device_name = get_device_name();
-    auto device = std::string(device_name ? device_name.value() : "localhost");
+    auto device = get_device_name();
 
     // clang-format off
     main_t cfg;

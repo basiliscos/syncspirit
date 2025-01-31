@@ -6,11 +6,17 @@
 #include <cstdlib>
 #include <system_error>
 #include <boost/system/error_code.hpp>
+#include <boost/nowide/convert.hpp>
 
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <unistd.h>
 #include <sys/types.h>
 #include <pwd.h>
+#endif
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+#include <windows.h>
+#include <shlobj.h>
 #endif
 
 namespace syncspirit::utils {
@@ -27,12 +33,11 @@ SYNCSPIRIT_API std::string expand_home(const std::string &path, const home_optio
 
 outcome::result<bfs::path> get_home_dir() noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-    if (auto local_app = std::getenv("LocalAppData")) {
-        return bfs::path(local_app);
-    } else if (auto app_data = std::getenv("AppData")) {
-        return bfs::path(app_data);
+    wchar_t appdata[MAX_PATH] = {0};
+    if (SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, appdata) != S_OK) {
+        return error_code_t::cant_determine_config_dir;
     }
-    return error_code_t::cant_determine_config_dir;
+    return bfs::path(appdata);
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
     auto *pw = getpwuid(getuid());
     if (!pw) {

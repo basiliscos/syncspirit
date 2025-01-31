@@ -1,6 +1,6 @@
 
 [requires]
-openssl/1.1.1w
+openssl/3.3.2
 boost/1.84.0
 lz4/1.9.4
 nlohmann_json/3.11.2
