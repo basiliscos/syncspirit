@@ -251,6 +251,10 @@ int main(int argc, char **argv) {
                            .finish();
         // warm-up
         sup_net->do_process();
+        if (sup_net->get_shutdown_reason()) {
+            spdlog::debug("net supervisor has not started");
+            return 1;
+        }
 
         auto hasher_count = cfg.hasher_threads;
         using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
