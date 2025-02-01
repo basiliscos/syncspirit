@@ -147,6 +147,7 @@ struct my_table_t : static_table_t {
         certname_cell->update(peer.get_cert_name().value_or(""));
         client_name_cell->update(peer.get_client_name());
         client_version_cell->update(peer.get_client_version());
+        redraw();
     }
 
     peer_device_t &container;
