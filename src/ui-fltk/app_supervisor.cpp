@@ -30,10 +30,10 @@
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/peer/update_folder.h"
 #include "utils/format.hpp"
+#include "utils/io.h"
 
 #include <utility>
 #include <sstream>
-#include <fstream>
 #include <iomanip>
 #include <functional>
 
@@ -564,10 +564,10 @@ auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, mode
 }
 
 void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
-    using F = std::ios_base;
+    using F = utils::fstream_t;
     log->debug("going to write config");
     auto &path = get_config_path();
-    std::fstream f_cfg(path.string(), F::binary | F::trunc | F::in | F::out);
+    utils::fstream_t f_cfg(path.string(), F::binary | F::trunc | F::in | F::out);
     auto r = config::serialize(cfg, f_cfg);
     if (!r) {
         log->error("cannot save default config at {}: {}", path, r.error().message());

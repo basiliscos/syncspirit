@@ -7,7 +7,6 @@
 #include "config/utils.h"
 #include "../tree_item/settings.h"
 #include <FL/Fl_Button.H>
-#include <fstream>
 
 namespace syncspirit::fltk::config {
 

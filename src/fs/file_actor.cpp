@@ -11,9 +11,9 @@
 #include "model/diff/advance/remote_win.h"
 #include "model/diff/modify/finish_file.h"
 #include "utils.h"
+#include "utils/io.h"
 #include "utils/format.hpp"
 #include "utils/platform.h"
-#include <fstream>
 
 using namespace syncspirit::fs;
 
@@ -154,13 +154,11 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
             }
         } else {
             LOG_TRACE(log, "touching empty file {}", path.string());
-            std::ofstream out;
-            out.exceptions(out.failbit | out.badbit);
-            try {
-                out.open(path.string());
-            } catch (const std::ios_base::failure &e) {
-                LOG_ERROR(log, "error creating {} : {}", path.string(), e.code().message());
-                return sys::errc::make_error_code(sys::errc::io_error);
+            auto out = utils::ofstream_t(path, utils::ofstream_t::trunc);
+            if (!out) {
+                auto ec = sys::error_code{errno, sys::system_category()};
+                LOG_ERROR(log, "error creating {}: {}", path.string(), ec.message());
+                return ec;
             }
             out.close();
             bfs::last_write_time(path, from_unix(file.get_modified_s()), ec);

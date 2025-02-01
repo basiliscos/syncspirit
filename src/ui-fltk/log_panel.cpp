@@ -5,14 +5,13 @@
 
 #include "log_table.h"
 #include "log_colors.h"
+#include "utils/io.h"
 
 #include <spdlog/fmt/fmt.h>
 #include <FL/Fl_Box.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Native_File_Chooser.H>
 #include <boost/algorithm/string/replace.hpp>
-
-#include <fstream>
 
 using fmt::format_to;
 
@@ -107,7 +106,8 @@ static void export_log(Fl_Widget *, void *data) {
 
     // write
     auto filename = file_chooser.filename();
-    auto out = std::ofstream(filename, std::ofstream::binary);
+    using file_t = syncspirit::utils::fstream_t;
+    auto out = file_t(filename, file_t::binary);
     out << "level, date, source, message" << eol;
 
     auto escape_message = [](const std::string &msg) -> std::string {

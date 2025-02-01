@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "ssdp_actor.h"
 #include "upnp_actor.h"
 #include "proto/upnp_support.h"
+#include "utils/format.hpp"
 #include "names.h"
 
 using namespace syncspirit::net;
@@ -39,7 +40,27 @@ void ssdp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void ssdp_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
-    sock = std::make_unique<udp_socket_t>(strand.context(), udp::endpoint(udp::v4(), 0));
+    sock = std::make_unique<udp_socket_t>(strand.context());
+
+    auto endpoint = udp::endpoint(udp::v4(), 1234);
+    auto ec = sys::error_code{};
+    sock->open(endpoint.protocol(), ec);
+    if (ec) {
+        LOG_WARN(log, "init, can't open socket :: {}", ec.message());
+        return do_shutdown(make_error(ec));
+    }
+
+    sock->set_option(udp_socket_t::broadcast(true), ec);
+    if (ec) {
+        LOG_WARN(log, "init, can't set broadcast option :: {}", ec.message());
+        return do_shutdown(make_error(ec));
+    }
+
+    sock->bind(endpoint, ec);
+    if (ec) {
+        LOG_WARN(log, "init, can't bind socket {}: {}", endpoint, ec.message());
+        return do_shutdown(make_error(ec));
+    }
 
     /* broadcast discovery */
     auto max_wait = upnp_config.max_wait;
