@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
-#include <cstdio>
 #include <string>
-#include <boost/outcome.hpp>
 #include <filesystem>
+#include <memory>
+#include <boost/outcome.hpp>
 #include "model/file_info.h"
+#include "utils/io.h"
 #include "syncspirit-export.h"
 
 namespace syncspirit::fs {
@@ -43,17 +44,14 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     static outcome::result<file_t> open_read(const bfs::path &path) noexcept;
 
   private:
-    file_t(FILE *backend, model::file_info_ptr_t model, bfs::path path, bool temporal) noexcept;
-    file_t(FILE *backend, bfs::path path) noexcept;
+    using backend_ptr_t = std::unique_ptr<utils::fstream_t>;
+    file_t(utils::fstream_t backend, model::file_info_ptr_t model, bfs::path path, bool temporal) noexcept;
+    file_t(utils::fstream_t backend, bfs::path path) noexcept;
 
-    enum last_op_t { r, w };
-
-    FILE *backend;
+    backend_ptr_t backend;
     model::file_info_ptr_t model;
     bfs::path path;
     std::string path_str;
-    mutable size_t pos = 0;
-    mutable last_op_t last_op{last_op_t::r};
     bool temporal{false};
 };
 
