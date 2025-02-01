@@ -14,7 +14,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE True)
 find_package(
     Boost
     COMPONENTS
-        iostreams
+        nowide
         program_options
         system
         url
@@ -263,11 +263,10 @@ target_link_libraries(syncspirit_core
     rotor::asio
     rotor::thread
     pugixml::pugixml
-    Boost::iostreams
+    Boost::nowide
     Boost::program_options
     Boost::system
     Boost::url
-    Boost::nowide
     OpenSSL::SSL
     fmt::fmt
     spdlog::spdlog
