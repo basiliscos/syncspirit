@@ -9,12 +9,12 @@
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
-#include <fstream>
 #include <exception>
 
 #include "syncspirit-config.h"
 #include "constants.h"
 #include "config/utils.h"
+#include "utils/io.h"
 #include "utils/location.h"
 #include "utils/log-setup.h"
 #include "utils/platform.h"
@@ -176,14 +176,15 @@ int main(int argc, char **argv) {
                 return 1;
             }
             auto &cfg = cfg_opt.value();
-            std::fstream f_cfg(config_file_path_str, f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
+            using F = utils::fstream_t;
+            auto f_cfg = utils::fstream_t(config_file_path, F::binary | F::trunc | F::in | F::out);
             auto r = config::serialize(cfg, f_cfg);
             if (!r) {
                 spdlog::error("cannot save default config at {}: {}", config_file_path_str, r.error().message());
                 return 1;
             }
         }
-        std::ifstream config_file(config_file_path_str);
+        auto config_file = utils::ifstream_t(config_file_path);
         if (!config_file) {
             spdlog::error("Cannot open config file {}", config_file_path_str);
             return 1;

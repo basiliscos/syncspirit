@@ -9,7 +9,6 @@
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
-#include <fstream>
 #include <exception>
 
 #include "syncspirit-config.h"
@@ -175,7 +174,8 @@ int main(int argc, char **argv) {
                 return 1;
             }
             auto &cfg = cfg_opt.value();
-            std::fstream f_cfg(config_file_path, f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
+            using F = utils::fstream_t;
+            auto f_cfg = utils::fstream_t(config_file_path, F::binary | F::trunc | F::in | F::out);
             auto r = config::serialize(cfg, f_cfg);
             if (!r) {
                 spdlog::error("cannot save default config at :: {}", r.error().message());
