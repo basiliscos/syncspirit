@@ -77,7 +77,8 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         if (!default_location) {
             return "main/default_location is incorrect or missing";
         }
-        c.default_location = default_location.value();
+        // otherwise it will be corrupted somehow
+        c.default_location = boost::nowide::widen(default_location.value());
 
         auto hasher_threads = t["hasher_threads"].value<std::uint32_t>();
         if (!hasher_threads) {
@@ -535,7 +536,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                      {"hasher_threads", cfg.hasher_threads},
                      {"timeout", cfg.timeout},
                      {"device_name", cfg.device_name},
-                     {"default_location", cfg.default_location.c_str()},
+                     {"default_location", cfg.default_location.string()},
                  }}},
         {"log", logs},
         {"local_discovery", toml::table{{

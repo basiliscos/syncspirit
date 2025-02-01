@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "folder_data.h"
-#include "bep.pb.h"
+#include "structs.pb.h"
+
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit::model;
 
 void folder_data_t::assign_fields(const db::Folder &item) noexcept {
     id = item.id();
     label = item.label();
-    path = item.path();
+    path = boost::nowide::widen(item.path());
     folder_type = (folder_type_t)item.folder_type();
     rescan_interval = item.rescan_interval();
     pull_order = (pull_order_t)item.pull_order();
