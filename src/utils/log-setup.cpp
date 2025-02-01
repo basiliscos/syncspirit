@@ -96,6 +96,9 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcep
             dist_sink->add_sink(sink);
         }
         prev->set_level(cfg.level);
+        if (cfg.level == spdlog::level::trace) {
+            prev->flush_on(spdlog::level::trace);
+        }
         root_level = cfg.level;
         logger_map[name] = prev;
     }
