@@ -41,13 +41,12 @@ struct my_table_t : static_table_t {
 
     void refresh() override {
         auto augmentation = static_cast<augmentation_entry_base_t *>(container.get_proxy().get());
+        auto &stats = augmentation->get_stats();
         auto fi = augmentation->get_folder();
-        std::size_t entries_size = 0;
-
         index_cell->update(fmt::format("0x{:x}", fi->get_index()));
         max_sequence_cell->update(fmt::format("{}", fi->get_max_sequence()));
-        entries_cell->update(fmt::format("{}", fi->get_file_infos().size()));
-        entries_size_cell->update(fmt::format("{}", entries_size));
+        entries_cell->update(fmt::format("{}", stats.entries));
+        entries_size_cell->update(fmt::format("{}", stats.entries_size));
 
         redraw();
     }
