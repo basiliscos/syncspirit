@@ -5,8 +5,11 @@
 
 #include <string_view>
 #include <algorithm>
+#include <cstdint>
 
 namespace syncspirit::fltk {
+
+std::string get_file_size(std::int64_t value);
 
 template <typename NameProvider>
 int bisect(std::string_view new_label, int start_index, int end_index, int children_count,

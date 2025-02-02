@@ -8,6 +8,7 @@
 #include "../table_widget/input.h"
 #include "../table_widget/label.h"
 #include "../content/folder_table.h"
+#include "../utils.hpp"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
 #include <deque>
@@ -216,7 +217,7 @@ struct table_t : content::folder_table_t {
 
         auto max_sequence = description.get_max_sequence();
         entries_cell->update(fmt::format("{}", stats.entries));
-        entries_size_cell->update(fmt::format("{}", stats.entries_size));
+        entries_size_cell->update(get_file_size(stats.entries_size));
         max_sequence_cell->update(fmt::format("{}", max_sequence));
 
         notice->reset();

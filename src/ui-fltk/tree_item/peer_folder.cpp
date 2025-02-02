@@ -3,13 +3,12 @@
 
 #include "peer_folder.h"
 #include "peer_entry.h"
+#include "../utils.hpp"
 #include "../static_table.h"
-#include <filesystem>
 
 using namespace syncspirit;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
-namespace bfs = std::filesystem;
 
 namespace {
 
@@ -46,7 +45,7 @@ struct my_table_t : static_table_t {
         index_cell->update(fmt::format("0x{:x}", fi->get_index()));
         max_sequence_cell->update(fmt::format("{}", fi->get_max_sequence()));
         entries_cell->update(fmt::format("{}", stats.entries));
-        entries_size_cell->update(fmt::format("{}", stats.entries_size));
+        entries_size_cell->update(get_file_size(stats.entries_size));
 
         redraw();
     }

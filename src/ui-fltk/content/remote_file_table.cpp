@@ -3,6 +3,7 @@
 
 #include "remote_file_table.h"
 #include "../table_widget/checkbox.h"
+#include "../utils.hpp"
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::content;
@@ -90,7 +91,7 @@ void remote_file_table_t::refresh() {
     name_cell->update(entry.get_name());
     modified_cell->update(model::pt::to_simple_string(modified_date));
     sequence_cell->update(fmt::format("{}", entry.get_sequence()));
-    size_cell->update(fmt::format("{}", entry.get_size()));
+    size_cell->update(get_file_size(entry.get_size()));
 
     for (int i = 0; i < static_cast<int>(displayed_versions); ++i) {
         remove_row(4);
@@ -130,7 +131,7 @@ void remote_file_table_t::refresh() {
     modified_by_cell->update(fmt::format("{}", modified_by_device));
     symlink_target_cell->update(entry.get_link_target());
     entries_cell->update(fmt::format("{}", stats.entries));
-    entries_size_cell->update(fmt::format("{}", stats.entries_size));
+    entries_size_cell->update(get_file_size(entry.get_size()));
     local_entries_cell->update(fmt::format("{}", stats.scanned_entries));
 
     redraw();

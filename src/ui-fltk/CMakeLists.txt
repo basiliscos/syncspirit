@@ -23,6 +23,7 @@ add_executable(syncspirit-fltk WIN32
     toolbar.cpp
     tree_item.cpp
     tree_view.cpp
+    utils.cpp
     config/category.cpp
     config/control.cpp
     config/properties.cpp
