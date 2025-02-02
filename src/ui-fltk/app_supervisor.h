@@ -131,6 +131,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
             parent->remove(prev->get_widget());
             parent->begin();
             content = constructor(prev);
+            log->trace("replacing content {} -> {}", (void *)prev, (void *)content);
             content->refresh();
             parent->add(content->get_widget());
             parent->end();

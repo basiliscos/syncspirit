@@ -55,11 +55,15 @@ db_info_viewer_guard_t &db_info_viewer_guard_t::operator=(db_info_viewer_guard_t
 
 db_info_viewer_guard_t::~db_info_viewer_guard_t() {
     if (supervisor) {
+        supervisor->log->trace("~db_info_viewer_guard_t");
         supervisor->db_info_viewer = nullptr;
     }
 }
 
-void db_info_viewer_guard_t::reset() { supervisor = nullptr; }
+void db_info_viewer_guard_t::reset() {
+    supervisor->db_info_viewer = nullptr;
+    supervisor = nullptr;
+}
 
 using callback_fn_t = std::function<void()>;
 
@@ -290,6 +294,7 @@ void app_supervisor_t::postpone_update(augmentation_entry_base_t &entry) {
 }
 
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
+    log->trace("request_db_info");
     request<net::payload::db_info_request_t>(coordinator).send(init_timeout * 5 / 6);
     db_info_viewer = viewer;
     return db_info_viewer_guard_t(this);

@@ -131,7 +131,7 @@ void remote_file_table_t::refresh() {
     modified_by_cell->update(fmt::format("{}", modified_by_device));
     symlink_target_cell->update(entry.get_link_target());
     entries_cell->update(fmt::format("{}", stats.entries));
-    entries_size_cell->update(get_file_size(entry.get_size()));
+    entries_size_cell->update(get_file_size(stats.entries_size));
     local_entries_cell->update(fmt::format("{}", stats.scanned_entries));
 
     redraw();
