@@ -1,0 +1,4 @@
+#include <windows.h>    // RT_MANIFEST
+// CREATEPROCESS_MANIFEST_RESOURCE_ID is defined as 1 cast to `char*`; not directly usable here.
+
+1  RT_MANIFEST "app-manifest.xml"
