@@ -31,9 +31,12 @@
 #include "main_window.h"
 #include "log_sink.h"
 
+#if defined(__unix__)
+#include <signal.h>
+#endif
+
 #if defined(__linux__)
 #include <pthread.h>
-#include <signal.h>
 #endif
 
 #ifdef _WIN32
@@ -104,7 +107,7 @@ int main(int argc, char **argv) {
     Fl::lock();
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-#if defined(__linux__)
+#if defined(__unix__)
     struct sigaction act;
     memset(&act, 0, sizeof(act));
     act.sa_handler = [](int) { shutdown_flag = true; };
