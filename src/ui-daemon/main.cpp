@@ -84,7 +84,7 @@ BOOL WINAPI consoleHandler(DWORD signal) {
 int main(int argc, char **argv) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-#if defined(__unix__)
+#if defined(__unix__) || defined(__APPLE__) || defined(__MACH__)
     struct sigaction act;
     memset(&act, 0, sizeof(act));
     act.sa_handler = [](int) { shutdown_flag = true; };
