@@ -8,7 +8,8 @@
 #include "utils/base32.h"
 #include <algorithm>
 #include <cctype>
-#include "FL/Fl_Button.H"
+#include <boost/nowide/convert.hpp>
+#include <FL/Fl_Button.H>
 
 using namespace syncspirit;
 using namespace syncspirit::model::diff;
@@ -121,7 +122,7 @@ struct table_t : content::folder_table_t {
             if (ctx.folder.path().empty()) {
                 error = "path should be defined";
             } else {
-                auto path = bfs::path(ctx.folder.path());
+                auto path = bfs::path(boost::nowide::widen(ctx.folder.path()));
                 auto ec = sys::error_code{};
                 if (bfs::exists(path, ec)) {
                     if (!bfs::is_empty(path, ec)) {
@@ -204,7 +205,7 @@ bool folders_t::on_select() {
 
         auto db_folder = db::Folder();
         db_folder.set_rescan_interval(3600u);
-        db_folder.set_path(path.string());
+        db_folder.set_path(boost::nowide::narrow(path.wstring()));
         db_folder.set_id(id);
         auto folder = model::folder_t::create(sequencer.next_uuid(), db_folder).value();
         folder->assign_cluster(cluster);

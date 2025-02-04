@@ -4,6 +4,8 @@
 #include "augmentation.h"
 #include "tree_item.h"
 
+#include <boost/nowide/convert.hpp>
+
 namespace syncspirit::fltk {
 
 augmentation_t::augmentation_t(tree_item_t *owner_) : owner{owner_} {}
@@ -167,12 +169,12 @@ augmentation_entry_root_t::augmentation_entry_root_t(model::folder_info_t &folde
         files.emplace(file);
     }
     for (auto file : files) {
-        auto path = bfs::path(file->get_name());
+        auto path = bfs::path(boost::nowide::widen(file->get_name()));
         auto parent = (self_t *)(this);
         auto p_it = path.begin();
         auto count = std::distance(p_it, path.end());
         for (decltype(count) i = 0; i < count - 1; ++i, ++p_it) {
-            auto name = p_it->string();
+            auto name = boost::nowide::narrow(p_it->wstring());
             auto name_view = std::string_view(name);
             auto c_it = parent->children.find(name_view);
             parent = c_it->get();
@@ -194,12 +196,12 @@ void augmentation_entry_root_t::augment_pending() {
     auto updated_parents = nodes_t{};
     for (auto it = pending_augmentation.begin(); it != pending_augmentation.end();) {
         auto &file = **it;
-        auto path = bfs::path(file.get_name());
+        auto path = bfs::path(boost::nowide::widen(file.get_name()));
         auto host = (self_t *)(this);
         auto p_it = path.begin();
         auto count = std::distance(p_it, path.end());
         for (decltype(count) i = 0; i + 1 < count; ++i, ++p_it) {
-            auto name = p_it->string();
+            auto name = boost::nowide::narrow(p_it->wstring());
             auto name_view = std::string_view(name);
             auto c_it = host->children.find(name_view);
             if (c_it == host->children.end()) {

@@ -8,6 +8,7 @@
 
 #include <FL/Fl_Check_Button.H>
 #include <spdlog/fmt/fmt.h>
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace model::diff;
@@ -107,7 +108,7 @@ struct table_t : content::folder_table_t {
             if (ctx.folder.path().empty()) {
                 error = "path should be defined";
             } else {
-                auto path = bfs::path(ctx.folder.path());
+                auto path = bfs::path(boost::nowide::widen(ctx.folder.path()));
                 auto ec = sys::error_code{};
                 if (bfs::exists(path, ec)) {
                     if (!bfs::is_empty(path, ec)) {

@@ -11,6 +11,7 @@
 #include <FL/Fl_Native_File_Chooser.H>
 #include <filesystem>
 #include <spdlog/fmt/fmt.h>
+#include <boost/nowide/convert.hpp>
 
 #include <cassert>
 
@@ -326,11 +327,11 @@ struct path_cell_t final : property_cell_t {
         file_chooser.title(property->get_explanation().data());
         file_chooser.type(type);
         if (k == property_kind_t::file) {
-            auto path = bfs::path(property->get_value());
-            auto parent = path.parent_path().string();
+            auto path = bfs::path(boost::nowide::widen(property->get_value()));
+            auto parent = boost::nowide::narrow(path.parent_path().wstring());
             file_chooser.directory(parent.data());
 
-            auto ext = fmt::format("*{}", path.extension().string());
+            auto ext = fmt::format("*{}", boost::nowide::narrow(path.extension().wstring()));
             auto filter = fmt::format("{}\t{}", ext, ext);
             file_chooser.filter(filter.data());
         }

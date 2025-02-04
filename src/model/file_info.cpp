@@ -12,9 +12,10 @@
 #include "utils/string_comparator.hpp"
 #include <zlib.h>
 #include <spdlog/spdlog.h>
+#include <boost/date_time/c_local_time_adjustor.hpp>
+#include <boost/nowide/convert.hpp>
 #include <algorithm>
 #include <set>
-#include <boost/date_time/c_local_time_adjustor.hpp>
 
 namespace syncspirit::model {
 
@@ -277,7 +278,7 @@ bool file_info_t::is_partly_available() const noexcept { return missing_blocks <
 
 const std::filesystem::path &file_info_t::get_path() const noexcept {
     if (!path) {
-        path = folder_info->get_folder()->get_path() / std::string(get_name());
+        path = folder_info->get_folder()->get_path() / boost::nowide::widen(name);
     }
     return path.value();
 }
