@@ -193,6 +193,7 @@ add_library(syncspirit_core
     src/model/pending_device.cpp
     src/model/pending_folder.cpp
     src/model/remote_folder_info.cpp
+    src/model/some_device.cpp
     src/model/version.cpp
     src/net/acceptor_actor.cpp
     src/net/cluster_supervisor.cpp

@@ -268,19 +268,18 @@ make -j`nproc`
 ```
 git clone https://github.com/crosstool-ng/crosstool-ng.git
 cd crosstool
-git checkout crosstool-ng-1.26.0
+git checkout crosstool-ng-1.27.0-rc1
 ./bootstrap
 ./configure --enable-local
 make -j`nproc`
 ./ct-ng menuconfig
 ```
 
-select linux, some gcc comiler with **static build** and an olders supported
-glibc.
+select linux, some gcc comiler (gcc-10) and an olders supported glibc.
 
 ```
 ./ct-ng build
-export PATH=/home/b/x-tools/x86_64-syncspirit-linux-gnu/bin:$PATH
+export PATH=$HOME/x-tools/x86_64-syncspirit-linux-gnu/bin:$PATH
 cat ~/.conan2/profiles/old_linux 
 [settings]
 os=Linux
