@@ -8,6 +8,8 @@
 
 namespace syncspirit::fltk::config {
 
+namespace bfs = std::filesystem;
+
 namespace impl {
 struct positive_integer_t : property_t {
     positive_integer_t(std::string label, std::string explanation, std::uint64_t value, std::uint64_t default_value);
@@ -30,6 +32,8 @@ struct url_t : string_t {
 struct path_t : property_t {
     path_t(std::string label, std::string explanation, std::string value, std::string default_value,
            property_kind_t kind = property_kind_t::file);
+
+    bfs::path convert() noexcept;
 };
 
 struct bool_t : property_t {

@@ -5,6 +5,8 @@
 #include "utils/log.h"
 #include "model/device_id.h"
 #include <charconv>
+#include <boost/nowide/convert.hpp>
+#include <filesystem>
 
 namespace syncspirit::fltk::config {
 
@@ -55,6 +57,10 @@ error_ptr_t url_t::validate_value() noexcept {
 path_t::path_t(std::string label, std::string explanation, std::string value, std::string default_value,
                property_kind_t kind)
     : property_t(std::move(label), std::move(explanation), std::move(value), std::move(default_value), kind) {}
+
+bfs::path path_t::convert() noexcept {
+    return bfs::path(boost::nowide::widen(value));
+}
 
 bool_t::bool_t(bool value, bool default_value, std::string label)
     : property_t(std::move(label), "", value ? "true" : "", default_value ? "true" : "", property_kind_t::boolean),
@@ -347,7 +353,7 @@ default_location_t::default_location_t(std::string value, std::string default_va
     : parent_t("default_location", explanation_, std::move(value), std::move(default_value),
                property_kind_t::directory) {}
 
-void default_location_t::reflect_to(syncspirit::config::main_t &main) { main.default_location = value; }
+void default_location_t::reflect_to(syncspirit::config::main_t &main) { main.default_location = convert(); }
 
 const char *default_location_t::explanation_ = "where folders are created by default";
 

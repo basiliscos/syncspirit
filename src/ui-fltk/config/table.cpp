@@ -342,7 +342,8 @@ struct path_cell_t final : property_cell_t {
         }
 
         // commit
-        property->set_value(file_chooser.filename());
+        auto path = bfs::path(boost::nowide::widen(file_chooser.filename()));
+        property->set_value(boost::nowide::narrow(path.wstring()));
         load_value();
         done_editing();
     }
