@@ -58,9 +58,7 @@ path_t::path_t(std::string label, std::string explanation, std::string value, st
                property_kind_t kind)
     : property_t(std::move(label), std::move(explanation), std::move(value), std::move(default_value), kind) {}
 
-bfs::path path_t::convert() noexcept {
-    return bfs::path(boost::nowide::widen(value));
-}
+bfs::path path_t::convert() noexcept { return bfs::path(boost::nowide::widen(value)); }
 
 bool_t::bool_t(bool value, bool default_value, std::string label)
     : property_t(std::move(label), "", value ? "true" : "", default_value ? "true" : "", property_kind_t::boolean),

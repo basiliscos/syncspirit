@@ -10,6 +10,8 @@
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
 #include <exception>
+#include <cstdlib>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "syncspirit-config.h"
 #include "constants.h"
@@ -126,7 +128,11 @@ int main(int argc, char **argv) {
         SET_THREAD_EN_LANGUAGE();
         utils::platform_t::startup();
         auto inmem_sink = spdlog::sink_ptr(new fltk::im_memory_sink_t());
-        boostrap_guard = utils::bootstrap(inmem_sink);
+        auto console_sink = spdlog::sink_ptr();
+        if (auto value = std::getenv(constants::console_sink_env); value && value == std::string_view("1")) {
+            console_sink.reset(new spdlog::sinks::stderr_color_sink_mt());
+        }
+        boostrap_guard = utils::bootstrap(inmem_sink, console_sink);
 
         Fl::args(1, argv);
 

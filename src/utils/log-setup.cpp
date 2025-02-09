@@ -48,26 +48,6 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcep
         return utils::make_error_code(error_code_t::misconfigured_default_logger);
     }
 
-    // drop colorized stderr/stdout sinks
-    bool do_scan = true;
-    while (do_scan) {
-        do_scan = false;
-        for (auto &s : dist_sink->sinks()) {
-            auto sink_stderr = dynamic_cast<spdlog::sinks::stderr_color_sink_mt *>(s.get());
-            if (sink_stderr) {
-                dist_sink->remove_sink(s);
-                do_scan = true;
-                break;
-            }
-            auto sink_stdout = dynamic_cast<spdlog::sinks::stdout_color_sink_mt *>(s.get());
-            if (sink_stdout) {
-                dist_sink->remove_sink(s);
-                do_scan = true;
-                break;
-            }
-        }
-    }
-
     spdlog::drop_all();
     spdlog::set_default_logger(prev);
 
@@ -184,11 +164,12 @@ dist_sink_t create_root_logger() noexcept {
     return dist_sink;
 }
 
-auto bootstrap(spdlog::sink_ptr sink) noexcept -> boostrap_guard_ptr_t {
-    auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+auto bootstrap(const spdlog::sink_ptr &sink, const spdlog::sink_ptr &console_sink) noexcept -> boostrap_guard_ptr_t {
     auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(bootstrap_sink, true);
     auto dist_sink = create_root_logger();
-    dist_sink->add_sink(console_sink);
+    if (console_sink) {
+        dist_sink->add_sink(console_sink);
+    }
     dist_sink->add_sink(file_sink);
     if (sink) {
         dist_sink->add_sink(sink);

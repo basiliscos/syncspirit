@@ -651,9 +651,9 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     cfg.device_name = device;
     cfg.hasher_threads = 3;
     cfg.log_configs = {
-        log_config_t {
-            "default", spdlog::level::level_enum::trace, {"stdout"}
-        }
+        // log_config_t {
+        //     "default", spdlog::level::level_enum::trace, {"stdout"}
+        // }
     };
     cfg.local_announce_config = local_announce_config_t {
         true,   /* enabled */

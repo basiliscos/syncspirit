@@ -9,6 +9,7 @@
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <exception>
 
 #include "syncspirit-config.h"
@@ -107,7 +108,8 @@ int main(int argc, char **argv) {
 #if defined(__linux__)
         pthread_setname_np(pthread_self(), "ss/main");
 #endif
-        auto boostrap_guard = utils::bootstrap();
+        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        auto boostrap_guard = utils::bootstrap(console_sink);
 
         // clang-format off
         /* parse command-line & config options */

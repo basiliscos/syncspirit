@@ -34,6 +34,7 @@ using boostrap_guard_ptr_t = std::unique_ptr<boostrap_guard_t>;
 SYNCSPIRIT_API outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcept;
 
 SYNCSPIRIT_API dist_sink_t create_root_logger() noexcept;
-SYNCSPIRIT_API boostrap_guard_ptr_t bootstrap(const spdlog::sink_ptr sink = {}) noexcept;
+SYNCSPIRIT_API boostrap_guard_ptr_t bootstrap(const spdlog::sink_ptr &sink = {},
+                                              const spdlog::sink_ptr &console_sink = {}) noexcept;
 
 } // namespace syncspirit::utils
