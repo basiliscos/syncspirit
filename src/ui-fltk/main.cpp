@@ -127,12 +127,14 @@ int main(int argc, char **argv) {
     try {
         SET_THREAD_EN_LANGUAGE();
         utils::platform_t::startup();
-        auto inmem_sink = spdlog::sink_ptr(new fltk::im_memory_sink_t());
-        auto console_sink = spdlog::sink_ptr();
+
+        auto dist_sink = utils::create_root_logger();
+        dist_sink->add_sink(spdlog::sink_ptr(new fltk::im_memory_sink_t()));
         if (auto value = std::getenv(constants::console_sink_env); value && value == std::string_view("1")) {
-            console_sink.reset(new spdlog::sinks::stderr_color_sink_mt());
+            auto console_sink = spdlog::sink_ptr(new spdlog::sinks::stderr_color_sink_mt());
+            dist_sink->add_sink(console_sink);
         }
-        boostrap_guard = utils::bootstrap(inmem_sink, console_sink);
+        spdlog::trace("root logger has been bootstrapped");
 
         Fl::args(1, argv);
 
@@ -172,6 +174,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
+        boostrap_guard = utils::bootstrap(dist_sink, config_file_path);
 
         config_file_path.append("syncspirit.toml");
         bool populate = !bfs::exists(config_file_path);

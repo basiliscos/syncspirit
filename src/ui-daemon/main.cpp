@@ -83,6 +83,7 @@ BOOL WINAPI consoleHandler(DWORD signal) {
 #endif
 
 int main(int argc, char **argv) {
+    auto boostrap_guard = utils::boostrap_guard_ptr_t();
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
 #if defined(__unix__) || defined(__APPLE__) || defined(__MACH__)
@@ -108,8 +109,8 @@ int main(int argc, char **argv) {
 #if defined(__linux__)
         pthread_setname_np(pthread_self(), "ss/main");
 #endif
-        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        auto boostrap_guard = utils::bootstrap(console_sink);
+        auto dist_sink = utils::create_root_logger();
+        dist_sink->add_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 
         // clang-format off
         /* parse command-line & config options */
@@ -169,6 +170,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
+        boostrap_guard = utils::bootstrap(dist_sink, config_file_path);
 
         config_file_path.append("syncspirit.toml");
         auto config_file_path_str = config_file_path.string();
@@ -312,7 +314,6 @@ int main(int argc, char **argv) {
                 .finish();
         }
 
-        boostrap_guard->discard();
         /* launch actors */
         auto fs_thread = std::thread([&]() {
 #if defined(__linux__)
@@ -372,6 +373,7 @@ int main(int argc, char **argv) {
     /* exit */
 
     spdlog::info("normal exit");
+    boostrap_guard.reset();
     spdlog::drop_all();
     return 0;
 }

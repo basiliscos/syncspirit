@@ -4,6 +4,7 @@
 #include "log-setup.h"
 
 #include "error_code.h"
+#include "io.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <memory>
@@ -83,9 +84,9 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcep
         logger_map[name] = prev;
     }
 
-    if (dist_sink->sinks().size() == 1) {
-        return utils::make_error_code(error_code_t::misconfigured_default_logger);
-    }
+    // if (dist_sink->sinks().size() == 1) {
+    //     return utils::make_error_code(error_code_t::misconfigured_default_logger);
+    // }
 
     // init others
     for (auto &cfg : configs) {
@@ -123,8 +124,8 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcep
 
 static const char *bootstrap_sink = "syncspirit-bootstrap.log";
 
-boostrap_guard_t::boostrap_guard_t(dist_sink_t dist_sink_, file_sink_t *sink_)
-    : dist_sink{dist_sink_}, sink{sink_}, discarded{false} {}
+boostrap_guard_t::boostrap_guard_t(dist_sink_t dist_sink_, spdlog::sinks::sink *sink_)
+    : dist_sink{dist_sink_}, sink{sink_} {}
 
 boostrap_guard_t::~boostrap_guard_t() {
     auto logger = spdlog::default_logger_raw();
@@ -134,23 +135,15 @@ boostrap_guard_t::~boostrap_guard_t() {
         if (dist_sink) {
             for (auto &s : dist_sink->sinks()) {
                 if (s.get() == sink) {
-                    auto filename = sink->filename();
-                    auto path = bfs::path(filename);
                     dist_sink->flush();
                     sink->flush();
                     dist_sink->remove_sink(s);
-
-                    if (discarded) {
-                        auto ec = sys::error_code{};
-                        bfs::remove(path, ec); // ignore error, can't do much
-                    }
                 }
             }
         }
     }
 }
 
-void boostrap_guard_t::discard() { discarded = true; }
 auto boostrap_guard_t::get_dist_sink() -> dist_sink_t { return dist_sink; }
 
 dist_sink_t create_root_logger() noexcept {
@@ -164,17 +157,19 @@ dist_sink_t create_root_logger() noexcept {
     return dist_sink;
 }
 
-auto bootstrap(const spdlog::sink_ptr &sink, const spdlog::sink_ptr &console_sink) noexcept -> boostrap_guard_ptr_t {
-    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(bootstrap_sink, true);
-    auto dist_sink = create_root_logger();
-    if (console_sink) {
-        dist_sink->add_sink(console_sink);
+auto bootstrap(dist_sink_t &dist_sink, const bfs::path &dir) noexcept -> boostrap_guard_ptr_t {
+    using F = fstream_t;
+    auto file_path = dir / bootstrap_sink;
+    auto file = fstream_t(file_path, F::trunc | F::out | F::binary);
+    auto file_sink = spdlog::sink_ptr();
+    if (file) {
+        file.close();
+        file_sink.reset(new spdlog::sinks::basic_file_sink_mt(file_path, true));
+        dist_sink->add_sink(file_sink);
+        spdlog::trace("file sink has been added initialized");
+    } else {
+        spdlog::trace("file sink '{}' has NOT been added", file_path.string());
     }
-    dist_sink->add_sink(file_sink);
-    if (sink) {
-        dist_sink->add_sink(sink);
-    }
-    spdlog::trace("bootstrap logger has been initialized");
     return std::make_unique<boostrap_guard_t>(dist_sink, file_sink.get());
 }
 
