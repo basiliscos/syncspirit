@@ -164,7 +164,11 @@ auto bootstrap(dist_sink_t &dist_sink, const bfs::path &dir) noexcept -> boostra
     auto file_sink = spdlog::sink_ptr();
     if (file) {
         file.close();
-        file_sink.reset(new spdlog::sinks::basic_file_sink_mt(file_path, true));
+#if defined(_WIN32) && defined(SPDLOG_WCHAR_FILENAMES)
+        file_sink.reset(new spdlog::sinks::basic_file_sink_mt(file_path.wstring(), true));
+#else
+        file_sink.reset(new spdlog::sinks::basic_file_sink_mt(file_path.string(), true));
+#endif
         dist_sink->add_sink(file_sink);
         spdlog::trace("file sink has been added initialized");
     } else {
