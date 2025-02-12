@@ -85,7 +85,7 @@ protobuf_generate_cpp(
     src/protobuf/bep.proto
     src/protobuf/structs.proto
 )
-add_library(syncspirit_core
+add_library(syncspirit_core SHARED
     ${PROTO_SRCS}
     src/constants.cpp
     src/config/utils.cpp
