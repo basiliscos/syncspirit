@@ -70,7 +70,9 @@ target_include_directories(syncspirit-fltk PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/fltk/
     ${CMAKE_CURRENT_BINARY_DIR}/fltk/
 )
+
 install_executable("syncspirit-fltk")
+#install(TARGETS "syncspirit-fltk")
 
 if (("${CMAKE_BUILD_TYPE}" STREQUAL "Release") AND (NOT WIN32))
     include(CheckIPOSupported)

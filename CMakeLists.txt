@@ -9,7 +9,13 @@ cmake_policy(SET CMP0063 NEW)
 cmake_policy(SET CMP0077 NEW)
 
 include(GenerateExportHeader)
+
+#list(APPEND CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_LIBDIR})
+
 set(CMAKE_POSITION_INDEPENDENT_CODE True)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 find_package(
     Boost
@@ -33,6 +39,8 @@ find_package(nlohmann_json REQUIRED)
 find_package(c-ares REQUIRED)
 
 set(SYNCSPIRIT_VERSION "v0.4.0")
+
+option(SYNCSPIRIT_BUILD_TESTS "Enable building tests [default: OFF]"  OFF)
 
 set(dist_dir "${syncspirit_BINARY_DIR}/dist")
 add_custom_target("deploy")
@@ -64,16 +72,11 @@ function(install_executable target)
             )
         else()
             add_custom_command(TARGET deploy_${target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E
-                    copy
-                        "${CMAKE_INSTALL_PREFIX}/bin/$<TARGET_FILE_NAME:${target}>"
-                        "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
-               COMMAND
-                   perl ${syncspirit_SOURCE_DIR}/misc/post-install-nix.pl
-                       $<TARGET_FILE:${target}>
-                       "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
+                COMMAND
+                   cd ${syncspirit_BINARY_DIR} && sh
+                    ${syncspirit_SOURCE_DIR}/misc/make-appimage.sh
+                    ${target}
             )
-            install(CODE "execute_process(COMMAND make deploy_${target})")
         endif()
 endfunction()
 
@@ -282,7 +285,10 @@ target_link_libraries(syncspirit_core
 )
 install_executable("syncspirit_core")
 
-enable_testing()
-add_subdirectory("tests")
+if (SYNCSPIRIT_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory("tests")
+endif()
+
 add_subdirectory("src/ui-daemon")
 add_subdirectory("src/ui-fltk")

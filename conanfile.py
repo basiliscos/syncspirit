@@ -9,7 +9,8 @@ class SyncspiritRecipe(ConanFile):
     default_options = {
         "shared": True,
         "*/*:shared": True,
-        "fltk/*:with_xft": False,
+        "fltk/*:with_xft": True,
+        "fltk/*:with_gl": False,
         "boost/*:magic_autolink": False,
         "boost/*:visibility": "hidden",
         "boost/*:header_only": False,
@@ -26,7 +27,6 @@ class SyncspiritRecipe(ConanFile):
         "rotor/*:enable_asio": True,
         "rotor/*:enable_thread": True,
         "rotor/*:enable_fltk": True,
-        "fltk/*:with_gl": False,
     }
 
     def requirements(self):
