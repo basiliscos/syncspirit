@@ -2,7 +2,7 @@
 
 ## requirements
 
- - C++ 20 compatile compiler (tested with gcc-13.2 and clang-17)
+ - C++ 20 compatile compiler (tested with gcc-10 and clang-17)
  
  - [boost](https://www.boost.org/) (at least `v1.84.0`)
  - [openssl](https://www.openssl.org/)
@@ -33,12 +33,11 @@ shared library; otherwise applications will not work correctly.
 
 ```
 mkdir build.release && cd build.release
-conan install --build=missing -o '*:shared=True' -o '&:shared=True' --output-folder . -s build_type=Release .. 
+conan install --build=missing --output-folder . -s build_type=Release .. 
 cmake .. -G "Unix Makefiles" \
   -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_SHARED_LIBS=on
+  -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
 ```
 
@@ -49,14 +48,11 @@ should be:
 cmake .. -G "Unix Makefiles" \
   -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_SHARED_LIBS=on \
-  -DCMAKE_INSTALL_RPATH='$ORIGIN/' \
- - DCMAKE_INSTALL_PREFIX=`pwd`/image
+  -DCMAKE_BUILD_TYPE=Release
 ```
 
 ```
-make -j`nproc` install deploy
+make -j`nproc` deploy_syncspirit-fltk
 ```
 
 For win32 to gater `dll`s it should be
@@ -91,25 +87,17 @@ CC=x86_64-w64-mingw32-gcc
 CXX=x86_64-w64-mingw32-g++
 LD=ix86_64-w64-mingw32-ld
 RC=x86_64-w64-mingw32-windres
-
-[options]
-boost/*:without_fiber=True
-boost/*:without_graph=True
-boost/*:without_log=True
-boost/*:without_stacktrace=True
-boost/*:without_test=True
-boost/*:without_wave=True
 ```
 
 Then make a build
 
 ```
 mkdir build.release && cd build.release
-conan install --build=missing -o -o '*:shared=True' -o '&:shared=True' --output-folder . \
-    -s build_type=Release --profile:build=default --profile:host=mingw
+conan install --build=missing --output-folder . -s build_type=Release \
+    --profile:build=default --profile:host=mingw
 source ./conanbuild.sh 
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=on
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
 ```
 
@@ -156,14 +144,6 @@ CC=x86_64-w64-mingw32.shared-gcc
 CXX=x86_64-w64-mingw32.shared-g++
 LD=x86_64-w64-mingw32.shared-ld
 RC=x86_64-w64-mingw32.shared-windres
-
-[options]
-boost/*:without_fiber=True
-boost/*:without_graph=True
-boost/*:without_log=True
-boost/*:without_stacktrace=True
-boost/*:without_test=True
-boost/*:without_wave=True
 ```
 
 Go to `syncspirit` dir and then make a build
@@ -172,11 +152,11 @@ Go to `syncspirit` dir and then make a build
 ```
 cd syncspirit
 mkdir build.release && cd build.release
-conan install --build=missing -o '*:shared=True' -o '&:shared=True' --output-folder . \
-    -s build_type=Release --profile:build=default --profile:host=mxe ..
+conan install --build=missing --output-folder . -s build_type=Release \
+    --profile:build=default --profile:host=mxe ..
 source ./conanbuild.sh 
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=on
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
 ```
 
@@ -228,14 +208,6 @@ CXX=i686-w64-mingw32.shared-g++
 LD=i686-w64-mingw32.shared-ld
 RC=i686-w64-mingw32.shared-windres
 
-[options]
-boost/*:without_fiber=True
-boost/*:without_graph=True
-boost/*:without_log=True
-boost/*:without_stacktrace=True
-boost/*:without_test=True
-boost/*:without_wave=True
-
 [conf]
 tools.build:cflags=["-D_WIN32_WINNT=0x0501"]
 tools.build:cxxflags=["-D_WIN32_WINNT=0x0501"]
@@ -253,63 +225,69 @@ Go to `syncspirit` dir and then make a build
 ```
 cd syncspirit
 mkdir build.release && cd build.release
-conan install --build=missing -o -o '*:shared=True' -o '&:shared=True' --output-folder . \
-    -s build_type=Release --profile:build=default --profile:host=xp ..
+conan install --build=missing --output-folder . -s build_type=Release \
+    --profile:build=default --profile:host=xp ..
 source ./conanbuild.sh 
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=on \
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0501 -DBOOST_ASIO_ENABLE_CANCELIO=1"
 make -j`nproc`
 ```
 
 
-## cross building on linux for old linux (ubuntu 16.04 etc.)
+## making appImage (ubuntu 20.04 etc.)
 
 ```
-git clone https://github.com/crosstool-ng/crosstool-ng.git
-cd crosstool
-git checkout crosstool-ng-1.27.0-rc1
-./bootstrap
-./configure --enable-local
-make -j`nproc`
-./ct-ng menuconfig
-```
+debootstrap --arch amd64 focal  ubuntu-root http://archive.ubuntu.com/ubuntu/
 
-select linux, some gcc comiler (gcc-10) and an olders supported glibc.
+mount --bind /proc ubuntu-root/proc/
+mount --rbind /dev ubuntu-root/dev/
+chroot ubuntu-root
 
-```
-./ct-ng build
-export PATH=$HOME/x-tools/x86_64-syncspirit-linux-gnu/bin:$PATH
-cat ~/.conan2/profiles/old_linux 
+
+apt update
+apt-get install -y software-properties-common
+add-apt-repository universe -y
+add-apt-repository ppa:ubuntu-toolchain-r/ppa -y
+apt update
+apt install -y g++-9 gcc-9
+
+apt install -y g++-10 gcc-10
+apt-get install -y wget libxft-dev build-essential python3-pip cmake make git fuse libfuse2 libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev libxcomposite-dev libxcursor-dev libxdamage-dev libxfixes-dev libxi-dev libxinerama-dev libxkbfile-dev libxmuu-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxtst-dev libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util0-dev libxcb-util-dev libglu1-mesa-dev pkgconf
+
+adduser --quiet --disabled-password c
+
+su c
+export PATH=$HOME/.local/bin:$PATH
+pip3 install --user conan
+conan profile detect
+
+cat << EOF > $HOME/.conan2/profiles/default
 [settings]
-os=Linux
 arch=x86_64
-compiler=gcc
 build_type=Release
+os=Linux
+compiler=gcc
 compiler.cppstd=gnu17
 compiler.libcxx=libstdc++11
-compiler.version=8
-
+compiler.version=10
+os=Linux
 [buildenv]
-CC=x86_64-syncspirit-linux-gnu-gcc
-CXX=x86_64-syncspirit-linux-gnu-g++
-LD=x86_64-syncspirit-linux-gnu-ld
+CC=gcc-10
+CXX=g++-10
 
 [options]
-boost/*:without_fiber=True
-boost/*:without_graph=True
-boost/*:without_log=True
-boost/*:without_stacktrace=True
-boost/*:without_test=True
-boost/*:without_wave=True
-```
+protobuf/*:with_zlib=False
+EOF
 
-```
-conan install --build=missing -o '*:shared=False' -o shared=False --output-folder . \
-    -s build_type=Release --profile:build=default --profile:host=old_linux ..
-source ./conanbuild.sh 
-cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=off
-make -j`nproc`
-
+git clone https://notabug.org/basiliscos/syncspirit.git
+cd syncspirit
+git checkout v0.4.0-dev
+git submodule update --init
+mkdir build.chroot
+cd build.chroot
+conan install --build=missing --output-folder . -s build_type=Release ..
+source ./conanbuild.sh
+cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release
+make -j`nproc` deploy_syncspirit-fltk
 ```
