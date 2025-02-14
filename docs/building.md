@@ -289,5 +289,6 @@ cd build.chroot
 conan install --build=missing --output-folder . -s build_type=Release ..
 source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release
-make -j`nproc` deploy_syncspirit-fltk
+make -j`nproc`
+make deploy_syncspirit-fltk
 ```
