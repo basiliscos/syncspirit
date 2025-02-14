@@ -6,8 +6,9 @@ if [ -z "$1" ]; then
 fi
 
 APP_PATH=$1
-APP=basename $APP_PATH
+APP=$(basename $APP_PATH)
 APP_DIR="AppDir-$APP/usr/bin"
+echo $APP
 
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR"
