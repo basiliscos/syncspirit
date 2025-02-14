@@ -264,7 +264,6 @@ set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
 FetchContent_MakeAvailable(MBDX)
 
 target_include_directories(syncspirit_core PUBLIC
-    ${syncspirit_SOURCE_DIR}/lib/mbdx
     ${Protobuf_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
