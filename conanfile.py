@@ -47,4 +47,4 @@ class SyncspiritRecipe(ConanFile):
 
     def build_requirements(self):
         self.tool_requires("protobuf/3.21.12")
-#        self.tool_requires("cmake/3.22.6")
+        self.tool_requires("cmake/3.31.5")
