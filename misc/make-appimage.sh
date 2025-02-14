@@ -1,17 +1,18 @@
 #!/usr/bin/sh
 
 if [ -z "$1" ]; then
-    echo "Usage: make-appimage.sh application"
+    echo "Usage: make-appimage.sh path/to/app/application"
     exit 1
 fi
 
-APP=$1
+APP_PATH=$1
+APP=basename $APP_PATH
 APP_DIR="AppDir-$APP/usr/bin"
 
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR"
-strip --strip-all "./bin/$APP"
-cp "./bin/$APP" "$APP_DIR"
+strip --strip-all $APP_PATH
+cp $APP_PATH "$APP_DIR"
 
 if [ ! -e "./linuxdeploy-x86_64.AppImage" ]; then
     echo "going to download linux-deploy..."
@@ -19,6 +20,4 @@ if [ ! -e "./linuxdeploy-x86_64.AppImage" ]; then
     chmod +x linuxdeploy-x86_64.AppImage
 fi
 
-
 ./linuxdeploy-x86_64.AppImage -v 2 --appdir "$APP_DIR" --output appimage -e "$APP_DIR/$APP" --icon-file "../misc/$APP.png" -d "../misc/$APP.desktop"
-

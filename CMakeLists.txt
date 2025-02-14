@@ -5,17 +5,18 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+
 cmake_policy(SET CMP0063 NEW)
 cmake_policy(SET CMP0077 NEW)
+cmake_policy(SET CMP0135 NEW)
 
 include(GenerateExportHeader)
-
-#list(APPEND CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_LIBDIR})
+include (FetchContent)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE True)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+#set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+#set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 find_package(
     Boost
@@ -75,7 +76,7 @@ function(install_executable target)
                 COMMAND
                    cd ${syncspirit_BINARY_DIR} && sh
                     ${syncspirit_SOURCE_DIR}/misc/make-appimage.sh
-                    ${target}
+                        $<TARGET_FILE:${target}>
             )
         endif()
 endfunction()
@@ -245,13 +246,22 @@ target_compile_options(syncspirit_core PRIVATE
     -include ${CMAKE_CURRENT_BINARY_DIR}/include/syncspirit-export.h
 )
 
+FetchContent_Declare(MBDX
+#    GIT_REPOSITORY https://gitflic.ru/project/erthink/libmdbx.git
+#    GIT_TAG        v0.13.3
+    URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.13.3.tar.xz
+    URL_HASH SHA256=2e42505f1ceb57945569db3c1a5db9b5216d8f72da7c75c240ff81196f8e9a0b
+)
+
 set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
-set(MDBX_BUILD_TOOLS true CACHE BOOL "MDBX_BUILD_TOOLS")
+set(MDBX_BUILD_TOOLS false  CACHE BOOL "MDBX_BUILD_TOOLS")
 set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
 set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
 set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
+set(MDBX_ALLOY_BUILD_DEFAULT true CACHE BOOL "MDBX_ALLOY_BUILD_DEFAULT")
+set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
 
-add_subdirectory("lib/mbdx")
+FetchContent_MakeAvailable(MBDX)
 
 target_include_directories(syncspirit_core PUBLIC
     ${syncspirit_SOURCE_DIR}/lib/mbdx
