@@ -52,7 +52,7 @@ if (WIN32)
                 --binaries ${dist_dir}/*
                 --dirs
                     `conan config home`
-                    ${syncspirit_BINARY_DIR}/lib/mbdx/
+                    ${CMAKE_BINARY_DIR}
                     `dirname ${CMAKE_CXX_COMPILER}`/../../
         DEPENDS deploy
     )
