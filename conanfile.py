@@ -30,7 +30,7 @@ class SyncspiritRecipe(ConanFile):
     }
 
     def requirements(self):
-        self.requires("c-ares/1.28.1")
+        # self.requires("c-ares/1.28.1")
         self.requires("fltk/1.3.9")
         self.requires("libqrencode/4.1.1")
         self.requires("lz4/1.9.4")

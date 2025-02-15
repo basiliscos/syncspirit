@@ -5,6 +5,7 @@
 
 #include <cctype>
 #include <charconv>
+#include <ares.h>
 #include <boost/asio/ip/address.hpp>
 
 namespace syncspirit::utils {
@@ -74,5 +75,10 @@ auto make_endpoints(const std::vector<ip::address> &addresses, std::uint16_t por
 
 template auto make_endpoints<tcp, typename tcp::endpoint>(const std::vector<ip::address> &addresses,
                                                           std::uint16_t port) noexcept -> addresses_t<tcp::endpoint>;
+
+
+std::string_view cares_version() noexcept {
+    return std::string_view(::ares_version(nullptr));
+}
 
 } // namespace syncspirit::utils

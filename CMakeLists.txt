@@ -37,7 +37,7 @@ find_package(spdlog REQUIRED)
 find_package(pugixml REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
-find_package(c-ares REQUIRED)
+#find_package(c-ares REQUIRED)
 
 set(SYNCSPIRIT_VERSION "v0.4.0")
 
@@ -246,22 +246,37 @@ target_compile_options(syncspirit_core PRIVATE
     -include ${CMAKE_CURRENT_BINARY_DIR}/include/syncspirit-export.h
 )
 
+# windows xp patch required:
+# -        CancelIoEx(ior->overlapped_fd, &item->ov);
+# +        CancelIo(ior->overlapped_fd);
 FetchContent_Declare(MBDX
-#    GIT_REPOSITORY https://gitflic.ru/project/erthink/libmdbx.git
-#    GIT_TAG        v0.13.3
-    URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.13.3.tar.xz
-    URL_HASH SHA256=2e42505f1ceb57945569db3c1a5db9b5216d8f72da7c75c240ff81196f8e9a0b
+    URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.13.4.tar.xz
+    URL_HASH SHA256=86df30ca2231c9b3ad71424bb829dca9041947f5539d4295030c653d4982c1be
 )
-
-set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
-set(MDBX_BUILD_TOOLS false  CACHE BOOL "MDBX_BUILD_TOOLS")
-set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
-set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
-set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
-set(MDBX_ALLOY_BUILD_DEFAULT true CACHE BOOL "MDBX_ALLOY_BUILD_DEFAULT")
-set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
-
+    set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
+    set(MDBX_BUILD_TOOLS false  CACHE BOOL "MDBX_BUILD_TOOLS")
+    set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
+    set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
+    set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
+    set(MDBX_ALLOY_BUILD_DEFAULT true CACHE BOOL "MDBX_ALLOY_BUILD_DEFAULT")
+    set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
 FetchContent_MakeAvailable(MBDX)
+
+
+# To support WinXP there is need of that commit. When cares will be released
+# and pushed to conan center, the ready receive capn be used
+FetchContent_Declare(C_ARES
+    GIT_REPOSITORY https://github.com/c-ares/c-ares.git
+    GIT_TAG        7978cf75a82f9860da241227169a4d7f1d1f549a
+    # URL https://github.com/c-ares/c-ares/archive/refs/tags/v1.34.4.tar.gz
+    # URL_HASH SHA256=a35f7c4cdbdfaf0a69a9a50029e95ffe403daf605fade05c649d18333592222d
+)
+    set(CARES_STATIC      true  CACHE BOOL "CARES_STATIC")
+    set(CARES_SHARED      false CACHE BOOL "CARES_SHARED")
+    set(CARES_STATIC_PIC  true  CACHE BOOL "CARES_STATIC_PIC")
+    set(CARES_BUILD_TOOLS false CACHE BOOL "CARES_BUILD_TOOLS")
+    set(CARES_THREADS     false CACHE BOOL "CARES_THREADS")
+FetchContent_MakeAvailable(C_ARES)
 
 target_include_directories(syncspirit_core PUBLIC
     ${Protobuf_INCLUDE_DIRS}
@@ -272,25 +287,27 @@ target_include_directories(syncspirit_core PUBLIC
 )
 
 target_link_libraries(syncspirit_core
-    protobuf::libprotobuf
-    rotor::asio
-    rotor::thread
-    pugixml::pugixml
-    Boost::nowide
-    Boost::program_options
-    Boost::system
-    Boost::url
-    OpenSSL::SSL
-    fmt::fmt
-    spdlog::spdlog
-    tomlplusplus::tomlplusplus
-    nlohmann_json::nlohmann_json
-    lz4::lz4
-    c-ares::cares
-    $<IF:$<PLATFORM_ID:Windows>,mdbx,mdbx-static>
-    $<$<PLATFORM_ID:Windows>:iphlpapi>
-    $<$<PLATFORM_ID:Windows>:ws2_32>
-    $<$<PLATFORM_ID:Windows>:wsock32>
+    PUBLIC
+        protobuf::libprotobuf
+        rotor::asio
+        rotor::thread
+        pugixml::pugixml
+        Boost::nowide
+        Boost::program_options
+        Boost::system
+        Boost::url
+        OpenSSL::SSL
+        fmt::fmt
+        spdlog::spdlog
+        tomlplusplus::tomlplusplus
+        nlohmann_json::nlohmann_json
+        lz4::lz4
+        $<IF:$<PLATFORM_ID:Windows>,mdbx,mdbx-static>
+        $<$<PLATFORM_ID:Windows>:iphlpapi>
+        $<$<PLATFORM_ID:Windows>:ws2_32>
+        $<$<PLATFORM_ID:Windows>:wsock32>
+    PRIVATE
+        c-ares::cares
 )
 install_executable("syncspirit_core")
 

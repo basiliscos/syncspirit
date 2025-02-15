@@ -6,6 +6,7 @@
 #include "settings.h"
 #include "../static_table.h"
 #include "../qr_button.h"
+#include "utils/dns.h"
 #include "constants.h"
 
 #include <spdlog/fmt/fmt.h>
@@ -13,7 +14,6 @@
 #include <FL/Fl_Tile.H>
 
 #include <lz4.h>
-#include <ares.h>
 #include <openssl/crypto.h>
 #include <openssl/opensslv.h>
 #include "mdbx.h"
@@ -53,7 +53,7 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         auto app_version = fmt::format("{} {}", constants::client_name, constants::client_version);
         auto protobuf_version = google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION);
         auto fltk_version = fmt::format("{}", Fl::version());
-        auto ares_version = std::string(::ares_version(nullptr));
+        auto ares_version = std::string(utils::cares_version());
 
         device_id_short_cell = new static_string_provider_t();
         device_id_cell = new static_string_provider_t();

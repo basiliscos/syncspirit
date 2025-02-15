@@ -8,7 +8,10 @@
 #include "utils/dns.h"
 #include <boost/asio.hpp>
 #include <rotor.hpp>
-#include <ares.h>
+// #include <ares.h>
+
+struct ares_channeldata;
+typedef struct ares_channeldata  ares_channel_t;
 
 namespace syncspirit {
 namespace net {

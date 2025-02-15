@@ -6,6 +6,7 @@
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "names.h"
+#include <ares.h>
 
 using namespace syncspirit::net;
 using namespace syncspirit::utils;

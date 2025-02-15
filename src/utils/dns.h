@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #pragma once
 
-#include <ares.h>
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -47,5 +46,7 @@ template <> struct hash<dns_query_t> {
 namespace syncspirit::utils {
 
 SYNCSPIRIT_API std::vector<endpoint_t> parse_dns_servers(std::string_view str) noexcept;
+
+std::string_view SYNCSPIRIT_API cares_version() noexcept;
 
 }

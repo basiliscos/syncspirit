@@ -210,7 +210,7 @@ RC=i686-w64-mingw32.shared-windres
 
 [conf]
 tools.build:cflags=["-D_WIN32_WINNT=0x0501"]
-tools.build:cxxflags=["-D_WIN32_WINNT=0x0501"]
+tools.build:cxxflags=["-D_WIN32_WINNT=0x0501", "-DBOOST_ASIO_ENABLE_CANCELIO=1"]
 ```
 
 The supped libmbdx should be patched for windows xp support:
@@ -230,7 +230,7 @@ conan install --build=missing --output-folder . -s build_type=Release \
 source ./conanbuild.sh 
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0501 -DBOOST_ASIO_ENABLE_CANCELIO=1"
+  -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0501" -DBOOST_ASIO_ENABLE_CANCELIO=1
 make -j`nproc`
 ```
 
