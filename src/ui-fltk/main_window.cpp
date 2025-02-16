@@ -3,6 +3,7 @@
 
 #include "main_window.h"
 
+#include "app.h"
 #include "log_panel.h"
 #include "tree_view.h"
 #include "tree_item.h"
@@ -15,6 +16,11 @@ using namespace syncspirit::fltk;
 
 main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     : parent_t(w_, h_, "syncspirit-fltk"), supervisor{supervisor_} {
+
+#ifdef _WIN32
+    auto icon = LoadIcon(fl_display, MAKEINTRESOURCE(ID_SYNCSPIRIT_ICON));
+    this->icon((const void *)icon);
+#endif
 
     auto container = new Fl_Tile(0, 0, w(), h());
     auto &cfg = supervisor.get_app_config().fltk_config;

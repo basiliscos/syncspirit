@@ -49,4 +49,4 @@ SYNCSPIRIT_API std::vector<endpoint_t> parse_dns_servers(std::string_view str) n
 
 std::string_view SYNCSPIRIT_API cares_version() noexcept;
 
-}
+} // namespace syncspirit::utils

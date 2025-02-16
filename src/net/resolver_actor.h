@@ -11,7 +11,7 @@
 // #include <ares.h>
 
 struct ares_channeldata;
-typedef struct ares_channeldata  ares_channel_t;
+typedef struct ares_channeldata ares_channel_t;
 
 namespace syncspirit {
 namespace net {

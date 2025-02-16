@@ -66,9 +66,10 @@ target_link_libraries(syncspirit-fltk
     libqrencode::libqrencode
 )
 target_include_directories(syncspirit-fltk PUBLIC
+    ${syncspirit_SOURCE_DIR}/misc
     ${syncspirit_SOURCE_DIR}/src
-    ${syncspirit_SOURCE_DIR}/lib/fltk/
-    ${CMAKE_CURRENT_BINARY_DIR}/fltk/
+    ${syncspirit_SOURCE_DIR}/lib/fltk
+    ${CMAKE_CURRENT_BINARY_DIR}/fltk
 )
 
 install_executable("syncspirit-fltk")

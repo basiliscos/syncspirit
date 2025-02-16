@@ -228,7 +228,7 @@ void test_success_ipv6() {
             REQUIRE(results.size() == 1);
             REQUIRE(results.at(0) == asio::ip::make_address("fde8:6819:8685:4d00:be03:58ff:fe74:c854"));
 #else
-            auto& ee = sup->responses.at(0)->payload.ee;
+            auto &ee = sup->responses.at(0)->payload.ee;
             REQUIRE(ee);
             REQUIRE(ee->ec == utils::make_error_code(utils::error_code_t::cares_failure));
 #endif

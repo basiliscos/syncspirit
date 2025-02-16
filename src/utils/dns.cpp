@@ -76,9 +76,6 @@ auto make_endpoints(const std::vector<ip::address> &addresses, std::uint16_t por
 template auto make_endpoints<tcp, typename tcp::endpoint>(const std::vector<ip::address> &addresses,
                                                           std::uint16_t port) noexcept -> addresses_t<tcp::endpoint>;
 
-
-std::string_view cares_version() noexcept {
-    return std::string_view(::ares_version(nullptr));
-}
+std::string_view cares_version() noexcept { return std::string_view(::ares_version(nullptr)); }
 
 } // namespace syncspirit::utils
