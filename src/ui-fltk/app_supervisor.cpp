@@ -466,8 +466,8 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
         auto local_fi = folder_infos.by_device(*cluster->get_device());
         auto local_file = local_fi->get_file_infos().by_name(diff.proto_local.name());
         if (local_file) {
-            auto generic_augmnetation = local_fi->get_augmentation();
-            auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmnetation.get());
+            auto generic_augmentation = local_fi->get_augmentation();
+            auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmentation.get());
             if (!local_file->get_augmentation()) {
                 augmentation->track(*local_file);
                 augmentation->augment_pending();
@@ -523,8 +523,8 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto peer = cluster->get_devices().by_sha256(diff.peer_id);
     auto folder_info = folder->get_folder_infos().by_device(*peer);
-    if (auto generic_augmnetation = folder_info->get_augmentation(); generic_augmnetation) {
-        auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmnetation.get());
+    if (auto generic_augmentation = folder_info->get_augmentation(); generic_augmentation) {
+        auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmentation.get());
         auto &files_map = folder_info->get_file_infos();
         for (auto &file : diff.files) {
             auto file_info = files_map.by_name(file.name());
@@ -588,9 +588,9 @@ void app_supervisor_t::set_show_deleted(bool value) {
 
     for (auto &it_f : cluster->get_folders()) {
         for (auto &it : it_f.item->get_folder_infos()) {
-            auto generic_augmnetation = it.item->get_augmentation();
-            if (generic_augmnetation) {
-                auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
+            auto generic_augmentation = it.item->get_augmentation();
+            if (generic_augmentation) {
+                auto augmentation = static_cast<augmentation_base_t *>(generic_augmentation.get());
                 auto entry = static_cast<tree_item::entry_t *>(augmentation->get_owner());
                 if (entry) {
                     entry->show_deleted(value);
@@ -611,9 +611,9 @@ void app_supervisor_t::set_show_colorized(bool value) {
     auto refresher = refresher_t{};
     for (auto &it_f : cluster->get_folders()) {
         for (auto &it : it_f.item->get_folder_infos()) {
-            auto generic_augmnetation = it.item->get_augmentation();
-            if (generic_augmnetation) {
-                auto augmentation = static_cast<augmentation_base_t *>(generic_augmnetation.get());
+            auto generic_augmentation = it.item->get_augmentation();
+            if (generic_augmentation) {
+                auto augmentation = static_cast<augmentation_base_t *>(generic_augmentation.get());
                 auto entry = static_cast<tree_item::entry_t *>(augmentation->get_owner());
                 if (entry) {
                     entry->apply(refresher, {});

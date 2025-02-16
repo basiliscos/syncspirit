@@ -30,7 +30,7 @@ static constexpr int padding = 2;
 
 namespace {
 
-using ctx_t = folder_table_t::serialiazation_context_t;
+using ctx_t = folder_table_t::serialization_context_t;
 
 struct device_share_widget_t final : widgetable_t {
     using parent_t = widgetable_t;
@@ -637,7 +637,7 @@ std::pair<int, int> folder_table_t::scan(widgetable_t &widget) {
 }
 
 void folder_table_t::on_share() {
-    serialiazation_context_t ctx;
+    serialization_context_t ctx;
     auto valid = store(&ctx);
     if (!valid) {
         return;
@@ -660,7 +660,7 @@ void folder_table_t::on_share() {
 }
 
 void folder_table_t::on_apply() {
-    serialiazation_context_t ctx;
+    serialization_context_t ctx;
     auto valid = store(&ctx);
     if (!valid) {
         return;

@@ -2,8 +2,8 @@
 
 ## requirements
 
- - C++ 20 compatile compiler (tested with gcc-10 and clang-17)
- 
+ - C++ 20 compatible compiler (tested with gcc-10 and clang-17)
+
  - [boost](https://www.boost.org/) (at least `v1.84.0`)
  - [openssl](https://www.openssl.org/)
  - [protobuf](https://github.com/protocolbuffers/protobuf), (at least `v3.0`)
@@ -18,22 +18,22 @@
  - [c-ares](https://c-ares.org/)
  - [fltk](https://www.fltk.org/) (for fltk-ui)
 
-The [conan](https://conan.io/) package manager (v2.0+) is used with 
+The [conan](https://conan.io/) package manager (v2.0+) is used with
 [cmake](https://cmake.org/) build system.
 
 `syncspririt` can be build with [conan](https://conan.io/) or just with bare
-[cmake](https://cmake.org/) build system. [conan](https://conan.io/) is 
-responsible for installing and building dependecies, whith bare [cmake](https://cmake.org/)
+[cmake](https://cmake.org/) build system. [conan](https://conan.io/) is
+responsible for installing and building dependencies, with bare [cmake](https://cmake.org/)
 it should be done manually (e.g. use system-provided libraries).
 
-Please note, that [fltk](https://www.fltk.org/) library should be build as 
+Please note, that [fltk](https://www.fltk.org/) library should be build as
 shared library; otherwise applications will not work correctly.
 
-## generic build 
+## generic build
 
 ```
 mkdir build.release && cd build.release
-conan install --build=missing --output-folder . -s build_type=Release .. 
+conan install --build=missing --output-folder . -s build_type=Release ..
 cmake .. -G "Unix Makefiles" \
   -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
@@ -63,7 +63,7 @@ make -j`nproc` install deploy_deps
 
 ## cross building on linux for windows
 
-Generally it the process is the same as above, with the addition, that 
+Generally it the process is the same as above, with the addition, that
 cross-compiler should be installed and conan profiles should be activated
 
 ### mingw
@@ -73,7 +73,7 @@ Install mingw on linux (something like `cross-x86_64-w64-mingw32`)
 Make a conan profile for mingw:
 
 ```
-cat ~/.conan2/profiles/mingw 
+cat ~/.conan2/profiles/mingw
 [settings]
 os=Windows
 arch=x86_64
@@ -95,7 +95,7 @@ Then make a build
 mkdir build.release && cd build.release
 conan install --build=missing --output-folder . -s build_type=Release \
     --profile:build=default --profile:host=mingw
-source ./conanbuild.sh 
+source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
@@ -154,13 +154,13 @@ cd syncspirit
 mkdir build.release && cd build.release
 conan install --build=missing --output-folder . -s build_type=Release \
     --profile:build=default --profile:host=mxe ..
-source ./conanbuild.sh 
+source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
 ```
 
-### mxe & windows xp 
+### mxe & windows xp
 
 Download [mxe](https://mxe.cc); make sure all requirements are met.
 
@@ -227,7 +227,7 @@ cd syncspirit
 mkdir build.release && cd build.release
 conan install --build=missing --output-folder . -s build_type=Release \
     --profile:build=default --profile:host=xp ..
-source ./conanbuild.sh 
+source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0501" -DBOOST_ASIO_ENABLE_CANCELIO=1

@@ -164,7 +164,7 @@ void scan_scheduler_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 }
 
 void scan_scheduler_t::initiate_scan(std::string_view folder_id) noexcept {
-    LOG_DEBUG(log, "iniating folder '{}' scan", folder_id);
+    LOG_DEBUG(log, "initiating folder '{}' scan", folder_id);
     auto diff = model::diff::cluster_diff_ptr_t{};
     auto now = r::pt::microsec_clock::local_time();
     diff = new model::diff::local::scan_start_t(folder_id, now);

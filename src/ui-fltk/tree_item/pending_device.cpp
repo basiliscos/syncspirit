@@ -161,8 +161,8 @@ bool pending_device_t::on_select() {
         int bot_h = 100;
 
         auto group = new tile_t(x, y, w, h);
-        auto resizeable_area = new Fl_Box(x + w * 1. / 6, y + h * 1. / 2, w * 4. / 6, h / 2. - bot_h);
-        group->resizable(resizeable_area);
+        auto resizable_area = new Fl_Box(x + w * 1. / 6, y + h * 1. / 2, w * 4. / 6, h / 2. - bot_h);
+        group->resizable(resizable_area);
 
         group->begin();
         auto top = [&]() -> Fl_Widget * {

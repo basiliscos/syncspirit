@@ -34,7 +34,7 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
         auto folder_info_uuid = key.substr(1, uuid_length);
         auto folder_info = all_fi[folder_info_uuid];
         if (!folder_info) {
-            LOG_WARN(log, "cannot restore file '{}', missing folder, currupted db?", db.name());
+            LOG_WARN(log, "cannot restore file '{}', missing folder, corrupted db?", db.name());
             continue;
         }
 

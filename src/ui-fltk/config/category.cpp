@@ -43,7 +43,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             // clang-format off
             property_ptr_t(new db::max_blocks_per_diff_t(db.max_blocks_per_diff, db_def.max_blocks_per_diff)),
             property_ptr_t(new db::max_files_per_diff_t(db.max_files_per_diff, db_def.max_files_per_diff)),
-            property_ptr_t(new db::uncommited_threshold_t(db.uncommitted_threshold, db_def.uncommitted_threshold)),
+            property_ptr_t(new db::uncommitted_threshold_t(db.uncommitted_threshold, db_def.uncommitted_threshold)),
             property_ptr_t(new db::upper_limit_t(db.upper_limit, db_def.upper_limit)),
             // clang-format on
         };

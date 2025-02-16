@@ -181,14 +181,14 @@ void max_files_per_diff_t::reflect_to(syncspirit::config::main_t &main) {
 
 const char *max_files_per_diff_t::explanation_ = "maximum number of files per single diff (to display progress in UI)";
 
-uncommited_threshold_t::uncommited_threshold_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("uncommited_threshold", explanation_, value, default_value) {}
+uncommitted_threshold_t::uncommitted_threshold_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("uncommitted_threshold", explanation_, value, default_value) {}
 
-void uncommited_threshold_t::reflect_to(syncspirit::config::main_t &main) {
+void uncommitted_threshold_t::reflect_to(syncspirit::config::main_t &main) {
     main.db_config.uncommitted_threshold = native_value;
 }
 
-const char *uncommited_threshold_t::explanation_ = "how many transactions keep in memory before flushing to storage";
+const char *uncommitted_threshold_t::explanation_ = "how many transactions keep in memory before flushing to storage";
 
 upper_limit_t::upper_limit_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("upper_limit", explanation_, value, default_value) {}

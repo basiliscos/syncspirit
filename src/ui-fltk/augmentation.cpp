@@ -22,7 +22,7 @@ void augmentation_t::on_delete() noexcept {
     }
 }
 
-void augmentation_t::release_onwer() noexcept { owner = nullptr; }
+void augmentation_t::release_owner() noexcept { owner = nullptr; }
 
 tree_item_t *augmentation_t::get_owner() noexcept { return owner; }
 
@@ -33,7 +33,7 @@ void augmentation_proxy_t::on_delete() noexcept {
     // no-op, owner should receive own on-delete event
 }
 
-void augmentation_proxy_t::release_onwer() noexcept {
+void augmentation_proxy_t::release_owner() noexcept {
     // no-op, owner should receive own on-delete event
 }
 

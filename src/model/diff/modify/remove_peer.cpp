@@ -70,7 +70,7 @@ auto remove_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controlle
         return make_error_code(error_code_t::cannot_remove_self);
     }
 
-    LOG_TRACE(log, "applyging remove_peer_t (start), for device '{}' ({})", peer->device_id().get_short(),
+    LOG_TRACE(log, "applying remove_peer_t (start), for device '{}' ({})", peer->device_id().get_short(),
               peer->get_name());
     cluster.get_devices().remove(peer);
     return applicator_t::apply_sibling(cluster, controller);

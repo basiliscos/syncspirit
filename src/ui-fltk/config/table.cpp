@@ -20,20 +20,20 @@ namespace bfs = std::filesystem;
 
 static constexpr int col_min_size = 60;
 
-table_t::clip_guart_t::clip_guart_t(int, int x, int y, int w_, int h) : w{w_} {
+table_t::clip_guard_t::clip_guard_t(int, int x, int y, int w_, int h) : w{w_} {
     if (w) {
         fl_push_clip(x, y, w, h);
     }
 }
 
-table_t::clip_guart_t::~clip_guart_t() {
+table_t::clip_guard_t::~clip_guard_t() {
     if (w) {
         fl_pop_clip();
     }
 }
 
-auto table_t::cell_t::clip(int col, int x, int y, int w, int h) -> clip_guart_t {
-    return clip_guart_t(col, x, y, w, h);
+auto table_t::cell_t::clip(int col, int x, int y, int w, int h) -> clip_guard_t {
+    return clip_guard_t(col, x, y, w, h);
 }
 
 void table_t::cell_t::resize(int, int, int, int) {}
@@ -44,8 +44,8 @@ struct category_cell_t final : table_t::cell_t {
 
     category_cell_t(table_t *table_, category_ptr_t category_) : table{table_}, category{std::move(category_)} {}
 
-    auto clip(int col, int x, int y, int w, int h) -> table_t::clip_guart_t override {
-        return col == 0 ? parent_t::clip(col, x, y, w, h) : table_t::clip_guart_t(0, 0, 0, 0, 0);
+    auto clip(int col, int x, int y, int w, int h) -> table_t::clip_guard_t override {
+        return col == 0 ? parent_t::clip(col, x, y, w, h) : table_t::clip_guard_t(0, 0, 0, 0, 0);
     }
 
     void draw(int col, int x, int y, int w, int h) override {

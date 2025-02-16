@@ -16,7 +16,7 @@
 #include <lz4.h>
 #include <openssl/crypto.h>
 #include <openssl/opensslv.h>
-#include "mdbx.h"
+#include <mdbx.h>
 
 using namespace syncspirit;
 using namespace syncspirit::fltk;
@@ -48,8 +48,8 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         }
 
         auto openssl_version = fmt::format("{}.{}.{}{}", openssl_major, openssl_minor, openssl_patch, openssl_nibble_c);
-        auto mbdx_version =
-            fmt::format("{}.{}.{}_{}", mdbx_version.major, mdbx_version.minor, mdbx_version.patch, mdbx_version.tweak);
+        auto& mdbx_v = ::mdbx_version;
+        auto mdbx_version =fmt::format("{}.{}.{}_{}", mdbx_v.major, mdbx_v.minor, mdbx_v.patch, mdbx_v.tweak);
         auto app_version = fmt::format("{} {}", constants::client_name, constants::client_version);
         auto protobuf_version = google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION);
         auto fltk_version = fmt::format("{}", Fl::version());
@@ -70,7 +70,7 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         data.push_back({"mdbx pages", mdbx_pages_cell});
         data.push_back({"mdbx size, Kb", mdbx_size_cell});
         data.push_back({"app version", new static_string_provider_t(app_version)});
-        data.push_back({"mdbx version", new static_string_provider_t(mbdx_version)});
+        data.push_back({"mdbx version", new static_string_provider_t(mdbx_version)});
         data.push_back({"protobuf version", new static_string_provider_t(protobuf_version)});
         data.push_back({"lz4 version", new static_string_provider_t(LZ4_versionString())});
         data.push_back({"openssl version", new static_string_provider_t(openssl_version)});
@@ -171,8 +171,8 @@ bool self_device_t::on_select() {
 
         // auto group = new Fl_Group(x, y, w, h);
         auto group = new tile_t(x, y, w, h);
-        auto resizeable_area = new Fl_Box(x + w * 1. / 6, y + h * 1. / 2, w * 4. / 6, h / 2. - bot_h);
-        group->resizable(resizeable_area);
+        auto resizable_area = new Fl_Box(x + w * 1. / 6, y + h * 1. / 2, w * 4. / 6, h / 2. - bot_h);
+        group->resizable(resizable_area);
 
         group->begin();
         auto top = new self_table_t(this, x, y, w, h - bot_h);

@@ -83,7 +83,7 @@ BOOL WINAPI consoleHandler(DWORD signal) {
 #endif
 
 int main(int argc, char **argv) {
-    auto boostrap_guard = utils::boostrap_guard_ptr_t();
+    auto bootstrap_guard = utils::bootstrap_guard_ptr_t();
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
 #if defined(__unix__) || defined(__APPLE__) || defined(__MACH__)
@@ -170,7 +170,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
-        boostrap_guard = utils::bootstrap(dist_sink, config_file_path);
+        bootstrap_guard = utils::bootstrap(dist_sink, config_file_path);
 
         config_file_path.append("syncspirit.toml");
         auto config_file_path_str = config_file_path.string();
@@ -212,7 +212,7 @@ int main(int argc, char **argv) {
                 if (first_cfg.name == "default") {
                     auto level = log_level.value();
                     first_cfg.level = level;
-                    spdlog::trace("overriding default log levet to {}", int(level));
+                    spdlog::trace("overriding default log level to {}", int(level));
                 }
             }
         }
@@ -358,7 +358,7 @@ int main(int argc, char **argv) {
         }
         spdlog::trace("everything has been terminated");
     } catch (const po::error &ex) {
-        spdlog::critical("program options exceptionn: {}", ex.what());
+        spdlog::critical("program options exception: {}", ex.what());
         return 1;
     } catch (std::exception &ex) {
         spdlog::critical("std::exception: {}", ex.what());
@@ -373,7 +373,7 @@ int main(int argc, char **argv) {
     /* exit */
 
     spdlog::info("normal exit");
-    boostrap_guard.reset();
+    bootstrap_guard.reset();
     spdlog::drop_all();
     return 0;
 }

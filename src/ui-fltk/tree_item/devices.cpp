@@ -26,7 +26,7 @@ namespace {
 
 struct my_table_t;
 
-struct serialiazation_context_t {
+struct serialization_context_t {
     std::string_view device_id;
     std::string_view label;
 };
@@ -52,7 +52,7 @@ struct my_table_t : static_table_t {
     }
 
     void refresh() override {
-        serialiazation_context_t ctx{};
+        serialization_context_t ctx{};
         store(&ctx);
 
         auto device_opt = std::optional<model::device_id_t>{};
@@ -88,7 +88,7 @@ struct my_table_t : static_table_t {
     }
 
     void add_new_device() {
-        serialiazation_context_t ctx{};
+        serialization_context_t ctx{};
         store(&ctx);
 
         auto device_opt = model::device_id_t::from_string(ctx.device_id);
@@ -134,7 +134,7 @@ auto static make_device_id(my_table_t &container) -> widgetable_ptr_t {
         }
 
         bool store(void *data) override {
-            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+            auto ctx = reinterpret_cast<serialization_context_t *>(data);
             ctx->device_id = input->value();
             return true;
         }
@@ -155,7 +155,7 @@ auto static make_label(my_table_t &container) -> widgetable_ptr_t {
         }
 
         bool store(void *data) override {
-            auto ctx = reinterpret_cast<serialiazation_context_t *>(data);
+            auto ctx = reinterpret_cast<serialization_context_t *>(data);
             ctx->label = input->value();
             return true;
         }

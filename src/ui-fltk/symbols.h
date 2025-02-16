@@ -12,7 +12,7 @@ extern const std::string_view offline;
 extern const std::string_view connecting;
 extern const std::string_view discovering;
 extern const std::string_view scanning;
-extern const std::string_view syncrhonizing;
+extern const std::string_view synchronizing;
 extern const std::string_view deleted;
 extern const std::string_view colorize;
 

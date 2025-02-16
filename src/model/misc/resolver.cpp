@@ -57,7 +57,7 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
     auto r_id = r_best.id();
     auto l_id = l_best.id();
 
-    // check posssible conflict
+    // check possible conflict
     if (r_best.id() == l_best.id()) {
         if (lv > rv) {
             return advance_action_t::ignore;

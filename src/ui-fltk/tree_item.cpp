@@ -15,7 +15,7 @@ tree_item_t::tree_item_t(app_supervisor_t &supervisor_, Fl_Tree *tree, bool has_
 
 tree_item_t::~tree_item_t() {
     if (augmentation) {
-        augmentation->release_onwer();
+        augmentation->release_owner();
     }
 }
 
@@ -46,7 +46,7 @@ void tree_item_t::on_update() {
 void tree_item_t::on_delete() {
     select_other();
     if (augmentation) {
-        augmentation->release_onwer();
+        augmentation->release_owner();
     }
     auto upper = static_cast<tree_item_t *>(parent());
     if (upper) {

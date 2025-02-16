@@ -20,7 +20,7 @@ tx_timeout = 90000                  # tx max time, milliseconds
 # database settings
 [db]
 upper_limit = 0             # maximum amount of database, in bytes, 0 - for auto allocate
-uncommited_threshold = 150  # how often flush db to disk, i.e. how much operations
+uncommitted_threshold = 150 # how often flush db to disk, i.e. how much operations
                             # might be not committed. Affects disk performance
 max_blocks_per_diff = 8192  # maximum number of blocks per single diff (to display progress in UI)
 max_files_per_diff = 1024   # maximum number of files per single diff (to display progress in UI)

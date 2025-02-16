@@ -11,7 +11,7 @@ using namespace syncspirit::model::diff::modify;
 auto remove_blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
     if (!keys.empty()) {
-        LOG_TRACE(log, "applyging remove_blocks_t, blocks = {}", keys.size());
+        LOG_TRACE(log, "applying remove_blocks_t, blocks = {}", keys.size());
         auto &blocks = cluster.get_blocks();
         for (auto &block_key : keys) {
             auto block_hash = block_key.substr(1);

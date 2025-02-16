@@ -73,7 +73,7 @@ db_actor_t::db_actor_t(config_t &config)
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
         auto log = utils::get_logger("net.db");
-        LOG_CRITICAL(log, "mbdx environment creation error ({}): {}", r, mdbx_strerror(r));
+        LOG_CRITICAL(log, "mdbx environment creation error ({}): {}", r, mdbx_strerror(r));
         throw std::runtime_error(std::string(mdbx_strerror(r)));
     }
 }
@@ -115,7 +115,7 @@ void db_actor_t::open() noexcept {
     LOG_INFO(log, "open, db upper limit = {}", upper_limit);
     auto r = mdbx_env_set_geometry(env, -1, -1, upper_limit, -1, -1, -1);
     if (r != MDBX_SUCCESS) {
-        LOG_ERROR(log, "open, mbdx set geometry error ({}): {}", r, mdbx_strerror(r));
+        LOG_ERROR(log, "open, mdbx set geometry error ({}): {}", r, mdbx_strerror(r));
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
@@ -128,7 +128,7 @@ void db_actor_t::open() noexcept {
     r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
 #endif
     if (r != MDBX_SUCCESS) {
-        LOG_ERROR(log, "open, mbdx open environment error ({}): {}, path: {}", r, mdbx_strerror(r), db_dir.string());
+        LOG_ERROR(log, "open, mdbx open environment error ({}): {}, path: {}", r, mdbx_strerror(r), db_dir.string());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
@@ -209,7 +209,7 @@ void db_actor_t::shutdown_finish() noexcept {
     }
     auto r = mdbx_env_close(env);
     if (r != MDBX_SUCCESS) {
-        LOG_ERROR(log, "open, mbdx close error ({}): {}", r, mdbx_strerror(r));
+        LOG_ERROR(log, "open, mdbx close error ({}): {}", r, mdbx_strerror(r));
     }
     env = nullptr;
     r::actor_base_t::shutdown_finish();
@@ -221,7 +221,7 @@ void db_actor_t::on_db_info(message::db_info_request_t &request) noexcept {
     std::memset(&stat, 0, sizeof(stat));
     auto r = mdbx_env_stat_ex(env, nullptr, &stat, sizeof(stat));
     if (r != MDBX_SUCCESS) {
-        LOG_ERROR(log, "mdbx_env_stat_ex, mbdx error ({}): {}", r, mdbx_strerror(r));
+        LOG_ERROR(log, "mdbx_env_stat_ex, mdbx error ({}): {}", r, mdbx_strerror(r));
         auto ec = db::make_error_code(r);
         return reply_with_error(request, make_error(ec));
     }

@@ -158,12 +158,12 @@ struct max_files_per_diff_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct uncommited_threshold_t final : impl::positive_integer_t {
+struct uncommitted_threshold_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 
     static const char *explanation_;
 
-    uncommited_threshold_t(std::uint64_t value, std::uint64_t default_value);
+    uncommitted_threshold_t(std::uint64_t value, std::uint64_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 

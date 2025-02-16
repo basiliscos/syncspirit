@@ -13,15 +13,15 @@ namespace syncspirit::fltk::config {
 struct table_t : Fl_Table {
     using parent_t = Fl_Table;
 
-    struct clip_guart_t {
-        clip_guart_t(int col, int x, int y, int w, int h);
-        ~clip_guart_t();
+    struct clip_guard_t {
+        clip_guard_t(int col, int x, int y, int w, int h);
+        ~clip_guard_t();
         int w;
     };
 
     struct cell_t {
         virtual ~cell_t() = default;
-        virtual clip_guart_t clip(int col, int x, int y, int w, int h);
+        virtual clip_guard_t clip(int col, int x, int y, int w, int h);
         virtual void draw(int col, int x, int y, int w, int h) = 0;
         virtual void resize(int x, int y, int w, int h);
         virtual void load_value();

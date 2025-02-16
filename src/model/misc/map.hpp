@@ -51,7 +51,7 @@ template <> struct reduced_type_t<std::string> {
 };
 
 template <typename Key, size_t I>
-using singke_key_t = reduced_type_t<std::tuple_element_t<I, typename Key::storage_t>>::type;
+using single_key_t = reduced_type_t<std::tuple_element_t<I, typename Key::storage_t>>::type;
 
 } // namespace details
 
@@ -60,8 +60,8 @@ template <size_t I, typename Result, typename T> Result get_index(const T &item)
 
 namespace details {
 
-template <size_t I, typename K> singke_key_t<K, I> get_key(const K &key) noexcept {
-    return get_index<I, singke_key_t<K, I>>(key.item);
+template <size_t I, typename K> single_key_t<K, I> get_key(const K &key) noexcept {
+    return get_index<I, single_key_t<K, I>>(key.item);
 }
 
 struct hash_op_t {
@@ -79,7 +79,7 @@ struct eq_op_t {
 };
 
 template <size_t I, typename K> struct indexed_by {
-    using type = mi::hashed_unique<mi::global_fun<const K &, singke_key_t<K, I>, &get_key<I, K>>, hash_op_t, eq_op_t>;
+    using type = mi::hashed_unique<mi::global_fun<const K &, single_key_t<K, I>, &get_key<I, K>>, hash_op_t, eq_op_t>;
 };
 // using hash_fn_t = mi::hashed_unique<mi::mem_fun<T, std::string, &T::template get<I>>, hash_op_t, eq_op_t>;
 
@@ -99,10 +99,10 @@ template <typename T, size_t N = 1>
 using unordered_string_map_t =
     mi::multi_index_container<indexed_item_t<T, N>, typename hasher_t<N, N, indexed_item_t<T, N>>::type>;
 
-template <typename Item, typename WrappendItem> struct generalized_map_t {
-    static constexpr size_t N = WrappendItem::size;
+template <typename Item, typename WrappedItem> struct generalized_map_t {
+    static constexpr size_t N = WrappedItem::size;
     using map_t = details::unordered_string_map_t<Item, N>;
-    using composite_key_t = typename WrappendItem::storage_t;
+    using composite_key_t = typename WrappedItem::storage_t;
     using iterator_t = decltype(std::declval<map_t>().template get<0>().begin());
     using const_iterator_t = decltype(std::declval<map_t>().template get<0>().cbegin());
 
@@ -123,7 +123,7 @@ template <typename Item, typename WrappendItem> struct generalized_map_t {
         // key2item.template get<0>().erase(get_index<0>(item));
     }
 
-    template <size_t I = 0> Item get(details::singke_key_t<WrappendItem, I> id) const noexcept {
+    template <size_t I = 0> Item get(details::single_key_t<WrappedItem, I> id) const noexcept {
         auto &projection = key2item.template get<I>();
         auto it = projection.find(id);
         if (it != projection.end()) {
@@ -162,7 +162,7 @@ template <typename Item, typename WrappendItem> struct generalized_map_t {
 
   protected:
     template <size_t I> static void constexpr fill(composite_key_t &arr, const Item &item) noexcept {
-        using single_key_t = details::singke_key_t<WrappendItem, I>;
+        using single_key_t = details::single_key_t<WrappedItem, I>;
         std::get<I>(arr) = get_index<I, single_key_t>(item);
         if constexpr (I > 0) {
             fill<I - 1>(arr, item);
@@ -170,7 +170,7 @@ template <typename Item, typename WrappendItem> struct generalized_map_t {
     }
 
     template <size_t I> void remove(const Item &item) noexcept {
-        using single_key_t = details::singke_key_t<WrappendItem, I>;
+        using single_key_t = details::single_key_t<WrappedItem, I>;
         key2item.template get<I>().erase(get_index<I, single_key_t>(item));
         if constexpr (I + 1 < N) {
             remove<I + 1>(item);

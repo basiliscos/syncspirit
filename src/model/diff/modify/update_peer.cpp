@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "update_peer.h"
 #include "remove_ignored_device.h"
@@ -57,7 +57,7 @@ auto update_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controlle
         peer->update(item);
         peer->notify_update();
     }
-    LOG_TRACE(log, "applyging update_peer_t, device {}", peer->device_id());
+    LOG_TRACE(log, "applying update_peer_t, device {}", peer->device_id());
     return applicator_t::apply_sibling(cluster, controller);
 }
 

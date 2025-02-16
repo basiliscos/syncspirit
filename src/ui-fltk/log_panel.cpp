@@ -85,7 +85,7 @@ static void export_log(Fl_Widget *, void *data) {
     };
 
     Fl_Native_File_Chooser file_chooser;
-    file_chooser.title("Save synspirit log");
+    file_chooser.title("Save syncspirit log");
     file_chooser.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
     file_chooser.filter("CSV files\t*.csv");
 

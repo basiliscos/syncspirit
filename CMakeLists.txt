@@ -249,7 +249,7 @@ target_compile_options(syncspirit_core PRIVATE
 # windows xp patch required:
 # -        CancelIoEx(ior->overlapped_fd, &item->ov);
 # +        CancelIo(ior->overlapped_fd);
-FetchContent_Declare(MBDX
+FetchContent_Declare(MDBX
     URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.13.4.tar.xz
     URL_HASH SHA256=86df30ca2231c9b3ad71424bb829dca9041947f5539d4295030c653d4982c1be
 )
@@ -260,7 +260,7 @@ FetchContent_Declare(MBDX
     set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
     set(MDBX_ALLOY_BUILD_DEFAULT true CACHE BOOL "MDBX_ALLOY_BUILD_DEFAULT")
     set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
-FetchContent_MakeAvailable(MBDX)
+FetchContent_MakeAvailable(MDBX)
 
 
 # To support WinXP there is need of that commit. When cares will be released

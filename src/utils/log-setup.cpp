@@ -124,10 +124,10 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcep
 
 static const char *bootstrap_sink = "syncspirit-bootstrap.log";
 
-boostrap_guard_t::boostrap_guard_t(dist_sink_t dist_sink_, spdlog::sinks::sink *sink_)
+bootstrap_guard_t::bootstrap_guard_t(dist_sink_t dist_sink_, spdlog::sinks::sink *sink_)
     : dist_sink{dist_sink_}, sink{sink_} {}
 
-boostrap_guard_t::~boostrap_guard_t() {
+bootstrap_guard_t::~bootstrap_guard_t() {
     auto logger = spdlog::default_logger_raw();
     auto sinks = logger->sinks();
     if (sinks.size() == 1) {
@@ -144,7 +144,7 @@ boostrap_guard_t::~boostrap_guard_t() {
     }
 }
 
-auto boostrap_guard_t::get_dist_sink() -> dist_sink_t { return dist_sink; }
+auto bootstrap_guard_t::get_dist_sink() -> dist_sink_t { return dist_sink; }
 
 dist_sink_t create_root_logger() noexcept {
     auto dist_sink = std::make_shared<spdlog::sinks::dist_sink_mt>();
@@ -157,7 +157,7 @@ dist_sink_t create_root_logger() noexcept {
     return dist_sink;
 }
 
-auto bootstrap(dist_sink_t &dist_sink, const bfs::path &dir) noexcept -> boostrap_guard_ptr_t {
+auto bootstrap(dist_sink_t &dist_sink, const bfs::path &dir) noexcept -> bootstrap_guard_ptr_t {
     using F = fstream_t;
     auto file_path = dir / bootstrap_sink;
     auto file = fstream_t(file_path, F::trunc | F::out | F::binary);
@@ -174,7 +174,7 @@ auto bootstrap(dist_sink_t &dist_sink, const bfs::path &dir) noexcept -> boostra
     } else {
         spdlog::trace("file sink '{}' has NOT been added", file_path.string());
     }
-    return std::make_unique<boostrap_guard_t>(dist_sink, file_sink.get());
+    return std::make_unique<bootstrap_guard_t>(dist_sink, file_sink.get());
 }
 
 } // namespace syncspirit::utils

@@ -31,7 +31,7 @@ static const auto colorize_raw = u8"★";
 // ≈
 
 const std::string_view scanning = UTF8_CAST(scanning_raw);
-const std::string_view syncrhonizing = UTF8_CAST(synchronizing_raw);
+const std::string_view synchronizing = UTF8_CAST(synchronizing_raw);
 const std::string_view online = UTF8_CAST(online_raw);
 const std::string_view offline = UTF8_CAST(offline_raw);
 const std::string_view connecting = UTF8_CAST(connecting_raw);
@@ -42,8 +42,8 @@ const std::string_view colorize = UTF8_CAST(colorize_raw);
 std::string_view get_description(std::string_view symbol) {
     if (symbol == scanning) {
         return "scanning";
-    } else if (symbol == syncrhonizing) {
-        return "syncrhonizing";
+    } else if (symbol == synchronizing) {
+        return "synchronizing";
     } else if (symbol == online) {
         return "online";
     } else if (symbol == offline) {

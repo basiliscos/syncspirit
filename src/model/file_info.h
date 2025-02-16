@@ -211,7 +211,7 @@ using indexed_file_item_t = indexed_item_t<file_info_ptr_t, 3>;
 
 template <> struct indexed_by<2, indexed_file_item_t> {
     using K = indexed_file_item_t;
-    using type = mi::ordered_unique<mi::global_fun<const K &, singke_key_t<K, 2>, &get_key<2, K>>>;
+    using type = mi::ordered_unique<mi::global_fun<const K &, single_key_t<K, 2>, &get_key<2, K>>>;
 };
 
 } // namespace details

@@ -18,20 +18,20 @@ namespace bfs = std::filesystem;
 using dist_sink_t = std::shared_ptr<spdlog::sinks::dist_sink_mt>;
 using sink_t = spdlog::sink_ptr;
 
-struct SYNCSPIRIT_API boostrap_guard_t {
-    boostrap_guard_t(dist_sink_t dist_sink, spdlog::sinks::sink *);
-    ~boostrap_guard_t();
+struct SYNCSPIRIT_API bootstrap_guard_t {
+    bootstrap_guard_t(dist_sink_t dist_sink, spdlog::sinks::sink *);
+    ~bootstrap_guard_t();
     dist_sink_t get_dist_sink();
 
   private:
     dist_sink_t dist_sink;
     spdlog::sinks::sink *sink;
 };
-using boostrap_guard_ptr_t = std::unique_ptr<boostrap_guard_t>;
+using bootstrap_guard_ptr_t = std::unique_ptr<bootstrap_guard_t>;
 
 SYNCSPIRIT_API outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcept;
 
 SYNCSPIRIT_API dist_sink_t create_root_logger() noexcept;
-SYNCSPIRIT_API boostrap_guard_ptr_t bootstrap(dist_sink_t &, const bfs::path &dir) noexcept;
+SYNCSPIRIT_API bootstrap_guard_ptr_t bootstrap(dist_sink_t &, const bfs::path &dir) noexcept;
 
 } // namespace syncspirit::utils

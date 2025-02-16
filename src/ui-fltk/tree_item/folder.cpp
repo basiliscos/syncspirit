@@ -57,7 +57,7 @@ void folder_t::update_label() {
         color_context = color_context_t::outdated;
     }
     if (folder.is_synchronizing()) {
-        auto eob = fmt::format_to(synchronizing_buff, " {}", symbols::syncrhonizing);
+        auto eob = fmt::format_to(synchronizing_buff, " {}", symbols::synchronizing);
         synchronizing = std::string_view(synchronizing_buff, eob);
     }
     auto sz = folder_label.size() + id.size() + synchronizing.size() + scanning.size() + 16;
@@ -180,7 +180,7 @@ struct table_t : content::folder_table_t {
     void refresh() override {
         auto aug = static_cast<augmentation_entry_base_t *>(container.get_proxy().get());
         auto &stats = aug->get_stats();
-        serialiazation_context_t ctx;
+        serialization_context_t ctx;
         description.get_folder()->serialize(ctx.folder);
 
         auto copy_data = ctx.folder.SerializeAsString();

@@ -109,7 +109,7 @@ void net_supervisor_t::launch_early() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     db_addr = create_actor<db_actor_t>()
                   .timeout(timeout)
-                  .db_dir(app_config.config_path / "mbdx-db")
+                  .db_dir(app_config.config_path / "mdbx-db")
                   .db_config(app_config.db_config)
                   .cluster(cluster)
                   .escalate_failure()

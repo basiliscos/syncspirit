@@ -144,13 +144,13 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
         }
     }
 
-    auto seqeuence = local_folder->get_max_sequence() + 1;
+    auto sequence = local_folder->get_max_sequence() + 1;
     local_file->mark_local();
-    local_file->set_sequence(seqeuence);
+    local_file->set_sequence(sequence);
     local_folder->add_strict(local_file);
 
     LOG_TRACE(log, "advance_t ({}), folder = {}, name = {}, blocks = {}, seq. = {}", stringify(action), folder_id,
-              local_file->get_name(), proto_local.blocks_size(), seqeuence);
+              local_file->get_name(), proto_local.blocks_size(), sequence);
 
     local_file->notify_update();
     local_folder->notify_update();

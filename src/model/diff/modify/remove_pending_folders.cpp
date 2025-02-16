@@ -11,7 +11,7 @@ using namespace syncspirit::model::diff::modify;
 auto remove_pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
     if (!keys.empty()) {
-        LOG_TRACE(log, "applyging remove_pending_folders_t, folders = {}", keys.size());
+        LOG_TRACE(log, "applying remove_pending_folders_t, folders = {}", keys.size());
         auto &map = cluster.get_pending_folders();
         for (auto &key : keys) {
             auto folder = map.by_key(key);

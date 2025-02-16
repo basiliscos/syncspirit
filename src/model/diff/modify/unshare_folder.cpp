@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "unshare_folder.h"
 #include "remove_blocks.h"
@@ -38,7 +38,7 @@ auto unshare_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &contro
     if (!r) {
         return r;
     }
-    LOG_TRACE(log, "applyging unshare_folder_t");
+    LOG_TRACE(log, "applying unshare_folder_t");
     return applicator_t::apply_sibling(cluster, controller);
 }
 

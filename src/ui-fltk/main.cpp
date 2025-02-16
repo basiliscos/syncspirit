@@ -104,7 +104,7 @@ BOOL WINAPI consoleHandler(DWORD signal) {
 #endif
 
 int main(int argc, char **argv) {
-    auto boostrap_guard = utils::boostrap_guard_ptr_t();
+    auto bootstrap_guard = utils::bootstrap_guard_ptr_t();
 
     Fl::lock();
     GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
-        boostrap_guard = utils::bootstrap(dist_sink, config_file_path);
+        bootstrap_guard = utils::bootstrap(dist_sink, config_file_path);
 
         config_file_path.append("syncspirit.toml");
         bool populate = !bfs::exists(config_file_path);
@@ -215,7 +215,7 @@ int main(int argc, char **argv) {
                 if (first_cfg.name == "default") {
                     auto level = log_level.value();
                     first_cfg.level = level;
-                    spdlog::trace("overriding default log levet to {}", int(level));
+                    spdlog::trace("overriding default log level to {}", int(level));
                 }
             }
         }
@@ -282,12 +282,12 @@ int main(int argc, char **argv) {
             sup->do_process();
         }
 
-        // window should outive fltk ctx, as in ctx d-tor model augmentations
+        // window should outlive fltk ctx, as in ctx d-tor model augmentations
         // invoke fltk-things..
         auto main_window = std::unique_ptr<fltk::main_window_t>();
         auto fltk_ctx = rf::system_context_ptr_t(new rf::system_context_fltk_t());
         auto sup_fltk = fltk_ctx->create_supervisor<fltk::app_supervisor_t>()
-                            .dist_sink(boostrap_guard->get_dist_sink())
+                            .dist_sink(bootstrap_guard->get_dist_sink())
                             .config_path(config_file_path)
                             .app_config(cfg)
                             .timeout(timeout)
@@ -394,7 +394,7 @@ int main(int argc, char **argv) {
     /* exit */
 
     spdlog::info("normal exit");
-    boostrap_guard.reset();
+    bootstrap_guard.reset();
     spdlog::drop_all();
     return 0;
 }

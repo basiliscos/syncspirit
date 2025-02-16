@@ -53,7 +53,7 @@ share_folder_t::share_folder_t(const bu::uuid &uuid, const model::device_t &peer
 
 auto share_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
-    LOG_TRACE(log, "applyging share_folder_t");
+    LOG_TRACE(log, "applying share_folder_t");
     return applicator_t::apply_impl(cluster, controller);
 }
 

@@ -65,7 +65,7 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
 
 auto remove_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
-    LOG_TRACE(log, "applyging remove_folder_t (folder id = {})", folder_id);
+    LOG_TRACE(log, "applying remove_folder_t (folder id = {})", folder_id);
     auto r = applicator_t::apply_child(cluster, controller);
     if (!r) {
         return r;

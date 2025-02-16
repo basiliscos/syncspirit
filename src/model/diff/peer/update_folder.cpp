@@ -163,7 +163,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         }
 
         if (f.sequence() <= 0) {
-            LOG_WARN(log, "file '{}' has wrong sequnce", f.name(), f.sequence());
+            LOG_WARN(log, "file '{}' has wrong sequence", f.name(), f.sequence());
             return make_error_code(error_code_t::invalid_sequence);
         }
         for (int j = 0; j < f.blocks_size(); ++j) {

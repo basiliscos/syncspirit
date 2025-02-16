@@ -97,7 +97,7 @@ struct table_t : content::folder_table_t {
     }
 
     void refresh() override {
-        serialiazation_context_t ctx;
+        serialization_context_t ctx;
         folder->serialize(ctx.folder);
 
         auto copy_data = ctx.folder.SerializeAsString();

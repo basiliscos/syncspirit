@@ -14,7 +14,7 @@ struct folder_table_t : static_table_t {
     using parent_t = static_table_t;
     using shared_devices_t = boost::local_shared_ptr<model::devices_map_t>;
 
-    struct serialiazation_context_t {
+    struct serialization_context_t {
         db::Folder folder;
         std::uint64_t index;
         model::devices_map_t shared_with;

@@ -7,10 +7,10 @@
 namespace syncspirit::db {
 
 const static detail::db_code_category category;
-const static detail::mbdx_code_category mbdx_category;
+const static detail::mdbx_code_category mdbx_category;
 
 const detail::db_code_category &db_code_category() { return category; }
-const detail::mbdx_code_category &mbdx_code_category() { return mbdx_category; }
+const detail::mdbx_code_category &mdbx_code_category() { return mdbx_category; }
 
 namespace detail {
 
@@ -18,9 +18,9 @@ const char *db_code_category::name() const noexcept { return "syncspirit_db_erro
 
 std::string db_code_category::message(int c) const { return mdbx_strerror(c); }
 
-const char *mbdx_code_category::name() const noexcept { return "syncspirit_mbdx_error"; }
+const char *mdbx_code_category::name() const noexcept { return "syncspirit_mdbx_error"; }
 
-std::string mbdx_code_category::message(int c) const {
+std::string mdbx_code_category::message(int c) const {
     std::string r;
     switch (static_cast<error_code>(c)) {
     case error_code::success:

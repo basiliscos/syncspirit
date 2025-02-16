@@ -28,7 +28,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     auto bottom_share = std::min(std::max(0.1, cfg.bottom_panel_share), 0.9);
     container->begin();
 
-    auto resizeable_area = new Fl_Box(w() * 0.1, h() * 0.1, w() * 0.9, h() * 0.8);
+    auto resizable_area = new Fl_Box(w() * 0.1, h() * 0.1, w() * 0.9, h() * 0.8);
 
     auto left_w = static_cast<int>(w() * left_share);
     auto right_w = w() - left_w;
@@ -61,7 +61,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     log_panel->box(FL_FLAT_BOX);
 
     container->end();
-    container->resizable(resizeable_area);
+    container->resizable(resizable_area);
 
     end();
 
@@ -82,7 +82,7 @@ void main_window_t::on_shutdown() {
             if (auto augmentation = tree_item->get_proxy(); augmentation) {
                 auto aug = dynamic_cast<augmentation_base_t *>(augmentation.get());
                 if (aug) {
-                    aug->release_onwer();
+                    aug->release_owner();
                 }
             }
         }

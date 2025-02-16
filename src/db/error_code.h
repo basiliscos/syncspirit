@@ -24,7 +24,7 @@ class SYNCSPIRIT_API db_code_category : public boost::system::error_category {
     virtual std::string message(int c) const override;
 };
 
-class SYNCSPIRIT_API mbdx_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API mdbx_code_category : public boost::system::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
@@ -33,10 +33,10 @@ class SYNCSPIRIT_API mbdx_code_category : public boost::system::error_category {
 
 SYNCSPIRIT_API const detail::db_code_category &db_code_category();
 
-SYNCSPIRIT_API const detail::mbdx_code_category &mbdx_code_category();
+SYNCSPIRIT_API const detail::mdbx_code_category &mdbx_code_category();
 
 inline boost::system::error_code make_error_code(int e) { return {static_cast<int>(e), db_code_category()}; }
-inline boost::system::error_code make_error_code(error_code ec) { return {static_cast<int>(ec), mbdx_code_category()}; }
+inline boost::system::error_code make_error_code(error_code ec) { return {static_cast<int>(ec), mdbx_code_category()}; }
 
 } // namespace db
 } // namespace syncspirit
@@ -48,7 +48,7 @@ template <> struct is_error_code_enum<syncspirit::db::detail::db_code_category> 
     static const bool value = true;
 };
 
-template <> struct is_error_code_enum<syncspirit::db::detail::mbdx_code_category> : std::true_type {
+template <> struct is_error_code_enum<syncspirit::db::detail::mdbx_code_category> : std::true_type {
     static const bool value = true;
 };
 
