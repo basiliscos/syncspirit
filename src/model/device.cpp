@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "device.h"
-#include "structs.pb.h"
+#include "proto/proto-structs.h"
+#include "proto/proto-bep.h"
 #include "db/prefix.h"
 #include "misc/error_code.h"
 #include "utils/time.h"
@@ -34,12 +35,12 @@ template <> void device_t::assign(const db::Device &d) noexcept {
     set_static_uris(std::move(uris));
 }
 
-outcome::result<device_ptr_t> device_t::create(std::string_view key, const db::Device &data) noexcept {
+outcome::result<device_ptr_t> device_t::create(utils::bytes_view_t key, const db::Device &data) noexcept {
     if (key[0] != prefix) {
         return make_error_code(error_code_t::invalid_device_prefix);
     }
 
-    auto id = device_id_t::from_sha256(key.substr(1));
+    auto id = device_id_t::from_sha256(key.subspan(1));
     if (!id) {
         return make_error_code(error_code_t::invalid_device_sha256_digest);
     }
@@ -64,26 +65,27 @@ device_t::~device_t() {}
 
 void device_t::update(const db::Device &source) noexcept { assign(source); }
 
-std::string device_t::serialize(db::Device &r) const noexcept {
-    r.set_name(name);
-    r.set_compression(compression);
-    if (cert_name) {
-        r.set_cert_name(cert_name.value());
+auto device_t::serialize(db::Device &r) const noexcept -> utils::bytes_t {
+    r.name(name);
+    r.compression(compression);
+    if (cert_name.has_value()) {
+        auto cn = std::string_view(cert_name.value());
+        r.cert_name(cn);
     }
-    r.set_introducer(introducer);
-    r.set_skip_introduction_removals(skip_introduction_removals);
-    r.set_auto_accept(auto_accept);
-    r.set_paused(paused);
-    r.set_last_seen(utils::as_seconds(last_seen));
+    r.introducer(introducer);
+    r.skip_introduction_removals(skip_introduction_removals);
+    r.auto_accept(auto_accept);
+    r.paused(paused);
+    r.last_seen(utils::as_seconds(last_seen));
 
     for (auto &address : static_uris) {
-        *r.add_addresses() = address->buffer();
+       r.add_addresses(address->buffer());
     }
 
-    return r.SerializeAsString();
+    return r.encode();
 }
 
-std::string device_t::serialize() const noexcept {
+auto device_t::serialize() const noexcept -> utils::bytes_t {
     db::Device r;
     return serialize(r);
 }
@@ -112,7 +114,7 @@ void device_t::update_contact(const tcp::endpoint &endpoint_, std::string_view c
     client_version = client_version_;
 }
 
-std::string_view device_t::get_key() const noexcept { return id.get_key(); }
+auto device_t::get_key() const noexcept -> bytes_view_t{ return id.get_key(); }
 
 void device_t::set_static_uris(uris_t uris) noexcept { static_uris = std::move(uris); }
 
@@ -139,14 +141,23 @@ local_device_t::local_device_t(const device_id_t &device_id, std::string_view na
     state = device_state_t::online;
 }
 
-std::string_view local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
+utils::bytes_view_t local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const device_ptr_t &item) noexcept { return item->get_key(); }
-
-template <> SYNCSPIRIT_API std::string_view get_index<1>(const device_ptr_t &item) noexcept {
-    return item->device_id().get_sha256();
+template <> SYNCSPIRIT_API std::string_view get_index<0>(const device_ptr_t &item) noexcept {
+    auto key = item->get_key();
+    auto ptr = (const char*)key.data();
+    return std::string_view(ptr, key.size());
 }
 
-device_ptr_t devices_map_t::by_sha256(std::string_view device_id) const noexcept { return get<1>(device_id); }
+template <> SYNCSPIRIT_API std::string_view get_index<1>(const device_ptr_t &item) noexcept {
+    auto sha256 = item->device_id().get_sha256();
+    auto ptr = (const char*)sha256.data();
+    return std::string_view(ptr, sha256.size());
+}
+
+device_ptr_t devices_map_t::by_sha256(utils::bytes_view_t device_id) const noexcept {
+    auto ptr = (const char*)device_id.data();
+    return get<1>(std::string_view(ptr, device_id.size()));
+}
 
 } // namespace syncspirit::model

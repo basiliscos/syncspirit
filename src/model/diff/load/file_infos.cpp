@@ -16,7 +16,6 @@ auto file_infos_t::apply_forward(cluster_t &cluster, apply_controller_t &control
 auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
     using folder_info_by_id_t = std::unordered_map<std::string_view, folder_info_ptr_t>;
-
     auto all_fi = folder_info_by_id_t{};
     auto &folders = cluster.get_folders();
     for (auto f : folders) {
@@ -25,9 +24,7 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
             all_fi[f->get_uuid()] = f;
         }
     }
-
     auto &blocks = cluster.get_blocks();
-
     for (auto &pair : container) {
         auto key = pair.first;
         auto &db = pair.second;
@@ -46,10 +43,10 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
         folder_info->add_relaxed(fi);
 
         for (int i = 0; i < db.blocks_size(); ++i) {
-            auto block_hash = db.blocks(i);
-            auto block = blocks.get(block_hash);
+            auto block_hash = db.block(i);
+            auto block = blocks.by_hash(block_hash);
             assert(block);
-            fi->assign_block(block, (size_t)i);
+            fi->assign_block(std::move(block), (size_t)i);
         }
     }
     return applicator_t::apply_sibling(cluster, controller);

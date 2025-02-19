@@ -21,7 +21,7 @@ struct SYNCSPIRIT_API add_remote_folder_infos_t final : cluster_diff_t {
     outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
-    std::string device_id;
+    utils::bytes_t device_id;
     container_t container;
 };
 

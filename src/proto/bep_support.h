@@ -9,7 +9,7 @@
 #include <memory>
 #include <variant>
 #include "syncspirit-export.h"
-#include "bep.pb.h"
+#include "proto/proto-fwd.hpp"
 #include "utils/uri.h"
 
 namespace syncspirit::proto {

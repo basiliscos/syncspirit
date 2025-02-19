@@ -109,15 +109,13 @@ outcome::result<void> migrate(uint32_t from, model::device_ptr_t device, transac
 }
 
 outcome::result<container_t> load(discr_t prefix, transaction_t &txn) noexcept {
-    char prefix_val = (char)prefix;
-    std::string_view prefix_mask(&prefix_val, 1);
     auto cursor_opt = txn.cursor();
     if (!cursor_opt) {
         return cursor_opt.error();
     }
     auto &cursor = cursor_opt.value();
     container_t container;
-    auto r = cursor.iterate(prefix_mask, [&](auto &key, auto &value) -> outcome::result<void> {
+    auto r = cursor.iterate(prefix, [&](auto &key, auto &value) -> outcome::result<void> {
         container.push_back(pair_t{key, value});
         return outcome::success();
     });

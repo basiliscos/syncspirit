@@ -4,7 +4,7 @@
 #include "folder_info.h"
 #include "folder.h"
 #include "cluster.h"
-#include "structs.pb.h"
+#include "proto/proto-fwd.hpp"
 #include "../db/prefix.h"
 #include "misc/error_code.h"
 #include <spdlog/spdlog.h>
@@ -25,7 +25,7 @@ folder_info_t::decomposed_key_t::decomposed_key_t(std::string_view reduced_key, 
     std::copy(begin(folder_uuid), end(folder_uuid), folder_key_raw + 1);
 }
 
-auto folder_info_t::decompose_key(std::string_view key) -> decomposed_key_t {
+auto folder_info_t::decompose_key(utils::bytes_view_t key) -> decomposed_key_t {
     assert(key.size() == folder_info_t::data_length);
     auto device_key = key.substr(1, device_id_t::digest_length);
     auto folder_id = key.substr(1 + device_key.size(), uuid_length);
@@ -84,7 +84,7 @@ void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
     max_sequence = fi.max_sequence();
 }
 
-std::string_view folder_info_t::get_key() const noexcept { return std::string_view(key, data_length); }
+utils::bytes_view_t folder_info_t::get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
 
 std::string_view folder_info_t::get_uuid() const noexcept {
     return std::string_view(key + 1 + device_id_t::digest_length + uuid_length, uuid_length);
@@ -134,11 +134,11 @@ folder_info_ptr_t folder_infos_map_t::by_device(const device_t &device) const no
     return get<1>(device.device_id().get_sha256());
 }
 
-folder_info_ptr_t folder_infos_map_t::by_device_id(std::string_view device_id) const noexcept {
+folder_info_ptr_t folder_infos_map_t::by_device_id(utils::bytes_view_t device_id) const noexcept {
     return get<1>(device_id);
 }
 
-folder_info_ptr_t folder_infos_map_t::by_device_key(std::string_view device_key) const noexcept {
+folder_info_ptr_t folder_infos_map_t::by_device_key(utils::bytes_view_t device_key) const noexcept {
     return get<2>(device_key);
 }
 

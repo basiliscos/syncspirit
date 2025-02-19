@@ -3,6 +3,7 @@
 
 #include "file_availability.h"
 #include "../cluster_visitor.h"
+#include "proto/proto-bep.h"
 
 using namespace syncspirit::model::diff::local;
 

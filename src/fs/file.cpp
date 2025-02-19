@@ -143,16 +143,16 @@ auto file_t::remove() noexcept -> outcome::result<void> {
     return ec;
 }
 
-auto file_t::read(size_t offset, size_t size) const noexcept -> outcome::result<std::string> {
+auto file_t::read(size_t offset, size_t size) const noexcept -> outcome::result<utils::bytes_t> {
     if (backend->tellg() != offset) {
         if (!backend->seekp((long)offset, std::ios_base::beg)) {
             return sys::errc::make_error_code(sys::errc::io_error);
         }
     }
 
-    std::string r;
+    utils::bytes_t r;
     r.resize(size);
-    if (!backend->read(r.data(), size)) {
+    if (!backend->read(reinterpret_cast<char*>(r.data()), size)) {
         return sys::errc::make_error_code(sys::errc::io_error);
     }
     if (backend->gcount() != size) {
@@ -162,7 +162,7 @@ auto file_t::read(size_t offset, size_t size) const noexcept -> outcome::result<
     return r;
 }
 
-auto file_t::write(size_t offset, std::string_view data) noexcept -> outcome::result<void> {
+auto file_t::write(size_t offset, utils::bytes_view_t data) noexcept -> outcome::result<void> {
     assert(offset + data.size() <= (size_t)model->get_size());
     if (backend->tellp() != offset) {
         if (!backend->seekp((long)offset, std::ios_base::beg)) {
@@ -170,7 +170,8 @@ auto file_t::write(size_t offset, std::string_view data) noexcept -> outcome::re
         }
     }
 
-    if (!backend->write(data.data(), data.size())) {
+    auto ptr = reinterpret_cast<const char*>(data.data());
+    if (!backend->write(ptr, data.size())) {
         return sys::errc::make_error_code(sys::errc::io_error);
     }
     if (!backend->flush()) {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "update_folder.h"
 #include "model/misc/file_iterator.h"
@@ -11,9 +11,11 @@
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff::peer;
 
-update_folder_t::update_folder_t(std::string_view folder_id_, std::string_view peer_id_, files_t files_, uuids_t uuids,
+update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_t peer_id_, files_t files_, uuids_t uuids,
                                  blocks_t blocks, orphaned_blocks_t::set_t removed_blocks) noexcept
-    : folder_id{std::string(folder_id_)}, peer_id{std::string(peer_id_)}, files{std::move(files_)},
+    :
+      folder_id{std::string(folder_id_)}, peer_id{peer_id_.begin(), peer_id_.end()},
+      files(std::move(files_)),
       uuids{std::move(uuids)} {
     LOG_DEBUG(log, "update_folder_t, folder = {}", folder_id);
     auto current = (cluster_diff_t *)(nullptr);
@@ -57,9 +59,9 @@ auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
 
         if (f.size()) {
             for (int i = 0; i < f.blocks_size(); ++i) {
-                auto &b = f.blocks(i);
+                auto b = f.blocks(i);
                 auto strict_hash = block_info_t::make_strict_hash(b.hash());
-                auto block = bm.get(strict_hash.get_hash());
+                auto block = bm.by_hash(strict_hash.get_hash());
                 assert(block);
                 file->assign_block(block, (size_t)i);
             }
@@ -93,7 +95,7 @@ auto update_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noex
 
 using diff_t = diff::cluster_diff_ptr_t;
 
-static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, std::string_view peer_id,
+static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, syncspirit::utils::bytes_view_t peer_id,
                       update_folder_t::files_t files, update_folder_t::blocks_t new_blocks) -> outcome::result<diff_t> {
     auto folder = folder_info->get_folder();
 
@@ -130,9 +132,8 @@ static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, st
     return outcome::success(std::move(diff));
 }
 
-template <typename T>
 static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
-                        const T &message) noexcept -> outcome::result<diff_t> {
+                        const syncspirit::proto::Index &message) noexcept -> outcome::result<diff_t> {
     auto folder = cluster.get_folders().by_id(message.folder());
     if (!folder) {
         return make_error_code(error_code_t::folder_does_not_exist);
@@ -151,7 +152,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
     auto prev_sequence = fi->get_max_sequence();
     files.reserve(static_cast<size_t>(message.files_size()));
     for (int i = 0; i < message.files_size(); ++i) {
-        auto &f = message.files(i);
+        auto f = message.files(i);
         if (f.deleted() && f.blocks_size()) {
             LOG_WARN(log, "file {} should not have blocks", f.name());
             return make_error_code(error_code_t::unexpected_blocks);
@@ -167,16 +168,16 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
             return make_error_code(error_code_t::invalid_sequence);
         }
         for (int j = 0; j < f.blocks_size(); ++j) {
-            auto &b = f.blocks(j);
+            auto b = f.blocks(j);
             auto strict_hash = block_info_t::make_strict_hash(b.hash());
-            if (!blocks.get(strict_hash.get_hash())) {
-                new_blocks.emplace_back(std::move(b));
+            if (!blocks.by_hash(strict_hash.get_hash())) {
+                new_blocks.emplace_back(b.clone());
             }
         }
         if (!f.version().counters_size()) {
             return make_error_code(error_code_t::missing_version);
         }
-        files.emplace_back(std::move(message.files(i)));
+        files.emplace_back(f.clone());
     }
 
     return construct(sequencer, fi, device_id, std::move(files), std::move(new_blocks));
@@ -184,10 +185,5 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
 
 auto update_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, const model::device_t &source,
                              const proto::Index &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
-    return instantiate(cluster, sequencer, source, message);
-}
-
-auto update_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, const model::device_t &source,
-                             const proto::IndexUpdate &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
     return instantiate(cluster, sequencer, source, message);
 }

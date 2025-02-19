@@ -9,7 +9,7 @@
 using namespace syncspirit::model::diff::advance;
 
 remote_win_t::remote_win_t(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_file_,
-                           std::string_view folder_id_, std::string_view peer_id_) noexcept
+                           std::string_view folder_id_, utils::bytes_view_t peer_id_) noexcept
     : advance_t(folder_id_, peer_id_, advance_action_t::resolve_remote_win) {
     auto &self = *cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "finish_file.h"
 
@@ -16,7 +16,8 @@ finish_file_t::finish_file_t(const model::file_info_t &file) noexcept {
     auto &device_id = fi->get_device()->device_id();
     folder_id = folder->get_id();
     file_name = file.get_name();
-    peer_id = device_id.get_sha256();
+    auto sha256 = device_id.get_sha256();
+    peer_id = {sha256.begin(), sha256.end()};
     assert(device_id != folder->get_cluster()->get_device()->device_id());
     action = resolve(file);
     assert(action != advance_action_t::ignore);

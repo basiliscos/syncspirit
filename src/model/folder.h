@@ -13,7 +13,7 @@
 #include "misc/uuid.h"
 #include "folder_data.h"
 #include "syncspirit-export.h"
-#include "bep.pb.h"
+#include "proto/proto-fwd.hpp"
 
 namespace syncspirit::model {
 
@@ -28,7 +28,7 @@ struct folder_t;
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
 struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
-    static outcome::result<folder_ptr_t> create(std::string_view key, const db::Folder &folder) noexcept;
+    static outcome::result<folder_ptr_t> create(bytes_view_t key, const db::Folder &folder) noexcept;
     static outcome::result<folder_ptr_t> create(const bu::uuid &uuid, const db::Folder &folder) noexcept;
 
     using folder_data_t::assign_fields;

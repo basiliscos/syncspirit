@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -7,7 +7,7 @@
 #include "model/file_info.h"
 #include "model/misc/sequencer.h"
 #include "model/misc/resolver.h"
-#include "bep.pb.h"
+#include "proto/proto-fwd.hpp"
 
 namespace syncspirit::model::diff::advance {
 
@@ -20,13 +20,13 @@ struct SYNCSPIRIT_API advance_t : cluster_diff_t {
     proto::FileInfo proto_source;
     proto::FileInfo proto_local;
     std::string folder_id;
-    std::string peer_id;
+    utils::bytes_t peer_id;
     bu::uuid uuid;
     advance_action_t action;
     bool disable_blocks_removal;
 
   protected:
-    advance_t(std::string_view folder_id, std::string_view peer_id, advance_action_t action,
+    advance_t(std::string_view folder_id, utils::bytes_view_t peer_id, advance_action_t action,
               bool disable_blocks_removal = false) noexcept;
     void initialize(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_source,
                     std::string_view local_file_name) noexcept;

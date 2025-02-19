@@ -21,11 +21,10 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &local_files = local_folder_info->get_file_infos();
     auto name = proto_file_.name();
     auto local_file = local_files.by_name(name);
-    proto_file_.set_modified_by(self.device_id().get_uint());
+    proto_file_.modified_by(self.device_id().get_uint());
 
     initialize(cluster, sequencer, std::move(proto_file_), name);
 
-    auto &proto_version = *proto_local.mutable_version();
     auto version = version_ptr_t();
     if (local_file) {
         version = local_file->get_version();
@@ -33,6 +32,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     } else {
         version.reset(new version_t(device));
     }
+    auto proto_version = proto_local.mutable_version();
     version->to_proto(proto_version);
 }
 

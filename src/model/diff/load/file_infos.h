@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include "common.h"
-#include "structs.pb.h"
+#include "proto/proto-structs.h"
 
 namespace syncspirit::model::diff::load {
 

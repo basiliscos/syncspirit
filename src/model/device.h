@@ -9,9 +9,10 @@
 #include "device_id.h"
 #include "remote_folder_info.h"
 #include "utils/uri.h"
+#include "utils/bytes.h"
 #include "syncspirit-export.h"
-#include "bep.pb.h"
-#include "structs.pb.h"
+#include "proto/proto-fwd.hpp"
+#include "proto/proto-fwd.hpp"
 #include <boost/asio.hpp>
 #include <boost/outcome.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -26,6 +27,7 @@ struct file_iterator_t;
 struct cluster_t;
 using device_ptr_t = intrusive_ptr_t<device_t>;
 using file_iterator_ptr_t = intrusive_ptr_t<file_iterator_t>;
+using bytes_view_t = std::span<const unsigned char>;
 
 enum class device_state_t { offline, discovering, connecting, online };
 
@@ -34,17 +36,17 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     using name_option_t = std::optional<std::string>;
     using tcp = boost::asio::ip::tcp;
 
-    static outcome::result<device_ptr_t> create(std::string_view key, const db::Device &data) noexcept;
+    static outcome::result<device_ptr_t> create(utils::bytes_view_t key, const db::Device &data) noexcept;
     static outcome::result<device_ptr_t> create(const device_id_t &device_id, std::string_view name,
                                                 std::string_view cert_name = "") noexcept;
     virtual ~device_t();
 
-    virtual std::string_view get_key() const noexcept;
+    virtual bytes_view_t get_key() const noexcept;
     bool operator==(const device_t &other) const noexcept { return other.id == id; }
     bool operator!=(const device_t &other) const noexcept { return other.id != id; }
 
-    std::string serialize(db::Device &device) const noexcept;
-    std::string serialize() const noexcept;
+    utils::bytes_t serialize(db::Device &device) const noexcept;
+    utils::bytes_t serialize() const noexcept;
     inline bool is_dynamic() const noexcept { return static_uris.empty(); }
     inline device_state_t get_state() const noexcept { return state; }
     void update_state(device_state_t new_state, std::string_view connection_id) noexcept;
@@ -107,11 +109,12 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
 struct SYNCSPIRIT_API local_device_t final : device_t {
   public:
     local_device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept;
-    std::string_view get_key() const noexcept override;
+    bytes_view_t get_key() const noexcept override;
 };
 
 struct SYNCSPIRIT_API devices_map_t : public generic_map_t<device_ptr_t, 2> {
-    device_ptr_t by_sha256(std::string_view device_id) const noexcept;
+    device_ptr_t by_sha256(utils::bytes_view_t device_id) const noexcept;
+    device_ptr_t by_sha256(const utils::bytes_t& device_id) const noexcept;
 };
 
 } // namespace syncspirit::model

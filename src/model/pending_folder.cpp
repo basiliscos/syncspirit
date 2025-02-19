@@ -6,7 +6,7 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(syncspirit::db::prefix::pending_folder);
 
-outcome::result<pending_folder_ptr_t> pending_folder_t::create(std::string_view key,
+outcome::result<pending_folder_ptr_t> pending_folder_t::create(utils::bytes_view_t key,
                                                                const db::PendingFolder &data) noexcept {
     if (key.size() != data_length) {
         return make_error_code(error_code_t::invalid_pending_folder_length);
@@ -76,7 +76,7 @@ template <> SYNCSPIRIT_API std::string_view get_index<1>(const pending_folder_pt
     return item->get_id();
 }
 
-pending_folder_ptr_t pending_folder_map_t::by_key(std::string_view key) const noexcept { return get<0>(key); }
+pending_folder_ptr_t pending_folder_map_t::by_key(utils::bytes_view_t key) const noexcept { return get<0>(key); }
 
 pending_folder_ptr_t pending_folder_map_t::by_id(std::string_view id) const noexcept { return get<1>(id); }
 

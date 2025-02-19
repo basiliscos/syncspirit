@@ -15,7 +15,7 @@
 #include "misc/uuid.h"
 #include "block_info.h"
 #include "version.h"
-#include "structs.pb.h"
+#include "proto/proto-fwd.hpp"
 #include "syncspirit-export.h"
 
 namespace syncspirit::model {
@@ -68,11 +68,11 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
                                                    const folder_info_ptr_t &folder_info_) noexcept;
     static std::string create_key(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
 
-    static decomposed_key_t decompose_key(std::string_view key);
+    static decomposed_key_t decompose_key(utils::bytes_view_t key);
 
     ~file_info_t();
 
-    std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
+    utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
     std::string_view get_uuid() const noexcept;
     bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
 
@@ -169,7 +169,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void remove_block(block_info_ptr_t &block) noexcept;
 
-    char key[data_length];
+    unsigned char key[data_length];
     std::string name;
     folder_info_t *folder_info;
     proto::FileInfoType type;

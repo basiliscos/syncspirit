@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "folder_data.h"
-#include "structs.pb.h"
+#include "proto/proto-fwd.hpp"
 
 #include <boost/nowide/convert.hpp>
 

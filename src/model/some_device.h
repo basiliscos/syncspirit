@@ -10,8 +10,7 @@
 
 #include "device_id.h"
 #include "syncspirit-export.h"
-#include "structs.pb.h"
-#include "utils/time.h"
+#include "proto/proto-fwd.hpp"
 
 #include <boost/outcome.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -62,7 +61,10 @@ struct SYNCSPIRIT_API some_device_t final : some_device_base_t, augmentable_t<so
 
     struct SYNCSPIRIT_API map_t : public generic_map_t<ptr_t, 1> {
         using parent_t = generic_map_t<ptr_t, 1>;
-        ptr_t by_sha256(std::string_view value) const noexcept { return this->template get<0>(value); }
+        ptr_t by_sha256(utils::bytes_view_t value) const noexcept {
+            auto ptr = (const char*)value.data();
+            return this->template get<0>(std::string_view(ptr, value.size()));
+        }
     };
 
   private:

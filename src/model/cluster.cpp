@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "cluster.h"
 #include <spdlog/spdlog.h>
@@ -16,7 +16,7 @@ proto::ClusterConfig cluster_t::generate(const device_t &target) const noexcept 
         auto &folder = it.item;
         auto folder_opt = folder->generate(target);
         if (folder_opt) {
-            *(r.add_folders()) = folder_opt.value();
+            r.add_folder(std::move(folder_opt).value());
         }
     }
     return r;

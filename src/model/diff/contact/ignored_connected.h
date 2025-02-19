@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #pragma once
 
 #include "../cluster_diff.h"
-#include "model/ignored_device.h"
+#include "model/device_id.h"
+#include "proto/proto-structs.h"
 
 namespace syncspirit::model::diff::contact {
 

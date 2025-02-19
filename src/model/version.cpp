@@ -70,7 +70,7 @@ void version_t::update(const device_t &device) noexcept {
     counter->set_value(v);
 }
 
-auto version_t::get_best() noexcept -> proto::Counter & {
+auto version_t::get_best() noexcept -> proto::view::Counter & {
     assert(best_index != undef);
     return counters[best_index];
 }

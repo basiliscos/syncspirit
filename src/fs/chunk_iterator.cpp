@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
 
 #include "chunk_iterator.h"
+#include <algorithm>
 
 using namespace syncspirit::fs;
 
@@ -37,9 +38,11 @@ auto chunk_iterator_t::read() noexcept -> outcome::result<details::chunk_t> {
 
 void chunk_iterator_t::ack_hashing() noexcept { --unhashed_blocks; }
 
-void chunk_iterator_t::ack_block(std::string_view digest, size_t block_index) noexcept {
+void chunk_iterator_t::ack_block(bytes_view_t digest, size_t block_index) noexcept {
     auto &orig_block = peer_file->get_blocks().at(block_index);
-    if (orig_block->get_hash() != digest) {
+    auto h = orig_block->get_hash();
+    bool eq = std::equal(h.begin(), h.end(), digest.begin(), digest.end());
+    if (!eq) {
         return;
     }
     valid_blocks_map[block_index] = true;

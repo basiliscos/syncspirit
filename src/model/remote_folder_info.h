@@ -5,7 +5,7 @@
 
 #include <cstdint>
 #include "syncspirit-export.h"
-#include "bep.pb.h"
+#include "proto/proto-fwd.hpp"
 #include <boost/outcome.hpp>
 #include "misc/augmentation.hpp"
 #include "misc/map.hpp"

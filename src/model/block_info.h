@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <vector>
 #include "misc/arc.hpp"
 #include "misc/map.hpp"
 #include "misc/file_block.h"
-#include "bep.pb.h"
-#include "structs.pb.h"
+#include "proto/proto-fwd.hpp"
+#include "utils/bytes.h"
 #include "syncspirit-export.h"
 #include <boost/outcome.hpp>
+#include <cstdint>
 
 namespace syncspirit::model {
 
@@ -30,18 +28,18 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
     static const constexpr size_t data_length = digest_length + 1;
 
     struct strict_hash_t {
-        char data[data_length];
-        std::string_view get_hash() noexcept;
-        std::string_view get_key() noexcept;
+        unsigned char data[data_length];
+        utils::bytes_view_t get_hash() noexcept;
+        utils::bytes_view_t get_key() noexcept;
     };
 
-    static strict_hash_t make_strict_hash(std::string_view hash) noexcept;
+    static strict_hash_t make_strict_hash(utils::bytes_view_t hash) noexcept;
 
-    static outcome::result<block_info_ptr_t> create(std::string_view key, const db::BlockInfo &data) noexcept;
+    static outcome::result<block_info_ptr_t> create(utils::bytes_view_t key, const db::BlockInfo &data) noexcept;
     static outcome::result<block_info_ptr_t> create(const proto::BlockInfo &block) noexcept;
 
-    inline std::string_view get_hash() const noexcept { return std::string_view(hash + 1, digest_length); }
-    inline std::string_view get_key() const noexcept { return std::string_view(hash, data_length); }
+    inline utils::bytes_view_t get_hash() const noexcept { return utils::bytes_view_t(hash + 1, digest_length); }
+    inline utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(hash); }
     inline std::uint32_t get_weak_hash() const noexcept { return weak_hash; }
     inline std::uint32_t get_size() const noexcept { return size; }
     inline size_t usages() const noexcept { return file_blocks.size(); }
@@ -49,7 +47,7 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
     inline const file_blocks_t &get_file_blocks() const { return file_blocks; }
 
     proto::BlockInfo as_bep(size_t offset) const noexcept;
-    std::string serialize() const noexcept;
+    utils::bytes_t serialize() const noexcept;
 
     void link(file_info_t *file_info, size_t block_index) noexcept;
     removed_incides_t unlink(file_info_t *file_info) noexcept;
@@ -61,21 +59,29 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
     void lock() noexcept;
     void unlock() noexcept;
 
-    inline bool operator==(const block_info_t &right) const noexcept { return get_hash() == right.get_hash(); }
-    inline bool operator!=(const block_info_t &right) const noexcept { return !(get_hash() == right.get_hash()); }
+    inline bool operator==(const block_info_t &right) const noexcept {
+        auto lh = get_hash();
+        auto rh = right.get_hash();
+        return std::equal(lh.begin(), lh.end(), rh.begin(), rh.end());
+    }
+    inline bool operator!=(const block_info_t &right) const noexcept {
+        return !(*this == right);
+    }
 
   private:
     template <typename T> void assign(const T &item) noexcept;
-    block_info_t(std::string_view key) noexcept;
+    block_info_t(utils::bytes_view_t key) noexcept;
     block_info_t(const proto::BlockInfo &block) noexcept;
 
-    char hash[data_length];
+    unsigned char hash[data_length];
     std::uint32_t weak_hash = 0;
     std::int32_t size = 0;
     file_blocks_t file_blocks;
     std::uint32_t locked = 0;
 };
 
-using block_infos_map_t = generic_map_t<block_info_ptr_t, 1>;
+struct SYNCSPIRIT_API block_infos_map_t: generic_map_t<block_info_ptr_t, 1> {
+    block_info_ptr_t by_hash(utils::bytes_view_t view) const noexcept;
+};
 
 } // namespace syncspirit::model

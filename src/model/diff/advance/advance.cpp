@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "advance.h"
 #include "remote_copy.h"
@@ -11,6 +11,7 @@
 
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff::advance;
+using namespace pp;
 
 static std::string_view stringify(advance_action_t action) {
     if (action == advance_action_t::remote_copy) {
@@ -40,14 +41,16 @@ auto advance_t::create(advance_action_t action, const model::file_info_t &source
     }
 }
 
-advance_t::advance_t(std::string_view folder_id_, std::string_view peer_id_, advance_action_t action_,
+advance_t::advance_t(std::string_view folder_id_, utils::bytes_view_t peer_id_, advance_action_t action_,
                      bool disable_blocks_removal_) noexcept
-    : folder_id{folder_id_}, peer_id{peer_id_}, action{action_}, disable_blocks_removal{disable_blocks_removal_} {}
+    : folder_id{folder_id_}, action{action_}, disable_blocks_removal{disable_blocks_removal_} {
+    peer_id = utils::bytes_t(peer_id_.begin(), peer_id_.end());
+}
 
 void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_source_,
                            std::string_view local_file_name_) noexcept {
     proto_source = std::move(proto_source_);
-    assert(!(proto_source.blocks_size() && proto_source.deleted()));
+    assert(!(proto_source.block_size() && proto_source.deleted()));
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_id = folder->get_id();
     auto &self = *cluster.get_device();
@@ -60,8 +63,8 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
 
     auto orphans = orphaned_blocks_t::set_t();
     proto_local = proto_source;
-    proto_local.set_sequence(0);
-    proto_local.set_name(std::string(local_file_name_));
+    proto_local.sequence(0);
+    proto_local.name(local_file_name_);
 
     if (!local_file) {
         uuid = sequencer.next_uuid();
@@ -75,12 +78,14 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     auto new_blocks = modify::add_blocks_t::blocks_t{};
     auto &blocks_map = cluster.get_blocks();
     if (proto_local.size()) {
-        for (int i = 0; i < proto_local.blocks_size(); ++i) {
-            auto &b = proto_local.blocks(i);
-            auto strict_hash = block_info_t::make_strict_hash(b.hash());
-            auto block = blocks_map.get(strict_hash.get_hash());
+        auto blocks_size = proto_local.blocks_size();
+        for (int i = 0; i < blocks_size; ++i) {
+            auto block_view = proto_local.blocks(i);
+            auto h = block_view.hash();
+            auto strict_hash = block_info_t::make_strict_hash(h);
+            auto block = blocks_map.by_hash(strict_hash.get_hash());
             if (!block) {
-                new_blocks.push_back(b);
+                new_blocks.push_back(block_view.clone());
             } else {
                 auto it = orphans.find(strict_hash.get_key());
                 if (it != orphans.end()) {
@@ -135,9 +140,10 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
     if (proto_local.size()) {
         auto &blocks_map = cluster.get_blocks();
         for (int i = 0; i < proto_local.blocks_size(); ++i) {
-            auto &block = proto_local.blocks(i);
-            auto strict_hash = block_info_t::make_strict_hash(block.hash());
-            auto block_info = blocks_map.get(strict_hash.get_hash());
+            auto block = proto_local.blocks(i);
+            auto hash = block.hash();
+            auto strict_hash = block_info_t::make_strict_hash(hash);
+            auto block_info = blocks_map.by_hash(strict_hash.get_hash());
             assert(block_info);
             local_file->assign_block(block_info, i);
             local_file->mark_local_available(i);

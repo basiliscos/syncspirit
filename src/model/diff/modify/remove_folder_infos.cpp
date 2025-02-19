@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "remove_folder_infos.h"
 #include "reset_folder_infos.h"
@@ -14,9 +14,10 @@ remove_folder_infos_t::remove_folder_infos_t(const folder_infos_map_t &map, orph
     auto keys = unique_keys_t();
     for (auto &it : map) {
         auto &folder_info = *it.item;
-        keys.emplace(folder_info.get_key());
+        auto key = folder_info.get_key();
+        keys.emplace(utils::bytes_t(key.data(), key.data() + key.size()));
     }
-    std::copy(keys.begin(), keys.end(), std::back_inserter(this->keys));
+    std::move(keys.begin(), keys.end(), std::back_inserter(this->keys));
     assign_child(new reset_folder_infos_t(map, orphaned_blocks_));
     LOG_DEBUG(log, "remove_folder_infos_t, count = {}", map.size());
 }

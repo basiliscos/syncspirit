@@ -28,12 +28,13 @@ find_package(
     REQUIRED
 )
 find_package(OpenSSL REQUIRED)
-find_package(Protobuf REQUIRED)
+find_package(protopuf REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(rotor COMPONENTS asio thread REQUIRED)
 find_package(lz4 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(protopuf REQUIRED)
 find_package(pugixml REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
@@ -82,13 +83,6 @@ function(install_executable target)
 endfunction()
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
-set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src/protobuf)
-protobuf_generate_cpp(
-    PROTO_SRCS PROTO_HDRS
-    EXPORT_MACRO SYNCSPIRIT_API
-    src/protobuf/bep.proto
-    src/protobuf/structs.proto
-)
 add_library(syncspirit_core SHARED
     ${PROTO_SRCS}
     src/constants.cpp
@@ -221,6 +215,8 @@ add_library(syncspirit_core SHARED
     src/proto/bep_support.cpp
     src/proto/discovery_support.cpp
     src/proto/luhn32.cpp
+    src/proto/proto-bep.cpp
+    src/proto/proto-structs.cpp
     src/proto/relay_support.cpp
     src/proto/upnp_support.cpp
     src/transport/stream.cpp
@@ -237,6 +233,7 @@ add_library(syncspirit_core SHARED
     src/utils/time.cpp
     src/utils/tls.cpp
     src/utils/uri.cpp
+    src/proto/proto-impl.h
 )
 generate_export_header(syncspirit_core
     EXPORT_MACRO_NAME SYNCSPIRIT_API
@@ -279,7 +276,6 @@ FetchContent_Declare(C_ARES
 FetchContent_MakeAvailable(C_ARES)
 
 target_include_directories(syncspirit_core PUBLIC
-    ${Protobuf_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}/include
@@ -288,7 +284,7 @@ target_include_directories(syncspirit_core PUBLIC
 
 target_link_libraries(syncspirit_core
     PUBLIC
-        protobuf::libprotobuf
+        protopuf::protopuf
         rotor::asio
         rotor::thread
         pugixml::pugixml

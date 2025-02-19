@@ -53,7 +53,7 @@ SYNCSPIRIT_API outcome::result<std::string> as_serialized_der(X509 *cert) noexce
 
 SYNCSPIRIT_API outcome::result<std::string> get_common_name(X509 *cert) noexcept;
 
-SYNCSPIRIT_API void digest(const char *src, size_t length, char *storage) noexcept;
+SYNCSPIRIT_API void digest(const unsigned char *src, size_t length, unsigned char *storage) noexcept;
 
 } // namespace utils
 } // namespace syncspirit

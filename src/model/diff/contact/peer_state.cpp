@@ -8,7 +8,7 @@
 
 using namespace syncspirit::model::diff::contact;
 
-auto peer_state_t::create(cluster_t &cluster, std::string_view peer_id_, const r::address_ptr_t &peer_addr_,
+auto peer_state_t::create(cluster_t &cluster, utils::bytes_view_t peer_id_, const r::address_ptr_t &peer_addr_,
                           model::device_state_t state, std::string connection_id_, std::string cert_name_,
                           tcp::endpoint endpoint_, std::string_view client_name_,
                           std::string_view client_version_) noexcept -> cluster_diff_ptr_t {
@@ -24,13 +24,14 @@ auto peer_state_t::create(cluster_t &cluster, std::string_view peer_id_, const r
     return diff;
 }
 
-peer_state_t::peer_state_t(cluster_t &cluster, std::string_view peer_id_, const r::address_ptr_t &peer_addr_,
+peer_state_t::peer_state_t(cluster_t &cluster, utils::bytes_view_t peer_id_, const r::address_ptr_t &peer_addr_,
                            model::device_state_t state_, std::string connection_id_, std::string cert_name_,
                            tcp::endpoint endpoint_, std::string_view client_name_,
                            std::string_view client_version_) noexcept
-    : peer_id{peer_id_}, peer_addr{peer_addr_}, cert_name{cert_name_}, endpoint{endpoint_}, client_name{client_name_},
+    : peer_addr{peer_addr_}, cert_name{cert_name_}, endpoint{endpoint_}, client_name{client_name_},
       client_version{client_version_}, state{state_}, connection_id{connection_id_}, has_been_online{false} {
-    auto peer = cluster.get_devices().by_sha256(peer_id);
+    peer_id = {peer_id_.begin(), peer_id_.end()};
+    auto peer = cluster.get_devices().by_sha256(peer_id_);
     assert(peer);
     has_been_online = (state == device_state_t::offline) && (peer->get_state() == device_state_t::online);
     LOG_DEBUG(log, "peer_state_t ({}), device = {}, cert = {}, client ({})", (int)state, peer->device_id().get_short(),

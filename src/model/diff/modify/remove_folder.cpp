@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "remove_folder.h"
 #include "unshare_folder.h"
@@ -36,17 +36,23 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
             auto db = db::PendingFolder();
             auto db_fi = db.mutable_folder_info();
             auto db_f = db.mutable_folder();
-            db_fi->set_index_id(fi.get_index());
-            db_fi->set_max_sequence(fi.get_max_sequence());
-            db_f->set_id(std::string(folder.get_id()));
-            db_f->set_label(std::string(folder.get_label()));
-            db_f->set_read_only(folder.is_read_only());
-            db_f->set_ignore_permissions(folder.are_permissions_ignored());
-            db_f->set_ignore_delete(folder.is_deletion_ignored());
-            db_f->set_disable_temp_indexes(folder.are_temp_indixes_disabled());
-            db_f->set_paused(folder.is_paused());
+            db_fi.index_id(fi.get_index());
+            db_fi.max_sequence(fi.get_max_sequence());
+            db_f.id(folder.get_id());
+            db_f.label(folder.get_label());
+            db_f.read_only(folder.is_read_only());
+            db_f.ignore_permissions(folder.are_permissions_ignored());
+            db_f.ignore_delete(folder.is_deletion_ignored());
+            db_f.disable_temp_indexes(folder.are_temp_indixes_disabled());
+            db_f.paused(folder.is_paused());
+            db_f.scheduled(folder.is_scheduled());
+            db_f.path(folder.get_path().string());
+            db_f.folder_type(folder.get_folder_type());
+            db_f.pull_order(folder.get_pull_order());
 
-            auto item = add_pending_folders_t::item_t{std::move(db), std::string(d->device_id().get_sha256()),
+            auto sha256 = d->device_id().get_sha256();
+            auto peer_id = utils::bytes_t{sha256.begin(), sha256.end()};
+            auto item = add_pending_folders_t::item_t{std::move(db), std::move(peer_id),
                                                       sequencer.next_uuid()};
             pending_folders.emplace_back(std::move(item));
         }

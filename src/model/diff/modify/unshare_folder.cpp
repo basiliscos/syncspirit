@@ -16,7 +16,8 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &, model::folder_info_
               folder_info.get_device()->device_id());
 
     auto &peer = *folder_info.get_device();
-    peer_id = peer.device_id().get_sha256();
+    auto sha256 = peer.device_id().get_sha256();
+    peer_id = {sha256.begin(), sha256.end()};
     auto local_orphaned_blocks = orphaned_blocks_t();
     auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
 

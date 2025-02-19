@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "new_chunk_iterator.h"
 #include "utils.h"
@@ -10,9 +10,11 @@ using namespace syncspirit::fs;
 new_chunk_iterator_t::new_chunk_iterator_t(scan_task_ptr_t task_, proto::FileInfo metadata_,
                                            file_ptr_t backend_) noexcept
     : task{std::move(task_)}, metadata{std::move(metadata_)}, backend{std::move(backend_)}, next_idx{0}, offset{0} {
+    using namespace pp;
     if (metadata.type() == proto::FileInfoType::FILE) {
         file_size = metadata.size();
-        auto div = syncspirit::fs::get_block_size(file_size, metadata.block_size());
+        auto block_size = metadata.block_size();
+        auto div = syncspirit::fs::get_block_size(file_size, block_size);
         unread_blocks = div.count;
         block_size = div.size;
         unread_bytes = file_size;
@@ -48,10 +50,10 @@ auto new_chunk_iterator_t::read() noexcept -> outcome::result<details::chunk_t> 
 
 bool new_chunk_iterator_t::has_more_chunks() const noexcept { return unread_bytes > 0; }
 
-void new_chunk_iterator_t::ack(size_t block_index, uint32_t weak, std::string_view hash, int32_t block_size) noexcept {
+void new_chunk_iterator_t::ack(size_t block_index, uint32_t weak, utils::bytes_t hash, int32_t block_size) noexcept {
     assert(block_index < hashes.size());
     assert(unfinished.count(block_index));
     assert(!hash.empty());
-    hashes[block_index] = block_hash_t{std::string(hash), weak, block_size};
+    hashes[block_index] = block_hash_t{hash, weak, block_size};
     unfinished.erase(block_index);
 }

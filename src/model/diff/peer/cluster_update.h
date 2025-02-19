@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -23,7 +23,7 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     cluster_update_t(const cluster_t &cluster, sequencer_t &sequencer, const model::device_t &source,
                      const message_t &message) noexcept;
 
-    std::string peer_id;
+    utils::bytes_t peer_id;
 };
 
 } // namespace syncspirit::model::diff::peer

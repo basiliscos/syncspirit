@@ -3,12 +3,12 @@
 
 #pragma once
 
-#include <string>
 #include <filesystem>
 #include <memory>
 #include <boost/outcome.hpp>
 #include "model/file_info.h"
 #include "utils/io.h"
+#include "utils/bytes.h"
 #include "syncspirit-export.h"
 
 namespace syncspirit::fs {
@@ -17,8 +17,9 @@ namespace outcome = boost::outcome_v2;
 namespace bfs = std::filesystem;
 
 namespace details {
+
 struct chunk_t {
-    std::string data;
+    utils::bytes_t data;
     size_t block_index;
 };
 } // namespace details
@@ -36,9 +37,9 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
 
     outcome::result<void> close(bool remove_temporal, const bfs::path &local_name = {}) noexcept;
     outcome::result<void> remove() noexcept;
-    outcome::result<void> write(size_t offset, std::string_view data) noexcept;
+    outcome::result<void> write(size_t offset, utils::bytes_view_t data) noexcept;
     outcome::result<void> copy(size_t my_offset, const file_t &from, size_t source_offset, size_t size) noexcept;
-    outcome::result<std::string> read(size_t offset, size_t size) const noexcept;
+    outcome::result<utils::bytes_t> read(size_t offset, size_t size) const noexcept;
 
     static outcome::result<file_t> open_write(model::file_info_ptr_t model) noexcept;
     static outcome::result<file_t> open_read(const bfs::path &path) noexcept;

@@ -35,14 +35,18 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
 
 share_folder_t::share_folder_t(const bu::uuid &uuid, const model::device_t &peer, std::string_view folder_id_,
                                std::uint64_t index_id, model::pending_folder_ptr_t pf) noexcept
-    : peer_id(peer.device_id().get_sha256()), folder_id{folder_id_} {
+    : folder_id{folder_id_} {
+    auto sha256 = peer.device_id().get_sha256();
+    peer_id = {sha256.begin(), sha256.end()};
     LOG_DEBUG(log, "share_folder_t, with peer = {}, folder_id = {}", peer.device_id(), folder_id);
     auto current = assign_child(new upsert_folder_info_t(uuid, peer_id, folder_id, index_id));
     if (pf) {
         using container_t = typename add_remote_folder_infos_t::container_t;
         using item_t = typename container_t::value_type;
         auto keys = remove_pending_folders_t::keys_t{};
-        keys.emplace_back(std::string{pf->get_key()});
+        auto key = pf->get_key();
+        auto bytes = utils::bytes_t(key.begin(), key.end());
+        keys.emplace_back(std::move(bytes));
         auto diff = cluster_diff_ptr_t{};
         current = current->assign_sibling(new remove_pending_folders_t(std::move(keys)));
 

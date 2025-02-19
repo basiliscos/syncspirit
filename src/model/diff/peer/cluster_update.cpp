@@ -12,14 +12,17 @@
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
 #include "model/misc/orphaned_blocks.h"
+#include "proto/proto-bep.h"
+#include "proto/proto-structs.h"
 #include "utils/format.hpp"
-#include "utils/string_comparator.hpp"
 #include <spdlog/fmt/bin_to_hex.h>
 #include <spdlog/spdlog.h>
 
+using namespace syncspirit;
 using namespace syncspirit::model::diff::peer;
 
-using keys_t = std::set<std::string, syncspirit::utils::string_comparator_t>;
+using keys_t = syncspirit::model::diff::modify::generic_remove_t::unique_keys_t;
+using keys_view_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
 
 auto cluster_update_t::create(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
                               const message_t &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
@@ -28,7 +31,9 @@ auto cluster_update_t::create(const cluster_t &cluster, sequencer_t &sequencer, 
 
 cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
                                    const message_t &message) noexcept
-    : peer_id(source.device_id().get_sha256()) {
+    {
+    auto sha256 = source.device_id().get_sha256();
+    peer_id = {sha256.begin(), sha256.end()};
     LOG_DEBUG(log, "cluster_update_t, source = {}", source.device_id().get_short());
 
     auto &known_pending_folders = cluster.get_pending_folders();
@@ -39,50 +44,53 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     folder_infos_map_t reshared_folders;
     keys_t removed_pending_folders;
     keys_t confirmed_pending_folders;
-    keys_t confirmed_folders;
+    keys_view_t confirmed_folders;
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
     auto orphaned_blocks = orphaned_blocks_t{};
     auto folder_update_diff = diff::cluster_diff_ptr_t{};
     auto folder_update = (diff::cluster_diff_t *){nullptr};
 
-    auto add_pending = [&](const proto::Folder &f, const proto::Device &d) noexcept {
+    auto add_pending = [&](const proto::view::Folder& f, const proto::view::Device& d) noexcept {
         using item_t = decltype(new_pending_folders)::value_type;
         LOG_TRACE(log, "cluster_update_t, (add/update) pending folder = {}", f.label());
         db::PendingFolder db;
         auto fi = db.mutable_folder_info();
         auto db_f = db.mutable_folder();
-        fi->set_index_id(d.index_id());
-        fi->set_max_sequence(d.max_sequence());
-        db_f->set_id(f.id());
-        db_f->set_label(f.label());
-        db_f->set_read_only(f.read_only());
-        db_f->set_ignore_permissions(f.ignore_permissions());
-        db_f->set_ignore_delete(f.ignore_delete());
-        db_f->set_disable_temp_indexes(f.disable_temp_indexes());
-        db_f->set_paused(f.paused());
+        fi.index_id(d.index_id());
+        fi.max_sequence(d.max_sequence());
+        db_f.id(f.id());
+        db_f.label(f.label());
+        db_f.read_only(f.read_only());
+        db_f.ignore_permissions(f.ignore_permissions());
+        db_f.ignore_delete(f.ignore_delete());
+        db_f.disable_temp_indexes(f.disable_temp_indexes());
+        db_f.paused(f.paused());
 
-        auto id = std::string(source.device_id().get_sha256());
+        auto sha256 = source.device_id().get_sha256();
+        auto id = utils::bytes_t(sha256.begin(), sha256.end());
         new_pending_folders.push_back(item_t{std::move(db), std::move(id), sequencer.next_uuid()});
     };
 
     for (int i = 0; i < message.folders_size(); ++i) {
-        auto &f = message.folders(i);
-        auto &folder_id = f.id();
+        auto f = message.folders(i);
+        auto folder_id = f.id();
         auto folder = folders.by_id(folder_id);
         LOG_TRACE(log, "cluster_update_t, folder label = '{}', id = '{}'", f.label(), folder_id);
         if (!folder) {
             for (int i = 0; i < f.devices_size(); ++i) {
-                auto &d = f.devices(i);
+                auto d = f.devices(i);
                 if (d.id() == source.device_id().get_sha256()) {
                     for (auto &it : known_pending_folders) {
                         auto &uf = it.item;
                         auto match = uf->device_id() == source.device_id() && uf->get_id() == f.id();
                         if (match) {
-                            confirmed_pending_folders.emplace(std::string(uf->get_key()));
+                            auto key = uf->get_key();
+                            auto uf_key = utils::bytes_t(key.begin(), key.end());
+                            confirmed_pending_folders.emplace(uf_key);
                             bool actual = uf->get_index() == d.index_id() && uf->get_max_sequence() == d.max_sequence();
                             if (!actual) {
-                                removed_pending_folders.emplace(std::string(uf->get_key()));
+                                removed_pending_folders.emplace(std::move(uf_key));
                                 add_pending(f, d);
                             }
                             goto NEXT_FOLDER;
@@ -97,7 +105,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         }
 
         for (int j = 0; j < f.devices_size(); ++j) {
-            auto &d = f.devices(j);
+            auto d = f.devices(j);
             auto device_sha = d.id();
             auto device = devices.by_sha256(device_sha);
             auto device_opt = model::device_id_t::from_sha256(device_sha);
@@ -115,7 +123,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                 continue;
             }
             if (*device != source) {
-                remote_folders.emplace_back(f.id(), d.index_id(), d.max_sequence());
+                remote_folders.emplace_back(std::string(f.id()), d.index_id(), d.max_sequence());
                 LOG_TRACE(log, "cluster_update_t, remote folder = {}, device = {}, max seq. = {}", f.label(),
                           device_id.get_short(), d.max_sequence());
                 continue;
@@ -166,7 +174,9 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             continue;
         }
         if (uf->device_id() == source.device_id()) {
-            removed_pending_folders.emplace(std::string(uf->get_key()));
+            auto key = uf->get_key();
+            auto uf_key = utils::bytes_t(key.begin(), key.end());
+            removed_pending_folders.emplace(std::move(uf_key));
         }
     }
 

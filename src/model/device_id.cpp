@@ -100,7 +100,7 @@ std::optional<device_id_t> device_id_t::from_string(std::string_view value) noex
     return result_t{};
 }
 
-std::optional<device_id_t> device_id_t::from_sha256(std::string_view sha_256) noexcept {
+std::optional<device_id_t> device_id_t::from_sha256(bytes_view_t sha_256) noexcept {
     using result_t = std::optional<device_id_t>;
     auto sha256_enc = base32::encode(sha_256);
     if (sha256_enc.size() != SHA256_B32_SIZE) {
